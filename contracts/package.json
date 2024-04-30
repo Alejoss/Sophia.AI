@@ -1,0 +1,30 @@
+{
+  "name": "sophia-ai-contracts",
+  "version": "1.0.0",
+  "description": "The smart contract for sophia-ai",
+  "main": "index.js",
+  "scripts": {
+    "test": "truffle test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alejoss/Sophia.AI.git"
+  },
+  "keywords": [
+    "sophia",
+    "ai",
+    "smart",
+    "contracts"
+  ],
+  "author": "Alejandro Veintimilla & Luis Masuelli",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Alejoss/Sophia.AI/issues"
+  },
+  "homepage": "https://github.com/Alejoss/Sophia.AI#readme",
+  "dependencies": {
+    "@chainlink/contracts": "^1.1.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@truffle/hdwallet-provider": "^2.1.15"
+  }
+}
