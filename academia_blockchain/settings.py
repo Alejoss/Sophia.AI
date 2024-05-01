@@ -144,6 +144,7 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
+
 # Logging
 LOGGING = {
     "version": 1,
@@ -152,27 +153,29 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
-            "stream": "ext://sys.stdout"
+            "stream": "ext://sys.stdout",
         },
     },
     "formatters": {
         "verbose": {
             "format": "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S"
+            "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     },
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "ERROR",  # Log only errors
+            "propagate": False,
         },
         "app_logger": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "ERROR",  # Log only errors
+            "propagate": False,
         },
         "": {  # This is the root logger
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "ERROR",  # Log only errors
         },
     },
 }
