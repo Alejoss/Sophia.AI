@@ -21,7 +21,6 @@ from django.http import HttpResponse
 
 from courses.models import Event, ConnectionPlatform, Bookmark, CertificateRequest, Certificate, Comment
 from profiles.models import ContactMethod, AcceptedCrypto, Profile
-from profiles.utils import academia_blockchain_timezones
 from courses.utils import get_event_data_request
 from star_ratings.models import Rating
 from taggit.models import Tag
@@ -113,9 +112,6 @@ def event_detail(request, event_id):
 
     logger.debug(f"contact_methods: {contact_methods}")
     logger.debug(f"preferred_cryptos: {preferred_cryptos}")
-
-    # Call blockchain timezones (details not provided)
-    academia_blockchain_timezones()
 
     # Initialize variables for additional user-related data
     event_user_timezone = None

@@ -35,37 +35,58 @@ def send_email_message(receiver_email, subject, message):
 
 
 class AcademiaUserCreationForm(UserCreationForm):
-    # Cambia el idioma del form de django como sea necesario
+    """
+    A custom form for creating new users that modifies the Django UserCreationForm to change field labels
+    and placeholders to the desired language and style.
+    """
 
     class Meta:
-        fields = ('username', 'email')
         model = User
+        fields = ('username', 'email')
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control border', 'id': 'username', 'name': 'username',
-                                               'placeholder': "Nombre de Usuario"}),
-            'email': forms.TextInput(attrs={'class': 'form-control border', 'id': 'email', 'name': 'email',
-                                            'placeholder': "Correo Electrónico"})
+            'username': forms.TextInput(attrs={
+                'class': 'form-control border',
+                'id': 'username',
+                'name': 'username',
+                'placeholder': "Nombre de Usuario"  # Placeholder text in Spanish: "Username"
+            }),
+            'email': forms.TextInput(attrs={
+                'class': 'form-control border',
+                'id': 'email',
+                'name': 'email',
+                'placeholder': "Correo Electrónico"  # Placeholder text in Spanish: "Email"
+            })
         }
 
-
 class AcademiaLoginForm(AuthenticationForm):
-    # Cambia el idioma del form de django como sea necesario
+    """
+    A custom login form that modifies the Django AuthenticationForm to adjust field labels and
+    placeholders for the desired language and style.
+    """
 
-    username = UsernameField(widget=forms.TextInput(attrs={'autofocus': True,
-                                                           'class': 'form-control border', 'id': 'username',
-                                                           'name': 'username',
-                                                           'placeholder': "Nombre de Usuario"
-                                                           }))
+    # Field for username with a custom widget for autofocus and styling
+    username = UsernameField(widget=forms.TextInput(attrs={
+        'autofocus': True,
+        'class': 'form-control border',
+        'id': 'username',
+        'name': 'username',
+        'placeholder': "Nombre de Usuario"  # Placeholder text in Spanish: "Username"
+    }))
+
+    # Field for password with a custom widget for styling and label translation
     password = forms.CharField(
-        label="Contraseña",
+        label="Contraseña",  # Label text in Spanish: "Password"
         strip=False,
-        widget=forms.PasswordInput(attrs={'autocomplete': 'current-password',
-                                          'class': 'form-control border', 'id': 'email', 'name': 'email',
-                                          'placeholder': "Contraseña"
-                                          }),
+        widget=forms.PasswordInput(attrs={
+            'autocomplete': 'current-password',
+            'class': 'form-control border',
+            'id': 'email',
+            'name': 'email',
+            'placeholder': "Contraseña"  # Placeholder text in Spanish: "Password"
+        }),
     )
 
-
+# Custom ModelForm for Profile Picture management
 class ProfilePictureForm(forms.ModelForm):
     class Meta:
         model = Profile
@@ -77,52 +98,65 @@ class ProfilePictureForm(forms.ModelForm):
 
 class AcademiaPasswordResetForm(PasswordResetForm):
     """
-    Cambia el send_mail por con la config de mailgun
+    Custom password reset form that overrides the send_mail method to integrate with the Mailgun configuration.
     """
 
     def send_mail(self, subject_template_name, email_template_name,
                   context, from_email, to_email, html_email_template_name=None):
         """
-        Send a django.core.mail.EmailMultiAlternatives to `to_email`.
+        Sends an email using a custom email sending function integrated with Mailgun.
+
+        Args:
+            subject_template_name: Template for the email subject (not used in this version).
+            email_template_name: Template for the email body.
+            context: Context data for rendering the email templates.
+            from_email: The sender's email address (not used in this version).
+            to_email: The recipient's email address.
+            html_email_template_name: Optional template for HTML email content.
         """
 
-        # subject = loader.render_to_string(subject_template_name, context)
-        # # Email subject *must not* contain newlines
-        # subject = ''.join(subject.splitlines())
+        # Render the email body template with the provided context
         body = loader.render_to_string(email_template_name, context)
-        #
-        # email_message = EmailMultiAlternatives(subject, body, from_email, [to_email])
-        # if html_email_template_name is not None:
-        #     html_email = loader.render_to_string(html_email_template_name, context)
-        #     email_message.attach_alternative(html_email, 'text/html')
-        #
-        # #
 
+        # Log that the email is being sent (for debugging purposes)
         logger.warning("EMAIL SENT")
 
+        # Send the email using the custom email sending function
         send_email_message(
             receiver_email=to_email,
-            subject="CAMBIA TU CONTRASEÑA - Academia Blockchain",
+            subject="RESET YOUR PASSWORD - Blockchain Academy",
             message=body
         )
 
-
 class AcademiaSetPasswordForm(SetPasswordForm):
+    """
+    A custom form for setting a new password that modifies the Django SetPasswordForm
+    to include translated labels and custom widget attributes for password fields.
+    """
 
+    # First new password field with a label and help text in English
     new_password1 = forms.CharField(
-        label="Nueva Contraseña",
-        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password', 'class': 'form-control'}),
+        label="New Password",
+        widget=forms.PasswordInput(attrs={
+            'autocomplete': 'new-password',
+            'class': 'form-control'
+        }),
         strip=False,
         help_text=password_validation.password_validators_help_text_html(),
     )
+
+    # Second password confirmation field
     new_password2 = forms.CharField(
-        label="Repite la Contraseña",
+        label="Confirm Password",
         strip=False,
-        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password', 'class': 'form-control'}),
+        widget=forms.PasswordInput(attrs={
+            'autocomplete': 'new-password',
+            'class': 'form-control'
+        }),
     )
 
-
 def academia_blockchain_timezones():
+    # Timezones for the user to select in profile edit form
     tz_list = []
     for tz in pytz.all_timezones:
         if tz.startswith("America"):
@@ -133,11 +167,12 @@ def academia_blockchain_timezones():
 
 
 def get_cryptos_string(profile):
+    # This logic could go on the frontend. Creates a string with the accepted cryptos of a user
     c_list = profile.cryptos_list()
     logger.info("c_list: %s" % c_list)
     cryptos_string = ""
     for c in c_list:
-        cryptos_string += (c.crypto.code + ", ")  # arma string para el frontend
+        cryptos_string += (c.crypto.code + ", ")
     if len(cryptos_string) > 2:
         cryptos_string = cryptos_string[:-2]
 
@@ -145,44 +180,84 @@ def get_cryptos_string(profile):
 
 
 def send_confirmation_email(request, user, user_email):
-    # Enviar email de confirmacion
+    """
+    Sends an account confirmation email to the newly registered user. The email includes
+    a unique token and user ID for account activation.
+
+    Args:
+        request: HttpRequest object containing metadata about the request.
+        user: The user object representing the newly registered user.
+        user_email: The email address to which the confirmation email will be sent.
+    """
+    # Generate an activation token for the user
     activation_token = PasswordResetTokenGenerator().make_token(user)
-    logger.info("activation_token: %s" % activation_token)
+    logger.info(f"activation_token: {activation_token}")
+
+    # Get the current site's domain for building activation URLs
     current_site = get_current_site(request)
+
+    # Encode the user's primary key in a URL-safe base64 format
     uid = urlsafe_base64_encode(force_bytes(user.pk))
+    logger.info(f"uid: {uid}")
 
-    logger.info("uid: %s" % uid)
-
+    # Render the email message template with the necessary context
     message = render_to_string('profiles/email_confirm_account.html', {
         'username': user.username,
         'uid': uid,
         'token': activation_token,
         'domain': current_site
     })
-    send_email_message(subject="Activa tu cuenta",
-                       message=message,
-                       receiver_email=user_email
-                       )
 
-    logger.warning("current_site: %s" % current_site)
-    logger.warning("uid: %s" % uid)
-    logger.warning("activation_token: %s" % activation_token)
+    # Send the email using the custom email sending function
+    send_email_message(
+        subject="Activate your account",  # Translated from "Activa tu cuenta"
+        message=message,
+        receiver_email=user_email
+    )
+
+    # Log information for debugging purposes
+    logger.warning(f"current_site: {current_site}")
+    logger.warning(f"uid: {uid}")
+    logger.warning(f"activation_token: {activation_token}")
 
 
 def get_user_diamonds(user, certificates=None):
+    """
+    Calculates the number of diamonds (points or rewards) a user has based on their certificates.
+    The certificates are filtered by event type to determine different categories of diamonds.
+
+    Args:
+        user: The user whose diamonds are to be calculated.
+        certificates: An optional queryset of Certificate objects to consider for calculation. If not provided,
+                      it defaults to fetching all non-deleted certificates for the user.
+
+    Returns:
+        A dictionary with the count of diamonds for each category:
+        - 'green_diamonds': Diamonds for 'EVENT' type certificates
+        - 'yellow_diamonds': Diamonds for 'LIVE_COURSE' type certificates
+        - 'magenta_diamonds': Diamonds for 'PRE_RECORDED' type certificates
+        - 'blue_diamonds': Diamonds for 'EXAM' type certificates
+    """
     if not certificates:
         certificates = Certificate.objects.filter(user=user, deleted=False)
 
+    # Count diamonds based on event type
     green_diamonds = certificates.filter(event__event_type="EVENT").count()
     yellow_diamonds = certificates.filter(event__event_type="LIVE_COURSE").count()
     magenta_diamonds = certificates.filter(event__event_type="PRE_RECORDED").count()
     blue_diamonds = certificates.filter(event__event_type="EXAM").count()
 
-    logger.info("certificates: %s" % certificates)
-    logger.info("green_diamonds: %s" % green_diamonds)
-    logger.info("yellow_diamonds: %s" % yellow_diamonds)
-    logger.info("magenta_diamonds: %s" % magenta_diamonds)
-    logger.info("blue_diamonds: %s" % blue_diamonds)
+    # Log the counts for debugging and monitoring
+    logger.info(f"certificates: {certificates}")
+    logger.info(f"green_diamonds: {green_diamonds}")
+    logger.info(f"yellow_diamonds: {yellow_diamonds}")
+    logger.info(f"magenta_diamonds: {magenta_diamonds}")
+    logger.info(f"blue_diamonds: {blue_diamonds}")
 
-    return {"green_diamonds": green_diamonds, "yellow_diamonds": yellow_diamonds, "magenta_diamonds": magenta_diamonds,
-            "blue_diamonds": blue_diamonds}
+    # Return the diamond counts in a structured dictionary
+    return {
+        "green_diamonds": green_diamonds,
+        "yellow_diamonds": yellow_diamonds,
+        "magenta_diamonds": magenta_diamonds,
+        "blue_diamonds": blue_diamonds
+    }

@@ -8,9 +8,16 @@ logger = logging.getLogger('app_logger')
 
 def get_event_data_request(request):
     """
-    :param request: request django object with form data
-    :return: dict with processed data after logging
+    Processes form data from a Django request to extract and log information about an event,
+    returning a dictionary with the processed data.
+
+    Args:
+        request: HttpRequest object containing the form data.
+
+    Returns:
+        A dictionary containing processed event data.
     """
+    # Extract data from the request object
     event_type_description = request.POST.get("event_type_description")
     event_recurrent = bool(request.POST.get("event_recurrent"))
     title = request.POST.get("title")
@@ -24,19 +31,20 @@ def get_event_data_request(request):
     schedule_description = request.POST.get("schedule_description")
     tags = request.POST.getlist("tags[]")
 
-    logger.info("event_type_description: %s" % event_type_description)
-    logger.info("event_recurrent: %s" % event_recurrent)
-    logger.info("title: %s" % title)
-    logger.info("description: %s" % description)
-    logger.info("platform_name: %s" % platform_name)
-    logger.info("other_platform: %s" % other_platform)
-    logger.info("date_start: %s" % date_start)
-    logger.info("date_end: %s" % date_end)
-    logger.info("time_day: %s" % time_day)
-    logger.info("record_date: %s" % record_date)
-    logger.info("schedule_description: %s" % schedule_description)
+    # Log extracted data for debugging purposes
+    logger.info(f"event_type_description: {event_type_description}")
+    logger.info(f"event_recurrent: {event_recurrent}")
+    logger.info(f"title: {title}")
+    logger.info(f"description: {description}")
+    logger.info(f"platform_name: {platform_name}")
+    logger.info(f"other_platform: {other_platform}")
+    logger.info(f"date_start: {date_start}")
+    logger.info(f"date_end: {date_end}")
+    logger.info(f"time_day: {time_day}")
+    logger.info(f"record_date: {record_date}")
+    logger.info(f"schedule_description: {schedule_description}")
 
-    # Event Type
+    # Determine event type based on description
     if event_type_description == "pre_recorded":
         event_type = "PRE_RECORDED"
     elif event_type_description == "live_course":
@@ -46,28 +54,30 @@ def get_event_data_request(request):
     elif event_type_description == "exam":
         event_type = "EXAM"
     else:
-        logger.warning("EVENT TYPE NOT RECOGNIZED: %s" % event_type_description)
-        event_type = "COURSE"  # loggear exceptions
+        logger.warning(f"EVENT TYPE NOT RECOGNIZED: {event_type_description}")
+        event_type = "COURSE"  # Default event type
 
-    # Date & Time
-    if len(date_start) > 0:
+    # Convert date and time strings to datetime objects
+    if date_start:
         date_start = datetime.strptime(date_start, "%d/%m/%Y")
     else:
         date_start = None
-    if len(date_end) > 0:
+
+    if date_end:
         date_end = datetime.strptime(date_end, "%d/%m/%Y")
     else:
         date_end = None
-    if len(time_day) > 0 and date_start is not None:
-        time_day = datetime.strptime(time_day, "%I:%M %p")
-        date_start.replace(hour=time_day.hour, minute=time_day.minute)
 
-    if len(record_date) > 0:
+    if time_day and date_start:
+        time_day = datetime.strptime(time_day, "%I:%M %p")
+        date_start = date_start.replace(hour=time_day.hour, minute=time_day.minute)
+
+    if record_date:
         record_date = datetime.strptime(record_date, "%d/%m/%Y")
     else:
         record_date = None
 
-    # Connection Platform
+    # Retrieve the platform object based on the platform name
     try:
         platform_obj = ConnectionPlatform.objects.get(name=platform_name)
     except Exception as e:
@@ -75,19 +85,18 @@ def get_event_data_request(request):
         logger.warning(e)
         platform_obj = None
 
-    event_data = {
-            "event_type": event_type,
-            "event_recurrent": event_recurrent,
-            "title": title,
-            "description": description,
-            "platform": platform_obj,
-            "other_platform": other_platform,
-            "date_start": date_start,
-            "date_end": date_end,
-            "time_day": time_day,
-            "record_date": record_date,
-            "schedule_description": schedule_description,
-            "tags": tags
-        }
-
-    return event_data
+    # Return the processed data as a dictionary
+    return {
+        "event_type": event_type,
+        "event_recurrent": event_recurrent,
+        "title": title,
+        "description": description,
+        "platform": platform_obj,
+        "other_platform": other_platform,
+        "date_start": date_start,
+        "date_end": date_end,
+        "time_day": time_day,
+        "record_date": record_date,
+        "schedule_description": schedule_description,
+        "tags": tags
+    }
