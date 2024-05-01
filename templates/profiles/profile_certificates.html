@@ -1,0 +1,158 @@
+{% extends 'profiles/profile_base.html' %}
+{% load static %}
+
+{% block profile_content %}
+
+    <div class="col-md-8 col-lg-9 order-md-1">
+        <div class="row">
+            <div class="media media-avator-view flex-column flex-sm-row">
+                <div class="media-body">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-md certi_col">
+                                <div class="img_col">
+                                    <img title="Evento" src="{% static 'assets/img/diamante_verde.png' %}"  width="20px" alt="">
+                                </div>
+                                <div>
+                                    <h4>{{ user_diamonds.green_diamonds }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md  certi_col">
+                                 <div class="img_col">
+                                    <img title="Curso en Vivo" src="{% static 'assets/img/diamante_amarillo.png' %}"  width="20px" alt="">
+                                </div>
+                                <div>
+                                    <h4>{{ user_diamonds.yellow_diamonds }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md certi_col">
+                                 <div class="img_col">
+                                    <img title="Curso Grabado" src="{% static 'assets/img/diamante_magenta.png' %}"  width="20px" alt="">
+                                </div>
+                                <div>
+                                    <h4>{{ user_diamonds.magenta_diamonds }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md certi_col">
+                                 <div class="img_col">
+                                    <img title="Examen" src="{% static 'assets/img/diamante_azul.png' %}"  width="20px" alt="">
+                                </div>
+                                <div>
+                                    <h4>{{ user_diamonds.blue_diamonds }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="pt-md-10">
+                      Aquí puedes encontrar tus certificados. Recuerda que para recibir un
+                      certificado debes solicitarlo (puedes hacerlo en la página del evento). El creador debe aceptar tu solicitud.
+                    </p>
+                    <div class="text-white rounded bg-warning text-uppercase font-weight-medium px-6 py-3 mb-3">Tus Certificados</div>
+                    <hr>
+
+                    {% for c in certificates %}
+                        <div class="media media-list-view mb-5">
+                                <div class="media-img cert_div">
+
+                                {% if c.event.event_type == 'EVENT' %}
+                                    <img alt="" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}"
+                                                                         class="diamond_certi_new" width="22px">
+                                {% elif c.event.event_type == 'LIVE_COURSE' %}
+                                    <img alt="" title="Curso en Vivo" src="{% static 'assets/img/diamante_amarillo.png' %}"
+                                                                         class="diamond_certi_new" width="22px">
+                                {% elif c.event.event_type == "PRE_RECORDED" %}
+                                    <img alt="" title="Curso Pre Grabado" src="{% static 'assets/img/diamante_magenta.png' %}"
+                                                                         class="diamond_certi_new" width="22px">
+                                {% elif c.event.event_type == 'EXAM' %}
+                                    <img alt="" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}"
+                                                                         class="diamond_certi_new" width="22px">
+                                {% endif %}
+
+                                {% if c.event.image %}
+                                    <img class="main_card_img" src="{{ c.event.image.url }}" alt="">
+                                {% else %}
+                                    <img class="card-img-top" src="https://picsum.photos/500" alt="Event Image">
+                                {% endif %}
+
+                                </div>
+
+                            <div class="media-body">
+                                <h3>
+                                    <a class="text-warning" href="{% url 'event_detail' c.event.id %}">{{ c.event.title }}</a>
+                                </h3>
+                                <ul class="list-unstyled d-flex text-muted mb-3">
+                                    <li class="mr-3">
+                                        {% if c.event.event_type == "COURSE" %}
+                                            {% if c.event.is_recorded %}
+                                                <i class="fa fa-play-circle mr-2" aria-hidden="true"></i>Curso Grabado
+                                            {% else %}
+                                                <i class="fa fa-video-camera mr-2" aria-hidden="true"></i>Curso en Línea
+                                            {% endif %}
+                                        {% elif c.event.event_type == "EVENT" %}
+                                            {% if c.event.is_recurrent %}
+                                                <i class="fa fa-calendar mr-2" aria-hidden="true"></i>Evento Recurrente
+                                            {% else %}
+                                                <i class="fa fa-tag mr-2" aria-hidden="true"></i>Evento
+                                            {% endif %}
+                                        {% endif %}
+                                    </li>
+                                    <li>
+                                        {% if c.event.is_recorded %}
+                                            {% if c.event.is_recorded %}
+                                                <i class="fa fa-clock-o mr-2" aria-hidden="true"></i>
+                                                {{ c.event.date_recorded|date:"SHORT_DATE_FORMAT" }}
+                                            {% endif %}
+                                        {% elif c.event.is_recurrent %}
+                                            {% if c.event.schedule_description %}
+                                                <i class="fa fa-clock-o mr-2" aria-hidden="true"></i>
+                                                {{ c.event.schedule_description }}
+                                            {% endif %}
+                                        {% else %}
+                                            {% if c.event.date_start %}
+                                                <i class="fa fa-clock-o mr-2" aria-hidden="true"></i>
+                                                {{ c.event.date_start|date:"SHORT_DATE_FORMAT" }}
+                                            {% endif %}
+                                            {% if c.event.date_end %}
+                                                - {{ c.event.date_end|date:"SHORT_DATE_FORMAT" }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </li>
+                                </ul>
+
+                                <p class="text-justify mb-lg-2">{{ c.event.description|truncatewords:20|safe }}</p>
+
+                                <div class="profile_certificates-button-wrapper">
+                                    <button class="open_certificate btn btn-sm btn-white text-uppercase mb-1 mr-2 btn-hover-info"
+                                        onclick="location.href = '{% url 'certificate_preview' c.id %}' ">
+                                        <i class="fa fa-certificate mr-2" aria-hidden="true"></i>Ver Certificado
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock profile_content %}
+
+
+{% block extra_js %}
+    <script>
+    $( document ).ready(function() {
+        $(".send_to_blockchain").on("click", function(){
+            let cert_id = $(this).data("id");
+            console.log(cert_id);
+            $("#confirm_send_blockchain").data("id", cert_id);
+            $("#modal_send_blockchain").modal("show");
+        });
+        $("#confirm_send_blockchain").on("click", function(){
+            let cert_id = $(this).data("id");
+            window.location.href = "{% url 'send_cert_blockchain' 0 %}".replace("0", cert_id);
+        });
+    });
+    </script>
+{% endblock extra_js %}
