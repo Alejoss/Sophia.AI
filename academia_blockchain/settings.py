@@ -182,3 +182,4 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "event_index"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "es-ES"
+SEND_EMAILS = False

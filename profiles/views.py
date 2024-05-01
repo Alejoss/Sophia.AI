@@ -64,21 +64,19 @@ def register_profile(request):
             # Create default Accepted Cryptos
             bitcoin, _ = CryptoCurrency.objects.get_or_create(name="Bitcoin", code="BTC")
             ether, _ = CryptoCurrency.objects.get_or_create(name="Ethereum", code="ETH")
-            monero, _ = CryptoCurrency.objects.get_or_create(name="Monero", code="XMR")
 
+            # TODO should create wallets for users by default
             user_bitcoin = AcceptedCrypto.objects.create(user=new_user, crypto=bitcoin)
             user_ether = AcceptedCrypto.objects.create(user=new_user, crypto=ether)
-            user_monero = AcceptedCrypto.objects.create(user=new_user, crypto=monero)
 
             logger.warning(f"user_bitcoin: {user_bitcoin}")
             logger.warning(f"user_ether: {user_ether}")
-            logger.warning(f"user_monero: {user_monero}")
 
             login(request, new_user)
             email = form.cleaned_data['email']
 
             # Send confirmation email
-            if settings.HEROKU:
+            if settings.SEND_EMAILS:
                 send_confirmation_email(request, new_user, email)
 
             template = "profiles/profile_data.html"
@@ -133,7 +131,7 @@ def activate_account(request, uid, token):
         # If the token is not valid, inform the user
         return HttpResponse('Activation link is invalid!')
 
-
+# Account Registration html render views
 class AcademiaLogin(LoginView):
     template_name = "profiles/login.html"
     authentication_form = AcademiaLoginForm
@@ -173,6 +171,7 @@ def resend_activation_email(request):
 
 
 def content(request):
+    # TODO this view should go in app 'content'
     template = "profiles/content.html"
     context = {"content_index_active": "active"}
     return render(request, template, context)
@@ -324,7 +323,7 @@ def profile_edit_contact_method(request):
         logger.warning(f"contact_method_url: {contact_method_url}")
         logger.warning(f"contact_method_description: {contact_method_description}")
 
-        # If a valid contact method ID is provided, update the existing contact method
+        # frontend sends 0 when the contact method doesnt exist
         if int(contact_method_id) > 0:
             try:
                 obj = ContactMethod.objects.get(id=contact_method_id)

@@ -15,7 +15,6 @@ urlpatterns = [
     path('comment/<int:event_id>', views.event_comment, name="event_comment"),
     path('certificate_preview/<int:cert_id>', views.certificate_preview, name="certificate_preview"),
     path('send_cert_blockchain/<int:cert_id>', views.send_cert_blockchain, name="send_cert_blockchain"),
-    path('add_cert_hash/<int:cert_id>', views.add_cert_hash, name="add_cert_hash"),
 
 
     # API

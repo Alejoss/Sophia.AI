@@ -85,65 +85,106 @@ def event_search(request):
     else:
         return HttpResponse(status=400)
 
-# Display detailed information about a specific event
-def event_detail(request, event_id):
-    template = "courses/event_detail.html"
-    event = get_object_or_404(Event, id=event_id)
-    logger.warning("event: %s" % event)
 
+def event_detail(request, event_id):
+    """
+    Displays detailed information about a specific event. This view provides information including
+    contact methods, accepted cryptocurrencies, user profile, event comments, and ratings.
+    It also checks the user's status (authenticated or not) to display personalized information.
+
+    Args:
+        request: HttpRequest object containing metadata about the request.
+        event_id: The ID of the event to be displayed.
+
+    Returns:
+        Rendered HTML response with detailed information about the specified event.
+    """
+    template = "courses/event_detail.html"
+
+    # Retrieve the event or return a 404 error if not found
+    event = get_object_or_404(Event, id=event_id)
+    logger.warning(f"event: {event}")
+
+    # Fetch contact methods and cryptocurrencies of the event's owner
     contact_methods = ContactMethod.objects.filter(user=event.owner, deleted=False)
     accepted_cryptos = AcceptedCrypto.objects.filter(user=event.owner, deleted=False)
-    preferred_cryptos = coins_value(accepted_cryptos, event)
-    # llama al API CoinGeko y devuelve una lista con las monedas aceptadas por el usuario y sus valores.
+    preferred_cryptos = coins_value(accepted_cryptos, event)  # Retrieve preferred cryptos via CoinGecko API
     owner_profile = Profile.objects.get(user=event.owner)
 
-    logger.warning("contact_methods: %s" % contact_methods)
-    logger.warning("preferred_cryptos: %s" % preferred_cryptos)
+    logger.warning(f"contact_methods: {contact_methods}")
+    logger.warning(f"preferred_cryptos: {preferred_cryptos}")
 
+    # Call blockchain timezones (details not provided)
     academia_blockchain_timezones()
 
+    # Initialize variables for additional user-related data
     event_user_timezone = None
     logged_user_profile = None
     event_is_bookmarked = False
     user_certificate_request = None
+
+    # Check if the request user is authenticated
     if request.user.is_authenticated:
+        # Retrieve the logged-in user's profile
         logged_user_profile = Profile.objects.get(user=request.user)
         try:
+            # Convert event start time to the user's timezone
             user_timezone = pytz.timezone("America/Guayaquil")
             event_user_timezone = event.date_start.astimezone(user_timezone)
         except Exception as e:
             pass
 
+        # Check if the event is bookmarked by the user
         event_is_bookmarked = Bookmark.objects.filter(event=event, user=request.user, deleted=False).exists()
+
+        # Check if the user has a pending certificate request for the event
         if CertificateRequest.objects.filter(event=event, user=request.user).exists():
             user_certificate_request = CertificateRequest.objects.get(event=event, user=request.user)
 
-    logger.warning("event_user_timezone: %s" % event_user_timezone)
-    logger.warning("logged_user_profile: %s" % logged_user_profile)
-    logger.warning("event_is_bookmarked: %s" % event_is_bookmarked)
+    logger.warning(f"event_user_timezone: {event_user_timezone}")
+    logger.warning(f"logged_user_profile: {logged_user_profile}")
+    logger.warning(f"event_is_bookmarked: {event_is_bookmarked}")
 
+    # Check if the request user is the event owner
     is_event_owner = (event.owner == request.user)
     certificate_requests = CertificateRequest.objects.none()
 
-    logger.warning("is_event_owner: %s" % is_event_owner)
+    logger.warning(f"is_event_owner: {is_event_owner}")
     if is_event_owner:
+        # Retrieve pending certificate requests if the user owns the event
         certificate_requests = CertificateRequest.objects.filter(event=event, state="PENDING")
-        logger.warning("certificate_requests: %s" % certificate_requests)
+        logger.warning(f"certificate_requests: {certificate_requests}")
 
+    # Retrieve non-deleted comments and ratings for the event
     comments = Comment.objects.filter(event=event, deleted=False)
     rating = Rating.objects.for_instance(event)
+
+    # Check if the user has a certificate for the event
     has_certificate = False
     if request.user.is_authenticated:
         has_certificate = Certificate.objects.filter(event=event, user=request.user).exists()
-    logger.warning("has_certificate: %s" % has_certificate)
-    logger.warning("user_certificate_request: %s" % user_certificate_request)
+    logger.warning(f"has_certificate: {has_certificate}")
+    logger.warning(f"user_certificate_request: {user_certificate_request}")
 
-    context = {"event": event, "contact_methods": contact_methods, "accepted_cryptos": accepted_cryptos,
-               "owner_profile": owner_profile, "event_user_timezone": event_user_timezone,
-               "logged_user_profile": logged_user_profile, "event_is_bookmarked": event_is_bookmarked,
-               "is_event_owner": is_event_owner, "user_certificate_request": user_certificate_request,
-               "certificate_requests": certificate_requests, "comments": comments, 'rating': rating,
-               'lack_certificate': not has_certificate, "preferred_cryptos": preferred_cryptos}
+    # Prepare context data for rendering the event detail page
+    context = {
+        "event": event,
+        "contact_methods": contact_methods,
+        "accepted_cryptos": accepted_cryptos,
+        "owner_profile": owner_profile,
+        "event_user_timezone": event_user_timezone,
+        "logged_user_profile": logged_user_profile,
+        "event_is_bookmarked": event_is_bookmarked,
+        "is_event_owner": is_event_owner,
+        "user_certificate_request": user_certificate_request,
+        "certificate_requests": certificate_requests,
+        "comments": comments,
+        'rating': rating,
+        'lack_certificate': not has_certificate,
+        "preferred_cryptos": preferred_cryptos
+    }
+
+    # Render and return the event detail page
     return render(request, template, context)
 
 
@@ -196,6 +237,7 @@ def event_create(request):
         )
 
         # Update profile to reflect user as a teacher
+        # TODO this should check if the user actually created a course
         profile = Profile.objects.get(user=request.user)
         profile.is_teacher = True
         profile.save()
@@ -459,13 +501,6 @@ def send_cert_blockchain(request, cert_id):
 
     # Render and return the page with the certificate hash
     return render(request, template, context)
-
-
-def add_cert_hash(request, cert_id):
-    if request.method == "POST":
-        pass
-    else:
-        pass
 
 
 """
