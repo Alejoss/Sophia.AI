@@ -169,7 +169,7 @@ def academia_blockchain_timezones():
 def get_cryptos_string(profile):
     # This logic could go on the frontend. Creates a string with the accepted cryptos of a user
     c_list = profile.cryptos_list()
-    logger.info("c_list: %s" % c_list)
+    logger.debug("c_list: %s" % c_list)
     cryptos_string = ""
     for c in c_list:
         cryptos_string += (c.crypto.code + ", ")
@@ -191,14 +191,14 @@ def send_confirmation_email(request, user, user_email):
     """
     # Generate an activation token for the user
     activation_token = PasswordResetTokenGenerator().make_token(user)
-    logger.info(f"activation_token: {activation_token}")
+    logger.debug(f"activation_token: {activation_token}")
 
     # Get the current site's domain for building activation URLs
     current_site = get_current_site(request)
 
     # Encode the user's primary key in a URL-safe base64 format
     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    logger.info(f"uid: {uid}")
+    logger.debug(f"uid: {uid}")
 
     # Render the email message template with the necessary context
     message = render_to_string('profiles/email_confirm_account.html', {
@@ -248,11 +248,11 @@ def get_user_diamonds(user, certificates=None):
     blue_diamonds = certificates.filter(event__event_type="EXAM").count()
 
     # Log the counts for debugging and monitoring
-    logger.info(f"certificates: {certificates}")
-    logger.info(f"green_diamonds: {green_diamonds}")
-    logger.info(f"yellow_diamonds: {yellow_diamonds}")
-    logger.info(f"magenta_diamonds: {magenta_diamonds}")
-    logger.info(f"blue_diamonds: {blue_diamonds}")
+    logger.debug(f"certificates: {certificates}")
+    logger.debug(f"green_diamonds: {green_diamonds}")
+    logger.debug(f"yellow_diamonds: {yellow_diamonds}")
+    logger.debug(f"magenta_diamonds: {magenta_diamonds}")
+    logger.debug(f"blue_diamonds: {blue_diamonds}")
 
     # Return the diamond counts in a structured dictionary
     return {

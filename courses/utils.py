@@ -32,17 +32,17 @@ def get_event_data_request(request):
     tags = request.POST.getlist("tags[]")
 
     # Log extracted data for debugging purposes
-    logger.info(f"event_type_description: {event_type_description}")
-    logger.info(f"event_recurrent: {event_recurrent}")
-    logger.info(f"title: {title}")
-    logger.info(f"description: {description}")
-    logger.info(f"platform_name: {platform_name}")
-    logger.info(f"other_platform: {other_platform}")
-    logger.info(f"date_start: {date_start}")
-    logger.info(f"date_end: {date_end}")
-    logger.info(f"time_day: {time_day}")
-    logger.info(f"record_date: {record_date}")
-    logger.info(f"schedule_description: {schedule_description}")
+    logger.debug(f"event_type_description: {event_type_description}")
+    logger.debug(f"event_recurrent: {event_recurrent}")
+    logger.debug(f"title: {title}")
+    logger.debug(f"description: {description}")
+    logger.debug(f"platform_name: {platform_name}")
+    logger.debug(f"other_platform: {other_platform}")
+    logger.debug(f"date_start: {date_start}")
+    logger.debug(f"date_end: {date_end}")
+    logger.debug(f"time_day: {time_day}")
+    logger.debug(f"record_date: {record_date}")
+    logger.debug(f"schedule_description: {schedule_description}")
 
     # Determine event type based on description
     if event_type_description == "pre_recorded":
