@@ -53,13 +53,13 @@ def register_profile(request):
         form = AcademiaUserCreationForm(request.POST)
         if form.is_valid():
             new_user = form.save()
-            logger.warning(f"new_user: {new_user.username}")
+            logger.debug(f"new_user: {new_user.username}")
 
             # Create user profile
             new_profile = Profile.objects.create(user=new_user)
             new_profile.email_confirmed = True  # TODO: Remove this, should be activated by email
             new_profile.save()
-            logger.warning(f"new_profile: {new_profile}")
+            logger.debug(f"new_profile: {new_profile}")
 
             # Create default Accepted Cryptos
             bitcoin, _ = CryptoCurrency.objects.get_or_create(name="Bitcoin", code="BTC")
@@ -69,8 +69,8 @@ def register_profile(request):
             user_bitcoin = AcceptedCrypto.objects.create(user=new_user, crypto=bitcoin)
             user_ether = AcceptedCrypto.objects.create(user=new_user, crypto=ether)
 
-            logger.warning(f"user_bitcoin: {user_bitcoin}")
-            logger.warning(f"user_ether: {user_ether}")
+            logger.debug(f"user_bitcoin: {user_bitcoin}")
+            logger.debug(f"user_ether: {user_ether}")
 
             login(request, new_user)
             email = form.cleaned_data['email']
@@ -200,12 +200,12 @@ def profile_data(request):
         profile_description = request.POST.get("profile_description")
 
         # Log the received data
-        logger.warning(f"Email: {email}")
-        logger.warning(f"First name: {first_name}")
-        logger.warning(f"Last name: {last_name}")
-        logger.warning(f"Time zone: {time_zone}")
-        logger.warning(f"Interests: {interests}")
-        logger.warning(f"Profile description: {profile_description}")
+        logger.debug(f"Email: {email}")
+        logger.debug(f"First name: {first_name}")
+        logger.debug(f"Last name: {last_name}")
+        logger.debug(f"Time zone: {time_zone}")
+        logger.debug(f"Interests: {interests}")
+        logger.debug(f"Profile description: {profile_description}")
 
         # Update user basic information
         request.user.email = email
@@ -228,8 +228,8 @@ def profile_data(request):
         template = "profiles/profile_data.html"
         profile, created = Profile.objects.get_or_create(user=request.user)
         if created:
-            logger.warning(f"Profile created: {created}")
-        logger.warning(f"Profile: {profile}")
+            logger.debug(f"Profile created: {created}")
+        logger.debug(f"Profile: {profile}")
 
         # Additional data for the profile page
         cryptos_string = get_cryptos_string(profile)
@@ -266,18 +266,18 @@ def user_profile(request, profile_id):
 
     # Fetch user's contact methods that haven't been deleted
     contact_methods = ContactMethod.objects.filter(user=profile.user, deleted=False)
-    logger.warning(f"Contact methods: {contact_methods}")
+    logger.debug(f"Contact methods: {contact_methods}")
 
     # Retrieve user's cryptocurrency preferences as a string
     cryptos_string = get_cryptos_string(profile)
 
     # Fetch all events hosted by the user
     events = Event.objects.filter(owner=profile.user)
-    logger.warning(f"Events: {events}")
+    logger.debug(f"Events: {events}")
 
     # Fetch all active certificates owned by the user
     certificates = Certificate.objects.filter(user=profile.user, deleted=False)
-    logger.warning(f"Certificates: {certificates}")
+    logger.debug(f"Certificates: {certificates}")
 
     # Compute diamonds or points earned by the user (custom function)
     user_diamonds = get_user_diamonds(request.user, certificates=certificates)
@@ -318,17 +318,17 @@ def profile_edit_contact_method(request):
         contact_method_url = request.POST.get("contact_method_url")
         contact_method_description = request.POST.get("contact_method_description")
 
-        logger.warning(f"contact_method_id: {contact_method_id}")
-        logger.warning(f"contact_method_name: {contact_method_name}")
-        logger.warning(f"contact_method_url: {contact_method_url}")
-        logger.warning(f"contact_method_description: {contact_method_description}")
+        logger.debug(f"contact_method_id: {contact_method_id}")
+        logger.debug(f"contact_method_name: {contact_method_name}")
+        logger.debug(f"contact_method_url: {contact_method_url}")
+        logger.debug(f"contact_method_description: {contact_method_description}")
 
         # frontend sends 0 when the contact method doesnt exist
         if int(contact_method_id) > 0:
             try:
                 obj = ContactMethod.objects.get(id=contact_method_id)
             except ContactMethod.DoesNotExist:
-                logger.warning(f"contact_method_id not found: {contact_method_id}")
+                logger.debug(f"contact_method_id not found: {contact_method_id}")
                 return HttpResponse("Contact Method not found", status=404)
 
             obj.name = contact_method_name
@@ -343,14 +343,14 @@ def profile_edit_contact_method(request):
                 url_link=contact_method_url,
                 description=contact_method_description
             )
-            logger.warning(f"new_contact_method: {new_contact_method}")
+            logger.debug(f"new_contact_method: {new_contact_method}")
 
         return redirect('profile_edit_contact_method')
 
     else:
         # Retrieve all non-deleted contact methods for the user
         contact_methods = ContactMethod.objects.filter(user=request.user, deleted=False)
-        logger.warning(f"contact_methods: {contact_methods}")
+        logger.debug(f"contact_methods: {contact_methods}")
         context = {"contact_methods": contact_methods}
         return render(request, template, context)
 
@@ -370,7 +370,7 @@ def profile_edit_picture(request):
     if request.method == "POST":
         # Retrieve the user's profile
         user_profile = Profile.objects.get(user=request.user)
-        logger.warning(f"user_profile: {user_profile}")
+        logger.debug(f"user_profile: {user_profile}")
 
         # Create a form instance with the POST data and the uploaded file
         form = ProfilePictureForm(request.POST, request.FILES, instance=user_profile)
@@ -381,7 +381,7 @@ def profile_edit_picture(request):
             form.save()
         else:
             # Log form errors if the form is invalid
-            logger.warning(form.errors)
+            logger.debug(form.errors)
 
         # Redirect to the profile data page after processing the form
         return redirect("profile_data")
@@ -410,17 +410,17 @@ def profile_edit_cryptos(request):
         crypto_code = request.POST.get("crypto_code")
         crypto_address = request.POST.get("crypto_address")
 
-        logger.warning(f"accepted_crypto_id: {accepted_crypto_id}")
-        logger.warning(f"crypto_name: {crypto_name}")
-        logger.warning(f"crypto_code: {crypto_code}")
-        logger.warning(f"crypto_address: {crypto_address}")
+        logger.debug(f"accepted_crypto_id: {accepted_crypto_id}")
+        logger.debug(f"crypto_name: {crypto_name}")
+        logger.debug(f"crypto_code: {crypto_code}")
+        logger.debug(f"crypto_address: {crypto_address}")
 
         # If a valid crypto ID is provided, update the existing cryptocurrency
         if int(accepted_crypto_id) > 0:
             try:
                 obj = AcceptedCrypto.objects.get(id=accepted_crypto_id)
             except AcceptedCrypto.DoesNotExist:
-                logger.warning(f"Accepted crypto not found: {accepted_crypto_id}")
+                logger.debug(f"Accepted crypto not found: {accepted_crypto_id}")
                 return HttpResponse("Accepted Crypto not found", status=404)
 
             # Check if the crypto already exists; if so, update, if not, create a new crypto entry
@@ -428,7 +428,7 @@ def profile_edit_cryptos(request):
             obj.crypto = crypto_obj
             obj.address = crypto_address
             obj.save()
-            logger.warning(f"Crypto object (existing or new): {crypto_obj}")
+            logger.debug(f"Crypto object (existing or new): {crypto_obj}")
         else:
             # Create a new AcceptedCrypto entry
             crypto_obj, created = CryptoCurrency.objects.get_or_create(name=crypto_name, defaults={'code': crypto_code})
@@ -437,14 +437,14 @@ def profile_edit_cryptos(request):
                 crypto=crypto_obj,
                 address=crypto_address
             )
-            logger.warning(f"New accepted crypto: {new_accepted_crypto}")
+            logger.debug(f"New accepted crypto: {new_accepted_crypto}")
 
         return redirect("profile_edit_cryptos")
 
     else:
         # Retrieve all non-deleted accepted cryptos for the user
         accepted_cryptos = AcceptedCrypto.objects.filter(user=request.user, deleted=False)
-        logger.warning(f"Accepted cryptos: {accepted_cryptos}")
+        logger.debug(f"Accepted cryptos: {accepted_cryptos}")
 
         context = {"accepted_cryptos": accepted_cryptos}
         return render(request, template, context)
@@ -524,10 +524,10 @@ def profile_events(request):
     """
     template = "profiles/profile_events.html"
     events = Event.objects.filter(owner=request.user, deleted=False)
-    logger.warning(f"events: {events}")
+    logger.debug(f"events: {events}")
 
     certificate_requests = CertificateRequest.objects.filter(event__owner=request.user, state="PENDING")
-    logger.warning(f"certificate_requests: {certificate_requests}")
+    logger.debug(f"certificate_requests: {certificate_requests}")
 
     context = {
         "profile_index_active": "active",
@@ -575,10 +575,10 @@ def profile_cert_requests(request):
     """
     template = "profiles/profile_cert_requests.html"
     cert_requests = CertificateRequest.objects.filter(event__owner=request.user, state="PENDING").order_by("event")
-    logger.warning(f"cert_requests: {cert_requests}")
+    logger.debug(f"cert_requests: {cert_requests}")
 
     cert_requests_rejected = CertificateRequest.objects.filter(event__owner=request.user, state="REJECTED").order_by("event")
-    logger.warning(f"cert_requests_rejected: {cert_requests_rejected}")
+    logger.debug(f"cert_requests_rejected: {cert_requests_rejected}")
 
     context = {
         "cert_requests": cert_requests,
@@ -602,7 +602,7 @@ def profile_bookmarks(request):
     template = "profiles/profile_bookmarks.html"
     bookmarks = []
     bookmarked_events = Bookmark.objects.filter(user=request.user, deleted=False)
-    logger.warning(f"bookmarked_events: {bookmarked_events}")
+    logger.debug(f"bookmarked_events: {bookmarked_events}")
 
     # Compile list of bookmarks and associated certificate requests
     for b in bookmarked_events:
@@ -612,7 +612,7 @@ def profile_bookmarks(request):
             certificate_request = CertificateRequest.objects.get(user=request.user, event=b.event)
         bookmarks.append([b, certificate_request])
 
-    logger.warning(f"bookmarks: {bookmarks}")
+    logger.debug(f"bookmarks: {bookmarks}")
 
     context = {
         "profile_index_active": "active",
@@ -658,7 +658,7 @@ def profile_security(request):
             return redirect("password_reset_complete")
         else:
             # Log form errors and prepare to display them
-            logger.warning(f"form.errors: {form.errors}")
+            logger.debug(f"form.errors: {form.errors}")
             context = {
                 "profile_index_active": "active",
                 "underline_security": "text-underline",
