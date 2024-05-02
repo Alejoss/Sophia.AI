@@ -2,234 +2,62 @@
 {% load static %}
 
 {% block content %}
-
-<!--====================================
-——— BEGIN MAIN SLIDE LIST
-===================================== -->
-<section class="rev_slider_wrapper fullwidthbanner-container over" dir="ltr">
-
-  <!-- the ID here will be used in the JavaScript below to initialize the slider -->
-  <div id="rev_slider_1" class="rev_slider rev-slider-kidz-school" data-version="5.4.5" style="display:none">
-
-    <ul>
-        <!-- SLIDE 1  -->
-        <li data-transition="fade">
-            <img src="{% static 'assets/img/parallax_c.png' %}" alt="Sky" class="rev-slidebg">
-        <!-- LAYERS -->
-
-        <!-- LAYER NR. 1 -->
-        <div class="tp-caption tp-resizeme font-dosis font-weight-bold"
-          data-frames='[{
-            "delay":1600,"speed":1000,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-            {"delay":"wait","speed":300,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="left"
-          data-y="middle"
-          data-hoffset="['10', '40', '15', '30']"
-          data-voffset="['25', '25', '25', '25']"
-          data-fontsize="['50', '45', '40', '30']"
-          data-lineheight="['50', '45', '40', '30']"
-          data-color="#FFF"
-          data-width="auto"
-          data-basealign="grid"
-          data-responsive_offset="off"
-          style="z-index: 1;">
-            <span class="breadcrumb-title">Accede a Educacion sin Intermediarios!! </span>
-        </div>
-
-        <!-- LAYER NR. 2 -->
-        <div class="tp-caption tp-resizeme breadcrumb-title"
-          data-frames='[{
-          "delay":2000,"speed":1300,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-          {"delay":"wait","speed":200,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="left"
-          data-y="middle"
-          data-hoffset="['10', '40', '15', '30']"
-          data-voffset="['100', '100', '100', '100']"
-          data-width="['550','500','500','420']"
-          data-fontsize="['25', '23', '23', '23']"
-          data-lineheight="['30', '25', '25', '25']"
-          data-color="#FFF"
-          data-textAlign="left"
-          data-basealign="grid"
-          data-responsive_offset="off"
-          data-type="text"
-          data-whitespace="normal"
-          style="z-index: 10;">
-            En Academia Blockchain puedes encontrar eventos, cursos y exámenes.
-        </div>
-
-        <!-- LAYER NR. 3
-        <a href="https://wrapbootstrap.com/theme/kidz-multipurpose-children-kids-theme-WB059350N"
-          class="tp-caption tp-resizeme slide-layer-3 btn btn-white"
-          data-frames='[{
-            "delay":2200,"speed":1300,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-            {"delay":"wait","speed":200,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="left"
-          data-y="middle"
-          data-hoffset="['10', '40', '15', '30']"
-          data-voffset="['90', '80', '70', '55']"
-          data-width="['auto']"
-          data-height="['auto']"
-          data-fontsize="['18', '17', '16', '15']"
-          data-lineheight="['25', '23', '21', '20']"
-          data-color="#e7655a"
-          data-textAlign="left"
-          data-basealign="grid"
-          data-responsive_offset="off"
-          style="text-transform: uppercase; z-index: 1;">
-           purchase
-        </a> -->
-        </li>
-
-        <!-- SLIDE 2  -->
-        <li data-transition="fade">
-            <img src="{% static 'assets/img/parallax_a.jpg' %}" alt="Sky" class="rev-slidebg">
-        <!-- LAYERS-->
-
-        <!-- LAYER NR. 1 -->
-        <div class="tp-caption tp-resizeme font-dosis font-weight-bold breadcrumb-title"
-          data-frames='[{
-          "delay":1600,"speed":1000,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-          {"delay":"wait","speed":200,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="center"
-          data-y="middle"
-          data-hoffset="['0', '0', '0', '0']"
-          data-voffset="['-75', '-75', '-65', '-45']"
-          data-fontsize="['50', '45', '40', '30']"
-          data-lineheight="['50', '45', '40', '30']"
-          data-color="#FFF"
-          data-width="auto"
-          data-basealign="grid"
-          data-responsive_offset="off"
-          style="z-index: 1;">
-            Academia Blockchain es el futuro <br>
-            de la educación libre
-        </div>
-
-        <!-- LAYER NR. 2
-        <div class="tp-caption tp-resizeme"
-          data-frames='[{
-          "delay":2000,"speed":1300,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-          {"delay":"wait","speed":200,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="center"
-          data-y="middle"
-          data-hoffset="['0', '0', '0', '0']"
-          data-voffset="['0', '0', '0', '0']"
-          data-width="['550','400','400','420']"
-          data-fontsize="['25', '23', '23', '23']"
-          data-lineheight="['30', '25', '25', '25']"
-          data-color="#FFF"
-          data-textAlign="center"
-          data-basealign="grid"
-          data-responsive_offset="on"
-          data-responsive="on"
-          data-type="text"
-          data-whitespace="normal"
-          style="z-index: 10;">
-            All ecommerce features are included with KIDZ, Build your site.
-        </div>
-        -->
-
-        <!-- LAYER NR. 3 -->
-        <a href="{% url 'about' %}"
-          class="tp-caption tp-resizeme slide-layer-3 btn btn-white"
-          data-frames='[{
-          "delay":2200,"speed":1300,"frame":"500","from":"y:-50px;opacity:0;","to":"o:1;","ease":"Power3.easeInOut"},
-          {"delay":"wait","speed":200,"frame":"999","to":"auto:auto;","ease":"Power3.easeInOut"}]'
-
-          data-visibility="on"
-          data-x="center"
-          data-y="middle"
-          data-hoffset="['0', '0', '0', '0']"
-          data-voffset="['25', '25', '25', '25']"
-          data-width="['auto']"
-          data-height="['auto']"
-          data-fontsize="['18', '17', '16', '15']"
-          data-lineheight="['25', '23', '21', '20']"
-          data-color="#e7655a"
-          data-textAlign="left"
-          data-basealign="grid"
-          data-responsive_offset="off"
-          style="text-transform: uppercase; z-index: 1;">
-            Leer Más
-        </a>
-        </li>
-		</ul>
-  </div>
-</section>
-
 <!-- ====================================
 ———	SEARCH RESULT
 ===================================== -->
-
-<section class="pt-7 pb-7 pt-md-10">
-	<div class="container">
-{#		<form class="shadow-sm rounded mb-8">#}
-{#			<div class="input-group input-group-lg">#}
-{#				<div class="input-group-prepend">#}
-{#					<span class="input-group-text bg-light border-0 px-4">#}
-{#						<i class="fa fa-search text-muted font-size-18" aria-hidden="true"></i>#}
-{#					</span>#}
-{#				</div>#}
-{#				<input type="text" class="form-control bg-light border-0 form-control-lg" aria-label="Amount (to the nearest dollar)"#}
-{#				 placeholder="Cursos / Eventos / Conversaciones" required="">#}
-{#                <div class="input-group-append">#}
-{#					<button type="submit" class="btn shadow-none btn-lg btn-info text-uppercase">Buscar</button>#}
-{#				</div> #}
-{#			</div>#}
-{#		</form>#}
-
-        <h2 class="text-capitalize text-muted font-weight-bold mb-0">Reciente: </h2>
-	</div>
-</section>
-
-<section class="pb-md-10 pb-6">
-<div class=" container">
-    <div class="mb-8">
-        {% for tag in tags %}
-            <a href="{% url 'events_tag' tag.id %}" class="badge badge-light">{{ tag.name }}</a>
-        {% endfor %}
-    </div>
-
-    <div class="row wow" style="visibility: visible">
-        {% for event in events %}
-            {% include 'courses/event_card.html' with event=event %}
-        {% endfor %}
-    </div>
-
-    <div class="section-title justify-content-center mb-4 mb-md-8 wow event_list_link">
-      <span class="shape shape-left bg-warning"></span>
-        <a href="{% url 'events_all' %}"><h4 class="text-warning">&nbsp; Ver Todo &nbsp;</h4></a>
-      <span class="shape shape-right bg-warning"></span>
-    </div>
-
-    </div>
-</section>
-
-<section class="py-9 bg-parallax" style="background-image: url({% static 'assets/img/imagen_bottom.jpg' %});">
+<section class="pt-3 pb-3">
     <div class="container">
-        <div class="" style="visibility: visible; animation-name: fadeInUp;">
-          <div class="section-title justify-content-center">
-            <h2 class="text-white text-center breadcrumb-title">UTILIZA CRIPTOMONEDAS PARA APRENDER Y
-                GANA COMPARTIENDO CONOCIMIENTO</h2>
-          </div>
-            <div class="text-sm-right">
-              <button type="submit" class="btn btn-warning text-uppercase"
-                      onclick="location.href = '{% url 'event_create' %}' ">
-                Crear Nuevo Curso
-              </button>
-            </div>
+        <h2>Recent Activity</h2>
+    </div>
+</section>
+
+<section class="pb-5">
+    <div class="container">
+        <div class="mb-4">
+            {% for tag in tags %}
+                <a href="{% url 'events_tag' tag.id %}" class="badge bg-light">{{ tag.name }}</a>
+            {% endfor %}
         </div>
+
+        <div class="row">
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Cristopher is teaching about The Future of the Galaxy on April 20 <span class="text-end">BTC, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Juan uploaded a course on Trading Strategies <span class="text-end">BTC, ADA, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Mary is teaching about The Secret of Inhouse Gardening on June 13 <span class="text-end">Free</span>
+                    </li>
+                </ul>
+            </div>
+        
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Okrier saved 50 certificates on the blockchain <span class="text-end"> and earned 550 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Alexandr uploaded 3 new books to his certified library <span class="text-end">and earned 200 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Donme hashed and certfied 200 articles in his library <span class="text-end">and earned 2100 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Elizabeth now supports LusiMa's library <span class="text-end">and earned 10 ACBC Tokens</span>
+                    </li>
+                </ul>
+            </div>
+{#            {% for event in events %}#}
+{#                {% include 'courses/event_card.html' with event=event %}#}
+{#            {% endfor %}#}
+        </div>
+
+{#        <div class="d-flex justify-content-center mb-4">#}
+{#            <a href="{% url 'events_all' %}"><h4 class="text-warning">Ver Todo</h4></a>#}
+{#        </div>#}
     </div>
 </section>
 {% endblock content %}

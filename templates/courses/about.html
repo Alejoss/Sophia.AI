@@ -2,106 +2,36 @@
 {% load static %}
 
 {% block content %}
-  <!-- ====================================
-  ———	BREADCRUMB
-  ===================================== -->
-<section class="breadcrumb-bg" style="background-image: url({% static 'assets/img/cubo1.jpg' %}); ">
-<div class="container">
-  <div class="breadcrumb-holder">
-    <div>
-        <h1 class="breadcrumb-title">¿Qué es Academia Blockchain?</h1>
+  <section class="pt-3 pb-3">
+    <div class="container">
+        <h2>Academia Blockchain uses Sophia.AI</h2>
     </div>
-  </div>
-</div>
 </section>
-
-
-<section class="py-7 py-md-10">
-	<div class="container">
-
-		<div class="row">
-            <div class="col-sm-10 col-xs-10">
-              <div class="section-title mb-4">
-                <h2 class="text-danger pl-0">Educación Libre</h2>
-              </div>
-              <p class="text-muted font-size-20 mb-4">
-                  Academia Blockchain es una plataforma en la que podrás compartir conocimiento a cambio de criptomonedas. Además, podrás ganar criptomonedas aprendiendo y utilizar la blockchain para guardar tus certificados de educación. La comunidad de Academia Blockchain reconoce la
-                  <a href="{% url 'descentralize_education' %}">necesidad de descentralizar el conocimiento</a>. Queremos cambiar la forma en la que los alumnos conectan con los profesores, maestros, científicos, filósofos y expertos de todo tipo.
-              </p>
-			</div>
-		</div>
-	</div>
-</section>
-
-
-<!-- ====================================
-———	BREADCRUMB
-===================================== -->
-<section class="breadcrumb-bg" style="background-image: url({% static 'assets/img/cubo2.png' %}); ">
-<div class="container">
-  <div class="breadcrumb-holder">
-    <div class="transparent_background">
-        <h3 class="text-white">Las criptomonedas son una revolución en el mundo digital: Nació la escacez en el Internet.
-          En Academia Blockchain abrazamos el cambio y entendemos cómo aprovechar esta tecnología. </h3>
-    </div>
-  </div>
-</div>
-</section>
-
-
-<!-- ====================================
-———	ABOUT MEDIA
-===================================== -->
-<section class="py-7 py-md-10">
-	<div class="container">
-
-		<div class="row">
-            <div class="col-sm-10 col-xs-10">
-                <p class="text-muted font-size-20 mb-4">
-                  Puedes encontrar un profesor y pagarle directamente a él. En otros sitios educativos, la plataforma se queda hasta con el 40% de los ingresos del profesor. Academia Blockchain no es un intermediario en el pago y el 100% va al profesor / organizador del evento. El profesor puede elegir dar la clase utilizando su aplicación de preferencia (zoom, hangouts, whatsapp, jitsi) y el curso no se graba en nuestros servidores. También, el profesor puede elegir sus criptomonedas favoritas para aceptar los pagos.  Academia Blockchain no actúa como escrow y el pago no es guardado (básicamente, facilitamos una relación directa entre alumno - profesor).
-                </p>
-                <p class="text-info font-size-20 mb-4">Academia Blockchain sencillamente lista una oferta de Cursos / Eventos / Exámenes que puedes pagar usando tus criptomonedas. Queremos que conectes con gente interesante. </p>
+    
+<section class="pb-5">
+    <div class="container">
+        <div class="row">
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        To save education certificates on the blockchain.
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        To manage cryptocurrency payments for courses and library access.
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        To save document hashes to the blockchain, hence providing proof of existance.
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        To validate documents with descentralized AI calls. 
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        To provide the functionality of interactive conversations with libraries. 
+                    </li>
+                </ul>
             </div>
-		</div>
-	</div>
-</section>
-
-<!-- ====================================
-———	BREADCRUMB
-===================================== -->
-<section class="breadcrumb-bg" style="background-image: url({% static 'assets/img/cubo3.jpg' %}); ">
-<div class="container">
-  <div class="breadcrumb-holder">
-    <div class="transparent_background">
-        <h3 class="text-white">Las criptomonedas permiten realizar pagos punto-a-punto, o P2P. </h3>
+        </div>
     </div>
-  </div>
-</div>
 </section>
-
-
-<!-- ====================================
-———	ABOUT MEDIA
-===================================== -->
-<section class="py-7 py-md-10">
-	<div class="container">
-		<div class="row">
-			<div class="col-sm-6 col-xs-12 order-md-1">
-				<div class="image mb-4 mb-md-0">
-					<img class="img-fluid rounded" src="{% static 'assets/img/parallax_b.png' %}" alt="features-img1.jpg">
-				</div>
-			</div>
-
-			<div class="col-sm-6 col-xs-12">
-				<div class="">
-                  <div class="section-title mb-4">
-                  </div>
-                    <h2 class="text-warning pl-0">En la medida en la que participes en Academia Blockchain, podrás recibir certificados, calificar Cursos / Eventos / Exámenes y comentar contenido. Al hacerlo recibirás certificados y puntos canjeables por <strong>ACBC</strong>, el token de nuestra Organización Autónoma Descentralizada (DAO).</h2>
-                </div>
-			</div>
-
-		</div>
-	</div>
-</section>
-
+    
 {% endblock content %}

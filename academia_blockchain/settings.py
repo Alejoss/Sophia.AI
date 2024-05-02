@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'profiles',
     'courses',
+    'content',
     'star_ratings',
     'taggit'
 ]

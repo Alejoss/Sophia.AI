@@ -6,8 +6,8 @@ from django.http import HttpResponse
 
 # View all libraries
 def library_list(request):
-    libraries = Library.objects.filter(user=request.user)
-    return render(request, 'content/library_list.html', {'libraries': libraries})
+    libraries = Library.objects.all()
+    return render(request, 'content/libraries.html', {'libraries': libraries})
 
 
 # Create a new library
