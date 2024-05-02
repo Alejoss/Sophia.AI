@@ -9,6 +9,9 @@ def library_list(request):
     libraries = Library.objects.all()
     return render(request, 'content/libraries.html', {'libraries': libraries})
 
+def user_library(request):
+    library = None
+    return render(request, 'content/user_library.html', {'library': library})
 
 # Create a new library
 def library_create(request):
