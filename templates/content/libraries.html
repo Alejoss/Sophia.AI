@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- ====================================
+———	SEARCH RESULT
+===================================== -->
+<section class="pt-3 pb-3">
+    <div class="container">
+        <h2>Libraries</h2>
+    </div>
+</section>
+
+<section class="pb-5">
+    <div class="container">
+
+        <div class="row">
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Cristopher's curated library <span class="text-end">BTC, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Juan's curated library <span class="text-end">BTC, ADA, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Mary's curated library<span class="text-end">Free</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+{#        <div class="d-flex justify-content-center mb-4">#}
+{#            <a href="{% url 'events_all' %}"><h4 class="text-warning">Ver Todo</h4></a>#}
+{#        </div>#}
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+{% endblock extra_js %}
