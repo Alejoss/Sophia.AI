@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/Sophia.AI.iml" filepath="$PROJECT_DIR$/.idea/Sophia.AI.iml" />
       <module fileurl="file://$PROJECT_DIR$/acbc_app/acbc_app.iml" filepath="$PROJECT_DIR$/acbc_app/acbc_app.iml" />
       <module fileurl="file://$PROJECT_DIR$/contracts.iml" filepath="$PROJECT_DIR$/contracts.iml" />
+      <module fileurl="file://$PROJECT_DIR$/frontend_boilerplate.iml" filepath="$PROJECT_DIR$/frontend_boilerplate.iml" />
     </modules>
   </component>
 </project>
