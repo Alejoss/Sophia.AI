@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- ====================================
+———	SEARCH RESULT
+===================================== -->
+<section class="pt-3 pb-3">
+    <div class="container">
+        <h2>Your Library</h2>
+    </div>
+</section>
+
+<section class="pb-5">
+    <div class="container">
+        <form method="post" action="{% url 'file_upload' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="id_title" class="form-label">Title</label>
+                {{ form.title }}
+            </div>
+            <div class="mb-3">
+                <label for="id_file" class="form-label">File</label>
+                {{ form.file }}
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button> # TODO upload functionality
+        </form>
+    </div>
+</section>
+{% endblock content %}
