@@ -183,7 +183,7 @@ LOGGING = {
 
 # Other config
 LOGIN_URL = "profile_register"
-LOGIN_REDIRECT_URL = "event_index"
+LOGIN_REDIRECT_URL = "user_library"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "es-ES"
 SEND_EMAILS = False
