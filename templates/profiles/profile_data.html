@@ -8,8 +8,8 @@
     <div class="row">
         {% if not profile.email_confirmed %}
             <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <strong>Hola!</strong> por favor confirma el email de tu cuenta {{ user.email }}:
-                <a href="{% url 'resend_activation_email' %}" class="alert-link">Reenviar correo de confirmación</a>.
+                <strong>Hello!</strong> please confirm the email of your account {{ user.email }}:
+                <a href="{% url 'resend_activation_email' %}" class="alert-link">Resend confirmation email</a>.
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                   <span aria-hidden="true">×</span>
                 </button>
@@ -30,7 +30,7 @@
 
                 <span class="text-muted font-size-15 mb-1 d-block">
                     <strong>
-                        Intereses:
+                        Interests:
                     </strong>
                    {{ profile.interests }}
                 </span>
@@ -39,11 +39,11 @@
                 </p>
                 <span class="text-muted font-size-15 mb-1 d-block">
                     <p class="text-muted">
-                       <strong>Criptos preferidas</strong>:
+                       <strong>Preferred Cryptos</strong>:
                         {{ cryptos_string }}
                     </p>
 
-                    <strong>Métodos de Contacto</strong>:
+                    <strong>Contact Methods</strong>:
                     <ul class="text-muted">
                         {% for c in contact_methods %}
                             {% if c.has_contact_url %}
@@ -60,7 +60,7 @@
                 </span>
                 <span class="text-muted font-size-15 mb-1 d-block">
                     <strong>
-                        Zona Horaria:
+                        Timezone:
                     </strong>
                     {{ profile.timezone }}
                 </span>
@@ -70,13 +70,13 @@
     <div class="col-12">
         <div class="text-sm-center mt-6">
           <button id="edit_button" type="submit" class="btn btn-warning text-uppercase">
-            Editar Perfil
+            Edit Profile
           </button>
           <button id="edit_cryptos" type="submit" class="btn btn-info text-uppercase">
-            Criptos
+            Cryptos
           </button>
           <button id="edit_contact" type="submit" class="btn btn-success text-uppercase">
-            Métodos de Contacto
+            Contact Methods
           </button>
         </div>
         <hr>
@@ -94,12 +94,12 @@
             </div>
             <div class="form-group form-group-icon">
               <i class="fa fa-user"></i>
-              <input name="first_name" type="text" class="form-control border-info" placeholder="Nombre"
+              <input name="first_name" type="text" class="form-control border-info" placeholder="First Name"
               value="{{ user.first_name }}">
             </div>
             <div class="form-group form-group-icon">
               <i class="fa fa-user"></i>
-              <input name="last_name" type="text" class="form-control border-info" placeholder="Apellido"
+              <input name="last_name" type="text" class="form-control border-info" placeholder="Last Name"
               value="{{ user.last_name }}">
             </div>
           </div>
@@ -113,17 +113,17 @@
                 </select>
                 <small id="" class="form-text text-muted">
                     {% if profile.timezone %}
-                        Ahora estás en "{{ profile.timezone }}".
+                        You are currently in "{{ profile.timezone }}".
                     {% endif %}
                 </small>
           </div>
 
            <div class="form-group form-group-icon">
               <i class="fa fa-smile-o"></i>
-               <textarea name="interests" type="text" class="form-control border-info" placeholder="Tus Intereses">{{ profile.interests }}
+               <textarea name="interests" type="text" class="form-control border-info" placeholder="Your Interests">{{ profile.interests }}
                </textarea>
                <small id="" class="form-text text-muted">
-                    ¿Qué te apasiona? Separa tus intereses con comas.
+                    What are you passionate about? Separate your interests with commas.
                 </small>
            </div>
           </div>
@@ -134,51 +134,54 @@
               </textarea>
             </div>
               <small id="" class="form-text text-muted">
-                  ¿A qué te dedicas?
+                  What do you do?
               </small>
           </div>
 
           <div class="col-12">
             <div class="text-sm-center mt-6">
               <button type="submit" class="btn btn-danger text-uppercase">
-                Guardar Cambios
+                Save Changes
               </button>
             </div>
           </div>
         </div>
       </form>
+        
 
     </div>
+<hr>
 </div>
 
-{#    MODAL EDITAR IMAGEN DE PERFIL#}
+{#    MODAL EDIT PROFILE PICTURE#}
 
 <div class="modal fade mb-8" id="EditProfilePicModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" style="display: none;" aria-hidden="true">
 <div class="modal-dialog" role="document">
   <div class="modal-content">
     <div class="modal-header">
-      <h5 class="modal-title">Editar Imagen de Perfil</h5>
+      <h5 class="modal-title">Edit Profile Picture</h5>
       <button type="button" class="close" data-dismiss="modal" aria-label="Close">
         <span aria-hidden="true">×</span>
       </button>
     </div>
     <div class="modal-body">
       <p>
-        <form id ="upload_picture_form" method="post" action="{% url 'profile_edit_picture' %}" enctype="multipart/form-data">
+        <form id="upload_picture_form" method="post" action="{% url 'profile_edit_picture' %}" enctype="multipart/form-data">
         {% csrf_token %}
             {{ profile_picture_form.as_p }}
-            <label for="exampleFormControlFile1">Sube tu nueva imagen de perfil. Max 2Mb.
-                Te recomendamos dimensiones iguales. Por ej: 500px alto / 500px ancho </label>
+            <label for="exampleFormControlFile1">Upload your new profile picture. Max 2Mb.
+                We recommend equal dimensions. For example: 500px height / 500px width</label>
         </form>
       </p>
     </div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-      <button id="save_picture" type="button" class="btn btn-primary">Guardar Cambios</button>
+      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      <button id="save_picture" type="button" class="btn btn-primary">Save Changes</button>
     </div>
   </div>
 </div>
 </div>
+
 {% endblock profile_content %}
 
 

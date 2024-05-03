@@ -13,7 +13,8 @@ class Group(models.Model):
 
 
 class File(models.Model):
-    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to='files/')
     title = models.CharField(max_length=255)
+    extension = models.CharField(max_length=10, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)

@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Library, Group, File
+from .utils import FileUploadForm
 from django.http import HttpResponse
 
 
@@ -9,9 +10,25 @@ def library_list(request):
     libraries = Library.objects.all()
     return render(request, 'content/libraries.html', {'libraries': libraries})
 
+
 def user_library(request):
     library = None
     return render(request, 'content/user_library.html', {'library': library})
+
+
+def file_upload(request):
+    if request.method == "POST":
+        form = FileUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            file_instance = form.save(commit=False)
+            # Extract file extension and save it
+            file_instance.extension = file_instance.file.name.split('.')[-1]
+            file_instance.save()
+            return redirect('user_library')  # Adjust redirection as needed
+    else:
+        form = FileUploadForm()
+    return render(request, 'content/file_upload.html', {'form': form})
+
 
 # Create a new library
 def library_create(request):

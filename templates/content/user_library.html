@@ -39,12 +39,8 @@
         </div>
 
         <div class="d-flex justify-content-center mb-4">
-            <a href="{% url 'events_all' %}"><h4 class="text-warning">Upload a Document</h4></a>
+            <a href="{% url 'file_upload' %}"><h4 class="text-warning">Upload a Document</h4></a>
         </div>
     </div>
 </section>
 {% endblock content %}
-
-{% block extra_js %}
-    <script src="https://maps.googleapis.com/maps/api/js"></script>
-{% endblock extra_js %}

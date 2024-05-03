@@ -18,7 +18,6 @@ from django.template import loader
 from profiles.models import Profile
 from courses.models import Certificate
 
-
 logger = logging.getLogger('app_logger')
 
 
@@ -48,15 +47,16 @@ class AcademiaUserCreationForm(UserCreationForm):
                 'class': 'form-control border',
                 'id': 'username',
                 'name': 'username',
-                'placeholder': "Nombre de Usuario"  # Placeholder text in Spanish: "Username"
+                'placeholder': "Username"  # Placeholder text in Spanish: "Username"
             }),
             'email': forms.TextInput(attrs={
                 'class': 'form-control border',
                 'id': 'email',
                 'name': 'email',
-                'placeholder': "Correo Electrónico"  # Placeholder text in Spanish: "Email"
+                'placeholder': "Email"  # Placeholder text in Spanish: "Email"
             })
         }
+
 
 class AcademiaLoginForm(AuthenticationForm):
     """
@@ -70,21 +70,22 @@ class AcademiaLoginForm(AuthenticationForm):
         'class': 'form-control border',
         'id': 'username',
         'name': 'username',
-        'placeholder': "Nombre de Usuario"  # Placeholder text in Spanish: "Username"
+        'placeholder': "Username"  # Placeholder text in Spanish: "Username"
     }))
 
     # Field for password with a custom widget for styling and label translation
     password = forms.CharField(
-        label="Contraseña",  # Label text in Spanish: "Password"
+        label="Password",  # Label text in Spanish: "Password"
         strip=False,
         widget=forms.PasswordInput(attrs={
             'autocomplete': 'current-password',
             'class': 'form-control border',
             'id': 'email',
             'name': 'email',
-            'placeholder': "Contraseña"  # Placeholder text in Spanish: "Password"
+            'placeholder': "Password"  # Placeholder text in Spanish: "Password"
         }),
     )
+
 
 # Custom ModelForm for Profile Picture management
 class ProfilePictureForm(forms.ModelForm):
@@ -128,6 +129,7 @@ class AcademiaPasswordResetForm(PasswordResetForm):
             message=body
         )
 
+
 class AcademiaSetPasswordForm(SetPasswordForm):
     """
     A custom form for setting a new password that modifies the Django SetPasswordForm
@@ -154,6 +156,7 @@ class AcademiaSetPasswordForm(SetPasswordForm):
             'class': 'form-control'
         }),
     )
+
 
 def academia_blockchain_timezones():
     # Timezones for the user to select in profile edit form

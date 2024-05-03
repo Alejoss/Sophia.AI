@@ -31,7 +31,7 @@ def get_env_variable(variable_name):
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 DOCKER = True
-SECRET_KEY = os.getenv('ACADEMIA_BLOCKCHAIN_SKEY')
+SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY")
 
 # Application definition
 INSTALLED_APPS = [
@@ -182,7 +182,7 @@ LOGGING = {
 }
 
 # Other config
-LOGIN_URL = "login"
+LOGIN_URL = "profile_register"
 LOGIN_REDIRECT_URL = "event_index"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "es-ES"
