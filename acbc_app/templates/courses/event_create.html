@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+  <link href="{% static 'assets/css/tag-basic-style.css' %}" id="option_style" rel="stylesheet">
+  <script src='https://cdn.tiny.cloud/1/yedm03jmmtjrfydjtb1xhl94q6b8w29cudjs7xo4bsboo0qy/tinymce/5/tinymce.min.js' referrerpolicy="origin"></script>
+{% endblock extra_head %}
+
+{% block content %}
+    <section class="py-8 py-md-10">
+    <div class="container">
+    <div class="row">
+    <div class="col-sm-8 offset-lg-2 col-lg-8">
+         <div class="bg-warning rounded-top p-2">
+            <h3 class="text-white font-weight-bold mb-0 ml-2">Crea, Comparte</h3>
+          </div>
+    <div class="mb-4 mb-sm-0">
+        <hr>
+    {% if profile.email_confirmed %}
+        <form method="post" id="event_create_form" role="form" action="{% url 'event_create' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+            <div class="col-md-8">
+                <div class="form-group">
+                    <label for="Tipo">
+                        ¿Qué quieres crear?
+                    </label>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="event_type_description" id="radio_pre_recorded" value="pre_recorded">
+                      <label class="form-check-label" for="event_type_description">
+                        CURSO PRE GRABADO - <strong>Ya grabaste el curso.</strong>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="event_type_description" id="radio_live_course" value="live_course">
+                      <label class="form-check-label" for="event_type_description">
+                        CURSO ONLINE - <strong>Vas a dar el curso.</strong>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="event_type_description" id="radio_exam" value="exam">
+                      <label class="form-check-label" for="event_type_description">
+                        EXAMEN - <strong>Vas a evaluar conocimiento.</strong>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="event_type_description" id="radio_event" value="event_single">
+                      <label class="form-check-label" for="event_type_description">
+                        EVENTO - <strong> Se viene una conferencia, una conversación, una clase maestra.</strong>
+                      </label>
+                    </div>
+                </div>
+
+                <div class="form-check" id="event_recurrent">
+                    <input type="checkbox" class="form-check-input" name="event_recurrent"/>
+                    <label class="form-check-label" for="event_recurrent">
+                        Evento Recurrente - <strong> Un evento que se repite, y se repite y ...</strong>
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-4 form_img">
+                <img id="diamante_amarillo" title="Curso" src="{% static 'assets/img/diamante_amarillo.png' %}" class="diamond_form" alt="Curso">
+                <img id="diamante_azul" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="diamond_form" alt="Examen">
+                <img id="diamante_magenta" title="Pre-Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="diamond_form" alt="Pre-Grabado">
+                <img id="diamante_verde" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="diamond_form" alt="Evento">
+            </div>
+            </div>
+
+            <hr>
+
+            <div class="form-group">
+                <label for="title">
+                    Titulo*
+                </label>
+                <input type="text" class="form-control" id="title" name="title"/>
+            </div>
+            <div class="form-group">
+                <label for="description">
+                    Descripción*
+                </label>
+                <textarea class="form-control" id="description" rows="7" name="description" placeholder="¿A quien esta dirigido el evento? ¿Cuál es su público objetivo?"></textarea>
+            </div>
+
+            <label class="my-1 mr-2" for="">
+                Plataforma
+            </label>
+              <select class="custom-select my-1 mr-sm-2" id="platform_select" name="platform_name">
+                    {% for platform in platforms %}
+                        <option value="{{ platform.name }}">{{ platform.name }}</option>
+                    {% endfor %}
+              </select>
+                <small class="form-text text-muted">
+                  Qué plataforma vas a utilizar para compartir el curso / evento?
+                </small>
+
+            <div class="form-group">
+                <label for="other_platform">
+                    Otra Plataforma
+                </label>
+                <input type="text" class="form-control" id="other_platform" name="other_platform"
+                    data-date-format="dd/mm/yyyy"/>
+                <small class="form-text text-muted">
+                  Utilizas alguna otra plataforma en el curso / evento?
+                </small>
+            </div>
+
+            <div class="form-group date" id="input_record_date">
+                <label for="date_start">
+                    Fecha de Grabación
+                </label>
+                <input data-provide="datepicker" type="text" data-date-format="dd/mm/yyyy"
+                       class="form-control"
+                       id="record_date" name="record_date"/>
+                <small class="form-text text-muted">
+                  Aproximadamente, ¿cuándo terminaste la grabación?
+                </small>
+            </div>
+
+            <div class="form-group date" id="input_date_start">
+                <label for="date_start">
+                    Fecha de Inicio
+                </label>
+                <input data-provide="datepicker" type="text" class="form-control" data-date-format="dd/mm/yyyy"
+                       id="date_start" name="date_start"/>
+            </div>
+
+            <div class="form-group date" id="input_date_end">
+                <label for="date_end">
+                    Fecha Final
+                </label>
+                <input data-provide="datepicker" type="text" class="form-control" id="date_end" name="date_end"
+                    data-date-format="dd/mm/yyyy"/>
+            </div>
+
+            <div class="form-group" id ="input_time_day">
+                <label for="time_day">
+                    Hora
+                </label>
+                <input type="text" class="form-control timepicker" id="time_day" name="time_day"/>
+            </div>
+
+            <div class="form-group">
+                <label for="title">
+                    Detalles sobre la fecha y el horario.
+                </label>
+                <input type="text" class="form-control" id="" name="schedule_description"/>
+                <small id="" class="form-text text-muted">
+                    Una descripción extra sobre el calendario (opcional).
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="title">
+                    Tags
+                </label>
+                <div data-tags-input-name="tags" id="tagBox" class=""></div>
+                <small id="" class="form-text text-muted">
+                    Tags separados por comas.
+                </small>
+            </div>
+
+            <div class="form-group">
+              <label for="id_profile_picture">Imagen del Evento: </label>
+                <input type="file" name="event_picture" accept="image/*" id="id_event_picture">
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submit_form">
+                Crear
+            </button>
+        </form>
+
+        <hr>
+
+        <p>
+            *Recuerda que en tu <a href="{% url 'profile_data' %}">perfil</a> puedes definir tus criptos preferidas y
+            los métodos con los que la gente puede contactarte.
+            {% if user_contact_methods %}
+                Por ahora son:
+                {% for c in user_contact_methods %}
+                    {% if not c.deleted %}
+                        "{{ c.name }}"
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <strong>Por ahora no tienes métodos de contacto guardados, es importante que compartas una forma para contactarte!</strong>
+            {% endif %}
+        </p>
+    {% else %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <strong>Hola!</strong> por favor confirma el email de tu cuenta ({{ user.email }}) para crear un evento:
+            <a href="{% url 'resend_activation_email' %}" class="alert-link">Reenviar correo de confirmación</a>.
+        </div>
+    {% endif %}
+    </div>
+    </div>
+    </div>
+    </div>
+    </section>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js"></script>
+<script src='{% static 'assets/js/tagging.min.js' %}'></script>
+<script src='{% static 'assets/js/jquery.validate.js' %}'></script>
+
+<script>
+    $( document ).ready(function() {
+        $('.datepicker').datepicker({
+            format: 'dd/mm/yyyy',
+        });
+
+        // Default
+        $('#radio_live_course').prop("checked", true);
+        $('#diamante_azul').hide();
+        $('#diamante_amarillo').show();
+        $('#diamante_magenta').hide();
+        $('#diamante_verde').hide();
+        $('#input_record_date').hide();
+
+        $('.timepicker').timepicker({
+            timeFormat: 'h:mm p',
+            interval: 30,
+            minTime: '6',
+            defaultTime: '12',
+            dynamic: false,
+            dropdown: true,
+            scrollbar: true
+        });
+        tinymce.init({
+          selector: '#description'
+        });
+
+        $('#radio_pre_recorded').on("click", function(){
+            // Es un video grabado.
+            $("#input_date_start").hide();
+            $("#input_date_end").hide();
+            $("#input_time_day").hide();
+            $("#event_recurrent").hide();
+            $('#input_record_date').show();
+
+            $('#diamante_azul').hide();
+            $('#diamante_amarillo').hide();
+            $('#diamante_magenta').show();
+            $('#diamante_verde').hide();
+        });
+
+
+        $('#radio_live_course').on("click", function(){
+            // es un curso que se va a dar online
+            $("#input_date_start").show();
+            $("#input_date_end").show();
+            $("#input_time_day").show();
+            $('#input_record_date').hide();
+            $("#event_recurrent").hide();
+
+            $('#diamante_azul').hide();
+            $('#diamante_amarillo').show();
+            $('#diamante_magenta').hide();
+            $('#diamante_verde').hide();
+        });
+
+        $('#radio_exam').on("click", function(){
+            // es un examen que se toma una vez
+            $("#input_date_start").show();
+            $("#input_date_end").hide();
+            $("#input_time_day").show();
+            $('#input_record_date').hide();
+            $("#event_recurrent").hide();
+
+            $('#diamante_azul').show();
+            $('#diamante_amarillo').hide();
+            $('#diamante_magenta').hide();
+            $('#diamante_verde').hide();
+        });
+
+
+        $('#radio_event').on("click", function(){
+            // es un evento que se va a dar online en vivo, puede ser marcado como recurrente
+            $("#input_date_start").show();
+            $("#input_date_end").show();
+            $("#input_time_day").show();
+            $('#input_record_date').hide();
+            $("#event_recurrent").show();
+
+            $('#diamante_amarillo').hide();
+            $('#diamante_azul').hide();
+            $('#diamante_magenta').hide();
+            $('#diamante_verde').show();
+        });
+
+        var t = $( "#tagBox" ).tagging();
+        t[0].addClass( "form-control" );
+        $("#tagBox").find(".type-zone").attr("name", "tag");
+
+        $("#event_create_form").validate({
+            rules: {
+                title : {
+                    required: true,
+                    minlength: 2
+                },
+                description: {
+                    required: true,
+                    minlength: 100
+                }
+            },
+            messages: {
+                title: "¿Cuál es el título del evento?",
+            },
+            submitHandler: function(form) {
+                console.log("submit!");
+                form.submit();
+            }
+        });
+    });
+</script>
+{% endblock %}

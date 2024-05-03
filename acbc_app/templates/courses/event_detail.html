@@ -1,0 +1,520 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load ratings %}
+
+{% block content %}
+<!-- ====================================
+———	COURSES SECTION
+===================================== -->
+<link rel="stylesheet" href="{% static 'star-ratings/css/star-ratings.css' %}">
+<section class="py-8 pt-md-10">
+	<div class="container">
+        {% if event.deleted %}
+            <h3 class="card-title text-dark">* <strong>{{ event.title }} ha sido eliminado por el propietario</strong> *</h3>
+        {% endif %}
+        {% if is_event_owner %}
+            <h3 class="card-title text-dark">Tu <strong>{{ event.title }}:</strong></h3>
+            <div class="accordion mb-8" id="accordionExample">
+
+                {% if certificate_requests %}
+                <div class="card">
+                  <div class="card-header list-group-item-success" id="certificate_requests">
+                    <h5 class="mb-0">
+                      <button class="btn btn-link" type="button">
+                        Hay {{ certificate_requests.count }} usuarios que han solicitado un certificado de tu curso.
+                      </button>
+                    </h5>
+                  </div>
+                </div>
+                {% endif %}
+
+            </div>
+        <hr>
+        {% endif %}
+		<div class="row"> <!-- contenido -->
+			<div class="col-lg-8 col-md-7">
+				<div class="card shadow-none bg-transparent">
+                    {% if event.image %}
+					    <img class="card-img-top" src="{{ event.image.url }}" alt="Event Image">
+                    {% else %}
+                        <img class="card-img-top" src="https://picsum.photos/500" alt="Event Image">
+                    {% endif %}
+					<div class="card-img-overlay"> <!-- valor -->
+                        {% if event.event_type == "COURSE" %}
+                            <span class="badge badge-info badge-rounded-circle">
+                        {% else %}
+                            <span class="badge badge-success badge-rounded-circle">
+                        {% endif %}
+                            {% if event.reference_price == 0.0 %}
+                            <span data-toggle="tooltip" data-placement="top" title="GRATIS!" data-original-title="GRATIS!">
+                                <i class="fa fa-smile-o text-white" aria-hidden="true"></i>
+                            </span>
+                            {% else %} <!-- precio -->
+                            <span data-toggle="tooltip" data-placement="top" title="" data-original-title="Has click
+                            para ver el precio en criptomonedas">
+                                <span type="button" data-toggle="modal" data-target="#ModalPrecios"> <!-- boton modal precios -->
+                                    $ {{ event.reference_price|floatformat }}
+                                </span>
+                            </span>
+                            {% endif %}
+                        </span>
+					</div>
+
+                    {% if event.event_type == "COURSE" %}
+                        <div class="card-body border-top-5 border-info position-relative">
+                    {% else %}
+                        <div class="card-body border-top-5 border-success position-relative">
+                    {% endif %}
+
+                    <div class="mb-8">
+                        {% for tag in event.tags.all %}
+                        <span class="badge badge-pill badge-primary">
+                            {{ tag }}
+                        </span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-8">
+                    {% if event.owner == user %}
+                        <div class="text-right">
+                            <button id="event_edit" type="button" class="btn btn-primary mb-2"><i class="fa fa-edit"></i> Editar</button>
+                        </div>
+                    {% else %}
+                        <div id="remove_bookmark_div" class="text-right">
+                            <button id="remove_bookmark" type="button" class="btn btn-warning mb-2"><i class="fa fa-star-o"></i> Ya no me interesa</button>
+                        </div>
+                        <div id="event_bookmark_div" class="text-right">
+                            <button id="event_bookmark" type="button" class="btn btn-info mb-2"><i class="fa fa-star"></i> Me Interesa</button>
+                        </div>
+
+                        {% if user_certificate_request %}
+                            {% include 'courses/request_certificate_buttons.html' with cert_request=user_certificate_request %}
+                        {% else %}
+                            <div id="request_certificate_div" class="text-right">
+                                <button data-id="{{ event.id }}" type="button" class="btn btn-success mb-2 request_certificate">
+                                    <i class="fa fa-certificate"></i> Solicitar Certificado
+                                </button>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                    </div>
+
+                    <div>
+
+                        <h3 class="card-title text-dark">
+                        {% if event.event_type == 'EVENT' %}
+                            <span class="diamond_title"><img alt="" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="" width="22px"></span>
+                        {% elif event.event_type == 'LIVE_COURSE' %}
+                            <span class="diamond_title"><img alt="" title="Curso Online" src="{% static 'assets/img/diamante_amarillo.png' %}" class="" width="22px"></span>
+                        {% elif event.event_type == "PRE-RECORDED" %}
+                            <span class="diamond_title"><img alt="" title="Curso Pre Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="" width="22px"></span>
+                        {% elif event.event_type == 'EXAM' %}
+                            <span class="diamond_title"><img alt="" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="" width="22px"></span>
+                        {% endif %}
+                            {{ event.title }}
+                        </h3>
+                        <p class="">{{ event.description|safe }}</p>
+                    </div>
+
+                    <h3 class="card-title text-warning">Contacta a <a href="{% url 'user_profile' event.owner.id %}">
+                        {{ event.owner.username }}:</a>
+                    </h3>
+
+                    {% if user.is_authenticated %}
+                        <div class="list-group">
+                        {% if contact_methods %}
+                            {% for contact_method in contact_methods %}
+                                {% if contact_method.has_contact_url %}
+                                    <a class="list-group-item list-group-item-action list-group-item-light"
+                                       href="{{ contact_method.url_link }}" target="_blank">
+                                        <span class="badge badge-primary badge-pill">{{ contact_method.name }}</span>
+                                        {{ contact_method.description }}
+                                    </a>
+                                {% else %}
+                                    <p class="list-group-item list-group-item-action list-group-item-light">
+                                        <span class="badge badge-primary badge-pill">{{ contact_method.name }}</span>
+                                        {{ contact_method.url_link }} | {{ contact_method.description }}
+                                    </p>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <p>{{ event.owner.username }} no ha establecido métodos de contacto. </p>
+                        {% endif %}
+                        </div>
+                    {% else %}
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="{% url 'profile_register' %}">Regístrate en Academia Blockchain</a>
+                            </li>
+                        </ul>
+                    {% endif %}
+                    </div>
+
+                    <div class="text-right">
+                        {% ratings event read_only=lack_certificate %}
+                    </div>
+
+                <div class="card shadow-none bg-transparent">
+
+                    {% if user.is_authenticated %}
+                    <div class="bg-light shadow-sm rounded px-3 pt-3 pb-6 mb-4">
+                        <h3 class="mb-4 text-danger font-weight-bold">Deja un Comentario</h3>
+                        <form id="comment_form" method="post" action="{% url 'event_comment' event.id %}">
+                            {% csrf_token %}
+                            <div class="row">
+                                <div class="col">
+                                    <div class="form-group form-group-icon">
+                                    <i class="fa fa-comments"></i>
+                                        <textarea name="comment_text" class="form-control border-info"
+                                                  placeholder="Escribe un comentario" rows="6"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-right">
+                                <button class="btn btn-danger text-uppercase">Enviar</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    {% if comments %}
+                    <div class="bg-light shadow-sm rounded px-3 pt-3 pb-6 mb-4">
+
+                            <h3 class="mb-4 text-danger font-weight-bold">{{ comments.count }} Comentarios:</h3>
+                                {% for comment in comments %}
+                                    <hr>
+                                    <div class="media py-1">
+                                      <div class="media-body">
+                                        <span class="mb-3 font-weight-medium text-muted d-inline-block">{{ comment.user.username }}</span>
+                                            <time class="d-block text-muted font-size-13 mb-3">{{ comment.date_created|date:"SHORT_DATE_FORMAT" }}</time>
+                                                <p class="font-size-13 line-hight-21">{{ comment.text }} </p>
+                                      </div>
+                                    </div>
+                                {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+				</div>
+			</div>
+
+            <div class="modal fade" id="ModalPrecios" tabindex="-1" aria-hidden="true"> <!-- Modal precios -->
+                <div class="modal-dialog">
+                <div class="modal-content rounded-top">
+                    <div class="modal-header bg-info">
+                        <h5 class="modal-title text-white font-weight-bold py-2 pl-3 mb-0">Valor y formas de pago</h5>
+                        <button type="button" class="btn btn-danger text-uppercase" data-dismiss="modal">X</button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted font-weight-bold">
+                            <strong>$ {{ event.reference_price }} </strong>
+                            <ul class="list-unstyled list-item-border-bottom">
+                            {% for c in preferred_cryptos %}
+                            <li class="mb-4 pb-4">
+                              <div class="media">
+                                  <img class="rounded-lg w-100 border-warning border-2 d-block modal_img_new" src="{{ c.image }}"
+                                    alt="{{ c.symbol }} image">
+                                <div class="media-body media_body_modal">
+                                    <p class="text-muted font-weight-bold">
+                                        {{ c.symbol|upper }} : {{ c.event_reference_price_crypto }}
+                                    </p>
+                                </div>
+                              </div>
+                                <hr>
+                            </li>
+                            {% endfor %}
+                            </ul>
+                        </p>
+                       </div>
+                    <div class="modal-footer">
+                        <p> Powered by CoinGecko API </p>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+			<div class="col-lg-4 col-md-5"><!-- columna derecha - INFORMACION -->
+				<div class="pb-4 mb-2">
+                    {% if event.event_type == "COURSE" %}
+                        <div class="section-title bg-info rounded-top">
+                    {% else %}
+                        <div class="section-title bg-success rounded-top">
+                    {% endif %}
+						<h3 class="text-capitalize text-white font-weight-bold py-2 pl-3 mb-0">Información</h3>
+					</div>
+					<div class="border border-top-0 rounded-bottom">
+						<div class="media p-3 border-bottom">
+							<div class="icon-rounded-circle-medium mr-3 bg-warning">
+								<i class="fa fa-calendar text-white" aria-hidden="true"></i>
+							</div>
+							<div class="media-body">
+                                <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">¿Cuándo?</h4>
+                                {% if event.is_recorded %}
+                                    <p class="text-muted font-weight-bold">Grabado el {{ event.date_recorded|date:"SHORT_DATE_FORMAT" }}</p>
+                                {% else %}
+                                    {% if event.date_start %}
+                                        <p class="text-muted font-weight-bold">Comienza el {{ event.date_start|date:"SHORT_DATE_FORMAT" }}</p>
+                                        <p class="text-muted font-weight-bold">
+                                         {{ event.date_start|date:"h:i A" }}
+                                            {% if owner_profile.timezone %}
+                                                ({{ owner_profile.timezone }})
+                                            {% endif %}
+                                        </p>
+                                    {% endif %}
+
+                                    {% if event.date_end %}
+                                        <p class="text-muted font-weight-bold">Hasta el {{ event.date_end|date:"SHORT_DATE_FORMAT" }}</p>
+                                        <p class="text-muted font-weight-bold">
+                                         {{ event.date_end|date:"h:i A" }}
+                                        </p>
+                                    {% endif %}
+
+                                    {% if event.schedule_description %}
+                                        <p class="text-muted">
+                                            * {{ event.schedule_description }}
+                                        </p>
+                                    {% endif %}
+                                {% endif %}
+							</div>
+						</div>
+
+						<div class="media p-3 border-bottom">
+							<div class="icon-rounded-circle-medium mr-3 bg-warning">
+								<i class="fa fa-money text-white" aria-hidden="true"></i>
+							</div>
+							<div class="media-body">
+								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+									Criptos Preferidas
+								</h4>
+                                <p class="text-muted font-weight-bold">
+                                    $ {{ event.reference_price }}
+                                </p>
+								<p class="text-muted font-weight-bold">
+                                    {% for c in accepted_cryptos %}
+                                        {{ c.crypto.code }}
+                                    {% endfor %}
+                                </p>
+							</div>
+						</div>
+
+						<div class="media p-3 border-bottom">
+							<div class="icon-rounded-circle-medium mr-3 bg-warning">
+								<i class="fa fa-external-link-square text-white" aria-hidden="true"></i>
+							</div>
+							<div class="media-body">
+								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+									Aplicación
+								</h4>
+                                <p class="text-muted font-weight-bold">
+                                    {{ event.platform.name }}
+                                </p>
+                                {% if event.other_platform %}
+                                    <p class="text-muted font-weight-bold">
+                                        + {{ event.other_platform }}
+                                    </p>
+                                {% endif %}
+							</div>
+						</div>
+
+                        <div class="media p-3 border-bottom">
+							<div class="icon-rounded-circle-medium mr-3 bg-warning">
+								<i class="fa fa-comments text-white" aria-hidden="true"></i>
+							</div>
+							<div class="media-body">
+								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+									Contacto
+								</h4>
+                                <p class="text-muted font-weight-bold">
+                                    {% for contact_method in contact_methods %}
+                                        {{ contact_method.name }}
+                                    {% endfor %}
+                                </p>
+							</div>
+						</div>
+			        </div>
+		        </div>
+	        </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</section>
+
+{% endblock content %}
+
+{% block extra_js %}
+    <script type="text/javascript" src="{% static 'star-ratings/js/dist/star-ratings.min.js' %}"></script>
+    <script>
+        $( document ).ready(function() {
+
+            if ("{{ event_is_bookmarked }}" === "True"){
+                $("#event_bookmark_div").hide();
+            } else {
+                $("#remove_bookmark_div").hide();
+            }
+
+            $("#event_edit").on("click", function(e){
+                e.preventDefault();
+                window.location.href = "{% url 'event_edit' event.id %}";
+            });
+
+            $("#event_bookmark").on("click", function(e){
+                e.preventDefault();
+                if ("{{ user.is_authenticated }}" === "True"){
+                    data = {
+                        "event_id": {{ event.id }},
+                    }
+                    $.ajax({
+                        method: "post",
+                        url: "{% url 'event_bookmark' event.id %}",
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            console.log("BOOKMARKED!");
+                            $("#event_bookmark_div").hide();
+                            $("#remove_bookmark_div").show();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+                } else {
+                    window.location.href = "{% url 'login' %}";
+                }
+            });
+
+            $("#remove_bookmark").on("click", function(e){
+                data = {
+                        "event_id": {{ event.id }},
+                    }
+                $.ajax({
+                        method: "post",
+                        url: "{% url 'remove_bookmark' event.id %}",
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            console.log("removed!");
+                            $("#remove_bookmark_div").hide();
+                            $("#event_bookmark_div").show();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+            });
+
+            $("#certificate_requests").on("click", function(e){
+                e.preventDefault();
+                window.location.href = "{% url 'profile_cert_requests' %}";
+            });
+
+
+             $(".delete_bookmark").on("click", function(e){
+                data = {
+                        "event_id": $(this).data("id")
+                    }
+                console.log(data);
+                $.ajax({
+                        method: "post",
+                        url: "{% url 'remove_bookmark' 0 %}".replace("0", data["event_id"]),
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            location.reload();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+            });
+
+            // Cert Request Buttons
+            $(".request_certificate").on("click", function(e){
+                if ("{{ user.is_authenticated }}" === "True"){
+                    e.preventDefault();
+                    data = {
+                            "event_id": $(this).data("id")
+                        }
+                    console.log(data);
+                    $.ajax({
+                        method: "post",
+                        url: "{% url 'request_certificate' 0 %}".replace("0", data["event_id"]),
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            location.reload();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+                } else {
+                    window.location.href = "{% url 'login' %}";
+                }
+            });
+
+            $(".cancel_cert_request").on("click", function(e){
+                data = {
+                        "event_id": $(this).data("id")
+                    }
+                console.log(data);
+                $.ajax({
+                        method: "post",
+                        url: "{% url 'cancel_cert_request' 0 %}".replace("0", data["event_id"]),
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            location.reload();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+            });
+
+            $(".view_certificate").on("click", function(e){
+                data = {
+                        "event_id": $(this).data("id")
+                    }
+                console.log(data);
+                $.ajax({
+                        method: "post",
+                        url: "",  // TODO si da click en ver cert
+                        data: data,
+                        headers: {
+                            'X-CSRFToken': getCookie('{{ settings.CSRF_COOKIE_NAME }}')
+                        },
+                        success: function(response){
+                            location.reload();
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+            });
+
+        });
+    </script>
+{% endblock extra_js %}
+
+
+{#                        {% if event.event_type == 'EVENT' %}#}
+{#                            <img title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="diamond" alt="">#}
+{#                        {% elif event.event_type == 'COURSE' %}#}
+{#                            <img title="Curso Online" src="{% static 'assets/img/diamante_amarillo.png' %}" class="diamond" alt="">#}
+{#                        {% elif event.event_type == "PRE-RECORDED" %}#}
+{#                                <img title="Curso Pre Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="diamond" alt="">#}
+{#                        {% elif event.event_type == 'EXAM' %}#}
+{#                            <img title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="diamond" alt="">#}
+{#                        {% endif %}#}

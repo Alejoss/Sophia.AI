@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="main-wrapper course-list-left-sidebar">
+
+<!-- ====================================
+———	BLOG GRID LEFT SIDEBAR
+===================================== -->
+<section class="py-8 py-md-10 mt-4">
+	<div class="container">
+		<div class="row">
+
+        <div class="col-md-4 col-lg-3">
+            <div class="card shadow-none bg-transparent">
+                <h4 class="card-header font-weight-bold bg-warning rounded-top text-white">Your Profile</h4>
+                <div class="card-body border border-top-0 rounded-bottom">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_certificates }}" href="{% url 'profile_certificates' %}">Certificates</a>
+                        </li>
+                        <li class="mb-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_data }}" href="{% url 'profile_data' %}">Profile Data</a>
+                        </li>
+                        <li class="my-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_events }}" href="{% url 'profile_events' %}">Courses and Events</a>
+                        </li>
+                        <li class="my-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_bookmarks }}" href="{% url 'profile_bookmarks' %}">Bookmarks</a>
+                        </li>
+                        <li class="mt-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_content }}" href="{% url 'profile_content' %}">Personal Library</a>
+                        </li>
+                        <li class="my-2">
+                            <a class="text-muted font-weight-medium d-block border rounded py-2 pl-3 {{ underline_security }} " href="{% url 'profile_security' %}">Security</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+    {% block profile_content %}
+
+
+    {% endblock profile_content %}
+        
+        </div>
+        </div>
+    </section>
+
+</div> <!-- element wrapper ends -->
+
+{% endblock content %}

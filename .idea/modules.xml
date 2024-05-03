@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Sophia.AI.iml" filepath="$PROJECT_DIR$/.idea/Sophia.AI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/acbc_app/acbc_app.iml" filepath="$PROJECT_DIR$/acbc_app/acbc_app.iml" />
       <module fileurl="file://$PROJECT_DIR$/contracts.iml" filepath="$PROJECT_DIR$/contracts.iml" />
     </modules>
   </component>

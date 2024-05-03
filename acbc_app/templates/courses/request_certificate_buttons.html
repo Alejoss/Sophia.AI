@@ -1,0 +1,34 @@
+{% load static %}
+
+{% if cert_request.state == "ACCEPTED" %}  {# Ya obtuvo un certificado #}
+    <div class="text-right">
+        {% if cert_request.event.event_type == 'EVENT' %}
+            <span class="diamond_title"><img title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="" width="22px"></span>
+        {% elif cert_request.event.event_type == 'COURSE' %}
+            <span class="diamond_title"><img title="Curso Online" src="{% static 'assets/img/diamante_amarillo.png' %}" class="" width="22px"></span>
+        {% elif cert_request.event.event_type == "PRE-RECORDED" %}
+            <span class="diamond_title"><img title="Curso Pre Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="" width="22px"></span>
+        {% elif cert_request.event.event_type == 'EXAM' %}
+            <span class="diamond_title"><img title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="" width="22px"></span>
+        {% endif %}
+        Tienes un <a href="{% url 'profile_certificates' %}">certificado</a> de este evento.
+    </div>
+{% elif cert_request.state == "PENDING" %} {# Todavia no decide el profesor #}
+    <div class="text-right">
+        <button type="button" data-id="{{ cert_request.id }}" class="btn btn-warning mb-2 cancel_cert_request">
+            <i class="fa fa-times"></i> Eliminar Solicitud de Certificado!</button>
+    </div>
+{% elif cert_request.state == "REJECTED" %}
+    <div class="text-right">
+        <button type="button" data-id="{{ cert_request.id }}" class="btn mb-2 btn-disabled disabled">
+            <i class="fa fa-times"></i> Certificado Rechazado</button>
+        <small class="form-text text-muted">
+          Si tienes dudas por favor comunícate con el organizador del evento.
+        </small>
+    </div>
+{% elif cert_request.state == "DELETED" %}
+    <div class="text-right">
+        <button type="button" data-id="{{ cert_request.event.id }}" class="btn btn-primary mb-2 request_certificate">
+            <i class="fa fa-certificate"></i> Volver a Solicitar Certificado</button>
+    </div>
+{% endif %}

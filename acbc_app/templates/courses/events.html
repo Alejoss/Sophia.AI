@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- ====================================
+———	SEARCH RESULT
+===================================== -->
+<section class="pt-3 pb-3">
+    <div class="container">
+        <h2>Recent Activity</h2>
+    </div>
+</section>
+
+<section class="pb-5">
+    <div class="container">
+        <div class="mb-4">
+            {% for tag in tags %}
+                <a href="{% url 'events_tag' tag.id %}" class="badge bg-light">{{ tag.name }}</a>
+            {% endfor %}
+        </div>
+
+        <div class="row">
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Cristopher is teaching about The Future of the Galaxy on April 20 <span class="text-end">BTC, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Juan uploaded a course on Trading Strategies <span class="text-end">BTC, ADA, ETH</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Mary is teaching about The Secret of Inhouse Gardening on June 13 <span class="text-end">Free</span>
+                    </li>
+                </ul>
+            </div>
+        
+            <div class="container my-4">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Okrier saved 50 certificates on the blockchain <span class="text-end"> and earned 550 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Alexandr uploaded 3 new books to his certified library <span class="text-end">and earned 200 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Donme hashed and certfied 200 articles in his library <span class="text-end">and earned 2100 ACBC Tokens</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Elizabeth now supports LusiMa's library <span class="text-end">and earned 10 ACBC Tokens</span>
+                    </li>
+                </ul>
+            </div>
+{#            {% for event in events %}#}
+{#                {% include 'courses/event_card.html' with event=event %}#}
+{#            {% endfor %}#}
+        </div>
+
+{#        <div class="d-flex justify-content-center mb-4">#}
+{#            <a href="{% url 'events_all' %}"><h4 class="text-warning">Ver Todo</h4></a>#}
+{#        </div>#}
+    </div>
+</section>
+{% endblock content %}
+
+{% block extra_js %}
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+{% endblock extra_js %}
