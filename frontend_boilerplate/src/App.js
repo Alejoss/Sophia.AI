@@ -7,7 +7,7 @@ function App() {
   let chainName = process.env.REACT_APP_CHAIN_NAME;
   console.log(`Launching app for chain-id=[${chainId}] chain-name=[${chainName}]`)
   return (
-    <Wrapper expectedChainId={80002} expectedChainName={"Polygon Amoy"}>
+    <Wrapper expectedChainId={chainId} expectedChainName={chainName}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Main />} />
