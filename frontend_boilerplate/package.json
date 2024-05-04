@@ -17,14 +17,16 @@
     "web-vitals": "^2.1.4",
     "web3": "^4.8.0"
   },
-  "start": "env-cmd -f .env.development react-scripts start",
-  "start:testnet": "env-cmd -f .env.test react-scripts start",
-  "start:mainnet": "env-cmd -f .env.production react-scripts start",
-  "build:local": "env-cmd -f .env.development react-scripts build",
-  "build:testnet": "env-cmd -f .env.test react-scripts build",
-  "build": "env-cmd -f .env.production react-scripts build",
-  "test": "react-scripts test",
-  "eject": "react-scripts eject",
+  "scripts": {
+    "start": "env-cmd -f .env.development react-scripts start",
+    "start:testnet": "env-cmd -f .env.test react-scripts start",
+    "start:mainnet": "env-cmd -f .env.production react-scripts start",
+    "build:local": "env-cmd -f .env.development react-scripts build",
+    "build:testnet": "env-cmd -f .env.test react-scripts build",
+    "build": "env-cmd -f .env.production react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
