@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {Card, CardContent, MenuItem, Select} from "@mui/material";
+import {Card, CardContent, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
 
 export default function AccountPicker({ web3, accounts, accountIndex, setAccountIndex }) {
@@ -41,9 +41,9 @@ export default function AccountPicker({ web3, accounts, accountIndex, setAccount
                                     <MenuItem value={index} key={index}>{account}</MenuItem>
                                 ))}
                             </Select>
-                            <label style={{fontSize: '0.9rem'}}>
+                            <Typography sx={{display: 'inline'}}>
                                 Balance: {balance} ETH
-                            </label>
+                            </Typography>
                         </>
                     )) || null}
                     <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
