@@ -5,19 +5,19 @@ import ConnectToWallet from "./ConnectToWallet";
 export default function AccountPicker({ web3, accounts, accountIndex, setAccountIndex }) {
     const [balance, setBalance] = useState('0');
 
-    // Function to fetch the balance of the selected account
-    const fetchBalance = async (account) => {
-        const weiBalance = await web3.eth.getBalance(account);
-        const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
-        setBalance(ethBalance);
-    };
-
     // Effect to update balance when accountIndex changes
     useEffect(() => {
+        // Function to fetch the balance of the selected account
+        const fetchBalance = async (account) => {
+            const weiBalance = await web3.eth.getBalance(account);
+            const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
+            setBalance(ethBalance);
+        };
+
         if (accounts.length > 0 && accountIndex < accounts.length) {
             fetchBalance(accounts[accountIndex]);
         }
-    }, [accountIndex, accounts]); // Depend on accountIndex and accounts
+    }, [web3, accountIndex, accounts]); // Depend on accountIndex and accounts
 
     // Handler for dropdown change
     const handleAccountChange = (event) => {
