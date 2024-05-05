@@ -9,7 +9,7 @@ module.exports = async function(_deployer, network) {
         case "develop":
         case "development":
             // We'll deploy our own mock contract.
-            await _deployer.deploy(ChainLinkMaticUsdLocalMock)
+            await _deployer.deploy(ChainLinkMaticUsdLocalMock);
             deployedAddress = await ChainLinkMaticUsdLocalMock.deployed().address;
             break;
         case "mainnet":
@@ -23,5 +23,5 @@ module.exports = async function(_deployer, network) {
         default:
             throw new Error("Unknown error: " + network + ". Please, set up a proper address for it");
     }
-    await _deployer.deploy(SophiaAIParams);
+    await _deployer.deploy(SophiaAIParams, deployedAddress);
 };
