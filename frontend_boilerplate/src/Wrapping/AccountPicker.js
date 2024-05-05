@@ -32,32 +32,26 @@ export default function AccountPicker({
     };
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: '10px',
-            left: '10px',
-        }}>
-            <Card style={{ width: 'auto' }}>
-                <CardContent>
-                    {(accounts && accounts.length && (
-                        <>
-                            <Select size="small" sx={{ bgcolor: 'background.paper', marginRight: '10px', padding: '5px' }}
-                                    value={accountIndex} onChange={handleAccountChange}>
-                                {accounts.map((account, index) => (
-                                    <MenuItem value={index} key={index}>{account}</MenuItem>
-                                ))}
-                            </Select>
-                            <Typography sx={{display: 'inline'}}>
-                                Balance: {balance} ETH
-                            </Typography>
-                            <IconButton onClick={balanceRefresher}>
-                                <RefreshIcon />
-                            </IconButton>
-                        </>
-                    )) || null}
-                    <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
-                </CardContent>
-            </Card>
-        </div>
+        <Card style={{ width: 'auto', position: 'fixed', top: '10px', left: '10px' }}>
+            <CardContent>
+                {(accounts && accounts.length && (
+                    <>
+                        <Select size="small" sx={{ bgcolor: 'background.paper', marginRight: '10px', padding: '5px' }}
+                                value={accountIndex} onChange={handleAccountChange}>
+                            {accounts.map((account, index) => (
+                                <MenuItem value={index} key={index}>{account}</MenuItem>
+                            ))}
+                        </Select>
+                        <Typography sx={{display: 'inline'}}>
+                            Balance: {balance} ETH
+                        </Typography>
+                        <IconButton onClick={balanceRefresher}>
+                            <RefreshIcon />
+                        </IconButton>
+                    </>
+                )) || null}
+                <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
+            </CardContent>
+        </Card>
     );
 }
