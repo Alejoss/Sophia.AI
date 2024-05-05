@@ -1,5 +1,5 @@
 import {useContext} from "react";
-import {Web3Context} from "web3";
+import Web3Context from "../Wrapping/Web3Context";
 import Web3AccountContext from "../Wrapping/Web3AccountContext";
 
 /**
