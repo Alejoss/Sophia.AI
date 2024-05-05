@@ -10,7 +10,7 @@ module.exports = async function(_deployer, network) {
         case "development":
             // We'll deploy our own mock contract.
             await _deployer.deploy(ChainLinkMaticUsdLocalMock);
-            deployedAddress = await ChainLinkMaticUsdLocalMock.deployed().address;
+            deployedAddress = (await ChainLinkMaticUsdLocalMock.deployed()).address;
             break;
         case "mainnet":
             // We'll make use of a specific address.
