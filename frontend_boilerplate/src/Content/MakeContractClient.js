@@ -199,7 +199,7 @@ const contractABI = [
     }
 ];
 
-export function makeContractClient(web3) {
+export default function makeContractClient(web3) {
     const contractAddress = process.env.REACT_APP_PARAMS_CONTRACT;
     if (contractAddress && !web3.utils.isZero(contractAddress)) {
         return new web3.eth.Contract(contractABI, contractAddress);
