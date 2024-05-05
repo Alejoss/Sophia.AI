@@ -1,23 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import {Card, CardContent, MenuItem, Select, Typography} from "@mui/material";
+import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-export default function AccountPicker({ web3, accounts, accountIndex, setAccountIndex }) {
+export default function AccountPicker({
+    web3, accounts, accountIndex, setAccountIndex, balanceRefresher, setBalanceRefresher
+}) {
     const [balance, setBalance] = useState('0');
 
     // Effect to update balance when accountIndex changes
     useEffect(() => {
         // Function to fetch the balance of the selected account
         const fetchBalance = async (account) => {
+            console.log(`>>> Refreshing balance for account ${account}...`);
             const weiBalance = await web3.eth.getBalance(account);
             const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
+            console.log(`<<< Account balance is: ${ethBalance}`);
             setBalance(ethBalance);
         };
 
         if (accounts.length > 0 && accountIndex < accounts.length) {
+            setBalanceRefresher(() => fetchBalance(accounts[accountIndex]))
             fetchBalance(accounts[accountIndex]);
         }
-    }, [web3, accountIndex, accounts]); // Depend on accountIndex and accounts
+    }, [web3, accountIndex, accounts, setBalanceRefresher]); // Depend on accountIndex and accounts
 
     // Handler for dropdown change
     const handleAccountChange = (event) => {
@@ -44,6 +50,9 @@ export default function AccountPicker({ web3, accounts, accountIndex, setAccount
                             <Typography sx={{display: 'inline'}}>
                                 Balance: {balance} ETH
                             </Typography>
+                            <IconButton onClick={balanceRefresher}>
+                                <RefreshIcon />
+                            </IconButton>
                         </>
                     )) || null}
                     <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
