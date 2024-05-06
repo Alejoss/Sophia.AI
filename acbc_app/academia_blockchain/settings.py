@@ -30,8 +30,8 @@ def get_env_variable(variable_name):
 
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
-DOCKER = True
-SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY")
+DOCKER = False
+SECRET_KEY = "na"
 
 # Application definition
 INSTALLED_APPS = [
