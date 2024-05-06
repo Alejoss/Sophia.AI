@@ -17,6 +17,10 @@ RUN pip install -r requirements.txt
 # Copy project files into the Docker image
 COPY . /app
 
+# Create Django superuser
+RUN python manage.py migrate && \
+    echo "from django.contrib.auth.models import User; User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')" | python manage.py shell
+
 # Expose the port Django runs on
 EXPOSE 8000
 
