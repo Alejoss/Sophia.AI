@@ -1,13 +1,16 @@
 import AccountPicker from "./AccountPicker.js";
-import {useRef, useState} from "react";
+import {useMemo, useRef, useState} from "react";
 import Web3AccountContext from "./Web3AccountContext";
 
 
 export default function ChoosingAccount({ web3, accounts, children }) {
     const [accountIndex, setAccountIndex] = useState(0);
     const [balanceRefresherObj, setBalanceRefresherObj] = useState({callback: () => {}});
-    const setBalanceRefresher = useRef(null);
-    setBalanceRefresher.callback = (br) => setBalanceRefresherObj({callback: br});
+    const setBalanceRefresherRef = useRef(null);
+    setBalanceRefresherRef.callback = (br) => setBalanceRefresherObj({callback: br});
+    const setBalanceRefresher = useMemo(function() {
+        return (br) => { setBalanceRefresherRef.callback(br); }
+    }, [setBalanceRefresherRef]);
     const account = ((!accounts || accountIndex >= accounts.length)
         ? "" : accounts[accountIndex]);
 
