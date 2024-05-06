@@ -1,4 +1,4 @@
-import React, {useState, useMemo, forwardRef, useImperativeHandle} from 'react';
+import React, {useState, useMemo, forwardRef, useImperativeHandle, useEffect} from 'react';
 import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -29,6 +29,10 @@ const AccountPicker = forwardRef(({
 
     useImperativeHandle(ref, () => {
         return { refreshBalance }
+    }, [refreshBalance]);
+
+    useEffect(() => {
+        refreshBalance();
     }, [refreshBalance]);
 
     // Handler for dropdown change
