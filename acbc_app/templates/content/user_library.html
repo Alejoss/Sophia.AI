@@ -25,7 +25,7 @@
                     {% for file in library_files %}
                         <li class="list-group-item d-flex justify-content-between">
                             {{ file.title }} / {{ file.edition }} / {{ file.year }} / {{ file.author }}
-                            <span class="text-end"><a href="">Read</a></span>
+                            <span class="text-end"><a href="{% url 'file_detail' pk=file.pk %}">Read</a></span>
                         </li>
                     {% endfor %}
                 </ul>

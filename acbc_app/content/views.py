@@ -35,6 +35,11 @@ def file_upload(request):
     return render(request, 'content/file_upload.html', {'form': form})
 
 
+def file_detail(request, pk):
+    file = get_object_or_404(File, pk=pk)
+    return render(request, 'content/file_detail.html', {'file': file})
+
+
 # Create a new library
 def library_create(request):
     if request.method == "POST":

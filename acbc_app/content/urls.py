@@ -5,9 +5,10 @@ from content import views
 urlpatterns = [
     # Library URLs
     path('libraries/', views.library_list, name='library_list'),
-
     path('libraries/user_library', views.user_library, name='user_library'),
     path('libraries/user_library/file_upload', views.file_upload, name='file_upload'),
+    path('files/<int:pk>/', views.file_detail, name='file_detail'),
+
     path('libraries/new/', views.library_create, name='library_create'),
     path('libraries/<int:pk>/edit/', views.library_update, name='library_update'),
     path('libraries/<int:pk>/delete/', views.library_delete, name='library_delete'),

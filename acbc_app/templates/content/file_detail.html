@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+     <div class="container mt-5">
+        <h1>{{ file.title }}</h1>
+        <p><strong>Edition:</strong> {{ file.edition }}</p>
+        <p><strong>Year:</strong> {{ file.year }}</p>
+        <p><strong>Author:</strong> {{ file.author }}</p>
+        <p><strong>Description:</strong> {{ file.description }}</p>
+        <p><strong>File Size:</strong> {{ file.file_size }} bytes</p>
+        <p><strong>Uploaded At:</strong> {{ file.uploaded_at }}</p>
+        <a href="{{ file.file.url }}" download>Download File</a>
+    </div>
+{% endblock content %}
