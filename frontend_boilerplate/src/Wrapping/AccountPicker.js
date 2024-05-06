@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -7,23 +7,29 @@ export default function AccountPicker({
     web3, accounts, accountIndex, setAccountIndex, balanceRefresher, setBalanceRefresher
 }) {
     const [balance, setBalance] = useState('0');
+    const ref = useRef(null);
+    ref.callback = setBalance;
 
-    // Effect to update balance when accountIndex changes
-    useEffect(() => {
-        // Function to fetch the balance of the selected account
-        const fetchBalance = async (account) => {
-            console.log(`>>> Refreshing balance for account ${account}...`);
-            const weiBalance = await web3.eth.getBalance(account);
-            const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
-            console.log(`<<< Account balance is: ${ethBalance}`);
-            setBalance(ethBalance);
-        };
-
+    // We'll compute a function for when the accountIndex is set.
+    // We'll set this function in the setBalanceRefresher state,
+    // so it can be used in other components later.
+    const newBalanceRefresher = useMemo(function() {
         if (accounts.length > 0 && accountIndex < accounts.length) {
-            setBalanceRefresher(() => fetchBalance(accounts[accountIndex]))
-            fetchBalance(accounts[accountIndex]);
+            const account = accounts[accountIndex];
+            return async () => {
+                console.log(`>>> Refreshing balance for account ${account}...`);
+                const weiBalance = await web3.eth.getBalance(account);
+                const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
+                console.log(`<<< Account balance is: ${ethBalance}`);
+                ref.callback(ethBalance);
+            };
+        } else {
+            return () => {};
         }
-    }, [web3, accountIndex, accounts, setBalanceRefresher]); // Depend on accountIndex and accounts
+    }, [web3, accounts, accountIndex, ref]);
+    useEffect(() => {
+        setBalanceRefresher.callback(newBalanceRefresher);
+    }, [setBalanceRefresher, newBalanceRefresher]);
 
     // Handler for dropdown change
     const handleAccountChange = (event) => {
