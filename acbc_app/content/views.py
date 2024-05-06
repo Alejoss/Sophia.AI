@@ -12,8 +12,13 @@ def library_list(request):
 
 
 def user_library(request):
-    library = None
-    return render(request, 'content/user_library.html', {'library': library})
+    library = Library.objects.filter(user=request.user).first()
+    print(f"User: {request.user}")
+    print(f"Library: {library}")
+    library_files = File.objects.filter(library=library)
+    print(f"Files: {library_files}")
+
+    return render(request, 'content/user_library.html', {'library_files': library_files})
 
 
 def file_upload(request):

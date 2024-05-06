@@ -13,6 +13,7 @@ class Group(models.Model):
 
 
 class File(models.Model):
+    library = models.ForeignKey(Library, on_delete=models.CASCADE, null=True, blank=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to='files/')
     title = models.CharField(max_length=255)

@@ -22,18 +22,12 @@
         <div class="row">
             <div class="container my-4">
                 <ul class="list-group">
-                    <li class="list-group-item d-flex justify-content-between">
-                        The Origin of the Species / Special Edition Editorial Science / Charles Darwin <span class="text-end">Book</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        The Wealth of the Nations / 1992 Editorial Insfree / Adam Smith  <span class="text-end">Book</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        The Brics Phony Oposition <span class="text-end">Article</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        Corman Drosten Scientific Review <span class="text-end">Scientific Publication</span>
-                    </li>
+                    {% for file in library_files %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            {{ file.title }} / {{ file.edition }} / {{ file.year }} / {{ file.author }}
+                            <span class="text-end"><a href="">Read</a></span>
+                        </li>
+                    {% endfor %}
                 </ul>
             </div>
         </div>
