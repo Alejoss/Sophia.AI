@@ -25,7 +25,7 @@ export default function AccountPicker({
                 const weiBalance = await web3.eth.getBalance(account);
                 const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
                 console.log(`<<< Account balance is: ${ethBalance}`);
-                setBalance.callback(ethBalance);
+                setBalance(ethBalance);
             };
         } else {
             return () => {};
