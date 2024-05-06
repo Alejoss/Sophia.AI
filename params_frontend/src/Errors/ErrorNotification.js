@@ -1,5 +1,6 @@
 import React, {forwardRef, useImperativeHandle, useState} from 'react';
 import Snackbar from '@mui/material/Snackbar';
+import {Alert} from "@mui/material";
 
 const ErrorNotification = forwardRef(({ duration }, ref) => {
     const [message, setMessage] = useState('');
@@ -36,11 +37,21 @@ const ErrorNotification = forwardRef(({ duration }, ref) => {
 
     return (
         <Snackbar
-            open={message != null}
+            open={!!message}
             autoHideDuration={duration}  // Snackbar will auto close after 6000ms
             onClose={handleClose}
             message={message}
-        />
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+            <Alert
+                onClose={handleClose}
+                severity="error"
+                variant="filled"
+                sx={{ width: '100%' }}
+            >
+                {message}
+            </Alert>
+        </Snackbar>
     );
 });
 
