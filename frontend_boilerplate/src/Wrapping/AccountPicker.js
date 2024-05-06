@@ -1,56 +1,65 @@
-import React, { useState, useEffect } from 'react';
-import {Card, CardContent} from "@mui/material";
+import React, {useState, useMemo, forwardRef, useImperativeHandle} from 'react';
+import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-export default function AccountPicker({ web3, accounts, accountIndex, setAccountIndex }) {
-    const [balance, setBalance] = useState('0');
+const AccountPicker = forwardRef(({
+    web3, accounts, accountIndex, onAccountIndexChange
+}, ref) => {
+    // eslint-disable-next-line no-undef
+    const [balance, setBalance] = useState(BigInt('0'));
 
-    // Function to fetch the balance of the selected account
-    const fetchBalance = async (account) => {
-        const weiBalance = await web3.eth.getBalance(account);
-        const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
-        setBalance(ethBalance);
-    };
-
-    // Effect to update balance when accountIndex changes
-    useEffect(() => {
+    // We'll compute a function for when the accountIndex is set.
+    // We'll set this function in the setBalanceRefresher state,
+    // so it can be used in other components later.
+    const refreshBalance = useMemo(function() {
         if (accounts.length > 0 && accountIndex < accounts.length) {
-            fetchBalance(accounts[accountIndex]);
+            const account = accounts[accountIndex];
+            return async () => {
+                console.log(`>>> Refreshing balance for account ${account}...`);
+                const weiBalance = await web3.eth.getBalance(account);
+                const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
+                console.log(`<<< Account balance is: ${ethBalance}`);
+                setBalance(ethBalance);
+            };
+        } else {
+            return () => {};
         }
-    }, [accountIndex, accounts]); // Depend on accountIndex and accounts
+    }, [web3, accounts, accountIndex, setBalance]);
+
+    useImperativeHandle(ref, () => {
+        return { refreshBalance }
+    }, [refreshBalance]);
 
     // Handler for dropdown change
     const handleAccountChange = (event) => {
         const newIndex = parseInt(event.target.value, 10);
-        setAccountIndex(newIndex);
+        onAccountIndexChange(newIndex);
     };
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: '10px',
-            left: '10px',
-        }}>
-            <Card style={{ width: 'auto' }}>
-                <CardContent>
-                    {(accounts && accounts.length && (
-                        <>
-                            <select onChange={handleAccountChange} value={accountIndex}
-                                    style={{padding: '5px', marginRight: '10px'}}>
-                                {accounts.map((account, index) => (
-                                    <option key={account} value={index}>
-                                        {account}
-                                    </option>
-                                ))}
-                            </select>
-                            <label style={{fontSize: '0.9rem'}}>
-                                Balance: {balance} ETH
-                            </label>
-                        </>
-                    )) || null}
-                    <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
-                </CardContent>
-            </Card>
-        </div>
+        <Card style={{ width: 'auto', position: 'fixed', top: '10px', left: '10px' }}>
+            <CardContent>
+                {(accounts && accounts.length && (
+                    <>
+                        <Select size="small" sx={{ bgcolor: 'background.paper', marginRight: '10px', padding: '5px' }}
+                                value={accountIndex} onChange={handleAccountChange}>
+                            {accounts.map((account, index) => (
+                                <MenuItem value={index} key={index}>{account}</MenuItem>
+                            ))}
+                        </Select>
+                        <Typography sx={{display: 'inline'}}>
+                            Balance: {balance.toString()} ETH
+                        </Typography>
+                        <IconButton onClick={refreshBalance}>
+                            <RefreshIcon />
+                        </IconButton>
+                    </>
+                )) || null}
+                <ConnectToWallet web3={web3} style={{marginLeft: '10px'}}/>
+            </CardContent>
+        </Card>
     );
-}
+});
+
+export default AccountPicker;
