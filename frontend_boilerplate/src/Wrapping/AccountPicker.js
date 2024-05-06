@@ -53,7 +53,7 @@ export default function AccountPicker({
                             ))}
                         </Select>
                         <Typography sx={{display: 'inline'}}>
-                            Balance: {balance} ETH
+                            Balance: {balance.toString()} ETH
                         </Typography>
                         <IconButton onClick={balanceRefresher}>
                             <RefreshIcon />
