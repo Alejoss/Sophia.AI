@@ -31,6 +31,7 @@ logger = logging.getLogger('app_logger')
 HTML RENDERS
 """
 
+
 # Display a list of all non-deleted events along with their associated tags
 def event_index(request):
     template = "courses/events.html"
@@ -40,17 +41,20 @@ def event_index(request):
     context = {"events": events, "event_index_active": "active", "tags": tags}
     return render(request, template, context)
 
+
 # Display about page
 def about(request):
     template = "courses/about.html"
     context = {"info_index_active": "active"}
     return render(request, template, context)
 
+
 # Display a page with extra info on descentralized education
 def descentralize_education(request):
     template = "courses/descentralize_education.html"
     context = {"info_index_active": "active"}
     return render(request, template, context)
+
 
 # Display events associated with a specific tag
 def events_tag(request, tag_id):
@@ -61,6 +65,7 @@ def events_tag(request, tag_id):
     context = {"events": events, "event_index_active": "active", "tags": tags, "tag": tag}
     return render(request, template, context)
 
+
 # Display all events
 def events_all(request):
     template = "courses/events_all.html"
@@ -68,6 +73,7 @@ def events_all(request):
     tags = Tag.objects.all()
     context = {"events": events, "event_index_active": "active", "tags": tags}
     return render(request, template, context)
+
 
 # Handle search functionality for events
 def event_search(request):
@@ -404,6 +410,7 @@ def event_comment(request, event_id):
         # Return a 400 Bad Request response if the request method is not POST
         return HttpResponse(status=400)
 
+
 def certificate_preview(request, cert_id):
     """
     Generates a preview of a certificate by rendering text on a base certificate image.
@@ -452,7 +459,8 @@ def certificate_preview(request, cert_id):
     img_draw.multiline_text((310, 800), certificate.user.username, font=font_owner_certificate, fill=(96, 96, 96))
 
     # Draw the creation date of the certificate
-    img_draw.multiline_text((310, 935), certificate.date_created.strftime("%d %b %Y"), font=font_date, fill=(96, 96, 96))
+    img_draw.multiline_text((310, 935), certificate.date_created.strftime("%d %b %Y"), font=font_date,
+                            fill=(96, 96, 96))
 
     # Save the modified image to a buffer and encode it to base64 for HTML display
     buffered = BytesIO()
@@ -502,6 +510,7 @@ def send_cert_blockchain(request, cert_id):
 """
 API CALLS
 """
+
 
 @login_required
 def event_bookmark(request, event_id):
@@ -582,6 +591,7 @@ def remove_bookmark(request, event_id):
         # Return status code 403 if the request is not made via AJAX
         return HttpResponse(status=403)
 
+
 def certificate_detail(request, certificate_id):
     """
     Retrieve and return details of a specific certificate as a JSON response. This includes user and event details
@@ -613,6 +623,7 @@ def certificate_detail(request, certificate_id):
 
     # Return the certificate data as JSON
     return JsonResponse(cert_data)
+
 
 @login_required
 def request_certificate(request, event_id):
@@ -649,6 +660,7 @@ def request_certificate(request, event_id):
     else:
         # Return HTTP 403 for non-AJAX requests or non-POST methods
         return HttpResponse(status=403)
+
 
 @login_required
 def cancel_cert_request(request, cert_request_id):
@@ -692,6 +704,7 @@ def cancel_cert_request(request, cert_request_id):
         # Return HTTP 400 for non-AJAX requests or non-POST methods
         return HttpResponse(status=400)
 
+
 @login_required
 def accept_cert_request(request, cert_request_id):
     """
@@ -731,6 +744,7 @@ def accept_cert_request(request, cert_request_id):
     else:
         # Return status code 400 for requests that are not AJAX or POST
         return HttpResponse(status=400)
+
 
 @login_required
 def reject_cert_request(request, cert_request_id):
@@ -772,6 +786,7 @@ def reject_cert_request(request, cert_request_id):
         # Return status code 400 for non-AJAX or non-POST requests
         return HttpResponse(status=400)
 
+
 @login_required
 def restore_cert_request(request, cert_request_id):
     """
@@ -797,7 +812,8 @@ def restore_cert_request(request, cert_request_id):
         if request.user == certificate_request.event.owner:
             # Check if a certificate has already been issued for the request
             if Certificate.objects.filter(event=certificate_request.event, user=certificate_request.user).exists():
-                logger.debug(f"Attempt to restore a certificate request for which a certificate already exists: {certificate_request.id}")
+                logger.debug(
+                    f"Attempt to restore a certificate request for which a certificate already exists: {certificate_request.id}")
                 # Skip restoration as a certificate exists
             else:
                 # If no certificate exists, set the request state back to 'PENDING'
@@ -810,6 +826,7 @@ def restore_cert_request(request, cert_request_id):
     else:
         # Return status code 400 for non-AJAX or non-POST requests
         return HttpResponse(status=400)
+
 
 # API coingeko
 def coins_value(accepted_cryptos, event):
