@@ -1,23 +1,18 @@
-import React, {useState, useEffect, useMemo, useRef} from 'react';
+import React, {useState, useMemo, forwardRef, useImperativeHandle} from 'react';
 import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-export default function AccountPicker({
-                                          web3, accounts, accountIndex, setAccountIndex, balanceRefresher, setBalanceRefresher
-                                      }) {
+const AccountPicker = forwardRef(({
+    web3, accounts, accountIndex, onAccountIndexChange
+}, ref) => {
     // eslint-disable-next-line no-undef
-    const [balance, setBalance_] = useState(BigInt('0'));
-    const setBalanceRef = useRef(null);
-    setBalanceRef.callback = setBalance_;
-    const setBalance = useMemo(function() {
-        return (b) => setBalanceRef.callback(b);
-    }, [setBalanceRef])
+    const [balance, setBalance] = useState(BigInt('0'));
 
     // We'll compute a function for when the accountIndex is set.
     // We'll set this function in the setBalanceRefresher state,
     // so it can be used in other components later.
-    const newBalanceRefresher = useMemo(function() {
+    const refreshBalance = useMemo(function() {
         if (accounts.length > 0 && accountIndex < accounts.length) {
             const account = accounts[accountIndex];
             return async () => {
@@ -31,14 +26,15 @@ export default function AccountPicker({
             return () => {};
         }
     }, [web3, accounts, accountIndex, setBalance]);
-    useEffect(() => {
-        setBalanceRefresher(newBalanceRefresher);
-    }, [setBalanceRefresher, newBalanceRefresher]);
+
+    useImperativeHandle(ref, () => {
+        return { refreshBalance }
+    }, [refreshBalance]);
 
     // Handler for dropdown change
     const handleAccountChange = (event) => {
         const newIndex = parseInt(event.target.value, 10);
-        setAccountIndex(newIndex);
+        onAccountIndexChange(newIndex);
     };
 
     return (
@@ -55,7 +51,7 @@ export default function AccountPicker({
                         <Typography sx={{display: 'inline'}}>
                             Balance: {balance.toString()} ETH
                         </Typography>
-                        <IconButton onClick={balanceRefresher}>
+                        <IconButton onClick={refreshBalance}>
                             <RefreshIcon />
                         </IconButton>
                     </>
@@ -64,4 +60,6 @@ export default function AccountPicker({
             </CardContent>
         </Card>
     );
-}
+});
+
+export default AccountPicker;

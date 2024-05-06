@@ -1,23 +1,22 @@
 import AccountPicker from "./AccountPicker.js";
-import {useMemo, useRef, useState} from "react";
+import {useRef, useState} from "react";
 import Web3AccountContext from "./Web3AccountContext";
 
 
 export default function ChoosingAccount({ web3, accounts, children }) {
     const [accountIndex, setAccountIndex] = useState(0);
-    const [balanceRefresherObj, setBalanceRefresherObj] = useState({callback: () => {}});
-    const setBalanceRefresherRef = useRef(null);
-    setBalanceRefresherRef.callback = (br) => setBalanceRefresherObj({callback: br});
-    const setBalanceRefresher = useMemo(function() {
-        return (br) => { setBalanceRefresherRef.callback(br); }
-    }, [setBalanceRefresherRef]);
     const account = ((!accounts || accountIndex >= accounts.length)
         ? "" : accounts[accountIndex]);
 
+    // One ref for the account picker.
+    // This ref will hold a method: ref.current.refreshBalance().
+    const accountPickerRef = useRef();
+    let balanceRefresher = accountPickerRef.current?.refreshBalance || (() => {});
+
     return <>
-        <AccountPicker web3={web3} accounts={accounts} accountIndex={accountIndex} setAccountIndex={setAccountIndex}
-                       balanceRefresher={balanceRefresherObj.callback} setBalanceRefresher={setBalanceRefresher} />
-        <Web3AccountContext.Provider value={{account: account, balanceRefresher: balanceRefresherObj.callback}}>
+        <AccountPicker web3={web3} accounts={accounts} accountIndex={accountIndex} onAccountIndexChange={setAccountIndex}
+                       ref={accountPickerRef} />
+        <Web3AccountContext.Provider value={{account, balanceRefresher}}>
             {children}
         </Web3AccountContext.Provider>;
     </>;
