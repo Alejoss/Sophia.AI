@@ -1,13 +1,15 @@
-import React, {useState, useMemo, forwardRef, useImperativeHandle, useEffect} from 'react';
+import React, {useState, useMemo, forwardRef, useImperativeHandle, useEffect, useContext} from 'react';
 import {Card, CardContent, IconButton, MenuItem, Select, Typography} from "@mui/material";
 import ConnectToWallet from "./ConnectToWallet";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ErrorLauncherContext from "../Errors/ErrorLauncherContext";
 
 const AccountPicker = forwardRef(({
-    web3, accounts, accountIndex, onAccountIndexChange
-}, ref) => {
+                                      web3, accounts, accountIndex, onAccountIndexChange
+                                  }, ref) => {
     // eslint-disable-next-line no-undef
     const [balance, setBalance] = useState(BigInt('0'));
+    const errorLauncher = useContext(ErrorLauncherContext);
 
     // We'll compute a function for when the accountIndex is set.
     // We'll set this function in the setBalanceRefresher state,
@@ -15,17 +17,17 @@ const AccountPicker = forwardRef(({
     const refreshBalance = useMemo(function() {
         if (accounts.length > 0 && accountIndex < accounts.length) {
             const account = accounts[accountIndex];
-            return async () => {
+            return errorLauncher.current.capturingError(async () => {
                 console.log(`>>> Refreshing balance for account ${account}...`);
                 const weiBalance = await web3.eth.getBalance(account);
                 const ethBalance = web3.utils.fromWei(weiBalance, 'ether');
                 console.log(`<<< Account balance is: ${ethBalance}`);
                 setBalance(ethBalance);
-            };
+            });
         } else {
             return () => {};
         }
-    }, [web3, accounts, accountIndex, setBalance]);
+    }, [web3, accounts, accountIndex, setBalance, errorLauncher]);
 
     useImperativeHandle(ref, () => {
         return { refreshBalance }
