@@ -12,4 +12,11 @@
         <p><strong>Uploaded At:</strong> {{ file.uploaded_at }}</p>
         <a href="{{ file.file.url }}" download>Download File</a>
     </div>
+
+    {% if file.hash %}
+        <p>Hash: {{ file.hash }}</p>
+    {% else %}
+        <a href="{% url 'hash_pdf_view' file.id %}">Hash the document</a>
+    {% endif %}
+
 {% endblock content %}

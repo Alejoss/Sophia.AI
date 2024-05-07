@@ -1,7 +1,6 @@
-from django.shortcuts import render
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Library, Group, File
-from .utils import FileUploadForm
+from .utils import FileUploadForm, hash_pdf
 from django.http import HttpResponse
 
 
@@ -35,8 +34,24 @@ def file_upload(request):
     return render(request, 'content/file_upload.html', {'form': form})
 
 
-def file_detail(request, pk):
-    file = get_object_or_404(File, pk=pk)
+def hash_pdf_view(request, file_id):
+    file_instance = get_object_or_404(File, pk=file_id)
+
+    if file_instance.extension.lower() == 'pdf':
+        hash_value = hash_pdf(file_instance.file.path)
+
+        # Save the hash to the database
+        file_instance.hash = hash_value
+        file_instance.save()
+
+        # Redirect to the file detail view, passing the file's ID
+        return redirect('file_detail', file_id=file_instance.id)
+
+    return HttpResponse({'error': 'File is not a PDF'}, status=400)
+
+
+def file_detail(request, file_id):
+    file = get_object_or_404(File, pk=file_id)
     return render(request, 'content/file_detail.html', {'file': file})
 
 

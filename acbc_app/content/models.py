@@ -24,6 +24,8 @@ class File(models.Model):
     author = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     file_size = models.PositiveIntegerField(blank=True, null=True)  # Size in bytes
+    hash = models.CharField(max_length=64, blank=True, null=True)
+
 
     def save(self, *args, **kwargs):
         # Calculate file size in bytes
