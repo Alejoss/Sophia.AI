@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: backend.Dockerfile
+    container_name: acbc_backend
     volumes:
       - .:/app
       - static_volume:/app/static
