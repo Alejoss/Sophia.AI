@@ -1,5 +1,6 @@
 from .models import File
 from django import forms
+import fitz # PyMuPDF
 
 import hashlib
 import pdfquery
@@ -12,17 +13,12 @@ class FileUploadForm(forms.ModelForm):
 
 
 def hash_pdf(file_path):
-    # Load the PDF using PDFQuery
-    pdf = pdfquery.PDFQuery(file_path)
-    pdf.load()
-
-    # Extract text content from the PDF
+    document = fitz.open(file_path)
     text_content = ""
-    for page in range(1, pdf.doc.catalog['Pages']['Count'] + 1):  # TODO error 'PDFObjRef' object is not subscriptable
-        pdf.load(page)
-        text_content += pdf.pq('LTTextLineHorizontal').text()
 
-    # Compute the SHA-256 hash
+    for page in document:
+        text_content += page.get_text()
+
     sha256_hash = hashlib.sha256(text_content.encode('utf-8')).hexdigest()
-
+    print(f"SHA256 Hash: {sha256_hash}")
     return sha256_hash
