@@ -1,7 +1,7 @@
 import {useContext, useState} from "react";
 import Web3Context from "../Wrapping/Web3Context";
 import Web3AccountContext from "../Wrapping/Web3AccountContext";
-import {AppBar, IconButton, Paper, Toolbar, Typography} from "@mui/material";
+import {Alert, AppBar, IconButton, Paper, Toolbar, Typography} from "@mui/material";
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MakeContractClient from './MakeContractClient';
 import InfoIcon from '@mui/icons-material/Info';
@@ -72,27 +72,23 @@ export default function Main() {
             </Toolbar>
         </AppBar>
 
-        <Typography variant="body1" color="primary" style={{ marginTop: '20px' }}>
+        <Alert severity="info" sx={{marginTop: 4}}>
             This section allows the contract owner to modify the business parameters.
             This involves management of ownership, earnings, and costs (expressed in USD).
-        </Typography>
+        </Alert>
         {!isOwner ? (
-            <>
-                <Typography variant="body1" color="error">
-                    You're not the owner of this contract. Only the owner of this contract can edit these fields.
-                </Typography>
-                <Typography variant="body1" color="error">
-                    Any attempt to make any change will fail. If you think this is an error / outdated, refresh the page.
-                </Typography>
-            </>
+            <Alert severity="error">
+                You're not the owner of this contract. Only the owner of this contract can edit these fields.
+                Any attempt to make any change will fail. If you think this is an error / outdated, refresh the page.
+            </Alert>
         ) : (
             <>
-                <Typography variant="body1" color="success">
+                <Alert severity="success">
                     You're the owner of this contract. You can change any of these parameters.
-                </Typography>
-                <Typography variant="body1" color="warnings">
+                </Alert>
+                <Alert severity="warning">
                     These actions are dangerous, all of them. These can affect the entire business or make you lose the saved money.
-                </Typography>
+                </Alert>
             </>
         )}
         {/* Placeholder for further content */}
