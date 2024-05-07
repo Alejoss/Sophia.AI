@@ -4,10 +4,15 @@ import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ClearIcon from '@mui/icons-material/Clear';
 import Web3 from 'web3';
 
-function AddressInput({value, onChange}) {
+function AddressInput({value, onChange, sx, buttonSx}) {
     const [address, setAddress] = useState(value || "0x0");
     const [error, setError] = useState('');
     const [tooltipOpen, setTooltipOpen] = useState(false);
+    sx = sx || {};
+    buttonSx = buttonSx || {};
+    if (typeof sx.height !== "undefined") {
+        buttonSx = sx.height;
+    }
 
     const handlePaste = async () => {
         try {
@@ -60,12 +65,13 @@ function AddressInput({value, onChange}) {
                     variant="outlined"
                     error={!!error}
                     onClick={handleCloseTooltip}  // Close tooltip when the text field is clicked
+                    sx={{sx}}
                 />
             </Tooltip>
-            <IconButton onClick={handlePaste} color="primary">
+            <IconButton onClick={handlePaste} color="primary" sx={{buttonSx}}>
                 <ContentPasteIcon />
             </IconButton>
-            <IconButton onClick={handleClear} color="secondary">
+            <IconButton onClick={handleClear} color="secondary" sx={{buttonSx}}>
                 <ClearIcon />
             </IconButton>
         </div>
