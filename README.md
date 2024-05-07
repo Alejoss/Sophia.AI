@@ -13,5 +13,3 @@ docker-compose exec backend python manage.py migrate
 *Optionally create a superuser:*
 
 docker exec acbc_backend python manage.py create_admin
-
-
