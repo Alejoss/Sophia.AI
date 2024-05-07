@@ -1,4 +1,4 @@
-import {useContext, useState} from "react";
+import {useContext, useEffect, useState} from "react";
 import Web3Context from "../Wrapping/Web3Context";
 import Web3AccountContext from "../Wrapping/Web3AccountContext";
 import {Alert, AppBar, IconButton, Paper, Toolbar, Typography} from "@mui/material";
@@ -57,6 +57,11 @@ export default function Main() {
         console.log("Setting refresh data...");
         setParamsData({owner, earningsReceiver, earningsBalance, fiatCosts});
     });
+
+    // Force an initial refresh for our app.
+    useEffect(() => {
+        refresh();
+    }, [refresh]);
 
     return <Paper elevation={3} style={{ margin: '40px', marginTop: '120px', padding: '20px' }}>
         <AppBar position="static" color="primary">
