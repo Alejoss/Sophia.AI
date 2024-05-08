@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import { TextField, IconButton, Tooltip } from '@mui/material';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -13,6 +13,13 @@ function AddressInput({value, onChange, sx, buttonSx, variant = "outlined", ...p
     if (typeof sx.height !== "undefined") {
         buttonSx = sx.height;
     }
+
+    useEffect(() => {
+        setAddress(value || "0x0");
+        if (error) {
+            setTimeout(() => setError(''), 3000);
+        }
+    }, [value, error]);
 
     const handlePaste = async () => {
         try {
