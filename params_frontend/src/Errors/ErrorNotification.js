@@ -13,7 +13,7 @@ const ErrorNotification = forwardRef(({ duration }, ref) => {
         capturingError: function(f) {
             return function(...args) {
                 try {
-                    let result = f.apply(null, args);
+                    let result = f(...args);
                     if (result instanceof Promise) {
                         return result.catch(function(e) {
                             console.error(e);
