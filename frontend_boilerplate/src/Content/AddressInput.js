@@ -4,7 +4,7 @@ import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ClearIcon from '@mui/icons-material/Clear';
 import Web3 from 'web3';
 
-function AddressInput({value, onChange, sx, buttonSx, variant = "outlined"}) {
+function AddressInput({value, onChange, sx, buttonSx, variant = "outlined", ...props}) {
     const [address, setAddress] = useState(value || "0x0");
     const [error, setError] = useState('');
     const [tooltipOpen, setTooltipOpen] = useState(false);
@@ -66,6 +66,7 @@ function AddressInput({value, onChange, sx, buttonSx, variant = "outlined"}) {
                     error={!!error}
                     onClick={handleCloseTooltip}  // Close tooltip when the text field is clicked
                     sx={{sx}}
+                    {...props}
                 />
             </Tooltip>
             <IconButton onClick={handlePaste} color="primary" sx={{buttonSx}}>

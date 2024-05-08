@@ -20,7 +20,7 @@ function sanitizeInput(input) {
     return sanitized;
 }
 
-function TokenInput({ value: initialWei, onChange, sx, variant = "outlined", unit = 'ether' }) {
+function TokenInput({ value: initialWei, onChange, sx, variant = "outlined", unit = 'ether', ...props }) {
     // eslint-disable-next-line no-undef
     initialWei = (initialWei instanceof BigInt) ? initialWei : BigInt(0);
     sx = sx || {};
@@ -48,6 +48,7 @@ function TokenInput({ value: initialWei, onChange, sx, variant = "outlined", uni
             value={value}
             onChange={handleChange}
             sx={{...sx}}
+            {...props}
         />
     );
 }
