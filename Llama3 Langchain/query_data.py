@@ -1,9 +1,14 @@
 import argparse
 from dataclasses import dataclass
-from langchain.vectorstores.chroma import Chroma
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+from langchain_community.chat_models import ChatOpenAI
+
+# Directly specifying the OpenAI API key
+
+open_ai_api_key = ""
 
 CHROMA_PATH = "chroma"
 
@@ -26,7 +31,7 @@ def main():
     query_text = args.query_text
 
     # Prepare the DB.
-    embedding_function = OpenAIEmbeddings()
+    embedding_function = OpenAIEmbeddings(api_key=open_ai_api_key)
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
 
     # Search the DB.
@@ -40,7 +45,7 @@ def main():
     prompt = prompt_template.format(context=context_text, question=query_text)
     print(prompt)
 
-    model = ChatOpenAI()
+    model = ChatOpenAI(api_key=open_ai_api_key)
     response_text = model.predict(prompt)
 
     sources = [doc.metadata.get("source", None) for doc, _score in results]
