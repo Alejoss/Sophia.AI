@@ -1,13 +1,15 @@
-from langchain.document_loaders import DirectoryLoader
+from typing import List
+from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+
 
 import os
 import shutil
 
-CHROMA_PATH = "chroma"
+CHROMA_PATH = "/chroma_db"
 DATA_PATH = "/books"
 
 
@@ -24,7 +26,7 @@ def load_documents():
     return documents
 
 
-def split_text(documents: list[Document]):
+def split_text(documents: List[Document]):
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=300,
         chunk_overlap=100,
@@ -41,7 +43,7 @@ def split_text(documents: list[Document]):
     return chunks
 
 
-def save_to_chroma(chunks: list[Document]):
+def save_to_chroma(chunks: List[Document]):
     # Clear out the database first.
     if os.path.exists(CHROMA_PATH):
         shutil.rmtree(CHROMA_PATH)
