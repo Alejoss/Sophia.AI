@@ -71,6 +71,10 @@ Then, configure the local network in MetaMask with the following data:
 4. Chain ID: 31337.
 5. No block explorer.
 
+__Important__: If this is already set and you're launching the hardhat node again, reset your wallet's cache.
+
+There are times (and this is particular relevant to MetaMask) where you get weird errors due to tx nonces otherwise.
+
 ## Fund your MetaMask account
 
 For this project in particular, the seed is this:
