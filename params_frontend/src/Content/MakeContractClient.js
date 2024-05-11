@@ -201,12 +201,12 @@ const contractABI = [
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-export default function makeContractClient(web3) {
+export default function makeContractClient(web3, account) {
     const contractAddress = process.env.REACT_APP_PARAMS_CONTRACT;
     if (contractAddress && web3.utils.isAddress(contractAddress) && (
         web3.utils.toChecksumAddress(contractAddress) !== web3.utils.toChecksumAddress(ZERO_ADDRESS)
     )) {
-        return new web3.eth.Contract(contractABI, contractAddress);
+        return new web3.eth.Contract(contractABI, contractAddress, {from: account});
     }
     return null;
 }
