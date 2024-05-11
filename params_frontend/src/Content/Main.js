@@ -50,16 +50,15 @@ export default function Main() {
     const isOwner = paramsData.owner === account;
     const earningsReceiver = paramsData.earningsReceiver;
     const costParams = paramsData.fiatCosts;
-    const setEarningsReceiver = (er) => {
-        setParamsData({
-            ...paramsData, earningsReceiver: er
-        });
-    }
     const setCostParam = (hash, value) => {
         let newFiatCosts = {...paramsData.fiatCosts};
         newFiatCosts[hash] = value;
         setParamsData({...paramsData, fiatCosts: newFiatCosts});
     }
+    const [newEarningsReceiver, setNewEarningsReceiver] = useState(paramsData.earningsReceiver);
+    useEffect(() => {
+        setNewEarningsReceiver(paramsData.earningsReceiver);
+    }, [paramsData.earningsReceiver]);
 
     // eslint-disable-next-line no-undef
     const [ amountToWithdraw, setAmountToWithdraw] = useState(BigInt(0));
@@ -106,7 +105,7 @@ export default function Main() {
 
     // This function sets the new earnings receiver.
     const updateEarningsReceiver = errorLauncher.current.capturingError(wrappedCall(async function() {
-        await contract.methods.setEarningsReceiver(earningsReceiver).send();
+        await contract.methods.setEarningsReceiver(newEarningsReceiver).send();
     }));
 
     // This function withdraws an amount to the earnings receiver.
@@ -179,7 +178,7 @@ export default function Main() {
                     <Label>Earnings Receiver:</Label>
                 </Grid>
                 <Grid item xs={10}>
-                    <AddressInput value={earningsReceiver} onChange={setEarningsReceiver} />
+                    <AddressInput value={newEarningsReceiver} onChange={setNewEarningsReceiver} />
                 </Grid>
                 <Grid item xs={12}>
                     <Button disabled={!contract} onClick={updateEarningsReceiver} variant="contained" color="primary" size="large">Update</Button>
