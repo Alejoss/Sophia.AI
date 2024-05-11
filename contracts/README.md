@@ -18,7 +18,9 @@ Run this command in a shell (the current directory must be the root of the proje
 npx hardhat node
 ```
 
-In another shell, run these commands:
+If present, delete the directory `ignition/deployments/chain-31337` (__only__ that one).
+
+Then, in another shell, run these commands:
 
 ```shell
 # For the params and price feed:
