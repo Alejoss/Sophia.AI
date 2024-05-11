@@ -16,8 +16,8 @@ import Web3 from "web3";
 const params = [
     // Define many costs like this:
     {
-        caption: "Defining a World",
-        hash: Web3.utils.soliditySha3("Costs::DefineWorld")
+        caption: "Indexing a Document",
+        hash: Web3.utils.soliditySha3("Costs::IndexDocument")
     }
 ];
 
@@ -137,7 +137,7 @@ export default function Main() {
         <AppBar position="static" color="primary">
             <Toolbar>
                 <Typography variant="h6" style={{ flexGrow: 1 }}>
-                    Stick 'em All - Management (Contract: {isDeployed ? abbr(contract.options.address) + "; Owner: " + abbr(paramsData.owner) : "not deployed yet"})
+                    Sophia.AI - Management (Contract: {isDeployed ? abbr(contract.options.address) + "; Owner: " + abbr(paramsData.owner) : "not deployed yet"})
                 </Typography>
                 {(isDeployed ? (
                     <IconButton color="inherit" onClick={refresh}>
