@@ -68,7 +68,7 @@ Then, configure the local network in MetaMask with the following data:
 1. Any name for the network.
 2. Symbol: GO (at least, MetaMask will not complain by choosing that symbol).
 3. RPC: https://your-awesome-domain.ngrok-free.app.
-4. Chain ID: 31337.
+4. Chain ID: 31337 (If you've already set up your network to Ganache, change the id from 1337 to 31337).
 5. No block explorer.
 
 __Important__: If this is already set and you're launching the hardhat node again, reset your wallet's cache.
