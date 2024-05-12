@@ -49,13 +49,6 @@ contract SophiaAIParams is Ownable {
   address public earningsReceiver;
 
   /**
-   * The total collected (and non-withdrawn) earnings so far.
-   * In other words, the remaining balance (expressed in the
-   * native token for the blockchain).
-   */
-  uint256 public earningsBalance;
-
-  /**
    * The registered fiat costs. A fiat cost of 0 should not be used,
    * since that value is used to tell an element does not exist.
    */
@@ -103,9 +96,13 @@ contract SophiaAIParams is Ownable {
    * Withdraws a specific amount.
    */
   function earningsWithdraw(uint256 _amount) public onlyOwner {
-    require(_amount <= earningsBalance, "SophiaAIParams: Insufficient funds");
-    earningsBalance -= _amount;
-    payable(earningsReceiver).transfer(_amount);
+    uint256 earningsBalance = address(this).balance;
+    require(_amount <= address(this).balance, "StickEmAllParams: Insufficient funds");
+    payable(earningsReceiver).call{value: _amount}("");
+  }
+
+  receive() {
+    // Nothing to do here.
   }
 
   /**
