@@ -96,12 +96,11 @@ contract SophiaAIParams is Ownable {
    * Withdraws a specific amount.
    */
   function earningsWithdraw(uint256 _amount) public onlyOwner {
-    uint256 earningsBalance = address(this).balance;
     require(_amount <= address(this).balance, "StickEmAllParams: Insufficient funds");
     payable(earningsReceiver).call{value: _amount}("");
   }
 
-  receive() {
+  receive() external payable {
     // Nothing to do here.
   }
 

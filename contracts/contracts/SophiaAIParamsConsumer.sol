@@ -15,7 +15,7 @@ abstract contract SophiaAIParamsConsumer {
 
     constructor(address _params) {
         require(_params != address(0), "SophiaAIParamsConsumer: Invalid params contract address");
-        params = SophiaAIParams(_params);
+        params = SophiaAIParams(payable(_params));
     }
 
     /**
