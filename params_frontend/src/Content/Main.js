@@ -74,10 +74,10 @@ export default function Main() {
         // Then, get the following elements:
         // - owner
         let owner = await contract.methods.owner().call();
-        // - earningsBalance
+        // - earningsReceiver
         let earningsReceiver = await contract.methods.earningsReceiver().call();
-        // - earningsReceiversent
-        let earningsBalance = await contract.methods.earningsBalance().call();
+        // - earningsBalance
+        let earningsBalance = await web3.eth.getBalance(contract.options.address);
         // - fiatCosts
         let fiatCosts = {};
         await Promise.all(params.map(async (e) => {
