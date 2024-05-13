@@ -57,7 +57,7 @@ So much then by way of preface as to the student, and the spirit in which he mus
 
 #### IV
 
-Since﻿—to resume﻿—all knowledge and all purpose aims at some good, what is this which we say is the aim of Politics; or, in other words, what is the highest of all realizable goods?
+Since—to resume﻿—all knowledge and all purpose aims at some good, what is this which we say is the aim of Politics; or, in other words, what is the highest of all realizable goods?
 
 As to its name, I suppose nearly all men are agreed; for the masses and the men of culture alike declare that it is happiness, and hold that to "live well" or to "do well" is the same as to be "happy."
 
