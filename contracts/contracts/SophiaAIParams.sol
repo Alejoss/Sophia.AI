@@ -37,7 +37,7 @@ contract SophiaAIParams is Ownable {
    * The math results in: 10**18 / (10**2 / 10**8) or 10**(16 + 8).
    * The feed scale we'll be provided by the feed itself.
    */
-  uint256 constant MaticFromCentsScaleFactor = 10 ** 16;
+  uint256 private constant MaticFromCentsScaleFactor = 10 ** 16;
 
   /**
    * The address that will receive the collected earnings.
@@ -47,13 +47,6 @@ contract SophiaAIParams is Ownable {
    * some sort of "split" logic on it).
    */
   address public earningsReceiver;
-
-  /**
-   * The total collected (and non-withdrawn) earnings so far.
-   * In other words, the remaining balance (expressed in the
-   * native token for the blockchain).
-   */
-  uint256 public earningsBalance;
 
   /**
    * The registered fiat costs. A fiat cost of 0 should not be used,
@@ -103,9 +96,12 @@ contract SophiaAIParams is Ownable {
    * Withdraws a specific amount.
    */
   function earningsWithdraw(uint256 _amount) public onlyOwner {
-    require(_amount <= earningsBalance, "SophiaAIParams: Insufficient funds");
-    earningsBalance -= _amount;
-    payable(earningsReceiver).transfer(_amount);
+    require(_amount <= address(this).balance, "StickEmAllParams: Insufficient funds");
+    payable(earningsReceiver).call{value: _amount}("");
+  }
+
+  receive() external payable {
+    // Nothing to do here.
   }
 
   /**
@@ -142,6 +138,6 @@ contract SophiaAIParams is Ownable {
     // 1e18 * ((fiatCost / 100) / (rate / 10**8))
     //
     // Which is the same as: 10 ** (18 - 2 + 8), or 10 ** 24
-    return MaticFromCentsScaleFactor * (18 ** decimals) * fiatCost / rate;
+    return MaticFromCentsScaleFactor * (10 ** decimals) * fiatCost / rate;
   }
 }

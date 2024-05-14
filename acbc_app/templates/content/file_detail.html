@@ -13,10 +13,29 @@
         <a href="{{ file.file.url }}" download>Download File</a>
     </div>
 
-    {% if file.hash %}
-        <p>Hash: {{ file.hash }}</p>
+    {% if file.text_hash %}
+        <p>Characters: {{ file.text_length }}</p>
+        <p>Hash: {{ file.text_hash }}</p>
+        <a href="{% url 'run_ai_detection' file.id %}">Test AI Detection</a>
     {% else %}
         <a href="{% url 'hash_pdf_view' file.id %}">Hash the document</a>
+    {% endif %}
+
+    {% if file.ai_detection_result %}
+        <div class="mt-4">
+            <h2>AI Detection Result</h2>
+            <p><strong>Predicted Class:</strong> {{ file.ai_detection_result.documents.0.predicted_class }}</p>
+            <p><strong>Average Generated Probability:</strong> {{ file.ai_detection_result.documents.0.average_generated_prob }}</p>
+            <p><strong>Completely Generated Probability:</strong> {{ file.ai_detection_result.documents.0.completely_generated_prob }}</p>
+            <p><strong>Confidence Category:</strong> {{ file.ai_detection_result.documents.0.confidence_category }}</p>
+            <p><strong>Confidence Score:</strong> {{ file.ai_detection_result.documents.0.confidence_score }}</p>
+            <h3>Class Probabilities</h3>
+            <ul>
+                <li>AI: {{ file.ai_detection_result.documents.0.class_probabilities.ai }}</li>
+                <li>Human: {{ file.ai_detection_result.documents.0.class_probabilities.human }}</li>
+                <li>Mixed: {{ file.ai_detection_result.documents.0.class_probabilities.mixed }}</li>
+            </ul>
+        </div>
     {% endif %}
 
 {% endblock content %}
