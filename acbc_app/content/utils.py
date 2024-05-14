@@ -1,9 +1,9 @@
+import os
 from .models import File
 from django import forms
-import fitz # PyMuPDF
-
-import hashlib
-import pdfquery
+import requests
+import json
+import fitz  # PyMuPDF
 
 
 class FileUploadForm(forms.ModelForm):
@@ -12,13 +12,33 @@ class FileUploadForm(forms.ModelForm):
         fields = ['group', 'file', 'title', 'edition', 'year', 'author', 'description']
 
 
-def hash_pdf(file_path):
-    document = fitz.open(file_path)
-    text_content = ""
+def extract_text_from_pdf(pdf_path):
+    document = fitz.open(pdf_path)
+    text = ""
+    for page_num in range(document.page_count):
+        page = document.load_page(page_num)
+        text += page.get_text()
+    return text
 
-    for page in document:
-        text_content += page.get_text()
 
-    sha256_hash = hashlib.sha256(text_content.encode('utf-8')).hexdigest()
-    print(f"SHA256 Hash: {sha256_hash}")
-    return sha256_hash
+def gptzero_post_request(api_key, document, version, multilingual=False):
+    url = "https://api.gptzero.me/v2/predict/text"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "x-api-key": api_key
+    }
+    data = {
+        "document": document,
+        "version": version,
+        "multilingual": multilingual
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("Request failed with status code:", response.status_code)
+        print("Response content:", response.content)
+        response.raise_for_status()  # Raise an HTTPError if the request was not successful

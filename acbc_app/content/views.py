@@ -1,7 +1,10 @@
+import hashlib
+import os
+
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Library, Group, File
-from .utils import FileUploadForm, hash_pdf
-from django.http import HttpResponse
+from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request
+from django.http import HttpResponse, JsonResponse
 
 
 # View all libraries
@@ -35,22 +38,56 @@ def file_upload(request):
 
 
 def hash_pdf_view(request, file_id):
+    print("Entering hash_pdf_view")
+
     file_instance = get_object_or_404(File, pk=file_id)
+    print(f"Retrieved file instance: {file_instance}")
 
     if file_instance.extension.lower() == 'pdf':
-        hash_value = hash_pdf(file_instance.file.path)
+        print(f"File is a PDF: {file_instance.file.path}")
 
-        # Save the hash to the database
+        document_text = extract_text_from_pdf(file_instance.file.path)
+        print(f"Extracted text length: {len(document_text)}")
+
+        document_length = len(document_text)
+        hash_value = hashlib.sha256(document_text.encode('utf-8')).hexdigest()
+        print(f"Calculated hash: {hash_value}")
+
+        # Save the hash and length to the database
+        file_instance.extracted_text = document_text
+        file_instance.extracted_text_length = document_length
         file_instance.hash = hash_value
         file_instance.save()
+        print("Saved file instance with extracted text and hash")
 
         # Redirect to the file detail view, passing the file's ID
         return redirect('file_detail', file_id=file_instance.id)
 
+    print("File is not a PDF")
     return HttpResponse({'error': 'File is not a PDF'}, status=400)
 
 
+def run_ai_detection_view(request, file_id):
+    file_instance = get_object_or_404(File, pk=file_id)
+
+    if file_instance.extracted_text:
+        api_key = os.getenv("GPTZERO_API_KEY")
+        if not api_key:
+            return JsonResponse({'error': 'API key not found'}, status=500)
+
+        response = gptzero_post_request(api_key, file_instance.extracted_text, version="2024-01-09")
+
+        # Save the AI detection result to the model
+        file_instance.ai_detection_result = response
+        file_instance.save()
+
+        return JsonResponse(response)
+
+    return JsonResponse({'error': 'No extracted text found for this file'}, status=400)
+
+
 def file_detail(request, file_id):
+    print("FILE DETAIL")
     file = get_object_or_404(File, pk=file_id)
     return render(request, 'content/file_detail.html', {'file': file})
 
