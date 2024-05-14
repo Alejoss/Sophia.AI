@@ -17,9 +17,6 @@ RUN pip install -r requirements.txt
 # Copy project files into the Docker image
 COPY . /app
 
-# Run Django migrations
-RUN python manage.py migrate
-
 # Expose the port Django runs on
 EXPOSE 8000
 
