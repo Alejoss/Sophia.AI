@@ -16,7 +16,13 @@
     {% if file.text_hash %}
         <p>Characters: {{ file.text_length }}</p>
         <p>Hash: {{ file.text_hash }}</p>
+        <a href="{% url 'hash_pdf_view' file.id %}">Hash again</a>
         <a href="{% url 'run_ai_detection' file.id %}">Test AI Detection</a>
+        <hr>
+        <div class="mt-4">
+            <h2>Extracted Text</h2>
+            <pre>{{ file.extracted_text }}</pre>
+        </div>
     {% else %}
         <a href="{% url 'hash_pdf_view' file.id %}">Hash the document</a>
     {% endif %}

@@ -1,9 +1,11 @@
-import os
+import json
+import hashlib
+import fitz # PyMuPDF
+import requests
+import re  # Regular expressions library
+
 from .models import File
 from django import forms
-import requests
-import json
-import fitz  # PyMuPDF
 
 
 class FileUploadForm(forms.ModelForm):
@@ -18,6 +20,7 @@ def extract_text_from_pdf(pdf_path):
     for page_num in range(document.page_count):
         page = document.load_page(page_num)
         text += page.get_text()
+
     return text
 
 

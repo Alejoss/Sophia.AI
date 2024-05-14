@@ -50,13 +50,14 @@ def hash_pdf_view(request, file_id):
         print(f"Extracted text length: {len(document_text)}")
 
         document_length = len(document_text)
+        print(f"document_length: {document_length}")
         hash_value = hashlib.sha256(document_text.encode('utf-8')).hexdigest()
         print(f"Calculated hash: {hash_value}")
 
         # Save the hash and length to the database
         file_instance.extracted_text = document_text
-        file_instance.extracted_text_length = document_length
-        file_instance.hash = hash_value
+        file_instance.text_length = document_length
+        file_instance.text_hash = hash_value
         file_instance.save()
         print("Saved file instance with extracted text and hash")
 
@@ -89,6 +90,7 @@ def run_ai_detection_view(request, file_id):
 def file_detail(request, file_id):
     print("FILE DETAIL")
     file = get_object_or_404(File, pk=file_id)
+    print(f"EXTRACTED TEXT: {file.extracted_text}")
     return render(request, 'content/file_detail.html', {'file': file})
 
 

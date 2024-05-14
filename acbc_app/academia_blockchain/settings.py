@@ -30,7 +30,7 @@ def get_env_variable(variable_name):
 
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
-DOCKER = False
+DOCKER = True
 SECRET_KEY = "na"
 
 # Application definition
