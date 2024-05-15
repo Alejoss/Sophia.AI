@@ -11,7 +11,7 @@ import "./SophiaAIParams.sol";
  * always be returned back).
  */
 abstract contract SophiaAIParamsConsumer {
-    SophiaAIParams private params;
+    SophiaAIParams public params;
 
     constructor(address _params) {
         require(_params != address(0), "SophiaAIParamsConsumer: Invalid params contract address");
@@ -40,13 +40,5 @@ abstract contract SophiaAIParamsConsumer {
      */
     function getNativeCost(bytes32 _param, uint256 amount) public view returns (uint256) {
         return params.getNativeCost(_param) * amount;
-    }
-
-    /**
-     * Calls the params contract to get the native cost of a value
-     * that is expressed in USD cents.
-     */
-    function getNativeCost(uint256 _fiatValue) public view returns (uint256) {
-        return params.getNativeCost(_fiatValue);
     }
 }
