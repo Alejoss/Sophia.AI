@@ -18,6 +18,7 @@ class File(models.Model):
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to='files/')
     title = models.CharField(max_length=255)
+    url = models.URLField(max_length=200, blank=True, null=True)  # Added URL field
     extension = models.CharField(max_length=10, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     edition = models.CharField(max_length=50, blank=True, null=True)

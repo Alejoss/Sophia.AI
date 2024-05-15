@@ -28,6 +28,7 @@ def get_env_variable(variable_name):
         v = "na"
     return v
 
+
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 DOCKER = True
@@ -80,7 +81,7 @@ TEMPLATES = [
 ]
 
 SETTINGS_EXPORT = [
-  'CSRF_COOKIE_NAME'
+    'CSRF_COOKIE_NAME'
 ]
 
 WSGI_APPLICATION = 'academia_blockchain.wsgi.application'
@@ -144,7 +145,6 @@ STATIC_ROOT = 'staticfiles/'
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-
 
 # Logging
 LOGGING = {
