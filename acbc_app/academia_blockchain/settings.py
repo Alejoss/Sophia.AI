@@ -87,8 +87,7 @@ SETTINGS_EXPORT = [
 WSGI_APPLICATION = 'academia_blockchain.wsgi.application'
 
 # Database
-# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
-
+# https://docs.djangoproject.com/en/3.0/ref/settings/#database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',

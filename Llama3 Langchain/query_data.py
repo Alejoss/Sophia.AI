@@ -5,7 +5,7 @@ from langchain_openai import OpenAI  # Updated import
 import os
 
 CHROMA_PATH = "chroma_db"
-open_ai_api_key = "sk-proj-20b4Wl9oYF09IBWFQPAYT3BlbkFJyiNuSP5iq19lv9fmilyS"
+open_ai_api_key = ""
 PROMPT_TEMPLATE = """Answer the question based only on the following context:
 
 {context}
