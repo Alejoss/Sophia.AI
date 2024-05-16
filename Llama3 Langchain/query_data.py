@@ -5,15 +5,14 @@ from langchain_openai import OpenAI  # Updated import
 import os
 
 CHROMA_PATH = "chroma_db"
-open_ai_api_key = ""
+open_ai_api_key = "your_openai_api_key"
 PROMPT_TEMPLATE = """Answer the question based only on the following context:
 
 {context}
 
 ---
 
-Answer the question based on the above context, please include a citation and a quote: {question}"""
-
+Answer the question based on the above context: {question}"""
 
 def query_chroma_db(query):
     print(f"Querying Chroma DB with query: '{query}'")
@@ -51,7 +50,6 @@ def query_chroma_db(query):
     sources = list({doc.metadata.get("source", None) for doc in results})
     formatted_response = f"Response: {response_text}\nSources: {sources}"
     print(formatted_response)
-
 
 if __name__ == "__main__":
     query_text = input("Please enter your query: ")

@@ -16,12 +16,13 @@ def generate_data_store():
         print("No documents loaded.")
         return
 
-    chunks = split_text(documents)
-    if not chunks:
-        print("No chunks created from documents.")
-        return
-
-    save_to_chroma(chunks)
+    # Process documents in batches
+    batch_size = 100
+    for i in range(0, len(documents), batch_size):
+        batch_documents = documents[i:i + batch_size]
+        chunks = split_text(batch_documents)
+        if chunks:
+            save_to_chroma(chunks)
     print("Data store generation complete.")
 
 
@@ -52,14 +53,13 @@ def split_text(documents):
 
 def save_to_chroma(chunks):
     print("Saving chunks to Chroma DB...")
-    # Clear out the database first.
-    if os.path.exists(CHROMA_PATH):
-        shutil.rmtree(CHROMA_PATH)
-        print(f"Existing Chroma DB at {CHROMA_PATH} removed.")
+    # Create a new DB from the documents if it doesn't exist.
+    if not os.path.exists(CHROMA_PATH):
+        os.makedirs(CHROMA_PATH)
 
-    # Create a new DB from the documents.
     embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    db = Chroma.from_documents(chunks, embedding_function, persist_directory=CHROMA_PATH)
+    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+    db.add_documents(chunks)
     print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
 
 
