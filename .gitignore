@@ -138,7 +138,6 @@ dmypy.json
 media/
 acbc_app.iml
 misc.xml
-params_frontend.iml
 Sophia.AI.iml
 
 # client
