@@ -5,8 +5,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ErrorLauncherContext from "../Errors/ErrorLauncherContext";
 
 const AccountPicker = forwardRef(({
-                                      web3, accounts, accountIndex, onAccountIndexChange
-                                  }, ref) => {
+    web3, accounts, accountIndex, onAccountIndexChange
+}, ref) => {
     // eslint-disable-next-line no-undef
     const [balance, setBalance] = useState(BigInt('0'));
     const errorLauncher = useContext(ErrorLauncherContext);
@@ -44,7 +44,7 @@ const AccountPicker = forwardRef(({
     };
 
     return (
-        <Card style={{ width: 'auto', position: 'fixed', top: '10px', left: '10px' }}>
+        <Card style={{ width: 'auto', position: 'fixed', top: '10px', left: '10px', zIndex: 1000 }}>
             <CardContent>
                 {(accounts && accounts.length && (
                     <>
