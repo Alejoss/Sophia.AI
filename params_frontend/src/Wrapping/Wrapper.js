@@ -91,8 +91,8 @@ const Wrapper = ({ expectedChainId, expectedChainName, children }) => {
         });
 
         return () => {
-            ethereum.removeListener('accountsChanged', setAccounts);
-            ethereum.removeListener('chainChanged', onChainIdChanged);
+            ethereum.off('accountsChanged', setAccounts);
+            ethereum.off('chainChanged', onChainIdChanged);
         };
     }, [expectedChainName, expectedChainId]);
 
