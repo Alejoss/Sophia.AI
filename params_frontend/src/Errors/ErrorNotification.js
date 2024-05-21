@@ -2,9 +2,9 @@ import React, {forwardRef, useImperativeHandle, useState} from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import {Alert} from "@mui/material";
 
-const ErrorNotification = forwardRef(({ duration }, ref) => {
+const ErrorNotification = forwardRef(({ dialogDuration, setInProgress }, ref) => {
     const [message, setMessage] = useState('');
-    duration = duration || 6000;
+    dialogDuration = dialogDuration || 6000;
 
     useImperativeHandle(ref, () => ({
         triggerError: function(msg = "An unexpected error has occurred") {
@@ -12,17 +12,39 @@ const ErrorNotification = forwardRef(({ duration }, ref) => {
         },
         capturingError: function(f) {
             return function(...args) {
+                let shouldDoFinally = true;
                 try {
+                    console.log("Setting inProgress=true");
+                    setInProgress(true);
+                    console.log("Starting logic");
                     let result = f(...args);
                     if (result instanceof Promise) {
-                        return result.catch(function(e) {
-                            console.error(e);
-                            setMessage(e.toString());
-                        });
+                        shouldDoFinally = false;
+                        return (async function() {
+                            try
+                            {
+                                return await result;
+                            }
+                            catch(e)
+                            {
+                                console.error(e);
+                                setMessage(e.toString());
+                            }
+                            finally
+                            {
+                                console.log("Finishing logic with inProgress=false");
+                                setInProgress(false);
+                            }
+                        })();
                     }
                 } catch(e) {
                     console.error(e);
                     setMessage(e.toString());
+                } finally {
+                    if (shouldDoFinally) {
+                        console.log("Finishing logic with inProgress=false");
+                        setInProgress(false);
+                    }
                 }
             }
         }
@@ -38,7 +60,7 @@ const ErrorNotification = forwardRef(({ duration }, ref) => {
     return (
         <Snackbar
             open={!!message}
-            autoHideDuration={duration}  // Snackbar will auto close after 6000ms
+            autoHideDuration={dialogDuration}  // Snackbar will auto close after 6000ms
             onClose={handleClose}
             message={message}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
