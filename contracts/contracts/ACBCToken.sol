@@ -6,6 +6,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract MyToken is ERC20, Ownable, ERC20Permit {
+
+    uint256 public constant INITIAL_SUPPLY = 1000000 * 10 ** 18;
+
     constructor(
         address initialOwner,
         uint256 initialSupply
@@ -14,7 +17,7 @@ contract MyToken is ERC20, Ownable, ERC20Permit {
         Ownable(initialOwner)
         ERC20Permit("AcademiaBlockchainToken")
     {
-        _mint(initialOwner, initialSupply);
+        _mint(initialOwner, INITIAL_SUPPLY);
     }
 
     // Mint function
