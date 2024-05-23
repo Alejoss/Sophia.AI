@@ -1,5 +1,4 @@
 import {Box, Paper, Toolbar, Typography} from "@mui/material";
-import { useTheme } from '@mui/material/styles';
 import ThemedPaper from "./ThemedPaper";
 
 
