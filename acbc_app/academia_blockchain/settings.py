@@ -32,7 +32,7 @@ def get_env_variable(variable_name):
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 DOCKER = True
-SECRET_KEY = "na"
+SECRET_KEY = "na"  # TODO CORRECT THIS
 
 # Application definition
 INSTALLED_APPS = [

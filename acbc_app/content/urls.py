@@ -10,6 +10,7 @@ urlpatterns = [
     path('files/<int:file_id>/', views.file_detail, name='file_detail'),
     path('hash-pdf/<int:file_id>/', views.hash_pdf_view, name='hash_pdf_view'),
     path('run-ai-detection/<int:file_id>/', views.run_ai_detection_view, name='run_ai_detection'),
+    path('libraries/connect_to_ethereum', views.connect_to_ethereum, name='connect_to_ethereum'),
 
     path('libraries/new/', views.library_create, name='library_create'),
     path('libraries/<int:pk>/edit/', views.library_update, name='library_update'),

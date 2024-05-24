@@ -5,6 +5,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import Library, Group, File
 from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request
 from django.http import HttpResponse, JsonResponse
+from content import interact_with_sc
 
 
 # View all libraries
@@ -85,6 +86,11 @@ def run_ai_detection_view(request, file_id):
         return JsonResponse(response)
 
     return JsonResponse({'error': 'No extracted text found for this file'}, status=400)
+
+
+def connect_to_ethereum(request):
+    interact_with_sc()
+    return
 
 
 def file_detail(request, file_id):
