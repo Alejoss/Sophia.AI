@@ -41,6 +41,8 @@ contract MyToken is ERC20, Ownable, ERC20Permit {
 }
 
 
+// 0x0Fa50B058e9CCAb5AfD2337F0dF997801715a66e
+
 [
 	{
 		"inputs": [
