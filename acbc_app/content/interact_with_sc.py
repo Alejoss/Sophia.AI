@@ -1,26 +1,24 @@
 import os
 from web3 import Web3
-from content import interact_with_sc
+
 
 # Connect to the Sepolia testnet via Alchemy
 def interact_with_sc():
-
     alchemy_url = "https://eth-sepolia.g.alchemy.com/v2/" + os.environ.get('ALCHEMY_API_KEY')
     web3 = Web3(Web3.HTTPProvider(alchemy_url))
 
     # Check if connected
-    if web3.isConnected():
+    if web3.is_connected():
         print('Connected to Sepolia testnet')
     else:
         print('Failed to connect to Sepolia testnet')
 
     # Addresses of the deployed contracts
-    acbc_token_address = '0xYourACBCTokenContractAddress'
-    hash_store_address = '0xYourHashStoreContractAddress'
+    acbc_token_address = '0x4a305E041c08Cbf3448f38BB177ec01098EBa55B'
+    hash_store_address = '0xc18bc0121630a6848b32d4ded7D23db641180117'
 
     # ABI of the contracts (replace with actual ABIs from Etherscan)
     acbc_token_abi = [
-        [
             {
                 "inputs": [
                     {
@@ -674,7 +672,6 @@ def interact_with_sc():
                 "type": "function"
             }
         ]
-    ]
 
     hash_store_abi = [
         {
@@ -977,7 +974,6 @@ def interact_with_sc():
         }
     ]
 
-
     # Create contract instances
     acbc_token = web3.eth.contract(address=acbc_token_address, abi=acbc_token_abi)
     hash_store = web3.eth.contract(address=hash_store_address, abi=hash_store_abi)
@@ -985,6 +981,7 @@ def interact_with_sc():
     # Interact with the ACBCToken contract
     total_supply = acbc_token.functions.totalSupply().call()
     print(f'Total Supply: {total_supply}')
+    return total_supply
 
 # Interact with the HashStore contract
 # Example: Check if a hash is stored
