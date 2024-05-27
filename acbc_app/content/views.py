@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 
 from .models import Library, Group, File
 from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request
-from .interact_with_sc import interact_with_sc
+from .interact_with_sc import HashStoreSmartContract
 
 
 # View all libraries
@@ -90,8 +90,9 @@ def run_ai_detection_view(request, file_id):
 
 
 def interact_with_blockchain(request):
-    response = interact_with_sc()
-    return JsonResponse(response)
+    hash_store_sc = HashStoreSmartContract()
+    is_stored = hash_store_sc.is_hash_stored("6e97caf1910c922cae8206df055d13c438efb722a857aa0dc60b4b0476b229eb")
+    return HttpResponse(is_stored)
 
 
 def file_detail(request, file_id):
