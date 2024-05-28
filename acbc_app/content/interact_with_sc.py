@@ -16,39 +16,64 @@ class HashStoreSmartContract:
         self.hash_store_contract_abi = hash_store_abi
         self.hash_store_contract = self.web3.eth.contract(address=self.hash_store_address,
                                                           abi=self.hash_store_contract_abi)
-        self.from_address = from_address
+        if from_address:
+            self.from_address = from_address
+            self.balance = self.web3.eth.get_balance(from_address)
+            print(f'Balance: {self.web3.from_wei(self.balance, "ether")} ETH')
+
         self.private_key = private_key
 
     def store_hash(self, hash_value):
         try:
-            nonce = self.web3.eth.getTransactionCount(self.from_address)
-            tx = self.hash_store_contract.functions.storeHash(hash_value).buildTransaction({
+            # Ensure the hash value is in bytes32 format
+            if isinstance(hash_value, str):
+                print(f'Hash value {hash_value} is a string, converting to bytes32')
+                hash_value = Web3.to_bytes(hexstr=hash_value)
+                print(f'Converted hash value: {hash_value}, type: {type(hash_value)}')
+
+            nonce = self.web3.eth.get_transaction_count(self.from_address)
+
+            # Estimate gas
+            gas_estimate = self.hash_store_contract.functions.storeHash(hash_value).estimate_gas({
                 'from': self.from_address,
                 'nonce': nonce,
-                'gas': 2000000,
-                'gasPrice': self.web3.toWei('50', 'gwei')
+                'maxFeePerGas': self.web3.to_wei('2', 'gwei'),
+                'maxPriorityFeePerGas': self.web3.to_wei('1', 'gwei')
             })
+
+            print(f"Estimated Gas: {gas_estimate}")
+
+            tx = self.hash_store_contract.functions.storeHash(hash_value).build_transaction({
+                'from': self.from_address,
+                'nonce': nonce,
+                'gas': gas_estimate,
+                'maxFeePerGas': self.web3.to_wei('2', 'gwei'),
+                'maxPriorityFeePerGas': self.web3.to_wei('1', 'gwei')
+            })
+
             signed_tx = self.web3.eth.account.sign_transaction(tx, self.private_key)
-            tx_hash = self.web3.eth.sendRawTransaction(signed_tx.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
             receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-            print(f'Transaction successful with hash: {self.web3.toHex(tx_hash)}')
+
+            print(f'Transaction successful with hash: {self.web3.to_hex(tx_hash)}')
             return receipt
         except Exception as e:
             print(f'Error storing hash: {e}')
+            raise
 
     def set_reward_amount(self, reward_amount):
         try:
-            nonce = self.web3.eth.getTransactionCount(self.from_address)
+            nonce = self.web3.eth.get_transaction_count(self.from_address)
             tx = self.hash_store_contract.functions.setRewardAmount(reward_amount).buildTransaction({
                 'from': self.from_address,
                 'nonce': nonce,
                 'gas': 2000000,
-                'gasPrice': self.web3.toWei('50', 'gwei')
+                'gasPrice': self.web3.to_wei('10', 'gwei')
             })
             signed_tx = self.web3.eth.account.sign_transaction(tx, self.private_key)
-            tx_hash = self.web3.eth.sendRawTransaction(signed_tx.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
             receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-            print(f'Transaction successful with hash: {self.web3.toHex(tx_hash)}')
+            print(f'Transaction successful with hash: {self.web3.to_hex(tx_hash)}')
             return receipt
         except Exception as e:
             print(f'Error setting reward amount: {e}')
@@ -61,7 +86,6 @@ class HashStoreSmartContract:
                 hash_value = Web3.to_bytes(hexstr=hash_value)
                 print(f'Converted hash value: {hash_value}, type: {type(hash_value)}')
             result = self.hash_store_contract.functions.isHashStored(hash_value).call()
-            print(f'Is hash stored: {result}')
             return result
         except Exception as e:
             print(f'Error checking hash: {e}')

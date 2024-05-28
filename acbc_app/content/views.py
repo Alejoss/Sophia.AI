@@ -1,11 +1,12 @@
 import hashlib
 import os
+from web3 import Web3
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse
 
 from .models import Library, Group, File
-from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request
+from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request, create_sha256_hash
 from .interact_with_sc import HashStoreSmartContract
 
 
@@ -90,9 +91,36 @@ def run_ai_detection_view(request, file_id):
 
 
 def interact_with_blockchain(request):
-    hash_store_sc = HashStoreSmartContract()
-    is_stored = hash_store_sc.is_hash_stored("6e97caf1910c922cae8206df055d13c438efb722a857aa0dc60b4b0476b229eb")
-    return HttpResponse(is_stored)
+    private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
+    from_address = os.getenv("SEPOLIA_WEB3_ADDRESS")
+    print(f"private_key: {private_key}")
+    print(f"from_address: {from_address}")
+
+    hash_store_sc = HashStoreSmartContract(from_address=from_address, private_key=private_key)
+
+    # create a hash to test the smart contract
+    word = "libertad"
+    sha256_hash = create_sha256_hash(word)
+    print(f"sha256_hash: {sha256_hash}")
+    bytes_liberty_hash = Web3.to_bytes(hexstr=sha256_hash)
+    print(f"bytes_liberty_hash: {bytes_liberty_hash}")
+
+    # is_stored = hash_store_sc.is_hash_stored(bytes_liberty_hash)
+    # print(f"is_stored: {is_stored}")
+    #
+    store_hash = hash_store_sc.store_hash(bytes_liberty_hash)
+    print(f"store_hash receipt: {store_hash}")
+    #
+    # user_hashes = hash_store_sc.get_my_hashes()
+    # print(f"user_hashes: {user_hashes}")
+    #
+    # user_by_hash = hash_store_sc.get_user_by_hash(bytes_liberty_hash)
+    # print(f"user_by_hash: {user_by_hash}")
+    #
+    # hashes_by_user = hash_store_sc.get_hashes_by_user(from_address)
+    # print(f"hashes_by_user: {hashes_by_user}")
+
+    return HttpResponse(bytes_liberty_hash)
 
 
 def file_detail(request, file_id):

@@ -45,3 +45,16 @@ def gptzero_post_request(api_key, document, version, multilingual=False):
         print("Request failed with status code:", response.status_code)
         print("Response content:", response.content)
         response.raise_for_status()  # Raise an HTTPError if the request was not successful
+
+
+def create_sha256_hash(input_string):
+    # Create a new sha256 hash object
+    sha256 = hashlib.sha256()
+
+    # Update the hash object with the bytes of the input string
+    sha256.update(input_string.encode('utf-8'))
+
+    # Get the hexadecimal representation of the hash
+    hash_hex = sha256.hexdigest()
+
+    return hash_hex
