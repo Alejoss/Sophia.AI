@@ -17,8 +17,7 @@ def deploy_contract():
     print("Connected to Sepolia testnet")
 
     private_key = os.getenv("SEPOLIA_PRIVATE_KEY")
-    if not private_key:
-        raise ValueError("SEPOLIA_PRIVATE_KEY environment variable not set")
+    if not private_key: raise ValueError("SEPOLIA_PRIVATE_KEY environment variable not set")
     from_address = os.getenv("SEPOLIA_ACBCTOKEN_CONTRACT_ADDRESS")
     if not from_address:
         raise ValueError("SEPOLIA_ACBCTOKEN_CONTRACT_ADDRESS environment variable not set")

@@ -94,7 +94,7 @@ def interact_with_hash_store_sc(request):
     private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
     from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
 
-    hash_value = "7b0c6489184eab0148b364d5799e12fb63af6fc37ed439723bd4643437212250"
+    hash_value = "57591ba59b6371caad3319378294ccf3e26a86e9b7446be1221e35f4bb7f11e2"
     ipfs_content_id = "QmYwAPJzv5CZsnAztb6HZdmBv6fT5fp8jP93fw5P8R8Qkv"
 
     print(f"From Address: {from_address}")

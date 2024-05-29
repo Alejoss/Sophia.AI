@@ -33,6 +33,11 @@ class HashStoreIpfsSmartContract:
                 hash_value = Web3.to_bytes(hexstr=hash_value)
                 print(f'Converted hash value: {hash_value}, type: {type(hash_value)}')
 
+            # Ensure IPFS content ID is a string and not None
+            if ipfs_content_id is None:
+                ipfs_content_id = ""
+            print(f'Final IPFS content ID: {ipfs_content_id}, type: {type(ipfs_content_id)}')
+
             nonce = self.web3.eth.get_transaction_count(self.from_address)
             print(f'Nonce: {nonce}')
 
@@ -44,6 +49,10 @@ class HashStoreIpfsSmartContract:
             print(f'Base fee per gas: {base_fee_per_gas}')
             print(f'Max priority fee per gas: {max_priority_fee_per_gas}')
             print(f'Max fee per gas: {max_fee_per_gas}')
+
+            # Print types and values of all parameters to ensure correctness
+            print(f'Hash value (final): {hash_value}, type: {type(hash_value)}')
+            print(f'IPFS content ID (final): {ipfs_content_id}, type: {type(ipfs_content_id)}')
 
             gas_estimate = self.hash_store_contract.functions.storeHash(hash_value, ipfs_content_id).estimate_gas({
                 'from': self.from_address,
@@ -65,6 +74,12 @@ class HashStoreIpfsSmartContract:
             receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
 
             print(f'Transaction successful with hash: {self.web3.to_hex(tx_hash)}')
+
+            # Fetching the logs
+            logs = self.web3.eth.get_transaction_receipt(tx_hash)['logs']
+            for log in logs:
+                print(f'Log: {log}')
+
             return receipt
         except Exception as e:
             print(f'Error storing hash: {e}')
