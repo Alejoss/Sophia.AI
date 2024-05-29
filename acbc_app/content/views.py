@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 
 from .models import Library, Group, File
 from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request, create_sha256_hash
-from .interact_with_sc import HashStoreSmartContract
+from .interact_with_sc import HashStoreIpfsSmartContract, ACBCTokenSmartContract
 
 
 # View all libraries
@@ -90,37 +90,103 @@ def run_ai_detection_view(request, file_id):
     return JsonResponse({'error': 'No extracted text found for this file'}, status=400)
 
 
-def interact_with_blockchain(request):
+def interact_with_hash_store_sc(request):
     private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
-    from_address = os.getenv("SEPOLIA_WEB3_ADDRESS")
-    print(f"private_key: {private_key}")
-    print(f"from_address: {from_address}")
+    from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
 
-    hash_store_sc = HashStoreSmartContract(from_address=from_address, private_key=private_key)
+    hash_value = "7b0c6489184eab0148b364d5799e12fb63af6fc37ed439723bd4643437212250"
+    ipfs_content_id = "QmYwAPJzv5CZsnAztb6HZdmBv6fT5fp8jP93fw5P8R8Qkv"
 
-    # create a hash to test the smart contract
-    word = "libertad"
-    sha256_hash = create_sha256_hash(word)
-    print(f"sha256_hash: {sha256_hash}")
-    bytes_liberty_hash = Web3.to_bytes(hexstr=sha256_hash)
-    print(f"bytes_liberty_hash: {bytes_liberty_hash}")
+    print(f"From Address: {from_address}")
+    print(f"Hash Value: {hash_value}")
+    print(f"IPFS Content ID: {ipfs_content_id}")
 
-    # is_stored = hash_store_sc.is_hash_stored(bytes_liberty_hash)
-    # print(f"is_stored: {is_stored}")
-    #
-    store_hash = hash_store_sc.store_hash(bytes_liberty_hash)
-    print(f"store_hash receipt: {store_hash}")
-    #
-    # user_hashes = hash_store_sc.get_my_hashes()
-    # print(f"user_hashes: {user_hashes}")
-    #
-    # user_by_hash = hash_store_sc.get_user_by_hash(bytes_liberty_hash)
-    # print(f"user_by_hash: {user_by_hash}")
-    #
-    # hashes_by_user = hash_store_sc.get_hashes_by_user(from_address)
-    # print(f"hashes_by_user: {hashes_by_user}")
+    try:
+        hash_store_sc = HashStoreIpfsSmartContract(from_address=from_address, private_key=private_key)
+        print("Smart contract instance created successfully.")
 
-    return HttpResponse(bytes_liberty_hash)
+        print(f"Storing hash {hash_value} with IPFS content ID {ipfs_content_id}")
+        store_receipt = hash_store_sc.store_hash(hash_value, ipfs_content_id)
+        print(f"Store transaction receipt: {dict(store_receipt)}")
+
+        is_stored = hash_store_sc.is_hash_stored(hash_value)
+        print(f"Is hash stored: {is_stored}")
+
+        user_by_hash = hash_store_sc.get_user_by_hash(hash_value)
+        print(f"User that stored the hash: {user_by_hash}")
+
+        ipfs_by_hash = hash_store_sc.get_ipfs_by_hash(hash_value)
+        print(f"IPFS content ID for hash: {ipfs_by_hash}")
+
+        hashes_by_user = hash_store_sc.get_hashes_by_user(from_address)
+        print(f"Hashes stored by user: {hashes_by_user}")
+
+        my_hashes = hash_store_sc.get_my_hashes()
+        print(f"My stored hashes: {my_hashes}")
+
+        return JsonResponse({
+            'success': True,
+            'store_receipt': dict(store_receipt),
+            'is_stored': is_stored,
+            'user_by_hash': user_by_hash,
+            'ipfs_by_hash': ipfs_by_hash,
+            'hashes_by_user': hashes_by_user,
+            'my_hashes': my_hashes,
+        })
+
+    except Exception as e:
+        print(f"Error interacting with the smart contract: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+def interact_with_acbc_token_sc(request):
+    from_address = "0xb6E5765385713366d687Ad01e83DbB21A24b4Eb0"
+    private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
+    to_address = "0xfD304999a3C992131ae08c2D959AC7e32115104D"
+    mint_amount = 100000000000000000000  # 100 tokens
+    burn_amount = 10000000000000000000  # 10 tokens
+
+    print(f"From Address: {from_address}")
+    print(f"To Address: {to_address}")
+    print(f"Mint Amount: {mint_amount}")
+    print(f"Burn Amount: {burn_amount}")
+
+    # Initialize the smart contract interaction
+    try:
+        acbc_token_sc = ACBCTokenSmartContract(from_address=from_address, private_key=private_key)
+        print("Smart contract instance created successfully.")
+
+        # Fetch the latest block to get the base fee
+        latest_block = acbc_token_sc.web3.eth.get_block('latest')
+        base_fee_per_gas = latest_block['baseFeePerGas']
+        max_priority_fee_per_gas = acbc_token_sc.web3.to_wei('2', 'gwei')
+        max_fee_per_gas = base_fee_per_gas + max_priority_fee_per_gas
+
+        # Mint tokens
+        print(f"Minting {mint_amount} tokens to {to_address}")
+        mint_receipt = acbc_token_sc.mint_tokens(to_address, mint_amount)
+        print(f"Mint transaction receipt: {mint_receipt}")
+
+        # Burn tokens
+        print(f"Burning {burn_amount} tokens from {from_address}")
+        burn_receipt = acbc_token_sc.burn_tokens(burn_amount)
+        print(f"Burn transaction receipt: {burn_receipt}")
+
+        # Get total supply
+        total_supply = acbc_token_sc.get_total_supply()
+        print(f"Total Supply: {total_supply}")
+
+        # Return the response as JSON
+        return JsonResponse({
+            'success': True,
+            'total_supply': total_supply,
+            'mint_receipt': dict(mint_receipt),
+            'burn_receipt': dict(burn_receipt),
+        })
+
+    except Exception as e:
+        print(f"Error interacting with the smart contract: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 def file_detail(request, file_id):

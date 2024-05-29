@@ -10,7 +10,8 @@ urlpatterns = [
     path('files/<int:file_id>/', views.file_detail, name='file_detail'),
     path('hash-pdf/<int:file_id>/', views.hash_pdf_view, name='hash_pdf_view'),
     path('run-ai-detection/<int:file_id>/', views.run_ai_detection_view, name='run_ai_detection'),
-    path('libraries/interact_with_blockchain', views.interact_with_blockchain, name='interact_with_blockchain'),
+    path('libraries/interact_with_hash_store_sc', views.interact_with_hash_store_sc, name='interact_with_hash_store_sc'),
+    path('libraries/interact_with_acbc_token_sc', views.interact_with_acbc_token_sc, name='interact_with_acbc_token_sc'),
 
     path('libraries/new/', views.library_create, name='library_create'),
     path('libraries/<int:pk>/edit/', views.library_update, name='library_update'),
