@@ -30,6 +30,7 @@ class File(models.Model):
     text_length = models.PositiveIntegerField(blank=True, null=True)
     text_hash = models.CharField(max_length=64, blank=True, null=True)  # sha256
     ai_detection_result = JSONField(blank=True, null=True)  # Field to store AI detection result
+    transaction_receipt = JSONField(blank=True, null=True)  # Transaction receipt from the StoreHash smart contract
 
     def save(self, *args, **kwargs):
         # Calculate file size in bytes

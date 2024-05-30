@@ -33,11 +33,6 @@ class HashStoreIpfsSmartContract:
                 hash_value = Web3.to_bytes(hexstr=hash_value)
                 print(f'Converted hash value: {hash_value}, type: {type(hash_value)}')
 
-            # Ensure IPFS content ID is a string and not None
-            if ipfs_content_id is None:
-                ipfs_content_id = ""
-            print(f'Final IPFS content ID: {ipfs_content_id}, type: {type(ipfs_content_id)}')
-
             nonce = self.web3.eth.get_transaction_count(self.from_address)
             print(f'Nonce: {nonce}')
 
@@ -75,12 +70,32 @@ class HashStoreIpfsSmartContract:
 
             print(f'Transaction successful with hash: {self.web3.to_hex(tx_hash)}')
 
-            # Fetching the logs
-            logs = self.web3.eth.get_transaction_receipt(tx_hash)['logs']
-            for log in logs:
-                print(f'Log: {log}')
+            # Convert receipt to a JSON-serializable format
+            receipt_dict = {
+                'transactionHash': receipt.transactionHash.hex(),
+                'blockHash': receipt.blockHash.hex(),
+                'blockNumber': receipt.blockNumber,
+                'from': receipt['from'],
+                'to': receipt.to,
+                'gasUsed': receipt.gasUsed,
+                'cumulativeGasUsed': receipt.cumulativeGasUsed,
+                'contractAddress': receipt.contractAddress,
+                'status': receipt.status,
+                'logsBloom': receipt.logsBloom.hex(),
+                'logs': [
+                    {
+                        'address': log['address'],
+                        'data': log['data'].hex(),  # Convert HexBytes data to hex string
+                        'topics': [topic.hex() for topic in log['topics']]
+                        # Convert each topic in HexBytes to hex string
+                    }
+                    for log in receipt.logs
+                ]
+            }
 
-            return receipt
+            print(f'receipt_dict: {receipt_dict}')
+
+            return receipt_dict
         except Exception as e:
             print(f'Error storing hash: {e}')
             raise
@@ -108,7 +123,9 @@ class HashStoreIpfsSmartContract:
     def get_hashes_by_user(self, user_address):
         try:
             hashes = self.hash_store_contract.functions.getHashesByUser(user_address).call()
-            return [self.web3.to_hex(h) for h in hashes]
+            hashes_list = [Web3.to_hex(h) for h in hashes]  # Convert each hash to a hex string
+            print(f'Hashes stored by user: {hashes_list}')
+            return hashes_list  # Return the list of hex strings, not the original bytes
         except Exception as e:
             print(f'Error getting hashes by user: {e}')
             raise
@@ -116,7 +133,9 @@ class HashStoreIpfsSmartContract:
     def get_my_hashes(self):
         try:
             hashes = self.hash_store_contract.functions.getMyHashes().call({'from': self.from_address})
-            return [self.web3.to_hex(h) for h in hashes]
+            hashes_list = [Web3.to_hex(h) for h in hashes]  # Convert each hash to a hex string
+            print(f'My stored hashes: {hashes_list}')
+            return hashes_list  # Return the list of hex strings, not the original bytes
         except Exception as e:
             print(f'Error getting my hashes: {e}')
             raise
