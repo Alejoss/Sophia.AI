@@ -27,3 +27,7 @@ async function runSandboxCode(sourceFilename, configFilename) {
         "source": source, ...config
     });
 }
+
+module.exports = {
+    runSandboxCode: runSandboxCode
+}
