@@ -135,7 +135,6 @@ dmypy.json
 
 # Extra
 .idea/
-media/
 acbc_app.iml
 misc.xml
 Sophia.AI.iml
