@@ -201,7 +201,7 @@ def event_create(request):
 
     if request.method == "GET":
         # Prepare the template and context data for event creation form
-        template = "courses/event_create.html"
+        template = "courses/event_create_english.html"
         platforms = ConnectionPlatform.objects.filter(deleted=False)  # Retrieve available platforms
         profile = Profile.objects.get(user=request.user)  # Get the profile of the logged-in user
         user_contact_methods = ContactMethod.objects.filter(user=request.user)  # User's contact methods

@@ -59,10 +59,10 @@
                 </div>
             </div>
             <div class="col-md-4 form_img">
-                <img id="diamante_amarillo" title="Curso" src="{% static 'assets/img/diamante_amarillo.png' %}" class="diamond_form" alt="Curso">
-                <img id="diamante_azul" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="diamond_form" alt="Examen">
-                <img id="diamante_magenta" title="Pre-Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="diamond_form" alt="Pre-Grabado">
-                <img id="diamante_verde" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="diamond_form" alt="Evento">
+                <img id="diamante_amarillo" title="Curso" src="{% static 'assets/img/diamante_amarillo.png' %}" class="diamond_form" alt="Live Course" width="20px">
+                <img id="diamante_azul" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="diamond_form" alt="Exam" width="20px">
+                <img id="diamante_magenta" title="Pre-Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="diamond_form" alt="Pre-recorded Course" width="20px">
+                <img id="diamante_verde" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="diamond_form" alt="Event" width="20px">
             </div>
             </div>
 
@@ -199,15 +199,15 @@
 {% endblock content %}
 
 {% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js"></script>
 <script src='{% static 'assets/js/tagging.min.js' %}'></script>
 <script src='{% static 'assets/js/jquery.validate.js' %}'></script>
 
 <script>
     $( document ).ready(function() {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-        });
+        console.log("HEyHey")
+
 
         // Default
         $('#radio_live_course').prop("checked", true);

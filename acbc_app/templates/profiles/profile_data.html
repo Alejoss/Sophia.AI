@@ -78,6 +78,7 @@
           <button id="edit_contact" type="submit" class="btn btn-success text-uppercase">
             Contact Methods
           </button>
+{#            TODO fix this javascript doesn't work#}
         </div>
         <hr>
     </div>
@@ -106,21 +107,23 @@
 
           <div class="col-sm-6 col-xs-12">
             <div class="form-group" id="input_time_zone">
+                <small id="" class="form-text text-muted">
+                Timezone: 
+                    {% if profile.timezone %}
+                        You are currently in "{{ profile.timezone }}".
+                    {% endif %}
+                </small>
                 <select class="custom-select my-1 mr-sm-2 border-info" id="time_zone_select" name="time_zone">
                   {% for tz in academia_blockchain_timezones %}
                       <option id="{{ tz }}" value="{{ tz }}">{{ tz }}</option>
                   {% endfor %}
                 </select>
-                <small id="" class="form-text text-muted">
-                    {% if profile.timezone %}
-                        You are currently in "{{ profile.timezone }}".
-                    {% endif %}
-                </small>
           </div>
 
            <div class="form-group form-group-icon">
               <i class="fa fa-smile-o"></i>
-               <textarea name="interests" type="text" class="form-control border-info" placeholder="Your Interests">{{ profile.interests }}
+               <textarea name="interests" type="text" class="form-control border-info" placeholder="Your Interests">
+                   {{ profile.interests }}
                </textarea>
                <small id="" class="form-text text-muted">
                     What are you passionate about? Separate your interests with commas.

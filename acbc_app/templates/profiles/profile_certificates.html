@@ -3,53 +3,54 @@
 
 {% block profile_content %}
 
-    <div class="col-md-8 col-lg-9 order-md-1">
-        <div class="row">
-            <div class="media media-avator-view flex-column flex-sm-row">
-                <div class="media-body">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col-md certi_col">
-                                <div class="img_col">
-                                    <img title="Evento" src="{% static 'assets/img/diamante_verde.png' %}"  width="20px" alt="">
-                                </div>
-                                <div>
-                                    <h4>{{ user_diamonds.green_diamonds }}</h4>
-                                </div>
+<div class="col-md-8 col-lg-9 order-md-1">
+    <div class="row">
+        <div class="media media-avator-view flex-column flex-sm-row">
+            <div class="media-body">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md certi_col">
+                            <div class="img_col">
+                                <img title="Event Certificate" src="{% static 'assets/img/diamante_verde.png' %}"  width="20px" alt="">
                             </div>
-                            <div class="col-md  certi_col">
-                                 <div class="img_col">
-                                    <img title="Curso en Vivo" src="{% static 'assets/img/diamante_amarillo.png' %}"  width="20px" alt="">
-                                </div>
-                                <div>
-                                    <h4>{{ user_diamonds.yellow_diamonds }}</h4>
-                                </div>
+                            <div>
+                                <h4>{{ user_diamonds.green_diamonds }}</h4>
                             </div>
-                            <div class="col-md certi_col">
-                                 <div class="img_col">
-                                    <img title="Curso Grabado" src="{% static 'assets/img/diamante_magenta.png' %}"  width="20px" alt="">
-                                </div>
-                                <div>
-                                    <h4>{{ user_diamonds.magenta_diamonds }}</h4>
-                                </div>
+                        </div>
+                        <div class="col-md  certi_col">
+                             <div class="img_col">
+                                <img title="Course Certificate" src="{% static 'assets/img/diamante_amarillo.png' %}"  width="20px" alt="">
                             </div>
-                            <div class="col-md certi_col">
-                                 <div class="img_col">
-                                    <img title="Examen" src="{% static 'assets/img/diamante_azul.png' %}"  width="20px" alt="">
-                                </div>
-                                <div>
-                                    <h4>{{ user_diamonds.blue_diamonds }}</h4>
-                                </div>
+                            <div>
+                                <h4>{{ user_diamonds.yellow_diamonds }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md certi_col">
+                             <div class="img_col">
+                                <img title="Recorded Course Certificate" src="{% static 'assets/img/diamante_magenta.png' %}"  width="20px" alt="">
+                            </div>
+                            <div>
+                                <h4>{{ user_diamonds.magenta_diamonds }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md certi_col">
+                             <div class="img_col">
+                                <img title="Exam Certificate" src="{% static 'assets/img/diamante_azul.png' %}"  width="20px" alt="">
+                            </div>
+                            <div>
+                                <h4>{{ user_diamonds.blue_diamonds }}</h4>
                             </div>
                         </div>
                     </div>
-
-                    <p class="pt-md-10">
-                      Aquí puedes encontrar tus certificados. Recuerda que para recibir un
-                      certificado debes solicitarlo (puedes hacerlo en la página del evento). El creador debe aceptar tu solicitud.
-                    </p>
-                    <div class="text-white rounded bg-warning text-uppercase font-weight-medium px-6 py-3 mb-3">Tus Certificados</div>
-                    <hr>
+                </div>
+                <span class="text-muted font-size-15 mb-3 d-block">
+                    Here you can find your certificates. Remember that to receive a certificate, 
+                    you must request it (you can do this on the event page). The creator must accept your request.
+                </span>
+                <div class="text-white rounded bg-warning text-uppercase font-weight-medium px-6 py-3 mb-3"> 
+                    &nbsp; Your Certificates
+                </div>
+                <hr>
 
                     <div class="row">
                         <div class="container my-4">

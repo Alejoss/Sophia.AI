@@ -11,20 +11,20 @@
                     <h5 class="mb-0">
                       <button class="btn btn-link cert_requests" type="button">
                           {% if certificate_requests.count == 1 %}
-                              Hay {{ certificate_requests.count }} usuario que ha solicitado un certificado de tu curso / evento.
+                              There is {{ certificate_requests.count }} user who has requested a certificate from your course / event.
                           {% else %}
-                              Hay {{ certificate_requests.count }} usuarios que han solicitado certificados de tu cursos / eventos.
+                              There are {{ certificate_requests.count }} users who have requested certificates from your courses / events.
                           {% endif %}
                       </button>
                     </h5>
                   </div>
                 </div>
             {% else %}
-                <div class="card">
+                <div class="card mb-3">
                   <div class="card-header list-group-item-info">
                     <h5 class="mb-0">
                       <button class="btn btn-link cert_requests certificate_requests" type="button">
-                        <i class="fa fa-certificate"></i> No tienes nuevas solicitudes de certificados en tus cursos.
+                        <i class="fa fa-certificate"></i> You have no new certificate requests for your courses.
                       </button>
                     </h5>
                   </div>
@@ -33,12 +33,12 @@
                 <div class="text-sm-center mt-6">
                   <button type="submit" class="btn btn-warning text-uppercase"
                           onclick="location.href = '{% url 'event_create' %}' ">
-                    Crear Nuevo Curso o Evento
+                    Create New Course or Event
                   </button>
                 </div>
                 <hr>
                   <p class="text-left">
-                     <strong>Tus Cursos y Eventos: </strong>
+                     <strong>Your Courses and Events: </strong>
                       <br>
                   </p>
             </div> {#     col-12       #}
@@ -49,7 +49,6 @@
         </div>
 
     </div>
-
 {% endblock profile_content %}
 
 
