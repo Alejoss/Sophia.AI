@@ -4,7 +4,7 @@
     "@nomicfoundation/hardhat-ignition": "^0.15.3",
     "@nomicfoundation/hardhat-ignition-ethers": "^0.15.2",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.22.3",
+    "hardhat": "^2.22.4",
     "hardhat-contract-sizer": "^2.10.0"
   },
   "dependencies": {
