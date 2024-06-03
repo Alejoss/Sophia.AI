@@ -10,10 +10,10 @@
 <section class="py-8 pt-md-10">
 	<div class="container">
         {% if event.deleted %}
-            <h3 class="card-title text-dark">* <strong>{{ event.title }} ha sido eliminado por el propietario</strong> *</h3>
+            <h3 class="card-title text-dark">* <strong>{{ event.title }} has been deleted by the owner</strong> *</h3>
         {% endif %}
         {% if is_event_owner %}
-            <h3 class="card-title text-dark">Tu <strong>{{ event.title }}:</strong></h3>
+            <h3 class="card-title text-dark">Your <strong>{{ event.title }}:</strong></h3>
             <div class="accordion mb-8" id="accordionExample">
 
                 {% if certificate_requests %}
@@ -21,7 +21,7 @@
                   <div class="card-header list-group-item-success" id="certificate_requests">
                     <h5 class="mb-0">
                       <button class="btn btn-link" type="button">
-                        Hay {{ certificate_requests.count }} usuarios que han solicitado un certificado de tu curso.
+                        There are {{ certificate_requests.count }} users who have requested a certificate for your course.
                       </button>
                     </h5>
                   </div>
@@ -31,7 +31,7 @@
             </div>
         <hr>
         {% endif %}
-		<div class="row"> <!-- contenido -->
+		<div class="row"> <!-- content -->
 			<div class="col-lg-8 col-md-7">
 				<div class="card shadow-none bg-transparent">
                     {% if event.image %}
@@ -39,20 +39,19 @@
                     {% else %}
                         <img class="card-img-top" src="https://picsum.photos/500" alt="Event Image">
                     {% endif %}
-					<div class="card-img-overlay"> <!-- valor -->
+					<div class="card-img-overlay"> <!-- value -->
                         {% if event.event_type == "COURSE" %}
                             <span class="badge badge-info badge-rounded-circle">
                         {% else %}
                             <span class="badge badge-success badge-rounded-circle">
                         {% endif %}
                             {% if event.reference_price == 0.0 %}
-                            <span data-toggle="tooltip" data-placement="top" title="GRATIS!" data-original-title="GRATIS!">
+                            <span data-toggle="tooltip" data-placement="top" title="FREE!" data-original-title="FREE!">
                                 <i class="fa fa-smile-o text-white" aria-hidden="true"></i>
                             </span>
-                            {% else %} <!-- precio -->
-                            <span data-toggle="tooltip" data-placement="top" title="" data-original-title="Has click
-                            para ver el precio en criptomonedas">
-                                <span type="button" data-toggle="modal" data-target="#ModalPrecios"> <!-- boton modal precios -->
+                            {% else %} <!-- price -->
+                            <span data-toggle="tooltip" data-placement="top" title="" data-original-title="Click to see the price in cryptocurrencies">
+                                <span type="button" data-toggle="modal" data-target="#ModalPrecios"> <!-- modal prices button -->
                                     $ {{ event.reference_price|floatformat }}
                                 </span>
                             </span>
@@ -77,14 +76,14 @@
                     <div class="mb-8">
                     {% if event.owner == user %}
                         <div class="text-right">
-                            <button id="event_edit" type="button" class="btn btn-primary mb-2"><i class="fa fa-edit"></i> Editar</button>
+                            <button id="event_edit" type="button" class="btn btn-primary mb-2"><i class="fa fa-edit"></i> Edit</button>
                         </div>
                     {% else %}
                         <div id="remove_bookmark_div" class="text-right">
-                            <button id="remove_bookmark" type="button" class="btn btn-warning mb-2"><i class="fa fa-star-o"></i> Ya no me interesa</button>
+                            <button id="remove_bookmark" type="button" class="btn btn-warning mb-2"><i class="fa fa-star-o"></i> Not Interested Anymore</button>
                         </div>
                         <div id="event_bookmark_div" class="text-right">
-                            <button id="event_bookmark" type="button" class="btn btn-info mb-2"><i class="fa fa-star"></i> Me Interesa</button>
+                            <button id="event_bookmark" type="button" class="btn btn-info mb-2"><i class="fa fa-star"></i> Interested</button>
                         </div>
 
                         {% if user_certificate_request %}
@@ -92,7 +91,7 @@
                         {% else %}
                             <div id="request_certificate_div" class="text-right">
                                 <button data-id="{{ event.id }}" type="button" class="btn btn-success mb-2 request_certificate">
-                                    <i class="fa fa-certificate"></i> Solicitar Certificado
+                                    <i class="fa fa-certificate"></i> Request Certificate
                                 </button>
                             </div>
                         {% endif %}
@@ -103,20 +102,20 @@
 
                         <h3 class="card-title text-dark">
                         {% if event.event_type == 'EVENT' %}
-                            <span class="diamond_title"><img alt="" title="Evento" src="{% static 'assets/img/diamante_verde.png' %}" class="" width="22px"></span>
+                            <span class="diamond_title"><img alt="" title="Event" src="{% static 'assets/img/diamante_verde.png' %}" class="" width="22px"></span>
                         {% elif event.event_type == 'LIVE_COURSE' %}
-                            <span class="diamond_title"><img alt="" title="Curso Online" src="{% static 'assets/img/diamante_amarillo.png' %}" class="" width="22px"></span>
+                            <span class="diamond_title"><img alt="" title="Online Course" src="{% static 'assets/img/diamante_amarillo.png' %}" class="" width="22px"></span>
                         {% elif event.event_type == "PRE-RECORDED" %}
-                            <span class="diamond_title"><img alt="" title="Curso Pre Grabado" src="{% static 'assets/img/diamante_magenta.png' %}" class="" width="22px"></span>
+                            <span class="diamond_title"><img alt="" title="Pre-Recorded Course" src="{% static 'assets/img/diamante_magenta.png' %}" class="" width="22px"></span>
                         {% elif event.event_type == 'EXAM' %}
-                            <span class="diamond_title"><img alt="" title="Examen" src="{% static 'assets/img/diamante_azul.png' %}" class="" width="22px"></span>
+                            <span class="diamond_title"><img alt="" title="Exam" src="{% static 'assets/img/diamante_azul.png' %}" class="" width="22px"></span>
                         {% endif %}
                             {{ event.title }}
                         </h3>
                         <p class="">{{ event.description|safe }}</p>
                     </div>
 
-                    <h3 class="card-title text-warning">Contacta a <a href="{% url 'user_profile' event.owner.id %}">
+                    <h3 class="card-title text-warning">Contact <a href="{% url 'user_profile' event.owner.id %}">
                         {{ event.owner.username }}:</a>
                     </h3>
 
@@ -138,13 +137,13 @@
                                 {% endif %}
                             {% endfor %}
                         {% else %}
-                            <p>{{ event.owner.username }} no ha establecido métodos de contacto. </p>
+                            <p>{{ event.owner.username }} has not established contact methods. </p>
                         {% endif %}
                         </div>
                     {% else %}
                         <ul class="list-group">
                             <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <a href="{% url 'profile_register' %}">Regístrate en Academia Blockchain</a>
+                                <a href="{% url 'profile_register' %}">Register at Academia Blockchain</a>
                             </li>
                         </ul>
                     {% endif %}
@@ -158,7 +157,7 @@
 
                     {% if user.is_authenticated %}
                     <div class="bg-light shadow-sm rounded px-3 pt-3 pb-6 mb-4">
-                        <h3 class="mb-4 text-danger font-weight-bold">Deja un Comentario</h3>
+                        <h3 class="mb-4 text-danger font-weight-bold">Leave a Comment</h3>
                         <form id="comment_form" method="post" action="{% url 'event_comment' event.id %}">
                             {% csrf_token %}
                             <div class="row">
@@ -166,13 +165,13 @@
                                     <div class="form-group form-group-icon">
                                     <i class="fa fa-comments"></i>
                                         <textarea name="comment_text" class="form-control border-info"
-                                                  placeholder="Escribe un comentario" rows="6"></textarea>
+                                                  placeholder="Write a comment" rows="6"></textarea>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="text-right">
-                                <button class="btn btn-danger text-uppercase">Enviar</button>
+                                <button class="btn btn-danger text-uppercase">Send</button>
                             </div>
                         </form>
                     </div>
@@ -180,35 +179,34 @@
 
                     {% if comments %}
                     <div class="bg-light shadow-sm rounded px-3 pt-3 pb-6 mb-4">
-
-                            <h3 class="mb-4 text-danger font-weight-bold">{{ comments.count }} Comentarios:</h3>
-                                {% for comment in comments %}
-                                    <hr>
-                                    <div class="media py-1">
-                                      <div class="media-body">
-                                        <span class="mb-3 font-weight-medium text-muted d-inline-block">{{ comment.user.username }}</span>
-                                            <time class="d-block text-muted font-size-13 mb-3">{{ comment.date_created|date:"SHORT_DATE_FORMAT" }}</time>
-                                                <p class="font-size-13 line-hight-21">{{ comment.text }} </p>
-                                      </div>
-                                    </div>
-                                {% endfor %}
+                        <h3 class="mb-4 text-danger font-weight-bold">{{ comments.count }} Comments:</h3>
+                        {% for comment in comments %}
+                            <hr>
+                            <div class="media py-1">
+                                <div class="media-body">
+                                    <span class="mb-3 font-weight-medium text-muted d-inline-block">{{ comment.user.username }}</span>
+                                    <time class="d-block text-muted font-size-13 mb-3">{{ comment.created_on|date:"SHORT_DATE_FORMAT" }}</time>
+                                    <p class="font-size-13 line-height-21">{{ comment.text }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
                     {% endif %}
                 </div>
 
-				</div>
-			</div>
+            </div>
+        </div>
 
-            <div class="modal fade" id="ModalPrecios" tabindex="-1" aria-hidden="true"> <!-- Modal precios -->
-                <div class="modal-dialog">
+        <div class="modal fade" id="ModalPrecios" tabindex="-1" aria-hidden="true"> <!-- Price Modal -->
+            <div class="modal-dialog">
                 <div class="modal-content rounded-top">
                     <div class="modal-header bg-info">
-                        <h5 class="modal-title text-white font-weight-bold py-2 pl-3 mb-0">Valor y formas de pago</h5>
+                        <h5 class="modal-title text-white font-weight-bold py-2 pl-3 mb-0">Value and Payment Methods</h5>
                         <button type="button" class="btn btn-danger text-uppercase" data-dismiss="modal">X</button>
                     </div>
                     <div class="modal-body">
                         <p class="text-muted font-weight-bold">
-                            <strong>$ {{ event.reference_price }} </strong>
+                            <strong>$ {{ event.reference_price }}</strong>
                             <ul class="list-unstyled list-item-border-bottom">
                             {% for c in preferred_cryptos %}
                             <li class="mb-4 pb-4">
@@ -226,115 +224,113 @@
                             {% endfor %}
                             </ul>
                         </p>
-                       </div>
+                    </div>
                     <div class="modal-footer">
                         <p> Powered by CoinGecko API </p>
                     </div>
                 </div>
-                </div>
             </div>
+        </div>
 
-			<div class="col-lg-4 col-md-5"><!-- columna derecha - INFORMACION -->
-				<div class="pb-4 mb-2">
-                    {% if event.event_type == "COURSE" %}
-                        <div class="section-title bg-info rounded-top">
-                    {% else %}
-                        <div class="section-title bg-success rounded-top">
-                    {% endif %}
-						<h3 class="text-capitalize text-white font-weight-bold py-2 pl-3 mb-0">Información</h3>
-					</div>
-					<div class="border border-top-0 rounded-bottom">
-						<div class="media p-3 border-bottom">
-							<div class="icon-rounded-circle-medium mr-3 bg-warning">
-								<i class="fa fa-calendar text-white" aria-hidden="true"></i>
-							</div>
-							<div class="media-body">
-                                <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">¿Cuándo?</h4>
-                                {% if event.is_recorded %}
-                                    <p class="text-muted font-weight-bold">Grabado el {{ event.date_recorded|date:"SHORT_DATE_FORMAT" }}</p>
-                                {% else %}
-                                    {% if event.date_start %}
-                                        <p class="text-muted font-weight-bold">Comienza el {{ event.date_start|date:"SHORT_DATE_FORMAT" }}</p>
-                                        <p class="text-muted font-weight-bold">
-                                         {{ event.date_start|date:"h:i A" }}
-                                            {% if owner_profile.timezone %}
-                                                ({{ owner_profile.timezone }})
-                                            {% endif %}
-                                        </p>
-                                    {% endif %}
-
-                                    {% if event.date_end %}
-                                        <p class="text-muted font-weight-bold">Hasta el {{ event.date_end|date:"SHORT_DATE_FORMAT" }}</p>
-                                        <p class="text-muted font-weight-bold">
-                                         {{ event.date_end|date:"h:i A" }}
-                                        </p>
-                                    {% endif %}
-
-                                    {% if event.schedule_description %}
-                                        <p class="text-muted">
-                                            * {{ event.schedule_description }}
-                                        </p>
-                                    {% endif %}
-                                {% endif %}
-							</div>
-						</div>
-
-						<div class="media p-3 border-bottom">
-							<div class="icon-rounded-circle-medium mr-3 bg-warning">
-								<i class="fa fa-money text-white" aria-hidden="true"></i>
-							</div>
-							<div class="media-body">
-								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
-									Criptos Preferidas
-								</h4>
-                                <p class="text-muted font-weight-bold">
-                                    $ {{ event.reference_price }}
-                                </p>
-								<p class="text-muted font-weight-bold">
-                                    {% for c in accepted_cryptos %}
-                                        {{ c.crypto.code }}
-                                    {% endfor %}
-                                </p>
-							</div>
-						</div>
-
-						<div class="media p-3 border-bottom">
-							<div class="icon-rounded-circle-medium mr-3 bg-warning">
-								<i class="fa fa-external-link-square text-white" aria-hidden="true"></i>
-							</div>
-							<div class="media-body">
-								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
-									Aplicación
-								</h4>
-                                <p class="text-muted font-weight-bold">
-                                    {{ event.platform.name }}
-                                </p>
-                                {% if event.other_platform %}
+        <div class="col-lg-4 col-md-5"><!-- right column - INFORMATION -->
+            <div class="pb-4 mb-2">
+                {% if event.event_type == "COURSE" %}
+                    <div class="section-title bg-info rounded-top">
+                {% else %}
+                    <div class="section-title bg-success rounded-top">
+                {% endif %}
+                <h3 class="text-capitalize text-white font-weight-bold py-2 pl-3 mb-0">Information</h3>
+                </div>
+                <div class="border border-top-0 rounded-bottom">
+                    <div class="media p-3 border-bottom">
+                        <div class="icon-rounded-circle-medium mr-3 bg-warning">
+                            <i class="fa fa-calendar text-white" aria-hidden="true"></i>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">When?</h4>
+                            {% if event.is_recorded %}
+                                <p class="text-muted font-weight-bold">Recorded on {{ event.date_recorded|date:"SHORT_DATE_FORMAT" }}</p>
+                            {% else %}
+                                {% if event.date_start %}
+                                    <p class="text-muted font-weight-bold">Starts on {{ event.date_start|date:"SHORT_DATE_FORMAT" }}</p>
                                     <p class="text-muted font-weight-bold">
-                                        + {{ event.other_platform }}
+                                     {{ event.date_start|date:"h:i A" }}
+                                        {% if owner_profile.timezone %}
+                                            ({{ owner_profile.timezone }})
+                                        {% endif %}
                                     </p>
                                 {% endif %}
-							</div>
-						</div>
 
-                        <div class="media p-3 border-bottom">
-							<div class="icon-rounded-circle-medium mr-3 bg-warning">
-								<i class="fa fa-comments text-white" aria-hidden="true"></i>
-							</div>
-							<div class="media-body">
-								<h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
-									Contacto
-								</h4>
+                                {% if event.date_end %}
+                                    <p class="text-muted font-weight-bold">Until {{ event.date_end|date:"SHORT_DATE_FORMAT" }}</p>
+                                    <p class="text-muted font-weight-bold">
+                                     {{ event.date_end|date:"h:i A" }}
+                                    </p>
+                                {% endif %}
+
+                                {% if event.schedule_description %}
+                                    <p class="text-muted">
+                                        * {{ event.schedule_description }}
+                                    </p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="media p-3 border-bottom">
+                        <div class="icon-rounded-circle-medium mr-3 bg-warning">
+                            <i class="fa fa-money text-white" aria-hidden="true"></i>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+                                Preferred Cryptos
+                            </h4>
+                            <p class="text-muted font-weight-bold">
+                                $ {{ event.reference_price }}
+                            </p>
+                            <p class="text-muted font-weight-bold">
+                                {% for c in accepted_cryptos %}
+                                    {{ c.crypto.code }}
+                                {% endfor %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="media p-3 border-bottom">
+                        <div class="icon-rounded-circle-medium mr-3 bg-warning">
+                            <i class="fa fa-external-link-square text-white" aria-hidden="true"></i>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+                                Application
+                            </h4>
+                            <p class="text-muted font-weight-bold">
+                                {{ event.platform.name }}
+                            </p>
+                            {% if event.other_platform %}
                                 <p class="text-muted font-weight-bold">
-                                    {% for contact_method in contact_methods %}
-                                        {{ contact_method.name }}
-                                    {% endfor %}
+                                    + {{ event.other_platform }}
                                 </p>
-							</div>
-						</div>
-			        </div>
-		        </div>
-	        </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="media p-3 border-bottom">
+                        <div class="icon-rounded-circle-medium mr-3 bg-warning">
+                            <i class="fa fa-comments text-white" aria-hidden="true"></i>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="text-uppercase text-secondary mt-0 font-weight-bold">
+                                Contact
+                            </h4>
+                            <p class="text-muted font-weight-bold">
+                                {% for contact_method in contact_methods %}
+                                    {{ contact_method.name }}
+                                {% endfor %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -342,6 +338,7 @@
 </section>
 
 {% endblock content %}
+
 
 {% block extra_js %}
     <script type="text/javascript" src="{% static 'star-ratings/js/dist/star-ratings.min.js' %}"></script>
