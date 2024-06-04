@@ -1,6 +1,6 @@
 import hashlib
 import os
-from web3 import Web3
+# from web3 import Web3
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse
@@ -8,7 +8,7 @@ from django.contrib import messages
 
 from .models import Library, Group, File
 from .utils import FileUploadForm, extract_text_from_pdf, gptzero_post_request, create_sha256_hash
-from .interact_with_sc import HashStoreIpfsSmartContract, ACBCTokenSmartContract
+# from .interact_with_sc import HashStoreIpfsSmartContract, ACBCTokenSmartContract
 
 
 # View all libraries
@@ -92,105 +92,107 @@ def run_ai_detection_view(request, file_id):
 
 
 def send_hash_to_sc(request, file_id):
-    file = get_object_or_404(File, pk=file_id)
-
-    # Check if the hash has already been successfully stored
-    if file.transaction_receipt:
-        messages.error(request, "This file's hash has already been sent to the blockchain.")
-        return redirect('file_detail', file_id=file.id)
-
-    if not file.text_hash:
-        messages.error(request, "No hash available for this file.")
-        return redirect('file_detail', file_id=file.id)
-
-    private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
-    from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
-
-    hash_store_sc = HashStoreIpfsSmartContract(from_address=from_address, private_key=private_key)
-
-    try:
-        receipt = hash_store_sc.store_hash(file.text_hash)
-        file.transaction_receipt = receipt  # Save the receipt to the file model
-        file.save()
-        messages.success(request, "Hash sent to the blockchain successfully!")
-    except Exception as e:
-        messages.error(request, f"Failed to send hash to the blockchain: {str(e)}")
-
-    return redirect('file_detail', file_id=file.id)
+    pass
+    # file = get_object_or_404(File, pk=file_id)
+    #
+    # # Check if the hash has already been successfully stored
+    # if file.transaction_receipt:
+    #     messages.error(request, "This file's hash has already been sent to the blockchain.")
+    #     return redirect('file_detail', file_id=file.id)
+    #
+    # if not file.text_hash:
+    #     messages.error(request, "No hash available for this file.")
+    #     return redirect('file_detail', file_id=file.id)
+    #
+    # private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
+    # from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
+    #
+    # hash_store_sc = HashStoreIpfsSmartContract(from_address=from_address, private_key=private_key)
+    #
+    # try:
+    #     receipt = hash_store_sc.store_hash(file.text_hash)
+    #     file.transaction_receipt = receipt  # Save the receipt to the file model
+    #     file.save()
+    #     messages.success(request, "Hash sent to the blockchain successfully!")
+    # except Exception as e:
+    #     messages.error(request, f"Failed to send hash to the blockchain: {str(e)}")
+    #
+    # return redirect('file_detail', file_id=file.id)
 
 
 def interact_with_hash_store_sc(request):
+    pass
     # Tests all the endpoints of the HashStore Smart Contract
 
-    private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
-    from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
-
-    hash_value = "fb1484ec19172fbfc3e662f9ffd80f2add2ec6ed17118cabdffb1eaf9551e3ef"
-    ipfs_content_id = "QmYwAPJzv5CZsnAztb6HZdmBv6fT5fp8jP93fw5P8R8Qkv"
-
-    print(f"From Address: {from_address}")
-    print(f"Hash Value: {hash_value}")
-    print(f"IPFS Content ID: {ipfs_content_id}")
-
-    hash_store_sc = HashStoreIpfsSmartContract(from_address=from_address, private_key=private_key)
-    print("Smart contract instance created successfully.")
-
-    try:
-        print(f"Storing hash {hash_value} with IPFS content ID {ipfs_content_id}")
-        store_receipt = hash_store_sc.store_hash(hash_value, ipfs_content_id)
-        print(f"Store transaction receipt: {dict(store_receipt)}")
-    except Exception as e:
-        print(f'Error storing hash: {e}')
-        return JsonResponse({'success': False, 'error': f'Error storing hash: {str(e)}'})
-
-    try:
-        is_stored = hash_store_sc.is_hash_stored(hash_value)
-        print(f"Is hash stored: {is_stored}")
-    except Exception as e:
-        print(f'Error checking if hash is stored: {e}')
-        return JsonResponse({'success': False, 'error': f'Error checking if hash is stored: {str(e)}'})
-
-    try:
-        user_by_hash = hash_store_sc.get_user_by_hash(hash_value)
-        print(f"User that stored the hash: {user_by_hash}")
-    except Exception as e:
-        print(f'Error getting user by hash: {e}')
-        return JsonResponse({'success': False, 'error': f'Error getting user by hash: {str(e)}'})
-
-    try:
-        ipfs_by_hash = hash_store_sc.get_ipfs_by_hash(hash_value)
-        print(f"IPFS content ID for hash: {ipfs_by_hash}")
-    except Exception as e:
-        print(f'Error getting IPFS content ID by hash: {e}')
-        return JsonResponse({'success': False, 'error': f'Error getting IPFS content ID by hash: {str(e)}'})
-
-    try:
-        hashes_by_user = hash_store_sc.get_hashes_by_user(from_address)
-        print(f"Hashes stored by user: {hashes_by_user}")
-    except Exception as e:
-        print(f'Error getting hashes by user: {e}')
-        return JsonResponse({'success': False, 'error': f'Error getting hashes by user: {str(e)}'})
-
-    try:
-        my_hashes = hash_store_sc.get_my_hashes()
-        print(f"My stored hashes: {my_hashes}")
-    except Exception as e:
-        print(f'Error getting my hashes: {e}')
-        return JsonResponse({'success': False, 'error': f'Error getting my hashes: {str(e)}'})
-
-    try:
-        return JsonResponse({
-            'success': True,
-            'store_receipt': dict(store_receipt),
-            'is_stored': is_stored,
-            'user_by_hash': user_by_hash,
-            'ipfs_by_hash': ipfs_by_hash,
-            'hashes_by_user': hashes_by_user,
-            'my_hashes': my_hashes,
-        })
-    except Exception as e:
-        print(f"Error building json response: {e}")
-        return JsonResponse({'success': False, 'error': str(e)})
+    # private_key = os.getenv("SEPOLIA_WEB3_PRIVATE_KEY")
+    # from_address = os.getenv("SEPOLIA_WEB3_PUBLIC_KEY")
+    #
+    # hash_value = "fb1484ec19172fbfc3e662f9ffd80f2add2ec6ed17118cabdffb1eaf9551e3ef"
+    # ipfs_content_id = "QmYwAPJzv5CZsnAztb6HZdmBv6fT5fp8jP93fw5P8R8Qkv"
+    #
+    # print(f"From Address: {from_address}")
+    # print(f"Hash Value: {hash_value}")
+    # print(f"IPFS Content ID: {ipfs_content_id}")
+    #
+    # hash_store_sc = HashStoreIpfsSmartContract(from_address=from_address, private_key=private_key)
+    # print("Smart contract instance created successfully.")
+    #
+    # try:
+    #     print(f"Storing hash {hash_value} with IPFS content ID {ipfs_content_id}")
+    #     store_receipt = hash_store_sc.store_hash(hash_value, ipfs_content_id)
+    #     print(f"Store transaction receipt: {dict(store_receipt)}")
+    # except Exception as e:
+    #     print(f'Error storing hash: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error storing hash: {str(e)}'})
+    #
+    # try:
+    #     is_stored = hash_store_sc.is_hash_stored(hash_value)
+    #     print(f"Is hash stored: {is_stored}")
+    # except Exception as e:
+    #     print(f'Error checking if hash is stored: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error checking if hash is stored: {str(e)}'})
+    #
+    # try:
+    #     user_by_hash = hash_store_sc.get_user_by_hash(hash_value)
+    #     print(f"User that stored the hash: {user_by_hash}")
+    # except Exception as e:
+    #     print(f'Error getting user by hash: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error getting user by hash: {str(e)}'})
+    #
+    # try:
+    #     ipfs_by_hash = hash_store_sc.get_ipfs_by_hash(hash_value)
+    #     print(f"IPFS content ID for hash: {ipfs_by_hash}")
+    # except Exception as e:
+    #     print(f'Error getting IPFS content ID by hash: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error getting IPFS content ID by hash: {str(e)}'})
+    #
+    # try:
+    #     hashes_by_user = hash_store_sc.get_hashes_by_user(from_address)
+    #     print(f"Hashes stored by user: {hashes_by_user}")
+    # except Exception as e:
+    #     print(f'Error getting hashes by user: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error getting hashes by user: {str(e)}'})
+    #
+    # try:
+    #     my_hashes = hash_store_sc.get_my_hashes()
+    #     print(f"My stored hashes: {my_hashes}")
+    # except Exception as e:
+    #     print(f'Error getting my hashes: {e}')
+    #     return JsonResponse({'success': False, 'error': f'Error getting my hashes: {str(e)}'})
+    #
+    # try:
+    #     return JsonResponse({
+    #         'success': True,
+    #         'store_receipt': dict(store_receipt),
+    #         'is_stored': is_stored,
+    #         'user_by_hash': user_by_hash,
+    #         'ipfs_by_hash': ipfs_by_hash,
+    #         'hashes_by_user': hashes_by_user,
+    #         'my_hashes': my_hashes,
+    #     })
+    # except Exception as e:
+    #     print(f"Error building json response: {e}")
+    #     return JsonResponse({'success': False, 'error': str(e)})
 
 
 def interact_with_acbc_token_sc(request):
@@ -204,43 +206,44 @@ def interact_with_acbc_token_sc(request):
     print(f"To Address: {to_address}")
     print(f"Mint Amount: {mint_amount}")
     print(f"Burn Amount: {burn_amount}")
+    pass
 
     # Initialize the smart contract interaction
-    try:
-        acbc_token_sc = ACBCTokenSmartContract(from_address=from_address, private_key=private_key)
-        print("Smart contract instance created successfully.")
-
-        # Fetch the latest block to get the base fee
-        latest_block = acbc_token_sc.web3.eth.get_block('latest')
-        base_fee_per_gas = latest_block['baseFeePerGas']
-        max_priority_fee_per_gas = acbc_token_sc.web3.to_wei('2', 'gwei')
-        max_fee_per_gas = base_fee_per_gas + max_priority_fee_per_gas
-
-        # Mint tokens
-        print(f"Minting {mint_amount} tokens to {to_address}")
-        mint_receipt = acbc_token_sc.mint_tokens(to_address, mint_amount)
-        print(f"Mint transaction receipt: {mint_receipt}")
-
-        # Burn tokens
-        print(f"Burning {burn_amount} tokens from {from_address}")
-        burn_receipt = acbc_token_sc.burn_tokens(burn_amount)
-        print(f"Burn transaction receipt: {burn_receipt}")
-
-        # Get total supply
-        total_supply = acbc_token_sc.get_total_supply()
-        print(f"Total Supply: {total_supply}")
+    # try:
+        # acbc_token_sc = ACBCTokenSmartContract(from_address=from_address, private_key=private_key)
+        # print("Smart contract instance created successfully.")
+        #
+        # # Fetch the latest block to get the base fee
+        # # latest_block = acbc_token_sc.web3.eth.get_block('latest')
+        # # base_fee_per_gas = latest_block['baseFeePerGas']
+        # # max_priority_fee_per_gas = acbc_token_sc.web3.to_wei('2', 'gwei')
+        # # max_fee_per_gas = base_fee_per_gas + max_priority_fee_per_gas
+        #
+        # # Mint tokens
+        # print(f"Minting {mint_amount} tokens to {to_address}")
+        # mint_receipt = acbc_token_sc.mint_tokens(to_address, mint_amount)
+        # print(f"Mint transaction receipt: {mint_receipt}")
+        #
+        # # Burn tokens
+        # print(f"Burning {burn_amount} tokens from {from_address}")
+        # burn_receipt = acbc_token_sc.burn_tokens(burn_amount)
+        # print(f"Burn transaction receipt: {burn_receipt}")
+        #
+        # # Get total supply
+        # total_supply = acbc_token_sc.get_total_supply()
+        # print(f"Total Supply: {total_supply}")
 
         # Return the response as JSON
-        return JsonResponse({
-            'success': True,
-            'total_supply': total_supply,
-            'mint_receipt': dict(mint_receipt),
-            'burn_receipt': dict(burn_receipt),
-        })
-
-    except Exception as e:
-        print(f"Error interacting with the smart contract: {e}")
-        return JsonResponse({'success': False, 'error': str(e)})
+        # return JsonResponse({
+        #     'success': True,
+        #     'total_supply': total_supply,
+        #     'mint_receipt': dict(mint_receipt),
+        #     'burn_receipt': dict(burn_receipt),
+        # })
+    #
+    # except Exception as e:
+    #     print(f"Error interacting with the smart contract: {e}")
+    #     return JsonResponse({'success': False, 'error': str(e)})
 
 
 def file_detail(request, file_id):

@@ -88,12 +88,26 @@ WSGI_APPLICATION = 'academia_blockchain.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#database
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
+
+#
+# # for RDS and Elastic Beanstalk
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'ebdb',
+        'USER': 'postgres',
+        'PASSWORD': 'any_password',
+        'HOST': 'awseb-e-mr2v9jfs93-stack-awsebrdsdatabase-udcrlxqkcbzw.cu620yfazayx.us-east-1.rds.amazonaws.com',
+        'PORT': '5432',
     }
 }
+
 
 if DOCKER:
     DATABASES = {
