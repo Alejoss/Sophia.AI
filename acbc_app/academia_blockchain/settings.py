@@ -31,7 +31,7 @@ def get_env_variable(variable_name):
 
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
-DOCKER = True
+DOCKER = False
 SECRET_KEY = "na"  # TODO CORRECT THIS
 
 # Application definition
