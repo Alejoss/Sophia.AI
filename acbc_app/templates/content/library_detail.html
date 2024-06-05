@@ -7,19 +7,20 @@
 ===================================== -->
 <section class="pt-3 pb-3">
     <div class="container">
-        <h2>Libraries</h2>
+        <h2>{{ library.user.username }}'s library</h2>
     </div>
 </section>
 
 <section class="pb-5">
     <div class="container">
+
         <div class="row">
             <div class="container my-4">
                 <ul class="list-group">
-                    {% for library in libraries %}
+                    {% for file in files %}
                     <li class="list-group-item d-flex justify-content-between">
-                        {{ library.user.username }}'s library <span class="text-end">
-                        <a href="{% url 'library_detail' library.id %}">visit</a></span>
+                        {{ file.title }} / {{ file.author }}
+                        <span class="text-end"> <a href="{% url 'file_detail' file.id %}">open</a></span>
                     </li>
                     {% endfor %}
                 </ul>

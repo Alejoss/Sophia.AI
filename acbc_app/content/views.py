@@ -27,6 +27,14 @@ def user_library(request):
     return render(request, 'content/user_library.html', {'library_files': library_files})
 
 
+def library_detail(request, library_id):
+    library = get_object_or_404(Library, pk=library_id)
+    files = File.objects.filter(library=library)
+    print(f"Files: {files}")
+    context = {'library': library, 'files': files}
+    return render(request, 'content/library_detail.html', context)
+
+
 def file_upload(request):
     if request.method == "POST":
         form = FileUploadForm(request.POST, request.FILES)

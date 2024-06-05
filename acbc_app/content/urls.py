@@ -6,6 +6,7 @@ urlpatterns = [
     # Library URLs
     path('libraries/', views.library_list, name='library_list'),
     path('libraries/user_library', views.user_library, name='user_library'),
+    path('libraries/<int:library_id>', views.library_detail, name='library_detail'),
     path('libraries/user_library/file_upload', views.file_upload, name='file_upload'),
     path('files/<int:file_id>/', views.file_detail, name='file_detail'),
     path('hash-pdf/<int:file_id>/', views.hash_pdf_view, name='hash_pdf_view'),

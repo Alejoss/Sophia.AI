@@ -12,4 +12,8 @@ docker-compose exec backend python manage.py migrate
 
 *Optionally create a superuser:*
 
-docker exec acbc_backend python manage.py create_admin
+docker-compose exec backend python manage.py create_admin
+
+*Load the database with inital test data*
+
+docker-compose exec backend python manage.py load_libraries
