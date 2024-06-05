@@ -14,6 +14,12 @@ docker-compose exec backend python manage.py migrate
 
 docker-compose exec backend python manage.py create_admin
 
-*Load the database with inital test data*
+*Load fixtures*
+
+docker-compose exec backend python manage.py load_fixtures
+
+*Load the database with initial test data*
 
 docker-compose exec backend python manage.py load_libraries
+
+
