@@ -139,6 +139,7 @@ acbc_app.iml
 misc.xml
 Sophia.AI.iml
 acbc_app/media
+acbc_app/.gitignore
 
 # client
 node_modules
