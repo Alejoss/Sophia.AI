@@ -18,7 +18,7 @@
                 <ul class="list-group">
                     {% for library in libraries %}
                     <li class="list-group-item d-flex justify-content-between">
-                        {{ library.user.username }}'s library <span class="text-end">
+                        {{ library.user.username }}'s library - <strong> {{ library.name }} </strong> <span class="text-end">
                         <a href="{% url 'library_detail' library.id %}">visit</a></span>
                     </li>
                     {% endfor %}

@@ -21,5 +21,3 @@ docker-compose exec backend python manage.py load_fixtures
 *Load the database with initial test data*
 
 docker-compose exec backend python manage.py load_libraries
-
-
