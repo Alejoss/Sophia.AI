@@ -21,13 +21,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
-def get_env_variable(variable_name):
-    try:
-        v = os.environ[variable_name]
-    except Exception as e:
-        v = "na"
-    return v
-
 
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
@@ -200,3 +193,14 @@ LOGIN_REDIRECT_URL = "user_library"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "es-ES"
 SEND_EMAILS = False
+
+
+# AWS config
+# settings.py
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = 'academiablockchain'
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+
+STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/media/'
