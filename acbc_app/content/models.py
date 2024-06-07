@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import JSONField
 
+# python manage.py dumpdata content.Library content.Group content.File > data.json
+
 
 class Library(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

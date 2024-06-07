@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY")
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     'courses',
     'content',
     'star_ratings',
-    'taggit'
+    'taggit',
+    'storages'
 ]
 
 MIDDLEWARE = [
@@ -161,14 +162,6 @@ LANGUAGE_CODE = "es-ES"
 SEND_EMAILS = False
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.0/howto/static-files/
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR + "/media/"
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-
 if ENVIRONMENT == "PRODUCTION":
     # DEBUG = False
     # for RDS and Elastic Beanstalk
@@ -187,12 +180,21 @@ if ENVIRONMENT == "PRODUCTION":
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = 'academiablockchain'
+    AWS_S3_REGION_NAME = 'us-west-2'  # example region
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 
+    AWS_S3_URL_PROTOCOL = 'https'
+    AWS_S3_USE_SSL = True
+    AWS_S3_VERIFY = True
+
+    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/media/'
+
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 else:
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -203,3 +205,10 @@ else:
             "PORT": "5432",
         }
     }
+
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR + "/media/"
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    STATIC_URL = '/static/'
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+
