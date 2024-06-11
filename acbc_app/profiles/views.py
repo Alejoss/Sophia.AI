@@ -18,7 +18,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 
 from profiles.utils import AcademiaUserCreationForm, AcademiaLoginForm, ProfilePictureForm, \
-    get_cryptos_string, academia_blockchain_timezones, send_email_message, AcademiaPasswordResetForm,\
+    get_cryptos_string, academia_blockchain_timezones, send_email_message, AcademiaPasswordResetForm, \
     AcademiaSetPasswordForm, send_confirmation_email, get_user_diamonds
 
 from profiles.models import Profile, AcceptedCrypto, ContactMethod, CryptoCurrency
@@ -88,6 +88,7 @@ def register_profile(request):
             context = {"form": form}
             return render(request, template, context)
 
+
 def activate_account(request, uid, token):
     """
     Activates a user account if the provided token is valid. This function is typically used in the context of
@@ -130,6 +131,7 @@ def activate_account(request, uid, token):
     else:
         # If the token is not valid, inform the user
         return HttpResponse('Activation link is invalid!')
+
 
 # Account Registration html render views
 class AcademiaLogin(LoginView):
@@ -246,6 +248,7 @@ def profile_data(request):
         # Render and return the profile data page
         return render(request, template, context)
 
+
 @login_required
 def user_profile(request, profile_id):
     """
@@ -354,6 +357,7 @@ def profile_edit_contact_method(request):
         context = {"contact_methods": contact_methods}
         return render(request, template, context)
 
+
 @login_required
 def profile_edit_picture(request):
     """
@@ -388,6 +392,7 @@ def profile_edit_picture(request):
     else:
         # Return HTTP status 400 for any non-POST requests
         return HttpResponse(status=400)
+
 
 @login_required
 def profile_edit_cryptos(request):
@@ -449,6 +454,7 @@ def profile_edit_cryptos(request):
         context = {"accepted_cryptos": accepted_cryptos}
         return render(request, template, context)
 
+
 @login_required
 def profile_delete_contact_method(request):
     """
@@ -480,6 +486,7 @@ def profile_delete_contact_method(request):
         # Return HTTP status 400 for non-POST requests to indicate a bad request
         return HttpResponse(status=400)
 
+
 @login_required
 def profile_delete_crypto(request):
     """
@@ -510,6 +517,7 @@ def profile_delete_crypto(request):
         # Return HTTP status 400 for non-POST requests to indicate a bad request
         return HttpResponse(status=400)
 
+
 @login_required
 def profile_events(request):
     """
@@ -537,6 +545,7 @@ def profile_events(request):
     }
     return render(request, template, context)
 
+
 @login_required
 def profile_certificates(request):
     """
@@ -561,6 +570,7 @@ def profile_certificates(request):
     }
     return render(request, template, context)
 
+
 @login_required
 def profile_cert_requests(request):
     """
@@ -577,7 +587,8 @@ def profile_cert_requests(request):
     cert_requests = CertificateRequest.objects.filter(event__owner=request.user, state="PENDING").order_by("event")
     logger.debug(f"cert_requests: {cert_requests}")
 
-    cert_requests_rejected = CertificateRequest.objects.filter(event__owner=request.user, state="REJECTED").order_by("event")
+    cert_requests_rejected = CertificateRequest.objects.filter(event__owner=request.user, state="REJECTED").order_by(
+        "event")
     logger.debug(f"cert_requests_rejected: {cert_requests_rejected}")
 
     context = {
@@ -585,6 +596,7 @@ def profile_cert_requests(request):
         "cert_requests_rejected": cert_requests_rejected
     }
     return render(request, template, context)
+
 
 @login_required
 def profile_bookmarks(request):
@@ -620,6 +632,7 @@ def profile_bookmarks(request):
         "bookmarks": bookmarks
     }
     return render(request, template, context)
+
 
 @login_required
 def profile_content(request):
