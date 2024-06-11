@@ -1,5 +1,6 @@
 import hashlib
 import os
+import requests
 # from web3 import Web3
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -252,6 +253,31 @@ def interact_with_acbc_token_sc(request):
     # except Exception as e:
     #     print(f"Error interacting with the smart contract: {e}")
     #     return JsonResponse({'success': False, 'error': str(e)})
+
+
+def test_unstoppable(request):
+    api_key = os.getenv("UNSTOPPABLE_API_KEY")
+    domain = 'example.crypto'  # The domain you want to resolve
+    headers = {'Authorization': f'Bearer {api_key}'}
+    url = f'https://api.ud-sandbox.com/resolve/domains/{domain}'
+    print(f'api_key: {api_key}')
+    print(f"url: {url}")
+    url = "https://api.ud-sandbox.com/partner/v3/domains"
+
+    query = {
+        "$expand": "records",
+        "tlds": "crypto",
+        "ending": "dao",
+        "query": "academia blockchain"
+    }
+
+    response = requests.get(url, headers=headers, params=query)
+
+    data = response.json()
+    print(data)
+
+    # Returning the response as JSON
+    return JsonResponse(response.json(), safe=False)
 
 
 def file_detail(request, file_id):

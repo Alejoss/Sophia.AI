@@ -14,6 +14,7 @@ urlpatterns = [
     path('libraries/send_hash_to_sc/<int:file_id>/', views.send_hash_to_sc, name='send_hash_to_sc'),
     path('libraries/interact_with_hash_store_sc', views.interact_with_hash_store_sc, name='interact_with_hash_store_sc'),
     path('libraries/interact_with_acbc_token_sc', views.interact_with_acbc_token_sc, name='interact_with_acbc_token_sc'),
+    path('libraries/test_unstoppable', views.test_unstoppable, name='test_unstoppable'),
 
     path('libraries/new/', views.library_create, name='library_create'),
     path('libraries/<int:pk>/edit/', views.library_update, name='library_update'),

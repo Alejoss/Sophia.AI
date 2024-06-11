@@ -165,14 +165,25 @@ SEND_EMAILS = False
 if ENVIRONMENT == "PRODUCTION":
     # DEBUG = False
     # for RDS and Elastic Beanstalk
+    # DATABASES = {
+    #     'default': {
+    #         'ENGINE': 'django.db.backends.postgresql_psycopg2',
+    #         'NAME': 'ebdb',
+    #         'USER': 'postgres',
+    #         'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
+    #         'HOST': 'awseb-e-mr2v9jfs93-stack-awsebrdsdatabase-udcrlxqkcbzw.cu620yfazayx.us-east-1.rds.amazonaws.com',
+    #         'PORT': '5432',
+    #     }
+    # }
+
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'ebdb',
-            'USER': 'postgres',
-            'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-            'HOST': 'awseb-e-mr2v9jfs93-stack-awsebrdsdatabase-udcrlxqkcbzw.cu620yfazayx.us-east-1.rds.amazonaws.com',
-            'PORT': '5432',
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "ACADEMIA_BLOCKCHAIN_DB",
+            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
+            "HOST": "postgres",  # The service name in Docker Compose
+            "PORT": "5432",
         }
     }
 
@@ -198,7 +209,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "ACADEMIA_BLOCKCHAIN_DB",
+            "NAME": "academia_blockchain_db",
             "USER": os.getenv("POSTGRES_USER", "postgres"),
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
             "HOST": "postgres",  # The service name in Docker Compose
