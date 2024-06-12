@@ -1,7 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 
-from profiles import views
+from acbc_app.profiles import views
 
 urlpatterns = [
     path('profile_data/', views.profile_data, name="profile_data"),
@@ -11,7 +11,7 @@ urlpatterns = [
     path('profile_certificates/', views.profile_certificates, name="profile_certificates"),
     path('profile_content/', views.profile_content, name="profile_content"),
     path('profile_activate/<str:uid>/<str:token>/', views.activate_account, name="activate_account"),
-    path('test_unstoppable_domains/', views.test_unstoppable_domains, name="test_unstoppable_domains"),
+    # path('test_unstoppable_domains/', views.test_unstoppable_domains, name="test_unstoppable_domains"),
 
     path('profile_edit_picture/', views.profile_edit_picture, name="profile_edit_picture"),
     path('profile_edit_contactm/', views.profile_edit_contact_method, name="profile_edit_contactm"),
@@ -22,7 +22,7 @@ urlpatterns = [
     path('profile_cert_requests/', views.profile_cert_requests, name="profile_cert_requests"),
     path('content/', views.content, name="content"),  # Proximamente
 
-    # manejo de cuentas
+    # account management
     path('register/', views.register_profile, name="profile_register"),
     path('login/', views.AcademiaLogin.as_view(), name="login"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),

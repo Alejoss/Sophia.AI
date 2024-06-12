@@ -17,11 +17,16 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
-from courses import views as courses_views
+from acbc_app.courses import views as courses_views
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    path('api/courses/', include('courses.api_urls')),
+    path('api/profiles/', include('profiles.api_urls')),
+    path('api/content/', include('content.api_urls')),
+
     path('', courses_views.event_index, name="event_index"),
     path('courses/', include('courses.urls')),
     # path('exams/', include('exams.urls')),

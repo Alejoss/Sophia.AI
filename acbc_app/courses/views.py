@@ -1,10 +1,7 @@
-from http import HTTPStatus
 import pytz
 import logging
 import json
 from pycoingecko import CoinGeckoAPI
-from http import HTTPStatus
-from datetime import datetime
 from hashlib import sha256
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -14,16 +11,18 @@ from urllib.request import urlopen
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
-from django.utils.timezone import is_aware
-from django.contrib.auth import get_user
-from django.http import HttpResponse
+from django.http import JsonResponse, HttpResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from star_ratings.models import Rating
+from taggit.models import Tag
 
+from .models import Event
+from acbc_app.courses.serializers import EventSerializer
 from courses.models import Event, ConnectionPlatform, Bookmark, CertificateRequest, Certificate, Comment
 from profiles.models import ContactMethod, AcceptedCrypto, Profile
 from courses.utils import get_event_data_request
-from star_ratings.models import Rating
-from taggit.models import Tag
+
 
 logger = logging.getLogger('app_logger')
 
@@ -33,13 +32,16 @@ HTML RENDERS
 
 
 # Display a list of all non-deleted events along with their associated tags
+@api_view(['GET'])
 def event_index(request):
-    template = "courses/events.html"
-    events = Event.objects.filter(deleted=False)
-    tags = Tag.objects.all()
-    logger.debug("events: %s" % events)
-    context = {"events": events, "event_index_active": "active", "tags": tags}
-    return render(request, template, context)
+    """
+    API endpoint that returns a list of events that are not deleted.
+    """
+    if request.method == 'GET':
+        events = Event.objects.filter(deleted=False)
+        logger.debug("events: %s", events)
+        serializer = EventSerializer(events, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 # Display about page

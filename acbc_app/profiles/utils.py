@@ -169,19 +169,6 @@ def academia_blockchain_timezones():
     return tz_list
 
 
-def get_cryptos_string(profile):
-    # This logic could go on the frontend. Creates a string with the accepted cryptos of a user
-    c_list = profile.cryptos_list()
-    logger.debug("c_list: %s" % c_list)
-    cryptos_string = ""
-    for c in c_list:
-        cryptos_string += (c.crypto.code + ", ")
-    if len(cryptos_string) > 2:
-        cryptos_string = cryptos_string[:-2]
-
-    return cryptos_string
-
-
 def send_confirmation_email(request, user, user_email):
     """
     Sends an account confirmation email to the newly registered user. The email includes

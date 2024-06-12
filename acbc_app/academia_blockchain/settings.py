@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'content',
     'star_ratings',
     'taggit',
-    'storages'
+    'storages',
+    'rest_framework'
 ]
 
 MIDDLEWARE = [

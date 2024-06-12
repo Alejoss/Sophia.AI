@@ -26,9 +26,6 @@ class Profile(models.Model):
     def __str__(self):
         return self.user.username
 
-    def cryptos_list(self):
-        return [crypto for crypto in AcceptedCrypto.objects.filter(user=self.user, deleted=False)]
-
 
 class CryptoCurrency(models.Model):
     name = models.CharField(max_length=50, blank=True, unique=True)

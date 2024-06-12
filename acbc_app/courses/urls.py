@@ -2,7 +2,7 @@ from django.urls import path
 from courses import views
 
 urlpatterns = [
-    path('', views.event_index, name="event_index"),
+    # path('', views.event_index, name="event_index"),
     path('about/', views.about, name="about"),
     path('descentralize_education/', views.descentralize_education, name="descentralize_education"),
     path('events_tag/<int:tag_id>', views.events_tag, name="events_tag"),
@@ -17,6 +17,8 @@ urlpatterns = [
     path('send_cert_blockchain/<int:cert_id>', views.send_cert_blockchain, name="send_cert_blockchain"),
 
     # API
+    path('api/events/', views.event_index, name='event-index'),
+
     path('event_bookmark/<int:event_id>', views.event_bookmark, name="event_bookmark"),
     path('remove_bookmark/<int:event_id>', views.remove_bookmark, name="remove_bookmark"),
     path('certificate_detail/<int:certificate_id>', views.certificate_detail, name="certificate_detail"),
