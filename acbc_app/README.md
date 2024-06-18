@@ -4,7 +4,22 @@ A descentralized, blockchain-backed library that uses AI to interact with and to
 
 **Installation**
 
+run the docker containers and build the image from the root directory of acbc_app:
+
 docker-compose up --build
+
+**DATABASE CONFIGURATION**
+
+Create the database in the docker container. Make sure the postgres container is running.
+
+docker exec -it <container_name_or_id> bash
+
+psql -U postgres
+
+CREATE DATABASE academia_blockchain_db;
+
+GRANT ALL PRIVILEGES ON DATABASE academia_blockchain_db TO postgres;
+
 
 *Important, don't forget to run migrations:*
 
