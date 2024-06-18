@@ -18,7 +18,7 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 
 from profiles.utils import AcademiaUserCreationForm, AcademiaLoginForm, ProfilePictureForm, \
-    get_cryptos_string, academia_blockchain_timezones, send_email_message, AcademiaPasswordResetForm, \
+    academia_blockchain_timezones, send_email_message, AcademiaPasswordResetForm, \
     AcademiaSetPasswordForm, send_confirmation_email, get_user_diamonds
 
 from profiles.models import Profile, AcceptedCrypto, ContactMethod, CryptoCurrency

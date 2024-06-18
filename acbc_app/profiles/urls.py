@@ -1,7 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
-
-from acbc_app.profiles import views
+from profiles import views
 
 urlpatterns = [
     path('profile_data/', views.profile_data, name="profile_data"),

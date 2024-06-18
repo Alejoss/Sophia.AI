@@ -1,9 +1,14 @@
 from django.urls import path
-from acbc_app.courses.api_views import (CommentList, CommentDetail, CertificateList, CertificateDetail,
-                    BookmarkList, BookmarkDetail, CertificateRequestList, CertificateRequestDetail)
+from courses.api_views import (CommentList, CommentDetail, CertificateList, CertificateDetail,
+                                        BookmarkList, BookmarkDetail, CertificateRequestList, CertificateRequestDetail,
+                                        EventDetail, EventList)
 
 
 urlpatterns = [
+    # Urls for Events
+    path('events/', EventList.as_view(), name='event_list'),
+    path('events/<int:pk>/', EventDetail.as_view(), name='event_detail'),
+
     # URLs for Comments
     path('comments/', CommentList.as_view(), name='comment-list'),
     path('comments/<int:pk>/', CommentDetail.as_view(), name='comment-detail'),

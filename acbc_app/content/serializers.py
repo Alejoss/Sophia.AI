@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from acbc_app.content.models import Library, Group, File
-from acbc_app.profiles.serializers import UserSerializer
+from content.models import Library, Group, File
+from profiles.serializers import UserSerializer
 
 
 class LibrarySerializer(serializers.ModelSerializer):

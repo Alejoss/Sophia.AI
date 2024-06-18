@@ -16,9 +16,6 @@ urlpatterns = [
     path('certificate_preview/<int:cert_id>', views.certificate_preview, name="certificate_preview"),
     path('send_cert_blockchain/<int:cert_id>', views.send_cert_blockchain, name="send_cert_blockchain"),
 
-    # API
-    path('api/events/', views.event_index, name='event-index'),
-
     path('event_bookmark/<int:event_id>', views.event_bookmark, name="event_bookmark"),
     path('remove_bookmark/<int:event_id>', views.remove_bookmark, name="remove_bookmark"),
     path('certificate_detail/<int:certificate_id>', views.certificate_detail, name="certificate_detail"),

@@ -1,5 +1,5 @@
 from django.urls import path
-from acbc_app.content.api_views import (LibraryList, LibraryDetail, GroupList, GroupDetail,
+from content.api_views import (LibraryList, LibraryDetail, GroupList, GroupDetail,
                                     FileList, FileDetail)
 
 urlpatterns = [

@@ -2,8 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from .models import Library
-from .serializers import LibrarySerializer
+from .models import Library, File
+from .serializers import LibrarySerializer, FileSerializer
 
 
 class LibraryList(APIView):
@@ -80,9 +80,6 @@ class GroupDetail(APIView):
         group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-from .models import File
-from .serializers import FileSerializer
 
 class FileList(APIView):
     def get(self, request, format=None):

@@ -18,7 +18,7 @@ from star_ratings.models import Rating
 from taggit.models import Tag
 
 from .models import Event
-from acbc_app.courses.serializers import EventSerializer
+from courses.serializers import EventSerializer
 from courses.models import Event, ConnectionPlatform, Bookmark, CertificateRequest, Certificate, Comment
 from profiles.models import ContactMethod, AcceptedCrypto, Profile
 from courses.utils import get_event_data_request
