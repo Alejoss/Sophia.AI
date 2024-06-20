@@ -1,12 +1,15 @@
 // src/App.tsx
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
-import AppRoutes from './routes';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import EventsList from './features/events/EventsList';
 
 const App: React.FC = () => {
   return (
     <Router>
-      <AppRoutes />
+      <Routes>
+        <Route path="/" element={<EventsList />} />
+        {/* More routes can be added here */}
+      </Routes>
     </Router>
   );
 };
