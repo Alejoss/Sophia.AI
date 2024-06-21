@@ -1,9 +1,9 @@
 ### Build and install packages
-FROM python:3.8
+FROM python:3.12
 
 # Update and install system dependencies
 RUN apt-get update -y \
-  && apt-get install -y gettext \
+  && apt-get install -y gettext libpq-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 

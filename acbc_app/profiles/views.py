@@ -13,7 +13,7 @@ from django.urls import reverse_lazy
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_text
+from django.utils.encoding import force_bytes, force_str
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 
@@ -104,7 +104,7 @@ def activate_account(request, uid, token):
     """
     try:
         # Decode the user ID from base64 encoding
-        uid = force_text(urlsafe_base64_decode(uid))
+        uid = force_str(urlsafe_base64_decode(uid))
         logger.debug(f"uid: {uid}")
 
         # Retrieve the user by decoded ID

@@ -1,7 +1,6 @@
 import pytz
 import logging
 import json
-from pycoingecko import CoinGeckoAPI
 from hashlib import sha256
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -115,11 +114,9 @@ def event_detail(request, event_id):
     # Fetch contact methods and cryptocurrencies of the event's owner
     contact_methods = ContactMethod.objects.filter(user=event.owner, deleted=False)
     accepted_cryptos = AcceptedCrypto.objects.filter(user=event.owner, deleted=False)
-    preferred_cryptos = coins_value(accepted_cryptos, event)  # Retrieve preferred cryptos via CoinGecko API
     owner_profile = Profile.objects.get(user=event.owner)
 
     logger.debug(f"contact_methods: {contact_methods}")
-    logger.debug(f"preferred_cryptos: {preferred_cryptos}")
 
     # Initialize variables for additional user-related data
     event_user_timezone = None
@@ -185,7 +182,6 @@ def event_detail(request, event_id):
         "comments": comments,
         'rating': rating,
         'lack_certificate': not has_certificate,
-        "preferred_cryptos": preferred_cryptos
     }
 
     # Render and return the event detail page
@@ -828,43 +824,3 @@ def restore_cert_request(request, cert_request_id):
     else:
         # Return status code 400 for non-AJAX or non-POST requests
         return HttpResponse(status=400)
-
-
-# API coingeko
-def coins_value(accepted_cryptos, event):
-    """
-    Retrieves current market values for accepted cryptocurrencies relative to the event's reference price.
-    This function uses the CoinGecko API to fetch real-time crypto prices in USD and calculates each crypto's
-    value in terms of the event's reference price.
-
-    Args:
-        accepted_cryptos: A list of Cryptocurrency model instances that are accepted for the event.
-        event: The Event model instance which includes a reference price.
-
-    Returns:
-        A list of dictionaries for each cryptocurrency with its ID, image URL, symbol, name, current price in USD,
-        and its price relative to the event's reference price.
-        Returns a list with an error dictionary if the API call fails.
-    """
-    if event.reference_price != 0:
-        ways_to_pay = []
-        for c in accepted_cryptos:  # Create a list of the accepted cryptocurrencies.
-            ways_to_pay.append(c.crypto.name.lower())
-
-        try:
-            # Fetch current market data for the accepted cryptocurrencies in USD.
-            coins_request = CoinGeckoAPI().get_coins_markets(ids=ways_to_pay, vs_currency='usd')
-            crypto_info = []
-            for coin in coins_request:  # Create a list with the value of each coin.
-                event_reference_price_crypto = event.reference_price / coin["current_price"]
-                crypto_info.append(
-                    {"id": coin["id"], "image": coin["image"], "symbol": coin["symbol"], "name": coin["name"],
-                     "current_price": coin["current_price"],
-                     "event_reference_price_crypto": event_reference_price_crypto})
-            return crypto_info
-        except Exception as e:
-            print(e)
-            print('It is not possible to connect to the CoinGecko API at this moment')
-            return [{"id": "API connection error", "image": "", "symbol": "ERROR", "name": "error",
-                     "current_price": "API connection error",
-                     "event_reference_price_crypto": "API connection error"}]

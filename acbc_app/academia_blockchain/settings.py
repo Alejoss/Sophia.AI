@@ -158,6 +158,7 @@ LOGGING = {
 }
 
 # Other config
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "profile_register"
 LOGIN_REDIRECT_URL = "user_library"
 LOGOUT_REDIRECT_URL = "event_index"
@@ -166,18 +167,6 @@ SEND_EMAILS = False
 
 
 if ENVIRONMENT == "PRODUCTION":
-    # DEBUG = False
-    # for RDS and Elastic Beanstalk
-    # DATABASES = {
-    #     'default': {
-    #         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-    #         'NAME': 'ebdb',
-    #         'USER': 'postgres',
-    #         'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-    #         'HOST': 'awseb-e-mr2v9jfs93-stack-awsebrdsdatabase-udcrlxqkcbzw.cu620yfazayx.us-east-1.rds.amazonaws.com',
-    #         'PORT': '5432',
-    #     }
-    # }
 
     DATABASES = {
         "default": {
