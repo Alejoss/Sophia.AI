@@ -1,13 +1,12 @@
 // src/features/events/eventsSlice.ts
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { EventsState, Event } from './eventTypes';
-import { fetchEvents } from '../../api/eventsApi';
+import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
+import {Event, EventsState} from './eventTypes';
+import {fetchEvents} from '../../api/eventsApi';
 
 export const fetchEventsThunk = createAsyncThunk<Event[], void>(
   'events/fetchEvents',
   async () => {
-    const response = await fetchEvents();
-    return response.data;
+    return await fetchEvents();
   }
 );
 

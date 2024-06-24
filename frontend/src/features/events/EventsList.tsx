@@ -1,20 +1,19 @@
 // src/features/events/EventsList.tsx
 import React, { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/hooks'; // Import both hooks once
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { fetchEventsThunk } from './eventsSlice';
 import { Event } from './eventTypes';
 
 const EventsList: React.FC = () => {
   const dispatch = useAppDispatch();
-
-  // Use useEffect to log the entire state once on component mount
-  useEffect(() => {
-    const entireState = useAppSelector(state => state);
-    console.log("Redux State on Mount:", entireState);
-  }, []); // Empty dependency array to run only once
-
+  const entireState = useAppSelector(state => state); // Moved outside useEffect
   const events = useAppSelector((state) => state.events.events);
   const status = useAppSelector((state) => state.events.status);
+
+  // Logging the entire state once on component mount
+  useEffect(() => {
+    console.log("Redux State on Mount:", entireState);
+  }, [entireState]); // Correctly depend on entireState to avoid stale closure issues
 
   // Fetch events when the component mounts and the status is 'idle'
   useEffect(() => {
