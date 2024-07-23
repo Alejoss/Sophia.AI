@@ -22,6 +22,7 @@ from courses import views as courses_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/',include('academia_blockchain.api.urls')),
 
     path('api/courses/', include('courses.api_urls')),
     path('api/profiles/', include('profiles.api_urls')),
