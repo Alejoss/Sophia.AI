@@ -234,14 +234,13 @@ def profile_data(request):
         logger.debug(f"Profile: {profile}")
 
         # Additional data for the profile page
-        cryptos_string = get_cryptos_string(profile)
         contact_methods = ContactMethod.objects.filter(user=request.user, deleted=False)
         profile_picture_form = ProfilePictureForm()
 
         context = {
             "profile_index_active": "active", "underline_data": "text-underline",
             "profile": profile, "academia_blockchain_timezones": academia_blockchain_timezones(),
-            "cryptos_string": cryptos_string, "contact_methods": contact_methods,
+            "contact_methods": contact_methods,
             "profile_picture_form": profile_picture_form
         }
 
@@ -271,9 +270,6 @@ def user_profile(request, profile_id):
     contact_methods = ContactMethod.objects.filter(user=profile.user, deleted=False)
     logger.debug(f"Contact methods: {contact_methods}")
 
-    # Retrieve user's cryptocurrency preferences as a string
-    cryptos_string = get_cryptos_string(profile)
-
     # Fetch all events hosted by the user
     events = Event.objects.filter(owner=profile.user)
     logger.debug(f"Events: {events}")
@@ -290,7 +286,6 @@ def user_profile(request, profile_id):
         "profile": profile,
         "events": events,
         "contact_methods": contact_methods,
-        "cryptos_string": cryptos_string,
         "certificates": certificates,
         "user_diamonds": user_diamonds
     }

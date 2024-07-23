@@ -121,7 +121,7 @@ class CommentDetail(APIView):
 
 class CertificateList(APIView):
     def get(self, request, format=None):
-        certificates = Certificate.objects.all()
+        certificates = Certificate.objects.filter(user=request.user)
         serializer = CertificateSerializer(certificates, many=True)
         return Response(serializer.data)
 
@@ -158,7 +158,7 @@ class CertificateDetail(APIView):
 
 class BookmarkList(APIView):
     def get(self, request, format=None):
-        bookmarks = Bookmark.objects.all()
+        bookmarks = Bookmark.objects.filter(user=request.user)
         serializer = BookmarkSerializer(bookmarks, many=True)
         return Response(serializer.data)
 
