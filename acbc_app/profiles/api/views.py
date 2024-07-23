@@ -1,13 +1,13 @@
 from rest_framework.viewsets import ModelViewSet
 from ..models import Profile, AcceptedCrypto
 from .serializers import ProfileSerializer, AcceptedCryptoSerializer
+from rest_framework.views import APIView
 
-
-class ProfileList(ModelViewSet):
+class ProfileList(APIView):
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
 
-class ProfileDetail(ModelViewSet):
+class ProfileDetail(APIView):
     def get(self, request, pk, format=None):
         profile = get_object_or_404(Profile, pk=pk)
         serializer = ProfileSerializer(profile)
@@ -27,7 +27,7 @@ class ProfileDetail(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AcceptedCryptoList(ModelViewSet):
+class AcceptedCryptoList(APIView):
     def get(self, request, format=None):
         cryptos = AcceptedCrypto.objects.all()
         serializer = AcceptedCryptoSerializer(cryptos, many=True)
