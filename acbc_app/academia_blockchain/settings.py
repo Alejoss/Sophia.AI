@@ -42,8 +42,12 @@ INSTALLED_APPS = [
     'taggit',
     'corsheaders',
     'storages',
-    'rest_framework'
+    'rest_framework',
+
 ]
+
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -217,7 +221,5 @@ else:
     STATIC_URL = '/static/'
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-    CORS_ALLOWED_ORIGINS = [
-        'http://localhost:5173',  # The origin of your frontend application
-    ]
+    CORS_ALLOW_ALL_ORIGINS = True ## i made this change because CORS isn't allows me to get data with axios.
 
