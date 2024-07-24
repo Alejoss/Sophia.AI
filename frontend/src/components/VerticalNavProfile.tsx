@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import '../VerticalMenu.css';
+import '/src/styles/VerticalMenu.css';
 
 const VerticalMenu: React.FC = () => {
   return (
