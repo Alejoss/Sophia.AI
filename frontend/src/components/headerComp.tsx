@@ -1,5 +1,5 @@
 import React, { useContext, useEffect } from 'react';
-import '../header.css';
+import '/src/styles/header.css';
 
 
 const HeaderComp = () => {

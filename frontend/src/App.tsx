@@ -6,13 +6,13 @@ import EventsList from './features/events/EventsList';
 import EventDetail from './features/events/EventDetail';
 import ProfileDetail from './features/profiles/ProfileDetail';
 import ProfilesLayout from './layouts/ProfilesLayout'
-import ProfileData from './paginas/profiles.tsx'
-import Bookmarks from './paginas/bookmarks.tsx'
-import Certificates from './paginas/certificates.tsx'
-import Events from './paginas/events.tsx'
-import PersonalLibrary from './paginas/personalibrary.tsx'
-import Security from './paginas/security.tsx'
-import About from './paginas/about.tsx'
+import ProfileData from './features/profiles/profiles.tsx'
+import Bookmarks from './features/profiles/bookmarks.tsx'
+import Certificates from './features/profiles/certificates.tsx'
+import Events from './features/profiles/events.tsx'
+import PersonalLibrary from './features/profiles/personalibrary.tsx'
+import Security from './features/profiles/security.tsx'
+import About from './features/profiles/about.tsx'
 
 const App: React.FC = () => {
   return (
