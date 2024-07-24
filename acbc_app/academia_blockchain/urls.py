@@ -24,7 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('academia_blockchain.api.urls')),
 
-    path('', courses_views.event_index, name="event_index"),
+    path('', courses_views.events_all, name="events_all"),
     path('courses/', include('courses.urls')),
     # path('exams/', include('exams.urls')),  no hay modulo con ese nombre y crashea.
     path('profiles/', include('profiles.urls')),

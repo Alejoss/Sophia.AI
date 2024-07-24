@@ -31,17 +31,6 @@ HTML RENDERS
 
 
 # Display a list of all non-deleted events along with their associated tags
-@api_view(['GET'])
-def event_index(request):
-    """
-    API endpoint that returns a list of events that are not deleted.
-    """
-    if request.method == 'GET':
-        events = Event.objects.filter(deleted=False)
-        logger.debug("events: %s", events)
-        serializer = EventSerializer(events, many=True, context={'request': request})
-        return Response(serializer.data)
-
 
 # Display about page
 def about(request):
