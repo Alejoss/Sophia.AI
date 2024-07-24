@@ -1,0 +1,36 @@
+.nav {
+  background-color: #333;
+  padding: 1rem;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.nav-list {
+  list-style-type: none;
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 1200px; /* Limitar el ancho máximo para que no se estire demasiado en pantallas grandes */
+  margin: 0;
+  padding: 0;
+}
+
+.nav-item {
+  margin: 0 1.5rem;
+}
+
+.nav-link {
+  color: white;
+  text-decoration: none;
+  font-size: 1.4rem;
+}
+
+.nav-link:hover {
+  text-decoration: underline;
+}
