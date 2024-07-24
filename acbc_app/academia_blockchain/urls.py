@@ -22,9 +22,7 @@ from courses import views as courses_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/',include('academia_blockchain.api.urls')),
-    path('api/', include('profiles.api.urls')),
-    path('api/', include('courses.api.urls')),
+    path('api/', include('academia_blockchain.api.urls')),
 
     path('', courses_views.event_index, name="event_index"),
     path('courses/', include('courses.urls')),

@@ -6,3 +6,5 @@ const clienteAxios= axios.create({
 });
 
 export default clienteAxios;
+
+// TODO todo debe estar en ingles. Y el orden de las carpetas no se entiende muy bien, hay un axios.ts en la carpeta api
