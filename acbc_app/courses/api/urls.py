@@ -9,6 +9,13 @@ from .views import (
 
 
 #Crear un router
-courses_router = DefaultRouter()
+#courses_router = DefaultRouter()
 
-courses_router.register(r'courses', EventList)
+#courses_router.register(r'courses', EventList)
+
+from .views import EventList,EventDetail
+
+urlpatterns = [
+    path('courses/', EventList.as_view(), name='course-list'),
+    path('courses/<int:pk>/', EventDetail.as_view(), name='course-detail'),
+]

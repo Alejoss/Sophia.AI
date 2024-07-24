@@ -1,16 +1,16 @@
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
+
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from .models import ConnectionPlatform, Event, Bookmark, Comment, CertificateRequest, Certificate
+from courses.models import ConnectionPlatform, Event, Bookmark, Comment, CertificateRequest, Certificate
 
 from .serializers import (ConnectionPlatformSerializer, EventSerializer,
                           BookmarkSerializer, CommentSerializer, CertificateRequestSerializer,
                           CertificateSerializer)
 
 
-class ConnectionPlatformList(ModelViewSet):
+class ConnectionPlatformList(APIView):
     def get(self, request, format=None):
         platforms = ConnectionPlatform.objects.all()
         serializer = ConnectionPlatformSerializer(platforms, many=True)
@@ -47,7 +47,7 @@ class ConnectionPlatformDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class EventList(ModelViewSet):
+class EventList(APIView):
     def get(self, request, format=None):
         events = Event.objects.all()
         serializer = EventSerializer(events, many=True)
@@ -61,7 +61,7 @@ class EventList(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class EventDetail(ModelViewSet):
+class EventDetail(APIView):
     def get_object(self, pk):
         return get_object_or_404(Event, pk=pk)
 
@@ -84,7 +84,7 @@ class EventDetail(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CommentList(ModelViewSet):
+class CommentList(APIView):
     def get(self, request, format=None):
         comments = Comment.objects.all()
         serializer = CommentSerializer(comments, many=True)
@@ -98,7 +98,7 @@ class CommentList(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CommentDetail(ModelViewSet):
+class CommentDetail(APIView):
     def get_object(self, pk):
         return get_object_or_404(Comment, pk=pk)
 
@@ -121,7 +121,7 @@ class CommentDetail(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CertificateList(ModelViewSet):
+class CertificateList(APIView):
     def get(self, request, format=None):
         certificates = Certificate.objects.filter(user=request.user)
         serializer = CertificateSerializer(certificates, many=True)
@@ -135,7 +135,7 @@ class CertificateList(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CertificateDetail(ModelViewSet):
+class CertificateDetail(APIView):
     def get_object(self, pk):
         return get_object_or_404(Certificate, pk=pk)
 
@@ -158,7 +158,7 @@ class CertificateDetail(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class BookmarkList(ModelViewSet):
+class BookmarkList(APIView):
     def get(self, request, format=None):
         bookmarks = Bookmark.objects.filter(user=request.user)
         serializer = BookmarkSerializer(bookmarks, many=True)
@@ -172,7 +172,7 @@ class BookmarkList(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class BookmarkDetail(ModelViewSet):
+class BookmarkDetail(APIView):
     def get_object(self, pk):
         return get_object_or_404(Bookmark, pk=pk)
 
@@ -195,7 +195,7 @@ class BookmarkDetail(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CertificateRequestList(ModelViewSet):
+class CertificateRequestList(APIView):
     def get(self, request, format=None):
         requests = CertificateRequest.objects.all()
         serializer = CertificateRequestSerializer(requests, many=True)
