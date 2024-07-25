@@ -1,7 +1,7 @@
 // src/features/events/EventDetail.tsx
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';  // Make sure Link is imported
-import axiosInstance from '../../api/axios';
+import axiosInstance from '../api/axios';
 import { Event } from './eventTypes';
 
 const EventDetail: React.FC = () => {

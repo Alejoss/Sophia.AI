@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import clienteAxios from '../config/axios';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '/src/context/AuthContext.tsx';
+import fetchProfileData from '/src/api/profilesAPi.ts'; // Importa la función desde el archivo
+import clienteAxios from '/src/api/axios';
 
 const ProfileData = () => {
-  const [email, setEmail] = useState('');
+  const { username } = useContext(AuthContext);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [timezone, setTimezone] = useState('');
@@ -12,41 +14,55 @@ const ProfileData = () => {
   const [preferredCryptos, setPreferredCryptos] = useState([]);
   const [contactMethods, setContactMethods] = useState('');
   const [profileId, setProfileId] = useState(null);
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        console.log('Fetching profile data');
-        const { data } = await clienteAxios.get('/profiles');
-        console.log(data[0].id);
+  const [email, setEmail] = useState('');
 
-        setProfileId(data[0].id);
-        setUserName(data[0].user.username || '');
-        setEmail(data[0].email || '');
-        setFirstName(data[0].firstName || '');
-        setLastName(data[0].lastName || '');
-        setTimezone(data[0].timezone || '');
-        setInterests(data[0].interests || '');
-        setWhatDoYouDo(data[0].whatDoYouDo || '');
-        setPreferredCryptos(data[0].cryptos_list || []);
-        setContactMethods(data[0].contactMethods || '');
+  const storedUsername = localStorage.getItem('userName');
+
+  useEffect(() => {
+    const Data = async () => {
+      try {
+        const { user, updatedUser } = await fetchProfileData(storedUsername);
+
+        if (user) {
+          console.log(updatedUser.email);
+
+          setProfileId(user.id);
+          setUserName(user.user.username || '');
+          setFirstName(user.firstName || '');
+          setLastName(user.lastName || '');
+          setTimezone(user.timezone || '');
+          setInterests(user.interests || '');
+          setWhatDoYouDo(user.whatDoYouDo || '');
+          setPreferredCryptos(user.cryptos_list || []);
+          setContactMethods(user.contactMethods || '');
+          setEmail(updatedUser.email || '');
+        }
       } catch (error) {
-        console.error('Error al buscar perfiles:', error);
+        console.error('Error fetching profile data:', error);
       }
     };
 
-    fetchProfileData();
-  }, []);
+    Data();
+  }, [username, storedUsername]);
 
   const handleSaveChanges = async () => {
     const updatedData = {
+      firstName,
+      lastName,
       timezone,
       interests,
       profile_description: whatDoYouDo,
     };
 
+    const updatedEmailData = {
+      email: email,
+    };
+
     try {
       const response = await clienteAxios.put(`/profiles/${profileId}/`, updatedData);
       console.log('Profile updated successfully:', response.data);
+      const responseMail = await clienteAxios.put(`/users/${profileId}/`, updatedEmailData);
+      console.log('Email updated successfully:', responseMail.data);
     } catch (error) {
       console.error('Error updating profile:', error);
     }
@@ -79,7 +95,7 @@ const ProfileData = () => {
             type="email"
             id="email"
             value={email}
-            placeholder={email}
+            placeholder="Enter your email"
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
@@ -112,7 +128,6 @@ const ProfileData = () => {
             <option value="UTC">UTC</option>
             <option value="GMT">GMT</option>
             <option value="EST">EST</option>
-
           </select>
         </div>
         <div className="form-group">
@@ -142,3 +157,5 @@ const ProfileData = () => {
 };
 
 export default ProfileData;
+
+

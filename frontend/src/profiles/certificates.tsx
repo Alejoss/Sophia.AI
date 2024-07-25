@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import clienteAxios from '../config/axios';
+import clienteAxios from '/src/api/axios.ts';
 
 const Certificates = () => {
   const [certificates, setCertificates] = useState({
@@ -14,7 +14,7 @@ const Certificates = () => {
       try {
         console.log('Fetching profile data');
         const { data } = await clienteAxios.get('/profiles');
-        console.log(data[0]);
+
 
         setCertificates({
           greenDiamonds: data[0].green_diamonds || 0,

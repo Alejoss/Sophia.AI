@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import clienteAxios from '../config/axios';
+import clienteAxios from '/src/api/axios.ts';
 import { useNavigate } from 'react-router-dom';
 
 

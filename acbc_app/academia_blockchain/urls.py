@@ -24,9 +24,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/',include('academia_blockchain.api.urls')),
 
-    path('api/courses/', include('courses.api_urls')),
-    path('api/profiles/', include('profiles.api_urls')),
-    path('api/content/', include('content.api_urls')),
+
+
 
     path('', courses_views.event_index, name="event_index"),
     path('courses/', include('courses.urls')),
