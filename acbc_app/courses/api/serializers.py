@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from courses.models import Event, Comment, ConnectionPlatform, Certificate, Bookmark, CertificateRequest
-from profiles.serializers import UserSerializer
+from profiles.api.serializers import UserSerializer
 
 
 class ConnectionPlatformSerializer(serializers.ModelSerializer):

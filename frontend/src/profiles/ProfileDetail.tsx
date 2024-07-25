@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axiosInstance from '../../api/axios';
+import axiosInstance from '../api/axios';
 import { Profile } from './profileTypes';
 
 const ProfileDetail: React.FC = () => {

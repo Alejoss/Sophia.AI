@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from content.models import Library, Group, File
-from profiles.serializers import UserSerializer
+from profiles.api.serializers import UserSerializer
 
 
 class LibrarySerializer(serializers.ModelSerializer):

@@ -3,9 +3,9 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from courses.models import ConnectionPlatform, Event, Bookmark, Comment, CertificateRequest, Certificate
 
-from .serializers import (ConnectionPlatformSerializer, EventSerializer,
+from courses.models import ConnectionPlatform, Event, Bookmark, Comment, CertificateRequest, Certificate
+from courses.api.serializers import (ConnectionPlatformSerializer, EventSerializer,
                           BookmarkSerializer, CommentSerializer, CertificateRequestSerializer,
                           CertificateSerializer)
 
