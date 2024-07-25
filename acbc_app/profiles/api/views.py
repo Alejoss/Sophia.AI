@@ -1,10 +1,15 @@
-# profiles/api/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from profiles.models import Profile
-from .serializers import ProfileSerializer
+
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import User
+
+
+from profiles.api.serializers import UserSerializer
+from .serializers import ProfileSerializer
+from profiles.models import Profile
+
 
 class ProfileList(APIView):
     def get(self, request, format=None):
@@ -18,6 +23,38 @@ class ProfileList(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class UserListView(APIView):
+    def get(self, request, format=None):
+        # Obtén todos los usuarios
+        users = User.objects.all()
+        # Serializa los datos de todos los usuarios
+        serializer = UserSerializer(users, many=True)
+        # Devuelve los datos serializados
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserDetailView(APIView):
+    def get(self, request, pk, format=None):
+        # Obtén un usuario específico por su pk (ID)
+        user = get_object_or_404(User, pk=pk)
+        # Serializa los datos del usuario
+        serializer = UserSerializer(user)
+        # Devuelve los datos serializados
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk, format=None):
+        # Obtén un usuario específico por su pk (ID)
+        user = get_object_or_404(User, pk=pk)
+        # Serializa los datos del usuario con los datos actualizados
+        serializer = UserSerializer(user, data=request.data, partial=True)  # `partial=True` para permitir actualizaciones parciales
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ProfileDetail(APIView):
     def get(self, request, pk, format=None):

@@ -2,28 +2,41 @@
 import React from 'react';
 import HomeLayout from './layouts/HomeLayout'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import EventsList from './features/events/EventsList';
-import EventDetail from './features/events/EventDetail';
-import ProfileDetail from './features/profiles/ProfileDetail';
+import EventsList from './events/EventsList';
+import EventDetail from './events/EventDetail';
+import ProfileDetail from './profiles/ProfileDetail';
 import ProfilesLayout from './layouts/ProfilesLayout'
-import ProfileData from './features/profiles/profiles.tsx'
-import Bookmarks from './features/profiles/bookmarks.tsx'
-import Certificates from './features/profiles/certificates.tsx'
-import Events from './features/profiles/events.tsx'
-import PersonalLibrary from './features/profiles/personalibrary.tsx'
-import Security from './features/profiles/security.tsx'
-import About from './features/profiles/about.tsx'
+import ProfileData from './profiles/profileData.tsx'
+import Bookmarks from './profiles/bookmarks.tsx'
+import Certificates from './profiles/certificates.tsx'
+import Events from './profiles/events.tsx'
+import PersonalLibrary from './profiles/personalibrary.tsx'
+import Security from './profiles/security.tsx'
+import About from './profiles/about.tsx'
+import Login from './profiles/login.tsx'
+
+import { AuthProvider } from './context/AuthContext.tsx';
+
 
 const App: React.FC = () => {
   return (
+
+
+   <AuthProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeLayout/>} />
+
+
         <Route path="/events/:eventId" element={<EventDetail />} />
+
        <Route path="/profiles/:profileId" element={<ProfileDetail />} />
 
 
        <Route path="/Profiles" element={<ProfilesLayout/>}>
+            <Route path="login" element={<Login/>} />
+            <Route path="register" element={<Certificates/>} />
+            <Route path="cerrar_sesion" element={<Certificates/>} />
             <Route path="profile_certificates" element={<Certificates/>} />
             <Route path="profile_data" element={<ProfileData/>} />
             <Route path="profile_events" element={<Events/>} />
@@ -37,6 +50,7 @@ const App: React.FC = () => {
        </Route>
       </Routes>
     </BrowserRouter>
+    </AuthProvider>
   );
 };
 

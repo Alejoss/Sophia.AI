@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from content.models import Library, File
-from .serializers import LibrarySerializer, FileSerializer
+from content.api.serializers import LibrarySerializer, FileSerializer
 
 
 class LibraryList(APIView):

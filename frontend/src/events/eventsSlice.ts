@@ -1,7 +1,7 @@
 // src/features/events/eventsSlice.ts
 import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {Event, EventsState} from './eventTypes';
-import {fetchEvents} from '../../api/eventsApi';
+import {fetchEvents} from '../api/eventsApi';
 
 export const fetchEventsThunk = createAsyncThunk<Event[], void>(
   'events/fetchEvents',

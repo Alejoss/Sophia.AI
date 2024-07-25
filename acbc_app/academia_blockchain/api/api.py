@@ -12,4 +12,5 @@ class ApiRoot(APIView):
             'courses': request.build_absolute_uri(reverse_lazy('course-list')),
             'content': request.build_absolute_uri(reverse_lazy('library-list')),
             'group': request.build_absolute_uri(reverse_lazy('group-list')),
+            'users': request.build_absolute_uri(reverse_lazy('user-detail')),
         })
