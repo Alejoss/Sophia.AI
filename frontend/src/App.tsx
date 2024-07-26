@@ -6,11 +6,11 @@ import EventsList from './events/EventsList';
 import EventDetail from './events/EventDetail';
 import ProfileDetail from './profiles/ProfileDetail';
 import ProfilesLayout from './layouts/ProfileLayout.tsx'
-import ProfileData from './profiles/profileData.tsx'
+import ProfileData from './profiles/ProfileData.tsx'
 import Bookmarks from './profiles/Bookmarks.tsx'
 import Certificates from './profiles/Certificates.tsx'
-import Events from './profiles/events.tsx'
-import PersonalLibrary from './profiles/personalibrary.tsx'
+import Events from './profiles/Events.tsx'
+import PersonalLibrary from './profiles/PersonalLibrary.tsx'
 import Security from './profiles/security.tsx'
 import About from './profiles/About.tsx'
 import Login from './profiles/login.tsx'

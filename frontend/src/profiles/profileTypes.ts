@@ -4,11 +4,27 @@ export interface User {
   username: string;
 }
 
-export interface AcceptedCrypto {
+export interface CryptoCurrency {
   id: number;
   name: string;
   code: string;
+}
+
+export interface AcceptedCrypto {
+  id: number;
+  user: User;
+  crypto: CryptoCurrency;
   address: string;
+  deleted: boolean;
+}
+
+export interface ContactMethod {
+  id: number;
+  user: User;
+  name: string;
+  description: string;
+  url_link: string;
+  deleted: boolean;
 }
 
 export interface Profile {
