@@ -1,9 +1,8 @@
-
+// src/profiles/profileTypes.ts
 export interface User {
   id: number;
   username: string;
 }
-
 
 export interface AcceptedCrypto {
   id: number;

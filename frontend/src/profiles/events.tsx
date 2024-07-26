@@ -1,14 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import clienteAxios from '/src/api/axios.ts';
-import { useNavigate } from 'react-router-dom';
-
-
 const Events = () => {
-
-
-
-
-
   return (
     <div className="courses-events-container">
       <div className="text-center mt-6">
@@ -30,6 +20,5 @@ const Events = () => {
     </div>
   );
 };
-
 
 export default Events

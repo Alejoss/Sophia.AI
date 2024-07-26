@@ -1,11 +1,12 @@
-// src/api/profileAPI.js
-import clienteAxios from './axios';
+// src/api/profileAPI.ts
+import axiosInstance from './axios';
+import { Profile, User } from '../profiles/profileTypes';
 
-const fetchProfileData = async (storedUsername) => {
+const fetchProfileData = async (storedUsername: string): Promise<{ user: Profile | undefined, updatedUser: User | undefined }> => {
   try {
     console.log('Fetching profile data');
-    const responseProfiles = await clienteAxios.get('/profiles');
-    const responseUsers = await clienteAxios.get('/users');
+    const responseProfiles = await axiosInstance.get<Profile[]>('/profiles');
+    const responseUsers = await axiosInstance.get<User[]>('/users');
 
     const profiles = responseProfiles.data;
     const users = responseUsers.data;
@@ -16,7 +17,7 @@ const fetchProfileData = async (storedUsername) => {
     return { user, updatedUser };
   } catch (error) {
     console.error('Error fetching profile data:', error);
-    throw error; // Re-lanzar el error para que pueda ser manejado por el componente
+    throw error; // Re-throw the error to be handled by the component
   }
 };
 

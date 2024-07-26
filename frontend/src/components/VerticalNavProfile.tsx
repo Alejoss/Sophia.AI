@@ -1,8 +1,7 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import '/src/styles/VerticalMenu.css';
 
-const VerticalMenu: React.FC = () => {
+const VerticalNavProfile = () => {
   return (
     <div className="vertical-menu">
       <h1>Your Profile</h1>
@@ -30,4 +29,4 @@ const VerticalMenu: React.FC = () => {
   );
 };
 
-export default VerticalMenu;
+export default VerticalNavProfile;

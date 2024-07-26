@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import clienteAxios from '/src/api/axios.ts';
+import { useState, useEffect } from 'react';
+import fetchProfileData from "/src/api/profilesAPi.ts"; // Importa la función desde el archivo
 
 const Certificates = () => {
   const [certificates, setCertificates] = useState({
@@ -9,26 +9,30 @@ const Certificates = () => {
     blueDiamonds: 0
   });
 
+  // Recupera el nombre de usuario almacenado (asumiendo que se almacena en localStorage)
+  const storedUsername = localStorage.getItem('userName');
+
   useEffect(() => {
-    const fetchProfileData = async () => {
+    const SetProfileData = async () => {
       try {
         console.log('Fetching profile data');
-        const { data } = await clienteAxios.get('/profiles');
+        const { user } = await fetchProfileData(storedUsername);
 
-
-        setCertificates({
-          greenDiamonds: data[0].green_diamonds || 0,
-          yellowDiamonds: data[0].yellow_diamonds || 0,
-          purpleDiamonds: data[0].purple_diamonds || 0,
-          blueDiamonds: data[0].blue_diamonds || 0
-        });
+        if (user) {
+          setCertificates({
+            greenDiamonds: user.green_diamonds || 0,
+            yellowDiamonds: user.yellow_diamonds || 0,
+            purpleDiamonds: user.purple_diamonds || 0,
+            blueDiamonds: user.blue_diamonds || 0
+          });
+        }
       } catch (error) {
         console.error('Error al buscar perfiles:', error);
       }
     };
 
-    fetchProfileData();
-  }, []);
+    SetProfileData();
+  }, [storedUsername]);
 
   return (
     <div>
@@ -57,13 +61,14 @@ const Certificates = () => {
             <p>{certificates.blueDiamonds}</p>
           </div>
         </div>
-        <div class="certificate-block">
-    <h4>Certificate on Blockchain for Modern Corporations</h4>
-    <a href="#">Send to the Blockchain</a>
-  </div>
+        <div className="certificate-block">
+          <h4>Certificate on Blockchain for Modern Corporations</h4>
+          <a href="#">Send to the Blockchain</a>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Certificates;
+

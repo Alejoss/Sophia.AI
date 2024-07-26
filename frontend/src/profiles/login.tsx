@@ -7,7 +7,7 @@ import { AuthContext } from '/src/context/AuthContext.tsx'; // Importa el contex
 const Login = () =>{
     const navigate = useNavigate();
     const { username, setUsername } = useContext(AuthContext);
-    const [auth,setAuth]=useState(false);
+    const [auth, setAuth]=useState(false);
 
 
     useEffect(() => {
@@ -16,9 +16,6 @@ const Login = () =>{
         console.log('Fetching profile data');
         const { data } = await clienteAxios.get('/profiles');
         console.log(data[0].user.username);
-
-
-
 
       } catch (error) {
         console.error('Error al buscar perfiles:', error);
@@ -50,13 +47,8 @@ const Login = () =>{
 
     return (
 
-
-
-
         <div>
-
             <h1> Login</h1>
-
             <form className="login-form">
                 <div className="form-group">
                   <label htmlFor="email">Email:</label>

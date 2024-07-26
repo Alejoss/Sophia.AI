@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '/src/context/AuthContext.tsx';
-import fetchProfileData from '/src/api/profilesAPi.ts'; // Importa la función desde el archivo
+import fetchProfileData from "/src/api/profilesAPi.ts"; // Importa la función desde el archivo
 import clienteAxios from '/src/api/axios';
 
 const ProfileData = () => {

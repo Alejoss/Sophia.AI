@@ -1,5 +1,5 @@
-import React, { createContext, useState } from 'react';
-
+import { createContext, useState } from 'react';
+// / TODO manejar esto con redux toolkit slice
 const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {

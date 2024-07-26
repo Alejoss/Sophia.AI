@@ -9,6 +9,8 @@ from django.contrib.auth.models import User
 from profiles.api.serializers import UserSerializer
 from .serializers import ProfileSerializer
 from profiles.models import Profile
+
+
 class ProfileList(APIView):
     def get(self, request, format=None):
         profiles = Profile.objects.all()
@@ -32,8 +34,6 @@ class UserListView(APIView):
         serializer = UserSerializer(users, many=True)
         # Devuelve los datos serializados
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 
 
 class UserDetailView(APIView):

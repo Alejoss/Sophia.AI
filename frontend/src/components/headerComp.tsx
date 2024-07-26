@@ -1,7 +1,7 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import '/src/styles/header.css';
 import '/src/styles/dropdown.css';
+
 
 const HeaderComp = () => {
   return (
