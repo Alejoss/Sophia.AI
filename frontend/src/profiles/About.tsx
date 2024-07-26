@@ -1,4 +1,3 @@
-import React from 'react';
 import '/src/styles/about.css';
 const About = () => {
     console.log('estoy en about');

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import clienteAxios from '/src/api/axios.ts';
+import { useState, useEffect } from 'react';
+import clienteAxios from "/src/api/axios.ts";
 
 const Certificates = () => {
   const [certificates, setCertificates] = useState({
@@ -9,6 +9,7 @@ const Certificates = () => {
     blueDiamonds: 0
   });
 
+  // TODO utilizar profilesAPI
   useEffect(() => {
     const fetchProfileData = async () => {
       try {

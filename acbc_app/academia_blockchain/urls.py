@@ -17,12 +17,13 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
+
 from courses import views as courses_views
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/',include('academia_blockchain.api.urls')),
+    path('api/', include('academia_blockchain.api.urls')),
 
 
 

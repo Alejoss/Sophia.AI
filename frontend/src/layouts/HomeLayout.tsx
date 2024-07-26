@@ -1,5 +1,4 @@
-import React from 'react'
-import HeaderComp from '../components/headerComp';
+import HeaderComp from '../components/HeaderComp.tsx';
 
 import { Outlet } from 'react-router-dom';
 const HomeLayout = () => {
@@ -8,10 +7,7 @@ const HomeLayout = () => {
     <div>
         <HeaderComp/>
             <Outlet/>
-
-
         </div>
-
     </>
       )
 }

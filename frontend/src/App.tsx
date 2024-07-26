@@ -5,14 +5,14 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import EventsList from './events/EventsList';
 import EventDetail from './events/EventDetail';
 import ProfileDetail from './profiles/ProfileDetail';
-import ProfilesLayout from './layouts/ProfilesLayout'
+import ProfilesLayout from './layouts/ProfileLayout.tsx'
 import ProfileData from './profiles/profileData.tsx'
-import Bookmarks from './profiles/bookmarks.tsx'
-import Certificates from './profiles/certificates.tsx'
+import Bookmarks from './profiles/Bookmarks.tsx'
+import Certificates from './profiles/Certificates.tsx'
 import Events from './profiles/events.tsx'
 import PersonalLibrary from './profiles/personalibrary.tsx'
 import Security from './profiles/security.tsx'
-import About from './profiles/about.tsx'
+import About from './profiles/About.tsx'
 import Login from './profiles/login.tsx'
 
 import { AuthProvider } from './context/AuthContext.tsx';

@@ -1,10 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import clienteAxios from '/src/api/axios.ts';
-import { useNavigate } from 'react-router-dom';
-
-
-
-const Bookmarks: React.FC = () => {
+const Bookmarks = () => {
   console.log('hola mundo');
 
   return (
