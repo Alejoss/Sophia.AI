@@ -3,7 +3,7 @@ import clienteAxios from '/src/api/axios.ts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '/src/context/AuthContext.tsx'; // Importa el contexto
 
-
+// TODO revisar como manejar login correctamente con django y react
 const Login = () =>{
     const navigate = useNavigate();
     const { username, setUsername } = useContext(AuthContext);

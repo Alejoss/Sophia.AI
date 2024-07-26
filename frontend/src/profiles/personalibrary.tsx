@@ -1,7 +1,5 @@
-import React from 'react';
 
-
-const PersonalLibrary: React.FC = () => {
+const PersonalLibrary = () => {
   console.log('hola mundo');
 
   return (
