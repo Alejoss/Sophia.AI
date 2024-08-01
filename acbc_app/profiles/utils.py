@@ -16,7 +16,7 @@ from django.conf import settings
 from django.template import loader
 
 from profiles.models import Profile
-from courses.models import Certificate
+from events.models import Certificate
 
 logger = logging.getLogger('app_logger')
 

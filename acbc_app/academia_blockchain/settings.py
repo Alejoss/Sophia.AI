@@ -36,17 +36,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'profiles',
-    'courses',
+    'events',
     'content',
     'star_ratings',
     'taggit',
     'corsheaders',
     'storages',
     'rest_framework',
-
 ]
-
-
 
 
 MIDDLEWARE = [

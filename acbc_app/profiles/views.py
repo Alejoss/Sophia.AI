@@ -22,7 +22,7 @@ from profiles.utils import AcademiaUserCreationForm, AcademiaLoginForm, ProfileP
     AcademiaSetPasswordForm, send_confirmation_email, get_user_diamonds
 
 from profiles.models import Profile, AcceptedCrypto, ContactMethod, CryptoCurrency
-from courses.models import Event, Bookmark, CertificateRequest, Certificate
+from events.models import Event, Bookmark, CertificateRequest, Certificate
 
 logger = logging.getLogger('app_logger')
 

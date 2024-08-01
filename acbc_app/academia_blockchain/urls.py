@@ -18,18 +18,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 
-from courses import views as courses_views
+from events import views as event_views
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('academia_blockchain.api.urls')),
-
-
-
-
-    path('', courses_views.events_all, name="events_all"),
-    path('courses/', include('courses.urls')),
+    path('', event_views.events_all, name="events_all"),
+    path('events/', include('events.urls')),
     # path('exams/', include('exams.urls')),
     path('profiles/', include('profiles.urls')),
     path('content/', include('content.urls')),
