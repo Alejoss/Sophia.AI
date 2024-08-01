@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from courses.models import Event, ConnectionPlatform, Bookmark, CertificateRequest, Certificate, Comment
+from events.models import Event, ConnectionPlatform, Bookmark, CertificateRequest, Certificate, Comment
 
 admin.site.register(Event)
 admin.site.register(ConnectionPlatform)

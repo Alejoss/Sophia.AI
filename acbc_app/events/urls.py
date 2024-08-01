@@ -1,5 +1,5 @@
 from django.urls import path
-from courses import views
+from events import views
 
 urlpatterns = [
     # path('', views.event_index, name="event_index"),

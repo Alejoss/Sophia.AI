@@ -1,7 +1,7 @@
 from django.urls import path, include
 
 from profiles.api.views import ProfileList, ProfileDetail,UserDetailView,UserListView
-from courses.api.views import EventList, EventDetail
+from events.api.views import EventList, EventDetail
 from content.api.views import (LibraryList, LibraryDetail, GroupList, GroupDetail,FileList, FileDetail)
 from academia_blockchain.api.api import ApiRoot
 

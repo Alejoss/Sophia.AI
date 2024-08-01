@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 
-from courses.models import ConnectionPlatform
+from events.models import ConnectionPlatform
 
 logger = logging.getLogger('app_logger')
 
