@@ -1,6 +1,6 @@
 [
     {
-        "model": "courses.event",
+        "model": "events.event",
         "pk": 100,
         "fields": {
             "event_type": "LIVE_COURSE",
@@ -21,7 +21,7 @@
         }
     },
     {
-        "model": "courses.event",
+        "model": "events.event",
         "pk": 101,
         "fields": {
             "event_type": "LIVE_COURSE",
@@ -42,7 +42,7 @@
         }
     },
     {
-        "model": "courses.event",
+        "model": "events.event",
         "pk": 102,
         "fields": {
             "event_type": "LIVE_COURSE",
@@ -63,7 +63,7 @@
         }
     },
     {
-        "model": "courses.event",
+        "model": "events.event",
         "pk": 103,
         "fields": {
             "event_type": "LIVE_COURSE",
@@ -84,7 +84,7 @@
         }
     },
     {
-        "model": "courses.event",
+        "model": "events.event",
         "pk": 104,
         "fields": {
             "event_type": "LIVE_COURSE",

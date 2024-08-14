@@ -36,3 +36,7 @@ docker-compose exec backend python manage.py load_fixtures
 *Load the libraries database with initial test data*
 
 docker-compose exec backend python manage.py load_libraries
+
+*To run the django tests in the docker container run*
+
+docker-compose exec backend python manage.py test

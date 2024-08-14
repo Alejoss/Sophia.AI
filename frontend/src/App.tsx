@@ -26,13 +26,13 @@ const App: React.FC = () => {
        <Route path="/profiles/:profileId" element={<ProfileDetail />} />
 
        <Route path="/profiles" element={<ProfilesLayout/>}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/profile_certificates" element={<Certificates/>} />
-            <Route path="/profile_data" element={<ProfileData/>} />
-            <Route path="/profile_events" element={<Events/>} />
-            <Route path="/profile_bookmarks" element={<Bookmarks/>} />
-            <Route path="/profile_content" element={<PersonalLibrary/>} />
-            <Route path="/security" element={<Security/>} />
+            <Route path="login" element={<Login />} />
+            <Route path="profile_certificates" element={<Certificates/>} />
+            <Route path="profile_data" element={<ProfileData/>} />
+            <Route path="profile_events" element={<Events/>} />
+            <Route path="profile_bookmarks" element={<Bookmarks/>} />
+            <Route path="profile_content" element={<PersonalLibrary/>} />
+            <Route path="security" element={<Security/>} />
        </Route >
 
        <Route path="/courses" element={<HomeLayout/>}>

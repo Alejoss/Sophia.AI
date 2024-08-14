@@ -57,9 +57,10 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-        'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 CSRF_COOKIE_NAME = 'csrftoken'
@@ -243,5 +244,5 @@ else:
     STATIC_URL = '/static/'
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-    CORS_ALLOW_ALL_ORIGINS = True ## i made this change because CORS isn't allows me to get data with axios.
+    CORS_ALLOW_ALL_ORIGINS = True  # i made this change because CORS isn't allows me to get data with axios.
 
