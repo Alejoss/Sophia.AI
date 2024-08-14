@@ -188,9 +188,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "profile_register"
 LOGIN_REDIRECT_URL = "profile_data"
 LOGOUT_REDIRECT_URL = "event_index"
-LANGUAGE_CODE = "es-ES"
+LANGUAGE_CODE = "en-us"
 SEND_EMAILS = False
-SITE_ID = 1 # django-allauth
+SITE_ID = 1  # django-allauth
 
 
 if ENVIRONMENT == "PRODUCTION":
