@@ -24,6 +24,7 @@ urlpatterns = [
     # account management
     path('register/', views.register_profile, name="profile_register"),
     path('login/', views.AcademiaLogin.as_view(), name="login"),
+    path('set_jwt_token/', views.set_jwt_token, name="set_jwt_token"),
     path('logout/', auth_views.LogoutView.as_view(), name="logout"),
     path('password_reset/', views.AcademiaPasswordResetView.as_view(), name="password_reset"),
     path('password_reset_done/', views.AcademiaPasswordResetDoneView.as_view(), name="password_reset_done"),

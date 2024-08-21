@@ -13,7 +13,7 @@ import PersonalLibrary from './profiles/PersonalLibrary.tsx'
 import Security from './profiles/security.tsx'
 import About from './profiles/About.tsx'
 import Login from './profiles/Login.tsx'
-
+import TokenHandler from './profiles/TokenHandler.tsx'
 
 const App: React.FC = () => {
   return (
@@ -33,6 +33,7 @@ const App: React.FC = () => {
             <Route path="profile_bookmarks" element={<Bookmarks/>} />
             <Route path="profile_content" element={<PersonalLibrary/>} />
             <Route path="security" element={<Security/>} />
+            <Route path="token_handler" element={<TokenHandler/>} />
        </Route >
 
        <Route path="/courses" element={<HomeLayout/>}>

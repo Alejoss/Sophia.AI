@@ -1,5 +1,5 @@
-from http import HTTPStatus
 import logging
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -7,18 +7,15 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, PasswordResetView, PasswordResetDoneView, \
     PasswordResetConfirmView, PasswordResetCompleteView
-from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth import login
 from django.urls import reverse_lazy
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_str
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 from django.conf import settings
-from django.contrib.auth.forms import SetPasswordForm
 
 from profiles.utils import AcademiaUserCreationForm, AcademiaLoginForm, ProfilePictureForm, \
-    academia_blockchain_timezones, send_email_message, AcademiaPasswordResetForm, \
+    academia_blockchain_timezones, AcademiaPasswordResetForm, \
     AcademiaSetPasswordForm, send_confirmation_email, get_user_diamonds
 
 from profiles.models import Profile, AcceptedCrypto, ContactMethod, CryptoCurrency
@@ -133,10 +130,26 @@ def activate_account(request, uid, token):
         return HttpResponse('Activation link is invalid!')
 
 
-# Account Registration html render views
 class AcademiaLogin(LoginView):
     template_name = "profiles/login.html"
     authentication_form = AcademiaLoginForm
+
+
+def set_jwt_token(request):
+    user = request.user
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+
+    response = HttpResponseRedirect('http://localhost:5173/profiles/token_handler')
+
+    # Set JWT in an HttpOnly cookie
+    response.set_cookie(
+        'jwt', access_token, httponly=True, secure=True, samesite='Strict'
+    )
+    return response
 
 
 class AcademiaPasswordResetView(PasswordResetView):

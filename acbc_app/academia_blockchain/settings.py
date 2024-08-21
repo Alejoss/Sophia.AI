@@ -14,6 +14,7 @@ import ast
 import os
 import dj_database_url
 import logging
+from datetime import timedelta
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'storages',
     'rest_framework',
+    'rest_framework_simplejwt'
 ]
 
 
@@ -67,6 +69,7 @@ CSRF_COOKIE_NAME = 'csrftoken'
 
 ROOT_URLCONF = 'academia_blockchain.urls'
 
+# To customize django-allauth templates: https://docs.allauth.org/en/latest/common/templates.html
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -164,6 +167,27 @@ LOGGING = {
     },
 }
 
+# REST Framework configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+}
+
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -190,7 +214,7 @@ SOCIALACCOUNT_PROVIDERS = {
 # Other config
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "profile_register"
-LOGIN_REDIRECT_URL = "profile_data"
+LOGIN_REDIRECT_URL = "set_jwt_token"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "en-us"
 SEND_EMAILS = False
@@ -248,5 +272,5 @@ else:
     STATIC_URL = '/static/'
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-    CORS_ALLOW_ALL_ORIGINS = True  # i made this change because CORS isn't allows me to get data with axios.
+    CORS_ALLOW_ALL_ORIGINS = True  # made this change because CORS isn't allows me to get data with axios.
 
