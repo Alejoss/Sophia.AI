@@ -1,26 +1,33 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { setAccessToken } from '../api/axios';  // Updated import path
+import { fetchUserData } from './authSlice';
+import { unwrapResult } from '@reduxjs/toolkit';
+import Cookies from 'js-cookie';
 
 const TokenHandler = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    // Retrieve the JWT token from the cookie (or URL if using that approach)
-    const token = document.cookie.split('jwt=')[1];
-    console.log("token:");
-    console.log(token);
+    const token = Cookies.get('jwt');
 
     if (token) {
-      // Save the token as needed (e.g., in localStorage or context)
-      localStorage.setItem('access_token', token);
-
-      // Redirect to the desired route
-      navigate('/profiles/profile_data');
+      setAccessToken(token);
+      
+      dispatch(fetchUserData() as any)
+        .then(unwrapResult)
+        .then(() => {
+          navigate('/profiles/profile_data');
+        })
+        .catch(() => {
+          navigate('/profiles/login');
+        });
     } else {
-      // Handle the error or redirect to login if no token is found
       navigate('/profiles/login');
     }
-  }, [navigate]);
+  }, [navigate, dispatch]);
 
   return <div>Loading...</div>;
 };
