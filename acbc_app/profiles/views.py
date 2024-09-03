@@ -137,18 +137,49 @@ class AcademiaLogin(LoginView):
 
 def set_jwt_token(request):
     user = request.user
+
+    # Debug: Check if user is authenticated
+    print('User authenticated:', user.is_authenticated)
+
     if not user.is_authenticated:
+        print('User not authenticated, returning error.')
         return JsonResponse({'error': 'User not authenticated'}, status=401)
 
+    # Debug: Log that the tokens are being created
+    print('Creating refresh and access tokens for user:', user)
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
 
-    response = HttpResponseRedirect('http://localhost:5173/profiles/token_handler')
+    # Debug: Log the setting of the JWT cookie
+    # Define the cookie attributes
+    cookie_attributes = {
+        'key': 'jwt',
+        'value': access_token,
+        'httponly': True,
+        'secure': False,  # Set to False if testing locally over HTTP
+        'samesite': 'Lax',
+        'path': '/',
+        'max_age': None,  # Can specify max_age if needed
+    }
 
-    # Set JWT in an HttpOnly cookie
+    # Print all the cookie attributes
+    print("Cookie attributes:", cookie_attributes)
+
+    # Set the cookie with the specified attributes
+    response = HttpResponseRedirect('http://localhost:5173/profiles/token_handler')
+    redirect_url = "http://localhost:5173/profiles/token_handler"
+    print(f'Redirecting to {redirect_url} with JWT token.')
+
     response.set_cookie(
-        'jwt', access_token, httponly=True, secure=True, samesite='Strict'
+        cookie_attributes['key'],
+        cookie_attributes['value'],
+        httponly=cookie_attributes['httponly'],
+        secure=cookie_attributes['secure'],
+        samesite=cookie_attributes['samesite'],
+        path=cookie_attributes['path'],
+        max_age=cookie_attributes['max_age'],
     )
+
     return response
 
 

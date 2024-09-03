@@ -13,7 +13,7 @@ import PersonalLibrary from './profiles/PersonalLibrary.tsx'
 import Security from './profiles/security.tsx'
 import About from './profiles/About.tsx'
 import Login from './profiles/Login.tsx'
-import TokenHandler from './profiles/TokenHandler.ts'
+import TokenHandler from './profiles/LoginSuccessful.tsx'
 
 const App: React.FC = () => {
   return (
