@@ -27,7 +27,7 @@ export const fetchUserData = createAsyncThunk<UserData, void, { rejectValue: str
   'auth/fetchUserData',
   async (_, thunkAPI) => {
     try {
-      const response = await axiosInstance.get<UserData>('/profile_data/');
+      const response = await axiosInstance.get<UserData>('/user_profile/');
       return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue('Failed to fetch profile data');

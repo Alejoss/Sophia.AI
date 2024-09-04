@@ -166,9 +166,9 @@ def set_jwt_token(request):
     print("Cookie attributes:", cookie_attributes)
 
     # Set the cookie with the specified attributes
-    response = HttpResponseRedirect('http://localhost:5173/profiles/token_handler')
-    redirect_url = "http://localhost:5173/profiles/token_handler"
-    print(f'Redirecting to {redirect_url} with JWT token.')
+    redirect_url = "http://localhost:5173/profiles/login_successful"
+    response = HttpResponseRedirect(redirect_url)
+    print(f'Redirecting to {redirect_url} with JWT token cookie.')
 
     response.set_cookie(
         cookie_attributes['key'],

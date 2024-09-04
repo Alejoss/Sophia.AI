@@ -13,7 +13,7 @@ const ProfileDetail: React.FC = () => {
         const fetchProfile = async () => {
             setIsLoading(true);
             try {
-                const response = await axiosInstance.get<Profile>(`api/profiles/${profileId}`);  // Use Axios instance
+                const response = await axiosInstance.get<Profile>(`/profiles/${profileId}`);  // Use Axios instance
                 setProfile(response.data);
                 setError(null); // Clear any previous errors
             } catch (err) {

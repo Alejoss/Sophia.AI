@@ -11,6 +11,25 @@ from .serializers import ProfileSerializer
 from profiles.models import Profile
 
 
+class UserProfileView(APIView):
+    def get(self, request, format=None):
+        # Fetch the profile of the authenticated user
+        user_profile = Profile.objects.filter(user=request.user).first()
+        if not user_profile:
+            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ProfileSerializer(user_profile)
+        return Response(serializer.data)
+
+    def post(self, request, format=None):
+        # Update or create a profile for the authenticated user
+        serializer = ProfileSerializer(data=request.data, instance=request.user.profile)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ProfileList(APIView):
     def get(self, request, format=None):
         profiles = Profile.objects.all()

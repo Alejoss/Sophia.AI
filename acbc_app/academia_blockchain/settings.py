@@ -19,7 +19,6 @@ from datetime import timedelta
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
@@ -51,7 +50,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt'
 ]
-
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -170,7 +168,8 @@ LOGGING = {
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'profiles.api.authentication.CustomAuthentication',  # Custom class for HttpOnly cookies
+        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -186,6 +185,8 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+
+    'AUTH_COOKIE': 'jwt',  # custom
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -210,7 +211,6 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-
 # Other config
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "profile_register"
@@ -219,7 +219,8 @@ LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "en-us"
 SEND_EMAILS = False
 SITE_ID = 1  # django-allauth
-
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 if ENVIRONMENT == "PRODUCTION":
 
@@ -251,8 +252,6 @@ if ENVIRONMENT == "PRODUCTION":
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-    CORS_ALLOW_ALL_ORIGINS = True
-
 else:
 
     DATABASES = {
@@ -271,6 +270,3 @@ else:
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATIC_URL = '/static/'
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-
-    CORS_ALLOW_ALL_ORIGINS = True  # made this change because CORS isn't allows me to get data with axios.
-
