@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { fetchUserData } from './authSlice';
+import { fetchUserData } from '../redux/authSlice.ts';
 import { unwrapResult } from '@reduxjs/toolkit';
 
 const LoginSuccessful = () => {
+  // TODO logout functionality
   console.log("Login Successful");
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -14,7 +15,7 @@ const LoginSuccessful = () => {
     dispatch(fetchUserData() as any)
       .then(unwrapResult)
       .then(() => {
-        navigate('/profile');  // Assuming '/profile' is the route for the user profile
+        navigate('/profiles/profile_data');  // Assuming '/profile' is the route for the user profile
       })
       .catch((error) => {
         console.error('Failed to fetch user data:', error);

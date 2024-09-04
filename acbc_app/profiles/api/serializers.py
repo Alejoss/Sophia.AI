@@ -38,7 +38,7 @@ class ContactMethodSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    cryptos_list = serializers.SerializerMethodField()  # TODO manejar en otro endpoint
+    # cryptos_list = serializers.SerializerMethodField()  # TODO manejar en otro endpoint
 
     class Meta:
         model = Profile

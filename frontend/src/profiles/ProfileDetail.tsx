@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axiosInstance from '../api/axios';
-import { Profile } from './profileTypes';
+import { Profile } from '../types/profileTypes.ts';
 
 const ProfileDetail: React.FC = () => {
     const { profileId } = useParams<{ profileId: string }>();

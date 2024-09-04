@@ -1,31 +1,15 @@
 // src/api/profileAPI.ts
 import axiosInstance from './axios';
-import { Profile, User } from '../profiles/profileTypes';
+import { Profile } from '../types/profileTypes.ts';
 
-const fetchProfileData = async (profileId: number | null): Promise<{ profile?: Profile, user?: User }> => {
-  if (!profileId) {
-    throw new Error("No profile ID provided");
-  }
-
+const getUserProfile = async (): Promise<Profile | null> => {
   try {
-    // Fetch the specific profile by ID
-    const responseProfile = await axiosInstance.get<Profile>(`/profiles/${profileId}/`);
-
-    // Assuming the profile contains user data or a user ID that can be used to fetch the user detail
-    const profile = responseProfile.data;
-    let user;
-
-    if (profile && profile.user) {
-      // Fetch the specific user by user ID
-      const responseUser = await axiosInstance.get<User>(`/users/${profile.user.id}/`);
-      user = responseUser.data;
-    }
-
-    return { profile, user };
+    const response = await axiosInstance.get<Profile>('/user_profile/');
+    return response.data; // Assuming the API returns the profile directly
   } catch (error) {
-    console.error('Error fetching profile data:', error);
-    throw error; // Re-throw the error to be handled by the component
+    console.error('Failed to fetch user profile:', error);
+    return null; // Return null or handle the error as appropriate for your application context
   }
-};
+}
 
-export default fetchProfileData;
+export { getUserProfile };

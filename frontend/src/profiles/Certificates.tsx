@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import fetchProfileData from "../api/profilesApi.ts"; // Importa la función desde el archivo
+import { getUserProfile } from "../api/profilesApi.ts"; // Importa la función desde el archivo
 
 const Certificates = () => {
   const [certificates, setCertificates] = useState({
@@ -17,7 +17,7 @@ const Certificates = () => {
     const SetProfileData = async () => {
       try {
         console.log('Fetching profile data');
-        const { user } = await fetchProfileData(storedUsername);
+        const { user } = await getUserProfile(storedUsername);
 
         if (user) {
           setCertificates({
