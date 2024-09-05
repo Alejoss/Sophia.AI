@@ -13,6 +13,7 @@ import Security from './profiles/security.tsx'
 import About from './profiles/About.tsx'
 import Login from './profiles/Login.tsx'
 import LoginSuccessful from './profiles/LoginSuccessful.tsx'
+import Logout from './profiles/Logout.tsx'
 
 const App: React.FC = () => {
   return (
@@ -23,6 +24,7 @@ const App: React.FC = () => {
        <Route path="/profiles" element={<ProfilesLayout/>}>
             <Route path="login" element={<Login />} />
             <Route path="login_successful" element={<LoginSuccessful/>} />
+            <Route path="logout" element={<Logout/>} />
             <Route path="profile_certificates" element={<Certificates/>} />
             <Route path="profile_data" element={<ProfileData/>} />
             <Route path="profile_events" element={<Events/>} />

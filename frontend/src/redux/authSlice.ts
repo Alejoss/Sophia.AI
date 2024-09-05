@@ -1,5 +1,6 @@
-// authSlice.ts
+// Import RootState from your store configuration if it's defined there
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { RootState } from '../app/store'
 import { Profile } from '../types/profileTypes';
 import { getUserProfile } from "../api/profilesApi";
 
@@ -8,7 +9,10 @@ export const fetchUserData = createAsyncThunk<Profile, void, { rejectValue: stri
   async (_, thunkAPI) => {
     try {
       const response = await getUserProfile();
-      return response.data;
+      if (!response) {
+        return thunkAPI.rejectWithValue('No profile data available');
+      }
+      return response;
     } catch (error) {
       return thunkAPI.rejectWithValue('Error fetching profile data: ' + error.message);
     }
@@ -33,9 +37,9 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    logout(state) {
-      state.isAuthenticated = false;
-      state.user = null;
+    resetAuthState(state) {
+      // Resets the entire state to its initial state
+      Object.assign(state, initialState);
     },
     clearError(state) {
       state.error = null;
@@ -61,9 +65,11 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { resetAuthState, clearError } = authSlice.actions;
 
-// Selector example
-export const selectIsAuthenticated = (state: any) => state.auth.isAuthenticated;
+// Selectors
+export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
+export const selectUser = (state: RootState) => state.auth.user;
+export const selectAuthStatus = (state: RootState) => state.auth.status;
 
 export default authSlice.reducer;

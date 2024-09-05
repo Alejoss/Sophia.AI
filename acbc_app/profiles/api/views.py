@@ -102,3 +102,8 @@ class ProfileDetail(APIView):
         profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+def logout(request):
+    response = Response({'message': 'Logged out successfully'})
+    response.delete_cookie('jwt')  # Delete the JWT cookie
+    return response

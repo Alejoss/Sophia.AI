@@ -4,7 +4,7 @@ from profiles.api.views import ProfileList, ProfileDetail, UserDetailView, UserL
 from events.api.views import EventList, EventDetail
 from content.api.views import (LibraryList, LibraryDetail, GroupList, GroupDetail, FileList, FileDetail)
 from academia_blockchain.api.api import ApiRoot
-from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshView)
+
 
 urlpatterns = [
     path('', ApiRoot.as_view(), name='api-root'),
@@ -22,6 +22,6 @@ urlpatterns = [
     path('users/', UserListView.as_view(), name='user-detail'),
     path('users/<int:pk>/', UserDetailView.as_view(), name='file-detail'),
 
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('logout/', logout, name='logout'),
+
 ]
