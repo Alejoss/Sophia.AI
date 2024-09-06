@@ -5,7 +5,6 @@ import { fetchUserData } from '../redux/authSlice.ts';
 import { unwrapResult } from '@reduxjs/toolkit';
 
 const LoginSuccessful = () => {
-  // TODO logout functionality
   console.log("Login Successful");
   const navigate = useNavigate();
   const dispatch = useDispatch();

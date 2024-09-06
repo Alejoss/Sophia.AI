@@ -1,14 +1,22 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
-from django.shortcuts import get_object_or_404
+from django.shortcuts import redirect, get_object_or_404
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.utils.decorators import method_decorator
+from django.contrib.auth import logout as django_logout
+from django.middleware.csrf import get_token
 
 from profiles.api.serializers import UserSerializer
 from .serializers import ProfileSerializer
 from profiles.models import Profile
+
+
+
 
 
 class UserProfileView(APIView):
@@ -103,7 +111,34 @@ class ProfileDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def logout(request):
-    response = Response({'message': 'Logged out successfully'})
-    response.delete_cookie('jwt')  # Delete the JWT cookie
-    return response
+class GetCsrfToken(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        """
+        Ensure a CSRF cookie is set and return a simple JSON message.
+        """
+        get_token(request)  # This will set the CSRF cookie if it is not already set
+        return Response({'message': 'CSRF cookie set'})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class Logout(APIView):
+    def post(self, request):
+        print("Logging out")
+        django_logout(request) # This will clear the session
+        response = Response({'message': 'Logged out successfully'}, status=200)
+        response.delete_cookie('jwt')  # Delete the JWT cookie
+        return response
+
+@method_decorator(csrf_exempt, name='dispatch')
+class Login(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            # Redirect to set JWT token
+            return redirect('set_jwt_token')
+        else:
+            return Response({'error': 'Invalid credentials'}, status=401)

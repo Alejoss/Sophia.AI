@@ -16,7 +16,7 @@ const Logout = () => {
         // Reset authentication state
         dispatch(resetAuthState());
         // Redirect to login or home page
-        navigate('profiles/login');
+        navigate('/profiles/login/');
       } catch (error) {
         console.error('Logout failed:', error);
       }

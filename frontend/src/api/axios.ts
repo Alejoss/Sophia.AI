@@ -1,7 +1,7 @@
 // src/api/axios.ts
 import axios from 'axios';
+// import Cookies from 'js-cookie';
 
-axios.defaults.withCredentials = true;
 
 const baseURL = 'http://localhost:8000/api';
 

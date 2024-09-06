@@ -64,6 +64,9 @@ MIDDLEWARE = [
 ]
 
 CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_HTTPONLY = False  # Allows JavaScript to read the CSRF cookie
+CSRF_COOKIE_SAMESITE = 'Lax'  # Helps mitigate CSRF attacks
+
 
 ROOT_URLCONF = 'academia_blockchain.urls'
 
@@ -173,6 +176,12 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
     ),
 }
 
