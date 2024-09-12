@@ -20,11 +20,18 @@ class Collection(models.Model):
 
 
 class Content(models.Model):
+    MEDIA_TYPES = [
+        ('VIDEO', 'Video'),
+        ('AUDIO', 'Audio'),
+        ('TEXT', 'Text'),
+        ('IMAGE', 'Image')
+    ]
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
     created_for = models.CharField(max_length=20, choices=[('KNOWLEDGE_PATH', 'Knowledge Path'), ('USER_WALL', 'User Wall'), ('TEACHER_RESOURCE', 'Teacher Resource')], default='USER_WALL')
+    media_type = models.CharField(max_length=5, choices=MEDIA_TYPES, default='TEXT')
     activity_requirement = models.ForeignKey('ActivityRequirement', on_delete=models.SET_NULL, null=True, blank=True, related_name='required_contents')
     is_visible = models.BooleanField(default=False)  # Whether the content is visible to others
     rating = models.IntegerField(blank=True, null=True, choices=[(i, str(i)) for i in range(1, 6)])  # Content rating by teachers or peers
@@ -128,3 +135,33 @@ class NodeActivityRequirement(models.Model):
             return f"Complete {self.activity_requirement} to move from {self.preceding_node.title} to {self.following_node.title}"
         else:
             return f"Complete {self.activity_requirement} to finish {self.preceding_node.title}"
+
+
+class Topic(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_topics')
+    moderators = models.ManyToManyField(User, related_name='moderated_topics')
+    related_topics = models.ManyToManyField('self', blank=True, related_name='related_to', symmetrical=False)
+
+    def __str__(self):
+        return self.title
+
+    def is_moderator_or_creator(self, user):
+        return user == self.creator or user in self.moderators.all()
+
+
+class ModerationLog(models.Model):
+    ACTION_CHOICES = [
+        ('DELETE', 'Delete'),
+        ('REPORT', 'Report')
+    ]
+    moderator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='moderation_actions')
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='moderation_logs')
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.action} by {self.moderator.username} on {self.content.title} at {self.created_at}"
+
