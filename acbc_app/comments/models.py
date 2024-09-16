@@ -13,7 +13,8 @@ class Comment(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
     votes = models.IntegerField(default=0)
-    topic = models.ForeignKey(Topic, on_delete=models.SET_NULL, null=True, blank=True, related_name='comments')  # Optional field for topic context
+    topic = models.ForeignKey(Topic, on_delete=models.SET_NULL, null=True, blank=True, related_name='comments')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
 
     def __str__(self):
         return f"Comment by {self.author.username} on {self.created_at}"
