@@ -5,6 +5,7 @@ from content.models import KnowledgePath  # Assuming this is your knowledge path
 
 
 class Certificate(models.Model):
+    # Represents an issued certificate for completing a KnowledgePath, with potential future extension to include events, linked to specific templates.
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, null=True, blank=True)
     # event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)  # Uncomment in the future
@@ -21,6 +22,7 @@ class Certificate(models.Model):
 
 
 class CertificateRequest(models.Model):
+    # Tracks user requests for certificates based on completed KnowledgePaths or events, managing the request's approval status and related details.
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
         ('APPROVED', 'Approved'),
@@ -40,6 +42,7 @@ class CertificateRequest(models.Model):
 
 
 class CertificateTemplate(models.Model):
+    # Defines templates for certificates, including the title and detailed description, used in the generation of actual certificates.
     title = models.CharField(max_length=255)
     description = models.TextField()
 

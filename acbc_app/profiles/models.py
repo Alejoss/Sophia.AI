@@ -15,6 +15,8 @@ def upload_profile_picture(instance, filename):
 
 
 class Profile(models.Model):
+    # Represents user profiles with personal details, preferences, and a custom uploaded profile picture.
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     interests = models.CharField(max_length=250, blank=True)
     profile_description = models.TextField(max_length=2500, blank=True)
@@ -28,6 +30,8 @@ class Profile(models.Model):
 
 
 class CryptoCurrency(models.Model):
+    # Defines a cryptocurrency by name and code, ensuring each currency name is unique within the system.
+
     name = models.CharField(max_length=50, blank=True, unique=True)
     code = models.CharField(max_length=10, blank=True)
 
@@ -36,6 +40,8 @@ class CryptoCurrency(models.Model):
 
 
 class AcceptedCrypto(models.Model):
+    # Tracks cryptocurrency addresses accepted by users for transactions, allowing soft deletion.
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     crypto = models.ForeignKey(CryptoCurrency, on_delete=models.CASCADE, null=True)
     address = models.CharField(max_length=250, blank=True)
@@ -46,6 +52,8 @@ class AcceptedCrypto(models.Model):
 
 
 class ContactMethod(models.Model):
+    # Stores user-specific contact methods with optional URLs, which are validated and can be soft deleted.
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=50, blank=True)
     description = models.CharField(max_length=250, blank=True)
@@ -65,6 +73,8 @@ class ContactMethod(models.Model):
 
 
 class UserProgressKnowledgePath(models.Model):
+    # Records progress of users through nodes in a KnowledgePath, ensuring uniqueness for each user-node combination.
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     node_order = models.ForeignKey(NodeOrder, on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
@@ -79,6 +89,8 @@ class UserProgressKnowledgePath(models.Model):
 
 
 class UserActivityStatus(models.Model):
+    # Keeps track of user completions for specific activities within a knowledge path, recording completion status and time.
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
@@ -87,4 +99,3 @@ class UserActivityStatus(models.Model):
     def __str__(self):
         status = 'Completed' if self.is_completed else 'Pending'
         return f"{self.user.username} - {self.activity_requirement} ({status})"
-
