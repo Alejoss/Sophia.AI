@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from content.models import Topic  # Assuming the Topic model is defined in the content app
+
+from content.models import Topic, Content  # Assuming the Topic model is defined in the content app
 
 
 class Vote(models.Model):
