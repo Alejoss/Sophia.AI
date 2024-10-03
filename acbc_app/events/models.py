@@ -10,9 +10,11 @@ from taggit.managers import TaggableManager
 
 def upload_event_picture(instance, filename):
     return "event_pictures/" + instance.title + "_" + datetime.today().strftime('%h-%d-%y') + ".jpeg"
+    # TODO utilizar django timezone module
 
 
 class Event(models.Model):
+    # TODO arreglar este model. Incluir Bookmarks.
     """
     It can be a Recorded Course, a Live Course, a Conference, etc.
     """
@@ -43,80 +45,3 @@ class Event(models.Model):
 
     def __str__(self):
         return self.title + " - " + self.owner.username
-
-
-class Comment(models.Model):
-    """
-    Comments on Events.
-    """
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="comments")
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField(blank=True)
-    created_on = models.DateTimeField(auto_now_add=True)
-    deleted = models.BooleanField(default=False)
-
-    class Meta:
-        ordering = ['created_on']
-
-    def __str__(self):
-        return "Comment by {} in {}".format(self.user.username, self.event.title)
-
-
-class ConnectionPlatform(models.Model):
-    """
-    How the students connect with the professor
-    """
-    name = models.CharField(max_length=150, blank=True)
-    url_link = models.URLField(blank=True)
-    deleted = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.name
-
-
-class Certificate(models.Model):
-    """
-    A certificate is given to students that assist an event. This, ideally, will be
-    hashed and sent to a blockchain.
-    """
-    date_created = models.DateTimeField(auto_now_add=True)
-    event = models.ForeignKey(Event, null=True, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
-    deleted = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.event.title + " - " + self.user.username
-
-
-class Bookmark(models.Model):
-    """
-    Users can bookmark events
-    """
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    date = models.DateTimeField(auto_now_add=True, null=True, blank=True)
-    deleted = models.BooleanField(default=False, null=True, blank=True)
-
-    def __str__(self):
-        return self.event.title + " - " + self.user.username
-
-
-class CertificateRequest(models.Model):
-    """
-    Students can request a certificate after they assist to an event
-    """
-    CERTIFICATE_STATES = (("ACCEPTED", "accepted"),
-                          ("REJECTED", "rejected"),
-                          ("DELETED", "deleted"),
-                          ("PENDING", "pending"))
-
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    state = models.CharField(max_length=50, choices=CERTIFICATE_STATES, blank=True, default="PENDING")
-    date = models.DateTimeField(auto_now_add=True, null=True, blank=True)
-
-    class Meta:
-        unique_together = ["user", "event"]
-
-    def __str__(self):
-        return self.user.username + " - " + self.event.title

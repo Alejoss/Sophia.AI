@@ -8,7 +8,7 @@ from ..models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id','username','email']
+        fields = ['id', 'username', 'email']
 
 
 class CryptoCurrencySerializer(serializers.ModelSerializer):
@@ -30,7 +30,7 @@ class ContactMethodSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ContactMethod
-        fields = ['id', 'user', 'name', 'description', 'url_link', 'deleted', 'has_contact_url']
+        fields = ['id', 'user', 'name', 'description', 'url_link', 'deleted']
 
     def get_has_contact_url(self, obj):
         return obj.has_contact_url()
@@ -38,6 +38,7 @@ class ContactMethodSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+
     # cryptos_list = serializers.SerializerMethodField()  # TODO manejar en otro endpoint
 
     class Meta:
@@ -50,4 +51,3 @@ class ProfileSerializer(serializers.ModelSerializer):
         cryptos = AcceptedCrypto.objects.filter(user=obj.user, deleted=False)
         # Serialize the data
         return AcceptedCryptoSerializer(cryptos, many=True).data
-

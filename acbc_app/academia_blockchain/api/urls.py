@@ -5,11 +5,9 @@ from profiles.api.views import (ProfileList, ProfileDetail, UserDetailView, User
 from events.api.views import EventList, EventDetail
 from content.api.views import (LibraryList, LibraryDetail, GroupList, GroupDetail, FileList,
                                FileDetail)
-from academia_blockchain.api.api import ApiRoot
 
 
 urlpatterns = [
-    path('', ApiRoot.as_view(), name='api-root'),
     path('user_profile/', UserProfileView.as_view(), name='user_profile'),
     path('profiles/', ProfileList.as_view(), name='profile-list'),
     path('profiles/<int:pk>/', ProfileDetail.as_view(), name='profile-detail'),

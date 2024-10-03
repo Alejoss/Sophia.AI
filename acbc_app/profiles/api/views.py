@@ -16,9 +16,6 @@ from .serializers import ProfileSerializer
 from profiles.models import Profile
 
 
-
-
-
 class UserProfileView(APIView):
     def get(self, request, format=None):
         # Fetch the profile of the authenticated user
@@ -52,7 +49,6 @@ class ProfileList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class UserListView(APIView):
     def get(self, request, format=None):
         # Obtén todos los usuarios
@@ -76,7 +72,8 @@ class UserDetailView(APIView):
         # Obtén un usuario específico por su pk (ID)
         user = get_object_or_404(User, pk=pk)
         # Serializa los datos del usuario con los datos actualizados
-        serializer = UserSerializer(user, data=request.data, partial=True)  # `partial=True` para permitir actualizaciones parciales
+        serializer = UserSerializer(user, data=request.data,
+                                    partial=True)  # `partial=True` para permitir actualizaciones parciales
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -126,10 +123,11 @@ class GetCsrfToken(APIView):
 class Logout(APIView):
     def post(self, request):
         print("Logging out")
-        django_logout(request) # This will clear the session
+        django_logout(request)  # This will clear the session
         response = Response({'message': 'Logged out successfully'}, status=200)
         response.delete_cookie('jwt')  # Delete the JWT cookie
         return response
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class Login(APIView):

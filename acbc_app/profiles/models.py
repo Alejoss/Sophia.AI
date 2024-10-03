@@ -90,7 +90,6 @@ class UserProgressKnowledgePath(models.Model):
 
 class UserActivityStatus(models.Model):
     # Keeps track of user completions for specific activities within a knowledge path, recording completion status and time.
-
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
