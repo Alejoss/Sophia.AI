@@ -59,14 +59,3 @@ class ExamCall(models.Model):
 
     def __str__(self):
         return f"{self.call_type} Call between {self.teacher.username} and {self.student.username}"
-
-
-class ContentRating(models.Model):
-    content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='rating')
-    rating = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
-    comment = models.TextField(blank=True, null=True)
-    rated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='content_ratings')
-
-    def __str__(self):
-        return f"Rating for {self.content.title} by {self.rated_by.username if self.rated_by else 'Unknown'}: {self.rating}"
-

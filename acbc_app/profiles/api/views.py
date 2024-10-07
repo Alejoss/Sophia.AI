@@ -49,16 +49,6 @@ class ProfileList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserListView(APIView):
-    def get(self, request, format=None):
-        # Obtén todos los usuarios
-        users = User.objects.all()
-        # Serializa los datos de todos los usuarios
-        serializer = UserSerializer(users, many=True)
-        # Devuelve los datos serializados
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 class UserDetailView(APIView):
     def get(self, request, pk, format=None):
         # Obtén un usuario específico por su pk (ID)
@@ -89,14 +79,6 @@ class ProfileDetail(APIView):
     def put(self, request, pk, format=None):
         profile = get_object_or_404(Profile, pk=pk)
         serializer = ProfileSerializer(profile, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk, format=None):
-        profile = get_object_or_404(Profile, pk=pk)
-        serializer = ProfileSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -137,6 +119,6 @@ class Login(APIView):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             # Redirect to set JWT token
-            return redirect('set_jwt_token')
+            return redirect('profiles:set_jwt_token')
         else:
             return Response({'error': 'Invalid credentials'}, status=401)

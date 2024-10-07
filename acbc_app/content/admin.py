@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Library, Group, File
+from content.models import Library, Collection, File
 
 
 @admin.register(Library)
@@ -10,7 +10,7 @@ class LibraryAdmin(admin.ModelAdmin):
     search_fields = ['name', 'user__username']
 
 
-@admin.register(Group)
+@admin.register(Collection)
 class GroupAdmin(admin.ModelAdmin):
     list_display = ['name', 'library']
     list_filter = ['library']

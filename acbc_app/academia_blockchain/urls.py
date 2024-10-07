@@ -30,7 +30,7 @@ urlpatterns = [
     # path('exams/', include('exams.urls')),
     path('profiles/', include('profiles.urls')),
     path('content/', include('content.urls')),
-    path('ratings/', include('star_ratings.urls', namespace='ratings')),
+    path('ratings/', include('star_ratings.urls', namespace='ratings'))
 ]
 
 
