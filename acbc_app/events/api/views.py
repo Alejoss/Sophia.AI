@@ -7,9 +7,12 @@ from rest_framework.generics import get_object_or_404
 from events.models import Event
 from comments.models import Comment
 from certificates.models import Certificate, CertificateRequest
-from events.api.serializers import (ConnectionPlatformSerializer, EventSerializer,
-                          BookmarkSerializer, CommentSerializer, CertificateRequestSerializer,
-                          CertificateSerializer)
+from events.api.serializers import (ConnectionPlatformSerializer,
+                                    EventSerializer,
+                                    # BookmarkSerializer,
+                                    CommentSerializer,
+                                    CertificateRequestSerializer,
+                                    CertificateSerializer)
 
 
 
