@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.postgres.fields import JSONField
 from django.contrib.auth.models import User
 
 
@@ -67,7 +66,7 @@ class BlockchainInteraction(models.Model):
     # Records transaction details when content interactions are recorded on a blockchain.
 
     content = models.OneToOneField(Content, on_delete=models.CASCADE)
-    transaction_receipt = JSONField(blank=True, null=True)
+    transaction_receipt = models.JSONField(blank=True, null=True)
 
     def __str__(self):
         return f"Blockchain Interaction for {self.content.title}"
