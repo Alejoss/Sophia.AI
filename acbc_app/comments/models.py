@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
-from content.models import KnowledgePath
+from content.models import KnowledgePath, Topic
 from certificates.models import Certificate
 
 
