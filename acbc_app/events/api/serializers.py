@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from events.models import Event, Comment, ConnectionPlatform, Certificate, Bookmark, CertificateRequest
+from comments.models import Comment
+from certificates.models import Certificate, CertificateRequest
+from events.models import Event, ConnectionPlatform # TODO Bookmark
 from profiles.api.serializers import UserSerializer
 
 
@@ -54,13 +56,13 @@ class CertificateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class BookmarkSerializer(serializers.ModelSerializer):
-    event = EventSerializer(read_only=True)
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = Bookmark
-        fields = '__all__'
+# class BookmarkSerializer(serializers.ModelSerializer): # TODO create Bookmark model
+#     event = EventSerializer(read_only=True)
+#     user = UserSerializer(read_only=True)
+#
+#     class Meta:
+#         model = Bookmark
+#         fields = '__all__'
 
 
 class CertificateRequestSerializer(serializers.ModelSerializer):

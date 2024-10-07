@@ -54,7 +54,7 @@ class KnowledgePathVoteSummary(models.Model):
     # Maintains a summary of votes for each KnowledgePath within a given topic, enabling efficient vote count updates and access.
 
     knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, related_name='vote_summaries')
-    topic = models.ForeignKey('Topic', on_delete=models.CASCADE, related_name='knowledge_path_vote_summaries')
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='knowledge_path_vote_summaries')
     vote_count = models.IntegerField(default=0)
 
     class Meta:

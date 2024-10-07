@@ -43,3 +43,21 @@ class Event(models.Model):
 
     def __str__(self):
         return self.title + " - " + self.owner.username
+
+
+class ConnectionPlatform(models.Model):
+    PLATFORM_CHOICES = [
+        ('twitch', 'Twitch'),
+        ('youtube', 'YouTube'),
+        ('facebook', 'Facebook Gaming'),
+        ('mixer', 'Mixer'),
+    ]
+
+    name = models.CharField(max_length=50, choices=PLATFORM_CHOICES, unique=True)
+
+    class Meta:
+        verbose_name = 'Streaming Platform'
+        verbose_name_plural = 'Streaming Platforms'
+
+    def __str__(self):
+        return self.get_name_display()  # Displays the friendly name instead of the code
