@@ -175,7 +175,7 @@ LOGGING = {
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'profiles.api.authentication.CustomAuthentication',  # Custom class for HttpOnly cookies
+        'profiles.authentication.CustomAuthentication',  # Custom class for HttpOnly cookies
         # 'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
