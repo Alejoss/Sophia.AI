@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from django.contrib.auth.models import User
 
-from ..models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
+from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -3,7 +3,7 @@ from rest_framework import serializers
 from comments.models import Comment
 from certificates.models import Certificate, CertificateRequest
 from events.models import Event, ConnectionPlatform # TODO Bookmark
-from profiles.api.serializers import UserSerializer
+from profiles.serializers import UserSerializer
 
 
 class ConnectionPlatformSerializer(serializers.ModelSerializer):
