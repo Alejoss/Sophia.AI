@@ -227,7 +227,7 @@ SOCIALACCOUNT_PROVIDERS = {
 # Other config
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "profile_register"
-LOGIN_REDIRECT_URL = "set_jwt_token"
+LOGIN_REDIRECT_URL = "profiles:set_jwt_token"
 LOGOUT_REDIRECT_URL = "event_index"
 LANGUAGE_CODE = "en-us"
 SEND_EMAILS = False
