@@ -226,11 +226,13 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Other config
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-LOGIN_URL = "profile_register"
+LOGIN_URL = "account_login"
 LOGIN_REDIRECT_URL = "profiles:set_jwt_token"
-LOGOUT_REDIRECT_URL = "event_index"
+LOGOUT_REDIRECT_URL = "http://localhost:5173/profiles/login"
 LANGUAGE_CODE = "en-us"
 SEND_EMAILS = False
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
