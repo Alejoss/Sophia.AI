@@ -1,15 +1,19 @@
 from django.urls import path
 
-# from content.api.views import (LibraryList,
-#                                LibraryDetail,
-#                                GroupList,
-#                                GroupDetail,
-#                                FileList,
-#                                FileDetail)
+from content import views
 
 app_name = "content"
 
 urlpatterns = [
+    path('libraries/', views.LibraryListView.as_view(), name='library_list'),
+    path('libraries/<int:pk>/', views.LibraryDetailView.as_view(), name='library_detail'),
+    path('collections/', views.CollectionListView.as_view(), name='collection_list'),
+    path('collections/<int:pk>/', views.CollectionDetailView.as_view(), name='collection_detail'),
+    path('contents/', views.ContentListView.as_view(), name='content_list'),
+    path('contents/<int:pk>/', views.ContentDetailView.as_view(), name='content_detail'),
+    path('knowledge-paths/', views.KnowledgePathListView.as_view(), name='knowledge_path_list'),
+    path('knowledge-paths/<int:pk>/', views.KnowledgePathDetailView.as_view(), name='knowledge_path_detail'),
+    path('nodes/<int:pk>/', views.NodeDetailView.as_view(), name='node_detail'),
     # path('libraries/', LibraryList.as_view(), name='library-list'),
     # path('libraries/<int:pk>/', LibraryDetail.as_view(), name='library-detail'),
     # path('groups/', GroupList.as_view(), name='group-list'),
