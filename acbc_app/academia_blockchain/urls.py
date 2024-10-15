@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/profiles/', include('profiles.urls', namespace='profiles')),
     path('api/content/', include('content.urls', namespace='content')),
     path('api/events/', include('events.urls', namespace='events')),
+    path('api/comments/', include('comments.urls', namespace='comments')),
     path('ratings/', include('star_ratings.urls', namespace='ratings')),
     # path('exams/', include('exams.urls')),
     # path('', event_views.events_all, name="events_all"),
