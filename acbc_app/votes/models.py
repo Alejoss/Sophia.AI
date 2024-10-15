@@ -30,7 +30,7 @@ class Vote(models.Model):
         return f"Vote by {self.user.username} for {self.content_type.model} ID {self.object_id} in {self.topic.title}"
 
 
-class ContentVoteTopic(models.Model):
+class ContentVoteTopicCount(models.Model):
     # Aggregates votes for content items within topics, updating and summarizing total votes to facilitate quick retrieval.
     content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='vote_summaries')
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='vote_summaries')
@@ -50,15 +50,11 @@ class ContentVoteTopic(models.Model):
         self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
 
 
-class KnowledgePathVoteSummary(models.Model):
+class KnowledgePathVoteCount(models.Model):
     # Maintains a summary of votes for each KnowledgePath within a given topic, enabling efficient vote count updates and access.
 
     knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, related_name='vote_summaries')
-    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='knowledge_path_vote_summaries')
     vote_count = models.IntegerField(default=0)
-
-    class Meta:
-        unique_together = ('knowledge_path', 'topic')
 
     def __str__(self):
         return f"{self.vote_count} votes for {self.knowledge_path.title} in {self.topic.title}"
