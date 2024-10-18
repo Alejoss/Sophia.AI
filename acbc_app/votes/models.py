@@ -10,11 +10,11 @@ class Vote(models.Model):
     # Tracks individual user votes for various content types, ensuring uniqueness of votes per content object per topic.
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    value = models.IntegerField(default=1)  # Typically 1 or -1 for up/down votes
+    value = models.IntegerField(default=-1)  # Typically 1 or -1 for up/down votes
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
-    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='votes')  # Track the topic of each vote
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, null=True, blank=True, related_name='votes')  # Track the topic of each vote
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -57,7 +57,7 @@ class KnowledgePathVoteCount(models.Model):
     vote_count = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"{self.vote_count} votes for {self.knowledge_path.title} in {self.topic.title}"
+        return f"{self.vote_count} votes for {self.knowledge_path.title}"
 
     def update_vote_count(self, new_votes=1):
         """ Update the vote count by a specified number of new votes. """
