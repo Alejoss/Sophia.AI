@@ -5,10 +5,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 
+from comments.managers import CommentManager
 from content.models import KnowledgePath
-from comments.permissions import IsAuthorOrAdmin
+from comments.permissions import IsAuthor
 from comments.models import Comment
-from comments.serializer import CommentSerializer, KnowledgePathCommentSerializer
+from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer
 
 
 class KnowledgePathCommentsView(APIView):
@@ -20,7 +21,8 @@ class KnowledgePathCommentsView(APIView):
         comments = Comment.objects.filter(
             content_type=ContentType.objects.get_for_model(knowledge_path),
             object_id=knowledge_path.id,
-            parent=None
+            parent=None,
+            is_active=True
         ).select_related('author')
 
         serializer = KnowledgePathCommentSerializer(comments, many=True)
@@ -60,7 +62,8 @@ class KnowledgePathCommentRepliesView(APIView):
         """ Retrieve replies for a comment. """
         comment = get_object_or_404(
             Comment.objects.prefetch_related('replies').select_related('author'),
-            pk=pk
+            pk=pk,
+            is_active=True
         )
         replies = comment.replies.all()
         serializer = KnowledgePathCommentSerializer(replies, many=True)
@@ -96,11 +99,11 @@ class KnowledgePathCommentRepliesView(APIView):
 
 class CommentView(APIView):
     """ View for updating and deleting comments. """
-    permission_classes = [IsAuthorOrAdmin]
+    permission_classes = [IsAuthor]
 
     def put(self, request, pk):
         """ Update a comment. """
-        comment = get_object_or_404(Comment, pk=pk)
+        comment = get_object_or_404(Comment, pk=pk, is_active=True)
         self.check_object_permissions(request, comment) # Check if the user is the author of the comment or an admin
 
         user = request.user
@@ -123,10 +126,10 @@ class CommentView(APIView):
 
     def delete(self, request, pk):
         """ Delete a comment. """
-        comment = get_object_or_404(Comment, pk=pk)
+        comment = get_object_or_404(Comment, pk=pk, is_active=True)
         self.check_object_permissions(request, comment) # Check if the user is the author of the comment or an admin
 
-        comment.delete()
+        Comment.objects.logic_delete(comment) # Call the custom manager method to logically delete the comment
 
         return Response(
             {"success": "Comment deleted successfully."},
