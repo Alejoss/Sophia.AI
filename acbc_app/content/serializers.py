@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, KnowledgePath
+from content.models import Library, Collection, Content, KnowledgePath, Node
 
 
 class LibrarySerializer(serializers.ModelSerializer):
@@ -21,7 +21,15 @@ class ContentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class KnowledgePathNodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Node
+        fields = ['id', 'title', 'media_type']
+
+
 class KnowledgePathSerializer(serializers.ModelSerializer):
+    nodes = KnowledgePathNodeSerializer(many=True)
+
     class Meta:
         model = KnowledgePath
         fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'nodes']
