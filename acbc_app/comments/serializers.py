@@ -3,7 +3,6 @@ from .models import Comment
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    author = serializers.CharField(source='author.username')
     have_replies = serializers.SerializerMethodField()  # Field to indicate if the comment has replies
 
     class Meta:
@@ -19,6 +18,15 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_have_replies(self, obj):
         # Method to check if the comment has any replies
         return obj.replies.exists()
+
+    def to_representation(self, instance):
+        # Call the original `to_representation` method to get the default representation
+        representation = super().to_representation(instance)
+
+        # Add the username field from the author
+        representation['author'] = instance.author.username
+
+        return representation
 
 
 class KnowledgePathCommentSerializer(CommentSerializer):
