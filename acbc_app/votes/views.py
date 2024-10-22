@@ -22,20 +22,26 @@ class KnowledgePathVoteView(APIView):
             knowledge_path=knowledge_path
         )
 
-        # Retrieve or create the user's vote
-        existing_vote, _ = Vote.objects.get_or_create(
+        existing_vote = Vote.objects.filter(
             user=user,
             content_type=ContentType.objects.get_for_model(KnowledgePath),
-            object_id=knowledge_path.id,
-        )
+            object_id=knowledge_path.id
+        ).first()
 
-        # Determine if the user has upvoted or downvoted
-        vote = False if existing_vote.value == -1 else True
+        if existing_vote:
+            return Response(
+                {
+                    "vote_count": knowledge_path_vote_count.vote_count,
+                    "vote": existing_vote.value
+                },
+                status=status.HTTP_200_OK,
+            )
 
+        # Return the vote count with no vote if the user has not voted
         return Response(
             {
                 "vote_count": knowledge_path_vote_count.vote_count,
-                "vote": vote
+                "vote": 0
             },
             status=status.HTTP_200_OK,
         )
@@ -56,24 +62,16 @@ class KnowledgePathUpvoteView(APIView):
             object_id=knowledge_path.id,
         )
 
-        if existing_vote.value == 1:
-            return Response(
-                {"error": "You have already upvoted this KnowledgePath."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Set vote to upvote
-        existing_vote.value = 1
-        existing_vote.save()
+        new_vote = existing_vote.upvote()
 
         # Update the total vote count
         knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
             knowledge_path=knowledge_path
         )
-        knowledge_path_vote_count.update_vote_count(new_votes=1)
+        knowledge_path_vote_count.update_vote_count(new_votes=new_vote)
 
         return Response(
-            {"vote": True},
+            {"vote": existing_vote.value},
             status=status.HTTP_200_OK,
         )
 
@@ -93,28 +91,14 @@ class KnowledgePathDownvoteView(APIView):
             object_id=knowledge_path.id,
         )
 
-        if existing_vote.value == -1:
-            return Response(
-                {"error": "You have already downvoted this KnowledgePath."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        new_vote = existing_vote.downvote()
 
-        # Prevent downvoting if no upvotes exist
         knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
             knowledge_path=knowledge_path
         )
-        if knowledge_path_vote_count.vote_count == 0:
-            return Response(
-                {"vote": False},
-                status=status.HTTP_200_OK,
-            )
-
-        # Set vote to downvote
-        existing_vote.value = -1
-        existing_vote.save()
-        knowledge_path_vote_count.update_vote_count(new_votes=-1)
+        knowledge_path_vote_count.update_vote_count(new_votes=new_vote)
 
         return Response(
-            {"vote": False},
+            {"vote": existing_vote.value},
             status=status.HTTP_200_OK,
         )
