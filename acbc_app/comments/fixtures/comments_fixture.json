@@ -1,0 +1,322 @@
+[
+  {
+    "model": "comments.comment",
+    "pk": 1,
+    "fields": {
+      "author": 100,
+      "body": "I find this topic very interesting, especially the applications of mathematics in real life.",
+      "created_at": "2024-10-01T10:00:00Z",
+      "updated_at": "2024-10-01T10:00:00Z",
+      "content_type": 23,
+      "object_id": 1,
+      "votes": 5,
+      "topic": 1,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 2,
+    "fields": {
+      "author": 101,
+      "body": "This project on ecosystems is crucial for understanding our environment.",
+      "created_at": "2024-10-02T12:30:00Z",
+      "updated_at": "2024-10-02T12:30:00Z",
+      "content_type": 23,
+      "object_id": 2,
+      "votes": 3,
+      "topic": 2,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 3,
+    "fields": {
+      "author": 102,
+      "body": "Shakespeare's influence on literature is unparalleled. What are your thoughts?",
+      "created_at": "2024-10-03T09:15:00Z",
+      "updated_at": "2024-10-03T09:15:00Z",
+      "content_type": 23,
+      "object_id": 3,
+      "votes": 2,
+      "topic": 3,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 4,
+    "fields": {
+      "author": 100,
+      "body": "This is a great summary of the ecosystem topic! Can you elaborate on the interdependence of species?",
+      "created_at": "2024-10-04T11:00:00Z",
+      "updated_at": "2024-10-04T11:00:00Z",
+      "content_type": 23,
+      "object_id": 2,
+      "votes": 0,
+      "topic": 2,
+      "parent": 1,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 5,
+    "fields": {
+      "author": 103,
+      "body": "The impact of digital technology on education is profound. Let's discuss its future.",
+      "created_at": "2024-10-05T15:45:00Z",
+      "updated_at": "2024-10-05T15:45:00Z",
+      "content_type": 23,
+      "object_id": 1,
+      "votes": 4,
+      "topic": 1,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 6,
+    "fields": {
+      "author": 104,
+      "body": "I disagree with some points made. Here’s my perspective on the digital divide.",
+      "created_at": "2024-10-06T08:00:00Z",
+      "updated_at": "2024-10-06T08:00:00Z",
+      "content_type": 23,
+      "object_id": 1,
+      "votes": 1,
+      "topic": 1,
+      "parent": 5,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 7,
+    "fields": {
+      "author": 101,
+      "body": "Sustainability practices are vital. What are the best examples we can implement?",
+      "created_at": "2024-10-07T09:30:00Z",
+      "updated_at": "2024-10-07T09:30:00Z",
+      "content_type": 23,
+      "object_id": 2,
+      "votes": 2,
+      "topic": 2,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 8,
+    "fields": {
+      "author": 102,
+      "body": "Literature and society are deeply intertwined. Let's explore this relationship.",
+      "created_at": "2024-10-08T14:00:00Z",
+      "updated_at": "2024-10-08T14:00:00Z",
+      "content_type": 23,
+      "object_id": 3,
+      "votes": 2,
+      "topic": 3,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 9,
+    "fields": {
+      "author": 103,
+      "body": "What are the key themes in Shakespeare's plays that are still relevant today?",
+      "created_at": "2024-10-09T16:00:00Z",
+      "updated_at": "2024-10-09T16:00:00Z",
+      "content_type": 23,
+      "object_id": 3,
+      "votes": 0,
+      "topic": 3,
+      "parent": 8,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 10,
+    "fields": {
+      "author": 104,
+      "body": "The relationship between technology and education is evolving rapidly.",
+      "created_at": "2024-10-10T12:30:00Z",
+      "updated_at": "2024-10-10T12:30:00Z",
+      "content_type": 23,
+      "object_id": 1,
+      "votes": 1,
+      "topic": 1,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 11,
+    "fields": {
+      "author": 105,
+      "body": "Can someone recommend resources for learning calculus?",
+      "created_at": "2024-10-11T14:00:00Z",
+      "updated_at": "2024-10-11T14:00:00Z",
+      "content_type": 26,
+      "object_id": 1,
+      "votes": 2,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 12,
+    "fields": {
+      "author": 106,
+      "body": "I believe there are many online courses available. Have you checked out Coursera?",
+      "created_at": "2024-10-12T16:00:00Z",
+      "updated_at": "2024-10-12T16:00:00Z",
+      "content_type": 26,
+      "object_id": 1,
+      "votes": 1,
+      "topic": null,
+      "parent": 11,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 13,
+    "fields": {
+      "author": 107,
+      "body": "Could you also share your thoughts on the importance of foundational concepts?",
+      "created_at": "2024-10-13T10:30:00Z",
+      "updated_at": "2024-10-13T10:30:00Z",
+      "content_type": 26,
+      "object_id": 2,
+      "votes": 0,
+      "topic": null,
+      "parent": 12,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 14,
+    "fields": {
+      "author": 108,
+      "body": "What role does technology play in enhancing education?",
+      "created_at": "2024-10-14T14:00:00Z",
+      "updated_at": "2024-10-14T14:00:00Z",
+      "content_type": 26,
+      "object_id": 2,
+      "votes": 3,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 15,
+    "fields": {
+      "author": 109,
+      "body": "I think understanding technology is crucial for modern education.",
+      "created_at": "2024-10-15T09:00:00Z",
+      "updated_at": "2024-10-15T09:00:00Z",
+      "content_type": 26,
+      "object_id": 3,
+      "votes": 2,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 16,
+    "fields": {
+      "author": 110,
+      "body": "Have you considered the ethical implications of using AI in education?",
+      "created_at": "2024-10-16T10:00:00Z",
+      "updated_at": "2024-10-16T10:00:00Z",
+      "content_type": 26,
+      "object_id": 1,
+      "votes": 2,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 17,
+    "fields": {
+      "author": 111,
+      "body": "The role of educators is more important than ever in guiding technology use.",
+      "created_at": "2024-10-17T11:15:00Z",
+      "updated_at": "2024-10-17T11:15:00Z",
+      "content_type": 26,
+      "object_id": 1,
+      "votes": 3,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 18,
+    "fields": {
+      "author": 112,
+      "body": "I'm curious about the effectiveness of virtual reality in classrooms.",
+      "created_at": "2024-10-18T09:45:00Z",
+      "updated_at": "2024-10-18T09:45:00Z",
+      "content_type": 26,
+      "object_id": 2,
+      "votes": 4,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 19,
+    "fields": {
+      "author": 113,
+      "body": "What do you think about gamification as a learning strategy?",
+      "created_at": "2024-10-19T08:30:00Z",
+      "updated_at": "2024-10-19T08:30:00Z",
+      "content_type": 26,
+      "object_id": 2,
+      "votes": 1,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  },
+  {
+    "model": "comments.comment",
+    "pk": 20,
+    "fields": {
+      "author": 114,
+      "body": "I believe that collaborative learning can significantly enhance understanding.",
+      "created_at": "2024-10-20T14:15:00Z",
+      "updated_at": "2024-10-20T14:15:00Z",
+      "content_type": 26,
+      "object_id": 3,
+      "votes": 2,
+      "topic": null,
+      "parent": null,
+      "is_active": true
+    }
+  }
+]
