@@ -10,7 +10,7 @@ class Vote(models.Model):
     # Tracks individual user votes for various content types, ensuring uniqueness of votes per content object per topic.
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    value = models.IntegerField(default=-1)  # Typically 1 or -1 for up/down votes
+    value = models.IntegerField(default=0)  # Typically 1 or -1 for up/down votes | 0 for no vote
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
@@ -28,6 +28,38 @@ class Vote(models.Model):
 
     def __str__(self):
         return f"Vote by {self.user.username} for {self.content_type.model} ID {self.object_id} in {self.topic.title}"
+
+    def upvote(self):
+        """Changes the vote to upvote or removes it if it already exists."""
+        if self.value == 1:
+            self.value = 0  # Removes the upvote
+            self.save()
+            return -1 # Return -1 to indicate the vote was removed
+
+        old_value = self.value
+
+        self.value = 1
+        self.save()
+
+        if old_value == -1:
+            return 2 # Return 2 to indicate the vote was changed from downvote to upvote
+        return self.value
+
+    def downvote(self):
+        """Changes the vote to downvote or removes it if it already exists."""
+        if self.value == -1:
+            self.value = 0  # Removes the downvote
+            self.save()
+            return 1 # Return 1 to indicate the vote was removed
+
+        old_value = self.value
+
+        self.value = -1
+        self.save()
+
+        if old_value == 1:
+            return -2 # Return -2 to indicate the vote was changed from upvote to downvote
+        return self.value
 
 
 class ContentVoteTopicCount(models.Model):
