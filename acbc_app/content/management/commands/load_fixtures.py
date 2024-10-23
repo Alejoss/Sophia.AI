@@ -10,6 +10,9 @@ class Command(BaseCommand):
         fixtures = [
             'users_fixture.json',
             'profiles_fixture.json',
+            'content_fixture.json',
+            'comments_fixture.json',
+            'votes_fixture.json',
             'events_fixture.json'
         ]
 
