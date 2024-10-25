@@ -39,3 +39,9 @@ class KnowledgePathCommentSerializer(CommentSerializer):
     def get_author_is_certified(self, obj):
         # We call the model method to check if the author is certified for this KnowledgePath
         return obj.author_is_certified
+
+
+class ContentTopicCommentSerializer(CommentSerializer):
+    class Meta(CommentSerializer.Meta):
+        # We inherit the fields from CommentSerializer
+        fields = CommentSerializer.Meta.fields
