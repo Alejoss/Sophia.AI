@@ -3,8 +3,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 
-from content.models import Library, Collection, Content, KnowledgePath, Node
-from content.serializers import LibrarySerializer, CollectionSerializer, ContentSerializer, KnowledgePathSerializer
+from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
+from content.serializers import (LibrarySerializer,
+                                 CollectionSerializer,
+                                 ContentSerializer,
+                                 KnowledgePathSerializer,
+                                 TopicContentsSerializer)
 
 
 class LibraryListView(APIView):
@@ -52,9 +56,8 @@ class ContentListView(APIView):
     API view to retrieve the list of all Content instances.
     """
     def get(self, request):
-        contents = Content.objects.all()
-        serializer = ContentSerializer(contents, many=True)
-        return Response(serializer.data)
+        contents = Content.objects.values('title', 'author')
+        return Response(contents)
 
 
 class ContentDetailView(APIView):
@@ -95,3 +98,22 @@ class NodeDetailView(APIView):
     def get(self, request, pk):
         node = get_object_or_404(Node, pk=pk)
         return Response(node, status=status.HTTP_200_OK)
+
+
+class TopicListView(APIView):
+    """
+    API view to retrieve the list of all topics instances.
+    """
+    def get(self, request):
+        topics = Topic.objects.values('title', 'creator')
+        return Response(topics, status=status.HTTP_200_OK)
+
+
+class TopicContentsListView(APIView):
+    """
+    API view to retrieve the contents associated with a specific Topic instance.
+    """
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        serializer = TopicContentsSerializer(topic)
+        return Response(serializer.data, status=status.HTTP_200_OK)
