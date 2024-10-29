@@ -41,6 +41,12 @@ class KnowledgePathCommentSerializer(CommentSerializer):
         return obj.author_is_certified
 
 
+class TopicCommentSerializer(CommentSerializer):
+    class Meta(CommentSerializer.Meta):
+        # We inherit the fields from CommentSerializer
+        fields = CommentSerializer.Meta.fields
+
+
 class ContentTopicCommentSerializer(CommentSerializer):
     class Meta(CommentSerializer.Meta):
         # We inherit the fields from CommentSerializer
