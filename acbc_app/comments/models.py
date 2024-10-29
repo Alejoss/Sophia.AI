@@ -1,4 +1,7 @@
+import bleach
+
 from django.db import models
+from django.db.models.signals import pre_save
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -34,10 +37,8 @@ class Comment(models.Model):
         return False
 
 
-# Example query to fetch comments for a specific content item
-# content_item = Content.objects.get(id=content_id)
-# comments = Comment.objects.filter(
-#     content_type=ContentType.objects.get_for_model(content_item),
-#     object_id=content_item.id
-# ).select_related('author').prefetch_related('author__certificates')
+def sanitize_comment_body(sender, instance, *args, **kwargs):
+    instance.body = bleach.clean(instance.body)
 
+
+pre_save.connect(sanitize_comment_body, sender=Comment)
