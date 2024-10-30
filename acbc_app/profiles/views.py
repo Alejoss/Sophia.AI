@@ -112,6 +112,7 @@ class GetCsrfToken(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class Logout(APIView):
+
     def post(self, request):
         print("Logging out")
         django_logout(request)  # This will clear the session

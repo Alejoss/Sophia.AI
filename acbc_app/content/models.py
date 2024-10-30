@@ -80,6 +80,7 @@ class KnowledgePath(models.Model):
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_paths')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    votes = models.IntegerField(default=0)
 
     def __str__(self):
         return self.title

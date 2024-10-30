@@ -14,20 +14,18 @@ class Vote(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
-    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, null=True, blank=True, related_name='votes')  # Track the topic of each vote
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         # Ensure a user can only vote once per content object per topic
         indexes = [
-            models.Index(fields=['content_type', 'object_id', 'topic']),
+            models.Index(fields=['content_type', 'object_id']),
             models.Index(fields=['value']),  # If filtering or sorting on value is common
         ]
-        unique_together = ('user', 'content_type', 'object_id', 'topic')
-        unique_together = ('user', 'content_type', 'object_id', 'topic')
+        unique_together = ('user', 'content_type', 'object_id')
 
     def __str__(self):
-        return f"Vote by {self.user.username} for {self.content_type.model} ID {self.object_id} in {self.topic.title}"
+        return f"Vote by {self.user.username} for {self.content_type.model}"
 
     def upvote(self):
         """Changes the vote to upvote or removes it if it already exists."""
@@ -58,7 +56,7 @@ class Vote(models.Model):
         self.save()
 
         if old_value == 1:
-            return -2 # Return -2 to indicate the vote was changed from upvote to downvote
+            return -2  # Return -2 to indicate the vote was changed from upvote to downvote
         return self.value
 
 
@@ -77,22 +75,6 @@ class ContentVoteTopicCount(models.Model):
     def update_vote_count(self, new_votes=1):
         """ Update the vote count by a specified number of new votes. """
         # Using F() expression to avoid race conditions
-        self.vote_count = models.F('vote_count') + new_votes
-        self.save()
-        self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
-
-
-class KnowledgePathVoteCount(models.Model):
-    # Maintains a summary of votes for each KnowledgePath within a given topic, enabling efficient vote count updates and access.
-
-    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, related_name='vote_summaries')
-    vote_count = models.IntegerField(default=0)
-
-    def __str__(self):
-        return f"{self.vote_count} votes for {self.knowledge_path.title}"
-
-    def update_vote_count(self, new_votes=1):
-        """ Update the vote count by a specified number of new votes. """
         self.vote_count = models.F('vote_count') + new_votes
         self.save()
         self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression

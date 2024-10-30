@@ -7,45 +7,7 @@ from rest_framework.generics import get_object_or_404
 
 from content.models import KnowledgePath, Topic, Content
 from events.models import ConnectionPlatform
-from votes.models import Vote, KnowledgePathVoteCount, ContentVoteTopicCount
-
-
-class KnowledgePathVoteView(APIView):
-    """ View for voting on KnowledgePaths. """
-
-    def get(self, request, pk):
-        """ Retrieve the vote count for a KnowledgePath. """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        user = request.user
-
-        # Ensure the KnowledgePath has a vote count record
-        knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
-            knowledge_path=knowledge_path
-        )
-
-        existing_vote = Vote.objects.filter(
-            user=user,
-            content_type=ContentType.objects.get_for_model(KnowledgePath),
-            object_id=knowledge_path.id
-        ).first()
-
-        if existing_vote:
-            return Response(
-                {
-                    "vote_count": knowledge_path_vote_count.vote_count,
-                    "vote": existing_vote.value
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        # Return the vote count with no vote if the user has not voted
-        return Response(
-            {
-                "vote_count": knowledge_path_vote_count.vote_count,
-                "vote": 0
-            },
-            status=status.HTTP_200_OK,
-        )
+from votes.models import Vote, ContentVoteTopicCount
 
 
 class KnowledgePathUpvoteView(APIView):
