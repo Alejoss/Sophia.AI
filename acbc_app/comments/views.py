@@ -10,7 +10,8 @@ from comments.managers import CommentManager
 from content.models import KnowledgePath, Topic, Content
 from comments.permissions import IsAuthor
 from comments.models import Comment
-from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer, ContentTopicCommentSerializer
+from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer, ContentTopicCommentSerializer, \
+    TopicCommentSerializer
 
 
 class BaseCommentView(APIView):
@@ -68,6 +69,31 @@ class KnowledgePathCommentsView(BaseCommentView):
         serializer.save(
             object_id=knowledge_path.id,
             content_type=ContentType.objects.get_for_model(knowledge_path)
+        )
+
+
+class TopicCommentsView(BaseCommentView):
+    """ View for retrieving and adding comments on a Topic. """
+
+    def get_serializer_class(self):
+        return TopicCommentSerializer
+
+    def get_queryset(self, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        return Comment.objects.filter(
+            content_type=ContentType.objects.get_for_model(Topic),
+            object_id=topic.id,
+            topic=topic,
+            parent=None,
+            is_active=True
+        ).select_related('author')
+
+    def save_serializer(self, serializer, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        serializer.save(
+            object_id=topic.id,
+            content_type=ContentType.objects.get_for_model(Topic),
+            topic=topic
         )
 
 
@@ -156,6 +182,14 @@ class KnowledgePathCommentRepliesView(BaseCommentRepliesView):
 
     def get_serializer_class(self):
         return KnowledgePathCommentSerializer
+
+
+class TopicCommentRepliesView(BaseCommentRepliesView):
+    """ View for retrieving and adding replies to comments for Topic. """
+    requires_topic = True
+
+    def get_serializer_class(self):
+        return TopicCommentSerializer
 
 
 class ContentTopicCommentRepliesView(BaseCommentRepliesView):
