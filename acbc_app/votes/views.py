@@ -5,199 +5,134 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 
+from comments.models import Comment
 from content.models import KnowledgePath, Topic, Content
 from events.models import ConnectionPlatform
 from votes.models import Vote, KnowledgePathVoteCount, ContentVoteTopicCount
 
 
-class KnowledgePathVoteView(APIView):
-    """ View for voting on KnowledgePaths. """
+class BaseVoteView(APIView):
+    """Base class for handling voting actions."""
 
-    def get(self, request, pk):
-        """ Retrieve the vote count for a KnowledgePath. """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        user = request.user
+    model = None
+    vote_count_model = None
+    vote_related_field = None
 
-        # Ensure the KnowledgePath has a vote count record
-        knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
-            knowledge_path=knowledge_path
+    def get_vote_count_instance(self, obj, topic):
+        """Retrieve or create the vote count instance based on provided kwargs."""
+        if topic:
+            return self.vote_count_model.objects.get_or_create(
+                **{self.vote_related_field: obj, 'topic': topic}
+            )
+        return self.vote_count_model.objects.get_or_create(
+            **{self.vote_related_field: obj}
         )
 
-        existing_vote = Vote.objects.filter(
+    def get_vote(self, user, obj_id, topic=None):
+        """Retrieve the user's vote for a specific object and topic, if applicable."""
+        return Vote.objects.filter(
             user=user,
-            content_type=ContentType.objects.get_for_model(KnowledgePath),
-            object_id=knowledge_path.id
+            content_type=ContentType.objects.get_for_model(self.model),
+            object_id=obj_id,
+            topic=topic
         ).first()
 
-        if existing_vote:
-            return Response(
-                {
-                    "vote_count": knowledge_path_vote_count.vote_count,
-                    "vote": existing_vote.value
-                },
-                status=status.HTTP_200_OK,
-            )
+    def perform_vote_action(self, request, obj, vote_method, topic=None):
+        user = request.user
 
-        # Return the vote count with no vote if the user has not voted
+        # Get or create vote
+        existing_vote, _ = Vote.objects.get_or_create(
+            user=user,
+            content_type=ContentType.objects.get_for_model(self.model),
+            object_id=obj.id,
+            topic=topic
+        )
+
+        # Perform voting action
+        new_vote = getattr(existing_vote, vote_method)()
+
+        # Update the vote count
+        vote_count_instance, _ = self.get_vote_count_instance(obj, topic)
+        vote_count_instance.update_vote_count(new_votes=new_vote)
+
+        return Response({"vote": existing_vote.value}, status=status.HTTP_200_OK)
+
+
+class BaseGetVoteView(BaseVoteView):
+    """Base class for retrieving the vote count and user's vote."""
+
+    def get(self, request, pk, topic_pk=None):
+        obj = get_object_or_404(self.model, pk=pk)
+        topic = None
+
+        if topic_pk:
+            topic = get_object_or_404(Topic, pk=topic_pk)
+            obj = get_object_or_404(topic.contents, pk=pk)
+
+        vote_count_instance, _ = self.get_vote_count_instance(obj, topic)
+        existing_vote = self.get_vote(request.user, obj.id, topic)
+
         return Response(
             {
-                "vote_count": knowledge_path_vote_count.vote_count,
-                "vote": 0
+                "vote_count": vote_count_instance.vote_count,
+                "vote": existing_vote.value if existing_vote else 0 # Return 0 if no vote exists
             },
             status=status.HTTP_200_OK,
         )
 
 
-class KnowledgePathUpvoteView(APIView):
-    """ View for upvoting a KnowledgePath. """
+class KnowledgePathVoteView(BaseGetVoteView):
+    model = KnowledgePath
+    vote_count_model = KnowledgePathVoteCount
+    vote_related_field = 'knowledge_path'
+
+
+class KnowledgePathUpvoteView(BaseVoteView):
+    model = KnowledgePath
+    vote_count_model = KnowledgePathVoteCount
+    vote_related_field = 'knowledge_path'
 
     def post(self, request, pk):
-        """ Upvote a KnowledgePath. """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        user = request.user
-
-        # Get or create the user's vote for the KnowledgePath
-        existing_vote, _ = Vote.objects.get_or_create(
-            user=user,
-            content_type=ContentType.objects.get_for_model(KnowledgePath),
-            object_id=knowledge_path.id,
-        )
-
-        new_vote = existing_vote.upvote()
-
-        # Update the total vote count
-        knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
-            knowledge_path=knowledge_path
-        )
-        knowledge_path_vote_count.update_vote_count(new_votes=new_vote)
-
-        return Response(
-            {"vote": existing_vote.value},
-            status=status.HTTP_200_OK,
-        )
+        obj = get_object_or_404(self.model, pk=pk)
+        return self.perform_vote_action(request, obj, 'upvote')
 
 
-class KnowledgePathDownvoteView(APIView):
-    """ View for downvoting a KnowledgePath. """
+class KnowledgePathDownvoteView(BaseVoteView):
+    model = KnowledgePath
+    vote_count_model = KnowledgePathVoteCount
+    vote_related_field = 'knowledge_path'
 
     def post(self, request, pk):
-        """ Downvote a KnowledgePath. """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        user = request.user
-
-        # Get or create the user's vote for the KnowledgePath
-        existing_vote, _ = Vote.objects.get_or_create(
-            user=user,
-            content_type=ContentType.objects.get_for_model(KnowledgePath),
-            object_id=knowledge_path.id,
-        )
-
-        new_vote = existing_vote.downvote()
-
-        knowledge_path_vote_count, _ = KnowledgePathVoteCount.objects.get_or_create(
-            knowledge_path=knowledge_path
-        )
-        knowledge_path_vote_count.update_vote_count(new_votes=new_vote)
-
-        return Response(
-            {"vote": existing_vote.value},
-            status=status.HTTP_200_OK,
-        )
+        obj = get_object_or_404(self.model, pk=pk)
+        return self.perform_vote_action(request, obj, 'downvote')
 
 
-class ContentVoteTopicView(APIView):
-    """ View for voting on Content of specific Topic. """
+class ContentVoteTopicView(BaseGetVoteView):
+    model = Content
+    vote_count_model = ContentVoteTopicCount
+    vote_related_field = 'content'
 
     def get(self, request, topic_pk, content_pk):
-        topic = get_object_or_404(Topic, pk=topic_pk)
-        content = get_object_or_404(topic.contents, pk=content_pk)
-        user = request.user
-
-        content_vote_topic_count, _ = ContentVoteTopicCount.objects.get_or_create(
-            topic=topic,
-            content=content
-        )
-
-        existing_vote = Vote.objects.filter(
-            user=user,
-            content_type=ContentType.objects.get_for_model(Content),
-            object_id=content.id,
-            topic=topic
-        ).first()
-
-        if existing_vote:
-            return Response(
-                {
-                    "vote_count": content_vote_topic_count.vote_count,
-                    "vote": existing_vote.value
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        # Return the vote count with no vote if the user has not voted
-        return Response(
-            {
-                "vote_count": content_vote_topic_count.vote_count,
-                "vote": 0
-            },
-            status=status.HTTP_200_OK,
-        )
+        return super().get(request, content_pk, topic_pk)
 
 
-class ContentUpvoteTopicView(APIView):
-    """ View for upvoting a Content of specific Topic. """
+class ContentUpvoteTopicView(BaseVoteView):
+    model = Content
+    vote_count_model = ContentVoteTopicCount
+    vote_related_field = 'content'
 
     def post(self, request, topic_pk, content_pk):
         topic = get_object_or_404(Topic, pk=topic_pk)
-        content = get_object_or_404(topic.contents, pk=content_pk)
-        user = request.user
-
-        existing_vote, _ = Vote.objects.get_or_create(
-            user=user,
-            content_type=ContentType.objects.get_for_model(Content),
-            object_id=content.id,
-            topic=topic
-        )
-
-        new_vote = existing_vote.upvote()
-
-        # Update the total vote count
-        content_vote_topic_count, _ = ContentVoteTopicCount.objects.get_or_create(
-            topic=topic,
-            content=content
-        )
-        content_vote_topic_count.update_vote_count(new_votes=new_vote)
-
-        return Response(
-            {"vote": existing_vote.value},
-            status=status.HTTP_200_OK,
-        )
+        obj = get_object_or_404(topic.contents, pk=content_pk)
+        return self.perform_vote_action(request, obj, 'upvote', topic)
 
 
-class ContentDownvoteTopicView(APIView):
-    """ View for downvoting a Content of specific Topic. """
+class ContentDownvoteTopicView(BaseVoteView):
+    model = Content
+    vote_count_model = ContentVoteTopicCount
+    vote_related_field = 'content'
 
     def post(self, request, topic_pk, content_pk):
         topic = get_object_or_404(Topic, pk=topic_pk)
-        content = get_object_or_404(topic.contents, pk=content_pk)
-        user = request.user
-
-        existing_vote, _ = Vote.objects.get_or_create(
-            user=user,
-            content_type=ContentType.objects.get_for_model(Content),
-            object_id=content.id,
-            topic=topic
-        )
-
-        new_vote = existing_vote.downvote()
-
-        content_vote_topic_count, _ = ContentVoteTopicCount.objects.get_or_create(
-            topic=topic,
-            content=content
-        )
-        content_vote_topic_count.update_vote_count(new_votes=new_vote)
-
-        return Response(
-            {"vote": existing_vote.value},
-            status=status.HTTP_200_OK,
-        )
+        obj = get_object_or_404(topic.contents, pk=content_pk)
+        return self.perform_vote_action(request, obj, 'downvote', topic)
