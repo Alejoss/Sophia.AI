@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
+from comments.models import Comment
 from content.models import Topic, Content, KnowledgePath
 
 
@@ -90,6 +91,22 @@ class KnowledgePathVoteCount(models.Model):
 
     def __str__(self):
         return f"{self.vote_count} votes for {self.knowledge_path.title}"
+
+    def update_vote_count(self, new_votes=1):
+        """ Update the vote count by a specified number of new votes. """
+        self.vote_count = models.F('vote_count') + new_votes
+        self.save()
+        self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
+
+
+class CommentVoteCount(models.Model):
+    # Maintains a summary of votes for each Comment within a given topic, enabling efficient vote count updates and access.
+
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='vote_summaries')
+    vote_count = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.vote_count} votes for {self.comment.id}"
 
     def update_vote_count(self, new_votes=1):
         """ Update the vote count by a specified number of new votes. """

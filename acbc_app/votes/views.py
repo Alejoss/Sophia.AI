@@ -8,7 +8,7 @@ from rest_framework.generics import get_object_or_404
 from comments.models import Comment
 from content.models import KnowledgePath, Topic, Content
 from events.models import ConnectionPlatform
-from votes.models import Vote, KnowledgePathVoteCount, ContentVoteTopicCount
+from votes.models import Vote, KnowledgePathVoteCount, ContentVoteTopicCount, CommentVoteCount
 
 
 class BaseVoteView(APIView):
@@ -136,3 +136,29 @@ class ContentDownvoteTopicView(BaseVoteView):
         topic = get_object_or_404(Topic, pk=topic_pk)
         obj = get_object_or_404(topic.contents, pk=content_pk)
         return self.perform_vote_action(request, obj, 'downvote', topic)
+
+
+class CommentVoteView(BaseGetVoteView):
+    model = Comment
+    vote_count_model = CommentVoteCount
+    vote_related_field = 'comment'
+
+
+class CommentUpvoteView(BaseVoteView):
+    model = Comment
+    vote_count_model = CommentVoteCount
+    vote_related_field = 'comment'
+
+    def post(self, request, pk):
+        obj = get_object_or_404(self.model, pk=pk)
+        return self.perform_vote_action(request, obj, 'upvote')
+
+
+class CommentDownvoteView(BaseVoteView):
+    model = Comment
+    vote_count_model = CommentVoteCount
+    vote_related_field = 'comment'
+
+    def post(self, request, pk):
+        obj = get_object_or_404(self.model, pk=pk)
+        return self.perform_vote_action(request, obj, 'downvote')
