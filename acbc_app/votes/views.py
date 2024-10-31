@@ -17,24 +17,24 @@ class BaseVoteView(APIView):
     model = None
     vote_count_model = None
     vote_related_field = None
+    vote_count_related_field = None
 
     def get_vote_count_instance(self, obj, topic):
         """Retrieve or create the vote count instance based on provided kwargs."""
-        if topic:
-            return self.vote_count_model.objects.get_or_create(
-                **{self.vote_related_field: obj, 'topic': topic}
-            )
-        return self.vote_count_model.objects.get_or_create(
-            **{self.vote_related_field: obj}
-        )
+        if not self.vote_count_model:
+            return obj # Return the object itself, this model has vote count
 
-    def get_vote(self, user, obj_id, topic=None):
+        vote_count_instance, _ = self.vote_count_model.objects.get_or_create(
+            **{self.vote_related_field: obj, 'topic': topic}
+        )
+        return vote_count_instance
+
+    def get_vote(self, user, obj_id):
         """Retrieve the user's vote for a specific object and topic, if applicable."""
         return Vote.objects.filter(
             user=user,
             content_type=ContentType.objects.get_for_model(self.model),
             object_id=obj_id,
-            topic=topic
         ).first()
 
     def perform_vote_action(self, request, obj, vote_method, topic=None):
@@ -45,14 +45,13 @@ class BaseVoteView(APIView):
             user=user,
             content_type=ContentType.objects.get_for_model(self.model),
             object_id=obj.id,
-            topic=topic
         )
 
         # Perform voting action
         new_vote = getattr(existing_vote, vote_method)()
 
         # Update the vote count
-        vote_count_instance, _ = self.get_vote_count_instance(obj, topic)
+        vote_count_instance = self.get_vote_count_instance(obj, topic)
         vote_count_instance.update_vote_count(new_votes=new_vote)
 
         return Response({"vote": existing_vote.value}, status=status.HTTP_200_OK)
@@ -69,28 +68,24 @@ class BaseGetVoteView(BaseVoteView):
             topic = get_object_or_404(Topic, pk=topic_pk)
             obj = get_object_or_404(topic.contents, pk=pk)
 
-        vote_count_instance, _ = self.get_vote_count_instance(obj, topic)
-        existing_vote = self.get_vote(request.user, obj.id, topic)
+        vote_count_instance = self.get_vote_count_instance(obj, topic)
+        existing_vote = self.get_vote(request.user, obj.id)
+
+        vote_count = getattr(vote_count_instance, self.vote_count_related_field)
+        vote = existing_vote.value if existing_vote else 0 # Return 0 if no vote exists
 
         return Response(
             {
-                "vote_count": vote_count_instance.vote_count,
-                "vote": existing_vote.value if existing_vote else 0 # Return 0 if no vote exists
+                "vote_count": vote_count,
+                "vote": vote
             },
             status=status.HTTP_200_OK,
         )
 
 
-class KnowledgePathVoteView(BaseGetVoteView):
-    model = KnowledgePath
-    vote_count_model = KnowledgePathVoteCount
-    vote_related_field = 'knowledge_path'
-
-
 class KnowledgePathUpvoteView(BaseVoteView):
     model = KnowledgePath
-    vote_count_model = KnowledgePathVoteCount
-    vote_related_field = 'knowledge_path'
+    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)
@@ -99,8 +94,7 @@ class KnowledgePathUpvoteView(BaseVoteView):
 
 class KnowledgePathDownvoteView(BaseVoteView):
     model = KnowledgePath
-    vote_count_model = KnowledgePathVoteCount
-    vote_related_field = 'knowledge_path'
+    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)
@@ -111,6 +105,7 @@ class ContentVoteTopicView(BaseGetVoteView):
     model = Content
     vote_count_model = ContentVoteTopicCount
     vote_related_field = 'content'
+    vote_count_related_field = 'vote_count'
 
     def get(self, request, topic_pk, content_pk):
         return super().get(request, content_pk, topic_pk)
@@ -120,6 +115,7 @@ class ContentUpvoteTopicView(BaseVoteView):
     model = Content
     vote_count_model = ContentVoteTopicCount
     vote_related_field = 'content'
+    vote_count_related_field = 'vote_count'
 
     def post(self, request, topic_pk, content_pk):
         topic = get_object_or_404(Topic, pk=topic_pk)
@@ -131,6 +127,7 @@ class ContentDownvoteTopicView(BaseVoteView):
     model = Content
     vote_count_model = ContentVoteTopicCount
     vote_related_field = 'content'
+    vote_count_related_field = 'vote_count'
 
     def post(self, request, topic_pk, content_pk):
         topic = get_object_or_404(Topic, pk=topic_pk)
@@ -138,16 +135,9 @@ class ContentDownvoteTopicView(BaseVoteView):
         return self.perform_vote_action(request, obj, 'downvote', topic)
 
 
-class CommentVoteView(BaseGetVoteView):
-    model = Comment
-    vote_count_model = CommentVoteCount
-    vote_related_field = 'comment'
-
-
 class CommentUpvoteView(BaseVoteView):
     model = Comment
-    vote_count_model = CommentVoteCount
-    vote_related_field = 'comment'
+    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)
@@ -156,8 +146,7 @@ class CommentUpvoteView(BaseVoteView):
 
 class CommentDownvoteView(BaseVoteView):
     model = Comment
-    vote_count_model = CommentVoteCount
-    vote_related_field = 'comment'
+    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)

@@ -42,7 +42,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'nodes']
+        fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'votes', 'nodes']
 
 
 class TopicContentsSerializer(serializers.ModelSerializer):
