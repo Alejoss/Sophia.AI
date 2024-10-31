@@ -8,7 +8,7 @@ from rest_framework.generics import get_object_or_404
 from comments.models import Comment
 from content.models import KnowledgePath, Topic, Content
 from events.models import ConnectionPlatform
-from votes.models import Vote, KnowledgePathVoteCount, ContentVoteTopicCount, CommentVoteCount
+from votes.models import Vote, ContentVoteTopicCount
 
 
 class BaseVoteView(APIView):
