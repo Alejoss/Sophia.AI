@@ -17,6 +17,11 @@ from comments.serializers import CommentSerializer, KnowledgePathCommentSerializ
 class BaseCommentView(APIView):
     """ Base view for retrieving and adding comments. """
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return []
+        return super().get_permissions()
+
     def get_serializer_class(self):
         """ Override in subclasses to provide specific serializer. """
         raise NotImplementedError("Subclasses must implement get_serializer_class.")
@@ -126,6 +131,11 @@ class ContentTopicCommentsView(BaseCommentView):
 
 class BaseCommentRepliesView(APIView):
     """ Base view for retrieving and adding replies to comments. """
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return []
+        return super().get_permissions()
 
     def get_serializer_class(self):
         """ Override this method in subclasses to provide specific serializer. """
