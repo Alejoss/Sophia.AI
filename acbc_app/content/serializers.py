@@ -38,11 +38,23 @@ class KnowledgePathNodeSerializer(serializers.ModelSerializer):
 
 
 class KnowledgePathSerializer(serializers.ModelSerializer):
-    nodes = KnowledgePathNodeSerializer(many=True)
+    nodes = KnowledgePathNodeSerializer(many=True, read_only=True)
 
     class Meta:
         model = KnowledgePath
         fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'nodes']
+        extra_kwargs = {
+            'author': {'read_only': True}
+        }
+
+
+class NodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Node
+        fields = '__all__'
+        extra_kwargs = {
+            'knowledge_path': {'read_only': True}
+        }
 
 
 class TopicContentsSerializer(serializers.ModelSerializer):

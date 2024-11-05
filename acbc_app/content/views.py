@@ -2,13 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 
+from utils.permissions import IsAuthor
 from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
 from content.serializers import (LibrarySerializer,
                                  CollectionSerializer,
                                  ContentSerializer,
                                  KnowledgePathSerializer,
-                                 TopicContentsSerializer)
+                                 TopicContentsSerializer, NodeSerializer)
 
 
 class LibraryListView(APIView):
@@ -79,16 +81,73 @@ class KnowledgePathListView(APIView):
         knowledge_paths = KnowledgePath.objects.values('title', 'author')
         return Response(knowledge_paths, status=status.HTTP_200_OK)
 
+    def post(self, request):
+        # Create a new KnowledgePath object using the provided data.
+        serializer = KnowledgePathSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(author=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class KnowledgePathDetailView(APIView):
     """
     API view to retrieve a specific KnowledgePath instance by its primary key.
     """
+
+    permission_classes = [IsAuthor]
+
     def get(self, request, pk):
         # Retrieve a KnowledgePath object by its pk, prefetching related 'nodes' to optimize queries.
         knowledge_path = get_object_or_404(KnowledgePath.objects.prefetch_related('nodes'), pk=pk)
         serializer = KnowledgePathSerializer(knowledge_path)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        """
+        Update a KnowledgePath object by its pk using the provided data.
+        Only KnowledgePath fields, not nodes.
+        """
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        self.check_object_permissions(request, knowledge_path) # Check if the user is the author of the KnowledgePath
+
+        serializer = KnowledgePathSerializer(knowledge_path, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        """
+        Delete a KnowledgePath object by its pk.
+        """
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        self.check_object_permissions(request, knowledge_path)
+
+        knowledge_path.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class KnowledgePathNodesView(APIView):
+    """
+    API view to retrieve the nodes associated with a specific KnowledgePath instance.
+    """
+
+    permission_classes = [IsAuthor]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        serializer = KnowledgePathSerializer(knowledge_path)
+        return Response(serializer.data['nodes'], status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        self.check_object_permissions(request, knowledge_path)
+        serializer = NodeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(knowledge_path=knowledge_path)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class NodeDetailView(APIView):
