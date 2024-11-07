@@ -11,79 +11,96 @@ from content.serializers import (LibrarySerializer,
                                  TopicContentsSerializer)
 
 
-class LibraryListView(APIView):
+class BaseContentAppAPIView(APIView):
+    """ Base view for content app. """
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return []
+        return super().get_permissions()
+
+
+class LibraryListView(BaseContentAppAPIView):
     """
     API view to retrieve the list of all Library instances.
     """
+
     def get(self, request):
         libraries = Library.objects.all()
         serializer = LibrarySerializer(libraries, many=True)
         return Response(serializer.data)
 
 
-class LibraryDetailView(APIView):
+class LibraryDetailView(BaseContentAppAPIView):
     """
     API view to retrieve a specific Library instance by its primary key.
     """
+
     def get(self, request, pk):
         library = get_object_or_404(Library, pk=pk)
         serializer = LibrarySerializer(library)
         return Response(serializer.data)
 
 
-class CollectionListView(APIView):
+class CollectionListView(BaseContentAppAPIView):
     """
     API view to retrieve the list of all Collection instances.
     """
+
     def get(self, request):
         collections = Collection.objects.all()
         serializer = CollectionSerializer(collections, many=True)
         return Response(serializer.data)
 
 
-class CollectionDetailView(APIView):
+class CollectionDetailView(BaseContentAppAPIView):
     """
     API view to retrieve a specific Collection instance by its primary key.
     """
+
     def get(self, request, pk):
         collection = get_object_or_404(Collection, pk=pk)
         serializer = CollectionSerializer(collection)
         return Response(serializer.data)
 
 
-class ContentListView(APIView):
+class ContentListView(BaseContentAppAPIView):
     """
     API view to retrieve the list of all Content instances.
     """
+
     def get(self, request):
         contents = Content.objects.values('title', 'author')
         return Response(contents)
 
 
-class ContentDetailView(APIView):
+class ContentDetailView(BaseContentAppAPIView):
     """
     API view to retrieve a specific Content instance by its primary key.
     """
+
     def get(self, request, pk):
         content = get_object_or_404(Content, pk=pk)
         serializer = ContentSerializer(content)
         return Response(serializer.data)
 
 
-class KnowledgePathListView(APIView):
+class KnowledgePathListView(BaseContentAppAPIView):
     """
     API view to retrieve the list of all KnowledgePath instances.
     """
+
     def get(self, request):
         # Retrieve a queryset of KnowledgePath objects, returning only the 'title' and 'author' fields.
         knowledge_paths = KnowledgePath.objects.values('title', 'author')
         return Response(knowledge_paths, status=status.HTTP_200_OK)
 
 
-class KnowledgePathDetailView(APIView):
+class KnowledgePathDetailView(BaseContentAppAPIView):
     """
     API view to retrieve a specific KnowledgePath instance by its primary key.
     """
+
     def get(self, request, pk):
         # Retrieve a KnowledgePath object by its pk, prefetching related 'nodes' to optimize queries.
         knowledge_path = get_object_or_404(KnowledgePath.objects.prefetch_related('nodes'), pk=pk)
@@ -91,28 +108,31 @@ class KnowledgePathDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class NodeDetailView(APIView):
+class NodeDetailView(BaseContentAppAPIView):
     """
     API view to retrieve a specific Node instance by its primary key.
     """
+
     def get(self, request, pk):
         node = get_object_or_404(Node, pk=pk)
         return Response(node, status=status.HTTP_200_OK)
 
 
-class TopicListView(APIView):
+class TopicListView(BaseContentAppAPIView):
     """
     API view to retrieve the list of all topics instances.
     """
+
     def get(self, request):
         topics = Topic.objects.values('title', 'creator')
         return Response(topics, status=status.HTTP_200_OK)
 
 
-class TopicContentsListView(APIView):
+class TopicContentsListView(BaseContentAppAPIView):
     """
     API view to retrieve the contents associated with a specific Topic instance.
     """
+
     def get(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
         serializer = TopicContentsSerializer(topic)
