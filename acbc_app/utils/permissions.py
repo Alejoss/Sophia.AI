@@ -6,5 +6,5 @@ class IsAuthor(BasePermission):
     """
 
     def has_object_permission(self, request, view, obj):
-        # Check if the user is the author of the comment or an admin
+        # Check if the user is the author of the object
         return obj.author == request.user

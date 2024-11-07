@@ -13,6 +13,7 @@ urlpatterns = [
     path('contents/<int:pk>/', views.ContentDetailView.as_view(), name='content_detail'),
     path('knowledge-paths/', views.KnowledgePathListView.as_view(), name='knowledge_path_list'),
     path('knowledge-paths/<int:pk>/', views.KnowledgePathDetailView.as_view(), name='knowledge_path_detail'),
+    path('knowledge-paths/<int:pk>/nodes/', views.KnowledgePathNodesView.as_view(), name='knowledge_path_nodes'),
     path('nodes/<int:pk>/', views.NodeDetailView.as_view(), name='node_detail'),
     path('topics/', views.TopicListView.as_view(), name='topic_list'),
     path('topics/<int:pk>/contents/', views.TopicContentsListView.as_view(), name='topic_contents_list'),
