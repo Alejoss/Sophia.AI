@@ -85,6 +85,14 @@ class KnowledgePath(models.Model):
     def __str__(self):
         return self.title
 
+    def update_vote_count(self, new_votes=1):
+        """ Update the vote count by a specified number of new votes. """
+        # Using F() expression to avoid race conditions
+        self.votes = models.F('votes') + new_votes
+        self.save()
+        print(self.votes, new_votes)
+        self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
+
 
 class Node(models.Model):
     # Acts as a single step or element in a KnowledgePath, holding specific content and its type.

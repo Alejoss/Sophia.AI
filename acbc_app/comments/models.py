@@ -36,6 +36,13 @@ class Comment(models.Model):
             return Certificate.objects.filter(user=self.author, knowledge_path=self.content_object).exists()
         return False
 
+    def update_vote_count(self, new_votes=1):
+        """ Update the vote count by a specified number of new votes. """
+        # Using F() expression to avoid race conditions
+        self.votes = models.F('votes') + new_votes
+        self.save()
+        self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
+
 
 def sanitize_comment_body(sender, instance, *args, **kwargs):
     instance.body = bleach.clean(instance.body)
