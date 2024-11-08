@@ -170,7 +170,7 @@ class NodeDetailView(BaseContentAppAPIView):
     permission_classes = [IsAuthor]
 
     def get(self, request, pk):
-        node = get_object_or_404(Node, pk=pk)
+        node = get_object_or_404(Node.objects.select_related('knowledge_path', 'content'), pk=pk)
         return Response(node, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
