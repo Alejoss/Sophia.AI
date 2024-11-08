@@ -107,7 +107,7 @@ class Node(models.Model):
     media_type = models.CharField(max_length=5, choices=MEDIA_TYPES)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
-    content = models.OneToOneField(Content, on_delete=models.CASCADE)
+    content = models.ForeignKey(Content, related_name='nodes', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
