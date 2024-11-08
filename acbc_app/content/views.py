@@ -155,7 +155,7 @@ class KnowledgePathNodesView(APIView):
     def post(self, request, pk):
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
         self.check_object_permissions(request, knowledge_path)
-        serializer = NodeSerializer(data=request.data)
+        serializer = NodeSerializer(data=request.data, context={'knowledge_path': knowledge_path})
         if serializer.is_valid():
             serializer.save(knowledge_path=knowledge_path)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -169,8 +169,12 @@ class NodeDetailView(BaseContentAppAPIView):
 
     permission_classes = [IsAuthor]
 
+    def get(self, request, pk):
+        node = get_object_or_404(Node, pk=pk)
+        return Response(node, status=status.HTTP_200_OK)
+
     def put(self, request, pk):
-        node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=pk)
+        node = get_object_or_404(Node.objects.select_related('knowledge_path', 'content'), pk=pk)
         knowledge_path = node.knowledge_path # Get the knowledge path to check if the user is the author
         self.check_object_permissions(request, knowledge_path)
         serializer = NodeSerializer(node, data=request.data, partial=True)
@@ -185,10 +189,6 @@ class NodeDetailView(BaseContentAppAPIView):
         self.check_object_permissions(request, knowledge_path)
         node.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def get(self, request, pk):
-        node = get_object_or_404(Node, pk=pk)
-        return Response(node, status=status.HTTP_200_OK)
 
 
 class TopicListView(BaseContentAppAPIView):
