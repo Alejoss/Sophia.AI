@@ -60,6 +60,12 @@ class BaseVoteView(APIView):
 class BaseGetVoteView(BaseVoteView):
     """Base class for retrieving the vote count and user's vote."""
 
+    def get_permissions(self):
+        print("GET PERMISSIONS")
+        if self.request.method == 'GET':
+            return []
+        return super().get_permissions_classes()
+
     def get(self, request, pk, topic_pk=None):
         obj = get_object_or_404(self.model, pk=pk)
         topic = None
@@ -69,7 +75,7 @@ class BaseGetVoteView(BaseVoteView):
             obj = get_object_or_404(topic.contents, pk=pk)
 
         vote_count_instance = self.get_vote_count_instance(obj, topic)
-        existing_vote = self.get_vote(request.user, obj.id)
+        existing_vote = self.get_vote(request.user, obj.id) if request.user.is_authenticated else None
 
         vote_count = getattr(vote_count_instance, self.vote_count_related_field)
         vote = existing_vote.value if existing_vote else 0 # Return 0 if no vote exists
