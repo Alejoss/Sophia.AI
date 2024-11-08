@@ -61,7 +61,6 @@ class BaseGetVoteView(BaseVoteView):
     """Base class for retrieving the vote count and user's vote."""
 
     def get_permissions(self):
-        print("GET PERMISSIONS")
         if self.request.method == 'GET':
             return []
         return super().get_permissions_classes()
