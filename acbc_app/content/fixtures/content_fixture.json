@@ -1,492 +1,523 @@
 [
-    {
-        "model": "content.library",
-        "pk": 1,
-        "fields": {
-            "user": 100,
-            "name": "Teacher's Library"
-        }
-    },
-    {
-        "model": "content.library",
-        "pk": 2,
-        "fields": {
-            "user": 101,
-            "name": "Student's Library"
-        }
-    },
-    {
-        "model": "content.collection",
-        "pk": 1,
-        "fields": {
-            "library": 1,
-            "name": "Mathematics"
-        }
-    },
-    {
-        "model": "content.collection",
-        "pk": 2,
-        "fields": {
-            "library": 1,
-            "name": "Science"
-        }
-    },
-    {
-        "model": "content.collection",
-        "pk": 3,
-        "fields": {
-            "library": 2,
-            "name": "Literature"
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 1,
-        "fields": {
-            "collection": 1,
-            "title": "Algebra Basics",
-            "author": 100,
-            "description": "Introduction to algebra concepts.",
-            "created_for": "USER_WALL",
-            "media_type": "VIDEO",
-            "is_visible": true,
-            "rating": 5,
-            "topics": [1]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 2,
-        "fields": {
-            "collection": 1,
-            "title": "Geometry Principles",
-            "author": 100,
-            "description": "Understanding the fundamentals of geometry.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 4,
-            "topics": [1]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 3,
-        "fields": {
-            "collection": 2,
-            "title": "The Water Cycle",
-            "author": 101,
-            "description": "An overview of the water cycle process.",
-            "created_for": "TEACHER_RESOURCE",
-            "media_type": "IMAGE",
-            "is_visible": true,
-            "rating": 5,
-            "topics": [2]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 4,
-        "fields": {
-            "collection": 3,
-            "title": "Shakespeare's Plays",
-            "author": 102,
-            "description": "Analysis of Shakespeare's major works.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 4,
-            "topics": [3]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 5,
-        "fields": {
-            "collection": 1,
-            "title": "Geometry Fundamentals",
-            "author": 101,
-            "description": "Basic principles of geometry.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 4,
-            "topics": [1, 3]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 6,
-        "fields": {
-            "collection": 1,
-            "title": "Advanced Algebra Techniques",
-            "author": 102,
-            "description": "Mastering complex algebraic methods.",
-            "created_for": "USER_WALL",
-            "media_type": "VIDEO",
-            "is_visible": true,
-            "rating": 5,
-            "topics": [2, 1]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 7,
-        "fields": {
-            "collection": 2,
-            "title": "Ecosystem Dynamics",
-            "author": 103,
-            "description": "Understanding ecosystem interactions.",
-            "created_for": "USER_WALL",
-            "media_type": "IMAGE",
-            "is_visible": true,
-            "rating": 3,
-            "topics": [2]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 8,
-        "fields": {
-            "collection": 2,
-            "title": "Biodiversity Importance",
-            "author": 104,
-            "description": "Why biodiversity matters in ecosystems.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 4,
-            "topics": [1, 2]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 9,
-        "fields": {
-            "collection": 3,
-            "title": "Shakespeare's Life and Works",
-            "author": 105,
-            "description": "An overview of Shakespeare's contributions to literature.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 5,
-            "topics": [1, 2, 3]
-        }
-    },
-    {
-        "model": "content.content",
-        "pk": 10,
-        "fields": {
-            "collection": 3,
-            "title": "Literary Themes",
-            "author": 106,
-            "description": "Exploring recurring themes in literature.",
-            "created_for": "USER_WALL",
-            "media_type": "TEXT",
-            "is_visible": true,
-            "rating": 4,
-            "topics": [2, 3]
-        }
-    },
-    {
-        "model": "content.knowledgepath",
-        "pk": 1,
-        "fields": {
-            "title": "Mathematics Mastery",
-            "description": "A comprehensive path for mastering mathematics.",
-            "author": 100,
-            "created_at": "2024-10-22T12:00:00Z",
-            "updated_at": "2024-10-22T12:30:00Z"
-        }
-    },
-    {
-        "model": "content.knowledgepath",
-        "pk": 2,
-        "fields": {
-            "title": "Understanding Ecosystems",
-            "description": "Explore the interrelationships within ecosystems.",
-            "author": 101,
-            "created_at": "2024-10-21T15:30:00Z",
-            "updated_at": "2024-10-21T16:00:00Z"
-        }
-    },
-    {
-        "model": "content.knowledgepath",
-        "pk": 3,
-        "fields": {
-            "title": "Exploring Literature",
-            "description": "An in-depth study of major literary works.",
-            "author": 102,
-            "created_at": "2024-10-20T09:45:00Z",
-            "updated_at": "2024-10-20T10:15:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 1,
-        "fields": {
-            "knowledge_path": 1,
-            "media_type": "VIDEO",
-            "title": "Introduction to Algebra",
-            "description": "Learn the basics of algebra.",
-            "content": 1,
-            "created_at": "2024-10-22T12:00:00Z",
-            "updated_at": "2024-10-22T12:30:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 2,
-        "fields": {
-            "knowledge_path": 1,
-            "media_type": "TEXT",
-            "title": "Geometry Essentials",
-            "description": "Key concepts in geometry.",
-            "content": 2,
-            "created_at": "2024-10-21T15:30:00Z",
-            "updated_at": "2024-10-21T16:00:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 3,
-        "fields": {
-            "knowledge_path": 1,
-            "media_type": "TEXT",
-            "title": "Advanced Algebra",
-            "description": "Explore complex algebraic equations.",
-            "content": 3,
-            "created_at": "2024-10-21T09:45:00Z",
-            "updated_at": "2024-10-21T10:15:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 4,
-        "fields": {
-            "knowledge_path": 2,
-            "media_type": "IMAGE",
-            "title": "Ecosystem Components",
-            "description": "Components that make up an ecosystem.",
-            "content": 4,
-            "created_at": "2024-10-20T14:30:00Z",
-            "updated_at": "2024-10-20T14:45:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 5,
-        "fields": {
-            "knowledge_path": 2,
-            "media_type": "TEXT",
-            "title": "Food Chains",
-            "description": "Understanding the food chains in ecosystems.",
-            "content": 5,
-            "created_at": "2024-10-19T11:00:00Z",
-            "updated_at": "2024-10-19T11:15:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 6,
-        "fields": {
-            "knowledge_path": 2,
-            "media_type": "TEXT",
-            "title": "Biodiversity",
-            "description": "Importance of biodiversity in ecosystems.",
-            "content": 6,
-            "created_at": "2024-10-18T16:20:00Z",
-            "updated_at": "2024-10-18T16:35:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 7,
-        "fields": {
-            "knowledge_path": 3,
-            "media_type": "TEXT",
-            "title": "The Life of Shakespeare",
-            "description": "A brief biography of Shakespeare.",
-            "content": 7,
-            "created_at": "2024-10-17T10:10:00Z",
-            "updated_at": "2024-10-17T10:20:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 8,
-        "fields": {
-            "knowledge_path": 3,
-            "media_type": "TEXT",
-            "title": "Themes in Literature",
-            "description": "Exploring common themes in literature.",
-            "content": 8,
-            "created_at": "2024-10-16T14:45:00Z",
-            "updated_at": "2024-10-16T15:00:00Z"
-        }
-    },
-    {
-        "model": "content.node",
-        "pk": 9,
-        "fields": {
-            "knowledge_path": 3,
-            "media_type": "TEXT",
-            "title": "Modern vs. Classical Literature",
-            "description": "Comparing modern and classical literary works.",
-            "content": 9,
-            "created_at": "2024-10-15T09:30:00Z",
-            "updated_at": "2024-10-15T09:45:00Z"
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 1,
-        "fields": {
-            "knowledge_path": 1,
-            "node": 1,
-            "order": 1
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 2,
-        "fields": {
-            "knowledge_path": 1,
-            "node": 2,
-            "order": 2
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 3,
-        "fields": {
-            "knowledge_path": 1,
-            "node": 3,
-            "order": 3
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 4,
-        "fields": {
-            "knowledge_path": 2,
-            "node": 4,
-            "order": 1
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 5,
-        "fields": {
-            "knowledge_path": 2,
-            "node": 5,
-            "order": 2
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 6,
-        "fields": {
-            "knowledge_path": 2,
-            "node": 6,
-            "order": 3
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 7,
-        "fields": {
-            "knowledge_path": 3,
-            "node": 7,
-            "order": 1
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 8,
-        "fields": {
-            "knowledge_path": 3,
-            "node": 8,
-            "order": 2
-        }
-    },
-    {
-        "model": "content.nodeorder",
-        "pk": 9,
-        "fields": {
-            "knowledge_path": 3,
-            "node": 9,
-            "order": 3
-        }
-    },
-    {
-        "model": "content.activityrequirement",
-        "pk": 1,
-        "fields": {
-            "knowledge_path": 1,
-            "activity_type": "QUIZ",
-            "description": "Complete the quiz on algebra."
-        }
-    },
-    {
-        "model": "content.activityrequirement",
-        "pk": 2,
-        "fields": {
-            "knowledge_path": 1,
-            "activity_type": "ASSIGNMENT",
-            "description": "Solve the geometry problems."
-        }
-    },
-    {
-        "model": "content.activityrequirement",
-        "pk": 3,
-        "fields": {
-            "knowledge_path": 2,
-            "activity_type": "PROJECT",
-            "description": "Create a model of an ecosystem."
-        }
-    },
-    {
-        "model": "content.activityrequirement",
-        "pk": 4,
-        "fields": {
-            "knowledge_path": 3,
-            "activity_type": "ESSAY",
-            "description": "Write an essay on the significance of Shakespeare's works."
-        }
-    },
-    {
-        "model": "content.topic",
-        "pk": 1,
-        "fields": {
-            "title": "Mathematics",
-            "description": "Discussion about various mathematical concepts.",
-            "creator": 100,
-            "moderators": [101],
-            "related_topics": []
-        }
-    },
-    {
-        "model": "content.topic",
-        "pk": 2,
-        "fields": {
-            "title": "Ecosystems",
-            "description": "Discussion on the components and functions of ecosystems.",
-            "creator": 101,
-            "moderators": [100, 102],
-            "related_topics": [1]
-        }
-    },
-    {
-        "model": "content.topic",
-        "pk": 3,
-        "fields": {
-            "title": "Literature",
-            "description": "Exploring literary works and their impact.",
-            "creator": 104,
-            "moderators": [103, 105],
-            "related_topics": []
-        }
+  {
+    "model": "content.library",
+    "pk": 1,
+    "fields": {
+      "user": 100,
+      "name": "Teacher's Library"
     }
+  },
+  {
+    "model": "content.library",
+    "pk": 2,
+    "fields": {
+      "user": 101,
+      "name": "Student's Library"
+    }
+  },
+  {
+    "model": "content.collection",
+    "pk": 1,
+    "fields": {
+      "library": 1,
+      "name": "Mathematics"
+    }
+  },
+  {
+    "model": "content.collection",
+    "pk": 2,
+    "fields": {
+      "library": 1,
+      "name": "Science"
+    }
+  },
+  {
+    "model": "content.collection",
+    "pk": 3,
+    "fields": {
+      "library": 2,
+      "name": "Literature"
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 1,
+    "fields": {
+      "collection": 1,
+      "title": "Algebra Basics",
+      "author": 100,
+      "description": "Introduction to algebra concepts.",
+      "created_for": "USER_WALL",
+      "media_type": "VIDEO",
+      "is_visible": true,
+      "rating": 5,
+      "topics": [1]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 2,
+    "fields": {
+      "collection": 1,
+      "title": "Geometry Principles",
+      "author": 100,
+      "description": "Understanding the fundamentals of geometry.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [1]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 3,
+    "fields": {
+      "collection": 2,
+      "title": "The Water Cycle",
+      "author": 101,
+      "description": "An overview of the water cycle process.",
+      "created_for": "TEACHER_RESOURCE",
+      "media_type": "IMAGE",
+      "is_visible": true,
+      "rating": 5,
+      "topics": [2]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 4,
+    "fields": {
+      "collection": 3,
+      "title": "Shakespeare's Plays",
+      "author": 102,
+      "description": "Analysis of Shakespeare's major works.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [3]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 5,
+    "fields": {
+      "collection": 1,
+      "title": "Geometry Fundamentals",
+      "author": 101,
+      "description": "Basic principles of geometry.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [1, 3]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 6,
+    "fields": {
+      "collection": 1,
+      "title": "Advanced Algebra Techniques",
+      "author": 102,
+      "description": "Mastering complex algebraic methods.",
+      "created_for": "USER_WALL",
+      "media_type": "VIDEO",
+      "is_visible": true,
+      "rating": 5,
+      "topics": [2, 1]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 7,
+    "fields": {
+      "collection": 2,
+      "title": "Ecosystem Dynamics",
+      "author": 103,
+      "description": "Understanding ecosystem interactions.",
+      "created_for": "USER_WALL",
+      "media_type": "IMAGE",
+      "is_visible": true,
+      "rating": 3,
+      "topics": [2]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 8,
+    "fields": {
+      "collection": 2,
+      "title": "Biodiversity Importance",
+      "author": 104,
+      "description": "Why biodiversity matters in ecosystems.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [1, 2]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 9,
+    "fields": {
+      "collection": 3,
+      "title": "Shakespeare's Life and Works",
+      "author": 105,
+      "description": "An overview of Shakespeare's contributions to literature.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 5,
+      "topics": [1, 2, 3]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 10,
+    "fields": {
+      "collection": 3,
+      "title": "Literary Themes",
+      "author": 106,
+      "description": "Exploring recurring themes in literature.",
+      "created_for": "USER_WALL",
+      "media_type": "TEXT",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [2, 3]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 11,
+    "fields": {
+      "collection": 3,
+      "title": "Intervals Introduction",
+      "author": 106,
+      "description": "Exploring intervals.",
+      "created_for": "USER_WALL",
+      "media_type": "VIDEO",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [2, 3]
+    }
+  },
+  {
+    "model": "content.content",
+    "pk": 12,
+    "fields": {
+      "collection": 3,
+      "title": "Intervals Intermediate",
+      "author": 106,
+      "description": "Exploring intermediate intervals.",
+      "created_for": "USER_WALL",
+      "media_type": "AUDIO",
+      "is_visible": true,
+      "rating": 4,
+      "topics": [2, 3]
+    }
+  },
+
+  {
+    "model": "content.knowledgepath",
+    "pk": 1,
+    "fields": {
+      "title": "Mathematics Mastery",
+      "description": "A comprehensive path for mastering mathematics.",
+      "author": 100,
+      "created_at": "2024-10-22T12:00:00Z",
+      "updated_at": "2024-10-22T12:30:00Z"
+    }
+  },
+  {
+    "model": "content.knowledgepath",
+    "pk": 2,
+    "fields": {
+      "title": "Understanding Ecosystems",
+      "description": "Explore the interrelationships within ecosystems.",
+      "author": 101,
+      "created_at": "2024-10-21T15:30:00Z",
+      "updated_at": "2024-10-21T16:00:00Z"
+    }
+  },
+  {
+    "model": "content.knowledgepath",
+    "pk": 3,
+    "fields": {
+      "title": "Exploring Literature",
+      "description": "An in-depth study of major literary works.",
+      "author": 102,
+      "created_at": "2024-10-20T09:45:00Z",
+      "updated_at": "2024-10-20T10:15:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 1,
+    "fields": {
+      "knowledge_path": 1,
+      "media_type": "VIDEO",
+      "title": "Introduction to Algebra",
+      "description": "Learn the basics of algebra.",
+      "content": 1,
+      "created_at": "2024-10-22T12:00:00Z",
+      "updated_at": "2024-10-22T12:30:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 2,
+    "fields": {
+      "knowledge_path": 1,
+      "media_type": "TEXT",
+      "title": "Geometry Essentials",
+      "description": "Key concepts in geometry.",
+      "content": 2,
+      "created_at": "2024-10-21T15:30:00Z",
+      "updated_at": "2024-10-21T16:00:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 3,
+    "fields": {
+      "knowledge_path": 1,
+      "media_type": "TEXT",
+      "title": "Advanced Algebra",
+      "description": "Explore complex algebraic equations.",
+      "content": 3,
+      "created_at": "2024-10-21T09:45:00Z",
+      "updated_at": "2024-10-21T10:15:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 4,
+    "fields": {
+      "knowledge_path": 2,
+      "media_type": "IMAGE",
+      "title": "Ecosystem Components",
+      "description": "Components that make up an ecosystem.",
+      "content": 4,
+      "created_at": "2024-10-20T14:30:00Z",
+      "updated_at": "2024-10-20T14:45:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 5,
+    "fields": {
+      "knowledge_path": 2,
+      "media_type": "TEXT",
+      "title": "Food Chains",
+      "description": "Understanding the food chains in ecosystems.",
+      "content": 5,
+      "created_at": "2024-10-19T11:00:00Z",
+      "updated_at": "2024-10-19T11:15:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 6,
+    "fields": {
+      "knowledge_path": 2,
+      "media_type": "TEXT",
+      "title": "Biodiversity",
+      "description": "Importance of biodiversity in ecosystems.",
+      "content": 6,
+      "created_at": "2024-10-18T16:20:00Z",
+      "updated_at": "2024-10-18T16:35:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 7,
+    "fields": {
+      "knowledge_path": 3,
+      "media_type": "TEXT",
+      "title": "The Life of Shakespeare",
+      "description": "A brief biography of Shakespeare.",
+      "content": 7,
+      "created_at": "2024-10-17T10:10:00Z",
+      "updated_at": "2024-10-17T10:20:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 8,
+    "fields": {
+      "knowledge_path": 3,
+      "media_type": "TEXT",
+      "title": "Themes in Literature",
+      "description": "Exploring common themes in literature.",
+      "content": 8,
+      "created_at": "2024-10-16T14:45:00Z",
+      "updated_at": "2024-10-16T15:00:00Z"
+    }
+  },
+  {
+    "model": "content.node",
+    "pk": 9,
+    "fields": {
+      "knowledge_path": 3,
+      "media_type": "TEXT",
+      "title": "Modern vs. Classical Literature",
+      "description": "Comparing modern and classical literary works.",
+      "content": 9,
+      "created_at": "2024-10-15T09:30:00Z",
+      "updated_at": "2024-10-15T09:45:00Z"
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 1,
+    "fields": {
+      "knowledge_path": 1,
+      "node": 1,
+      "order": 1
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 2,
+    "fields": {
+      "knowledge_path": 1,
+      "node": 2,
+      "order": 2
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 3,
+    "fields": {
+      "knowledge_path": 1,
+      "node": 3,
+      "order": 3
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 4,
+    "fields": {
+      "knowledge_path": 2,
+      "node": 4,
+      "order": 1
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 5,
+    "fields": {
+      "knowledge_path": 2,
+      "node": 5,
+      "order": 2
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 6,
+    "fields": {
+      "knowledge_path": 2,
+      "node": 6,
+      "order": 3
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 7,
+    "fields": {
+      "knowledge_path": 3,
+      "node": 7,
+      "order": 1
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 8,
+    "fields": {
+      "knowledge_path": 3,
+      "node": 8,
+      "order": 2
+    }
+  },
+  {
+    "model": "content.nodeorder",
+    "pk": 9,
+    "fields": {
+      "knowledge_path": 3,
+      "node": 9,
+      "order": 3
+    }
+  },
+  {
+    "model": "content.activityrequirement",
+    "pk": 1,
+    "fields": {
+      "knowledge_path": 1,
+      "activity_type": "QUIZ",
+      "description": "Complete the quiz on algebra."
+    }
+  },
+  {
+    "model": "content.activityrequirement",
+    "pk": 2,
+    "fields": {
+      "knowledge_path": 1,
+      "activity_type": "ASSIGNMENT",
+      "description": "Solve the geometry problems."
+    }
+  },
+  {
+    "model": "content.activityrequirement",
+    "pk": 3,
+    "fields": {
+      "knowledge_path": 2,
+      "activity_type": "PROJECT",
+      "description": "Create a model of an ecosystem."
+    }
+  },
+  {
+    "model": "content.activityrequirement",
+    "pk": 4,
+    "fields": {
+      "knowledge_path": 3,
+      "activity_type": "ESSAY",
+      "description": "Write an essay on the significance of Shakespeare's works."
+    }
+  },
+  {
+    "model": "content.topic",
+    "pk": 1,
+    "fields": {
+      "title": "Mathematics",
+      "description": "Discussion about various mathematical concepts.",
+      "creator": 100,
+      "moderators": [101],
+      "related_topics": []
+    }
+  },
+  {
+    "model": "content.topic",
+    "pk": 2,
+    "fields": {
+      "title": "Ecosystems",
+      "description": "Discussion on the components and functions of ecosystems.",
+      "creator": 101,
+      "moderators": [100, 102],
+      "related_topics": [1]
+    }
+  },
+  {
+    "model": "content.topic",
+    "pk": 3,
+    "fields": {
+      "title": "Literature",
+      "description": "Exploring literary works and their impact.",
+      "creator": 104,
+      "moderators": [103, 105],
+      "related_topics": []
+    }
+  }
 ]

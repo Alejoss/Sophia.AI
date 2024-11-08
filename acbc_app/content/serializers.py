@@ -19,7 +19,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 class ContentSerializer(serializers.ModelSerializer):
     topics_count = serializers.SerializerMethodField()
-    knowledge_path_count = serializers.SerializerMethodField()
+    # knowledge_path_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -52,11 +52,22 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
 class NodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Node
-        fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'votes', 'nodes']
+        fields = ['id', 'title', 'description', 'created_at', 'updated_at', 'media_type', 'content']
         extra_kwargs = {
             'knowledge_path': {'read_only': True},
-            'media_type': {'read_only': True}
+            'media_type': {'read_only': True},
         }
+
+    def validate_content(self, value):
+        # Check if a node with the same content already exists in the knowledge path
+        node = self.instance
+        knowledge_path = node.knowledge_path if node else self.context['knowledge_path']
+        content = value
+
+        if knowledge_path.nodes.filter(content=content).exists():
+            raise serializers.ValidationError('A node with the same content already exists in the knowledge path')
+
+        return value
 
     def create(self, validated_data):
         # Set the media_type of the node based on the media_type of the content
@@ -66,7 +77,14 @@ class NodeSerializer(serializers.ModelSerializer):
         node = super().create(validated_data)
         return node
 
-        
+    def update(self, instance, validated_data):
+        # Set the media_type of the node based on the media_type of the content
+        content = validated_data.get('content')
+        validated_data['media_type'] = content.media_type
+
+        node = super().update(instance, validated_data)
+        return node
+
 
 class TopicContentsSerializer(serializers.ModelSerializer):
     contents = serializers.SerializerMethodField()
