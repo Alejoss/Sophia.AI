@@ -16,6 +16,7 @@ urlpatterns = [
     path('knowledge-paths/<int:pk>/nodes/', views.KnowledgePathNodesView.as_view(), name='knowledge_path_nodes'),
     path('nodes/<int:pk>/', views.NodeDetailView.as_view(), name='node_detail'),
     path('topics/', views.TopicListView.as_view(), name='topic_list'),
+    path('topics/<int:pk>/', views.TopicDetailView.as_view(), name='topic_detail'),
     path('topics/<int:pk>/contents/', views.TopicContentsListView.as_view(), name='topic_contents_list'),
     # path('libraries/', LibraryList.as_view(), name='library-list'),
     # path('libraries/<int:pk>/', LibraryDetail.as_view(), name='library-detail'),
