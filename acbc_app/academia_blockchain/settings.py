@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'storages',
     'rest_framework',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'drf_yasg'
 ]
 
 MIDDLEWARE = [
@@ -71,6 +72,8 @@ CSRF_COOKIE_NAME = 'csrftoken'
 CSRF_COOKIE_HTTPONLY = False  # Allows JavaScript to read the CSRF cookie
 CSRF_COOKIE_SAMESITE = 'Lax'  # Helps mitigate CSRF attacks
 
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'academia_blockchain.urls'
 
@@ -234,8 +237,7 @@ SEND_EMAILS = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+
 
 if ENVIRONMENT == "PRODUCTION":
 
