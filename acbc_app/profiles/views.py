@@ -155,6 +155,20 @@ def activate_account(request, uid, token):
 
 
 def set_jwt_token(request):
+    """
+    Endpoint to set a JWT token as a cookie for an authenticated user.
+
+    This view checks if the user is authenticated, and if so, generates a JWT access token. The token is then set as a cookie in the response. If the user is not authenticated, an error response with a status code of 401 is returned.
+
+    Redirects the user to the specified URL after setting the JWT token as a cookie.
+
+    Args:
+        request: The HTTP request object, containing user authentication details.
+
+    Returns:
+        HttpResponseRedirect: A response that redirects to a success URL with the JWT token set as a cookie.
+        JsonResponse: An error response if the user is not authenticated.
+    """
     user = request.user
 
     # Debug: Check if user is authenticated

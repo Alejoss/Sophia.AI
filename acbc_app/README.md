@@ -23,6 +23,7 @@ GRANT ALL PRIVILEGES ON DATABASE academia_blockchain_db TO postgres;
 
 *Important, don't forget to run migrations:*
 
+docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
 
 *Optionally create a superuser:*
