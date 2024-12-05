@@ -4,13 +4,15 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 
+from content.permissions import IsCreator, IsCreatorOrModerator
 from utils.permissions import IsAuthor
 from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
 from content.serializers import (LibrarySerializer,
                                  CollectionSerializer,
                                  ContentSerializer,
                                  KnowledgePathSerializer,
-                                 TopicContentsSerializer, NodeSerializer)
+                                 TopicContentsSerializer, NodeSerializer, TopicSerializer,
+                                 TopicListSerializer)
 
 
 class BaseContentAppAPIView(APIView):
@@ -197,8 +199,44 @@ class TopicListView(BaseContentAppAPIView):
     """
 
     def get(self, request):
-        topics = Topic.objects.values('title', 'creator')
-        return Response(topics, status=status.HTTP_200_OK)
+        topics = Topic.objects.all()
+        serializer = TopicListSerializer(topics, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = TopicListSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(creator=request.user) # Set the request user as creator
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TopicDetailView(BaseContentAppAPIView):
+    """
+    API view to retrieve a specific Topic instance by its primary key.
+    """
+
+    permission_classes = [IsCreator]
+
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        serializer = TopicSerializer(topic)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        self.check_object_permissions(request, topic)
+        serializer = TopicSerializer(topic, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        self.check_object_permissions(request, topic)
+        topic.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TopicContentsListView(BaseContentAppAPIView):
@@ -206,7 +244,30 @@ class TopicContentsListView(BaseContentAppAPIView):
     API view to retrieve the contents associated with a specific Topic instance.
     """
 
+    permission_classes = [IsCreatorOrModerator]
+
     def get(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
         serializer = TopicContentsSerializer(topic)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        # View for adding contents in topic
+        topic = get_object_or_404(Topic, pk=pk)
+        serializer = TopicContentsSerializer(data=request.data)
+        if serializer.is_valid():
+            content = serializer.validated_data['content_pk']
+            topic.contents.add(content) # Add the content to the topic
+            return Response(status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        # View for removing contents from topic
+        topic = get_object_or_404(Topic, pk=pk)
+        self.check_object_permissions(request, topic)
+        serializer = TopicContentsSerializer(data=request.data)
+        if serializer.is_valid():
+            content = serializer.validated_data['content_pk']
+            topic.contents.remove(content) # Remove the content from the topic
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

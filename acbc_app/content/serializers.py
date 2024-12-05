@@ -1,8 +1,12 @@
 from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
+
+
+User = get_user_model()
 
 
 class LibrarySerializer(serializers.ModelSerializer):
@@ -66,14 +70,38 @@ class NodeSerializer(serializers.ModelSerializer):
         node = super().create(validated_data)
         return node
 
-        
+
+class TopicListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Topic
+        fields = ['title', 'moderators', 'creator']
+        extra_kwargs = {
+            'creator': {'read_only': True},
+            'moderators': {'read_only': True}
+        }
+
+
+class TopicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Topic
+        fields = ['title', 'description', 'creator', 'moderators', 'related_topics']
+        extra_kwargs = {
+            'creator': {'read_only': True},
+        }
+
 
 class TopicContentsSerializer(serializers.ModelSerializer):
     contents = serializers.SerializerMethodField()
+    content_pk = serializers.PrimaryKeyRelatedField(queryset=Content.objects.all(), write_only=True)
 
     class Meta:
         model = Topic
-        fields = ['title', 'creator', 'contents']
+        fields = ['title', 'creator', 'contents', 'content_pk']
+        extra_kwargs = {
+            'title': {'read_only': True},
+            'creator': {'read_only': True},
+            'contents': {'read_only': True}
+        }
 
     def get_contents(self, obj):
         # Get the contents for the topic, ordered by the total number of votes
