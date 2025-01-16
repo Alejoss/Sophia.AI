@@ -1,4 +1,4 @@
-// src/api/axios.ts
+// src/api/axios_config.ts
 import axios from 'axios';
 // import Cookies from 'js-cookie';
 

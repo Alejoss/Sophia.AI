@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import '/src/styles/VerticalMenu.css';
+import '/src/styles/verticalmenu.css';
 
 const VerticalNavProfile = () => {
   return (

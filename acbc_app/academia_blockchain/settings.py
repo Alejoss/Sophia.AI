@@ -75,6 +75,11 @@ CSRF_COOKIE_SAMESITE = 'Lax'  # Helps mitigate CSRF attacks
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    # Add other trusted origins if needed
+]
+
 ROOT_URLCONF = 'academia_blockchain.urls'
 
 # To customize django-allauth templates: https://docs.allauth.org/en/latest/common/templates.html

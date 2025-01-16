@@ -14,10 +14,6 @@ export interface Profile {
   is_teacher: boolean;
   profile_picture: string | null;
   email_confirmed: boolean;
-  green_diamonds: number;
-  yellow_diamonds: number;
-  purple_diamonds: number;
-  blue_diamonds: number;
 }
 
 export interface CryptoCurrency {

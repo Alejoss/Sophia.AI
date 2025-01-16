@@ -1,5 +1,5 @@
 // src/api/profilesAPI.ts
-import axiosInstance from './axios';
+import axiosInstance from './axios_config.ts';
 import { Profile } from '../types/profileTypes';
 import Cookies from "js-cookie";
 

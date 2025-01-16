@@ -1,5 +1,5 @@
 // src/api/eventsApi.ts
-import axiosInstance from './axios';
+import axiosInstance from './axios_config.ts';
 import { Event } from '../events/eventTypes';
 
 export const fetchEvents = async (): Promise<Event[]> => {

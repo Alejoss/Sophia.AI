@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axiosInstance from 'axios';
+import axiosInstance from '../api/axios_config.ts';
 import { setCsrfToken } from '../api/profilesApi.ts'
+import '../styles/login.css';
 
 
 const Login = () => {
@@ -23,30 +24,36 @@ const Login = () => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        console.log('CSRF token on submit:', axiosInstance.defaults.headers.common['X-CSRFToken']);
-        try {
-            const response = await axiosInstance.post('http://localhost:8000/profiles/login/', credentials);
-            if (response.status === 302) {
-                navigate('/profiles/login_successful'); // Navigate based on successful login
+    e.preventDefault();
+    console.log('CSRF token on submit:', axiosInstance.defaults.headers.common['X-CSRFToken']);
+    try {
+        const response = await axiosInstance.post('/accounts/login/', {
+            login: credentials.username,
+            password: credentials.password
+        }, {
+            headers: {
+                'X-CSRFToken': axiosInstance.defaults.headers.common['X-CSRFToken']
             }
-        } catch (error) {
-            console.error('Login failed:', error.response.data);
-            alert('Login failed: ' + error.response.data.error);
+        });
+        if (response.status === 200) {
+            navigate('/profiles/login_successful'); // Navigate based on successful login
         }
+    } catch (error) {
+        console.error('Login failed:', error.response.data);
+        alert('Login FAILED CHECK LOGS: ' + error.response.data);
+    }
     };
 
     const logCsrfToken = () => {
         console.log('CSRF token:', axiosInstance.defaults.headers.common['X-CSRFToken']);
     };
-    // TODO el token no esta en el header.
 
     const handleGoogleLogin = () => {
         // Redirect the user to the Google OAuth endpoint
         window.location.href = 'http://localhost:8000/accounts/google/login/';
     };
 
-    return (
+     return (
         <div className="login-container">
             <h2>Login</h2>
             <button type="button" onClick={logCsrfToken}>Log CSRF Token</button>
