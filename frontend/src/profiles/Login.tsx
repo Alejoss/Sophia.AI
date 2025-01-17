@@ -27,8 +27,8 @@ const Login = () => {
     e.preventDefault();
     console.log('CSRF token on submit:', axiosInstance.defaults.headers.common['X-CSRFToken']);
     try {
-        const response = await axiosInstance.post('/accounts/login/', {
-            login: credentials.username,
+        const response = await axiosInstance.post('/profiles/login/', {
+            username: credentials.username,
             password: credentials.password
         }, {
             headers: {

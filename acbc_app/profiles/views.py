@@ -16,11 +16,10 @@ from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.middleware.csrf import get_token
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
-from django.utils.decorators import method_decorator
+from django.contrib.auth import authenticate, login
 
 from profiles.serializers import UserSerializer, ProfileSerializer
 from profiles.models import Profile
-
 
 logger = logging.getLogger('app_logger')
 
@@ -97,6 +96,37 @@ class ProfileDetail(APIView):
         profile = get_object_or_404(Profile, pk=pk)
         profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Log in a user with the provided credentials.
+        """
+        # Get the username and password from the request
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        # Debug: Print the received username and password
+        print(f"Received username: {username}")
+        print(f"Received password: {password}")
+
+        # Authenticate the user
+        user = authenticate(request, username=username, password=password)
+
+        if user:
+            print(f"User authenticated: {user.username}")
+        else:
+            print("Authentication failed")
+
+        # If the user is authenticated, log them in
+        if user:
+            login(request, user)
+            return Response({'message': 'User logged in'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class GetCsrfToken(APIView):
