@@ -15,8 +15,21 @@ const Login = () => {
                 console.log('CSRF token on Login load:', axiosInstance.defaults.headers.common['X-CSRFToken']);
             });
         };
+
+        const checkIfLoggedIn = async () => {
+            try {
+                const response = await axiosInstance.get('/profiles/check_auth/');
+                if (response.status === 200 && response.data.is_authenticated) {
+                    navigate('/profiles/profile_data');
+                }
+            } catch (error) {
+                console.error('Error checking authentication status:', error);
+            }
+        };
+
         initializeCsrf();
-    }, []);
+        checkIfLoggedIn();
+    }, [navigate]);
 
     const handleChange = (e) => {
         const {name, value} = e.target;

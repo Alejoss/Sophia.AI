@@ -5,6 +5,7 @@ from profiles import views
 app_name = 'profiles'
 
 urlpatterns = [
+    path('check_auth/', views.CheckAuth.as_view(), name='check_auth'),
     path('user_profile/', views.UserProfileView.as_view(), name='user_profile'),
     path('', views.ProfileList.as_view(), name='profile-list'),
     path('<int:pk>/', views.ProfileDetail.as_view(), name='profile-detail'),

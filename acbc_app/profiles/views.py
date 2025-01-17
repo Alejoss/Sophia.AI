@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 from django.middleware.csrf import get_token
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
@@ -22,6 +23,17 @@ from profiles.serializers import UserSerializer, ProfileSerializer
 from profiles.models import Profile
 
 logger = logging.getLogger('app_logger')
+
+
+class CheckAuth(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []  # Ensure no authentication is required
+
+    @method_decorator(csrf_exempt)
+    def get(self, request):
+        is_authenticated = request.user.is_authenticated
+        print(f"User authenticated: {is_authenticated}")
+        return Response({'is_authenticated': is_authenticated}, status=status.HTTP_200_OK)
 
 
 class UserProfileView(APIView):
@@ -98,8 +110,70 @@ class ProfileDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def set_jwt_token(request):
+    """
+    Endpoint to set a JWT token as a cookie for an authenticated user.
+
+    This view checks if the user is authenticated, and if so, generates a JWT access token. The token is then set as a
+    cookie in the response. If the user is not authenticated, an error response with a status code of 401 is returned.
+
+    Redirects the user to the specified URL after setting the JWT token as a cookie.
+
+    Args:
+        request: The HTTP request object, containing user authentication details.
+
+    Returns:
+        HttpResponseRedirect: A response that redirects to a success URL with the JWT token set as a cookie.
+        JsonResponse: An error response if the user is not authenticated.
+    """
+    user = request.user
+
+    # Debug: Check if user is authenticated
+    print('User authenticated:', user.is_authenticated)
+
+    if not user.is_authenticated:
+        print('User not authenticated, returning error.')
+        return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+    # Debug: Log that the tokens are being created
+    print('Creating refresh and access tokens for user:', user)
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+
+    # Debug: Log the setting of the JWT cookie
+    # Define the cookie attributes
+    cookie_attributes = {
+        'key': 'jwt',
+        'value': access_token,
+        'httponly': True,
+        'secure': False,  # Set to False if testing locally over HTTP
+        'samesite': 'Lax',
+        'path': '/',
+        'max_age': None,  # Can specify max_age if needed
+    }
+
+    # Print all the cookie attributes
+    print("Cookie attributes:", cookie_attributes)
+
+    # Set the cookie with the specified attributes
+    response = JsonResponse({'message': 'JWT token set'})
+
+    response.set_cookie(
+        cookie_attributes['key'],
+        cookie_attributes['value'],
+        httponly=cookie_attributes['httponly'],
+        secure=cookie_attributes['secure'],
+        samesite=cookie_attributes['samesite'],
+        path=cookie_attributes['path'],
+        max_age=cookie_attributes['max_age'],
+    )
+
+    return response
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # Ensure no authentication is required
 
     def post(self, request):
         """
@@ -124,7 +198,8 @@ class LoginView(APIView):
         # If the user is authenticated, log them in
         if user:
             login(request, user)
-            return Response({'message': 'User logged in'}, status=status.HTTP_200_OK)
+            response = set_jwt_token(request)
+            return response
         else:
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -183,64 +258,3 @@ def activate_account(request, uid, token):
         # If the token is not valid, inform the user
         return HttpResponse('Activation link is invalid!')
 
-
-def set_jwt_token(request):
-    """
-    Endpoint to set a JWT token as a cookie for an authenticated user.
-
-    This view checks if the user is authenticated, and if so, generates a JWT access token. The token is then set as a cookie in the response. If the user is not authenticated, an error response with a status code of 401 is returned.
-
-    Redirects the user to the specified URL after setting the JWT token as a cookie.
-
-    Args:
-        request: The HTTP request object, containing user authentication details.
-
-    Returns:
-        HttpResponseRedirect: A response that redirects to a success URL with the JWT token set as a cookie.
-        JsonResponse: An error response if the user is not authenticated.
-    """
-    user = request.user
-
-    # Debug: Check if user is authenticated
-    print('User authenticated:', user.is_authenticated)
-
-    if not user.is_authenticated:
-        print('User not authenticated, returning error.')
-        return JsonResponse({'error': 'User not authenticated'}, status=401)
-
-    # Debug: Log that the tokens are being created
-    print('Creating refresh and access tokens for user:', user)
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
-
-    # Debug: Log the setting of the JWT cookie
-    # Define the cookie attributes
-    cookie_attributes = {
-        'key': 'jwt',
-        'value': access_token,
-        'httponly': True,
-        'secure': False,  # Set to False if testing locally over HTTP
-        'samesite': 'Lax',
-        'path': '/',
-        'max_age': None,  # Can specify max_age if needed
-    }
-
-    # Print all the cookie attributes
-    print("Cookie attributes:", cookie_attributes)
-
-    # Set the cookie with the specified attributes
-    redirect_url = "http://localhost:5173/profiles/login_successful"
-    response = HttpResponseRedirect(redirect_url)
-    print(f'Redirecting to {redirect_url} with JWT token cookie.')
-
-    response.set_cookie(
-        cookie_attributes['key'],
-        cookie_attributes['value'],
-        httponly=cookie_attributes['httponly'],
-        secure=cookie_attributes['secure'],
-        samesite=cookie_attributes['samesite'],
-        path=cookie_attributes['path'],
-        max_age=cookie_attributes['max_age'],
-    )
-
-    return response

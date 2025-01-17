@@ -16,7 +16,7 @@ const axiosInstance = axios.create({
 // Add a request interceptor
 axiosInstance.interceptors.request.use(
   function (config) {
-    console.log(`Request made to URL: ${config.url}`);
+    console.log(`Request made to URL: ${baseURL}${config.url}`);
     return config;
   },
   function (error) {

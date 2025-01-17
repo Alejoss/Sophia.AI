@@ -18,8 +18,6 @@ const LoginSuccessful = () => {
       })
       .catch((error) => {
         console.error('Failed to fetch user data:', error);
-        // Handle error, possibly redirect to login or error page
-        navigate('/login');
       });
   }, [dispatch, navigate]);
 
