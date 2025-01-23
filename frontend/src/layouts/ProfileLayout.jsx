@@ -1,7 +1,7 @@
-import VerticalMenu from '../components/VerticalNavProfile';
+import VerticalMenu from '../components/VerticalNavProfile.jsx';
 import { Outlet } from 'react-router-dom';
 
-import HeaderComp from '../components/HeaderComp.tsx';
+import HeaderComp from '../components/HeaderComp.jsx';
 
 
 

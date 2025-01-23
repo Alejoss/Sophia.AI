@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getUserProfile } from "../api/profilesApi.ts"; // Importa la función desde el archivo
+import { getUserProfile } from "../api/profilesApi.js"; // Importa la función desde el archivo
 
 const Certificates = () => {
   const [certificates, setCertificates] = useState({

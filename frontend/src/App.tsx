@@ -1,19 +1,19 @@
 // src/App.tsx
 import React from 'react';
-import HomeLayout from './layouts/HomeLayout'
+import HomeLayout from './layouts/HomeLayout.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import ProfileDetail from './profiles/ProfileDetail';
-import ProfilesLayout from './layouts/ProfileLayout.tsx'
-import ProfileData from './profiles/ProfileData.tsx'
-import Bookmarks from './profiles/Bookmarks.tsx'
-import Certificates from './profiles/Certificates.tsx'
-import Events from './profiles/Events.tsx'
-import PersonalLibrary from './profiles/PersonalLibrary.tsx'
-import Security from './profiles/security.tsx'
-import About from './profiles/About.tsx'
-import Login from './profiles/Login.tsx'
-import LoginSuccessful from './profiles/LoginSuccessful.tsx'
-import Logout from './profiles/Logout.tsx'
+import ProfileDetail from './profiles/ProfileDetail.jsx';
+import ProfilesLayout from './layouts/ProfileLayout.jsx'
+import ProfileData from './profiles/ProfileData.jsx'
+import Bookmarks from './profiles/Bookmarks.jsx'
+import Certificates from './profiles/Certificates.jsx'
+import Events from './profiles/Events.jsx'
+import PersonalLibrary from './profiles/PersonalLibrary.jsx'
+import Security from './profiles/security.jsx'
+import About from './profiles/About.jsx'
+import Login from './profiles/Login.jsx'
+import LoginSuccessful from './profiles/LoginSuccessful.jsx'
+import Logout from './profiles/Logout.jsx'
 
 const App: React.FC = () => {
   return (

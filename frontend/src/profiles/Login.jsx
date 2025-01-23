@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axiosInstance from '../api/axios_config.ts';
-import { setCsrfToken } from '../api/profilesApi.ts'
+import axios from 'axios';
+import axiosInstance from '../api/axios_config.js';
+import { setCsrfToken } from '../api/profilesApi.js';
+import { useDispatch } from 'react-redux';
 import '../styles/login.css';
 
-
 const Login = () => {
-    const [credentials, setCredentials] = useState({username: '', password: ''});
+    const [credentials, setCredentials] = useState({ username: '', password: '' });
     const navigate = useNavigate();
+    const dispatch = useDispatch();
 
     useEffect(() => {
         const initializeCsrf = () => {
@@ -19,11 +21,22 @@ const Login = () => {
         const checkIfLoggedIn = async () => {
             try {
                 const response = await axiosInstance.get('/profiles/check_auth/');
+                // Redirect to profile data page if user is already authenticated
+                console.log('Check auth response:', response);
                 if (response.status === 200 && response.data.is_authenticated) {
                     navigate('/profiles/profile_data');
                 }
             } catch (error) {
-                console.error('Error checking authentication status:', error);
+                if (axios.isAxiosError(error)) {
+                    if (error.response && error.response.status === 401) {
+                        console.log('User is not authenticated:', error.response.data);
+                        // Handle the 401 error (e.g., show a message or redirect to login)
+                    } else {
+                        console.error('Error checking authentication status:', error);
+                    }
+                } else {
+                    console.error('Unexpected error:', error);
+                }
             }
         };
 
@@ -32,29 +45,34 @@ const Login = () => {
     }, [navigate]);
 
     const handleChange = (e) => {
-        const {name, value} = e.target;
-        setCredentials({...credentials, [name]: value});
+        const { name, value } = e.target;
+        setCredentials({ ...credentials, [name]: value });
     };
 
     const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log('CSRF token on submit:', axiosInstance.defaults.headers.common['X-CSRFToken']);
-    try {
-        const response = await axiosInstance.post('/profiles/login/', {
-            username: credentials.username,
-            password: credentials.password
-        }, {
-            headers: {
-                'X-CSRFToken': axiosInstance.defaults.headers.common['X-CSRFToken']
+        e.preventDefault();
+        console.log('CSRF token on submit:', axiosInstance.defaults.headers.common['X-CSRFToken']);
+        try {
+            const response = await axiosInstance.post('/profiles/login/', {
+                username: credentials.username,
+                password: credentials.password
+            }, {
+                headers: {
+                    'X-CSRFToken': axiosInstance.defaults.headers.common['X-CSRFToken']
+                }
+            });
+            if (response.status === 200) {
+                await dispatch(fetchUserData());
+                navigate('/profiles/login_successful'); // Navigate based on successful login
             }
-        });
-        if (response.status === 200) {
-            navigate('/profiles/login_successful'); // Navigate based on successful login
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error('Login failed:', error.response?.data);
+                alert('Login FAILED CHECK LOGS: ' + error.response?.data);
+            } else {
+                console.error('Unexpected error:', error);
+            }
         }
-    } catch (error) {
-        console.error('Login failed:', error.response.data);
-        alert('Login FAILED CHECK LOGS: ' + error.response.data);
-    }
     };
 
     const logCsrfToken = () => {
@@ -66,7 +84,7 @@ const Login = () => {
         window.location.href = 'http://localhost:8000/accounts/google/login/';
     };
 
-     return (
+    return (
         <div className="login-container">
             <h2>Login</h2>
             <button type="button" onClick={logCsrfToken}>Log CSRF Token</button>
@@ -99,4 +117,3 @@ const Login = () => {
 };
 
 export default Login;
-

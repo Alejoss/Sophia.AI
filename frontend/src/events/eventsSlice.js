@@ -1,16 +1,14 @@
-// src/features/events/eventsSlice.ts
-import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {Event, EventsState} from './eventTypes';
-import {fetchEvents} from '../api/eventsApi';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { fetchEvents } from '../api/eventsApi.js';
 
-export const fetchEventsThunk = createAsyncThunk<Event[], void>(
+export const fetchEventsThunk = createAsyncThunk(
   'events/fetchEvents',
   async () => {
     return await fetchEvents();
   }
 );
 
-const initialState: EventsState = {
+const initialState = {
   events: [],
   status: 'idle',
   error: null
@@ -25,7 +23,7 @@ const eventsSlice = createSlice({
       .addCase(fetchEventsThunk.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(fetchEventsThunk.fulfilled, (state, action: PayloadAction<Event[]>) => {
+      .addCase(fetchEventsThunk.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.events = action.payload;
       })

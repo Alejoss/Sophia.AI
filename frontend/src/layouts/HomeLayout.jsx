@@ -1,4 +1,4 @@
-import HeaderComp from '../components/HeaderComp.tsx';
+import HeaderComp from '../components/HeaderComp.jsx';
 
 import { Outlet } from 'react-router-dom';
 const HomeLayout = () => {

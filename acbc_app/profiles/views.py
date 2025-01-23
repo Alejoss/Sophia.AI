@@ -27,7 +27,6 @@ logger = logging.getLogger('app_logger')
 
 class CheckAuth(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []  # Ensure no authentication is required
 
     @method_decorator(csrf_exempt)
     def get(self, request):
@@ -258,3 +257,13 @@ def activate_account(request, uid, token):
         # If the token is not valid, inform the user
         return HttpResponse('Activation link is invalid!')
 
+
+class LogoutView(APIView):
+
+    def post(self, request):
+        try:
+            response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+            response.delete_cookie('jwt')  # Remove the JWT cookie
+            return response
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

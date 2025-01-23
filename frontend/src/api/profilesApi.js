@@ -1,19 +1,20 @@
-// src/api/profilesAPI.ts
-import axiosInstance from './axios_config.ts';
-import { Profile } from '../types/profileTypes';
+// src/api/profilesAPI.js
+import axiosInstance from './axios_config.js';
 import Cookies from "js-cookie";
 
-const getUserProfile = async (): Promise<Profile | null> => {
+const getUserProfile = async () => {
   try {
-    const response = await axiosInstance.get<Profile>('/user_profile/');
+    console.log('getUserProfile: Making API call to fetch user profile');
+    const response = await axiosInstance.get('/profiles/user_profile/');
+    console.log('getUserProfile: API response received', response.data);
     return response.data; // Assuming the API returns the profile directly
   } catch (error) {
-    console.error('Failed to fetch user profile:', error);
+    console.error('getUserProfile: Failed to fetch user profile:', error);
     return null; // Simply return null on error
   }
 }
 
-const logout = async (): Promise<void> => {
+const logout = async () => {
   try {
     await axiosInstance.post('/profiles/logout/');
   } catch (error) {
@@ -40,5 +41,4 @@ async function setCsrfToken() {
   }
 }
 
-
-export { getUserProfile, logout, setCsrfToken};
+export { getUserProfile, logout, setCsrfToken };

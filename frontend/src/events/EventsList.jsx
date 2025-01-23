@@ -1,8 +1,8 @@
 // src/features/events/EventsList.tsx
 import React, { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
-import { fetchEventsThunk } from './eventsSlice';
-import { Event } from './eventTypes';
+import { useAppDispatch, useAppSelector } from '../app/hooks.js';
+import { fetchEventsThunk } from './eventsSlice.js';
+import { Event } from './eventTypes.js';
 import { Link } from 'react-router-dom';
 
 const EventsList: React.FC = () => {

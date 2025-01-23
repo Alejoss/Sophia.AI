@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axiosInstance from '../api/axios_config.ts';
-import { Profile } from '../types/profileTypes.ts';
+import axiosInstance from '../api/axios_config.js';
 
-const ProfileDetail: React.FC = () => {
-    const { profileId } = useParams<{ profileId: string }>();
-    const [profile, setProfile] = useState<Profile | null>(null);
+const ProfileDetail = () => {
+    const { profileId } = useParams();
+    const [profile, setProfile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -13,7 +12,7 @@ const ProfileDetail: React.FC = () => {
         const fetchProfile = async () => {
             setIsLoading(true);
             try {
-                const response = await axiosInstance.get<Profile>(`/profiles/${profileId}`);  // Use Axios instance
+                const response = await axiosInstance.get(`/profiles/${profileId}`);  // Use Axios instance
                 setProfile(response.data);
                 setError(null); // Clear any previous errors
             } catch (err) {

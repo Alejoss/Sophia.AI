@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import clienteAxios from '/src/api/axios_config.ts';
+import clienteAxios from '/src/api/axios_config.js';
 import { useNavigate } from 'react-router-dom';
 
 const Security = () => {

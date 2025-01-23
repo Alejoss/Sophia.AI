@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { resetAuthState } from '../redux/authSlice'; // Use the correct action
-import { logout as apiLogout } from '../api/profilesApi'; // This assumes logout is exported from profilesApi
+import { logout as apiLogout } from '../api/profilesApi.js'; // This assumes logout is exported from profilesApi
 
 const Logout = () => {
   const dispatch = useDispatch();

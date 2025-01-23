@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { fetchUserData } from '../redux/authSlice.ts';
 import { unwrapResult } from '@reduxjs/toolkit';
 
 const LoginSuccessful = () => {
@@ -11,7 +10,7 @@ const LoginSuccessful = () => {
 
   useEffect(() => {
     console.log('LoginSuccessful component loaded');
-    dispatch(fetchUserData() as any)
+    dispatch(fetchUserData())
       .then(unwrapResult)
       .then(() => {
         navigate('/profiles/profile_data');  // Assuming '/profile' is the route for the user profile

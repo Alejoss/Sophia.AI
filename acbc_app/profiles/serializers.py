@@ -43,8 +43,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ['id', 'user', 'interests', 'profile_description', 'timezone', 'is_teacher', 'profile_picture',
-                  'email_confirmed']
+        fields = ['user', 'interests', 'profile_description', 'timezone', 'is_teacher', 'profile_picture']
 
     def get_cryptos_list(self, obj):
         # Fetch all non-deleted AcceptedCrypto instances related to this profile's user
