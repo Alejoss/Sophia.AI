@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import { getUserProfile } from "../api/profilesApi.js";
 
 const ProfileData = () => {
   const [profile, setProfile] = useState({});
-  const user = useSelector(selectUser);
-  console.log('User from Redux:', user);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (storedUser) {
+      setUser(storedUser);
+    }
+
     const fetchData = async () => {
       try {
         const data = await getUserProfile(); // Calls the API to get the logged-in user's profile

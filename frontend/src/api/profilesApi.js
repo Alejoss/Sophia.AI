@@ -14,14 +14,25 @@ const getUserProfile = async () => {
   }
 }
 
-const logout = async () => {
+const apiLogout = async () => {
   try {
-    await axiosInstance.post('/profiles/logout/');
+    console.log('Making API call to logout...');
+    const response = await axiosInstance.post('/profiles/logout/');
+    console.log('Logout API response:', response);
   } catch (error) {
     console.error('Failed to logout:', error);
-    throw new Error('Logout failed'); // Throw an error for logout failure
+    throw new Error('Logout failed');
   }
-}
+};
+
+const apiLogin = async ({ username, password }) => {
+  try {
+    const response = await axiosInstance.post('/profiles/login/', { username, password });
+    return response.data; // Ensure this returns the user data
+  } catch (error) {
+    throw error;
+  }
+};
 
 async function setCsrfToken() {
   try {
@@ -41,4 +52,4 @@ async function setCsrfToken() {
   }
 }
 
-export { getUserProfile, logout, setCsrfToken };
+export { getUserProfile, apiLogout, setCsrfToken, apiLogin };

@@ -1,31 +1,44 @@
-import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useEffect, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logout as apiLogout } from '../api/profilesApi.js'; // This assumes logout is exported from profilesApi
+import { apiLogout } from '../api/profilesApi.js';
+import { getUserFromLocalStorage, setAuthenticationStatus, isAuthenticated } from '../context/localStorageUtils.js';
+import { AuthContext } from '../context/AuthContext.jsx';
 
 const Logout = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const { setAuthState } = useContext(AuthContext);
 
   useEffect(() => {
+    const storedUser = getUserFromLocalStorage();
+    if (storedUser && storedUser.username) {
+      setUsername(storedUser.username);
+    }
     const logoutUser = async () => {
-      try {
-        // Call backend logout endpoint
-        await apiLogout();
-        // Reset authentication state
-        dispatch(resetAuthState());
-        // Redirect to login or home page
+      if (!isAuthenticated()) {
+        console.log('User is not authenticated, redirecting to login.');
         navigate('/profiles/login/');
+        return;
+      }
+
+      try {
+        console.log('Attempting to logout...');
+        await apiLogout();
+        setAuthenticationStatus(false);  // Local Storage
+        setAuthState({ isAuthenticated: false, user: null });  // Context
+        console.log('Logout successful, redirecting to login.');
       } catch (error) {
         console.error('Logout failed:', error);
       }
+      await new Promise(resolve => setTimeout(resolve, 4000));
+      navigate('/profiles/login/');
     };
 
     logoutUser();
-  }, [dispatch, navigate]);
+  }, [navigate]);
 
   return (
-    <div>Logging out...</div>
+    <div>Logging out {username}...</div>
   );
 };
 

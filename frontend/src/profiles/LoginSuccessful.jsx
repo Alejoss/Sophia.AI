@@ -1,26 +1,26 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { unwrapResult } from '@reduxjs/toolkit';
+import React, { useEffect, useState } from 'react';
+import { getUserFromLocalStorage } from '../context/localStorageUtils.js';
 
 const LoginSuccessful = () => {
-  console.log("Login Successful");
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    console.log('LoginSuccessful component loaded');
-    dispatch(fetchUserData())
-      .then(unwrapResult)
-      .then(() => {
-        navigate('/profiles/profile_data');  // Assuming '/profile' is the route for the user profile
-      })
-      .catch((error) => {
-        console.error('Failed to fetch user data:', error);
-      });
-  }, [dispatch, navigate]);
+    const storedUser = getUserFromLocalStorage();
+    if (storedUser) {
+      setUser(storedUser);
+    }
+  }, []);
 
-  return <div>Loading your profile...</div>;
+  return (
+    <div>
+      <h1>Login Successful</h1>
+      {user && (
+        <div>
+          <p>Welcome back, {user.username}!</p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default LoginSuccessful;

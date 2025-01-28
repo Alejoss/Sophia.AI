@@ -1,6 +1,6 @@
 import logging
 
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -109,98 +109,95 @@ class ProfileDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def set_jwt_token(request):
+def set_jwt_token(user):
     """
-    Endpoint to set a JWT token as a cookie for an authenticated user.
-
-    This view checks if the user is authenticated, and if so, generates a JWT access token. The token is then set as a
-    cookie in the response. If the user is not authenticated, an error response with a status code of 401 is returned.
-
-    Redirects the user to the specified URL after setting the JWT token as a cookie.
+    Generate a JWT token for an authenticated user and return it in a JsonResponse.
 
     Args:
-        request: The HTTP request object, containing user authentication details.
+        user: The authenticated user object.
 
     Returns:
-        HttpResponseRedirect: A response that redirects to a success URL with the JWT token set as a cookie.
-        JsonResponse: An error response if the user is not authenticated.
+        JsonResponse: A response containing the JWT token.
     """
-    user = request.user
+    try:
+        # Debug: Check if user is authenticated
+        print('User authenticated:', user.is_authenticated)
 
-    # Debug: Check if user is authenticated
-    print('User authenticated:', user.is_authenticated)
+        if not user.is_authenticated:
+            print('User not authenticated, returning error.')
+            return JsonResponse({'error': 'User not authenticated'}, status=401)
 
-    if not user.is_authenticated:
-        print('User not authenticated, returning error.')
-        return JsonResponse({'error': 'User not authenticated'}, status=401)
+        # Debug: Log that the tokens are being created
+        print('Creating refresh and access tokens for user:', user)
+        access_token = str(AccessToken.for_user(user))
 
-    # Debug: Log that the tokens are being created
-    print('Creating refresh and access tokens for user:', user)
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
+        # Debug: Log the setting of the JWT cookie
+        print('Setting JWT cookie with access token:', access_token)
+        response = JsonResponse({'token': access_token})
+        response.set_cookie(
+            'jwt',
+            access_token,
+            httponly=True,
+            secure=False,  # Set to False if testing locally over HTTP
+            samesite='Lax',
+            path='/',
+            max_age=None,
+        )
 
-    # Debug: Log the setting of the JWT cookie
-    # Define the cookie attributes
-    cookie_attributes = {
-        'key': 'jwt',
-        'value': access_token,
-        'httponly': True,
-        'secure': False,  # Set to False if testing locally over HTTP
-        'samesite': 'Lax',
-        'path': '/',
-        'max_age': None,  # Can specify max_age if needed
-    }
-
-    # Print all the cookie attributes
-    print("Cookie attributes:", cookie_attributes)
-
-    # Set the cookie with the specified attributes
-    response = JsonResponse({'message': 'JWT token set'})
-
-    response.set_cookie(
-        cookie_attributes['key'],
-        cookie_attributes['value'],
-        httponly=cookie_attributes['httponly'],
-        secure=cookie_attributes['secure'],
-        samesite=cookie_attributes['samesite'],
-        path=cookie_attributes['path'],
-        max_age=cookie_attributes['max_age'],
-    )
-
-    return response
+        return response
+    except Exception as e:
+        print('Error in set_jwt_token:', str(e))
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []  # Ensure no authentication is required
+    authentication_classes = []
 
     def post(self, request):
         """
-        Log in a user with the provided credentials.
+        Log in a user with the provided credentials and set the JWT token in the cookie.
         """
-        # Get the username and password from the request
         username = request.data.get('username')
         password = request.data.get('password')
 
-        # Debug: Print the received username and password
-        print(f"Received username: {username}")
-        print(f"Received password: {password}")
+        print('Login attempt with username:', username)
 
-        # Authenticate the user
         user = authenticate(request, username=username, password=password)
 
         if user:
-            print(f"User authenticated: {user.username}")
-        else:
-            print("Authentication failed")
-
-        # If the user is authenticated, log them in
-        if user:
+            print('User authenticated successfully:', user)
             login(request, user)
-            response = set_jwt_token(request)
-            return response
+
+            try:
+                # Generate JWT tokens
+                print('Creating refresh and access tokens for user:', user)
+                access_token = str(AccessToken.for_user(user))
+
+                # Set the JWT token in an HTTP-only cookie
+                print('Setting JWT cookie with access token:', access_token)
+                response = JsonResponse(UserSerializer(user).data)
+                response.set_cookie(
+                    'jwt',
+                    access_token,
+                    httponly=True,
+                    secure=False,  # Set to True in production over HTTPS
+                    samesite='Lax',
+                    path='/',
+                )
+
+                print('JWT token set successfully')
+                return response
+            except Exception as e:
+                print('Error while generating JWT token:', str(e))
+                return Response({'error': 'Failed to set JWT token'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            print('Invalid credentials for username:', username)
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+                content_type='application/json',
+            )
 
 
 class GetCsrfToken(APIView):
