@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { apiLogin } from '../api/profilesApi.js';
 import { getUserFromLocalStorage, setUserInLocalStorage, setAuthenticationStatus } from '../context/localStorageUtils.js';
+
 const Login = () => {
   const navigate = useNavigate();
   const { setAuthState } = useContext(AuthContext);

@@ -33,9 +33,11 @@ class Content(models.Model):
     title = models.CharField(max_length=255)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
-    created_for = models.CharField(max_length=20, choices=[('KNOWLEDGE_PATH', 'Knowledge Path'), ('USER_WALL', 'User Wall'), ('TEACHER_RESOURCE', 'Teacher Resource')], default='USER_WALL')
+    created_for = models.CharField(max_length=20, choices=[('KNOWLEDGE_PATH', 'Knowledge Path'), ('USER_WALL', 'User Wall'),
+                                                           ('TEACHER_RESOURCE', 'Teacher Resource')], default='USER_WALL')
     media_type = models.CharField(max_length=5, choices=MEDIA_TYPES, default='TEXT')
-    activity_requirement = models.ForeignKey('ActivityRequirement', on_delete=models.SET_NULL, null=True, blank=True, related_name='required_contents')
+    activity_requirement = models.ForeignKey('ActivityRequirement', on_delete=models.SET_NULL, null=True, blank=True,
+                                             related_name='required_contents')
     is_visible = models.BooleanField(default=False)  # Whether the content is visible to others
     rating = models.IntegerField(blank=True, null=True, choices=[(i, str(i)) for i in range(1, 6)])  # Content rating by teachers or peers
     feedback = models.TextField(blank=True, null=True)  # Optional feedback from teachers or peers

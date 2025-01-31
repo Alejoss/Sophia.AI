@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import FormProvider from './context/FormContext.jsx';
+
 import Home from './components/Home';
 import HomeLayout from './layouts/HomeLayout.jsx';
 import ProfileDetail from './profiles/ProfileDetail.jsx';
@@ -15,10 +17,14 @@ import About from './profiles/About.jsx';
 import Login from './profiles/Login.jsx';
 import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
+import CreateContentStepOne from './content/CreateContentStepOne.jsx';
+import CreateContentStepTwo from './content/CreateContentStepTwo.jsx';
+
 
 const App = () => {
   return (
     <AuthProvider>
+    <FormProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
@@ -34,11 +40,13 @@ const App = () => {
           <Route path="security" element={<Security />} />
           <Route path="user_profile/:profileId" element={<ProfileDetail />} />
         </Route>
-        <Route path="/courses" element={<HomeLayout />}>
-          <Route path="about" element={<About />} />
+        <Route path="content">
+            <Route path="create_content_step_one" element={<CreateContentStepOne />}/>
+            <Route path="create_content_step_two" element={<CreateContentStepTwo />}/>
         </Route>
       </Routes>
     </BrowserRouter>
+    </FormProvider>
     </AuthProvider>
   );
 };

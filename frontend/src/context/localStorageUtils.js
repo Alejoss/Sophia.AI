@@ -1,3 +1,4 @@
+
 export const getUserFromLocalStorage = () => {
   const storedUser = localStorage.getItem('user');
   return storedUser ? JSON.parse(storedUser) : null;
@@ -18,3 +19,7 @@ export const isAuthenticated = () => {
 export const setAuthenticationStatus = (status) => {
   localStorage.setItem('is_authenticated', status ? 'true' : 'false');
 };
+
+export const setFormType = (formType) => {
+  localStorage.setItem('form_type', formType);
+}

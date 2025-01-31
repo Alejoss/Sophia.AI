@@ -21,21 +21,24 @@ const HeaderComp = () => {
           <a className="nav-link" href="http://127.0.0.1:8000/content/libraries/">Libraries</a>
         </li>
         {isAuthenticated ? (
-          <>
-            <li className="nav-item">
-              <a className="nav-link" href="http://127.0.0.1:8000/content/libraries/user_library">Your Library</a>
-            </li>
-            <li className="nav-item">
-              <a className="nav-link" href="/profiles/profile_data">{user.username}</a>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/profiles/logout">Cerrar sesión</Link>
-            </li>
-          </>
+            <>
+              <li className="nav-item">
+                <a className="nav-link" href="/profiles/profile_library">Your Library</a>
+              </li>
+              <li className="nav-item">
+                <a className="nav-link" href="/content/create_content_step_one">Crear Contenido</a>
+              </li>
+              <li className="nav-item">
+                <a className="nav-link" href="/profiles/profile_data">{user.username}</a>
+              </li>
+              <li className="nav-item">
+                <Link className="nav-link" to="/profiles/logout">Cerrar sesión</Link>
+              </li>
+            </>
         ) : (
-          <>
-            <li className="nav-item">
-              <Link className="nav-link" to="/profiles/login">Iniciar sesión</Link>
+            <>
+              <li className="nav-item">
+                <Link className="nav-link" to="/profiles/login">Iniciar sesión</Link>
             </li>
             <li className="nav-item">
               <Link className="nav-link" to="/profiles/register">Registrar</Link>
