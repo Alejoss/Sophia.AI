@@ -10,6 +10,9 @@ export const AuthProvider = ({ children }) => {
   });
 
   useEffect(() => {
+    if (isAuthenticated()) {
+      // confirm the user is authenticated with the backend ??
+    }
     const storedUser = getUserFromLocalStorage();
     const userIsAuthenticated = isAuthenticated();
     setAuthState({

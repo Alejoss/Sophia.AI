@@ -2,6 +2,24 @@
 import axiosInstance from './axios_config.js';
 import Cookies from "js-cookie";
 
+const checkAuth = async () => {
+  try {
+    const response = await axiosInstance.get('/profiles/check_auth/');
+    console.log("Check Auth response:")
+    console.log(response);
+    if(response.status === 200) {
+      return response.data.is_authenticated === true;
+    } else if (response.status === 401) {
+      return false;
+    } else {
+      throw new Error('Unexpected response status');
+    }
+  } catch(error) {
+    console.error('Error:', error);
+    throw error;
+  }
+}
+
 const getUserProfile = async () => {
   try {
     console.log('getUserProfile: Making API call to fetch user profile');
@@ -52,4 +70,4 @@ async function setCsrfToken() {
   }
 }
 
-export { getUserProfile, apiLogout, setCsrfToken, apiLogin };
+export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth };

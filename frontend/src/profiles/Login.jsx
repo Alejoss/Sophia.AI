@@ -1,8 +1,9 @@
 import {useState, useEffect, useContext} from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
-import { apiLogin } from '../api/profilesApi.js';
-import { getUserFromLocalStorage, setUserInLocalStorage, setAuthenticationStatus } from '../context/localStorageUtils.js';
+import { apiLogin, checkAuth } from '../api/profilesApi.js';
+import { getUserFromLocalStorage, setUserInLocalStorage,
+  setAuthenticationStatus, isAuthenticated } from '../context/localStorageUtils.js';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -10,15 +11,26 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [backendAuthStatus, setBackendAuthStatus] = useState(false);
 
   useEffect(() => {
     const storedUser = getUserFromLocalStorage();
-    console.log('storedUser:', storedUser);
+    const localStorageAuth = isAuthenticated();
+
+    // check if the user is authenticated with the backend and sync with localStorage
+    checkAuth().then((backendAuthStatus) => {
+      setBackendAuthStatus(backendAuthStatus);
+      if (localStorageAuth && backendAuthStatus) {
+        console.log("User is already authenticated")
+      } else if (backendAuthStatus && !localStorageAuth) {
+        setAuthenticationStatus(true);
+      } else if (!backendAuthStatus && localStorageAuth) {
+        setAuthenticationStatus(false);
+      }
+    });
+
     if (storedUser) {
-      console.log('Username found:', storedUser.username);
-      setUsername(storedUser.username); // Set the username in the state for the form input
-    } else {
-      console.log('No stored user found');
+      setUsername(storedUser.username);
     }
   }, []);
 
@@ -43,30 +55,40 @@ const Login = () => {
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <div>
-        <label htmlFor="username">Username:</label>
-        <input
-          type="text"
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-      <button type="submit">Login</button>
-    </form>
-  );
+  if (backendAuthStatus) {
+    return (
+        <div>
+            <p>Already logged in as {username}, want to
+              <Link to="/profiles/logout"> logout?</Link>
+            </p>
+        </div>
+    );
+  } else {
+    return (
+        <form onSubmit={handleSubmit}>
+            <div>
+                <label htmlFor="username">Username:</label>
+                <input
+                    type="text"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                />
+            </div>
+            <div>
+                <label htmlFor="password">Password:</label>
+                <input
+                    type="password"
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+            </div>
+            {error && <div style={{ color: 'red' }}>{error}</div>}
+            <button type="submit">Login</button>
+        </form>
+    );
+    }
 };
 
 export default Login;
