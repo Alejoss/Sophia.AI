@@ -1,6 +1,5 @@
 // src/forms/formSchemas.js
 
-
 export const createContentSchema = { // form type = create_content
   collection: null,
   title: '',

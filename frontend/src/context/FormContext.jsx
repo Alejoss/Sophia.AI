@@ -1,20 +1,36 @@
 // src/context/FormContext.js
-import React, { useState, useEffect, createContext } from 'react';
+import React, { useEffect, createContext } from 'react';
+import { useForm } from "react-hook-form";
+import { getFormFromLocalStorage, setFormData } from "./localStorageUtils.js";
 
 export const FormContext = createContext();
 
 const FormProvider = ({ children }) => {
-  const [formData, setFormData] = useState(() => {
-    const localState = localStorage.getItem('form');
-    return localState ? JSON.parse(localState) : {}; // Empty by default
-  });
 
+  // Load form state from localStorage
+  const storedForm = getFormFromLocalStorage()
+  const storedFromData = storedForm.formData
+  const storedFormType = storedForm.formType
+
+  const formMethods = useForm({
+    defaultValues: storedFromData, // Load saved data
+    });
+
+  const saveFormData = (data) => {
+    setFormData(data);
+  }
+
+  // Auto-save form data to localStorage on change
   useEffect(() => {
-    localStorage.setItem('form', JSON.stringify(formData));
-  }, [formData]);
+    const subscription = formMethods.watch((data) => {
+      saveFormData(data);
+    });
+
+    return () => subscription.unsubscribe(); // Cleanup on unmount
+  }, [formMethods.watch]);
 
   return (
-    <FormContext.Provider value={{ formData, setFormData }}>
+    <FormContext.Provider value={{formMethods, storedFormType}}>
       {children}
     </FormContext.Provider>
   );

@@ -1,60 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormContext } from '../context/FormContext';
 import { useContext } from 'react';
 import { createContentSchema } from "../context/formSchemas.js";
-import { setFormType} from "../context/localStorageUtils.js";
+import { setFormType } from "../context/localStorageUtils.js";
 
 const CreateContentStepOne = () => {
   const navigate = useNavigate();
-  const { formData, setFormData } = useContext(FormContext);
-  const [selected, setSelected] = useState(!!formData.media_type);
+  const { formMethods, storedFormType } = useContext(FormContext);
+  const { register, handleSubmit, watch } = formMethods;
 
-  // Initialize formData with schema if empty
+  // Initialize form with schema if needed
   useEffect(() => {
-    if (Object.keys(formData).length === 0) {
-      setFormData(createContentSchema);
+    if (!storedFormType || storedFormType !== "create_content") {
+      formMethods.reset(createContentSchema);
       setFormType("create_content");
     }
-    else if (localStorage.getItem("form_type") !== "create_content") {
-            // User stopped creating one form and started a new one.
-            setFormData(createContentSchema);
-            setFormType("create_content");
-        }
-        else {
-            // User decided to continue filling the same form
-            console.log("User continues to fill the create_content form")
-        }
   }, []);
 
-  const handleOptionChange = (event) => {
-    setFormData((prev) => ({ ...prev, media_type: event.target.value }));
-    setSelected(true);
-  };
+  // Watch media_type to control button disabled state
+  const mediaType = watch('media_type');
 
-  const handleNext = () => {
+  const onSubmit = (data) => {
     navigate('/content/create_content_step_two');
   };
 
   return (
     <div>
       <h1>Create Content</h1>
-      <form>
+      <form onSubmit={handleSubmit(onSubmit)}>
         {["VIDEO", "AUDIO", "TEXT", "IMAGE"].map((option) => (
           <div key={option}>
             <label>
               <input
                 type="radio"
                 value={option}
-                checked={formData.media_type === option}
-                onChange={handleOptionChange}
+                {...register('media_type')}
               />
               {option}
             </label>
           </div>
         ))}
+        <button type="submit" disabled={!mediaType}>Next</button>
       </form>
-      <button onClick={handleNext} disabled={!selected}>Next</button>
     </div>
   );
 };
