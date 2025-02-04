@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./acbc_app
+      dockerfile: backend.Dockerfile
+    container_name: acbc_backend
+    volumes:
+      - ./acbc_app:/app
+      - static_volume:/app/static
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file:
+      - ./acbc_app/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: frontend.Dockerfile
+    container_name: acbc_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+
+  postgres:
+    image: postgres
+    env_file:
+      - ./acbc_app/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  static_volume:
