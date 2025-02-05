@@ -21,30 +21,38 @@ class Collection(models.Model):
 
 
 class Content(models.Model):
-    # Holds individual pieces of media or information such as videos, texts, images, or audio.
-
+    # Core content data
     MEDIA_TYPES = [
         ('VIDEO', 'Video'),
         ('AUDIO', 'Audio'),
         ('TEXT', 'Text'),
         ('IMAGE', 'Image')
     ]
-    collection = models.ForeignKey(Collection, on_delete=models.CASCADE, null=True, blank=True)
-    title = models.CharField(max_length=255)
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    description = models.TextField(blank=True, null=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_for = models.CharField(max_length=20, choices=[('KNOWLEDGE_PATH', 'Knowledge Path'), ('USER_WALL', 'User Wall'),
                                                            ('TEACHER_RESOURCE', 'Teacher Resource')], default='USER_WALL')
     media_type = models.CharField(max_length=5, choices=MEDIA_TYPES, default='TEXT')
     activity_requirement = models.ForeignKey('ActivityRequirement', on_delete=models.SET_NULL, null=True, blank=True,
                                              related_name='required_contents')
-    is_visible = models.BooleanField(default=False)  # Whether the content is visible to others
-    rating = models.IntegerField(blank=True, null=True, choices=[(i, str(i)) for i in range(1, 6)])  # Content rating by teachers or peers
-    feedback = models.TextField(blank=True, null=True)  # Optional feedback from teachers or peers
-    topics = models.ManyToManyField('Topic', related_name='contents')  # Links contents to multiple topics
+    topics = models.ManyToManyField('Topic', related_name='contents')
 
     def __str__(self):
-        return f"{self.title} by {self.author.username if self.author else 'Unknown Author'}"
+        profile = getattr(self, 'profile', None)
+        return f"Content {self.id}" if not profile else profile.title
+
+
+class ContentProfile(models.Model):
+    # Metadata and user-specific information about the content
+    content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='profile')    
+    title = models.CharField(max_length=255, blank=True, null=True)
+    author = models.CharField(max_length=255, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    collection = models.ForeignKey('Collection', on_delete=models.CASCADE, null=True, blank=True)
+    personal_note = models.TextField(blank=True, null=True)    
+    is_visible = models.BooleanField(default=False)        
+
+    def __str__(self):
+        return self.title if self.title else f"Profile for Content {self.content.id}"
 
 
 class FileDetails(models.Model):

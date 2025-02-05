@@ -4,9 +4,11 @@ import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 
 const schema = yup.object().shape({
+  // TODO, only the image files have author and title as optional fields
   file: yup
     .mixed()
     .required('File is required'),
+
   title: yup.string().max(100, 'Title must not exceed 100 characters'),
   author: yup.string().max(100, 'Author must not exceed 100 characters'),
   personalNote: yup
