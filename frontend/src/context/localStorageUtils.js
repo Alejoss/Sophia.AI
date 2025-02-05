@@ -40,30 +40,3 @@ export const setAuthenticationStatus = (status) => {
     console.error('Failed to set authentication status in localStorage:', error);
   }
 };
-
-export const setFormType = (formType) => {
-  try {
-    localStorage.setItem('form_type', formType);
-  } catch (error) {
-    console.error('Failed to set form type in localStorage:', error);
-  }
-};
-
-export const setFormData = (formData) => {
-  try {
-    localStorage.setItem('form_data', JSON.stringify(formData));
-  } catch (error) {
-    console.error('Failed to set form data in localStorage:', error);
-  }
-};
-
-export const getFormFromLocalStorage = () => {
-  try {
-    const formType = localStorage.getItem('form_type');
-    const formData = localStorage.getItem('form_data');
-    return { "formType": formType, "formData": JSON.parse(formData) };
-  } catch (error) {
-    console.error('Failed to get form from localStorage:', error);
-    return { formType: null, formData: null };
-  }
-};

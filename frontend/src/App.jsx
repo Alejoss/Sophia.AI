@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
-import FormProvider from './context/FormContext.jsx';
+
 
 import Home from './components/Home';
 import HomeLayout from './layouts/HomeLayout.jsx';
@@ -17,14 +17,12 @@ import About from './profiles/About.jsx';
 import Login from './profiles/Login.jsx';
 import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
-import CreateContentStepOne from './content/CreateContentStepOne.jsx';
-import CreateContentStepTwo from './content/CreateContentStepTwo.jsx';
+import UploadContentForm from './content/UploadContentForm.jsx';
 
 
 const App = () => {
   return (
     <AuthProvider>
-    <FormProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
@@ -40,13 +38,12 @@ const App = () => {
           <Route path="security" element={<Security />} />
           <Route path="user_profile/:profileId" element={<ProfileDetail />} />
         </Route>
-        <Route path="content">
-            <Route path="create_content_step_one" element={<CreateContentStepOne />}/>
-            <Route path="create_content_step_two" element={<CreateContentStepTwo />}/>
+        <Route path="/content">
+          <Route path="upload_content" element={<UploadContentForm />} />
         </Route>
+
       </Routes>
     </BrowserRouter>
-    </FormProvider>
     </AuthProvider>
   );
 };

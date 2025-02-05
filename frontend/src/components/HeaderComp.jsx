@@ -26,7 +26,7 @@ const HeaderComp = () => {
                 <a className="nav-link" href="/profiles/profile_library">Your Library</a>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="/content/create_content_step_one">Crear Contenido</a>
+                <a className="nav-link" href="/content/upload_content">Subir Contenido</a>
               </li>
               <li className="nav-item">
                 <a className="nav-link" href="/profiles/profile_data">{user.username}</a>
