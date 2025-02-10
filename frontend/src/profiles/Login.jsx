@@ -29,10 +29,11 @@ const Login = () => {
           user: storedUser
         });
       } else if (!backendAuthStatus && localStorageAuth) {
+        console.log("User is authenticated but backend is not")
         setAuthenticationStatus(false);
         setAuthState({
-          // dont change the user to null cause we want to remember the username
           isAuthenticated: false,
+          user: storedUser
         });
       }
     });

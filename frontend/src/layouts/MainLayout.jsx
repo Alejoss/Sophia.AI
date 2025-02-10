@@ -1,4 +1,4 @@
-import HeaderComp from '../components/HeaderComp.jsx';
+import HeaderComp from '../generalComponents/HeaderComp.jsx';
 
 import { Outlet } from 'react-router-dom';
 const MainLayout = () => {

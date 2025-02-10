@@ -2,7 +2,7 @@ from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
+from content.models import Library, Collection, Content, KnowledgePath, Node, Topic, ContentProfile
 
 
 class LibrarySerializer(serializers.ModelSerializer):
@@ -96,3 +96,13 @@ class TopicContentsSerializer(serializers.ModelSerializer):
             grouped_contents[media_type]['count'] += 1
 
         return grouped_contents
+
+
+class ContentProfileSerializer(serializers.ModelSerializer):
+    content_type = serializers.CharField(source='content.media_type')
+    
+    class Meta:
+        model = ContentProfile
+        fields = ['id', 'title', 'author', 'content_type', 'personal_note', 
+                 'is_visible', 'collection']
+        

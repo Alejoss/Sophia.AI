@@ -1,23 +1,20 @@
 // src/api/axiosConfig.ts
 import axios from 'axios';
-// import Cookies from 'js-cookie';
-
 
 const baseURL = 'http://localhost:8000/api';
 
-
+// Create a single axios instance
 const axiosInstance = axios.create({
   baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true // Important: This ensures cookies are sent with requests
+  withCredentials: true
 });
 
-// Add a request interceptor
+// Add the request interceptor for CSRF
 axiosInstance.interceptors.request.use(
   function (config) {
-    // Get CSRF token from cookie
     const csrfToken = document.cookie
       .split('; ')
       .find(row => row.startsWith('csrftoken='))
@@ -27,7 +24,6 @@ axiosInstance.interceptors.request.use(
       config.headers['X-CSRFToken'] = csrfToken;
     }
 
-    // For file uploads, let the browser set the correct Content-Type
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -40,11 +36,17 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Add a response interceptor for error handling
+// Add response interceptor for handling 401s
 axiosInstance.interceptors.response.use(
   response => response,
   error => {
     console.error('Request failed:', error.response?.data || error.message);
+    
+    if (error.response?.status === 401 && !window.location.pathname.includes('/profiles/login')) {
+      console.log("UNAUTHORIZED: Redirecting to login page");
+      window.location.href = '/profiles/login';
+    }
+    
     return Promise.reject(error);
   }
 );

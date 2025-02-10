@@ -13,19 +13,10 @@ from content.serializers import (LibrarySerializer,
                                  CollectionSerializer,
                                  ContentSerializer,
                                  KnowledgePathSerializer,
-                                 TopicContentsSerializer, NodeSerializer)
+                                 TopicContentsSerializer, NodeSerializer, ContentProfileSerializer)
 
 
-class BaseContentAppAPIView(APIView):
-    """ Base view for content app. """
-
-    def get_permissions(self):
-        if self.request.method == 'GET':
-            return []
-        return super().get_permissions()
-
-
-class LibraryListView(BaseContentAppAPIView):
+class LibraryListView(APIView):
     """
     API view to retrieve the list of all Library instances.
     """
@@ -36,7 +27,7 @@ class LibraryListView(BaseContentAppAPIView):
         return Response(serializer.data)
 
 
-class LibraryDetailView(BaseContentAppAPIView):
+class LibraryDetailView(APIView):
     """
     API view to retrieve a specific Library instance by its primary key.
     """
@@ -47,7 +38,7 @@ class LibraryDetailView(BaseContentAppAPIView):
         return Response(serializer.data)
 
 
-class CollectionListView(BaseContentAppAPIView):
+class CollectionListView(APIView):
     """
     API view to retrieve the list of all Collection instances.
     """
@@ -58,7 +49,7 @@ class CollectionListView(BaseContentAppAPIView):
         return Response(serializer.data)
 
 
-class CollectionDetailView(BaseContentAppAPIView):
+class CollectionDetailView(APIView):
     """
     API view to retrieve a specific Collection instance by its primary key.
     """
@@ -69,7 +60,7 @@ class CollectionDetailView(BaseContentAppAPIView):
         return Response(serializer.data)
 
 
-class ContentListView(BaseContentAppAPIView):
+class ContentListView(APIView):
     """
     API view to retrieve the list of all Content instances.
     """
@@ -79,7 +70,7 @@ class ContentListView(BaseContentAppAPIView):
         return Response(contents)
 
 
-class ContentDetailView(BaseContentAppAPIView):
+class ContentDetailView(APIView):
     """
     API view to retrieve a specific Content instance by its primary key.
     """
@@ -90,10 +81,12 @@ class ContentDetailView(BaseContentAppAPIView):
         return Response(serializer.data)
 
 
-class KnowledgePathListView(BaseContentAppAPIView):
+class KnowledgePathListView(APIView):
     """
     API view to retrieve the list of all KnowledgePath instances.
     """
+
+    permission_classes = [IsAuthenticated]  # Only for POST
 
     def get(self, request):
         # Retrieve a queryset of KnowledgePath objects, returning only the 'title' and 'author' fields.
@@ -109,11 +102,10 @@ class KnowledgePathListView(BaseContentAppAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class KnowledgePathDetailView(BaseContentAppAPIView):
+class KnowledgePathDetailView(APIView):
     """
     API view to retrieve a specific KnowledgePath instance by its primary key.
     """
-
 
     permission_classes = [IsAuthor]
 
@@ -165,12 +157,16 @@ class KnowledgePathNodesView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class NodeDetailView(BaseContentAppAPIView):
+class NodeDetailView(APIView):
     """
     API view to retrieve a specific Node instance by its primary key.
     """
 
     permission_classes = [IsAuthor]
+
+    def get(self, request, pk):
+        node = get_object_or_404(Node, pk=pk)
+        return Response(node, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
         node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=pk)
@@ -189,12 +185,8 @@ class NodeDetailView(BaseContentAppAPIView):
         node.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def get(self, request, pk):
-        node = get_object_or_404(Node, pk=pk)
-        return Response(node, status=status.HTTP_200_OK)
 
-
-class TopicListView(BaseContentAppAPIView):
+class TopicListView(APIView):
     """
     API view to retrieve the list of all topics instances.
     """
@@ -204,7 +196,7 @@ class TopicListView(BaseContentAppAPIView):
         return Response(topics, status=status.HTTP_200_OK)
 
 
-class TopicContentsListView(BaseContentAppAPIView):
+class TopicContentsListView(APIView):
     """
     API view to retrieve the contents associated with a specific Topic instance.
     """
@@ -262,3 +254,18 @@ class UploadContentView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+
+class UserContentListView(APIView):
+    """
+    API view to retrieve all content profiles owned by a user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        content_profiles = ContentProfile.objects.filter(user=request.user)\
+            .select_related('content')\
+            .order_by('-content__uploaded_by')
+        
+        serializer = ContentProfileSerializer(content_profiles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+                
