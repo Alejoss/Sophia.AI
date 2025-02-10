@@ -1,7 +1,7 @@
 import HeaderComp from '../components/HeaderComp.jsx';
 
 import { Outlet } from 'react-router-dom';
-const HomeLayout = () => {
+const MainLayout = () => {
   return (
     <>
     <div>
@@ -12,4 +12,4 @@ const HomeLayout = () => {
       )
 }
 
-export default HomeLayout
+export default MainLayout

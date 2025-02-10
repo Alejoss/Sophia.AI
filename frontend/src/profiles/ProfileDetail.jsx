@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axiosInstance from '../api/axios_config.js';
+import axiosInstance from '../api/axiosConfig.js';
 
 const ProfileDetail = () => {
     const { profileId } = useParams();

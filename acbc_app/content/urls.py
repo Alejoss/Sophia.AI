@@ -17,6 +17,7 @@ urlpatterns = [
     path('nodes/<int:pk>/', views.NodeDetailView.as_view(), name='node_detail'),
     path('topics/', views.TopicListView.as_view(), name='topic_list'),
     path('topics/<int:pk>/contents/', views.TopicContentsListView.as_view(), name='topic_contents_list'),
+    path('upload-content/', views.UploadContentView.as_view(), name='upload-content'),
     # path('libraries/', LibraryList.as_view(), name='library-list'),
     # path('libraries/<int:pk>/', LibraryDetail.as_view(), name='library-detail'),
     # path('groups/', GroupList.as_view(), name='group-list'),

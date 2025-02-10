@@ -3,9 +3,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 from utils.permissions import IsAuthor
-from content.models import Library, Collection, Content, KnowledgePath, Node, Topic
+from content.models import Library, Collection, Content, KnowledgePath, Node, Topic, ContentProfile, FileDetails
 from content.serializers import (LibrarySerializer,
                                  CollectionSerializer,
                                  ContentSerializer,
@@ -210,3 +213,52 @@ class TopicContentsListView(BaseContentAppAPIView):
         topic = get_object_or_404(Topic, pk=pk)
         serializer = TopicContentsSerializer(topic)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UploadContentView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)  # Required for handling file uploads
+
+    def post(self, request):
+        try:
+            # Get the uploaded file
+            file = request.FILES.get('file')
+            if not file:
+                return Response({'error': 'No file provided'}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+
+            # Create the Content instance with just media_type
+            content = Content.objects.create(
+                uploaded_by=request.user,
+                media_type='TEXT'  # Default value, you might want to detect this from the file
+            )
+
+            # Create the ContentProfile
+            content_profile = ContentProfile.objects.create(
+                content=content,
+                title=request.data.get('title'),
+                author=request.data.get('author'),
+                personal_note=request.data.get('personalNote'),
+                user=request.user,
+                is_visible=True  # Default value
+            )
+
+            # Save file details
+            file_details = FileDetails.objects.create(
+                content=content,
+                file=file,
+                extension=file.name.split('.')[-1] if '.' in file.name else '',
+                file_size=file.size
+            )
+
+            return Response({
+                'message': 'Content uploaded successfully',
+                'content_id': content.id
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        

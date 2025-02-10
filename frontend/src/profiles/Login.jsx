@@ -24,15 +24,23 @@ const Login = () => {
         console.log("User is already authenticated")
       } else if (backendAuthStatus && !localStorageAuth) {
         setAuthenticationStatus(true);
+        setAuthState({
+          isAuthenticated: true,
+          user: storedUser
+        });
       } else if (!backendAuthStatus && localStorageAuth) {
         setAuthenticationStatus(false);
+        setAuthState({
+          // dont change the user to null cause we want to remember the username
+          isAuthenticated: false,
+        });
       }
     });
 
     if (storedUser) {
       setUsername(storedUser.username);
     }
-  }, []);
+  }, [setAuthState]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

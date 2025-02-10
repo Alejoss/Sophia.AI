@@ -29,8 +29,6 @@ class Content(models.Model):
         ('IMAGE', 'Image')
     ]
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    created_for = models.CharField(max_length=20, choices=[('KNOWLEDGE_PATH', 'Knowledge Path'), ('USER_WALL', 'User Wall'),
-                                                           ('TEACHER_RESOURCE', 'Teacher Resource')], default='USER_WALL')
     media_type = models.CharField(max_length=5, choices=MEDIA_TYPES, default='TEXT')
     activity_requirement = models.ForeignKey('ActivityRequirement', on_delete=models.SET_NULL, null=True, blank=True,
                                              related_name='required_contents')

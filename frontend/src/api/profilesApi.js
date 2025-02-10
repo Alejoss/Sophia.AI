@@ -1,5 +1,5 @@
 // src/api/profilesAPI.js
-import axiosInstance from './axios_config.js';
+import axiosInstance from './axiosConfig.js';
 import Cookies from "js-cookie";
 
 const checkAuth = async () => {
@@ -15,6 +15,7 @@ const checkAuth = async () => {
       throw new Error('Unexpected response status');
     }
   } catch(error) {
+    // TODO: Handle error, if the server is down, we should show a message to the user
     console.error('Error:', error);
     throw error;
   }

@@ -1,5 +1,5 @@
 // src/api/eventsApi.js
-import axiosInstance from './axios_config.js';
+import axiosInstance from './axiosConfig.js';
 
 export const fetchEvents = async () => {
   const response = await axiosInstance.get('api/events/');

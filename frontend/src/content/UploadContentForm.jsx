@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
+import axiosInstance from '../api/axiosConfig';  // Import our configured instance
 
 const schema = yup.object().shape({
   // TODO, only the image files have author and title as optional fields
@@ -41,14 +42,7 @@ const UploadContentForm = () => {
       formData.append('author', data.author);
       formData.append('personalNote', data.personalNote);
 
-      const response = await fetch('/api/upload-content', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
+      const response = await axiosInstance.post('/content/upload-content/', formData);
 
       reset();
       alert('Content uploaded successfully!');
@@ -110,7 +104,7 @@ const UploadContentForm = () => {
         </button>
       </form>
 
-      <style jsx>{`
+      <style>{`
         .upload-form-container {
           max-width: 600px;
           margin: 0 auto;
