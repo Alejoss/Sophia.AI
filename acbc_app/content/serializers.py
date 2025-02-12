@@ -2,33 +2,48 @@ from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, KnowledgePath, Node, Topic, ContentProfile
+from content.models import Library, Collection, Content, KnowledgePath, Node, Topic, ContentProfile, FileDetails
 
 
 class LibrarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Library
-        fields = '__all__'
+        fields = ['id', 'name', 'user']
 
 
 class CollectionSerializer(serializers.ModelSerializer):
+    library_name = serializers.CharField(source='library.name', read_only=True)
+
     class Meta:
         model = Collection
-        fields = '__all__'
+        fields = ['id', 'name', 'library', 'library_name']
+        extra_kwargs = {
+            'library': {'write_only': True}  # Hide library id in responses but allow it in creation
+        }
+
+
+class FileDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FileDetails
+        fields = ['file', 'file_size', 'uploaded_at']
 
 
 class ContentSerializer(serializers.ModelSerializer):
-    topics_count = serializers.SerializerMethodField()
-    knowledge_path_count = serializers.SerializerMethodField()
+    file_details = FileDetailsSerializer(read_only=True)
 
     class Meta:
         model = Content
-        fields = ['id', 'title', 'description',
-                  'author', 'collection', 'media_type',
-                  'activity_requirement', 'rating', 'feedback', 'topics_count']
+        fields = ['id', 'media_type', 'file_details']
 
-    def get_topics_count(self, obj):
-        return obj.topics.count()
+
+class ContentProfileSerializer(serializers.ModelSerializer):
+    content = ContentSerializer(read_only=True)
+    collection_name = serializers.CharField(source='collection.name', read_only=True)
+
+    class Meta:
+        model = ContentProfile
+        fields = ['id', 'title', 'author', 'personal_note', 
+                 'is_visible', 'collection', 'collection_name', 'content']
 
 
 class KnowledgePathNodeSerializer(serializers.ModelSerializer):
@@ -42,7 +57,6 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KnowledgePath
-
         fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'nodes']
         extra_kwargs = {
             'author': {'read_only': True}
@@ -59,14 +73,11 @@ class NodeSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        # Set the media_type of the node based on the media_type of the content
         content = validated_data.get('content')
         validated_data['media_type'] = content.media_type
-
         node = super().create(validated_data)
         return node
 
-        
 
 class TopicContentsSerializer(serializers.ModelSerializer):
     contents = serializers.SerializerMethodField()
@@ -76,12 +87,10 @@ class TopicContentsSerializer(serializers.ModelSerializer):
         fields = ['title', 'creator', 'contents']
 
     def get_contents(self, obj):
-        # Get the contents for the topic, ordered by the total number of votes
         contents = Content.objects.filter(topics=obj).annotate(
             total_votes=Coalesce(Max('vote_summaries__vote_count', filter=Q(vote_summaries__topic=obj)), Value(0))
         ).order_by('-total_votes')
 
-        # Group contents by media_type
         grouped_contents = {}
         for content in contents:
             media_type = content.media_type
@@ -96,13 +105,4 @@ class TopicContentsSerializer(serializers.ModelSerializer):
             grouped_contents[media_type]['count'] += 1
 
         return grouped_contents
-
-
-class ContentProfileSerializer(serializers.ModelSerializer):
-    content_type = serializers.CharField(source='content.media_type')
-    
-    class Meta:
-        model = ContentProfile
-        fields = ['id', 'title', 'author', 'content_type', 'personal_note', 
-                 'is_visible', 'collection']
         

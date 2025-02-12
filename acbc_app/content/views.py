@@ -33,30 +33,12 @@ class LibraryDetailView(APIView):
     """
 
     def get(self, request, pk):
-        library = get_object_or_404(Library, pk=pk)
+        library = get_object_or_404(
+            Library, 
+            pk=pk,
+            message='Library not found'
+        )
         serializer = LibrarySerializer(library)
-        return Response(serializer.data)
-
-
-class CollectionListView(APIView):
-    """
-    API view to retrieve the list of all Collection instances.
-    """
-
-    def get(self, request):
-        collections = Collection.objects.all()
-        serializer = CollectionSerializer(collections, many=True)
-        return Response(serializer.data)
-
-
-class CollectionDetailView(APIView):
-    """
-    API view to retrieve a specific Collection instance by its primary key.
-    """
-
-    def get(self, request, pk):
-        collection = get_object_or_404(Collection, pk=pk)
-        serializer = CollectionSerializer(collection)
         return Response(serializer.data)
 
 
@@ -76,7 +58,11 @@ class ContentDetailView(APIView):
     """
 
     def get(self, request, pk):
-        content = get_object_or_404(Content, pk=pk)
+        content = get_object_or_404(
+            Content, 
+            pk=pk,
+            message='Content not found'
+        )
         serializer = ContentSerializer(content)
         return Response(serializer.data)
 
@@ -110,8 +96,11 @@ class KnowledgePathDetailView(APIView):
     permission_classes = [IsAuthor]
 
     def get(self, request, pk):
-        # Retrieve a KnowledgePath object by its pk, prefetching related 'nodes' to optimize queries.
-        knowledge_path = get_object_or_404(KnowledgePath.objects.prefetch_related('nodes'), pk=pk)
+        knowledge_path = get_object_or_404(
+            KnowledgePath.objects.prefetch_related('nodes'), 
+            pk=pk,
+            message='Knowledge path not found'
+        )
         serializer = KnowledgePathSerializer(knowledge_path)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -120,8 +109,12 @@ class KnowledgePathDetailView(APIView):
         Update a KnowledgePath object by its pk using the provided data.
         Only KnowledgePath fields, not nodes.
         """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        self.check_object_permissions(request, knowledge_path) # Check if the user is the author of the KnowledgePath
+        knowledge_path = get_object_or_404(
+            KnowledgePath, 
+            pk=pk,
+            message='Knowledge path not found'
+        )
+        self.check_object_permissions(request, knowledge_path)
 
         serializer = KnowledgePathSerializer(knowledge_path, data=request.data, partial=True)
         if serializer.is_valid():
@@ -133,7 +126,11 @@ class KnowledgePathDetailView(APIView):
         """
         Delete a KnowledgePath object by its pk.
         """
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        knowledge_path = get_object_or_404(
+            KnowledgePath, 
+            pk=pk,
+            message='Knowledge path not found'
+        )
         self.check_object_permissions(request, knowledge_path)
 
         knowledge_path.delete()
@@ -148,8 +145,13 @@ class KnowledgePathNodesView(APIView):
     permission_classes = [IsAuthor]
 
     def post(self, request, pk):
-        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        knowledge_path = get_object_or_404(
+            KnowledgePath, 
+            pk=pk,
+            message='Knowledge path not found'
+        )
         self.check_object_permissions(request, knowledge_path)
+        
         serializer = NodeSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(knowledge_path=knowledge_path)
@@ -165,13 +167,22 @@ class NodeDetailView(APIView):
     permission_classes = [IsAuthor]
 
     def get(self, request, pk):
-        node = get_object_or_404(Node, pk=pk)
+        node = get_object_or_404(
+            Node, 
+            pk=pk,
+            message='Node not found'
+        )
         return Response(node, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
-        node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=pk)
-        knowledge_path = node.knowledge_path # Get the knowledge path to check if the user is the author
+        node = get_object_or_404(
+            Node.objects.select_related('knowledge_path'), 
+            pk=pk,
+            message='Node not found'
+        )
+        knowledge_path = node.knowledge_path
         self.check_object_permissions(request, knowledge_path)
+        
         serializer = NodeSerializer(node, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -179,8 +190,12 @@ class NodeDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=pk)
-        knowledge_path = node.knowledge_path # Get the knowledge path to check if the user is the author
+        node = get_object_or_404(
+            Node.objects.select_related('knowledge_path'), 
+            pk=pk,
+            message='Node not found'
+        )
+        knowledge_path = node.knowledge_path
         self.check_object_permissions(request, knowledge_path)
         node.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -202,14 +217,18 @@ class TopicContentsListView(APIView):
     """
 
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_object_or_404(
+            Topic, 
+            pk=pk,
+            message='Topic not found'
+        )
         serializer = TopicContentsSerializer(topic)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UploadContentView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)  # Required for handling file uploads
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
         try:
@@ -232,14 +251,13 @@ class UploadContentView(APIView):
                 author=request.data.get('author'),
                 personal_note=request.data.get('personalNote'),
                 user=request.user,
-                is_visible=True  # Default value
+                is_visible=True
             )
 
-            # Save file details
+            # Save file details - removed the extension field
             file_details = FileDetails.objects.create(
                 content=content,
                 file=file,
-                extension=file.name.split('.')[-1] if '.' in file.name else '',
                 file_size=file.size
             )
 
@@ -267,5 +285,80 @@ class UserContentListView(APIView):
             .order_by('-content__uploaded_by')
         
         serializer = ContentProfileSerializer(content_profiles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserCollectionsView(APIView):
+    """Get all collections for the authenticated user"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        collections = Collection.objects.filter(library__user=request.user)
+        serializer = CollectionSerializer(collections, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """Create a new collection"""
+        library, _ = Library.objects.get_or_create(
+            user=request.user,
+            defaults={'name': f"{request.user.username}'s Library"}
+        )
+        
+        collection_data = request.data.copy()
+        collection_data['library'] = library.id
+        
+        serializer = CollectionSerializer(data=collection_data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CollectionContentView(APIView):
+    """Get all content profiles for a specific collection"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, collection_id):
+        collection = get_object_or_404(
+            Collection, 
+            id=collection_id, 
+            library__user=request.user,
+            message='Collection not found or you do not have permission to access it'
+        )
+        
+        content_profiles = ContentProfile.objects.filter(
+            collection=collection
+        ).select_related('content', 'content__file_details')
+        
+        serializer = ContentProfileSerializer(content_profiles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, collection_id):
+        """Add content to a collection"""
+        collection = get_object_or_404(
+            Collection, 
+            id=collection_id, 
+            library__user=request.user,
+            message='Collection not found or you do not have permission to access it'
+        )
+        
+        content_profile_id = request.data.get('content_profile_id')
+        if not content_profile_id:
+            return Response(
+                {'error': 'content_profile_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        content_profile = get_object_or_404(
+            ContentProfile,
+            id=content_profile_id,
+            user=request.user,
+            message='Content profile not found or you do not have permission to access it'
+        )
+        
+        content_profile.collection = collection
+        content_profile.save()
+        
+        serializer = ContentProfileSerializer(content_profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
                 

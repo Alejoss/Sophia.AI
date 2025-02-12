@@ -13,6 +13,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@hookform/resolvers": "^3.10.0",
+    "@mui/icons-material": "^6.4.4",
     "@mui/material": "^6.4.3",
     "axios": "^1.7.2",
     "js-cookie": "^3.0.5",

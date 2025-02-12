@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails
+from content.models import Library, Collection, FileDetails, Content, ContentProfile
 
 
 @admin.register(Library)
@@ -17,9 +17,24 @@ class GroupAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
-# @admin.register(FileDetails)
-# class FileAdmin(admin.ModelAdmin):
-#     list_display = ['title', 'group', 'uploaded_at']
-#     list_filter = ['group', 'uploaded_at']
-#     search_fields = ['title']
-#     date_hierarchy = 'uploaded_at'
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'media_type', 'uploaded_by']
+    list_filter = ['media_type']
+    search_fields = ['id']
+
+
+@admin.register(ContentProfile)
+class ContentProfileAdmin(admin.ModelAdmin):
+    list_display = ['title', 'author', 'user', 'collection']
+    list_filter = ['user', 'collection']
+    search_fields = ['title', 'author']
+
+
+@admin.register(FileDetails)
+class FileDetailsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'file', 'uploaded_at']
+    list_filter = ['uploaded_at']
+    search_fields = ['file']
+    date_hierarchy = 'uploaded_at'
+
