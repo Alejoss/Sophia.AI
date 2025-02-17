@@ -209,12 +209,26 @@ class NodeActivityRequirement(models.Model):
             return f"Complete {self.activity_requirement} to finish {self.preceding_node.title}"
 
 
+def topic_image_path(instance, filename):
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Create a new filename using the topic id and extension
+    return f'topic_images/{instance.id}/topic_image.{ext}'
+
 class Topic(models.Model):
     # Represents a subject under which multiple contents and discussions can be grouped.
 
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_topics')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    topic_image = models.ImageField(
+        upload_to=topic_image_path,
+        null=True,
+        blank=True,
+        max_length=255  # Increased max_length
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     moderators = models.ManyToManyField(User, related_name='moderated_topics')
     related_topics = models.ManyToManyField('self', blank=True, related_name='related_to', symmetrical=False)
 

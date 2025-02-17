@@ -14,6 +14,18 @@ import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
 import UploadContentForm from './content/UploadContentForm.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
+import CollectionsUser from './content/CollectionsUser.jsx';
+import CreateCollectionForm from './content/CreateCollectionForm.jsx';
+import Collection from './content/Collection.jsx';
+import CollectionEditContent from './content/CollectionEditContent.jsx';
+import ContentDetails from './content/ContentDetails';
+import TopicCreationForm from './content/TopicCreationForm';
+import TopicEdit from './content/TopicEdit';
+import TopicList from './content/TopicList';
+import TopicAddContent from './content/TopicAddContent';
+import TopicEditContent from './content/TopicEditContent';
+import TopicDetail from './content/TopicDetail';
+import TopicContentMediaType from './content/TopicContentMediaType';
 
 const App = () => {
   return (
@@ -36,7 +48,19 @@ const App = () => {
           <Route path="content">
             <Route path="upload_content" element={<UploadContentForm />} />
             <Route path="library_user" element={<LibraryUser />} />
+            <Route path="collections" element={<CollectionsUser />} />
+            <Route path="collections/create" element={<CreateCollectionForm />} />
+            <Route path="collections/:collectionId" element={<Collection />} />
+            <Route path="collections/:collectionId/edit" element={<CollectionEditContent />} />
+            <Route path="create_topic" element={<TopicCreationForm />} />
+            <Route path="topics/:topicId/edit" element={<TopicEdit />} />
+            <Route path="topics" element={<TopicList />} />
+            <Route path="topics/:topicId/add-content" element={<TopicAddContent />} />
+            <Route path="topics/:topicId/edit-content" element={<TopicEditContent />} />
+            <Route path="topics/:topicId" element={<TopicDetail />} />
+            <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
           </Route>          
+          <Route path="/content/:contentId" element={<ContentDetails />} />
         </Route>
       </Routes>
     </BrowserRouter>

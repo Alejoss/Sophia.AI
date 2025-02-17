@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Card, CardContent, Chip, ToggleButton, ToggleButtonGroup, IconButton, Button } from '@mui/material';
 import NoteIcon from '@mui/icons-material/Note';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { isAuthenticated } from '../context/localStorageUtils';
 import contentApi from '../api/contentApi';
+import { useNavigate } from 'react-router-dom';
 
 const LibraryUser = () => {
+    // TODO order by most recent by default
     const [userContent, setUserContent] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [mediaFilter, setMediaFilter] = useState('ALL');
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchUserContent = async () => {
@@ -59,13 +63,24 @@ const LibraryUser = () => {
                     <ToggleButton value="AUDIO">Audio</ToggleButton>
                 </ToggleButtonGroup>
 
-                <Button 
-                    variant="contained" 
-                    color="primary"
-                    onClick={() => {/* TODO: Handle collections click */}}
-                >
-                    Collections
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button 
+                        variant="contained" 
+                        color="primary"
+                        onClick={() => navigate('/content/collections')}
+                    >
+                        Collections
+                    </Button>
+
+                    <Button 
+                        variant="contained" 
+                        color="primary"
+                        startIcon={<UploadFileIcon />}
+                        onClick={() => navigate('/content/upload_content')}
+                    >
+                        Upload Content
+                    </Button>
+                </Box>
             </Box>
             
             {mediaFilter === 'TEXT' ? (
@@ -82,7 +97,14 @@ const LibraryUser = () => {
                         </thead>
                         <tbody>
                             {filteredContent.map((contentProfile) => (
-                                <tr key={contentProfile.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <tr 
+                                    key={contentProfile.id} 
+                                    style={{ 
+                                        borderBottom: '1px solid #eee',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => navigate(`/content/${contentProfile.content.id}`)}
+                                >
                                     <td style={{ padding: '12px' }}>{contentProfile.title}</td>
                                     <td style={{ padding: '12px' }}>{contentProfile.author}</td>
                                     <td style={{ padding: '12px' }}>
@@ -113,7 +135,10 @@ const LibraryUser = () => {
                 <Box display="grid" gridTemplateColumns="repeat(12, 1fr)" gap={3}>
                     {filteredContent.map((contentProfile) => (
                         <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={contentProfile.id}>
-                            <Card>
+                            <Card 
+                                sx={{ cursor: 'pointer' }}
+                                onClick={() => navigate(`/content/${contentProfile.content.id}`)}
+                            >
                                 {contentProfile.content.media_type === 'IMAGE' && contentProfile.content.file_details?.file && (
                                     <Box sx={{ 
                                         width: '100%', 

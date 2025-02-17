@@ -20,16 +20,12 @@ const HeaderComp = () => {
           <a className="nav-link" href="http://127.0.0.1:8000/">Courses</a>
         </li>
         <li className="nav-item">
-          <a className="nav-link" href="http://127.0.0.1:8000/content/libraries/">Libraries</a>
+          <Link className="nav-link" to="/content/topics">Topics</Link>
         </li>
         {isAuthenticated ? (
             <>
               <li className="nav-item">
                 <a className="nav-link" href="/content/library_user">Tu Librería</a>
-              </li>
-              <li className="nav-item">
-                <a className="nav-link" href="/content/upload_content">Subir Contenido</a>
-
               </li>
               <li className="nav-item">
                 <a className="nav-link" href="/profiles/profile_data">{user.username}</a>

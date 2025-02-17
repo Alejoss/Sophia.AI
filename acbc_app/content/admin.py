@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails, Content, ContentProfile
+from content.models import Library, Collection, FileDetails, Content, ContentProfile, Topic
 
 
 @admin.register(Library)
@@ -37,4 +37,11 @@ class FileDetailsAdmin(admin.ModelAdmin):
     list_filter = ['uploaded_at']
     search_fields = ['file']
     date_hierarchy = 'uploaded_at'
+
+@admin.register(Topic)
+class TopicAdmin(admin.ModelAdmin):
+    list_display = ['id', 'title', 'creator']
+    list_filter = ['creator']
+    search_fields = ['title']
+
 
