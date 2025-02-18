@@ -1,13 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
-from content.models import KnowledgePath  # Assuming this is your knowledge path model
+from knowledge_paths.models import KnowledgePath  # Update import
 # from events.models import Event  # You might add this later
 
 
 class Certificate(models.Model):
     # Represents an issued certificate for completing a KnowledgePath, with potential future extension to include events, linked to specific templates.
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, null=True, blank=True)
+    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE)
     # event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)  # Uncomment in the future
     template = models.ForeignKey('CertificateTemplate', on_delete=models.CASCADE)
     issued_on = models.DateTimeField(auto_now_add=True)
@@ -30,7 +30,7 @@ class CertificateRequest(models.Model):
     ]
 
     requester = models.ForeignKey(User, related_name='certificate_requests', on_delete=models.CASCADE)
-    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, null=True, blank=True)
+    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE)
     # event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)  # To be used later
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     request_date = models.DateTimeField(auto_now_add=True)

@@ -1,11 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
-from content.models import ActivityRequirement
+from knowledge_paths.models import ActivityRequirement
 from content.models import Content
 
 
 class Quiz(models.Model):
-    activity_requirement = models.OneToOneField(ActivityRequirement, on_delete=models.CASCADE, related_name='quiz')
+    activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
 
@@ -50,7 +50,7 @@ class Answer(models.Model):
 
 
 class ExamCall(models.Model):
-    activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE, related_name='exam_calls')
+    activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
     teacher = models.ForeignKey(User, related_name='teacher_exam_calls', on_delete=models.CASCADE)
     student = models.ForeignKey(User, related_name='student_exam_calls', on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)

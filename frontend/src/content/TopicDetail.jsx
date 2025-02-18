@@ -19,6 +19,7 @@ import NoteIcon from '@mui/icons-material/Note';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import contentApi from '../api/contentApi';
 import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
+import { MEDIA_BASE_URL } from '../api/config';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
@@ -31,12 +32,23 @@ const TopicDetail = () => {
     useEffect(() => {
         const fetchTopic = async () => {
             try {
+                console.log(`Fetching topic ${topicId}...`);
                 const data = await contentApi.getTopicDetails(topicId);
+                console.log('Received topic data:', data);
                 setTopic(data);
+                
+                // Check if contents exists before processing
+                if (!data.contents) {
+                    console.log('No contents in topic data');
+                    setContentByType({});
+                    setLoading(false);
+                    return;
+                }
                 
                 // Group content by media type
                 const grouped = data.contents.reduce((acc, content) => {
                     const type = content.media_type.toLowerCase();
+                    console.log(`Processing content of type: ${type}`, content);
                     if (!acc[type]) {
                         acc[type] = [];
                     }
@@ -51,9 +63,16 @@ const TopicDetail = () => {
                     );
                 });
 
+                console.log('Grouped content by type:', grouped);
                 setContentByType(grouped);
                 setLoading(false);
             } catch (err) {
+                console.error('Error fetching topic:', err);
+                console.error('Error details:', {
+                    message: err.message,
+                    status: err.response?.status,
+                    data: err.response?.data
+                });
                 setError('Failed to fetch topic details');
                 setLoading(false);
             }
@@ -90,7 +109,7 @@ const TopicDetail = () => {
                         <Grid item xs={12} sm={6} md={4} key={content.id}>
                             <Card 
                                 sx={{ height: '100%', cursor: 'pointer' }}
-                                onClick={() => navigate(`/content/${content.id}`)}
+                                onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             >
                                 {type === 'image' && content.file_details?.file && (
                                     <CardMedia

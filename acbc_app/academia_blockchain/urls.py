@@ -27,6 +27,8 @@ urlpatterns = [
     path('api/events/', include('events.urls', namespace='events')),
     path('api/votes/', include('votes.urls', namespace='votes')),
     path('api/comments/', include('comments.urls', namespace='comments')),
+    path('api/knowledge_paths/', include('knowledge_paths.urls', namespace='knowledge_paths')),
+    
     path('ratings/', include('star_ratings.urls', namespace='ratings')),
     # path('exams/', include('exams.urls')),
     # path('', event_views.events_all, name="events_all"),

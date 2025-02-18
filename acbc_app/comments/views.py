@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 
 from comments.managers import CommentManager
-from content.models import KnowledgePath, Topic, Content
+from content.models import Topic, Content
 from utils.permissions import IsAuthor
 from comments.models import Comment
 from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer, ContentTopicCommentSerializer, \

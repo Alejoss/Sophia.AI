@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
-SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY")
+SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY", 'django-insecure-development-key-123')  # Default key for development
 ALLOWED_HOSTS = ["*"]
 DEBUG = True
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
@@ -46,7 +46,8 @@ INSTALLED_APPS = [
     'storages',
     'rest_framework',
     'rest_framework_simplejwt',
-    'drf_yasg'
+    'drf_yasg',
+    'knowledge_paths',
 ]
 
 MIDDLEWARE = [
@@ -266,6 +267,9 @@ if ENVIRONMENT == "PRODUCTION":
 
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    if SECRET_KEY == 'django-insecure-development-key-123':
+        raise ValueError("Please set a proper SECRET_KEY in production!")
 
 else:
 

@@ -4,7 +4,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
 from comments.models import Comment
-from content.models import Topic, Content, KnowledgePath
+from content.models import Topic, Content
+from knowledge_paths.models import KnowledgePath
 
 
 class Vote(models.Model):

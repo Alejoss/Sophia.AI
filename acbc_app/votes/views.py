@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 
 from comments.models import Comment
-from content.models import KnowledgePath, Topic, Content
+from content.models import Topic, Content
+from knowledge_paths.models import KnowledgePath
 from events.models import ConnectionPlatform
 from votes.models import Vote, ContentVoteTopicCount
 

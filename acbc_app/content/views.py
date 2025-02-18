@@ -10,12 +10,21 @@ import os
 from django.conf import settings
 
 from utils.permissions import IsAuthor
-from content.models import Library, Collection, Content, KnowledgePath, Node, Topic, ContentProfile, FileDetails
-from content.serializers import (LibrarySerializer,
-                                 CollectionSerializer,
-                                 ContentSerializer,
-                                 KnowledgePathSerializer,
-                                 TopicContentsSerializer, NodeSerializer, ContentProfileSerializer, ContentSerializerWithProfiles, TopicSerializer, ContentWithSelectedProfileSerializer)
+from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails
+from knowledge_paths.models import KnowledgePath, Node
+from content.serializers import (
+    LibrarySerializer,
+    CollectionSerializer,
+    ContentSerializer,
+    ContentWithSelectedProfileSerializer,
+    TopicBasicSerializer,
+    TopicDetailSerializer,
+    ContentProfileSerializer
+)
+from knowledge_paths.serializers import (
+    KnowledgePathSerializer,
+    NodeSerializer
+)
 
 
 class LibraryListView(APIView):
@@ -62,7 +71,7 @@ class ContentDetailView(APIView):
     def get(self, request, pk):
         try:
             content = get_object_or_404(Content, pk=pk)
-            serializer = ContentSerializerWithProfiles(content)
+            serializer = ContentWithSelectedProfileSerializer(content)
             return Response(serializer.data)
         except Content.DoesNotExist:
             return Response(
@@ -210,30 +219,15 @@ class TopicView(APIView):
 
     def get(self, request):
         topics = Topic.objects.all()
-        serializer = TopicSerializer(topics, many=True, context={'request': request})
+        serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = TopicSerializer(data=request.data, context={'request': request})
+        serializer = TopicBasicSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(creator=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class TopicContentsListView(APIView):
-    """
-    API view to retrieve the contents associated with a specific Topic instance.
-    """
-
-    def get(self, request, pk):
-        topic = get_object_or_404(
-            Topic, 
-            pk=pk,
-            message='Topic not found'
-        )
-        serializer = TopicContentsSerializer(topic)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UploadContentView(APIView):
@@ -415,16 +409,33 @@ class TopicDetailView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request, pk):
-        topic = get_object_or_404(
-            Topic.objects.prefetch_related(
+        print(f"Attempting to fetch topic {pk}")
+        try:
+            topic = Topic.objects.prefetch_related(
                 'contents',
                 'contents__file_details',
                 'contents__profiles'
-            ), 
-            pk=pk
-        )
-        serializer = TopicSerializer(topic, context={'request': request})
-        return Response(serializer.data)
+            ).get(pk=pk)
+            print(f"Found topic: {topic.title}")
+            print(f"Topic image field: {topic.topic_image}")
+            print(f"Topic image URL: {topic.topic_image.url if topic.topic_image else None}")
+            print(f"Contents count: {topic.contents.count()}")
+            serializer = TopicDetailSerializer(topic, context={'request': request})
+            data = serializer.data
+            print(f"Serialized data: {data}")
+            return Response(data)
+        except Topic.DoesNotExist:
+            print(f"Topic {pk} not found")
+            return Response(
+                {"error": "Topic not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Error fetching topic: {str(e)}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def patch(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
@@ -447,7 +458,7 @@ class TopicDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        serializer = TopicSerializer(topic, context={'request': request})
+        serializer = TopicDetailSerializer(topic, context={'request': request})
         return Response(serializer.data)
 
 
@@ -511,3 +522,12 @@ class TopicContentMediaTypeView(APIView):
             },
             'contents': serializer.data
         })
+
+# Add new view for basic topic details
+class TopicBasicView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        serializer = TopicBasicSerializer(topic)
+        return Response(serializer.data)

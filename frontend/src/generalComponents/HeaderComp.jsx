@@ -14,10 +14,7 @@ const HeaderComp = () => {
     <nav className="nav">
       <ul className="nav-list">
         <li className="nav-item">
-          <a className="nav-link" href="/courses/about">Academia Blockchain</a>
-        </li>
-        <li className="nav-item">
-          <a className="nav-link" href="http://127.0.0.1:8000/">Courses</a>
+          <a className="nav-link" href="/knowledge_path/create">Create Knowledge Path</a>
         </li>
         <li className="nav-item">
           <Link className="nav-link" to="/content/topics">Topics</Link>

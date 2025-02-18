@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
+import VoteComponent from '../votes/VoteComponent';
 
 const TopicContentMediaType = () => {
     const { topicId, mediaType } = useParams();
@@ -74,7 +75,7 @@ const TopicContentMediaType = () => {
                     <Grid item xs={12} sm={6} md={4} key={content.id}>
                         <Card 
                             sx={{ height: '100%', cursor: 'pointer' }}
-                            onClick={() => navigate(`/content/${content.id}`)}
+                            onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                         >
                             {mediaType === 'image' && content.file_details?.file && (
                                 <CardMedia
@@ -88,13 +89,19 @@ const TopicContentMediaType = () => {
                                 <Typography variant="h6" gutterBottom>
                                     {content.selected_profile?.title || 'Untitled'}
                                 </Typography>
-                                {content.selected_profile?.author && (
-                                    <Chip 
-                                        label={`Author: ${content.selected_profile.author}`}
-                                        size="small"
-                                        variant="outlined"
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    {content.selected_profile?.author && (
+                                        <Chip 
+                                            label={`Author: ${content.selected_profile.author}`}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                    )}
+                                    <VoteComponent 
+                                        topicId={topicId} 
+                                        contentId={content.id}
                                     />
-                                )}
+                                </Box>
                             </CardContent>
                         </Card>
                     </Grid>

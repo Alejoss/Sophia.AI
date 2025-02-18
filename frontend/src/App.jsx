@@ -18,7 +18,7 @@ import CollectionsUser from './content/CollectionsUser.jsx';
 import CreateCollectionForm from './content/CreateCollectionForm.jsx';
 import Collection from './content/Collection.jsx';
 import CollectionEditContent from './content/CollectionEditContent.jsx';
-import ContentDetails from './content/ContentDetails';
+import ContentDetailsTopic from './content/ContentDetailsTopic';
 import TopicCreationForm from './content/TopicCreationForm';
 import TopicEdit from './content/TopicEdit';
 import TopicList from './content/TopicList';
@@ -26,6 +26,9 @@ import TopicAddContent from './content/TopicAddContent';
 import TopicEditContent from './content/TopicEditContent';
 import TopicDetail from './content/TopicDetail';
 import TopicContentMediaType from './content/TopicContentMediaType';
+import ContentDetailsLibrary from './content/ContentDetailsLibrary';
+import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
+import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 
 const App = () => {
   return (
@@ -59,8 +62,13 @@ const App = () => {
             <Route path="topics/:topicId/edit-content" element={<TopicEditContent />} />
             <Route path="topics/:topicId" element={<TopicDetail />} />
             <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
-          </Route>          
-          <Route path="/content/:contentId" element={<ContentDetails />} />
+            <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
+            <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
+          </Route>
+          <Route path="knowledge_path">
+            <Route path="create" element={<KnowledgePathCreationForm />} />
+            <Route path=":pathId/edit" element={<KnowledgePathEdit />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

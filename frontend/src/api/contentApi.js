@@ -167,6 +167,16 @@ const contentApi = {
             throw error;
         }
     },
+
+    getTopicBasicDetails: async (topicId) => {
+        try {
+            const response = await axiosInstance.get(`/content/topics/${topicId}/basic/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching topic basic details:', error);
+            throw error;
+        }
+    },
 };
 
 export default contentApi;

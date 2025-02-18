@@ -6,9 +6,10 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
-from content.models import KnowledgePath, Topic
+from content.models import Topic
 from certificates.models import Certificate
 from comments.managers import CommentManager
+from knowledge_paths.models import KnowledgePath
 
 
 class Comment(models.Model):
