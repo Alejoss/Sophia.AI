@@ -14,6 +14,8 @@ const KnowledgePathEdit = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddingNode, setIsAddingNode] = useState(false);
+  const [isRemovingNode, setIsRemovingNode] = useState(false);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -59,15 +61,35 @@ const KnowledgePathEdit = () => {
   };
 
   const handleSelectContent = async (content) => {
+    setIsAddingNode(true);
+    setError(null);
+
     try {
       const newNode = await knowledgePathsApi.addNode(pathId, {
-        content_id: content.id,
-        order: nodes.length + 1
+        content_id: content.id
       });
       setNodes([...nodes, newNode]);
       setIsModalOpen(false);
     } catch (err) {
-      setError('Failed to add node');
+      const errorMessage = err.response?.data?.error || 'Failed to add node';
+      setError(errorMessage);
+    } finally {
+      setIsAddingNode(false);
+    }
+  };
+
+  const handleRemoveNode = async (nodeId) => {
+    setIsRemovingNode(true);
+    setError(null);
+
+    try {
+      await knowledgePathsApi.removeNode(pathId, nodeId);
+      setNodes(nodes.filter(node => node.id !== nodeId));
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Failed to remove node';
+      setError(errorMessage);
+    } finally {
+      setIsRemovingNode(false);
     }
   };
 
@@ -170,7 +192,14 @@ const KnowledgePathEdit = () => {
                     {node.media_type}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
-                    <button className="text-red-600 hover:text-red-900">Remove</button>
+                    <button 
+                      onClick={() => handleRemoveNode(node.id)}
+                      disabled={isRemovingNode}
+                      className={`text-red-600 hover:text-red-900 transition-colors
+                        ${isRemovingNode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      Remove
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -181,8 +210,12 @@ const KnowledgePathEdit = () => {
 
       <ContentSearchModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setError(null);
+        }}
         onSelectContent={handleSelectContent}
+        isLoading={isAddingNode}
       />
     </div>
   );

@@ -14,7 +14,10 @@ const HeaderComp = () => {
     <nav className="nav">
       <ul className="nav-list">
         <li className="nav-item">
-          <a className="nav-link" href="/knowledge_path/create">Create Knowledge Path</a>
+          <Link className="nav-link" to="/knowledge_path">Knowledge Paths</Link>
+        </li>
+        <li className="nav-item">
+          <Link className="nav-link" to="/knowledge_path/create">Create Knowledge Path</Link>
         </li>
         <li className="nav-item">
           <Link className="nav-link" to="/content/topics">Topics</Link>

@@ -23,6 +23,7 @@ urlpatterns = [
     path('content-profiles/<int:content_profile_id>/', views.ContentProfileView.as_view(), name='content-profile-detail'),
     path('topics/<int:pk>/content/', views.TopicEditContentView.as_view(), name='topic-edit-content'),
     path('topics/<int:pk>/content/<str:media_type>/', views.TopicContentMediaTypeView.as_view(), name='topic-content-media-type'),
+    path('recent-content/', views.RecentUserContentView.as_view(), name='recent-content'),
     # path('libraries/', LibraryList.as_view(), name='library-list'),
     # path('libraries/<int:pk>/', LibraryDetail.as_view(), name='library-detail'),
     # path('groups/', GroupList.as_view(), name='group-list'),

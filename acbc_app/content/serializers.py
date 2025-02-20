@@ -52,26 +52,34 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
         fields = ContentSerializer.Meta.fields + ['selected_profile']
 
     def get_selected_profile(self, content):
+        user = self.context.get('user')
         topic = self.context.get('topic')
-        if not topic:
-            return None
-
-        creator_profile = ContentProfile.objects.filter(
-            content=content,
-            user=topic.creator
-        ).first()
         
-        if creator_profile:
-            return ContentProfileSerializer(creator_profile).data
+        # 1. Try to get the logged-in user's profile
+        try:
+            user_profile = ContentProfile.objects.get(
+                content=content,
+                user=user
+            )
+            return ContentProfileSerializer(user_profile).data
+        except ContentProfile.DoesNotExist:
+            # 2. If we have a topic, try to get the topic creator's profile
+            if topic and topic.creator:
+                try:
+                    creator_profile = ContentProfile.objects.get(
+                        content=content,
+                        user=topic.creator
+                    )
+                    return ContentProfileSerializer(creator_profile).data
+                except ContentProfile.DoesNotExist:
+                    pass
 
-        latest_profile = ContentProfile.objects.filter(
-            content=content
-        ).order_by('-created_at').first()
-        
-        if latest_profile:
-            return ContentProfileSerializer(latest_profile).data
-
-        return None
+        # 3. Fall back to original content data
+        return {
+            'title': content.original_title,
+            'author': content.original_author,
+            'personal_note': None
+        }
 
 
 class CollectionSerializer(serializers.ModelSerializer):
@@ -105,7 +113,8 @@ class TopicDetailSerializer(TopicBasicSerializer):
         fields = TopicBasicSerializer.Meta.fields + ['contents']
 
     def to_representation(self, instance):
-        self.context['topic'] = instance
+        # Pass user context to the content serializer
+        self.context['user'] = self.context.get('user')
         return super().to_representation(instance)
 
 

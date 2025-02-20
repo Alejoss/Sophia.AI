@@ -33,10 +33,34 @@ const knowledgePathsApi = {
 
     addNode: async (pathId, nodeData) => {
         try {
+            console.log('Sending request to add node:', { pathId, nodeData });
             const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/`, nodeData);
+            console.log('Response from add node:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error adding node:', error);
+            throw error;
+        }
+    },
+
+    getKnowledgePaths: async () => {
+        try {
+            const response = await axiosInstance.get('/knowledge_paths/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching knowledge paths:', error);
+            throw error;
+        }
+    },
+
+    removeNode: async (pathId, nodeId) => {
+        try {
+            console.log('Sending request to remove node:', { pathId, nodeId });
+            const response = await axiosInstance.delete(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+            console.log('Response from remove node:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error removing node:', error);
             throw error;
         }
     },

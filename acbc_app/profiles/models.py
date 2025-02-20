@@ -77,7 +77,7 @@ class UserProgressKnowledgePath(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)    
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
-    current_node = models.ForeignKey(Node, on_delete=models.SET_NULL, null=True)
+    current_node = models.ForeignKey('knowledge_paths.Node', on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         status = 'Completed' if self.is_completed else 'Not Completed'
@@ -87,7 +87,7 @@ class UserProgressKnowledgePath(models.Model):
 class UserActivityStatus(models.Model):
     # Keeps track of user completions for specific activities within a knowledge path, recording completion status and time.
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
+    activity_requirement = models.ForeignKey('knowledge_paths.ActivityRequirement', on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
 

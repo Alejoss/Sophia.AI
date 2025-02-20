@@ -25,6 +25,7 @@ const contentApi = {
     getContentDetails: async (contentId) => {
         try {
             const response = await axiosInstance.get(`/content/content_details/${contentId}/`);
+            console.log('Content details response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error fetching content details:', error);
@@ -174,6 +175,16 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error('Error fetching topic basic details:', error);
+            throw error;
+        }
+    },
+
+    getRecentContent: async () => {
+        try {
+            const response = await axiosInstance.get('/content/recent-content/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching recent content:', error);
             throw error;
         }
     },

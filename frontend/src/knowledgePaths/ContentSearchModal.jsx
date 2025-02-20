@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import contentApi from '../api/contentApi';
 
-const ContentSearchModal = ({ isOpen, onClose, onSelectContent }) => {
+const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [userContent, setUserContent] = useState([]);
   const [filteredContent, setFilteredContent] = useState([]);
@@ -53,7 +53,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent }) => {
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50"
-        onClick={onClose}
+        onClick={!isLoading ? onClose : undefined}
       />
 
       {/* Modal Container */}
@@ -63,12 +63,14 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent }) => {
           <h3 className="text-xl font-semibold text-gray-800">
             Select Content in your Library
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <span className="text-2xl">×</span>
-          </button>
+          {!isLoading && (
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <span className="text-2xl">×</span>
+            </button>
+          )}
         </div>
 
         {/* Search Input */}
@@ -101,8 +103,9 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent }) => {
               {filteredContent.map((content) => (
                 <div
                   key={content.id}
-                  onClick={() => onSelectContent(content)}
-                  className="group p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                  onClick={!isLoading ? () => onSelectContent(content) : undefined}
+                  className={`group p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all 
+                    ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -125,12 +128,19 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent }) => {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
+          {isLoading ? (
+            <div className="flex items-center text-gray-600">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent mr-2"></div>
+              Adding content...
+            </div>
+          ) : (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     </div>

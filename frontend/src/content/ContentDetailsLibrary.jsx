@@ -17,8 +17,10 @@ const ContentDetailsLibrary = () => {
         const fetchData = async () => {
             try {
                 const contentData = await contentApi.getContentDetails(contentId);
+                console.log('Fetched content data:', contentData);
                 setContent(contentData);
             } catch (err) {
+                console.error('Error fetching content:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);
@@ -32,7 +34,8 @@ const ContentDetailsLibrary = () => {
     if (error) return <div>Error: {error}</div>;
     if (!content) return <div>No content found</div>;
 
-    const profile = content.profiles?.[0];
+    const profile = content.selected_profile;
+    console.log('Current profile:', profile);
 
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
@@ -75,19 +78,19 @@ const ContentDetailsLibrary = () => {
             <Card sx={{ padding: 3 }}>
                 {/* Title Section */}
                 <Typography variant="h2" gutterBottom sx={{ fontSize: '2rem', mb: 3 }}>
-                    {profile?.title}
+                    {profile?.title || content?.original_title || 'Untitled'}
                 </Typography>
 
                 {/* Content Information */}
                 <Box sx={{ mb: 3 }}>
                     <Chip 
-                        label={content.media_type} 
+                        label={content?.media_type} 
                         color="primary" 
                         sx={{ mr: 1 }}
                     />
-                    {profile?.author && (
+                    {(profile?.author || content?.original_author) && (
                         <Chip 
-                            label={`Author: ${profile.author}`} 
+                            label={`Author: ${profile?.author || content?.original_author}`} 
                             variant="outlined" 
                             sx={{ mr: 1 }}
                         />
@@ -136,12 +139,39 @@ const ContentDetailsLibrary = () => {
 
                 {/* Personal Notes Section */}
                 {profile?.personal_note && (
-                    <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="body1">
-                            {profile.personal_note}
+                    <Box sx={{ mt: 3 }}>
+                        <Typography variant="h6" gutterBottom color="text.secondary">
+                            Personal Notes
                         </Typography>
+                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                                {profile.personal_note}
+                            </Typography>
+                        </Box>
                     </Box>
                 )}
+
+                {/* Content Details Section */}
+                <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom color="text.secondary">
+                        Content Details
+                    </Typography>
+                    <Box sx={{ display: 'grid', gap: 2 }}>
+                        <Typography variant="body2">
+                            <strong>Added to Library:</strong> {formatDate(content?.created_at)}
+                        </Typography>
+                        {content?.file_details?.file_size && (
+                            <Typography variant="body2">
+                                <strong>File Size:</strong> {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
+                            </Typography>
+                        )}
+                        {profile?.collection_name && (
+                            <Typography variant="body2">
+                                <strong>Collection:</strong> {profile.collection_name}
+                            </Typography>
+                        )}
+                    </Box>
+                </Box>
 
                 {/* Topics */}
                 {content.topics?.length > 0 && (

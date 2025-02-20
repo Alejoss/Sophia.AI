@@ -29,6 +29,8 @@ import TopicContentMediaType from './content/TopicContentMediaType';
 import ContentDetailsLibrary from './content/ContentDetailsLibrary';
 import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
+import KnowledgePathList from './knowledgePaths/KnowledgePathList';
+import KnowledgePathDetail from './knowledgePaths/KnowledgePathDetail';
 
 const App = () => {
   return (
@@ -66,6 +68,8 @@ const App = () => {
             <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
           </Route>
           <Route path="knowledge_path">
+            <Route path="" element={<KnowledgePathList />} />
+            <Route path=":pathId" element={<KnowledgePathDetail />} />
             <Route path="create" element={<KnowledgePathCreationForm />} />
             <Route path=":pathId/edit" element={<KnowledgePathEdit />} />
           </Route>

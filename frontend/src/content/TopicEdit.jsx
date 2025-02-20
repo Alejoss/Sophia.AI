@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Box, Typography, Paper, Button, Chip, Divider, Alert, IconButton, Modal, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import contentApi from '../api/contentApi';
@@ -170,7 +171,20 @@ const TopicEdit = () => {
 
     return (
         <Box sx={{ pt: 12, px: 3, maxWidth: 800, mx: 'auto' }}>
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, position: 'relative' }}>
+                {/* View Topic Button */}
+                <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}>
+                    <Button
+                        component={Link}
+                        to={`/content/topics/${topicId}`}
+                        startIcon={<OpenInNewIcon />}
+                        variant="outlined"
+                        size="small"
+                    >
+                        View Topic
+                    </Button>
+                </Box>
+
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3 }}>
                     {/* Topic Image */}
                     <Box sx={{ position: 'relative', width: 200, height: 200 }}>

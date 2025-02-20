@@ -108,29 +108,45 @@ const TopicDetail = () => {
                     {displayContents.map((content) => (
                         <Grid item xs={12} sm={6} md={4} key={content.id}>
                             <Card 
-                                sx={{ height: '100%', cursor: 'pointer' }}
+                                sx={{ 
+                                    height: '100%', 
+                                    cursor: 'pointer',
+                                    // For image type, remove extra padding
+                                    ...(type === 'image' && {
+                                        '& .MuiCardContent-root': {
+                                            padding: 0
+                                        }
+                                    })
+                                }}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             >
-                                {type === 'image' && content.file_details?.file && (
+                                {type === 'image' && content.file_details?.file ? (
+                                    // For images, show only the image
                                     <CardMedia
                                         component="img"
-                                        height="140"
+                                        sx={{ 
+                                            height: 200,
+                                            width: '100%',
+                                            objectFit: 'cover'
+                                        }}
                                         image={content.file_details.file}
-                                        alt={content.selected_profile?.title || 'Untitled'}
+                                        alt="Content image"
                                     />
+                                ) : (
+                                    // For non-image content, show title and author
+                                    <CardContent>
+                                        <Typography variant="h6" gutterBottom>
+                                            {content.selected_profile?.title || 'Untitled'}
+                                        </Typography>
+                                        {content.selected_profile?.author && (
+                                            <Chip 
+                                                label={`Author: ${content.selected_profile.author}`}
+                                                size="small"
+                                                variant="outlined"
+                                            />
+                                        )}
+                                    </CardContent>
                                 )}
-                                <CardContent>
-                                    <Typography variant="h6" gutterBottom>
-                                        {content.selected_profile?.title || 'Untitled'}
-                                    </Typography>
-                                    {content.selected_profile?.author && (
-                                        <Chip 
-                                            label={`Author: ${content.selected_profile.author}`}
-                                            size="small"
-                                            variant="outlined"
-                                        />
-                                    )}
-                                </CardContent>
                             </Card>
                         </Grid>
                     ))}

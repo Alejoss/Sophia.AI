@@ -8,6 +8,8 @@ import contentApi from '../api/contentApi';
 import VoteComponent from '../votes/VoteComponent';
 
 const ContentDetailsTopic = () => {
+    // TODO if the content has a content_profile for the logged user with a different title
+    // place that title in the title section next to the original title
     const [content, setContent] = useState(null);
     const [topic, setTopic] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ const ContentDetailsTopic = () => {
     if (error) return <div>Error: {error}</div>;
     if (!content) return <div>No content found</div>;
 
-    const profile = content.profiles?.[0];
+    const profile = content.selected_profile;
 
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
@@ -72,7 +74,7 @@ const ContentDetailsTopic = () => {
                     )}
                     
                     <Typography color="text.primary">
-                        {profile?.title}
+                        {profile?.title || 'Untitled'}
                     </Typography>
                 </Breadcrumbs>
             </Box>
@@ -81,7 +83,7 @@ const ContentDetailsTopic = () => {
                 {/* Title Section */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Typography variant="h2" sx={{ fontSize: '2rem' }}>
-                        {profile?.title}
+                        {profile?.title || 'Untitled'}
                     </Typography>
                     <VoteComponent 
                         topicId={topicId} 
