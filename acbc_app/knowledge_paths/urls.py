@@ -4,7 +4,8 @@ from .views import (
     KnowledgePathDetailView,
     KnowledgePathCreateView,
     NodeCreateView,
-    NodeDeleteView
+    NodeDeleteView,
+    ActivityRequirementCreateView
 )
 
 app_name = 'knowledge_paths'
@@ -15,4 +16,5 @@ urlpatterns = [
     path('<int:pk>/', KnowledgePathDetailView.as_view(), name='knowledge-path-detail'),
     path('<int:path_id>/nodes/', NodeCreateView.as_view(), name='node-create'),
     path('<int:path_id>/nodes/<int:node_id>/', NodeDeleteView.as_view(), name='node-delete'),
+    path('<int:path_id>/activity-requirements/', ActivityRequirementCreateView.as_view(), name='activity-requirement-create'),
 ] 

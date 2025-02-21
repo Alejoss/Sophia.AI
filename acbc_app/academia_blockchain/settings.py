@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'content',
     'certificates',
     'comments',
-    'exams',
+    'quizzes',
     'votes',
     'star_ratings',
     'taggit',
@@ -237,6 +237,8 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 if ENVIRONMENT == "PRODUCTION":
 

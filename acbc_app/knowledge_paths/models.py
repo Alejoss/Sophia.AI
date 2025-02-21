@@ -2,7 +2,11 @@ from django.db import models
 from django.contrib.auth.models import User
 from content.models import Content
 
-# Create your models here.
+
+
+def upload_knowledge_path_image(instance, filename):
+    # Generate path: knowledge_path_images/path_<id>_<filename>
+    return f"knowledge_path_images/path_{instance.id}_{filename}"
 
 class KnowledgePath(models.Model):
     title = models.CharField(max_length=200)
@@ -11,6 +15,13 @@ class KnowledgePath(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     votes = models.IntegerField(default=0)
+    image = models.ImageField(
+        upload_to=upload_knowledge_path_image, 
+        null=True, 
+        blank=True,
+        help_text="Cover image for the knowledge path"
+    )
+
 
     def __str__(self):
         return self.title
@@ -19,6 +30,12 @@ class KnowledgePath(models.Model):
         self.votes = models.F('votes') + new_votes
         self.save()
         self.refresh_from_db()
+
+    def delete(self, *args, **kwargs):
+        # Delete the image file when the knowledge path is deleted
+        if self.image:
+            self.image.delete()
+        super().delete(*args, **kwargs)
 
 class Node(models.Model):
     MEDIA_TYPES = [

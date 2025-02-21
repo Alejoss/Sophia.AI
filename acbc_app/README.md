@@ -12,6 +12,7 @@ docker-compose up --build
 
 Create the database in the docker container. Make sure the postgres container is running.
 
+docker exec -it sophiaaiacademiablockchain-postgres-1 bash      
 docker exec -it <container_name_or_id> bash
 
 psql -U postgres

@@ -133,10 +133,20 @@ class UserContentListView(APIView):
 
     def get(self, request):
         content_profiles = ContentProfile.objects.filter(user=request.user)\
-            .select_related('content')\
+            .select_related('content', 'content__file_details')\
             .order_by('title')
-        serializer = ContentProfileSerializer(content_profiles, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        print(f"Found {content_profiles.count()} content profiles for user {request.user.id}")
+        
+        serializer = ContentProfileSerializer(
+            content_profiles, 
+            many=True,
+            context={'request': request}
+        )
+        response_data = serializer.data
+        print("API response data:", response_data)
+        
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class RecentUserContentView(APIView):

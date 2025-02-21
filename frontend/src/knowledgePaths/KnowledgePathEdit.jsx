@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentSearchModal from './ContentSearchModal';
-// TODO migrate node order delete model
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
@@ -16,11 +17,14 @@ const KnowledgePathEdit = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddingNode, setIsAddingNode] = useState(false);
   const [isRemovingNode, setIsRemovingNode] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
       try {
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
+        console.log('Knowledge path data:', data);
+        console.log('Nodes:', data.nodes);
         setFormData({
           title: data.title,
           description: data.description
@@ -47,10 +51,11 @@ const KnowledgePathEdit = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage('');
 
     try {
       await knowledgePathsApi.updateKnowledgePath(pathId, formData);
-      // Don't navigate away after update
+      setSuccessMessage('Knowledge path updated successfully');
     } catch (err) {
       setError(err.message || 'Failed to update knowledge path');
     }
@@ -93,6 +98,10 @@ const KnowledgePathEdit = () => {
     }
   };
 
+  const handleAddActivityRequirement = () => {
+    navigate(`/knowledge_path/${pathId}/add-quiz`);
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -104,6 +113,12 @@ const KnowledgePathEdit = () => {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          {successMessage}
         </div>
       )}
 
@@ -153,11 +168,14 @@ const KnowledgePathEdit = () => {
         >
           Add Content Node
         </button>
-        <button
-          className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Add Activity Requirement
-        </button>
+        {nodes.length >= 2 && (
+          <button
+            onClick={handleAddActivityRequirement}
+            className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Add Activity Requirement
+          </button>
+        )}
       </div>
 
       {nodes.length > 0 && (
@@ -175,34 +193,52 @@ const KnowledgePathEdit = () => {
                   Media Type
                 </th>
                 <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  View
+                </th>
+                <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {nodes.map((node, index) => (
-                <tr key={node.id}>
-                  <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
-                    {index + 1}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
-                    {node.title}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
-                    {node.media_type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
-                    <button 
-                      onClick={() => handleRemoveNode(node.id)}
-                      disabled={isRemovingNode}
-                      className={`text-red-600 hover:text-red-900 transition-colors
-                        ${isRemovingNode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {nodes.map((node, index) => {
+                console.log('Node data:', node);
+                return (
+                  <tr key={node.id}>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      {node.title || 'Untitled'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      {node.media_type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <Link
+                        to={`/content/${node.content_id}/library`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        View
+                        <OpenInNewIcon className="w-4 h-4" />
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <button 
+                        onClick={() => handleRemoveNode(node.id)}
+                        disabled={isRemovingNode}
+                        className={`text-red-600 hover:text-red-900 transition-colors
+                          ${isRemovingNode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -4,9 +4,11 @@ from django.contrib.auth.models import User
 
 
 class KnowledgePathNodeSerializer(serializers.ModelSerializer):
+    content_id = serializers.IntegerField(source='content.id')
+
     class Meta:
         model = Node
-        fields = ['id', 'title', 'media_type']
+        fields = ['id', 'title', 'media_type', 'content_id']
 
 
 class KnowledgePathSerializer(serializers.ModelSerializer):
@@ -23,7 +25,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
 class NodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Node
-        fields = ['id', 'title', 'order', 'media_type', 'content', 'knowledge_path']
+        fields = ['id', 'title', 'order', 'media_type', 'content', 'knowledge_path', 'content_id']
         read_only_fields = ['id', 'order']
 
 
@@ -31,6 +33,7 @@ class ActivityRequirementSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityRequirement
         fields = ['id', 'knowledge_path', 'activity_type', 'description']
+        read_only_fields = ['id']
 
 
 class NodeActivityRequirementSerializer(serializers.ModelSerializer):

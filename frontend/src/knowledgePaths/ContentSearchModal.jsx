@@ -12,9 +12,11 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
     const fetchUserContent = async () => {
       try {
         const content = await contentApi.getUserContent();
+        console.log('Fetched user content:', content);
         setUserContent(content);
         setFilteredContent(content);
       } catch (err) {
+        console.error('Error fetching content:', err);
         setError('Failed to load content');
       } finally {
         setLoading(false);
@@ -27,8 +29,8 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
   }, [isOpen]);
 
   useEffect(() => {
-    const filtered = userContent.filter(content =>
-      content.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const filtered = userContent.filter(contentProfile =>
+      (contentProfile.content?.original_title || contentProfile.title || 'Untitled').toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredContent(filtered);
   }, [searchTerm, userContent]);
@@ -100,28 +102,57 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredContent.map((content) => (
-                <div
-                  key={content.id}
-                  onClick={!isLoading ? () => onSelectContent(content) : undefined}
-                  className={`group p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all 
-                    ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                        {content.title}
-                      </h4>
-                      <span className={`inline-block px-3 py-1 mt-2 text-xs font-medium rounded-full ${getMediaTypeStyles(content.media_type)}`}>
-                        {content.media_type}
+              {filteredContent.map((contentProfile) => {
+                console.log('Rendering content profile:', contentProfile);
+                console.log('Content:', contentProfile.content);
+                console.log('Media type:', contentProfile.content?.media_type);
+                console.log('File details:', contentProfile.content?.file_details);
+                
+                const content = contentProfile.content;
+                if (!content) return null;
+
+                return (
+                  <div
+                    key={contentProfile.id}
+                    onClick={!isLoading ? () => onSelectContent(content) : undefined}
+                    className={`group p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all 
+                      ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3">
+                          {content.media_type === 'IMAGE' && content.file_details?.url && (
+                            <div className="flex-shrink-0 w-16 h-16 rounded overflow-hidden">
+                              <img 
+                                src={content.file_details.url} 
+                                alt={contentProfile.title || content.original_title || 'Untitled'} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  console.error('Image failed to load:', content.file_details.url);
+                                  e.target.src = '/placeholder-image.png';
+                                  e.target.onerror = null;
+                                }}
+                                onLoad={() => console.log('Image loaded successfully:', content.file_details.url)}
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {contentProfile.title || content.original_title || 'Untitled'}
+                            </h4>
+                            <span className={`inline-block px-3 py-1 mt-2 text-xs font-medium rounded-full ${getMediaTypeStyles(content.media_type)}`}>
+                              {content.media_type}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-gray-400 group-hover:text-blue-500 transition-colors">
+                        →
                       </span>
                     </div>
-                    <span className="text-gray-400 group-hover:text-blue-500 transition-colors">
-                      →
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -31,6 +31,7 @@ import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationFor
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 import KnowledgePathList from './knowledgePaths/KnowledgePathList';
 import KnowledgePathDetail from './knowledgePaths/KnowledgePathDetail';
+import QuizCreate from './quizzes/QuizCreate';
 
 const App = () => {
   return (
@@ -72,6 +73,7 @@ const App = () => {
             <Route path=":pathId" element={<KnowledgePathDetail />} />
             <Route path="create" element={<KnowledgePathCreationForm />} />
             <Route path=":pathId/edit" element={<KnowledgePathEdit />} />
+            <Route path=":pathId/add-quiz" element={<QuizCreate />} />
           </Route>
         </Route>
       </Routes>

@@ -30,7 +30,7 @@ urlpatterns = [
     path('api/knowledge_paths/', include('knowledge_paths.urls', namespace='knowledge_paths')),
     
     path('ratings/', include('star_ratings.urls', namespace='ratings')),
-    # path('exams/', include('exams.urls')),
+    path('api/quizzes/', include('quizzes.urls', namespace='quizzes')),
     # path('', event_views.events_all, name="events_all"),
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

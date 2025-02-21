@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import KnowledgePath, Node
-from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer
+from .models import KnowledgePath, Node, ActivityRequirement
+from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, ActivityRequirementSerializer
 from utils.permissions import IsAuthor
 from content.models import Content
 from django.db import IntegrityError
@@ -94,3 +94,22 @@ class NodeDeleteView(APIView):
         
         node.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class ActivityRequirementCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, path_id):
+        # Get the knowledge path
+        knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
+        
+        # Add knowledge_path to the request data
+        data = {
+            **request.data,
+            'knowledge_path': path_id
+        }
+        
+        serializer = ActivityRequirementSerializer(data=data)
+        if serializer.is_valid():
+            activity_requirement = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

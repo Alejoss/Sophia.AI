@@ -13,14 +13,28 @@ class LibrarySerializer(serializers.ModelSerializer):
 
 
 class FileDetailsSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
     class Meta:
         model = FileDetails
-        fields = ['file', 'file_size', 'uploaded_at']
+        fields = ['file', 'file_size', 'uploaded_at', 'url']
+    
+    def get_url(self, obj):
+        if obj.file:
+            url = obj.file.url
+            absolute_url = self.context['request'].build_absolute_uri(url) if 'request' in self.context else url
+            print(f"FileDetails URL for file {obj.id}:")
+            print(f"  - Raw URL: {url}")
+            print(f"  - Absolute URL: {absolute_url}")
+            return absolute_url
+        print(f"No file URL for FileDetails {obj.id}")
+        return None
 
 
 class ContentSerializer(serializers.ModelSerializer):
     file_details = FileDetailsSerializer(read_only=True)
     topics = serializers.StringRelatedField(many=True, read_only=True)
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -32,13 +46,24 @@ class ContentSerializer(serializers.ModelSerializer):
             'created_at',
             'original_title',
             'original_author',
-            'uploaded_by'
+            'uploaded_by',
+            'url'
         ]
+    
+    def get_url(self, obj):
+        if obj.file_details and obj.file_details.file:
+            return obj.file_details.file.url
+        return None
 
 
 class ContentProfileSerializer(serializers.ModelSerializer):
     collection_name = serializers.CharField(source='collection.name', read_only=True)
     content = ContentSerializer(read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        print(f"ContentProfile serialized data for id {instance.id}:", data)
+        return data
 
     class Meta:
         model = ContentProfile
