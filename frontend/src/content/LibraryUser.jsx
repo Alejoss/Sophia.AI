@@ -117,7 +117,7 @@ const LibraryUser = () => {
                                     <td style={{ padding: '12px' }}>
                                         {contentProfile.content.file_details?.file && (
                                             <a 
-                                                href={`http://localhost:8000${contentProfile.content.file_details.file}`}
+                                                href={contentProfile.content.file_details.file}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
@@ -149,7 +149,7 @@ const LibraryUser = () => {
                                         justifyContent: 'center'
                                     }}>
                                         <img 
-                                            src={`http://localhost:8000${contentProfile.content.file_details.file}`} 
+                                            src={contentProfile.content.file_details.file} 
                                             alt={contentProfile.title || 'Content image'}
                                             style={{
                                                 width: '100%',

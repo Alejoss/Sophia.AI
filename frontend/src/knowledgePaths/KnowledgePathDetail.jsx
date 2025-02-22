@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import { useAuth } from '../context/AuthContext';
 
 const KnowledgePathDetail = () => {
   const { pathId } = useParams();
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { authState } = useAuth();
+  const { user } = authState;
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -35,12 +38,14 @@ const KnowledgePathDetail = () => {
             <h1 className="text-3xl font-bold mb-2">{knowledgePath.title}</h1>
             <p className="text-gray-600">Created by {knowledgePath.author}</p>
           </div>
-          <Link
-            to={`/knowledge_path/${pathId}/edit`}
-            className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
-          >
-            Edit Path
-          </Link>
+          {user && user.username === knowledgePath.author && (
+            <Link
+              to={`/knowledge_path/${pathId}/edit`}
+              className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+            >
+              Edit Path
+            </Link>
+          )}
         </div>
 
         <div className="mb-8">
@@ -59,7 +64,12 @@ const KnowledgePathDetail = () => {
                 >
                   <span className="font-bold text-gray-500 mr-4">{index + 1}</span>
                   <div>
-                    <h3 className="font-medium">{node.title}</h3>
+                    <Link 
+                      to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                      className="font-medium hover:text-blue-500"
+                    >
+                      {node.title}
+                    </Link>
                     <span className="text-sm text-gray-500">{node.media_type}</span>
                   </div>
                 </div>

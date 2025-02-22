@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, Typography, Box, Chip, Divider, Button, Breadcrumbs } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import EditIcon from '@mui/icons-material/Edit';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
 
@@ -12,6 +14,7 @@ const ContentDetailsLibrary = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { contentId } = useParams();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -73,6 +76,24 @@ const ContentDetailsLibrary = () => {
                         {profile?.title}
                     </Typography>
                 </Breadcrumbs>
+            </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate('/content/library_user')}
+                >
+                    Back to Library
+                </Button>
+                <Button
+                    variant="outlined"
+                    startIcon={<EditIcon />}
+                    onClick={() => navigate(`/content/${contentId}/edit`)}
+                >
+                    Edit Content
+                </Button>
             </Box>
 
             <Card sx={{ padding: 3 }}>

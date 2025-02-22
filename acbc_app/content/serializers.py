@@ -23,11 +23,7 @@ class FileDetailsSerializer(serializers.ModelSerializer):
         if obj.file:
             url = obj.file.url
             absolute_url = self.context['request'].build_absolute_uri(url) if 'request' in self.context else url
-            print(f"FileDetails URL for file {obj.id}:")
-            print(f"  - Raw URL: {url}")
-            print(f"  - Absolute URL: {absolute_url}")
             return absolute_url
-        print(f"No file URL for FileDetails {obj.id}")
         return None
 
 
@@ -62,7 +58,6 @@ class ContentProfileSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        print(f"ContentProfile serialized data for id {instance.id}:", data)
         return data
 
     class Meta:

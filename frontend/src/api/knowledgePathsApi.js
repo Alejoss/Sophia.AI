@@ -65,6 +65,36 @@ const knowledgePathsApi = {
         }
     },
 
+    getKnowledgePathBasic: async (pathId) => {
+        try {
+            const response = await axiosInstance.get(`/knowledge_paths/${pathId}/basic/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching basic knowledge path:', error);
+            throw error;
+        }
+    },
+
+    getNode: async (pathId, nodeId) => {
+        try {
+            const response = await axiosInstance.get(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching node:', error);
+            throw error;
+        }
+    },
+
+    updateNode: async (pathId, nodeId, nodeData) => {
+        try {
+            const response = await axiosInstance.put(`/knowledge_paths/${pathId}/nodes/${nodeId}/`, nodeData);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating node:', error);
+            throw error;
+        }
+    },
+
     // Add other knowledge path-related API calls here as needed
 };
 

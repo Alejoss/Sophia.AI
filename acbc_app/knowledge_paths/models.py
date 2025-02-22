@@ -47,6 +47,7 @@ class Node(models.Model):
     knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, related_name='nodes')
     content = models.ForeignKey(Content, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
     media_type = models.CharField(max_length=20, choices=MEDIA_TYPES)
     created_at = models.DateTimeField(auto_now_add=True)

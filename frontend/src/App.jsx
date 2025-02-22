@@ -32,6 +32,10 @@ import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 import KnowledgePathList from './knowledgePaths/KnowledgePathList';
 import KnowledgePathDetail from './knowledgePaths/KnowledgePathDetail';
 import QuizCreate from './quizzes/QuizCreate';
+import ContentEdit from './content/ContentEdit.jsx';
+import NodeCreate from './knowledgePaths/NodeCreate';
+import NodeEdit from './knowledgePaths/NodeEdit';
+import NodeDetail from './knowledgePaths/NodeDetail';
 
 const App = () => {
   return (
@@ -67,13 +71,17 @@ const App = () => {
             <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
             <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
             <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
+            <Route path=":contentId/edit" element={<ContentEdit />} />
           </Route>
           <Route path="knowledge_path">
             <Route path="" element={<KnowledgePathList />} />
             <Route path=":pathId" element={<KnowledgePathDetail />} />
             <Route path="create" element={<KnowledgePathCreationForm />} />
             <Route path=":pathId/edit" element={<KnowledgePathEdit />} />
+            <Route path=":pathId/add-node" element={<NodeCreate />} />
             <Route path=":pathId/add-quiz" element={<QuizCreate />} />
+            <Route path=":pathId/nodes/:nodeId/edit" element={<NodeEdit />} />
+            <Route path=":pathId/nodes/:nodeId" element={<NodeDetail />} />
           </Route>
         </Route>
       </Routes>

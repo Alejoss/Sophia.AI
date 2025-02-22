@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import KnowledgePath, Node, ActivityRequirement
-from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, ActivityRequirementSerializer
+from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, ActivityRequirementSerializer, KnowledgePathBasicSerializer
 from utils.permissions import IsAuthor
 from content.models import Content
 from django.db import IntegrityError
@@ -113,3 +113,36 @@ class ActivityRequirementCreateView(APIView):
             activity_requirement = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class KnowledgePathBasicDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        serializer = KnowledgePathBasicSerializer(knowledge_path)
+        return Response(serializer.data)
+
+class NodeDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, path_id, node_id):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
+        node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+        serializer = NodeSerializer(node)
+        return Response(serializer.data)
+
+    def put(self, request, path_id, node_id):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
+        node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+        serializer = NodeSerializer(node, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, path_id, node_id):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
+        node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+        node.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

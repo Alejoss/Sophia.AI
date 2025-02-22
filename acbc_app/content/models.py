@@ -98,6 +98,12 @@ class FileDetails(models.Model):
     def __str__(self):
         return f"File for {self.content.original_title}"
 
+    @property
+    def url(self):
+        if self.file:
+            return self.file.url
+        return None
+
 
 class BlockchainInteraction(models.Model):
     # Records transaction details when content interactions are recorded on a blockchain.

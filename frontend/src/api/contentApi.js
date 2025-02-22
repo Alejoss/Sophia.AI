@@ -188,6 +188,28 @@ const contentApi = {
             throw error;
         }
     },
+
+    updateContentProfile: async (profileId, profileData) => {
+        try {
+            const response = await axiosInstance.patch(
+                `/content/content-profiles/${profileId}/`,
+                profileData
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error updating content profile:', error);
+            throw error;
+        }
+    },
+
+    deleteContent: async (contentId) => {
+        try {
+            await axiosInstance.delete(`/content/content_details/${contentId}/`);
+        } catch (error) {
+            console.error('Error deleting content:', error);
+            throw error;
+        }
+    },
 };
 
 export default contentApi;

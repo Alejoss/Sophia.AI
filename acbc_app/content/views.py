@@ -52,7 +52,9 @@ class ContentListView(APIView):
 
 
 class ContentDetailView(APIView):
-    """API view to retrieve a specific Content instance by its primary key."""
+    """API view to retrieve, update, or delete a specific Content instance."""
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, pk):
         try:
             content = get_object_or_404(Content, pk=pk)
@@ -65,6 +67,37 @@ class ContentDetailView(APIView):
             return Response(
                 {'error': 'Content not found'}, 
                 status=status.HTTP_404_NOT_FOUND
+            )
+
+    def delete(self, request, pk):
+        try:
+            content = get_object_or_404(Content, pk=pk)
+            # Check if the user has permission to delete this content
+            content_profile = ContentProfile.objects.get(content=content, user=request.user)
+            
+            # Delete the content profile first
+            content_profile.delete()
+            
+            # Only delete the content and file if this was the last profile
+            remaining_profiles = ContentProfile.objects.filter(content=content).count()
+            if remaining_profiles == 0:
+                # No more profiles exist, safe to delete the content and file
+                if content.file_details:
+                    if content.file_details.file:
+                        content.file_details.file.delete()
+                    content.file_details.delete()
+                content.delete()
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ContentProfile.DoesNotExist:
+            return Response(
+                {'error': 'You do not have permission to delete this content'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
