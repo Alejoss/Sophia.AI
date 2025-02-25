@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentDisplay from './ContentDisplay';
-import { useAuth } from '../context/AuthContext';
+import { getUserFromLocalStorage } from '../context/localStorageUtils';
 
 const NodeDetail = () => {
   const { pathId, nodeId } = useParams();
@@ -10,8 +10,7 @@ const NodeDetail = () => {
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { authState } = useAuth();
-  const { user } = authState;
+  const user = getUserFromLocalStorage();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -20,9 +19,13 @@ const NodeDetail = () => {
           knowledgePathsApi.getNode(pathId, nodeId),
           knowledgePathsApi.getKnowledgePathBasic(pathId)
         ]);
+        console.log('Node data:', nodeData);
+        console.log('Path data:', pathData);
+        console.log('Is node available:', nodeData.is_available);
         setNode(nodeData);
         setKnowledgePath(pathData);
       } catch (err) {
+        console.error('Error fetching node:', err);
         setError('Failed to load node');
       } finally {
         setLoading(false);
@@ -31,6 +34,16 @@ const NodeDetail = () => {
 
     fetchData();
   }, [pathId, nodeId]);
+
+  const handleComplete = async () => {
+    try {
+      await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
+      // Optionally refresh the node data or show success message
+      // You might want to redirect to the next available node
+    } catch (error) {
+      setError('Failed to mark node as completed');
+    }
+  };
 
   if (loading) return <div className="container mx-auto p-4">Loading...</div>;
   if (error) return <div className="container mx-auto p-4 text-red-600">{error}</div>;
@@ -91,6 +104,14 @@ const NodeDetail = () => {
             >
               Back to Path
             </Link>
+            {!node.is_completed && (
+              <button
+                onClick={handleComplete}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Mark as Completed
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -4,6 +4,8 @@ import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentSearchModal from './ContentSearchModal';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EditIcon from '@mui/icons-material/Edit';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
@@ -19,13 +21,12 @@ const KnowledgePathEdit = () => {
   const [isAddingNode, setIsAddingNode] = useState(false);
   const [isRemovingNode, setIsRemovingNode] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isReordering, setIsReordering] = useState(false);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
       try {
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
-        console.log('Knowledge path data:', data);
-        console.log('Nodes:', data.nodes);
         setFormData({
           title: data.title,
           description: data.description
@@ -101,6 +102,37 @@ const KnowledgePathEdit = () => {
 
   const handleAddActivityRequirement = () => {
     navigate(`/knowledge_path/${pathId}/add-quiz`);
+  };
+
+  const handleMoveNode = async (nodeId, direction) => {
+    setIsReordering(true);
+    console.log('Moving node:', nodeId, 'direction:', direction);
+    try {
+      const currentIndex = nodes.findIndex(node => node.id === nodeId);
+      if (currentIndex === -1) return;
+
+      const newNodes = [...nodes];
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      // Swap nodes
+      [newNodes[currentIndex], newNodes[targetIndex]] = [newNodes[targetIndex], newNodes[currentIndex]];
+
+      // Prepare order data
+      const nodeOrders = newNodes.map((node, index) => ({
+        id: node.id,
+        order: index + 1
+      }));
+      console.log('Sending node orders:', nodeOrders);
+
+      // Update backend
+      const updatedNodes = await knowledgePathsApi.reorderNodes(pathId, nodeOrders);
+      setNodes(updatedNodes);
+    } catch (err) {
+      console.error('Reorder error:', err.response?.data || err.message);
+      setError('Failed to reorder nodes');
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   if (loading) {
@@ -232,6 +264,24 @@ const KnowledgePathEdit = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
                         <div className="flex gap-2">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleMoveNode(node.id, 'up')}
+                              disabled={isReordering || index === 0}
+                              className={`p-1 rounded hover:bg-gray-100 transition-colors
+                                ${(isReordering || index === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              <ArrowUpwardIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleMoveNode(node.id, 'down')}
+                              disabled={isReordering || index === nodes.length - 1}
+                              className={`p-1 rounded hover:bg-gray-100 transition-colors
+                                ${(isReordering || index === nodes.length - 1) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              <ArrowDownwardIcon className="w-4 h-4" />
+                            </button>
+                          </div>
                           <Link
                             to={`/knowledge_path/${pathId}/nodes/${node.id}/edit`}
                             className="text-blue-500 hover:text-blue-700"

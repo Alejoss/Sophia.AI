@@ -95,6 +95,29 @@ const knowledgePathsApi = {
         }
     },
 
+    reorderNodes: async (pathId, nodeOrders) => {
+        try {
+            const response = await axiosInstance.put(
+                `/knowledge_paths/${pathId}/nodes/reorder/`,
+                { node_orders: nodeOrders }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error reordering nodes:', error);
+            throw error;
+        }
+    },
+
+    markNodeCompleted: async (pathId, nodeId) => {
+        try {
+            const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error marking node as completed:', error);
+            throw error;
+        }
+    },
+
     // Add other knowledge path-related API calls here as needed
 };
 
