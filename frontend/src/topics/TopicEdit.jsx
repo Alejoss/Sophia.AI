@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Box, Typography, Paper, Button, Chip, Divider, Alert, IconButton, Modal, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Typography, Paper, Button, Chip, Divider, Alert, IconButton, Modal, List, ListItem, ListItemIcon, ListItemText, TextField } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import SaveIcon from '@mui/icons-material/Save';
 import contentApi from '../api/contentApi';
 
 const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
@@ -136,12 +137,21 @@ const TopicEdit = () => {
     const [error, setError] = useState(null);
     const [imageFile, setImageFile] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState({
+        title: '',
+        description: ''
+    });
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         const fetchTopic = async () => {
             try {
                 const data = await contentApi.getTopicDetails(topicId);
                 setTopic(data);
+                setFormData({
+                    title: data.title || '',
+                    description: data.description || ''
+                });
                 setLoading(false);
             } catch (err) {
                 setError('Failed to fetch topic details');
@@ -162,6 +172,29 @@ const TopicEdit = () => {
             setError(null);
         } catch (err) {
             setError('Failed to update topic image');
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const updatedTopic = await contentApi.updateTopic(topicId, formData);
+            setTopic(updatedTopic);
+            setError(null);
+            navigate(`/content/topics/${topicId}`);
+        } catch (err) {
+            setError('Failed to update topic details');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -217,16 +250,41 @@ const TopicEdit = () => {
                         </Button>
                     </Box>
 
-                    {/* Topic Title and Description */}
+                    {/* Topic Title and Description Form */}
                     <Box sx={{ flex: 1 }}>
-                        <Typography variant="h4" gutterBottom>
-                            {topic.title}
-                        </Typography>
-                        {topic.description && (
-                            <Typography variant="body1">
-                                {topic.description}
-                            </Typography>
-                        )}
+                        <form onSubmit={handleSubmit}>
+                            <TextField
+                                fullWidth
+                                label="Title"
+                                name="title"
+                                value={formData.title}
+                                onChange={handleInputChange}
+                                margin="normal"
+                                required
+                                error={!formData.title}
+                                helperText={!formData.title ? "Title is required" : ""}
+                            />
+                            <TextField
+                                fullWidth
+                                label="Description"
+                                name="description"
+                                value={formData.description}
+                                onChange={handleInputChange}
+                                margin="normal"
+                                multiline
+                                rows={4}
+                            />
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                color="primary"
+                                startIcon={<SaveIcon />}
+                                disabled={saving || !formData.title}
+                                sx={{ mt: 2 }}
+                            >
+                                {saving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </form>
                     </Box>
                 </Box>
 

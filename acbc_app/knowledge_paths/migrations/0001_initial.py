@@ -57,13 +57,12 @@ class Migration(migrations.Migration):
             name='NodeActivityRequirement',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('is_mandatory', models.BooleanField(default=True)),
-                ('activity_requirement', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='knowledge_paths.activityrequirement')),
-                ('following_node', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='preceding_activities', to='knowledge_paths.node')),
                 ('preceding_node', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='following_activities', to='knowledge_paths.node')),
+                ('following_node', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='preceding_activities', to='knowledge_paths.node')),
+                ('is_mandatory', models.BooleanField(default=True)),
             ],
             options={
-                'unique_together': {('preceding_node', 'following_node', 'activity_requirement')},
+                'unique_together': {('preceding_node', 'following_node')},
             },
         ),
     ]

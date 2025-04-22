@@ -6,7 +6,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from knowledge_paths.models import ActivityRequirement, Node
+from knowledge_paths.models import Node, KnowledgePath
+from quizzes.models import Quiz
 
 
 def upload_profile_picture(instance, filename):
@@ -71,26 +72,29 @@ class ContactMethod(models.Model):
         return self.name + " " + self.user.username
 
 
-class UserProgressKnowledgePath(models.Model):
-    # Records progress of users through nodes in a KnowledgePath, ensuring uniqueness for each user-node combination.
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE)    
-    is_completed = models.BooleanField(default=False)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    current_node = models.ForeignKey('knowledge_paths.Node', on_delete=models.SET_NULL, null=True)
-
-    def __str__(self):
-        status = 'Completed' if self.is_completed else 'Not Completed'
-        return f"{self.user.username} - ({status})"
-
-
 class UserActivityStatus(models.Model):
     # Keeps track of user completions for specific activities within a knowledge path, recording completion status and time.
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    activity_requirement = models.ForeignKey('knowledge_paths.ActivityRequirement', on_delete=models.CASCADE)
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         status = 'Completed' if self.is_completed else 'Pending'
-        return f"{self.user.username} - {self.activity_requirement} ({status})"
+        return f"{self.user.username} - {status}"
+
+
+class UserNodeCompletion(models.Model):
+    # Tracks the completion status of each node for a user within a knowledge path.
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE)
+    node = models.ForeignKey(Node, on_delete=models.CASCADE)
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'knowledge_path', 'node')
+
+    def __str__(self):
+        status = 'Completed' if self.is_completed else 'Pending'
+        return f"{self.user.username} - {self.node.title} ({status})"

@@ -63,7 +63,6 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('is_completed', models.BooleanField(default=False)),
                 ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('activity_requirement', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='knowledge_paths.activityrequirement')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -36,14 +37,42 @@ class CheckAuth(APIView):
 
 
 class UserProfileView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
     def get(self, request, format=None):
         # Fetch the profile of the authenticated user
         user_profile = Profile.objects.filter(user=request.user).first()
         if not user_profile:
             return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ProfileSerializer(user_profile)
+        serializer = ProfileSerializer(user_profile, context={'request': request})
         return Response(serializer.data)
+
+    def put(self, request, format=None):
+        # Get the profile of the authenticated user
+        user_profile = Profile.objects.filter(user=request.user).first()
+        if not user_profile:
+            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Handle profile picture upload
+        profile_picture = request.FILES.get('profile_picture')
+        if profile_picture:
+            user_profile.profile_picture = profile_picture
+
+        # Handle profile description update
+        profile_description = request.data.get('profile_description')
+        if profile_description is not None:  # Allow empty string
+            user_profile.profile_description = profile_description
+
+        try:
+            user_profile.save()
+            serializer = ProfileSerializer(user_profile, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update profile: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     def post(self, request, format=None):
         # Update or create a profile for the authenticated user
@@ -91,20 +120,23 @@ class UserDetailView(APIView):
 
 class ProfileDetail(APIView):
     def get(self, request, pk, format=None):
-        profile = get_object_or_404(Profile, pk=pk)
-        serializer = ProfileSerializer(profile)
+        # Look up profile by user_id instead of profile_id
+        profile = get_object_or_404(Profile, user_id=pk)
+        serializer = ProfileSerializer(profile, context={'request': request})
         return Response(serializer.data)
 
     def put(self, request, pk, format=None):
-        profile = get_object_or_404(Profile, pk=pk)
-        serializer = ProfileSerializer(profile, data=request.data)
+        # Update to also use user_id
+        profile = get_object_or_404(Profile, user_id=pk)
+        serializer = ProfileSerializer(profile, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, format=None):
-        profile = get_object_or_404(Profile, pk=pk)
+        # Update to also use user_id
+        profile = get_object_or_404(Profile, user_id=pk)
         profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

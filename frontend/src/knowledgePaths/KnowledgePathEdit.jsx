@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
-import ContentSearchModal from './ContentSearchModal';
+import quizzesApi from '../api/quizzesApi';
+import ContentSearchModal from '../content/ContentSearchModal';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -22,6 +23,7 @@ const KnowledgePathEdit = () => {
   const [isRemovingNode, setIsRemovingNode] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [isReordering, setIsReordering] = useState(false);
+  const [quizzes, setQuizzes] = useState({});
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -32,8 +34,23 @@ const KnowledgePathEdit = () => {
           description: data.description
         });
         setNodes(data.nodes || []);
+        
+        // Fetch quizzes and map them to nodes using the correct attribute
+        const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
+        console.log('Fetched quizzes data:', quizzesData); // Log the quizzes data
+
+        // Map quizzes to nodes using the 'node' attribute
+        const quizzesMap = quizzesData.reduce((acc, quiz) => {
+          if (!acc[quiz.node]) {
+            acc[quiz.node] = [];
+          }
+          acc[quiz.node].push(quiz);
+          return acc;
+        }, {});
+        console.log('Mapped quizzes:', quizzesMap); // Log the mapped quizzes
+        setQuizzes(quizzesMap);
       } catch (err) {
-        setError('Failed to load knowledge path');
+        console.error('Failed to load knowledge path or quizzes', err);
       } finally {
         setLoading(false);
       }
@@ -67,13 +84,13 @@ const KnowledgePathEdit = () => {
     navigate(`/knowledge_path/${pathId}/add-node`);
   };
 
-  const handleSelectContent = async (content) => {
+  const handleSelectContent = async (contentProfile) => {
     setIsAddingNode(true);
     setError(null);
 
     try {
       const newNode = await knowledgePathsApi.addNode(pathId, {
-        content_id: content.id
+        content_profile_id: contentProfile.id
       });
       setNodes([...nodes, newNode]);
       setIsModalOpen(false);
@@ -101,12 +118,11 @@ const KnowledgePathEdit = () => {
   };
 
   const handleAddActivityRequirement = () => {
-    navigate(`/knowledge_path/${pathId}/add-quiz`);
+    navigate(`/quizzes/${pathId}/create`);
   };
 
   const handleMoveNode = async (nodeId, direction) => {
     setIsReordering(true);
-    console.log('Moving node:', nodeId, 'direction:', direction);
     try {
       const currentIndex = nodes.findIndex(node => node.id === nodeId);
       if (currentIndex === -1) return;
@@ -122,7 +138,6 @@ const KnowledgePathEdit = () => {
         id: node.id,
         order: index + 1
       }));
-      console.log('Sending node orders:', nodeOrders);
 
       // Update backend
       const updatedNodes = await knowledgePathsApi.reorderNodes(pathId, nodeOrders);
@@ -150,6 +165,15 @@ const KnowledgePathEdit = () => {
           ← Back to Path
         </Link>
         <h1 className="text-2xl font-bold">Edit Knowledge Path</h1>
+      </div>
+
+      <div className="mb-4">
+        <Link
+          to={`/knowledge_path/${pathId}`}
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          View Knowledge Path
+        </Link>
       </div>
 
       {/* Form Section */}
@@ -229,6 +253,9 @@ const KnowledgePathEdit = () => {
                     Media Type
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Quiz
+                  </th>
+                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     View
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -238,7 +265,8 @@ const KnowledgePathEdit = () => {
               </thead>
               <tbody>
                 {nodes.map((node, index) => {
-                  console.log('Node data:', node);
+                  console.log('Node ID:', node.id); // Log each node's ID
+                  console.log('Node quizzes:', quizzes[node.id]); // Log quizzes for each node
                   return (
                     <tr key={node.id}>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
@@ -249,6 +277,19 @@ const KnowledgePathEdit = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
                         {node.media_type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                        {quizzes[node.id] && quizzes[node.id].length > 0 ? (
+                          quizzes[node.id].map((quiz, quizIndex) => (
+                            <Link
+                              key={quiz.id}
+                              to={`/quizzes/${quiz.id}/edit`}
+                              className="text-blue-500 hover:text-blue-700"
+                            >
+                              {quiz.title || `Quiz ${quizIndex + 1}`}
+                            </Link>
+                          ))
+                        ) : 'No'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
                         <Link

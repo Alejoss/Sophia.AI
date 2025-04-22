@@ -34,7 +34,9 @@ const knowledgePathsApi = {
     addNode: async (pathId, nodeData) => {
         try {
             console.log('Sending request to add node:', { pathId, nodeData });
-            const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/`, nodeData);
+            const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/`, {
+                content_profile_id: nodeData.content_profile_id
+            });
             console.log('Response from add node:', response.data);
             return response.data;
         } catch (error) {
@@ -110,10 +112,13 @@ const knowledgePathsApi = {
 
     markNodeCompleted: async (pathId, nodeId) => {
         try {
+            console.log('Sending node completion request:', { pathId, nodeId });
             const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+            console.log('Node completion API response:', response.data);
             return response.data;
         } catch (error) {
-            console.error('Error marking node as completed:', error);
+            console.error('Error in markNodeCompleted API call:', error);
+            console.error('Error response:', error.response?.data);
             throw error;
         }
     },

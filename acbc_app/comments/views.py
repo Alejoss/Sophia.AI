@@ -5,13 +5,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from utils.permissions import IsAuthor
 
 from comments.managers import CommentManager
 from content.models import Topic, Content
-from utils.permissions import IsAuthor
 from comments.models import Comment
 from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer, ContentTopicCommentSerializer, \
-    TopicCommentSerializer
+    TopicCommentSerializer, CommentCreateSerializer
+from knowledge_paths.models import KnowledgePath
 
 
 class BaseCommentView(APIView):
@@ -32,7 +34,7 @@ class BaseCommentView(APIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
-        serializer = self.get_serializer_class()(queryset, many=True)
+        serializer = self.get_serializer_class()(queryset, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
@@ -45,61 +47,106 @@ class BaseCommentView(APIView):
 
         serializer = self.get_serializer_class()(data=data)
         serializer.is_valid(raise_exception=True)
-        self.save_serializer(serializer, **kwargs)
-
-        return Response({"success": "Comment added successfully."}, status=status.HTTP_201_CREATED)
+        comment = self.save_serializer(serializer, **kwargs)
+        
+        # Return the serialized comment data
+        return_serializer = self.get_serializer_class()(comment, context={'request': request})
+        return Response(return_serializer.data, status=status.HTTP_201_CREATED)
 
     def save_serializer(self, serializer, **kwargs):
         """ Override to save with specific attributes. """
         raise NotImplementedError("Subclasses must implement save_serializer.")
 
 
-class KnowledgePathCommentsView(BaseCommentView):
-    """ View for retrieving and adding comments on a KnowledgePath. """
+class KnowledgePathCommentsView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def get_serializer_class(self):
-        return KnowledgePathCommentSerializer
-
-    def get_queryset(self, pk):
+    def get(self, request, pk):
+        """Get all comments for a knowledge path"""
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        return Comment.objects.filter(
-            content_type=ContentType.objects.get_for_model(knowledge_path),
-            object_id=knowledge_path.id,
+        knowledge_path_type = ContentType.objects.get_for_model(KnowledgePath)
+        
+        # Get comments that:
+        # 1. Are linked to a KnowledgePath via content_object
+        # 2. Have no topic association (topic is null)
+        # 3. Are top-level comments (no parent)
+        # 4. Are active
+        comments = Comment.objects.filter(
+            content_type=knowledge_path_type,
+            object_id=pk,
+            topic__isnull=True,  # Ensure these are not topic-related comments
             parent=None,
             is_active=True
-        ).select_related('author')
+        ).order_by('-created_at')
+        
+        serializer = KnowledgePathCommentSerializer(comments, many=True, context={'request': request})
+        return Response(serializer.data)
 
-    def save_serializer(self, serializer, pk):
+    def post(self, request, pk):
+        """Add a new comment to a knowledge path"""
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        serializer.save(
-            object_id=knowledge_path.id,
-            content_type=ContentType.objects.get_for_model(knowledge_path)
-        )
+        knowledge_path_type = ContentType.objects.get_for_model(KnowledgePath)
+        
+        comment_data = {
+            'body': request.data.get('body'),
+            'content_type': knowledge_path_type.id,
+            'object_id': pk,
+            'author': request.user.id,
+            'parent': request.data.get('parent'),
+            # No topic field - it will default to null
+        }
+        
+        serializer = CommentCreateSerializer(data=comment_data)
+        if serializer.is_valid():
+            comment = serializer.save()
+            return_serializer = KnowledgePathCommentSerializer(comment, context={'request': request})
+            return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TopicCommentsView(BaseCommentView):
-    """ View for retrieving and adding comments on a Topic. """
+class TopicCommentsView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def get_serializer_class(self):
-        return TopicCommentSerializer
-
-    def get_queryset(self, pk):
+    def get(self, request, pk):
+        """Get all comments for a topic"""
         topic = get_object_or_404(Topic, pk=pk)
-        return Comment.objects.filter(
-            content_type=ContentType.objects.get_for_model(Topic),
-            object_id=topic.id,
-            topic=topic,
+        topic_type = ContentType.objects.get_for_model(Topic)
+        
+        # Get comments that:
+        # 1. Are linked to the Topic via content_object
+        # 2. Have no topic association (to distinguish from content+topic comments)
+        # 3. Are active
+        comments = Comment.objects.filter(
+            content_type=topic_type,
+            object_id=pk,
+            topic__isnull=True,
             parent=None,
             is_active=True
-        ).select_related('author')
+        ).order_by('-created_at')
+        
+        serializer = TopicCommentSerializer(comments, many=True, context={'request': request})
+        return Response(serializer.data)
 
-    def save_serializer(self, serializer, pk):
+    def post(self, request, pk):
+        """Add a new comment to a topic"""
         topic = get_object_or_404(Topic, pk=pk)
-        serializer.save(
-            object_id=topic.id,
-            content_type=ContentType.objects.get_for_model(Topic),
-            topic=topic
-        )
+        topic_type = ContentType.objects.get_for_model(Topic)
+        
+        comment_data = {
+            'body': request.data.get('body'),
+            'content_type': topic_type.id,
+            'object_id': pk,
+            'author': request.user.id,
+            'parent': request.data.get('parent'),
+            # No topic field - it will default to null
+        }
+        
+        serializer = CommentCreateSerializer(data=comment_data)
+        if serializer.is_valid():
+            comment = serializer.save()
+            return_serializer = TopicCommentSerializer(comment, context={'request': request})
+            return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ContentTopicCommentsView(BaseCommentView):
@@ -155,7 +202,7 @@ class BaseCommentRepliesView(APIView):
         self.validate_comment(comment)
 
         replies = comment.replies.all()
-        serializer = self.get_serializer_class()(replies, many=True)
+        serializer = self.get_serializer_class()(replies, many=True, context={'request': request})
 
         return Response(
             serializer.data,
@@ -186,12 +233,32 @@ class BaseCommentRepliesView(APIView):
         )
 
 
-class KnowledgePathCommentRepliesView(BaseCommentRepliesView):
-    """ View for retrieving and adding replies to comments for KnowledgePath. """
-    requires_topic = False
+class KnowledgePathCommentRepliesView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def get_serializer_class(self):
-        return KnowledgePathCommentSerializer
+    def get(self, request, pk):
+        """Get all replies for a knowledge path comment"""
+        parent_comment = get_object_or_404(Comment, pk=pk, is_active=True)
+        replies = Comment.objects.filter(parent=parent_comment, is_active=True).order_by('created_at')
+        serializer = KnowledgePathCommentSerializer(replies, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request, pk):
+        """Add a reply to a knowledge path comment"""
+        parent_comment = get_object_or_404(Comment, pk=pk)
+        
+        serializer = CommentCreateSerializer(data={
+            'body': request.data.get('body'),
+            'knowledge_path': parent_comment.knowledge_path.id,
+            'parent': parent_comment.id,
+            'author': request.user.id
+        })
+        
+        if serializer.is_valid():
+            comment = serializer.save()
+            return_serializer = KnowledgePathCommentSerializer(comment, context={'request': request})
+            return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TopicCommentRepliesView(BaseCommentRepliesView):
@@ -216,35 +283,90 @@ class CommentView(APIView):
 
     def put(self, request, pk):
         """ Update a comment. """
-        comment = get_object_or_404(Comment, pk=pk, is_active=True)
-        self.check_object_permissions(request, comment) # Check if the user is the author of the comment or an admin
+        try:
+            comment = get_object_or_404(Comment, pk=pk)
+            self.check_object_permissions(request, comment)
 
-        user = request.user
-        body = request.data.get('body')
+            body = request.data.get('body')
+            if not body:
+                return Response(
+                    {"error": "Comment body is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        data = {
-            "author": user.id,
-            "body": body,
-        }
-        serializer = CommentSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
+            comment.body = body
+            comment.save()
 
-        comment.body = body
-        comment.save()
-
-        return Response(
-            {"success": "Comment updated successfully."},
-            status=status.HTTP_200_OK,
-        )
+            # Return the updated comment data
+            serializer = CommentSerializer(comment, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Comment.DoesNotExist:
+            raise
+        except Exception as e:
+            raise
 
     def delete(self, request, pk):
         """ Delete a comment. """
-        comment = get_object_or_404(Comment, pk=pk, is_active=True)
-        self.check_object_permissions(request, comment) # Check if the user is the author of the comment or an admin
+        print(f"\n=== Starting comment deletion for ID: {pk} ===")
+        try:
+            comment = get_object_or_404(Comment, pk=pk)
+            print(f"Found comment: {comment.id} by user {comment.author.username}")
+            
+            self.check_object_permissions(request, comment)
+            print(f"Permission check passed for user {request.user.username}")
 
-        Comment.objects.logic_delete(comment) # Call the custom manager method to logically delete the comment
+            # Store the comment ID for the response
+            comment_id = comment.id
+            
+            # Delete the comment
+            print(f"Calling logic_delete for comment {comment_id}")
+            Comment.objects.logic_delete(comment)
+            print(f"Successfully deleted comment {comment_id}")
 
-        return Response(
-            {"success": "Comment deleted successfully."},
-            status=status.HTTP_200_OK,
-        )
+            return Response(
+                {"id": comment_id, "success": "Comment deleted successfully."},
+                status=status.HTTP_200_OK
+            )
+        except Comment.DoesNotExist:
+            print(f"Comment with ID {pk} not found")
+            raise
+        except Exception as e:
+            print(f"Error deleting comment {pk}: {str(e)}")
+            raise
+
+
+class CommentRepliesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        """Get all replies for a comment"""
+        try:
+            parent_comment = get_object_or_404(Comment, pk=pk, is_active=True)
+            replies = Comment.objects.filter(parent=parent_comment, is_active=True).order_by('created_at')
+            serializer = CommentSerializer(replies, many=True, context={'request': request})
+            return Response(serializer.data)
+        except Comment.DoesNotExist:
+            raise
+        except Exception as e:
+            raise
+
+    def post(self, request, pk):
+        """Add a reply to a comment"""
+        parent_comment = get_object_or_404(Comment, pk=pk)
+        
+        # Inherit content_type and object_id from parent comment
+        comment_data = {
+            'body': request.data.get('body'),
+            'content_type': parent_comment.content_type.id,
+            'object_id': parent_comment.object_id,
+            'author': request.user.id,
+            'parent': parent_comment.id,
+            'topic': parent_comment.topic_id  # Will be None for non-topic comments
+        }
+        
+        serializer = CommentCreateSerializer(data=comment_data)
+        if serializer.is_valid():
+            comment = serializer.save()
+            return_serializer = CommentSerializer(comment, context={'request': request})
+            return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

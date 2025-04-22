@@ -1,20 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
-import axiosInstance from '../api/axiosConfig.js';
+import { getProfileById } from '../api/profilesApi';
+import { AuthContext } from '../context/AuthContext';
+import PublicationList from '../publications/PublicationList';
+import { Box, Typography, Paper, Grid, CircularProgress, Tabs, Tab } from '@mui/material';
 
 const ProfileDetail = () => {
     const { profileId } = useParams();
     const [profile, setProfile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [activeTab, setActiveTab] = useState('publications');
+    const { authState } = useContext(AuthContext);
+    const currentUser = authState.user;
+    
+    const isOwnProfile = currentUser && currentUser.id === parseInt(profileId);
 
     useEffect(() => {
         const fetchProfile = async () => {
             setIsLoading(true);
             try {
-                const response = await axiosInstance.get(`/profiles/${profileId}`);  // Use Axios instance
-                setProfile(response.data);
-                setError(null); // Clear any previous errors
+                const profileData = await getProfileById(profileId);
+                console.log('Profile data received:', profileData);
+                console.log('Profile picture URL:', profileData?.profile_picture);
+                setProfile(profileData);
+                setError(null);
             } catch (err) {
                 setError(err.message);
                 setProfile(null);
@@ -24,38 +34,80 @@ const ProfileDetail = () => {
         };
 
         fetchProfile();
-    }, [profileId]); // Depend on profileId to refetch if it changes
+    }, [profileId]);
 
-    if (isLoading) return <p>Loading...</p>;
-    if (error) return <p>Error: {error}</p>;
-    if (!profile) return <p>No profile found</p>;
+    if (isLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+        </Box>
+    );
+    
+    if (error) return (
+        <Box sx={{ p: 3 }}>
+            <Typography color="error">Error: {error}</Typography>
+        </Box>
+    );
+    
+    if (!profile) return (
+        <Box sx={{ p: 3 }}>
+            <Typography>No profile found</Typography>
+        </Box>
+    );
+
+    console.log('Current profile state:', profile);
+    console.log('Profile picture being used in render:', profile.profile_picture || '/default-avatar.png');
 
     return (
-        <div>
-            <h1>Profile: {profile.user.username}</h1>
-            <img src={profile.profile_picture || 'default_profile_pic.jpg'} alt="Profile" />
-            <p>Description: {profile.profile_description}</p>
-            <p>Timezone: {profile.timezone}</p>
-            <p>Interests: {profile.interests}</p>
-            <p>Teaching Status: {profile.is_teacher ? 'Teacher' : 'Student'}</p>
-            <p>Email Confirmed: {profile.email_confirmed ? 'Yes' : 'No'}</p>
-            <p>Green Diamonds: {profile.green_diamonds}</p>
-            <p>Yellow Diamonds: {profile.yellow_diamonds}</p>
-            <p>Purple Diamonds: {profile.purple_diamonds}</p>
-            <p>Blue Diamonds: {profile.blue_diamonds}</p>
-            <div>
-                <h3>Cryptocurrencies:</h3>
-                {profile.cryptos_list.length > 0 ? (
-                    <ul>
-                        {profile.cryptos_list.map(crypto => (
-                            <li key={crypto.id}>{crypto.name} - Address: {crypto.address}</li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p>No cryptocurrencies listed.</p>
+        <Box sx={{ p: 3 }}>
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                            <img 
+                                src={profile.profile_picture || '/default-avatar.png'} 
+                                alt="Profile" 
+                                style={{ width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={12} md={9}>
+                        <Typography variant="h4" gutterBottom>
+                            {profile.user.username}
+                        </Typography>
+                        <Typography variant="body1" paragraph>
+                            {profile.profile_description || 'No description available.'}
+                        </Typography>
+                    </Grid>
+                </Grid>
+            </Paper>
+            
+            {/* Tabs */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs 
+                    value={activeTab} 
+                    onChange={(e, newValue) => setActiveTab(newValue)}
+                >
+                    <Tab label="Publications" value="publications" />
+                    <Tab label="Activity" value="activity" />
+                </Tabs>
+            </Box>
+
+            {/* Tab Content */}
+            <Box>
+                {activeTab === 'publications' && (
+                    <Box>
+                        <PublicationList isOwnProfile={isOwnProfile} />
+                    </Box>
                 )}
-            </div>
-        </div>
+                {activeTab === 'activity' && (
+                    <Box>
+                        <Typography variant="body1" color="text.secondary">
+                            Recent activity will be shown here.
+                        </Typography>
+                    </Box>
+                )}
+            </Box>
+        </Box>
     );
 };
 

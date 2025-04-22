@@ -33,6 +33,34 @@ const getUserProfile = async () => {
   }
 }
 
+const getProfileById = async (profileId) => {
+  try {
+    console.log(`getProfileById: Making API call to fetch profile ${profileId}`);
+    const response = await axiosInstance.get(`/profiles/${profileId}/`);
+    console.log('getProfileById: API response received', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('getProfileById: Failed to fetch profile:', error);
+    throw error;
+  }
+};
+
+const updateProfile = async (formData) => {
+  try {
+    console.log('updateProfile: Making API call to update profile');
+    const response = await axiosInstance.put('/profiles/user_profile/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    console.log('updateProfile: API response received', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('updateProfile: Failed to update profile:', error);
+    throw error;
+  }
+};
+
 const apiLogout = async () => {
   try {
     console.log('Making API call to logout...');
@@ -71,4 +99,4 @@ async function setCsrfToken() {
   }
 }
 
-export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth };
+export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth, getProfileById, updateProfile };

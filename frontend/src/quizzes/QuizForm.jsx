@@ -1,36 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
-import quizApi from '../api/quizApi';
+import quizApi from '../api/quizzesApi';
 
-const QuizCreate = () => {
-  const { pathId } = useParams();
+const QuizForm = () => {
   const navigate = useNavigate();
+  const { pathId: initialPathId, quizId } = useParams();
+  const mode = quizId ? 'edit' : 'create';
+  
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPathId, setCurrentPathId] = useState(initialPathId);
   
-  // Quiz form state
   const [quizData, setQuizData] = useState({
     title: '',
     description: '',
     precedingNodeId: '',
-    questions: []
+    questions: [],
+    max_attempts_per_day: 2
   });
 
   useEffect(() => {
-    const fetchNodes = async () => {
+    const initializeForm = async () => {
       try {
-        const data = await knowledgePathsApi.getKnowledgePath(pathId);
-        setNodes(data.nodes || []);
+        let pathIdToUse = initialPathId;
+        console.log('Initializing form with path ID:', pathIdToUse);
+        
+        if (mode === 'edit' && quizId) {
+          console.log('Edit mode - fetching quiz data for ID:', quizId);
+          const quizData = await quizApi.getQuiz(quizId);
+          console.log('Received quiz data:', quizData);
+          
+          if (!quizData.node) {
+            console.error('Quiz is missing node information:', quizData);
+            setError('Quiz is missing node information');
+            return;
+          }
+          
+          pathIdToUse = quizData.knowledge_path;
+          console.log('Using path ID from quiz:', pathIdToUse);
+          setCurrentPathId(pathIdToUse);
+          
+          // Ensure max_attempts_per_day is at least 2
+          const maxAttempts = Math.max(2, parseInt(quizData.max_attempts_per_day) || 2);
+          console.log('Initializing max_attempts_per_day:', maxAttempts);
+          
+          setQuizData({
+            title: quizData.title,
+            description: quizData.description,
+            precedingNodeId: String(quizData.node),
+            max_attempts_per_day: maxAttempts,
+            questions: quizData.questions.map(q => ({
+              text: q.text,
+              questionType: q.question_type,
+              options: q.options.map(opt => ({
+                text: opt.text,
+                isCorrect: opt.is_correct
+              }))
+            }))
+          });
+        }
+
+        console.log('Fetching path data for ID:', pathIdToUse);
+        const pathData = await knowledgePathsApi.getKnowledgePath(pathIdToUse);
+        console.log('Received path data:', pathData);
+        setNodes(pathData.nodes || []);
+        console.log('Available nodes:', pathData.nodes);
       } catch (err) {
-        setError('Failed to load knowledge path nodes');
+        console.error('Form initialization error:', err);
+        console.error('Error details:', {
+          response: err.response?.data,
+          status: err.response?.status
+        });
+        setError('Failed to load data');
       } finally {
         setLoading(false);
       }
     };
-    fetchNodes();
-  }, [pathId]);
+
+    initializeForm();
+  }, [quizId, initialPathId, mode]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    console.log('Submitting quiz data:', quizData);
+    console.log('Current path ID:', currentPathId);
+    console.log('Initial path ID:', initialPathId);
+    console.log('Selected node ID:', quizData.precedingNodeId);
+    
+    try {
+      if (mode === 'create') {
+        console.log('Creating new quiz with data:', {
+          pathId: initialPathId,
+          quizData: {
+            ...quizData,
+            node: quizData.precedingNodeId
+          }
+        });
+        await quizApi.createQuiz(initialPathId, quizData);
+      } else {
+        console.log('Updating quiz with data:', {
+          ...quizData,
+          node: quizData.precedingNodeId
+        });
+        await quizApi.updateQuiz(quizId, {
+          ...quizData,
+          node: quizData.precedingNodeId
+        });
+      }
+      navigate(`/knowledge_path/${currentPathId}/edit`);
+    } catch (err) {
+      console.error('Error details:', {
+        response: err.response?.data,
+        status: err.response?.status,
+        headers: err.response?.headers
+      });
+      // Parse the error response
+      let errorMessage = `Failed to ${mode} quiz`;
+      
+      if (err?.response?.data) {
+        const errors = err.response.data;
+        console.log('Received error data:', errors);
+        // Convert validation errors into readable messages
+        const errorMessages = Object.entries(errors).map(([field, messages]) => {
+          // Convert field name to readable format (e.g., max_attempts_per_day -> Maximum Attempts Per Day)
+          const readableField = field
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          // Handle both string and array messages
+          const messageList = Array.isArray(messages) ? messages : [messages];
+          return `${readableField}: ${messageList.join(', ')}`;
+        });
+        
+        if (errorMessages.length > 0) {
+          errorMessage = errorMessages.join('\n');
+        }
+      }
+      
+      setError(errorMessage);
+    }
+  };
 
   const handleAddQuestion = () => {
     setQuizData(prev => ({
@@ -38,8 +149,6 @@ const QuizCreate = () => {
       questions: [...prev.questions, {
         text: '',
         questionType: 'SINGLE',
-        image: null,
-        imageDescription: '',
         options: [
           { text: '', isCorrect: false },
           { text: '', isCorrect: false }
@@ -63,24 +172,25 @@ const QuizCreate = () => {
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await quizApi.createQuiz(pathId, quizData);
-      navigate(`/knowledge-paths/${pathId}/edit`);
-    } catch (err) {
-      setError(err.message || 'Failed to create quiz');
-    }
-  };
-
   if (loading) return <div>Loading...</div>;
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Create Quiz</h1>
+      <div className="mb-6">
+        <button
+          onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
+          className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
+        >
+          ← Back to Knowledge Path
+        </button>
+      </div>
+
+      <h1 className="text-2xl font-bold mb-4">
+        {mode === 'create' ? 'Create Quiz' : 'Edit Quiz'}
+      </h1>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 whitespace-pre-line">
           {error}
         </div>
       )}
@@ -130,7 +240,6 @@ const QuizCreate = () => {
           />
         </div>
 
-        {/* Questions Section */}
         <div className="space-y-6">
           <h2 className="text-xl font-bold">Questions</h2>
           
@@ -162,7 +271,6 @@ const QuizCreate = () => {
                 </select>
               </div>
 
-              {/* Options */}
               <div className="space-y-2">
                 <label className="block text-gray-700 font-bold mb-2">
                   Options
@@ -221,11 +329,40 @@ const QuizCreate = () => {
         </div>
 
         <div>
+          <label className="block text-gray-700 font-bold mb-2">
+            Maximum Attempts Per Day
+          </label>
+          <select
+            value={quizData.max_attempts_per_day}
+            onChange={(e) => {
+              const value = Math.max(2, parseInt(e.target.value) || 2);
+              console.log('Selected max attempts:', value);
+              setQuizData(prev => {
+                const updated = { ...prev, max_attempts_per_day: value };
+                console.log('Updated quiz data:', updated);
+                return updated;
+              });
+            }}
+            required
+            className="w-full p-2 border rounded"
+          >
+            {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+              <option key={num} value={num}>
+                {num} attempts
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-gray-600 mt-1">
+            Set how many times a student can attempt this quiz per day
+          </p>
+        </div>
+
+        <div>
           <button
             type="submit"
             className="bg-blue-500 text-white px-6 py-2 rounded"
           >
-            Create Quiz
+            {mode === 'create' ? 'Create Quiz' : 'Update Quiz'}
           </button>
         </div>
       </form>
@@ -233,4 +370,4 @@ const QuizCreate = () => {
   );
 };
 
-export default QuizCreate; 
+export default QuizForm;

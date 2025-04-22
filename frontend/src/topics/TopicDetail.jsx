@@ -20,6 +20,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import contentApi from '../api/contentApi';
 import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
 import { MEDIA_BASE_URL } from '../api/config';
+import CommentSection from '../comments/CommentSection';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
@@ -81,6 +82,79 @@ const TopicDetail = () => {
         fetchTopic();
     }, [topicId]);
 
+    const renderContentPreview = (content, type) => {
+        if (!content.file_details) return null;
+
+        switch (type) {
+            case 'image':
+                return (
+                    <CardMedia
+                        component="img"
+                        sx={{ 
+                            height: 200,
+                            width: '100%',
+                            objectFit: 'cover'
+                        }}
+                        image={content.file_details.url}
+                        alt={content.selected_profile?.title || 'Content image'}
+                    />
+                );
+            case 'text':
+                return (
+                    <CardContent>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                            {content.file_details.text || 'No preview available'}
+                        </Typography>
+                    </CardContent>
+                );
+            case 'video':
+                return (
+                    <Box sx={{ position: 'relative', height: 200 }}>
+                        <CardMedia
+                            component="video"
+                            sx={{ 
+                                height: '100%',
+                                width: '100%',
+                                objectFit: 'cover'
+                            }}
+                            image={content.file_details.url}
+                        />
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'rgba(0, 0, 0, 0.3)',
+                            }}
+                        >
+                            <Typography variant="body1" color="white">
+                                Click to play video
+                            </Typography>
+                        </Box>
+                    </Box>
+                );
+            case 'audio':
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <audio
+                            controls
+                            style={{ width: '100%' }}
+                        >
+                            <source src={content.file_details.url} type="audio/mpeg" />
+                            Your browser does not support the audio element.
+                        </audio>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
+
     const renderContentSection = (type, contents) => {
         if (!contents || contents.length === 0) return null;
 
@@ -110,43 +184,26 @@ const TopicDetail = () => {
                             <Card 
                                 sx={{ 
                                     height: '100%', 
-                                    cursor: 'pointer',
-                                    // For image type, remove extra padding
-                                    ...(type === 'image' && {
-                                        '& .MuiCardContent-root': {
-                                            padding: 0
-                                        }
-                                    })
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    cursor: 'pointer'
                                 }}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             >
-                                {type === 'image' && content.file_details?.file ? (
-                                    // For images, show only the image
-                                    <CardMedia
-                                        component="img"
-                                        sx={{ 
-                                            height: 200,
-                                            width: '100%',
-                                            objectFit: 'cover'
-                                        }}
-                                        image={content.file_details.file}
-                                        alt="Content image"
-                                    />
-                                ) : (
-                                    // For non-image content, show title and author
-                                    <CardContent>
-                                        <Typography variant="h6" gutterBottom>
-                                            {content.selected_profile?.title || 'Untitled'}
-                                        </Typography>
-                                        {content.selected_profile?.author && (
-                                            <Chip 
-                                                label={`Author: ${content.selected_profile.author}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </CardContent>
-                                )}
+                                {renderContentPreview(content, type)}
+                                <CardContent sx={{ flexGrow: 1 }}>
+                                    <Typography variant="h6" gutterBottom>
+                                        {content.selected_profile?.title || content.original_title || 'Untitled'}
+                                    </Typography>
+                                    {content.selected_profile?.author && (
+                                        <Chip 
+                                            label={`Author: ${content.selected_profile.author}`}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ mt: 1 }}
+                                        />
+                                    )}
+                                </CardContent>
                             </Card>
                         </Grid>
                     ))}
@@ -222,6 +279,9 @@ const TopicDetail = () => {
                     No content has been added to this topic yet.
                 </Typography>
             )}
+
+            {/* Add CommentSection */}
+            <CommentSection topicId={topicId} />
         </Box>
     );
 };

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
-import ContentSearchModal from './ContentSearchModal';
-import ContentDisplay from './ContentDisplay';
+import ContentSearchModal from '../content/ContentSearchModal';
+import ContentDisplay from '../content/ContentDisplay';
 
 const NodeEdit = () => {
   const { pathId, nodeId } = useParams();

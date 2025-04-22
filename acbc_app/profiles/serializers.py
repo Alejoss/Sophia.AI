@@ -38,12 +38,21 @@ class ContactMethodSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    profile_picture = serializers.SerializerMethodField()
 
     # cryptos_list = serializers.SerializerMethodField()  # TODO manejar en otro endpoint
 
     class Meta:
         model = Profile
         fields = ['user', 'interests', 'profile_description', 'timezone', 'is_teacher', 'profile_picture']
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
     def get_cryptos_list(self, obj):
         # Fetch all non-deleted AcceptedCrypto instances related to this profile's user

@@ -50,9 +50,9 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
     }
   };
 
-  const handleSelectContent = (content) => {
-    console.log('Selected content in modal:', content);
-    onSelectContent(content);
+  const handleSelectContent = (contentProfile) => {
+    console.log('Selected content profile in modal:', contentProfile);
+    onSelectContent(contentProfile);
     onClose();
   };
 
@@ -120,7 +120,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
                 return (
                   <div
                     key={contentProfile.id}
-                    onClick={!isLoading ? () => handleSelectContent(content) : undefined}
+                    onClick={!isLoading ? () => handleSelectContent(contentProfile) : undefined}
                     className={`group p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all 
                       ${!isLoading ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                   >

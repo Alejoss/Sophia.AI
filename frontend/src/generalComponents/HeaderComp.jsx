@@ -25,10 +25,10 @@ const HeaderComp = () => {
         {isAuthenticated ? (
             <>
               <li className="nav-item">
-                <a className="nav-link" href="/content/library_user">Tu Librería</a>
+                <Link className="nav-link" to="/content/library_user">Tu Librería</Link>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="/profiles/profile_data">{user.username}</a>
+                <Link className="nav-link" to="/profiles/my_profile">{user.username}</Link>
               </li>
               <li className="nav-item">
                 <Link className="nav-link" to="/profiles/logout">Cerrar sesión</Link>

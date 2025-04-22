@@ -1,29 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, Typography, Box, Chip, Divider, Button, Breadcrumbs } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
-
+import { AuthContext } from '../context/AuthContext';
+import ContentReferences from './ContentReferences';
+import ContentDisplay from './ContentDisplay';
 
 const ContentDetailsLibrary = () => {
     const [content, setContent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [references, setReferences] = useState(null);
     const { contentId } = useParams();
     const navigate = useNavigate();
+    const { authState } = useContext(AuthContext);
+    const currentUser = authState.user;
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const contentData = await contentApi.getContentDetails(contentId);
-                console.log('Fetched content data:', contentData);
+                const [contentData, referencesData] = await Promise.all([
+                    contentApi.getContentDetails(contentId),
+                    contentApi.getContentReferences(contentId)
+                ]);
+                
                 setContent(contentData);
+                setReferences(referencesData);
             } catch (err) {
-                console.error('Error fetching content:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);
@@ -38,7 +45,12 @@ const ContentDetailsLibrary = () => {
     if (!content) return <div>No content found</div>;
 
     const profile = content.selected_profile;
-    console.log('Current profile:', profile);
+    
+    // Determine if the current user is the owner of the profile
+    const isOwner = profile?.user && currentUser && profile.user === currentUser.id;
+    
+    // Get the username for the button text
+    const ownerUsername = profile?.user_username || 'User';
 
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
@@ -83,9 +95,13 @@ const ContentDetailsLibrary = () => {
                 <Button
                     variant="outlined"
                     startIcon={<ArrowBackIcon />}
-                    onClick={() => navigate('/content/library_user')}
+                    onClick={() => {
+                        if (profile?.user) {
+                            navigate(`/content/library/${profile.user}`);
+                        }
+                    }}
                 >
-                    Back to Library
+                    {isOwner ? "Go to your library" : `Go to ${ownerUsername}'s library`}
                 </Button>
                 <Button
                     variant="outlined"
@@ -97,66 +113,40 @@ const ContentDetailsLibrary = () => {
             </Box>
 
             <Card sx={{ padding: 3 }}>
-                {/* Title Section */}
-                <Typography variant="h2" gutterBottom sx={{ fontSize: '2rem', mb: 3 }}>
-                    {profile?.title || content?.original_title || 'Untitled'}
-                </Typography>
-
-                {/* Content Information */}
-                <Box sx={{ mb: 3 }}>
-                    <Chip 
-                        label={content?.media_type} 
-                        color="primary" 
-                        sx={{ mr: 1 }}
-                    />
-                    {(profile?.author || content?.original_author) && (
-                        <Chip 
-                            label={`Author: ${profile?.author || content?.original_author}`} 
-                            variant="outlined" 
-                            sx={{ mr: 1 }}
-                        />
-                    )}
-                </Box>
-
-                {/* File Details with Download */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ color: 'text.secondary', mb: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                            Created: {formatDate(content.created_at)}
-                        </Typography>
-                        {content.file_details && (
-                            <Typography variant="body2">
-                                File size: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
-                            </Typography>
-                        )}
-                    </Box>
-                    
-                    {content.file_details?.file && (
-                        <Button
-                            variant="outlined"
-                            startIcon={<DownloadIcon />}
-                            href={`http://localhost:8000${content.file_details.file}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                        >
-                            Download File
-                        </Button>
-                    )}
-                </Box>
+                {/* Content Display */}
+                <ContentDisplay 
+                    content_profile={{
+                        title: profile?.title || content?.original_title,
+                        author: profile?.author || content?.original_author,
+                        content: {
+                            media_type: content?.media_type,
+                            file_details: content?.file_details,
+                            original_title: content?.original_title,
+                            original_author: content?.original_author
+                        }
+                    }}
+                    variant="detailed"
+                    showAuthor={true}
+                />
 
                 <Divider sx={{ my: 3 }} />
 
-                {/* Image Display */}
-                {content.media_type === 'IMAGE' && content.file_details?.file && (
-                    <Box sx={{ my: 3 }}>
-                        <img 
-                            src={`http://localhost:8000${content.file_details.file}`}
-                            alt={profile?.title}
-                            style={{ maxWidth: '100%', height: 'auto' }}
-                        />
+                {/* Content Details Section */}
+                <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom color="text.secondary">
+                        Content Details
+                    </Typography>
+                    <Box sx={{ display: 'grid', gap: 2 }}>
+                        <Typography variant="body2">
+                            <strong>Added to Library:</strong> {formatDate(content?.created_at)}
+                        </Typography>
+                        {profile?.collection_name && (
+                            <Typography variant="body2">
+                                <strong>Collection:</strong> {profile.collection_name}
+                            </Typography>
+                        )}
                     </Box>
-                )}
+                </Box>
 
                 {/* Personal Notes Section */}
                 {profile?.personal_note && (
@@ -172,49 +162,31 @@ const ContentDetailsLibrary = () => {
                     </Box>
                 )}
 
-                {/* Content Details Section */}
-                <Box sx={{ mt: 3 }}>
-                    <Typography variant="h6" gutterBottom color="text.secondary">
-                        Content Details
-                    </Typography>
-                    <Box sx={{ display: 'grid', gap: 2 }}>
-                        <Typography variant="body2">
-                            <strong>Added to Library:</strong> {formatDate(content?.created_at)}
-                        </Typography>
-                        {content?.file_details?.file_size && (
-                            <Typography variant="body2">
-                                <strong>File Size:</strong> {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
-                            </Typography>
-                        )}
-                        {profile?.collection_name && (
-                            <Typography variant="body2">
-                                <strong>Collection:</strong> {profile.collection_name}
-                            </Typography>
-                        )}
-                    </Box>
-                </Box>
-
-                {/* Topics */}
-                {content.topics?.length > 0 && (
-                    <Box sx={{ mt: 3 }}>
-                        <Typography variant="subtitle2" gutterBottom color="text.secondary">
-                            Topics
-                        </Typography>
-                        <Box>
-                            {content.topics.map((topic, index) => (
-                                <Chip 
-                                    key={index} 
-                                    label={topic} 
-                                    sx={{ mr: 1, mb: 1 }}
-                                    size="small"
-                                />
-                            ))}
-                        </Box>
+                {/* Content References Section */}
+                {references && (
+                    <Box sx={{ mt: 4 }}>
+                        <ContentReferences references={references} />
                     </Box>
                 )}
             </Card>
         </Box>
     );
+};
+
+const formatFileSize = (bytes) => {
+    if (!bytes || isNaN(bytes)) return 'Unknown size';
+    
+    const size = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
+    
+    if (size < 1024) {
+        return `${size} bytes`;
+    } else if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(2)} KB`;
+    } else if (size < 1024 * 1024 * 1024) {
+        return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+    } else {
+        return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
 };
 
 export default ContentDetailsLibrary; 

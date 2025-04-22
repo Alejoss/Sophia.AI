@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import VoteComponent from '../votes/VoteComponent';
 
 const KnowledgePathList = () => {
   const [knowledgePaths, setKnowledgePaths] = useState([]);
@@ -11,6 +12,7 @@ const KnowledgePathList = () => {
     const fetchKnowledgePaths = async () => {
       try {
         const data = await knowledgePathsApi.getKnowledgePaths();
+        console.log('Knowledge paths data:', data);
         setKnowledgePaths(data);
       } catch (err) {
         setError('Failed to load knowledge paths');
@@ -39,18 +41,40 @@ const KnowledgePathList = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {knowledgePaths.map((path) => (
-          <Link 
+          <div 
             key={path.id}
-            to={`/knowledge_path/${path.id}`}
             className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow"
           >
-            <h2 className="text-xl font-semibold mb-2">{path.title}</h2>
+            {/* Title and Vote Section */}
+            <div className="flex justify-between items-start mb-4">
+              <Link 
+                to={`/knowledge_path/${path.id}`}
+                className="text-xl font-semibold hover:text-blue-500 transition-colors"
+              >
+                {path.title}
+              </Link>
+              <VoteComponent 
+                type="knowledge_path"
+                ids={{ pathId: path.id }}
+                initialVoteCount={path.vote_count}
+                initialUserVote={path.user_vote}
+              />
+            </div>
+
+            {/* Description */}
             <p className="text-gray-600 mb-4">{path.description}</p>
+
+            {/* Author and Date */}
             <div className="flex justify-between text-sm text-gray-500">
-              <span>By {path.author}</span>
+              <Link 
+                to={`/profiles/user_profile/${path.author_id}`}
+                className="hover:text-blue-500 transition-colors"
+              >
+                By {path.author}
+              </Link>
               <span>{new Date(path.created_at).toLocaleDateString()}</span>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>

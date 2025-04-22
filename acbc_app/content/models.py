@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.apps import apps
+from django.contrib.contenttypes.models import ContentType
 
 
 class Library(models.Model):
@@ -45,6 +47,28 @@ class Content(models.Model):
 
     def __str__(self):
         return f"Content: {self.original_title}"
+
+    @property
+    def vote_count(self):
+        """Get the current vote count"""
+        VoteCount = apps.get_model('votes', 'VoteCount')
+        content_type = ContentType.objects.get_for_model(self)
+        vote_count = VoteCount.objects.filter(
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote_count.vote_count if vote_count else 0
+
+    def get_user_vote(self, user):
+        """Get the user's vote status"""
+        Vote = apps.get_model('votes', 'Vote')
+        content_type = ContentType.objects.get_for_model(self)
+        vote = Vote.objects.filter(
+            user=user,
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote.value if vote else 0
 
 
 class ContentProfile(models.Model):
@@ -160,4 +184,49 @@ class ModerationLog(models.Model):
 
     def __str__(self):
         return f"{self.action} by {self.moderator.username} on {self.content.title} at {self.created_at}"
+
+
+class Publication(models.Model):    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='publications')
+    content_profile = models.ForeignKey(ContentProfile, on_delete=models.CASCADE, related_name='publications', null=True, blank=True)
+    text_content = models.TextField()
+    status = models.CharField(max_length=20, choices=[
+        ('DRAFT', 'Draft'),
+        ('PUBLISHED', 'Published'),
+        ('ARCHIVED', 'Archived')
+    ], default='PUBLISHED')
+    published_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-published_at']
+
+    def __str__(self):
+        if self.content_profile:
+            return f"Publication: {self.content_profile.display_title} by {self.user.username}" 
+        else:
+            return f"Publication (by {self.user.username})"
+
+    @property
+    def vote_count(self):
+        """Get the current vote count"""
+        VoteCount = apps.get_model('votes', 'VoteCount')
+        content_type = ContentType.objects.get_for_model(self)
+        vote_count = VoteCount.objects.filter(
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote_count.vote_count if vote_count else 0
+
+    def get_user_vote(self, user):
+        """Get the user's vote status"""
+        Vote = apps.get_model('votes', 'Vote')
+        content_type = ContentType.objects.get_for_model(self)
+        vote = Vote.objects.filter(
+            user=user,
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote.value if vote else 0
 

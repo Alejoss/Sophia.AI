@@ -4,7 +4,6 @@ import {
     Box, 
     Typography, 
     IconButton, 
-    Checkbox,
     Table,
     TableBody,
     TableCell,
@@ -12,132 +11,252 @@ import {
     TableHead,
     TableRow,
     Paper,
+    Button,
+    Alert,
+    Chip,
+    Link as MuiLink,
+    Divider
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
+import LibrarySelectMultiple from './LibrarySelectMultiple';
 
 const CollectionEditContent = () => {
     const { collectionId } = useParams();
     const navigate = useNavigate();
-    const [userContent, setUserContent] = useState([]);
-    const [collectionContent, setCollectionContent] = useState([]);
+    const [collectionData, setCollectionData] = useState(null);
+    const [collectionName, setCollectionName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [processing, setProcessing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [showAddContent, setShowAddContent] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchCollectionData = async () => {
+            console.log('Fetching collection data for ID:', collectionId);
             try {
-                // Fetch both user content and collection content in parallel
-                const [userData, collectionData] = await Promise.all([
-                    contentApi.getUserContent(),
-                    contentApi.getCollectionContent(collectionId)
-                ]);
-                
-                console.log('Fetched user data:', userData);
-                console.log('Fetched collection data:', collectionData);
-                
-                setUserContent(userData);
-                setCollectionContent(collectionData);
+                console.log('Fetching collection content...');
+                const contentData = await contentApi.getCollectionContent(collectionId);
+                console.log('Collection content fetched:', contentData);
+
+                // Get the collection name from the first content item's collection_name
+                if (contentData.length > 0 && contentData[0].collection_name) {
+                    setCollectionName(contentData[0].collection_name);
+                } else {
+                    // If no content, try to get it from user collections
+                    const collections = await contentApi.getUserCollections();
+                    const collection = collections.find(c => c.id === parseInt(collectionId));
+                    if (collection) {
+                        setCollectionName(collection.name);
+                    }
+                }
+
+                setCollectionData(contentData);
                 setLoading(false);
             } catch (err) {
-                console.error('Detailed fetch error:', err);
-                setError(err.response?.data?.error || 'Failed to fetch content');
+                console.error('Error fetching collection data:', err);
+                console.error('Error details:', {
+                    message: err.message,
+                    response: err.response,
+                    stack: err.stack
+                });
+                setError('Failed to fetch collection data');
                 setLoading(false);
             }
         };
 
-        fetchData();
+        fetchCollectionData();
     }, [collectionId]);
 
-    const isInCollection = (content) => {
-        // Check if this content's ID exists in the collection content
-        return collectionContent.some(item => item.id === content.id);
-    };
-
-    const handleToggleContent = async (contentProfile) => {
-        setProcessing(true);
+    const handleContentRemove = async (contentProfileId) => {
+        console.log('Removing content profile:', contentProfileId);
         try {
-            if (isInCollection(contentProfile)) {
-                // Remove from collection
-                await contentApi.removeContentFromCollection(contentProfile.id);
-                // Update collectionContent by removing the item
-                setCollectionContent(collectionContent.filter(item => item.id !== contentProfile.id));
-            } else {
-                // Add to collection
-                await contentApi.addContentToCollection(collectionId, contentProfile.id);
-                // Update collectionContent by adding the item
-                setCollectionContent([...collectionContent, contentProfile]);
-            }
-        } catch (error) {
-            console.error('Failed to update collection:', error);
-            alert('Failed to update collection. Please try again.');
-        } finally {
-            setProcessing(false);
+            setSaving(true);
+            await contentApi.removeContentFromCollection(contentProfileId);
+            console.log('Content removed successfully');
+            setCollectionData(prev => prev.filter(content => content.id !== contentProfileId));
+            setSaving(false);
+        } catch (err) {
+            console.error('Error removing content:', err);
+            setError('Failed to remove content from collection');
+            setSaving(false);
         }
     };
 
-    if (loading) return <Typography>Loading your content...</Typography>;
-    if (error) return <Typography color="error">{error}</Typography>;
+    const handleCancelAdd = () => {
+        console.log('Canceling add content');
+        setShowAddContent(false);
+    };
+
+    const handleSaveAdd = async (selectedContentProfileIds) => {
+        console.log('Saving selected content profiles:', selectedContentProfileIds);
+        try {
+            setSaving(true);
+            // Make a single API call with all selected content profile IDs
+            await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
+            console.log('All content added successfully');
+            // Refresh collection content
+            const data = await contentApi.getCollectionContent(collectionId);
+            console.log('Refreshed collection content:', data);
+            setCollectionData(data);
+            setShowAddContent(false);
+            setSaving(false);
+        } catch (error) {
+            console.error('Error adding content:', error);
+            setError('Failed to add content to collection');
+            setSaving(false);
+        }
+    };
+
+    const filterContent = (content) => {
+        // Filter out content that's already in this collection
+        const isInCollection = content.collection === parseInt(collectionId);
+        console.log('CollectionEditContent filtering content:', {
+            contentId: content.id,
+            contentTitle: content.title,
+            collectionId: collectionId,
+            contentCollection: content.collection,
+            isInCollection,
+            contentStructure: JSON.stringify(content, null, 2)
+        });
+        return !isInCollection;
+    };
+
+    if (loading) {
+        console.log('Component is loading...');
+        return <Typography>Loading collection content...</Typography>;
+    }
+    if (error) {
+        console.log('Component has error:', error);
+        return <Alert severity="error">{error}</Alert>;
+    }
+    if (!collectionData) {
+        console.log('No collection data available');
+        return <Alert severity="error">Collection not found</Alert>;
+    }
+
+    if (showAddContent) {
+        console.log('Showing add content view');
+        return (
+            <LibrarySelectMultiple
+                title="Add Content to Collection"
+                description="Select content from your library to add to this collection"
+                onCancel={handleCancelAdd}
+                onSave={handleSaveAdd}
+                filterFunction={filterContent}
+                contextName={collectionName}
+            />
+        );
+    }
+
+    console.log('Rendering collection content view:', {
+        collectionId,
+        collectionName,
+        contentCount: collectionData.length
+    });
 
     return (
-        <Box sx={{ pt: 12, px: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <IconButton 
-                    onClick={() => navigate(`/content/collections/${collectionId}`)} 
-                    sx={{ mr: 2 }}
-                >
-                    <ArrowBackIcon />
-                </IconButton>
-                <Typography variant="h4">
-                    Edit Collection Content
-                </Typography>
-            </Box>
+        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+            <Paper sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <IconButton 
+                        onClick={() => navigate(`/content/collections/${collectionId}`)}
+                        sx={{ mr: 2 }}
+                    >
+                        <ArrowBackIcon />
+                    </IconButton>
+                    <Typography variant="h4" sx={{ flexGrow: 1 }}>
+                        {collectionName}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => setShowAddContent(true)}
+                    >
+                        Add content from your library
+                    </Button>
+                </Box>
 
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>In Collection</TableCell>
-                            <TableCell>Title</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Author</TableCell>
-                            <TableCell>Notes</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {userContent.map((content) => (
-                            <TableRow 
-                                key={content.id}
-                                sx={{ 
-                                    backgroundColor: isInCollection(content)
-                                        ? 'rgba(25, 118, 210, 0.08)' 
-                                        : 'inherit'
-                                }}
-                            >
-                                <TableCell>
-                                    <Checkbox
-                                        checked={isInCollection(content)}
-                                        onChange={() => handleToggleContent(content)}
-                                        disabled={processing}
-                                    />
-                                </TableCell>
-                                <TableCell>{content.title || 'Untitled'}</TableCell>
-                                <TableCell>{content.content.media_type}</TableCell>
-                                <TableCell>{content.author || '-'}</TableCell>
-                                <TableCell>{content.personal_note || '-'}</TableCell>
-                            </TableRow>
-                        ))}
-                        {userContent.length === 0 && (
+                <Divider sx={{ my: 3 }} />
+
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    Content in Collection ({collectionData.length})
+                </Typography>
+
+                <TableContainer>
+                    <Table>
+                        <TableHead>
                             <TableRow>
-                                <TableCell colSpan={5} align="center">
-                                    No content available
-                                </TableCell>
+                                <TableCell>Title</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell>Author</TableCell>
+                                <TableCell>View</TableCell>
+                                <TableCell>Actions</TableCell>
                             </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                        </TableHead>
+                        <TableBody>
+                            {collectionData.map((content) => (
+                                <TableRow 
+                                    key={content.id}
+                                    hover
+                                    sx={{ cursor: 'pointer' }}
+                                >
+                                    <TableCell>{content.title || 'Untitled'}</TableCell>
+                                    <TableCell>
+                                        <Chip 
+                                            label={content.content.media_type} 
+                                            size="small"
+                                            color="primary"
+                                        />
+                                    </TableCell>
+                                    <TableCell>{content.author || 'Unknown'}</TableCell>
+                                    <TableCell>
+                                        <MuiLink
+                                            href={`/content/${content.content.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center',
+                                                gap: 0.5,
+                                                color: 'primary.main',
+                                                textDecoration: 'none',
+                                                '&:hover': {
+                                                    textDecoration: 'underline'
+                                                }
+                                            }}
+                                        >
+                                            View
+                                            <OpenInNewIcon fontSize="small" />
+                                        </MuiLink>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            size="small"
+                                            onClick={() => handleContentRemove(content.id)}
+                                            disabled={saving}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {collectionData.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                        No content in this collection
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
         </Box>
     );
 };

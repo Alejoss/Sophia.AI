@@ -1,0 +1,56 @@
+.edited-indicator {
+    color: #666;
+    font-size: 0.8em;
+    font-style: italic;
+    margin-left: 5px;
+}
+
+.timestamp {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.comment {
+    padding: 1rem;
+    border-left: 2px solid #eee;
+    margin-bottom: 1rem;
+}
+
+/* Depth-specific styling */
+.comment.depth-0 {
+    border-left-color: #ddd;
+}
+
+.comment.depth-1 {
+    border-left-color: #bbb;
+    margin-left: 1rem;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.comment.depth-2 {
+    border-left-color: #999;
+    margin-left: 1rem;
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.reply-limit-message {
+    font-size: 0.8em;
+    color: #666;
+    font-style: italic;
+}
+
+.replies {
+    margin-top: 1rem;
+}
+
+/* Visual indicator for nested comments */
+.comment .comment {
+    border-left-color: #ddd;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Even deeper nesting */
+.comment .comment .comment {
+    border-left-color: #ccc;
+    background-color: rgba(0, 0, 0, 0.04);
+} 

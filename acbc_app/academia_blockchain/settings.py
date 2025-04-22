@@ -159,17 +159,13 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": "ERROR",  # Log only errors
-            "propagate": False,
+            "level": "INFO",
+            "propagate": True,
         },
-        "app_logger": {
+        "comments": {
             "handlers": ["console"],
-            "level": "ERROR",  # Log only errors
-            "propagate": False,
-        },
-        "": {  # This is the root logger
-            "handlers": ["console"],
-            "level": "ERROR",  # Log only errors
+            "level": "DEBUG",
+            "propagate": True,
         },
     },
 }

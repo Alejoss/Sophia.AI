@@ -1,83 +1,93 @@
 import React, { useState, useEffect } from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
+import PropTypes from 'prop-types';
+import { IconButton, Typography, Box } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import votesApi from '../api/votesApi';
 
-const VoteComponent = ({ topicId, contentId }) => {
-    const [voteCount, setVoteCount] = useState(0);
-    const [userVote, setUserVote] = useState(0);
+const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 }) => {
+    const [voteCount, setVoteCount] = useState(initialVoteCount);
+    const [userVote, setUserVote] = useState(initialUserVote);
     const [loading, setLoading] = useState(false);
 
+    // Update state when props change
     useEffect(() => {
-        fetchVoteStatus();
-    }, [topicId, contentId]);
+        setVoteCount(initialVoteCount);
+        setUserVote(initialUserVote);
+    }, [initialVoteCount, initialUserVote]);
 
-    const fetchVoteStatus = async () => {
-        try {
-            const response = await votesApi.getContentVoteStatus(topicId, contentId);
-            setVoteCount(response.vote_count);
-            setUserVote(response.vote);
-        } catch (error) {
-            console.error('Failed to fetch vote status:', error);
+    const calculateVoteChange = (currentVote, action) => {
+        // If upvoting
+        if (action === 'upvote') {
+            if (currentVote === 1) return { voteChange: -1, newUserVote: 0 }; // Remove upvote
+            if (currentVote === -1) return { voteChange: 2, newUserVote: 1 }; // Change from downvote to upvote
+            return { voteChange: 1, newUserVote: 1 }; // Add upvote
         }
+        // If downvoting
+        if (action === 'downvote') {
+            if (currentVote === -1) return { voteChange: 1, newUserVote: 0 }; // Remove downvote
+            if (currentVote === 1) return { voteChange: -2, newUserVote: -1 }; // Change from upvote to downvote
+            return { voteChange: -1, newUserVote: -1 }; // Add downvote
+        }
+        return { voteChange: 0, newUserVote: currentVote };
     };
 
-    const handleVote = async (isUpvote) => {
+    const handleVote = async (action) => {
         if (loading) return;
-
         setLoading(true);
+
         try {
-            const voteFunction = isUpvote ? votesApi.upvoteContent : votesApi.downvoteContent;
-            const response = await voteFunction(topicId, contentId);
+            let response;
+            switch (type) {
+                case 'content':
+                    response = await votesApi.voteContent(ids.topicId, ids.contentId, action);
+                    break;
+                case 'comment':
+                    response = await votesApi.voteComment(ids.commentId, action);
+                    break;
+                case 'knowledge_path':
+                    response = await votesApi.voteKnowledgePath(ids.pathId, action);
+                    break;
+                default:
+                    throw new Error('Invalid vote type');
+            }
             
-            // Refresh vote status after voting
-            await fetchVoteStatus();
+            // Update with server values
+            setVoteCount(Number(response.vote_count) || 0);
+            setUserVote(Number(response.vote) || 0);
         } catch (error) {
-            console.error('Failed to vote:', error);
+            console.error('Error voting:', error);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box display="flex" alignItems="center">
             <IconButton 
-                onClick={(e) => {
-                    e.stopPropagation();  // Prevent event bubbling
-                    handleVote(true);
-                }}
-                color={userVote === 1 ? "primary" : "default"}
+                onClick={() => handleVote('upvote')}
+                color={userVote > 0 ? 'primary' : 'default'}
                 disabled={loading}
             >
                 <ThumbUpIcon />
             </IconButton>
-            
-            <Typography 
-                variant="body2" 
-                sx={{ 
-                    minWidth: '30px', 
-                    textAlign: 'center',
-                    color: voteCount > 0 ? 'success.main' : 
-                           voteCount < 0 ? 'error.main' : 
-                           'text.secondary'
-                }}
-            >
-                {voteCount}
-            </Typography>
-
+            <Typography variant="body1">{voteCount}</Typography>
             <IconButton 
-                onClick={(e) => {
-                    e.stopPropagation();  // Prevent event bubbling
-                    handleVote(false);
-                }}
-                color={userVote === -1 ? "primary" : "default"}
+                onClick={() => handleVote('downvote')}
+                color={userVote < 0 ? 'primary' : 'default'}
                 disabled={loading}
             >
                 <ThumbDownIcon />
             </IconButton>
         </Box>
     );
+};
+
+VoteComponent.propTypes = {
+    type: PropTypes.oneOf(['content', 'comment', 'knowledge_path']).isRequired,
+    ids: PropTypes.object.isRequired,
+    initialVoteCount: PropTypes.number,
+    initialUserVote: PropTypes.number
 };
 
 export default VoteComponent; 

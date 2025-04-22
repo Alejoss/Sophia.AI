@@ -9,146 +9,123 @@ from comments.models import Comment
 from content.models import Topic, Content
 from knowledge_paths.models import KnowledgePath
 from events.models import ConnectionPlatform
-from votes.models import Vote, ContentVoteTopicCount
+from votes.models import Vote, VoteCount
 
 
 class BaseVoteView(APIView):
     """Base class for handling voting actions."""
 
     model = None
-    vote_count_model = None
-    vote_related_field = None
-    vote_count_related_field = None
 
-    def get_vote_count_instance(self, obj, topic):
-        """Retrieve or create the vote count instance based on provided kwargs."""
-        if not self.vote_count_model:
-            return obj # Return the object itself, this model has vote count
-
-        vote_count_instance, _ = self.vote_count_model.objects.get_or_create(
-            **{self.vote_related_field: obj, 'topic': topic}
-        )
-        return vote_count_instance
-
-    def get_vote(self, user, obj_id):
-        """Retrieve the user's vote for a specific object and topic, if applicable."""
-        return Vote.objects.filter(
+    def get_vote(self, user, obj):
+        """Retrieve or create the user's vote for a specific object"""
+        content_type = ContentType.objects.get_for_model(self.model)
+        vote = Vote.objects.filter(
             user=user,
-            content_type=ContentType.objects.get_for_model(self.model),
-            object_id=obj_id,
+            content_type=content_type,
+            object_id=obj.id
         ).first()
+        return vote
 
-    def perform_vote_action(self, request, obj, vote_method, topic=None):
+    def get_vote_count(self, obj, topic=None):
+        """Get or create VoteCount for the object"""
+        content_type = ContentType.objects.get_for_model(self.model)
+        return VoteCount.objects.get_or_create(
+            content_type=content_type,
+            object_id=obj.id,
+            topic=topic
+        )[0]
+
+    def perform_vote_action(self, request, obj, action, topic=None):
         user = request.user
+        content_type = ContentType.objects.get_for_model(self.model)
 
         # Get or create vote
-        existing_vote, _ = Vote.objects.get_or_create(
+        vote, created = Vote.objects.get_or_create(
             user=user,
-            content_type=ContentType.objects.get_for_model(self.model),
+            content_type=content_type,
             object_id=obj.id,
+            defaults={'value': 0}
         )
 
         # Perform voting action
-        new_vote = getattr(existing_vote, vote_method)()
+        if action == 'upvote':
+            vote_change = vote.upvote()
+        elif action == 'downvote':
+            vote_change = vote.downvote()
 
-        # Update the vote count
-        vote_count_instance = self.get_vote_count_instance(obj, topic)
-        vote_count_instance.update_vote_count(new_votes=new_vote)
+        # Update vote count
+        vote_count = self.get_vote_count(obj, topic)
+        vote_count.update_vote_count(obj)
 
-        return Response({"vote": existing_vote.value}, status=status.HTTP_200_OK)
+        return Response({
+            "vote": vote.value,
+            "vote_count": vote_count.vote_count
+        }, status=status.HTTP_200_OK)
 
 
 class BaseGetVoteView(BaseVoteView):
-    """Base class for retrieving the vote count and user's vote."""
+    """Base class for retrieving vote count and user's vote."""
 
-    def get(self, request, pk, topic_pk=None):
-        obj = get_object_or_404(self.model, pk=pk)
+    def get(self, request, pk=None, topic_pk=None, content_pk=None):
+        # Handle different ID parameters
+        object_id = content_pk or pk  # Use content_pk if available, otherwise use pk
+        obj = get_object_or_404(self.model, pk=object_id)
         topic = None
 
         if topic_pk:
             topic = get_object_or_404(Topic, pk=topic_pk)
-            obj = get_object_or_404(topic.contents, pk=pk)
+            if hasattr(topic, 'contents'):
+                obj = get_object_or_404(topic.contents, pk=object_id)
 
-        vote_count_instance = self.get_vote_count_instance(obj, topic)
-        existing_vote = self.get_vote(request.user, obj.id)
+        vote_count = self.get_vote_count(obj, topic)
+        existing_vote = self.get_vote(request.user, obj)
 
-        vote_count = getattr(vote_count_instance, self.vote_count_related_field)
-        vote = existing_vote.value if existing_vote else 0 # Return 0 if no vote exists
-
-        return Response(
-            {
-                "vote_count": vote_count,
-                "vote": vote
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({
+            "vote_count": vote_count.vote_count,
+            "vote": existing_vote.value if existing_vote else 0
+        }, status=status.HTTP_200_OK)
 
 
-class KnowledgePathUpvoteView(BaseVoteView):
+class KnowledgePathVoteView(BaseGetVoteView):
     model = KnowledgePath
-    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)
-        return self.perform_vote_action(request, obj, 'upvote')
+        action = request.data.get('action')
+        
+        if action not in ['upvote', 'downvote']:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return self.perform_vote_action(request, obj, action)
 
 
-class KnowledgePathDownvoteView(BaseVoteView):
-    model = KnowledgePath
-    vote_count_related_field = 'votes'
-
-    def post(self, request, pk):
-        obj = get_object_or_404(self.model, pk=pk)
-        return self.perform_vote_action(request, obj, 'downvote')
-
-
-class ContentVoteTopicView(BaseGetVoteView):
+class ContentVoteView(BaseGetVoteView):
     model = Content
-    vote_count_model = ContentVoteTopicCount
-    vote_related_field = 'content'
-    vote_count_related_field = 'vote_count'
+
+    def post(self, request, topic_pk, content_pk):
+        topic = get_object_or_404(Topic, pk=topic_pk)
+        obj = get_object_or_404(topic.contents, pk=content_pk)
+        action = request.data.get('action')
+        
+        if action not in ['upvote', 'downvote']:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return self.perform_vote_action(request, obj, action, topic)
 
     def get(self, request, topic_pk, content_pk):
-        return super().get(request, content_pk, topic_pk)
+        return super().get(request, topic_pk=topic_pk, content_pk=content_pk)
 
 
-class ContentUpvoteTopicView(BaseVoteView):
-    model = Content
-    vote_count_model = ContentVoteTopicCount
-    vote_related_field = 'content'
-    vote_count_related_field = 'vote_count'
-
-    def post(self, request, topic_pk, content_pk):
-        topic = get_object_or_404(Topic, pk=topic_pk)
-        obj = get_object_or_404(topic.contents, pk=content_pk)
-        return self.perform_vote_action(request, obj, 'upvote', topic)
-
-
-class ContentDownvoteTopicView(BaseVoteView):
-    model = Content
-    vote_count_model = ContentVoteTopicCount
-    vote_related_field = 'content'
-    vote_count_related_field = 'vote_count'
-
-    def post(self, request, topic_pk, content_pk):
-        topic = get_object_or_404(Topic, pk=topic_pk)
-        obj = get_object_or_404(topic.contents, pk=content_pk)
-        return self.perform_vote_action(request, obj, 'downvote', topic)
-
-
-class CommentUpvoteView(BaseVoteView):
+class CommentVoteView(BaseGetVoteView):
     model = Comment
-    vote_count_related_field = 'votes'
 
     def post(self, request, pk):
         obj = get_object_or_404(self.model, pk=pk)
-        return self.perform_vote_action(request, obj, 'upvote')
-
-
-class CommentDownvoteView(BaseVoteView):
-    model = Comment
-    vote_count_related_field = 'votes'
-
-    def post(self, request, pk):
-        obj = get_object_or_404(self.model, pk=pk)
-        return self.perform_vote_action(request, obj, 'downvote')
+        action = request.data.get('action')
+        
+        if action not in ['upvote', 'downvote']:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return self.perform_vote_action(request, obj, action)
+    

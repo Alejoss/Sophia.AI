@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
-import ContentDisplay from './ContentDisplay';
+import ContentDisplay from '../content/ContentDisplay';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
+import { Box, Typography } from '@mui/material';
 
 const NodeDetail = () => {
   const { pathId, nodeId } = useParams();
+  const navigate = useNavigate();
   const [node, setNode] = useState(null);
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [nextNode, setNextNode] = useState(null);
+  const [prevNode, setPrevNode] = useState(null);
   const user = getUserFromLocalStorage();
 
   useEffect(() => {
@@ -17,15 +21,24 @@ const NodeDetail = () => {
       try {
         const [nodeData, pathData] = await Promise.all([
           knowledgePathsApi.getNode(pathId, nodeId),
-          knowledgePathsApi.getKnowledgePathBasic(pathId)
+          knowledgePathsApi.getKnowledgePath(pathId)
         ]);
-        console.log('Node data:', nodeData);
-        console.log('Path data:', pathData);
-        console.log('Is node available:', nodeData.is_available);
+        
+       
         setNode(nodeData);
         setKnowledgePath(pathData);
+        
+        // Find next and previous nodes by order
+        const nextAvailableNode = pathData.nodes.find(n => 
+          n.order === nodeData.order + 1
+        );
+        const previousNode = pathData.nodes.find(n => 
+          n.order === nodeData.order - 1
+        );
+        
+        setNextNode(nextAvailableNode);
+        setPrevNode(previousNode);
       } catch (err) {
-        console.error('Error fetching node:', err);
         setError('Failed to load node');
       } finally {
         setLoading(false);
@@ -35,13 +48,38 @@ const NodeDetail = () => {
     fetchData();
   }, [pathId, nodeId]);
 
+  useEffect(() => {
+    console.log('NodeDetail received node:', node);
+    if (node?.content_profile) {
+      console.log('Content profile:', node.content_profile);
+    }
+  }, [node]);
+
   const handleComplete = async () => {
+    // Add debug log before API call
+    let response;
     try {
-      await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
-      // Optionally refresh the node data or show success message
-      // You might want to redirect to the next available node
+      response = await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
     } catch (error) {
+      console.error('Error marking node as completed:', error);
       setError('Failed to mark node as completed');
+      return;
+    }
+
+    // Check if the response indicates completion
+    if (response.status === 'completed') {
+      setNode(prev => ({ ...prev, is_completed: true }));
+    }
+        
+    // Check if there's a quiz for this node
+    if (node.quizzes && node.quizzes.length > 0) {
+      navigate(`/quizzes/${node.quizzes[0].id}`);
+      return;
+    }
+    if (nextNode) {
+      navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}`);
+    } else {
+      navigate(`/knowledge_path/${pathId}`);
     }
   };
 
@@ -70,26 +108,44 @@ const NodeDetail = () => {
           
           {/* Content Display */}
           <div className="mb-6">
-            <ContentDisplay 
-              content={{
-                id: node.content_id,
-                original_title: node.title,
-                media_type: node.media_type,
-                file_details: node.file_details
-              }} 
-            />
-          </div>
+            {node.content_profile && (
+              <ContentDisplay 
+                content_profile={node.content_profile}
+                variant="detailed"
+                showAuthor={true}
+                showType={true}
+              />
+            )}
+          </div>          
 
           {/* Description */}
           {node.description && (
             <div className="mt-4">
-              <h2 className="text-lg font-semibold mb-2">Description</h2>
-              <p className="text-gray-700">{node.description}</p>
+              <Typography variant="h6" sx={{ mb: 1 }}>Node Description</Typography>
+              <Typography>{node.description}</Typography>
+            </div>
+          )}
+
+          {/* Quiz Information */}
+          {node.quizzes && node.quizzes.length > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <h2 className="text-lg font-semibold text-blue-700">
+                Quiz: {node.quizzes[0].title || "Node includes a quiz"}                
+              </h2>
+              <p>Mark the node as completed to take the quiz</p>
             </div>
           )}
 
           {/* Action Buttons */}
           <div className="mt-6 flex gap-4">
+            {prevNode && (
+              <button
+                onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}`)}
+                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                ← Previous
+              </button>
+            )}
             {user && user.username === knowledgePath?.author && (
               <Link
                 to={`/knowledge_path/${pathId}/nodes/${nodeId}/edit`}
@@ -104,7 +160,22 @@ const NodeDetail = () => {
             >
               Back to Path
             </Link>
-            {!node.is_completed && (
+            {node.is_completed ? (
+              <button
+                onClick={() => {
+                  // Check for quiz first
+                  if (node.quizzes && node.quizzes.length > 0) {
+                    navigate(`/quizzes/${node.quizzes[0].id}`);
+                  } else if (nextNode) {
+                    navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}`);
+                  }
+                }}
+                className={`${nextNode ? 'bg-green-500 hover:bg-green-700' : 'bg-gray-500'} text-white font-bold py-2 px-4 rounded`}
+                disabled={!nextNode && !node.quizzes?.length}
+              >
+                Already Completed {nextNode ? ': Next →' : ''}
+              </button>
+            ) : (
               <button
                 onClick={handleComplete}
                 className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"

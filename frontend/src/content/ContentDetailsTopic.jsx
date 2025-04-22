@@ -1,181 +1,131 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Card, Typography, Box, Chip, Divider, Button, Breadcrumbs } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import { formatDate } from '../utils/dateUtils';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    Box,
+    Typography,
+    Paper,
+    Button,
+    Divider,
+    CircularProgress,
+    Container
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
+import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
+import ContentDisplay from './ContentDisplay';
+import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
 
 const ContentDetailsTopic = () => {
-    // TODO if the content has a content_profile for the logged user with a different title
-    // place that title in the title section next to the original title
+    const { contentId, topicId } = useParams();
+    const navigate = useNavigate();
     const [content, setContent] = useState(null);
-    const [topic, setTopic] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { contentId, topicId } = useParams();
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchContent = async () => {
             try {
-                const [contentData, topicData] = await Promise.all([
-                    contentApi.getContentDetails(contentId),
-                    contentApi.getTopicBasicDetails(topicId)
-                ]);
-                setContent(contentData);
-                setTopic(topicData);
+                const data = await contentApi.getContentDetails(contentId);
+                setContent(data);
             } catch (err) {
-                setError(err.message);
+                setError('Failed to load content');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
-    }, [contentId, topicId]);
+        fetchContent();
+    }, [contentId]);
 
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
-    if (!content) return <div>No content found</div>;
+    if (loading) return (
+        <Container sx={{ pt: 12, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+        </Container>
+    );
+    
+    if (error) return (
+        <Container sx={{ pt: 12 }}>
+            <Typography color="error">{error}</Typography>
+        </Container>
+    );
+    
+    if (!content) return (
+        <Container sx={{ pt: 12 }}>
+            <Typography>Content not found</Typography>
+        </Container>
+    );
 
-    const profile = content.selected_profile;
+    const content_profile = {
+        title: content.selected_profile?.title || content.original_title,
+        author: content.selected_profile?.author || content.original_author,
+        content: {
+            id: content.id,
+            media_type: content.media_type,
+            file_details: content.file_details,
+            url: content.file_details?.url
+        }
+    };
 
     return (
-        <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
-            {/* Navigation Breadcrumbs */}
-            <Box sx={{ mb: 2 }}>
-                <Breadcrumbs 
-                    separator={<NavigateNextIcon fontSize="small" />}
-                    aria-label="content navigation"
-                >
-                    <Link 
-                        to="/content/topics"
-                        style={{ 
-                            color: 'inherit', 
-                            textDecoration: 'none',
-                            '&:hover': { textDecoration: 'underline' }
-                        }}
-                    >
-                        Topics
-                    </Link>
-                    
-                    {topic && (
-                        <Link
-                            to={`/content/topics/${topicId}`}
-                            style={{ 
-                                color: 'inherit', 
-                                textDecoration: 'none',
-                                '&:hover': { textDecoration: 'underline' }
-                            }}
-                        >
-                            {topic.title}
-                        </Link>
-                    )}
-                    
-                    <Typography color="text.primary">
-                        {profile?.title || 'Untitled'}
-                    </Typography>
-                </Breadcrumbs>
-            </Box>
+        <Container maxWidth="lg" sx={{ pt: 12, pb: 4 }}>
+            <Button
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate(`/content/topics/${topicId}`)}
+                sx={{ mb: 3 }}
+            >
+                Back to Topic
+            </Button>
 
-            <Card sx={{ padding: 3 }}>
-                {/* Title Section */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Typography variant="h2" sx={{ fontSize: '2rem' }}>
-                        {profile?.title || 'Untitled'}
-                    </Typography>
-                    <VoteComponent 
-                        topicId={topicId} 
-                        contentId={contentId}
-                    />
-                </Box>
-
-                {/* Content Information */}
-                <Box sx={{ mb: 3 }}>
-                    <Chip 
-                        label={content.media_type} 
-                        color="primary" 
-                        sx={{ mr: 1 }}
-                    />
-                    {profile?.author && (
-                        <Chip 
-                            label={`Author: ${profile.author}`} 
-                            variant="outlined" 
-                            sx={{ mr: 1 }}
-                        />
-                    )}
-                </Box>
-
-                {/* File Details with Download */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ color: 'text.secondary', mb: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                            Created: {formatDate(content.created_at)}
+            <Paper sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Box>
+                        <Typography variant="h4" gutterBottom>
+                            {content.selected_profile?.title || content.original_title || 'Untitled Content'}
                         </Typography>
-                        {content.file_details && (
-                            <Typography variant="body2">
-                                File size: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
+
+                        {content.selected_profile?.author && (
+                            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                                By {content.selected_profile.author}
                             </Typography>
                         )}
                     </Box>
-                    
-                    {content.file_details?.file && (
-                        <Button
-                            variant="outlined"
-                            startIcon={<DownloadIcon />}
-                            href={`http://localhost:8000${content.file_details.file}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                        >
-                            Download File
-                        </Button>
-                    )}
+                    <VoteComponent 
+                        type="content"
+                        ids={{ topicId, contentId }}
+                        initialVoteCount={content.vote_count}
+                        initialUserVote={content.user_vote}
+                    />
                 </Box>
 
-                <Divider sx={{ my: 3 }} />
+                <Divider sx={{ my: 2 }} />
 
-                {/* Image Display */}
-                {content.media_type === 'IMAGE' && content.file_details?.file && (
-                    <Box sx={{ my: 3 }}>
-                        <img 
-                            src={`http://localhost:8000${content.file_details.file}`}
-                            alt={profile?.title}
-                            style={{ maxWidth: '100%', height: 'auto' }}
-                        />
-                    </Box>
-                )}
+                {/* Content Display */}
+                <ContentDisplay 
+                    content_profile={content_profile}
+                    variant="detailed"
+                    showAuthor={true}
+                    showType={true}
+                />
 
-                {/* Personal Notes Section */}
-                {profile?.personal_note && (
-                    <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                        <Typography variant="body1">
-                            {profile.personal_note}
-                        </Typography>
-                    </Box>
-                )}
-
-                {/* Topics */}
-                {content.topics?.length > 0 && (
+                {/* Personal Note Section */}
+                {content.selected_profile?.personal_note && (
                     <Box sx={{ mt: 3 }}>
-                        <Typography variant="subtitle2" gutterBottom color="text.secondary">
-                            Topics
+                        <Typography variant="h6" gutterBottom>
+                            Personal Notes
                         </Typography>
-                        <Box>
-                            {content.topics.map((topic, index) => (
-                                <Chip 
-                                    key={index} 
-                                    label={topic} 
-                                    sx={{ mr: 1, mb: 1 }}
-                                    size="small"
-                                />
-                            ))}
-                        </Box>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(0, 0, 0, 0.02)' }}>
+                            <Typography variant="body1">
+                                {content.selected_profile.personal_note}
+                            </Typography>
+                        </Paper>
                     </Box>
                 )}
-            </Card>
-        </Box>
+            </Paper>
+
+            {/* Comments Section */}
+            <CommentSection topicId={topicId} contentId={contentId} />
+        </Container>
     );
 };
 

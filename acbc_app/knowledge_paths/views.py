@@ -3,14 +3,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import KnowledgePath, Node, ActivityRequirement
-from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, ActivityRequirementSerializer, KnowledgePathBasicSerializer, NodeReorderSerializer
+from .models import KnowledgePath, Node
+from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, KnowledgePathBasicSerializer, NodeReorderSerializer
 from utils.permissions import IsAuthor
-from content.models import Content
+from content.models import Content, ContentProfile
 from django.db import IntegrityError, transaction
 from django.db import models
-from profiles.models import UserProgressKnowledgePath
 from django.utils import timezone
+from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress
 
 
 class KnowledgePathCreateView(APIView):
@@ -28,12 +28,11 @@ class KnowledgePathListView(APIView):
 
     def get(self, request):
         knowledge_paths = KnowledgePath.objects.all().order_by('-created_at')
-        serializer = KnowledgePathSerializer(knowledge_paths, many=True)
+        serializer = KnowledgePathSerializer(knowledge_paths, many=True, context={'request': request})
         return Response(serializer.data)
 
 class KnowledgePathDetailView(APIView):
     """
-    TODO check this with another user
     Retrieve a knowledge path and allow updating if user is the author
     """
     permission_classes = [IsAuthenticated]
@@ -56,30 +55,24 @@ class NodeCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, path_id):
-        print(f"Received request to create node for path {path_id}")
-        print(f"Request data: {request.data}")
-        
         knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
-        print(f"Found knowledge path: {knowledge_path}")
         
-        content_id = request.data.get('content_id')
-        print(f"Content ID from request: {content_id}")
-        
-        content = get_object_or_404(Content, pk=content_id)
-        content_profile = content.profiles.get(user=request.user)
-        print(f"Found content profile: {content_profile}")
+        content_profile_id = request.data.get('content_profile_id')
+        content_profile = get_object_or_404(ContentProfile, pk=content_profile_id)
         
         try:
-            # The order will be handled by the model's save method
+            # Use the user-provided title if available, otherwise fall back to content profile
+            title = request.data.get('title') or content_profile.title or content_profile.content.original_title
+            description = request.data.get('description', '')
             node = Node.objects.create(
                 knowledge_path=knowledge_path,
-                content=content,
-                title=content_profile.display_title,
-                media_type=content.media_type
+                content_profile=content_profile,
+                title=title,
+                description=description,
+                media_type=content_profile.content.media_type
             )
-            print(f"Created node: {node}")
             
-            serializer = NodeSerializer(node)
+            serializer = NodeSerializer(node, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except IntegrityError:
@@ -101,25 +94,6 @@ class NodeDeleteView(APIView):
         
         node.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-class ActivityRequirementCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, path_id):
-        # Get the knowledge path
-        knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
-        
-        # Add knowledge_path to the request data
-        data = {
-            **request.data,
-            'knowledge_path': path_id
-        }
-        
-        serializer = ActivityRequirementSerializer(data=data)
-        if serializer.is_valid():
-            activity_requirement = serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class KnowledgePathBasicDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -150,7 +124,7 @@ class NodeDetailView(APIView):
         """Mark node as completed"""
         knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
         node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
-        
+
         # Let the serializer handle availability logic
         serializer = NodeSerializer(node, context={'request': request})
         if not serializer.data['is_available']:
@@ -159,24 +133,19 @@ class NodeDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        with transaction.atomic():
-            progress, created = UserProgressKnowledgePath.objects.get_or_create(
-                user=request.user,
-                current_node=node,
-                defaults={'is_completed': True, 'completed_at': timezone.now()}
+        try:
+            mark_node_as_completed(request.user, node)
+            return Response({"status": "completed"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to mark node as completed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
-            if not created:
-                progress.is_completed = True
-                progress.completed_at = timezone.now()
-                progress.save()
-
-        return Response({"status": "completed"}, status=status.HTTP_200_OK)
 
     def put(self, request, path_id, node_id):
         knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
         node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
-        serializer = NodeSerializer(node, data=request.data, partial=True)
+        serializer = NodeSerializer(node, data=request.data, context={'request': request}, partial=True)
         
         if serializer.is_valid():
             serializer.save()
@@ -193,17 +162,12 @@ class NodeReorderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, path_id):
-        print("Received reorder request for path:", path_id)
-        print("Request data:", request.data)
-        
-        # Get the knowledge path and verify ownership
         knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
         if knowledge_path.author != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         serializer = NodeReorderSerializer(data=request.data)
         if not serializer.is_valid():
-            print("Serializer validation errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -228,11 +192,20 @@ class NodeReorderView(APIView):
                     node.save()
 
                 nodes = Node.objects.filter(knowledge_path=knowledge_path).order_by('order')
-                return Response(NodeSerializer(nodes, many=True).data)
+                return Response(NodeSerializer(nodes, many=True, context={'request': request}).data)
 
         except Exception as e:
-            print("Error during reordering:", str(e))
             return Response(
                 {'error': f'Failed to reorder nodes: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+def knowledge_path_detail(request, path_id):
+    knowledge_path = get_object_or_404(KnowledgePath, id=path_id)
+    
+    progress = get_knowledge_path_progress(request.user, knowledge_path)
+    
+    return render(request, 'knowledge_paths/detail.html', {
+        'knowledge_path': knowledge_path,
+        'progress': progress
+    })

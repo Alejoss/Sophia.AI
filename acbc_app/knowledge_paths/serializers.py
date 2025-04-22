@@ -1,8 +1,10 @@
 from rest_framework import serializers
-from .models import KnowledgePath, Node, ActivityRequirement, NodeActivityRequirement
+from .models import KnowledgePath, Node
 from django.contrib.auth.models import User
-from content.models import FileDetails
-from profiles.models import UserProgressKnowledgePath
+from content.models import FileDetails, ContentProfile
+from profiles.models import UserNodeCompletion
+from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
+from quizzes.serializers import QuizSerializer
 
 
 class FileDetailsSerializer(serializers.ModelSerializer):
@@ -12,133 +14,105 @@ class FileDetailsSerializer(serializers.ModelSerializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
-    content_id = serializers.IntegerField(source='content.id', read_only=True)
-    file_details = FileDetailsSerializer(source='content.file_details', read_only=True)
+    content_profile = serializers.SerializerMethodField()
     is_available = serializers.SerializerMethodField()
     is_completed = serializers.SerializerMethodField()
+    quizzes = QuizSerializer(many=True, read_only=True)
     
     class Meta:
         model = Node
-        fields = ['id', 'title', 'description', 'order', 'media_type', 'is_available', 'is_completed', 'content_id', 'file_details']
-        read_only_fields = ['id', 'order', 'content', 'knowledge_path', 'media_type']
+        fields = ['id', 'title', 'description', 'order', 'media_type', 
+                 'is_available', 'is_completed', 'content_profile', 'quizzes']
+        read_only_fields = ['id', 'order', 'content_profile', 'knowledge_path', 'media_type']
+
+    def get_content_profile(self, obj):
+        content_profile = obj.content_profile
+        if not content_profile:
+            return None
+
+        content = content_profile.content
+        if not content:
+            return None
+
+        file_details = None
+        try:
+            if content.file_details:
+                file_details = {
+                    'url': content.file_details.file.url if content.file_details.file else None,
+                    'name': content.file_details.file.name if content.file_details.file else None,
+                    'size': content.file_details.file.size if content.file_details.file else None,
+                }
+                print(f"Constructed file_details for content {content.id}: {file_details}")
+        except FileDetails.DoesNotExist:
+            pass
+
+        result = {
+            'id': content_profile.id,
+            'title': content_profile.title,
+            'content': {
+                'id': content.id,
+                'media_type': content.media_type,
+                'file_details': file_details,
+                'url': file_details['url'] if file_details else None,
+            }
+        }
+        print(f"Returning content profile for node {obj.id}: {result}")
+        return result
 
     def get_is_available(self, obj):
         request = self.context.get('request')
-        print(f"\n--- Checking availability for node {obj.id} ---")
-        print(f"Request user: {request.user if request else 'No request'}")
-        print(f"Path author: {obj.knowledge_path.author}")
-        
         if not request or not request.user.is_authenticated:
-            print("No request or unauthenticated user - not available")
             return False
-            
-        # If user is creator, all nodes are available
-        if obj.knowledge_path.author == request.user:
-            print("User is creator - node available")
-            return True
-            
-        # Get user progress
-        try:
-            progress = UserProgressKnowledgePath.objects.get(
-                user=request.user,
-                knowledge_path=obj.knowledge_path
-            )
-            print(f"Found progress for user")
-            
-            # Node is available if it's the first one or if previous node is completed
-            if obj.order == 1:
-                print("First node - available")
-                return True
-            
-            previous_node = Node.objects.filter(
-                knowledge_path=obj.knowledge_path,
-                order=obj.order - 1
-            ).first()
-            print(f"Previous node: {previous_node}")
-            
-            if not previous_node:
-                print("No previous node - available")
-                return True
-            
-            is_prev_completed = UserProgressKnowledgePath.objects.filter(
-                user=request.user,
-                current_node=previous_node,
-                is_completed=True
-            ).exists()
-            print(f"Previous node completed: {is_prev_completed}")
-            return is_prev_completed
-            
-        except UserProgressKnowledgePath.DoesNotExist:
-            print("No progress found - checking if first node")
-            # Only first node is available for new users
-            return obj.order == 1
+        return is_node_available_for_user(obj, request.user)
 
     def get_is_completed(self, obj):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
-            
-        return UserProgressKnowledgePath.objects.filter(
-            user=request.user,
-            current_node=obj,
-            is_completed=True
-        ).exists()
+        
+        is_completed = is_node_completed_by_user(obj, request.user)
+        print(f"Node {obj.id} is_completed for user {request.user}: {is_completed}")
+        return is_completed
 
 
 class KnowledgePathSerializer(serializers.ModelSerializer):
     nodes = NodeSerializer(many=True, read_only=True)
     progress = serializers.SerializerMethodField()
     author = serializers.CharField(source='author.username', read_only=True)
+    author_id = serializers.IntegerField(source='author.id', read_only=True)
+    vote_count = serializers.SerializerMethodField()
+    user_vote = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'author', 'description', 'created_at', 'updated_at', 'nodes', 'progress']
+        fields = [
+            'id', 'title', 'author', 'author_id', 'description', 'created_at', 
+            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote'
+        ]
 
     def get_progress(self, obj):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return None
             
-        total_nodes = obj.nodes.count()
-        if total_nodes == 0:
-            return {
-                'completed_nodes': 0,
-                'total_nodes': 0,
-                'percentage': 0
-            }
-            
-        completed_nodes = UserProgressKnowledgePath.objects.filter(
-            user=request.user,
-            current_node__knowledge_path=obj,
-            is_completed=True
-        ).count()
+        # Use the service function to get detailed progress
+        progress_data = get_knowledge_path_progress(request.user, obj)
         
         return {
-            'completed_nodes': completed_nodes,
-            'total_nodes': total_nodes,
-            'percentage': (completed_nodes / total_nodes) * 100
+            'completed_nodes': progress_data['completed_nodes'],
+            'total_nodes': progress_data['total_nodes'],
+            'percentage': progress_data['completion_percentage'],
+            'is_completed': progress_data['is_completed']
         }
 
+    def get_vote_count(self, obj):
+        return obj.vote_count
 
-class KnowledgePathNodeSerializer(serializers.ModelSerializer):
-    content_id = serializers.IntegerField(source='content.id')
-
-    class Meta:
-        model = Node
-        fields = ['id', 'title', 'media_type', 'content_id']
-
-
-class ActivityRequirementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ActivityRequirement
-        fields = ['id', 'knowledge_path', 'activity_type', 'description']
-        read_only_fields = ['id']
-
-
-class NodeActivityRequirementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = NodeActivityRequirement
-        fields = ['id', 'preceding_node', 'following_node', 'activity_requirement', 'is_mandatory']
+    def get_user_vote(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        return obj.get_user_vote(request.user)
 
 
 class KnowledgePathCreateSerializer(serializers.ModelSerializer):
@@ -151,7 +125,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
 class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'created_at']
+        fields = ['id', 'title']
 
 
 # Add a new serializer for reordering

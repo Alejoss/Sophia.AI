@@ -87,7 +87,7 @@ const TopicContentMediaType = () => {
                             )}
                             <CardContent>
                                 <Typography variant="h6" gutterBottom>
-                                    {content.selected_profile?.title || 'Untitled'}
+                                    {content.selected_profile?.title || content.original_title || 'Untitled'}
                                 </Typography>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     {content.selected_profile?.author && (

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails, Content, ContentProfile, Topic
+from content.models import Library, Collection, FileDetails, Content, ContentProfile, Topic, Publication
 
 
 @admin.register(Library)
@@ -43,5 +43,14 @@ class TopicAdmin(admin.ModelAdmin):
     list_display = ['id', 'title', 'creator']
     list_filter = ['creator']
     search_fields = ['title']
+
+
+@admin.register(Publication)
+class PublicationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'content_profile', 'status', 'published_at']
+    list_filter = ['status', 'published_at']
+    search_fields = ['text_content']
+    date_hierarchy = 'published_at'
+    readonly_fields = ['published_at', 'updated_at']
 
 

@@ -11,6 +11,16 @@ const contentApi = {
         }
     },
 
+    getUserContentById: async (userId) => {
+        try {
+            const response = await axiosInstance.get(`/content/user-content/${userId}/`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching content for user ${userId}:`, error);
+            throw error;
+        }
+    },
+
     // Add other content-related API calls here
     uploadContent: async (contentData) => {
         try {
@@ -25,7 +35,6 @@ const contentApi = {
     getContentDetails: async (contentId) => {
         try {
             const response = await axiosInstance.get(`/content/content_details/${contentId}/`);
-            console.log('Content details response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error fetching content details:', error);
@@ -63,10 +72,13 @@ const contentApi = {
         }
     },
 
-    addContentToCollection: async (collectionId, contentProfileId) => {
+    addContentToCollection: async (collectionId, contentProfileIds) => {
         try {
+            // Ensure contentProfileIds is an array
+            const ids = Array.isArray(contentProfileIds) ? contentProfileIds : [contentProfileIds];
+            
             const response = await axiosInstance.post(`/content/collections/${collectionId}/content/`, {
-                content_profile_id: contentProfileId
+                content_profile_ids: ids
             });
             return response.data;
         } catch (error) {
@@ -135,14 +147,14 @@ const contentApi = {
         }
     },
 
-    addContentToTopic: async (topicId, contentIds) => {
+    addContentToTopic: async (topicId, contentProfileIds) => {
         try {
             const response = await axiosInstance.post(`/content/topics/${topicId}/content/`, {
-                content_ids: contentIds
+                content_profile_ids: contentProfileIds
             });
             return response.data;
         } catch (error) {
-            console.error('Error adding content to topic:', error);
+            console.error('Error adding content to topic:', error.response || error);
             throw error;
         }
     },
@@ -207,6 +219,76 @@ const contentApi = {
             await axiosInstance.delete(`/content/content_details/${contentId}/`);
         } catch (error) {
             console.error('Error deleting content:', error);
+            throw error;
+        }
+    },
+
+    createPublication: async (publicationData) => {
+        try {
+            const response = await axiosInstance.post('/content/publications/', publicationData);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating publication:', error);
+            throw error;
+        }
+    },
+
+    getUserPublications: async () => {
+        try {
+            const response = await axiosInstance.get('/content/publications/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user publications:', error);
+            throw error;
+        }
+    },
+
+    getPublicationDetails: async (publicationId) => {
+        try {
+            const response = await axiosInstance.get(`/content/publications/${publicationId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching publication details:', error);
+            throw error;
+        }
+    },
+
+    updatePublication: async (publicationId, publicationData) => {
+        try {
+            const response = await axiosInstance.put(`/content/publications/${publicationId}/`, publicationData);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating publication:', error);
+            throw error;
+        }
+    },
+
+    deletePublication: async (publicationId) => {
+        try {
+            const response = await axiosInstance.delete(`/content/publications/${publicationId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error deleting publication:', error);
+            throw error;
+        }
+    },
+
+    getContentReferences: async (contentId) => {
+        try {
+            const response = await axiosInstance.get(`/content/references/${contentId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching content references:', error);
+            throw error;
+        }
+    },
+
+    updateTopic: async (topicId, topicData) => {
+        try {
+            const response = await axiosInstance.patch(`/content/topics/${topicId}/`, topicData);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating topic:', error);
             throw error;
         }
     },

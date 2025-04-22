@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
-import axiosInstance from '../api/axiosConfig';  // Import our configured instance
+import axiosInstance from '../api/axiosConfig';
 import { Grid } from '@mui/material';
-import ContentRecentlyUploaded from './ContentRecentlyUploaded';
 
 const schema = yup.object().shape({
   // TODO, only the image files have author and title as optional fields
@@ -14,9 +13,6 @@ const schema = yup.object().shape({
 
   title: yup.string().max(100, 'Title must not exceed 100 characters'),
   author: yup.string().max(100, 'Author must not exceed 100 characters'),
-  personalNote: yup
-    .string()
-    .max(500, 'Personal note must not exceed 500 characters'),
 });
 
 const getMediaType = (file) => {
@@ -48,9 +44,8 @@ const getMediaType = (file) => {
   return null;
 };
 
-const UploadContentForm = () => {
+const UploadContentForm = ({ onContentUploaded }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const {
     register,
     handleSubmit,
@@ -60,8 +55,7 @@ const UploadContentForm = () => {
     resolver: yupResolver(schema),
     defaultValues: {
       title: '',
-      author: '',
-      personalNote: ''
+      author: ''
     }
   });
 
@@ -71,24 +65,19 @@ const UploadContentForm = () => {
       const formData = new FormData();
       const file = data.file[0];
       const mediaType = getMediaType(file);
-      console.log('File type:', file.type);
-      console.log('Detected media type:', mediaType);
       
       formData.append('file', file);
       formData.append('title', data.title);
       formData.append('author', data.author);
-      formData.append('personalNote', data.personalNote);
       formData.append('media_type', mediaType);
 
-      // Log the FormData (for debugging)
-      for (let pair of formData.entries()) {
-        console.log(pair[0], pair[1]);
+      const response = await axiosInstance.post('/content/upload-content/', formData);
+      
+      if (onContentUploaded) {
+        onContentUploaded(response.data.content_profile);
       }
 
-      const response = await axiosInstance.post('/content/upload-content/', formData);
-
       reset();
-      setRefreshKey(prev => prev + 1);
       alert('Content uploaded successfully!');
     } catch (error) {
       console.error('Upload failed:', error);
@@ -100,7 +89,7 @@ const UploadContentForm = () => {
 
   return (
     <Grid container spacing={3}>
-      <Grid item xs={12} md={8}>
+      <Grid item xs={12}>
         <div className="upload-form-container">
           <h2>Upload Content</h2>
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -131,18 +120,6 @@ const UploadContentForm = () => {
                 {...register('author')}
               />
               {errors.author && <span className="error">{errors.author.message}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Personal Note (optional):</label>
-              <textarea
-                placeholder="Enter personal note"
-                rows={5}
-                {...register('personalNote')}
-              />
-              {errors.personalNote && (
-                <span className="error">{errors.personalNote.message}</span>
-              )}
             </div>
 
             <button type="submit" disabled={isUploading}>
@@ -201,9 +178,6 @@ const UploadContentForm = () => {
             }
           `}</style>
         </div>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <ContentRecentlyUploaded refreshTrigger={refreshKey} />
       </Grid>
     </Grid>
   );

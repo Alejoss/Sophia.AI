@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from knowledge_paths.models import ActivityRequirement
+from knowledge_paths.models import Node
 from content.models import Content
 
 
@@ -11,12 +11,17 @@ def upload_question_image(instance, filename):
 
 
 class Quiz(models.Model):
-    activity_requirement = models.ForeignKey('knowledge_paths.ActivityRequirement', on_delete=models.CASCADE)
+    node = models.ForeignKey('knowledge_paths.Node', on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
+    max_attempts_per_day = models.SmallIntegerField(
+        choices=[(i, str(i)) for i in range(2, 10)],
+        default=2,
+        help_text="Maximum number of attempts allowed per day (2-9)"
+    )
 
     def __str__(self):
-        return self.title
+        return f"{self.title} (Max attempts/day: {self.max_attempts_per_day})"
 
 
 class Question(models.Model):
@@ -35,14 +40,19 @@ class Question(models.Model):
         return self.text
 
     def clean(self):
-        # Validate that multiple choice questions have at least one correct option
+        print(f"\nQuestion clean method:")
+        print(f"Question ID: {self.pk}")
+        print(f"Question type: {self.question_type}")
+        
         if self.pk:  # Only check for existing questions
             correct_options = self.options.filter(is_correct=True).count()
+            print(f"Number of correct options: {correct_options}")
+            
             if correct_options == 0:
                 raise ValidationError("Question must have at least one correct option")
             if self.question_type == 'SINGLE' and correct_options > 1:
                 raise ValidationError("Single choice questions can only have one correct option")
-            
+
     def delete(self, *args, **kwargs):
         # Delete the image file when the question is deleted
         if self.image:
@@ -59,11 +69,42 @@ class Option(models.Model):
         return f"{self.text} ({'correct' if self.is_correct else 'incorrect'})"
 
     def clean(self):
+        print(f"\nOption clean method:")
+        print(f"Option ID: {self.pk}")
+        print(f"Option text: {self.text}")
+        print(f"Is correct: {self.is_correct}")
+        print(f"Question type: {self.question.question_type}")
+        
+        # Only perform this validation if we're setting this option as correct
         if self.is_correct and self.question.question_type == 'SINGLE':
-            # Check if there's already a correct option for single choice questions
-            existing_correct = self.question.options.filter(is_correct=True).exclude(pk=self.pk).exists()
-            if existing_correct:
-                raise ValidationError("Single choice questions can only have one correct option")
+            # Instead of querying the database, get the current form data
+            # This is necessary because the database hasn't been updated yet
+            try:
+                current_correct = Option.objects.filter(
+                    question=self.question,
+                    is_correct=True
+                ).exclude(pk=self.pk)
+                
+                print(f"Found {current_correct.count()} other correct options")
+                if current_correct.exists():
+                    # Instead of raising an error, we'll handle this in save()
+                    pass
+            except Option.DoesNotExist:
+                pass
+
+    def save(self, *args, **kwargs):
+        print(f"\nOption save method:")
+        print(f"Saving option: {self.text}")
+        print(f"Is correct: {self.is_correct}")
+        
+        # If this is a single choice question and we're marking this option as correct
+        if self.is_correct and self.question.question_type == 'SINGLE':
+            print(f"Updating other options to not correct for question: {self.question.text}")
+            # First, update all other options to be incorrect
+            Option.objects.filter(question=self.question).exclude(pk=self.pk).update(is_correct=False)
+        
+        # Then save this option
+        super().save(*args, **kwargs)
 
 
 class UserQuizAttempt(models.Model):

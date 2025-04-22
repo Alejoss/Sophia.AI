@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Box, Typography, Card, CardContent, Chip, ToggleButton, ToggleButtonGroup, IconButton, Button } from '@mui/material';
 import NoteIcon from '@mui/icons-material/Note';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { isAuthenticated } from '../context/localStorageUtils';
 import contentApi from '../api/contentApi';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getFileUrl } from '../utils/fileUtils';
+import { AuthContext } from '../context/AuthContext';
 
 const LibraryUser = () => {
     // TODO order by most recent by default
@@ -12,16 +14,29 @@ const LibraryUser = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [mediaFilter, setMediaFilter] = useState('ALL');
+    const [userName, setUserName] = useState('');
     const navigate = useNavigate();
+    const { userId } = useParams();
+    const { authState } = useContext(AuthContext);
+    const currentUser = authState.user;
+    const isOwnLibrary = !userId || (currentUser && userId === currentUser.id.toString());
 
     useEffect(() => {
         const fetchUserContent = async () => {
             try {
-                const data = await contentApi.getUserContent();
+                let data;
+                if (userId) {
+                    // Fetch content for the specified user
+                    data = await contentApi.getUserContentById(userId);
+                    // You might need to implement this API method
+                } else {
+                    // Fetch content for the current user
+                    data = await contentApi.getUserContent();
+                }
                 setUserContent(data);
                 setLoading(false);
             } catch (err) {
-                setError('Failed to fetch your content');
+                setError('Failed to fetch content');
                 setLoading(false);
             }
         };
@@ -29,7 +44,7 @@ const LibraryUser = () => {
         if (isAuthenticated()) {
             fetchUserContent();
         }
-    }, []);
+    }, [userId]);
 
     const handleFilterChange = (event, newFilter) => {
         setMediaFilter(newFilter || 'ALL');
@@ -39,14 +54,14 @@ const LibraryUser = () => {
         mediaFilter === 'ALL' || contentProfile.content.media_type === mediaFilter
     );
 
-    if (loading) return <Typography>Loading your content...</Typography>;
+    if (loading) return <Typography>Loading content...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!isAuthenticated()) return <Typography>Please login to view your content</Typography>;
+    if (!isAuthenticated()) return <Typography>Please login to view content</Typography>;
 
     return (
         <Box sx={{ pt: 12, px: 3 }}>
             <Typography variant="h4" gutterBottom>
-                My Content Library
+                {isOwnLibrary ? "My Content Library" : `${userName || 'User'}'s Content Library`}
             </Typography>
 
             <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -63,24 +78,26 @@ const LibraryUser = () => {
                     <ToggleButton value="AUDIO">Audio</ToggleButton>
                 </ToggleButtonGroup>
 
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button 
-                        variant="contained" 
-                        color="primary"
-                        onClick={() => navigate('/content/collections')}
-                    >
-                        Collections
-                    </Button>
+                {isOwnLibrary && (
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button 
+                            variant="contained" 
+                            color="primary"
+                            onClick={() => navigate('/content/collections')}
+                        >
+                            Collections
+                        </Button>
 
-                    <Button 
-                        variant="contained" 
-                        color="primary"
-                        startIcon={<UploadFileIcon />}
-                        onClick={() => navigate('/content/upload_content')}
-                    >
-                        Upload Content
-                    </Button>
-                </Box>
+                        <Button 
+                            variant="contained" 
+                            color="primary"
+                            startIcon={<UploadFileIcon />}
+                            onClick={() => navigate('/content/upload_content_library')}
+                        >
+                            Upload Content
+                        </Button>
+                    </Box>
+                )}
             </Box>
             
             {mediaFilter === 'TEXT' ? (
@@ -117,7 +134,7 @@ const LibraryUser = () => {
                                     <td style={{ padding: '12px' }}>
                                         {contentProfile.content.file_details?.file && (
                                             <a 
-                                                href={contentProfile.content.file_details.file}
+                                                href={getFileUrl(contentProfile.content.file_details.file)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
@@ -149,7 +166,7 @@ const LibraryUser = () => {
                                         justifyContent: 'center'
                                     }}>
                                         <img 
-                                            src={contentProfile.content.file_details.file} 
+                                            src={getFileUrl(contentProfile.content.file_details.file)} 
                                             alt={contentProfile.title || 'Content image'}
                                             style={{
                                                 width: '100%',

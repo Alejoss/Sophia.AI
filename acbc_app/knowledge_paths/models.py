@@ -1,7 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from content.models import Content
+from django.apps import apps
+from django.contrib.contenttypes.models import ContentType
 
+from content.models import ContentProfile
 
 
 def upload_knowledge_path_image(instance, filename):
@@ -14,7 +17,6 @@ class KnowledgePath(models.Model):
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_paths')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    votes = models.IntegerField(default=0)
     image = models.ImageField(
         upload_to=upload_knowledge_path_image, 
         null=True, 
@@ -22,6 +24,27 @@ class KnowledgePath(models.Model):
         help_text="Cover image for the knowledge path"
     )
 
+    @property
+    def vote_count(self):
+        """Get the current vote count"""
+        VoteCount = apps.get_model('votes', 'VoteCount')
+        content_type = ContentType.objects.get_for_model(self)
+        vote_count = VoteCount.objects.filter(
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote_count.vote_count if vote_count else 0
+
+    def get_user_vote(self, user):
+        """Get the user's vote status"""
+        Vote = apps.get_model('votes', 'Vote')
+        content_type = ContentType.objects.get_for_model(self)
+        vote = Vote.objects.filter(
+            user=user,
+            content_type=content_type,
+            object_id=self.id
+        ).first()
+        return vote.value if vote else 0
 
     def __str__(self):
         return self.title
@@ -45,7 +68,7 @@ class Node(models.Model):
         ('IMAGE', 'Image')
     ]
     knowledge_path = models.ForeignKey(KnowledgePath, on_delete=models.CASCADE, related_name='nodes')
-    content = models.ForeignKey(Content, on_delete=models.CASCADE)
+    content_profile = models.ForeignKey(ContentProfile, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
@@ -67,30 +90,21 @@ class Node(models.Model):
     def __str__(self):
         return f"{self.title} ({self.get_media_type_display()})"
 
-class ActivityRequirement(models.Model):
-    ACTIVITY_TYPES = [
-        ('QUIZ', 'Quiz'),
-        ('VIDEO_CONSULTATION', 'Video Consultation'),
-        ('CONTENT_CREATION', 'Content Creation')
-    ]
-    knowledge_path = models.ForeignKey(KnowledgePath, related_name='requirements', on_delete=models.CASCADE)
-    activity_type = models.CharField(max_length=20, choices=ACTIVITY_TYPES)
-    description = models.TextField()
+    def get_preceding_node(self):
+        """
+        Retrieve the preceding node in the knowledge path based on the order.
+        
+        Returns:
+            Node: The preceding node if it exists, otherwise None.
+        """
+        return Node.objects.filter(
+            knowledge_path=self.knowledge_path,
+            order__lt=self.order
+        ).order_by('-order').first()
 
-    def __str__(self):
-        return f"{self.get_activity_type_display()} for {self.knowledge_path.title}"
-
-class NodeActivityRequirement(models.Model):
-    preceding_node = models.ForeignKey(Node, related_name='following_activities', on_delete=models.CASCADE)
-    following_node = models.ForeignKey(Node, related_name='preceding_activities', on_delete=models.CASCADE, null=True, blank=True)
-    activity_requirement = models.ForeignKey(ActivityRequirement, on_delete=models.CASCADE)
-    is_mandatory = models.BooleanField(default=True)
-
-    class Meta:
-        unique_together = ('preceding_node', 'following_node', 'activity_requirement')
-
-    def __str__(self):
-        if self.following_node:
-            return f"Complete {self.activity_requirement} to move from {self.preceding_node.title} to {self.following_node.title}"
-        else:
-            return f"Complete {self.activity_requirement} to finish {self.preceding_node.title}"
+    def get_next_node(self):
+        """Get the next node in the knowledge path based on order"""
+        return Node.objects.filter(
+            knowledge_path=self.knowledge_path,
+            order__gt=self.order
+        ).order_by('order').first()

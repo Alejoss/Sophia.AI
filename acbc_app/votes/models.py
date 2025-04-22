@@ -2,8 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Sum
+from django.apps import apps
 
-from comments.models import Comment
 from content.models import Topic, Content
 from knowledge_paths.models import KnowledgePath
 
@@ -16,6 +17,7 @@ class Vote(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
+    topic = models.ForeignKey('content.Topic', on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -61,22 +63,76 @@ class Vote(models.Model):
             return -2  # Return -2 to indicate the vote was changed from upvote to downvote
         return self.value
 
+    @property
+    def is_upvote(self):
+        return self.value > 0
 
-class ContentVoteTopicCount(models.Model):
-    # Aggregates votes for content items within topics, updating and summarizing total votes to facilitate quick retrieval.
-    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='vote_summaries')
-    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='vote_summaries')
+    @property
+    def is_downvote(self):
+        return self.value < 0
+
+    @classmethod
+    def get_user_votes(cls, user, content_type=None):
+        """Get all votes by a user, optionally filtered by content type"""
+        votes = cls.objects.filter(user=user)
+        if content_type:
+            votes = votes.filter(content_type=content_type)
+        return votes
+
+
+class VoteCount(models.Model):
+    """Generic vote count aggregation for any voteable object"""
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+    topic = models.ForeignKey('content.Topic', on_delete=models.CASCADE, null=True, blank=True)
     vote_count = models.IntegerField(default=0)
 
     class Meta:
-        unique_together = ('content', 'topic')
+        unique_together = ('content_type', 'object_id', 'topic')
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+        ]
 
     def __str__(self):
-        return f"{self.vote_count} votes for {self.content.title} in {self.topic.title}"
+        return f"{self.vote_count} votes for {self.content_object} in {self.topic or 'all topics'}"
 
-    def update_vote_count(self, new_votes=1):
-        """ Update the vote count by a specified number of new votes. """
-        # Using F() expression to avoid race conditions
-        self.vote_count = models.F('vote_count') + new_votes
+    def update_vote_count(self, obj=None):
+        """Update vote count for the object"""
+        if obj is None:
+            obj = self.content_object
+
+        # Calculate total votes using Vote model
+        vote_sum = Vote.objects.filter(
+            content_type=self.content_type,
+            object_id=self.object_id,
+        ).aggregate(Sum('value'))['value__sum'] or 0
+
+        self.vote_count = vote_sum
         self.save()
-        self.refresh_from_db()  # Refresh to get the updated vote_count after F() expression
+        return self.vote_count
+
+    @classmethod
+    def get_top_voted(cls, content_type, topic=None, limit=10):
+        """Get top voted objects of a specific type"""
+        filters = {'content_type': content_type}
+        if topic:
+            filters['topic'] = topic
+        return cls.objects.filter(**filters).order_by('-vote_count')[:limit]
+
+    @property
+    def positive_ratio(self):
+        """Calculate the ratio of positive votes"""
+        Vote = apps.get_model('votes', 'Vote')
+        total_votes = Vote.objects.filter(
+            content_type=self.content_type,
+            object_id=self.object_id
+        ).count()
+        if total_votes == 0:
+            return 0
+        positive_votes = Vote.objects.filter(
+            content_type=self.content_type,
+            object_id=self.object_id,
+            value__gt=0
+        ).count()
+        return positive_votes / total_votes
