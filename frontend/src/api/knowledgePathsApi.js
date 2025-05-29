@@ -45,9 +45,14 @@ const knowledgePathsApi = {
         }
     },
 
-    getKnowledgePaths: async () => {
+    getKnowledgePaths: async (page = 1, pageSize = 9) => {
         try {
-            const response = await axiosInstance.get('/knowledge_paths/');
+            const response = await axiosInstance.get('/knowledge_paths/', {
+                params: {
+                    page,
+                    page_size: pageSize
+                }
+            });
             return response.data;
         } catch (error) {
             console.error('Error fetching knowledge paths:', error);
@@ -83,6 +88,19 @@ const knowledgePathsApi = {
             return response.data;
         } catch (error) {
             console.error('Error fetching node:', error);
+            throw error;
+        }
+    },
+
+    getNodeContent: async (contentProfileId) => {
+        if (!contentProfileId) {
+            return null;
+        }
+        try {
+            const response = await axiosInstance.get(`/content/content-profiles/${contentProfileId}/detail/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching node content:', error);
             throw error;
         }
     },

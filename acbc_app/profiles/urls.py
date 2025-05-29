@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from profiles import views
 
@@ -10,6 +10,7 @@ urlpatterns = [
     path('', views.ProfileList.as_view(), name='profile-list'),
     path('<int:pk>/', views.ProfileDetail.as_view(), name='profile-detail'),
 
+    path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
 
@@ -18,4 +19,5 @@ urlpatterns = [
 
     path('set_jwt_token/', views.set_jwt_token, name="set_jwt_token"),
     path('get_csrf_token/', views.GetCsrfToken.as_view(), name='get_csrf_token'),
+    path('refresh_token/', views.RefreshTokenView.as_view(), name='refresh_token'),
 ]

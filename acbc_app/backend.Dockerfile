@@ -3,7 +3,7 @@ FROM python:3.12
 
 # Update and install system dependencies
 RUN apt-get update -y \
-  && apt-get install -y gettext libpq-dev \
+  && apt-get install -y gettext libpq-dev postgresql-client \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -16,6 +16,9 @@ RUN pip install -r requirements.txt
 
 # Copy project files into the Docker image
 COPY . /app
+
+# Set Python path
+ENV PYTHONPATH=/app
 
 # Expose the port Django runs on
 EXPOSE 8000

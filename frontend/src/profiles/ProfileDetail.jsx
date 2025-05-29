@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getProfileById } from '../api/profilesApi';
 import { AuthContext } from '../context/AuthContext';
 import PublicationList from '../publications/PublicationList';
-import { Box, Typography, Paper, Grid, CircularProgress, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Paper, Grid, CircularProgress, Tabs, Tab, Button } from '@mui/material';
 
 const ProfileDetail = () => {
     const { profileId } = useParams();
@@ -13,6 +13,7 @@ const ProfileDetail = () => {
     const [activeTab, setActiveTab] = useState('publications');
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
+    const navigate = useNavigate();
     
     const isOwnProfile = currentUser && currentUser.id === parseInt(profileId);
 
@@ -77,6 +78,16 @@ const ProfileDetail = () => {
                         <Typography variant="body1" paragraph>
                             {profile.profile_description || 'No description available.'}
                         </Typography>
+                        {!isOwnProfile && (
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                sx={{ mt: 2 }}
+                                onClick={() => navigate(`/messages/thread/${profile.user.id}`)}
+                            >
+                                Send Message
+                            </Button>
+                        )}
                     </Grid>
                 </Grid>
             </Paper>
@@ -96,7 +107,7 @@ const ProfileDetail = () => {
             <Box>
                 {activeTab === 'publications' && (
                     <Box>
-                        <PublicationList isOwnProfile={isOwnProfile} />
+                        <PublicationList isOwnProfile={isOwnProfile} userId={profile.user.id} />
                     </Box>
                 )}
                 {activeTab === 'activity' && (

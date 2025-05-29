@@ -1,0 +1,261 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import generalApi from '../api/generalApi';
+import '/src/styles/search.css';
+
+// Import icons for different result types
+import ContentIcon from '@mui/icons-material/Article';
+import TopicIcon from '@mui/icons-material/Label';
+import KnowledgePathIcon from '@mui/icons-material/AccountTree';
+import ImageIcon from '@mui/icons-material/Image';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import AudiotrackIcon from '@mui/icons-material/Audiotrack';
+
+const MainSearch = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchType, setSearchType] = useState('all'); // 'all', 'content', 'topics', 'knowledge_paths', 'people'
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalResults: 0
+  });
+  const navigate = useNavigate();
+
+  const handleSearch = async (e, page = 1) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const response = await generalApi.search(searchQuery, searchType, page);
+      
+      // Update search results
+      setSearchResults(response.results);
+      
+      // Update pagination info
+      setPagination({
+        currentPage: response.current_page,
+        totalPages: response.total_pages,
+        totalResults: response.count
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      handleSearch(new Event('submit'), newPage);
+    }
+  };
+
+  const handleResultClick = (result) => {
+    // Construct URL based on result type and ID
+    let url;
+    
+    if (result.type === 'content') {
+      // If it's a content profile, include the profile ID in the URL
+      if (result.source === 'profile' && result.profile_id) {
+        url = `/content/search/${result.id}?profile=${result.profile_id}`;
+      } else {
+        url = `/content/search/${result.id}`;
+      }
+    } else if (result.type === 'topic') {
+      url = `/content/topics/${result.id}`;
+    } else if (result.type === 'knowledge_path') {
+      url = `/knowledge_path/${result.id}`;
+    }
+    
+    if (url) {
+      // Pass the search query to the next component
+      navigate(url, { state: { searchQuery } });
+    }
+  };
+
+  // Get icon for result type
+  const getResultTypeIcon = (type, mediaType) => {
+    if (type === 'content') {
+      // Return media type specific icon
+      switch (mediaType) {
+        case 'IMAGE':
+          return <ImageIcon className="result-type-icon" />;
+        case 'VIDEO':
+          return <VideoLibraryIcon className="result-type-icon" />;
+        case 'TEXT':
+          return <TextSnippetIcon className="result-type-icon" />;
+        case 'AUDIO':
+          return <AudiotrackIcon className="result-type-icon" />;
+        default:
+          return <ContentIcon className="result-type-icon" />;
+      }
+    } else if (type === 'topic') {
+      return <TopicIcon className="result-type-icon" />;
+    } else if (type === 'knowledge_path') {
+      return <KnowledgePathIcon className="result-type-icon" />;
+    } else {
+      return <ContentIcon className="result-type-icon" />;
+    }
+  };
+
+  // Get media type label
+  const getMediaTypeLabel = (mediaType) => {
+    switch (mediaType) {
+      case 'IMAGE':
+        return 'Image';
+      case 'VIDEO':
+        return 'Video';
+      case 'TEXT':
+        return 'Text';
+      case 'AUDIO':
+        return 'Audio';
+      default:
+        return 'Content';
+    }
+  };
+
+  // Render search result item
+  const renderResultItem = (result) => {
+    return (
+      <li 
+        key={result.id} 
+        className="result-item"
+        onClick={() => handleResultClick(result)}
+      >
+        <div className="result-item-header">
+          <div className="result-type-badge">
+            {getResultTypeIcon(result.type, result.media_type)}
+            <span className="result-type-text">
+              {result.type === 'content' ? getMediaTypeLabel(result.media_type) : result.type}
+            </span>
+          </div>
+        </div>
+        
+        <h3 className="result-title">{result.title}</h3>
+        
+        {result.author && (
+          <p className="result-author">By {result.author}</p>
+        )}
+        
+        <div className="result-footer">
+          <button className="view-details-button">View Details</button>
+        </div>
+      </li>
+    );
+  };
+
+  return (
+    <div className="search-container">
+      <h1>Search</h1>
+      
+      <form onSubmit={(e) => handleSearch(e, 1)} className="search-form">
+        <div className="search-input-container">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search for content, topics, knowledge paths, or people..."
+            className="search-input"
+          />
+          <button type="submit" className="search-button">
+            Search
+          </button>
+        </div>
+        
+        <div className="search-filters">
+          <label>
+            <input
+              type="radio"
+              name="searchType"
+              value="all"
+              checked={searchType === 'all'}
+              onChange={(e) => setSearchType(e.target.value)}
+            />
+            All
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="searchType"
+              value="content"
+              checked={searchType === 'content'}
+              onChange={(e) => setSearchType(e.target.value)}
+            />
+            Content
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="searchType"
+              value="topics"
+              checked={searchType === 'topics'}
+              onChange={(e) => setSearchType(e.target.value)}
+            />
+            Topics
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="searchType"
+              value="knowledge_paths"
+              checked={searchType === 'knowledge_paths'}
+              onChange={(e) => setSearchType(e.target.value)}
+            />
+            Knowledge Paths
+          </label>
+        </div>
+      </form>
+
+      {isLoading ? (
+        <div className="loading">Loading results...</div>
+      ) : (
+        <div className="search-results">
+          {searchResults.length > 0 ? (
+            <>
+              <div className="results-summary">
+                Showing {searchResults.length} of {pagination.totalResults} results
+              </div>
+              <ul className="results-list">
+                {searchResults.map(renderResultItem)}
+              </ul>
+              
+              {/* Pagination controls */}
+              {pagination.totalPages > 1 && (
+                <div className="pagination-controls">
+                  <button 
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={pagination.currentPage === 1}
+                    className="pagination-button"
+                  >
+                    Previous
+                  </button>
+                  
+                  <span className="pagination-info">
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                  </span>
+                  
+                  <button 
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={pagination.currentPage === pagination.totalPages}
+                    className="pagination-button"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            searchQuery && <p className="no-results">No results found for "{searchQuery}"</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MainSearch; 

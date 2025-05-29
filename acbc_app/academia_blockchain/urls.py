@@ -21,15 +21,22 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/accounts/', include('allauth.urls')),
-    path('api/profiles/', include('profiles.urls', namespace='profiles')),
-    path('api/content/', include('content.urls', namespace='content')),
-    path('api/events/', include('events.urls', namespace='events')),
-    path('api/votes/', include('votes.urls', namespace='votes')),
-    path('api/comments/', include('comments.urls', namespace='comments')),
-    path('api/knowledge_paths/', include('knowledge_paths.urls', namespace='knowledge_paths')),
-    path('api/quizzes/', include('quizzes.urls', namespace='quizzes')),
-    path('ratings/', include('star_ratings.urls', namespace='ratings')),
+    path('api/profiles/', include('profiles.urls')),
+    path('api/events/', include('events.urls')),
+    path('api/content/', include('content.urls')),
+    path('api/comments/', include('comments.urls')),
+    path('api/quizzes/', include('quizzes.urls')),
+    path('api/votes/', include('votes.urls')),
+    path('api/knowledge_paths/', include('knowledge_paths.urls')),
+    path('api/search/', include('search.urls')),
+    
+    # dj-rest-auth URLs
+    path('rest-auth/', include('dj_rest_auth.urls')),
+    path('rest-auth/registration/', include('dj_rest_auth.registration.urls')),
+    
+    # django-allauth URLs - using standard paths
+    path('accounts/', include('allauth.urls')),
+    
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

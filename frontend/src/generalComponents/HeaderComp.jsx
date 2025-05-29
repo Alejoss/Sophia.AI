@@ -14,10 +14,10 @@ const HeaderComp = () => {
     <nav className="nav">
       <ul className="nav-list">
         <li className="nav-item">
-          <Link className="nav-link" to="/knowledge_path">Knowledge Paths</Link>
+          <Link className="nav-link" to="/search">Search</Link>
         </li>
         <li className="nav-item">
-          <Link className="nav-link" to="/knowledge_path/create">Create Knowledge Path</Link>
+          <Link className="nav-link" to="/knowledge_path">Knowledge Paths</Link>
         </li>
         <li className="nav-item">
           <Link className="nav-link" to="/content/topics">Topics</Link>
@@ -25,7 +25,7 @@ const HeaderComp = () => {
         {isAuthenticated ? (
             <>
               <li className="nav-item">
-                <Link className="nav-link" to="/content/library_user">Tu Librería</Link>
+                <Link className="nav-link" to="/content/library_user">Your Library</Link>
               </li>
               <li className="nav-item">
                 <Link className="nav-link" to="/profiles/my_profile">{user.username}</Link>
@@ -40,7 +40,7 @@ const HeaderComp = () => {
                 <Link className="nav-link" to="/profiles/login">Iniciar sesión</Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" to="/profiles/register">Registrar</Link>
+              <Link className="nav-link" to="/profiles/register">Register</Link>
             </li>
           </>
         )}

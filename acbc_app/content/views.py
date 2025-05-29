@@ -13,10 +13,12 @@ from rest_framework.decorators import action
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
+from django.db import models
 
 from utils.permissions import IsAuthor
 from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication
 from knowledge_paths.models import KnowledgePath, Node
+from votes.models import VoteCount
 from content.serializers import (
     LibrarySerializer,
     CollectionSerializer,
@@ -31,6 +33,7 @@ from knowledge_paths.serializers import (
     NodeSerializer
 )
 from .serializers import PublicationSerializer, ContentReferencesSerializer
+from content.utils import get_top_voted_contents
 
 # Library Views
 class LibraryListView(APIView):
@@ -49,26 +52,75 @@ class LibraryDetailView(APIView):
         return Response(serializer.data)
 
 
-# Content Views
-class ContentListView(APIView):
-    """API view to retrieve the list of all Content instances."""
-    def get(self, request):
-        contents = Content.objects.values('title', 'author')
-        return Response(contents)
-
-
 class ContentDetailView(APIView):
     """API view to retrieve, update, or delete a specific Content instance."""
     permission_classes = [IsAuthenticated]
 
+    def get_content_profile(self, content, request):
+        """
+        Get the appropriate ContentProfile based on context parameters.
+        Falls back to user's profile and finally to None if no profile is found.
+        """
+        context = request.query_params.get('context')
+        context_id = request.query_params.get('id')
+
+        if not context or not context_id:
+            return None
+
+        try:
+            # Try to get profile based on context
+            if context == 'topic':
+                topic = Topic.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=topic.creator)
+            
+            elif context == 'library':
+                library_owner = User.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=library_owner)
+            
+            elif context == 'publication':
+                publication = Publication.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=publication.user)
+            
+            elif context == 'knowledge_path':
+                path = KnowledgePath.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=path.author)
+
+        except (Topic.DoesNotExist, User.DoesNotExist, 
+                Publication.DoesNotExist, KnowledgePath.DoesNotExist,
+                ContentProfile.DoesNotExist):
+            pass
+
+        # First fallback: try to get logged user's profile
+        try:
+            return ContentProfile.objects.get(content=content, user=request.user)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Final fallback: return None (serializer will use original content data)
+        return None
+
     def get(self, request, pk):
         try:
-            content = get_object_or_404(Content, pk=pk)
+            content = Content.objects.get(pk=pk)
+            selected_profile = self.get_content_profile(content, request)
+            
+            # Get topic from context if available
+            topic = None
+            context = request.query_params.get('context')
+            context_id = request.query_params.get('id')
+            if context == 'topic' and context_id:
+                topic = Topic.objects.get(id=context_id)
+            
             serializer = ContentWithSelectedProfileSerializer(
-                content, 
-                context={'request': request, 'user': request.user}
+                content,
+                context={
+                    'request': request,
+                    'selected_profile': selected_profile,
+                    'topic': topic  # Pass the topic to the serializer context
+                }
             )
             return Response(serializer.data)
+            
         except Content.DoesNotExist:
             return Response(
                 {'error': 'Content not found'}, 
@@ -139,9 +191,22 @@ class UploadContentView(APIView):
                 filename = os.path.splitext(file.name)[0]
                 title = filename
 
+            # Convert string booleans to actual booleans
+            is_visible = request.data.get('is_visible')
+            if isinstance(is_visible, str):
+                is_visible = is_visible.lower() == 'true'
+            else:
+                is_visible = bool(is_visible)
+
+            is_producer = request.data.get('is_producer')
+            if isinstance(is_producer, str):
+                is_producer = is_producer.lower() == 'true'
+            else:
+                is_producer = bool(is_producer)
+
             content = Content.objects.create(
                 uploaded_by=request.user,
-                media_type=media_type,  # No default value
+                media_type=media_type,
                 original_title=title,
                 original_author=request.data.get('author')
             )
@@ -152,7 +217,8 @@ class UploadContentView(APIView):
                 author=request.data.get('author'),
                 personal_note=request.data.get('personalNote'),
                 user=request.user,
-                is_visible=True
+                is_visible=is_visible,
+                is_producer=is_producer
             )
 
             file_details = FileDetails.objects.create(
@@ -174,8 +240,12 @@ class UploadContentView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            print(f"Error in UploadContentView: {str(e)}")  # Add logging
             return Response(
-                {'error': str(e)}, 
+                {
+                    'error': 'Failed to upload content',
+                    'details': str(e)  # Include error details in response
+                }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -251,7 +321,7 @@ class RecentUserContentView(APIView):
             '-created_at'
         )[:4]
         
-        serializer = ContentProfileSerializer(recent_content, many=True)
+        serializer = ContentProfileSerializer(recent_content, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -343,6 +413,14 @@ class ContentProfileView(APIView):
             user=request.user
         )
         
+        # If trying to change visibility, check if user has claimed to be the producer
+        if 'is_visible' in request.data:
+            if not request.data.get('is_producer', False):
+                return Response(
+                    {'error': 'You must claim to be the producer to change visibility'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
         serializer = ContentProfileSerializer(
             content_profile, 
             data=request.data, 
@@ -416,6 +494,7 @@ class KnowledgePathNodesView(APIView):
 
 
 class NodeDetailView(APIView):
+    # TODO: Add permission classes
     """API view to manage individual nodes."""
     permission_classes = [IsAuthor]
 
@@ -464,6 +543,8 @@ class TopicDetailView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request, pk):
+        print(f"\n=== TopicDetailView.get - Starting for topic {pk} ===")
+        
         topic = get_object_or_404(
             Topic.objects.prefetch_related(
                 'contents',
@@ -472,16 +553,50 @@ class TopicDetailView(APIView):
             ),
             pk=pk
         )
+        print(f"Found topic: {topic.title} (ID: {topic.id})")
+
+        # Get top 3 most upvoted contents for each media type
+        top_contents = {}
+        for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
+            print(f"\nProcessing media type: {media_type}")
+            contents = get_top_voted_contents(topic, media_type)
+            print(f"Found {len(contents)} top voted contents for {media_type}")
+            for content in contents:
+                print(f"- Content ID: {content.id}, Title: {content.original_title}, Vote Count: {content.vote_count}")
+            top_contents[media_type] = contents
+
+        # Create ordered list of contents
+        ordered_contents = []
+        for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
+            ordered_contents.extend(top_contents[media_type])
+        
+        print(f"\nTotal ordered contents: {len(ordered_contents)}")
+        print("Ordered contents by type:")
+        for content in ordered_contents:
+            print(f"- Type: {content.media_type}, ID: {content.id}, Title: {content.original_title}, Vote Count: {content.vote_count}")
+
+        # Update the topic's contents with the ordered list
+        topic.contents.set(ordered_contents)
+        print("\nUpdated topic contents with ordered list")
+
         serializer = TopicDetailSerializer(topic, context={
             'request': request,
             'user': request.user,
             'topic': topic
         })
+        print("=== TopicDetailView.get - Completed ===\n")
         return Response(serializer.data)
 
     def patch(self, request, pk):
         print(f"TopicDetailView.patch - Received request data:", request.data)
         topic = get_object_or_404(Topic, pk=pk)
+        
+        # Check if user is author or moderator
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {"error": "You do not have permission to update this topic."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         # Handle image update if present
         if 'topic_image' in request.FILES:
@@ -596,7 +711,7 @@ class TopicContentMediaTypeView(APIView):
         serializer = ContentWithSelectedProfileSerializer(
             contents, 
             many=True,
-            context={'topic': topic}
+            context={'request': request, 'topic': topic}
         )
         
         return Response({
@@ -611,9 +726,12 @@ class TopicContentMediaTypeView(APIView):
 class PublicationListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, user_id=None):
+        if user_id is not None:
+            return self.get_user_publications(request, user_id)
+        
         publications = Publication.objects.filter(user=request.user, deleted=False)
-        serializer = PublicationSerializer(publications, many=True)
+        serializer = PublicationSerializer(publications, many=True, context={'request': request})
         data = serializer.data
         print("PublicationListView - Returning publications data:", data)
         return Response(data)
@@ -625,6 +743,17 @@ class PublicationListView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def get_user_publications(self, request, user_id):
+        try:
+            publications = Publication.objects.filter(user_id=user_id, deleted=False, status='PUBLISHED')
+            serializer = PublicationSerializer(publications, many=True, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class PublicationDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -634,7 +763,7 @@ class PublicationDetailView(APIView):
 
     def get(self, request, pk):
         publication = self.get_object(pk)
-        serializer = PublicationSerializer(publication)
+        serializer = PublicationSerializer(publication, context={'request': request})
         return Response(serializer.data)
 
     def put(self, request, pk):
@@ -656,7 +785,7 @@ class PublicationVoteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, pk):
-        return get_object_or_404(Publication, pk=pk, content__uploaded_by=self.request.user)
+        return get_object_or_404(Publication, pk=pk)
 
     def post(self, request, pk):
         publication = self.get_object(pk)
@@ -736,4 +865,25 @@ class ContentReferencesView(APIView):
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ContentProfileDetailView(APIView):
+    """
+    Retrieve a specific content profile by ID
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, profile_id):
+        try:
+            content_profile = ContentProfile.objects.get(pk=profile_id)
+            serializer = ContentProfileSerializer(
+                content_profile, 
+                context={'request': request}
+            )
+            return Response(serializer.data)
+        except ContentProfile.DoesNotExist:
+            return Response(
+                {"error": "Content profile not found"}, 
+                status=status.HTTP_404_NOT_FOUND
             )

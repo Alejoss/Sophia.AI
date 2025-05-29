@@ -5,17 +5,35 @@ html, body {
 
 .login-container {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
 form {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
 
 form div {
     margin-bottom: 10px;
+    width: 100%;
+}
+
+.social-login-section {
+    margin-top: 2rem;
+    text-align: center;
+    width: 100%;
+}
+
+.social-login-section p {
+    margin-bottom: 1rem;
+    color: #666;
+    font-size: 0.9rem;
 }

@@ -7,7 +7,8 @@ import { AuthContext } from '../context/AuthContext.jsx';
 const Logout = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
-  const { setAuthState } = useContext(AuthContext);
+  const [error, setError] = useState(null);
+  const { setAuthState, clearAccessToken } = useContext(AuthContext);
 
   useEffect(() => {
     const storedUser = getUserFromLocalStorage();
@@ -24,21 +25,51 @@ const Logout = () => {
       try {
         console.log('Attempting to logout...');
         await apiLogout();
-        setAuthenticationStatus(false);  // Local Storage
-        setAuthState({ isAuthenticated: false, user: null });  // Context
+        
+        // Clear access token from context
+        clearAccessToken();
+        
+        // Clear authentication status but keep user data
+        setAuthenticationStatus(false);
+        
+        // Clear auth state but keep user info
+        const storedUser = getUserFromLocalStorage();
+        setAuthState({ 
+          isAuthenticated: false, 
+          user: storedUser // Keep user info for welcome back message
+        });
+        
         console.log('Logout successful, redirecting to login.');
+        navigate('/profiles/login/');
       } catch (error) {
         console.error('Logout failed:', error);
+        setError(error.message || 'Failed to logout');
+        // Even if the API call fails, we should still clear auth state
+        clearAccessToken();
+        setAuthenticationStatus(false);
+        const storedUser = getUserFromLocalStorage();
+        setAuthState({ 
+          isAuthenticated: false, 
+          user: storedUser // Keep user info for welcome back message
+        });
+        
+        // Wait a moment before redirecting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        navigate('/profiles/login/');
       }
-      await new Promise(resolve => setTimeout(resolve, 4000));
-      navigate('/profiles/login/');
     };
 
     logoutUser();
-  }, [navigate]);
+  }, [navigate, setAuthState, clearAccessToken]);
 
   return (
-    <div>Logging out {username}...</div>
+    <div>
+      {error ? (
+        <div style={{ color: 'red' }}>Error: {error}</div>
+      ) : (
+        <div>Logging out {username}...</div>
+      )}
+    </div>
   );
 };
 

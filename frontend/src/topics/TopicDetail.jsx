@@ -21,6 +21,7 @@ import contentApi from '../api/contentApi';
 import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
 import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
+import VoteComponent from '../votes/VoteComponent';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
@@ -83,7 +84,7 @@ const TopicDetail = () => {
     }, [topicId]);
 
     const renderContentPreview = (content, type) => {
-        if (!content.file_details) return null;
+        if (!content.file_details && type !== 'image') return null;
 
         switch (type) {
             case 'image':
@@ -95,7 +96,7 @@ const TopicDetail = () => {
                             width: '100%',
                             objectFit: 'cover'
                         }}
-                        image={content.file_details.url}
+                        image={content.file_details?.url || `https://picsum.photos/800/600?random=${content.id}`}
                         alt={content.selected_profile?.title || 'Content image'}
                     />
                 );
@@ -103,7 +104,7 @@ const TopicDetail = () => {
                 return (
                     <CardContent>
                         <Typography variant="body2" color="text.secondary" noWrap>
-                            {content.file_details.text || 'No preview available'}
+                            {content.file_details?.text || 'No preview available'}
                         </Typography>
                     </CardContent>
                 );
@@ -117,7 +118,7 @@ const TopicDetail = () => {
                                 width: '100%',
                                 objectFit: 'cover'
                             }}
-                            image={content.file_details.url}
+                            image={content.file_details?.url}
                         />
                         <Box
                             sx={{
@@ -145,7 +146,7 @@ const TopicDetail = () => {
                             controls
                             style={{ width: '100%' }}
                         >
-                            <source src={content.file_details.url} type="audio/mpeg" />
+                            <source src={content.file_details?.url} type="audio/mpeg" />
                             Your browser does not support the audio element.
                         </audio>
                     </Box>
@@ -203,6 +204,20 @@ const TopicDetail = () => {
                                             sx={{ mt: 1 }}
                                         />
                                     )}
+                                    <Box 
+                                        sx={{ mt: 2 }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <VoteComponent
+                                            type="content"
+                                            ids={{
+                                                topicId: topicId,
+                                                contentId: content.id
+                                            }}
+                                            initialVoteCount={content.vote_count || 0}
+                                            initialUserVote={content.user_vote || 0}
+                                        />
+                                    </Box>
                                 </CardContent>
                             </Card>
                         </Grid>
@@ -232,7 +247,7 @@ const TopicDetail = () => {
                     {/* Topic Image */}
                     <Box sx={{ width: 200, height: 200 }}>
                         <img
-                            src={topic.topic_image || '/default-topic-image.png'}
+                            src={topic.topic_image || `https://picsum.photos/400/400?random=${topic.id}`}
                             alt={topic.title}
                             style={{
                                 width: '100%',

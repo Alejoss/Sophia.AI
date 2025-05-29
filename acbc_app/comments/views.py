@@ -169,11 +169,12 @@ class ContentTopicCommentsView(BaseCommentView):
     def save_serializer(self, serializer, topic_pk, content_pk):
         topic = get_object_or_404(Topic, pk=topic_pk)
         content = get_object_or_404(topic.contents, pk=content_pk)
-        serializer.save(
+        comment = serializer.save(
             object_id=content.id,
             content_type=ContentType.objects.get_for_model(Content),
             topic=topic
         )
+        return comment
 
 
 class BaseCommentRepliesView(APIView):
@@ -278,8 +279,14 @@ class ContentTopicCommentRepliesView(BaseCommentRepliesView):
 
 
 class CommentView(APIView):
-    """ View for updating and deleting comments. """
+    """ View for retrieving, updating and deleting comments. """
     permission_classes = [IsAuthor]
+
+    def get(self, request, pk):
+        """Get a specific comment"""
+        comment = get_object_or_404(Comment, pk=pk, is_active=True)
+        serializer = CommentSerializer(comment, context={'request': request})
+        return Response(serializer.data)
 
     def put(self, request, pk):
         """ Update a comment. """
@@ -295,6 +302,7 @@ class CommentView(APIView):
                 )
 
             comment.body = body
+            comment.is_edited = True
             comment.save()
 
             # Return the updated comment data
@@ -307,31 +315,17 @@ class CommentView(APIView):
 
     def delete(self, request, pk):
         """ Delete a comment. """
-        print(f"\n=== Starting comment deletion for ID: {pk} ===")
         try:
             comment = get_object_or_404(Comment, pk=pk)
-            print(f"Found comment: {comment.id} by user {comment.author.username}")
-            
             self.check_object_permissions(request, comment)
-            print(f"Permission check passed for user {request.user.username}")
-
-            # Store the comment ID for the response
-            comment_id = comment.id
             
             # Delete the comment
-            print(f"Calling logic_delete for comment {comment_id}")
             Comment.objects.logic_delete(comment)
-            print(f"Successfully deleted comment {comment_id}")
 
-            return Response(
-                {"id": comment_id, "success": "Comment deleted successfully."},
-                status=status.HTTP_200_OK
-            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Comment.DoesNotExist:
-            print(f"Comment with ID {pk} not found")
             raise
         except Exception as e:
-            print(f"Error deleting comment {pk}: {str(e)}")
             raise
 
 
@@ -367,6 +361,7 @@ class CommentRepliesView(APIView):
         serializer = CommentCreateSerializer(data=comment_data)
         if serializer.is_valid():
             comment = serializer.save()
+            # Use CommentSerializer for the response to include all fields
             return_serializer = CommentSerializer(comment, context={'request': request})
             return Response(return_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,0 +1,13 @@
+DJANGO_SETTINGS_MODULE=academia_blockchain.settings
+PYTHONPATH=/app
+PYTHONUNBUFFERED=1
+DB_HOST=postgres_test
+DB_NAME=test_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_PORT=5432
+
+# These are for the postgres_test service
+POSTGRES_DB=test_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres 

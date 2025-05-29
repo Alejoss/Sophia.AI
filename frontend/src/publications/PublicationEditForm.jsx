@@ -4,7 +4,7 @@ import { Grid, TextField, Button, Box, Typography, Paper, Divider, CircularProgr
 import UploadContentForm from '../content/UploadContentForm';
 import ContentSearchModal from '../content/ContentSearchModal';
 import contentApi from '../api/contentApi';
-import { getFileUrl } from '../utils/fileUtils';
+import ContentDisplay from '../content/ContentDisplay';
 
 const PublicationEditForm = () => {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ const PublicationEditForm = () => {
     text_content: '',
     status: 'PUBLISHED'
   });
-  const [content, setContent] = useState(null);
+  const [selectedContent, setSelectedContent] = useState(null);
   const [error, setError] = useState(null);
   const [showContentOptions, setShowContentOptions] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -26,16 +26,19 @@ const PublicationEditForm = () => {
       try {
         setIsFetching(true);
         const publicationData = await contentApi.getPublicationDetails(publicationId);
+        console.log('Publication data:', publicationData);
         
         // Set form data
         setFormData({
           text_content: publicationData.text_content || '',
-          status: publicationData.status || 'PUBLISHED'
+          status: publicationData.status || 'PUBLISHED',
+          content_profile_id: publicationData.content_profile_id || null
         });
         
         // Set content if it exists
-        if (publicationData.content_profile) {
-          setContent(publicationData.content_profile);
+        if (publicationData.content) {
+          console.log('Setting content:', publicationData.content);
+          setSelectedContent(publicationData.content);
         }
         
         setError(null);
@@ -51,13 +54,46 @@ const PublicationEditForm = () => {
   }, [publicationId]);
 
   const handleContentUpload = (uploadedContent) => {
-    setContent(uploadedContent);
+    console.log('Uploaded content:', uploadedContent);
+    
+    if (uploadedContent && uploadedContent.content) {
+      setSelectedContent({
+        id: uploadedContent.content.id,
+        original_title: uploadedContent.title || uploadedContent.content.original_title,
+        media_type: uploadedContent.content.media_type,
+        file_details: uploadedContent.content.file_details,
+        url: uploadedContent.content.url
+      });
+      
+      setFormData(prev => ({
+        ...prev,
+        content_profile_id: uploadedContent.id
+      }));
+    }
+    
     setShowUploadForm(false);
     setShowContentOptions(false);
   };
 
   const handleContentSelect = (selectedContent) => {
-    setContent(selectedContent);
+    console.log('Selected content:', selectedContent);
+    
+    // Make sure we have the content_profile_id
+    const contentProfileId = selectedContent.profile_id || selectedContent.id;
+    
+    setSelectedContent({
+      id: selectedContent.id,
+      original_title: selectedContent.original_title || selectedContent.title,
+      media_type: selectedContent.media_type,
+      file_details: selectedContent.file_details,
+      url: selectedContent.url
+    });
+    
+    setFormData(prev => ({
+      ...prev,
+      content_profile_id: contentProfileId
+    }));
+    
     setShowContentModal(false);
     setShowContentOptions(false);
   };
@@ -67,12 +103,11 @@ const PublicationEditForm = () => {
     try {
       setIsLoading(true);
       const publicationData = {
-        ...formData,
-        content_profile_id: content?.id || null
+        ...formData
       };
       console.log('Sending publication update data:', publicationData);
       await contentApi.updatePublication(publicationId, publicationData);
-      navigate('/profiles/profile');
+      navigate('/profiles/my_profile');
     } catch (err) {
       setError('Failed to update publication');
       console.error('Error updating publication:', err);
@@ -82,7 +117,7 @@ const PublicationEditForm = () => {
   };
 
   const handleCancel = () => {
-    navigate('/profiles/profile');
+    navigate('/profiles/my_profile');
   };
 
   const handleDelete = async () => {
@@ -90,7 +125,7 @@ const PublicationEditForm = () => {
       try {
         setIsLoading(true);
         await contentApi.deletePublication(publicationId);
-        navigate('/profiles/profile');
+        navigate('/profiles/my_profile');
       } catch (err) {
         setError('Failed to delete publication');
         console.error('Error deleting publication:', err);
@@ -114,7 +149,7 @@ const PublicationEditForm = () => {
         <Link 
           component="button"
           variant="body2"
-          onClick={() => navigate('/profiles/profile')}
+          onClick={() => navigate('/profiles/my_profile')}
           sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
         >
           ← Back to Profile
@@ -169,67 +204,53 @@ const PublicationEditForm = () => {
           Publication Details
         </Typography>
         
-        {content && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Selected Content:
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
-              <Typography variant="body1">
-                {content.display_title || content.original_title || 'Untitled'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Type: {content.content?.media_type || 'Unknown'}
-              </Typography>
-              
-              {content.content?.media_type === 'IMAGE' && content.content?.file_details?.file && (
-                <Box sx={{ mt: 2, maxWidth: 300 }}>
-                  <img 
-                    src={getFileUrl(content.content.file_details.file)} 
-                    alt={content.display_title || 'Content image'}
-                    style={{ width: '100%', height: 'auto', borderRadius: '4px' }}
-                    onError={(e) => {
-                      console.error('Image failed to load:', content.content.file_details.file);
-                      e.target.src = '/placeholder-image.png';
-                      e.target.onerror = null;
-                    }}
-                  />
-                </Box>
-              )}
-            </Paper>
-            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Content:
+          </Typography>
+          
+          {selectedContent ? (
+            <>
+              <Box sx={{ mb: 2 }}>
+                <ContentDisplay 
+                  content={selectedContent} 
+                  variant="detailed"
+                  maxImageHeight={300}
+                  showAuthor={true}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                <Button 
+                  variant="text" 
+                  color="primary" 
+                  onClick={() => {
+                    setSelectedContent(null);
+                    setFormData(prev => ({...prev, content_profile_id: null}));
+                    setShowContentOptions(true);
+                  }}
+                >
+                  Remove Content
+                </Button>
+                <Button 
+                  variant="text" 
+                  color="primary" 
+                  onClick={() => setShowContentOptions(true)}
+                >
+                  Change Content
+                </Button>
+              </Box>
+            </>
+          ) : (
+            <Box sx={{ mb: 2 }}>
               <Button 
-                variant="text" 
-                color="primary" 
-                onClick={() => {
-                  setContent(null);
-                  setShowContentOptions(true);
-                }}
-              >
-                Remove Content
-              </Button>
-              <Button 
-                variant="text" 
-                color="primary" 
+                variant="outlined" 
                 onClick={() => setShowContentOptions(true)}
               >
-                Change Content
+                Add Content
               </Button>
             </Box>
-          </Box>
-        )}
-        
-        {!content && (
-          <Box sx={{ mb: 3 }}>
-            <Button 
-              variant="outlined" 
-              onClick={() => setShowContentOptions(true)}
-              sx={{ mb: 2 }}
-            >
-              Add Content
-            </Button>
-          </Box>
-        )}
+          )}
+        </Box>
         
         <TextField
           fullWidth
@@ -251,7 +272,7 @@ const PublicationEditForm = () => {
             onClick={handleDelete}
             disabled={isLoading}
           >
-            Delete Publication
+            Delete
           </Button>
           <Button
             variant="outlined"

@@ -26,7 +26,7 @@ const ContentDetailsTopic = () => {
     useEffect(() => {
         const fetchContent = async () => {
             try {
-                const data = await contentApi.getContentDetails(contentId);
+                const data = await contentApi.getContentDetails(contentId, 'topic', topicId);
                 setContent(data);
             } catch (err) {
                 setError('Failed to load content');
@@ -36,7 +36,7 @@ const ContentDetailsTopic = () => {
         };
 
         fetchContent();
-    }, [contentId]);
+    }, [contentId, topicId]);
 
     if (loading) return (
         <Container sx={{ pt: 12, display: 'flex', justifyContent: 'center' }}>
@@ -55,17 +55,6 @@ const ContentDetailsTopic = () => {
             <Typography>Content not found</Typography>
         </Container>
     );
-
-    const content_profile = {
-        title: content.selected_profile?.title || content.original_title,
-        author: content.selected_profile?.author || content.original_author,
-        content: {
-            id: content.id,
-            media_type: content.media_type,
-            file_details: content.file_details,
-            url: content.file_details?.url
-        }
-    };
 
     return (
         <Container maxWidth="lg" sx={{ pt: 12, pb: 4 }}>
@@ -102,10 +91,9 @@ const ContentDetailsTopic = () => {
 
                 {/* Content Display */}
                 <ContentDisplay 
-                    content_profile={content_profile}
+                    content={content}
                     variant="detailed"
                     showAuthor={true}
-                    showType={true}
                 />
 
                 {/* Personal Note Section */}

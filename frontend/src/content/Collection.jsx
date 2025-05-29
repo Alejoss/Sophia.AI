@@ -62,7 +62,7 @@ const Collection = () => {
                     <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={contentProfile.id}>
                         <Card 
                             sx={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/content/${contentProfile.content.id}/library`)}
+                            onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${contentProfile.user}`)}
                         >
                             {contentProfile.content.media_type === 'IMAGE' && contentProfile.content.file_details?.file && (
                                 <Box sx={{ 

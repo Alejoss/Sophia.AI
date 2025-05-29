@@ -40,3 +40,11 @@ export const setAuthenticationStatus = (status) => {
     console.error('Failed to set authentication status in localStorage:', error);
   }
 };
+
+export const clearUserFromLocalStorage = () => {
+  localStorage.removeItem('user');
+};
+
+export const clearAuthenticationStatus = () => {
+  localStorage.removeItem('is_authenticated');
+};

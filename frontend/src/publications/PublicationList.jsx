@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Box, Typography, Paper, Button, Grid, CircularProgress, Divider, Card, CardMedia, CardContent } from '@mui/material';
+import { Box, Typography, Paper, Button, Grid, CircularProgress, Divider } from '@mui/material';
 import contentApi from '../api/contentApi';
-import { getFileUrl } from '../utils/fileUtils';
+import { createContentDetailUrl, CONTEXT_TYPES } from '../utils/urlUtils';
+import ContentDisplay from '../content/ContentDisplay';
 
-const PublicationList = ({ isOwnProfile = false }) => {
+const PublicationList = ({ isOwnProfile = false, userId = null }) => {
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +14,12 @@ const PublicationList = ({ isOwnProfile = false }) => {
     const fetchPublications = async () => {
       try {
         setLoading(true);
-        const data = await contentApi.getUserPublications();
+        let data;
+        if (isOwnProfile || !userId) {
+          data = await contentApi.getUserPublications();
+        } else {
+          data = await contentApi.getUserPublicationsById(userId);
+        }
         setPublications(data);
         setError(null);
       } catch (err) {
@@ -24,7 +30,7 @@ const PublicationList = ({ isOwnProfile = false }) => {
     };
 
     fetchPublications();
-  }, []);
+  }, [isOwnProfile, userId]);
 
   if (loading) {
     return (
@@ -56,17 +62,8 @@ const PublicationList = ({ isOwnProfile = false }) => {
     <Box sx={{ p: 2 }}>
       <Grid container spacing={3}>
         {publications.map((publication) => {
-          const hasContentFile = publication.content_profile && 
-                                publication.content_profile.content && 
-                                publication.content_profile.content.file_details && 
-                                publication.content_profile.content.file_details.file;
-          
-          const rawFileUrl = hasContentFile ? publication.content_profile.content.file_details.file : null;
-          const fileUrl = getFileUrl(rawFileUrl);
-          const mediaType = publication.content_profile?.content?.media_type || '';
-          const isImage = mediaType === 'IMAGE';
-          
-          const contentId = publication.content_profile?.content?.id;
+          const hasContent = publication.content;
+          const contentId = publication.content?.id;
           
           return (
             <Grid item xs={12} key={publication.id}>
@@ -93,59 +90,33 @@ const PublicationList = ({ isOwnProfile = false }) => {
                 
                 <Divider sx={{ my: 2 }} />
                 
-                {hasContentFile && (
+                {hasContent && (
                   <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       Referenced Content:
                     </Typography>
                     
-                    {isImage ? (
-                      <Card sx={{ maxWidth: 400, mb: 2 }}>
-                        <CardMedia
-                          component="img"
-                          height="200"
-                          image={fileUrl}
-                          alt={publication.content_profile.display_title || "Content image"}
-                          onError={(e) => {
-                            e.target.src = '/placeholder-image.png';
-                            e.target.onerror = null;
-                          }}
-                        />
-                        <CardContent>
-                          <Typography variant="body2" color="text.secondary">
-                            {publication.content_profile.display_title || "Untitled"}
-                          </Typography>
-                          {contentId && (
+                    <Box sx={{ mb: 2 }}>
+                      <ContentDisplay 
+                        content={publication.content}
+                        variant="detailed"
+                        maxImageHeight={200}
+                        showAuthor={true}
+                        additionalActions={
+                          contentId && (
                             <Button 
                               component={Link}
-                              to={`/content/${contentId}/library`}
+                              to={createContentDetailUrl(contentId, CONTEXT_TYPES.PUBLICATION, publication.id)}
                               variant="outlined"
                               size="small"
                               sx={{ mt: 1 }}
                             >
                               View Content Details
                             </Button>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body1">
-                          {publication.content_profile.display_title || "Untitled"}
-                        </Typography>
-                        {contentId && (
-                          <Button 
-                            component={Link}
-                            to={`/content/${contentId}/library`}
-                            variant="outlined"
-                            size="small"
-                            sx={{ mt: 1 }}
-                          >
-                            View Content Details
-                          </Button>
-                        )}
-                      </Box>
-                    )}
+                          )
+                        }
+                      />
+                    </Box>
                   </Box>
                 )}
                 

@@ -77,12 +77,13 @@ const TopicContentMediaType = () => {
                             sx={{ height: '100%', cursor: 'pointer' }}
                             onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                         >
-                            {mediaType === 'image' && content.file_details?.file && (
+                            {mediaType === 'image' && (
                                 <CardMedia
                                     component="img"
                                     height="140"
-                                    image={`http://localhost:8000${content.file_details.file}`}
+                                    image={content.file_details?.file ? `http://localhost:8000${content.file_details.file}` : `https://picsum.photos/800/600?random=${content.id}`}
                                     alt={content.selected_profile?.title || 'Untitled'}
+                                    sx={{ objectFit: 'cover' }}
                                 />
                             )}
                             <CardContent>
@@ -98,8 +99,10 @@ const TopicContentMediaType = () => {
                                         />
                                     )}
                                     <VoteComponent 
-                                        topicId={topicId} 
-                                        contentId={content.id}
+                                        type="content"
+                                        ids={{ topicId: topicId, contentId: content.id }}
+                                        initialVoteCount={content.vote_count || 0}
+                                        initialUserVote={content.user_vote || 0}
                                     />
                                 </Box>
                             </CardContent>

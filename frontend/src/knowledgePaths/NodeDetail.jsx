@@ -3,28 +3,52 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentDisplay from '../content/ContentDisplay';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Alert, Chip, CircularProgress } from '@mui/material';
+import ImageIcon from '@mui/icons-material/Image';
+import VideoFileIcon from '@mui/icons-material/VideoFile';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import AudioFileIcon from '@mui/icons-material/AudioFile';
+
+// Added to track render cycles
+let renderCount = 0;
 
 const NodeDetail = () => {
   const { pathId, nodeId } = useParams();
   const navigate = useNavigate();
   const [node, setNode] = useState(null);
+  const [nodeContent, setNodeContent] = useState(null);
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [nextNode, setNextNode] = useState(null);
   const [prevNode, setPrevNode] = useState(null);
   const user = getUserFromLocalStorage();
+  
+  // Track render count to detect potential infinite loops
+  renderCount++;
+  console.log(`🔄 NodeDetail RENDER #${renderCount} - pathId: ${pathId}, nodeId: ${nodeId}`);
 
   useEffect(() => {
+    console.log('📥 useEffect triggered - fetching data');
+    
+    // Reset renderCount on path/node change
+    renderCount = 1;
+    
+    let isMounted = true;
+    
     const fetchData = async () => {
       try {
+        console.log('🔍 Starting API calls');
+        const startTime = performance.now();
+        
+        // Fetch node and path data first
         const [nodeData, pathData] = await Promise.all([
           knowledgePathsApi.getNode(pathId, nodeId),
           knowledgePathsApi.getKnowledgePath(pathId)
         ]);
         
-       
+        if (!isMounted) return;
+        
         setNode(nodeData);
         setKnowledgePath(pathData);
         
@@ -38,28 +62,46 @@ const NodeDetail = () => {
         
         setNextNode(nextAvailableNode);
         setPrevNode(previousNode);
+        
+        // If content_profile_id exists, fetch content details in a separate call
+        if (nodeData.content_profile_id) {
+          const contentData = await knowledgePathsApi.getNodeContent(nodeData.content_profile_id);
+          if (isMounted) {
+            console.log('Content data loaded:', contentData);
+            setNodeContent(contentData);
+          }
+        }
+        
+        const endTime = performance.now();
+        console.log(`✅ API calls completed in ${Math.round(endTime - startTime)}ms`);
       } catch (err) {
-        setError('Failed to load node');
+        console.error('❌ Error fetching data:', err);
+        if (isMounted) {
+          setError('Failed to load node');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          console.log('✅ Setting loading to false');
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+    
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up NodeDetail component');
+      isMounted = false;
+    };
   }, [pathId, nodeId]);
 
-  useEffect(() => {
-    console.log('NodeDetail received node:', node);
-    if (node?.content_profile) {
-      console.log('Content profile:', node.content_profile);
-    }
-  }, [node]);
-
   const handleComplete = async () => {
-    // Add debug log before API call
+    console.log('🎯 handleComplete called');
     let response;
     try {
       response = await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
+      console.log('Response from marking node completed:', response);
     } catch (error) {
       console.error('Error marking node as completed:', error);
       setError('Failed to mark node as completed');
@@ -83,9 +125,29 @@ const NodeDetail = () => {
     }
   };
 
-  if (loading) return <div className="container mx-auto p-4">Loading...</div>;
-  if (error) return <div className="container mx-auto p-4 text-red-600">{error}</div>;
-  if (!node) return <div className="container mx-auto p-4">Node not found</div>;
+  console.log('🧩 Before render - loading:', loading, 'error:', error, 'node exists:', !!node);
+
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh"><CircularProgress /></Box>;
+  if (error) return <Box className="container mx-auto p-4 text-red-600">{error}</Box>;
+  if (!node) return <Box className="container mx-auto p-4">Node not found</Box>;
+
+  console.log('🧩 Ready to render with node:', {
+    id: node.id, 
+    title: node.title,
+    has_content: !!nodeContent
+  });
+
+  // Helper function to get media type icon
+  const getMediaTypeIcon = (mediaType) => {
+    const type = (mediaType || '').toUpperCase();
+    switch (type) {
+      case 'IMAGE': return <ImageIcon />;
+      case 'VIDEO': return <VideoFileIcon />;
+      case 'TEXT': return <TextSnippetIcon />;
+      case 'AUDIO': return <AudioFileIcon />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="container mx-auto p-4">
@@ -108,13 +170,35 @@ const NodeDetail = () => {
           
           {/* Content Display */}
           <div className="mb-6">
-            {node.content_profile && (
-              <ContentDisplay 
-                content_profile={node.content_profile}
-                variant="detailed"
-                showAuthor={true}
-                showType={true}
-              />
+            {nodeContent ? (
+              <>
+                {console.log('🖼️ Rendering ContentDisplay with:', nodeContent.content)}
+                <ContentDisplay 
+                  content={nodeContent.content}
+                  variant="detailed"
+                  showAuthor={true}
+                  onClick={() => {
+                    console.log('ContentDisplay clicked');
+                    navigate(`/content/${nodeContent.content.id}/library?context=knowledge_path&id=${pathId}`);
+                  }}
+                />
+              </>
+            ) : (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <div>
+                  <Typography variant="body1" gutterBottom>
+                    This node doesn't have any attached content.
+                  </Typography>
+                  {node.media_type && (
+                    <Chip 
+                      icon={getMediaTypeIcon(node.media_type)} 
+                      label={`Media type: ${node.media_type}`} 
+                      color="primary" 
+                      variant="outlined" 
+                    />
+                  )}
+                </div>
+              </Alert>
             )}
           </div>          
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 
 import Home from './generalComponents/Home.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
@@ -13,13 +14,18 @@ import Events from './profiles/Events.jsx';
 import Login from './profiles/Login.jsx';
 import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
+import Register from './profiles/Register.jsx';
+import Welcome from './profiles/Welcome.jsx';
 import UploadContentForm from './content/UploadContentForm.jsx';
+import UploadContent from './content/UploadContent.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
 import CollectionsUser from './content/CollectionsUser.jsx';
 import CreateCollectionForm from './content/CreateCollectionForm.jsx';
 import Collection from './content/Collection.jsx';
 import CollectionEditContent from './content/CollectionEditContent.jsx';
 import ContentDetailsTopic from './content/ContentDetailsTopic';
+import ContentDetailsLibrary from './content/ContentDetailsLibrary';
+import ContentDetailsSearch from './content/ContentDetailsSearch';
 import TopicCreationForm from './topics/TopicCreationForm';
 import TopicEdit from './topics/TopicEdit';
 import TopicList from './topics/TopicList';
@@ -27,13 +33,12 @@ import TopicAddContent from './topics/TopicAddContent';
 import TopicEditContent from './topics/TopicEditContent';
 import TopicDetail from './topics/TopicDetail';
 import TopicContentMediaType from './topics/TopicContentMediaType';
-import ContentDetailsLibrary from './content/ContentDetailsLibrary';
+import ContentEdit from './content/ContentEdit.jsx';
 import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 import KnowledgePathList from './knowledgePaths/KnowledgePathList';
 import KnowledgePathDetail from './knowledgePaths/KnowledgePathDetail';
 import QuizForm from './quizzes/QuizForm';
-import ContentEdit from './content/ContentEdit.jsx';
 import NodeCreate from './knowledgePaths/NodeCreate';
 import NodeEdit from './knowledgePaths/NodeEdit';
 import NodeDetail from './knowledgePaths/NodeDetail';
@@ -42,6 +47,8 @@ import PublicationCreationForm from './publications/PublicationCreationForm';
 import PublicationEditForm from './publications/PublicationEditForm';
 import UploadContentLibrary from './content/UploadContentLibrary';
 import PublicationDetail from './publications/PublicationDetail';
+import MainSearch from './generalComponents/MainSearch';
+import MessageThread from './messages/MessageThread.jsx';
 
 const App = () => {
   return (
@@ -51,9 +58,18 @@ const App = () => {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="profiles">
-              <Route path="login" element={<Login />} />
+              <Route path="login" element={
+                <GoogleOAuthInitializer>
+                  <Login />
+                </GoogleOAuthInitializer>
+              } />
+              <Route path="register" element={
+                <GoogleOAuthInitializer>
+                  <Register />
+                </GoogleOAuthInitializer>
+              } />
               <Route path="login_successful" element={<LoginSuccessful />} />
-              <Route path="logout" element={<Logout />} />
+              <Route path="logout" element={<Logout />} />              
               <Route path="profile_certificates" element={<Certificates />} />
               <Route path="my_profile" element={<PersonalProfile />} />
               <Route path="my_profile/edit" element={<EditProfile />} />
@@ -78,7 +94,9 @@ const App = () => {
               <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
+              <Route path="search/:contentId" element={<ContentDetailsSearch />} />
               <Route path=":contentId/edit" element={<ContentEdit />} />
+              <Route path="upload_content" element={<UploadContent />} />
             </Route>
             <Route path="knowledge_path">
               <Route path="" element={<KnowledgePathList />} />
@@ -98,6 +116,11 @@ const App = () => {
               <Route path="create" element={<PublicationCreationForm />} />
               <Route path=":publicationId" element={<PublicationDetail />} />
               <Route path=":publicationId/edit" element={<PublicationEditForm />} />
+            </Route>
+            <Route path="search" element={<MainSearch />} />
+            <Route path="welcome" element={<Welcome />} />
+            <Route path="messages">
+              <Route path="thread/:userId" element={<MessageThread />} />
             </Route>
           </Route>
         </Routes>

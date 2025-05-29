@@ -24,6 +24,9 @@ class KnowledgePath(models.Model):
         help_text="Cover image for the knowledge path"
     )
 
+    class Meta:
+        app_label = 'knowledge_paths'
+
     @property
     def vote_count(self):
         """Get the current vote count"""
@@ -77,6 +80,7 @@ class Node(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        app_label = 'knowledge_paths'
         ordering = ['order']
         unique_together = [['knowledge_path', 'order']]
 

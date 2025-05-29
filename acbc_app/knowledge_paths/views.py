@@ -3,14 +3,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from .models import KnowledgePath, Node
-from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, KnowledgePathBasicSerializer, NodeReorderSerializer
+from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, KnowledgePathBasicSerializer, NodeReorderSerializer, KnowledgePathListSerializer
 from utils.permissions import IsAuthor
 from content.models import Content, ContentProfile
 from django.db import IntegrityError, transaction
 from django.db import models
 from django.utils import timezone
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Prefetch
+from votes.models import VoteCount, Vote
 
 
 class KnowledgePathCreateView(APIView):
@@ -23,13 +27,71 @@ class KnowledgePathCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class KnowledgePathPagination(PageNumberPagination):
+    page_size = 9  # 3x3 grid
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class KnowledgePathListView(APIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = KnowledgePathPagination
 
     def get(self, request):
-        knowledge_paths = KnowledgePath.objects.all().order_by('-created_at')
-        serializer = KnowledgePathSerializer(knowledge_paths, many=True, context={'request': request})
-        return Response(serializer.data)
+        print("Starting KnowledgePathListView.get")
+        # Get the content type for KnowledgePath
+        content_type = ContentType.objects.get_for_model(KnowledgePath)
+        print(f"Content type: {content_type}")
+        
+        # Get all vote counts in a single query
+        vote_counts = {
+            vc.object_id: vc.vote_count 
+            for vc in VoteCount.objects.filter(
+                content_type=content_type
+            )
+        }
+        
+        # Get user votes in a single query
+        user_votes = {
+            v.object_id: v.value 
+            for v in Vote.objects.filter(
+                content_type=content_type,
+                user=request.user
+            )
+        }
+        
+        # Get knowledge paths and annotate with vote count
+        knowledge_paths = KnowledgePath.objects.select_related('author').all()
+        
+        # Add vote data to each knowledge path
+        for path in knowledge_paths:
+            path._vote_count = vote_counts.get(path.id, 0)
+            path._user_vote = user_votes.get(path.id, 0)
+            print(f"Path {path.id}: vote_count={path._vote_count}, user_vote={path._user_vote}")
+        
+        # Sort knowledge paths by vote count (descending)
+        knowledge_paths = sorted(
+            knowledge_paths,
+            key=lambda x: getattr(x, '_vote_count', 0),
+            reverse=True
+        )
+        
+        # Initialize paginator
+        paginator = self.pagination_class()
+        paginated_paths = paginator.paginate_queryset(knowledge_paths, request)
+        print(f"Paginated paths count: {len(paginated_paths)}")
+        
+        # Serialize the paginated data with request context
+        serializer = KnowledgePathListSerializer(
+            paginated_paths, 
+            many=True, 
+            context={'request': request}
+        )
+        print(f"Serialized data: {serializer.data}")
+        
+        # Return paginated response
+        response = paginator.get_paginated_response(serializer.data)
+        print(f"Response data: {response.data}")
+        return response
 
 class KnowledgePathDetailView(APIView):
     """
@@ -44,7 +106,14 @@ class KnowledgePathDetailView(APIView):
 
     def put(self, request, pk):
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        self.check_object_permissions(request, knowledge_path)
+        
+        # Check if user is the author
+        if knowledge_path.author != request.user:
+            return Response(
+                {"error": "You do not have permission to update this knowledge path"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
         serializer = KnowledgePathCreateSerializer(knowledge_path, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -145,6 +214,21 @@ class NodeDetailView(APIView):
     def put(self, request, path_id, node_id):
         knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
         node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+        # Check for content_profile_id in the request data
+        content_profile_id = request.data.get('content_profile_id')
+        if content_profile_id:
+            try:
+                # Fetch the new content profile and update the node
+                content_profile = ContentProfile.objects.get(pk=content_profile_id)
+                node.content_profile = content_profile
+                node.media_type = content_profile.content.media_type
+                # Don't save yet, let the serializer handle that
+            except ContentProfile.DoesNotExist:
+                return Response(
+                    {"error": f"Content profile with id {content_profile_id} does not exist"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
         serializer = NodeSerializer(node, data=request.data, context={'request': request}, partial=True)
         
         if serializer.is_valid():

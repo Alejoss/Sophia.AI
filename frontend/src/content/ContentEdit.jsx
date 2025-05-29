@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -12,10 +12,15 @@ import {
     DialogActions,
     Chip,
     Divider,
+    FormControlLabel,
+    Switch,
+    Checkbox,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
+import { AuthContext } from '../context/AuthContext';
+import ContentDisplay from './ContentDisplay';
 
 const ContentEdit = () => {
     const { contentId } = useParams();
@@ -25,20 +30,26 @@ const ContentEdit = () => {
         title: '',
         author: '',
         personal_note: '',
+        is_visible: true,
+        is_producer: false,
     });
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [error, setError] = useState('');
+    const { authState } = useContext(AuthContext);
 
     useEffect(() => {
         const fetchContent = async () => {
             try {
-                const data = await contentApi.getContentDetails(contentId);
+                const data = await contentApi.getContentDetails(contentId, 'library', authState?.user?.id);
+                console.log('Content details:', data);
                 setContent(data);
                 const profile = data.selected_profile;
                 setFormData({
                     title: profile?.title || data.original_title || '',
                     author: profile?.author || data.original_author || '',
                     personal_note: profile?.personal_note || '',
+                    is_visible: profile?.is_visible ?? true,
+                    is_producer: profile?.is_producer ?? false,
                 });
             } catch (err) {
                 setError('Failed to load content');
@@ -46,7 +57,7 @@ const ContentEdit = () => {
             }
         };
         fetchContent();
-    }, [contentId]);
+    }, [contentId, authState?.user?.id]);
 
     const handleChange = (e) => {
         setFormData({
@@ -58,10 +69,18 @@ const ContentEdit = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            if (!content.selected_profile?.id) {
+                setError('No content profile found');
+                return;
+            }
             await contentApi.updateContentProfile(content.selected_profile.id, formData);
-            navigate(`/content/${contentId}/library`);
+            navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`);
         } catch (err) {
-            setError('Failed to update content');
+            if (err.response?.data?.error?.includes('producer')) {
+                setError('You must claim to be the producer to change visibility');
+            } else {
+                setError('Failed to update content');
+            }
             console.error(err);
         }
     };
@@ -104,21 +123,20 @@ const ContentEdit = () => {
                         </Typography>
                     </Box>
 
-                    {/* File Preview Section */}
-                    {content.media_type === 'IMAGE' && content.file_details?.file && (
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="subtitle2" gutterBottom>
-                                Preview:
-                            </Typography>
-                            <img 
-                                src={`http://localhost:8000${content.file_details.file}`}
-                                alt="Content preview"
-                                style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
-                            />
-                        </Box>
-                    )}
+                    {/* Content Preview Section using ContentDisplay */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                            Preview:
+                        </Typography>
+                        <ContentDisplay 
+                            content={content}
+                            variant="detailed"
+                            maxImageHeight={300}
+                            showAuthor={false}
+                        />
+                    </Box>
 
-                    {/* File Details */}
+                    {/* Download Button */}
                     {content.file_details && (
                         <Box sx={{ mb: 3 }}>
                             <Typography variant="subtitle2" gutterBottom>
@@ -127,17 +145,19 @@ const ContentEdit = () => {
                             <Typography variant="body2">
                                 Size: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
                             </Typography>
-                            <Button
-                                variant="outlined"
-                                startIcon={<DownloadIcon />}
-                                href={`http://localhost:8000${content.file_details.file}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                sx={{ mt: 1 }}
-                            >
-                                Download File
-                            </Button>
+                            {content.file_details.file && (
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<DownloadIcon />}
+                                    href={content.url || content.file_details.url || content.file_details.file}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                    sx={{ mt: 1 }}
+                                >
+                                    Download File
+                                </Button>
+                            )}
                         </Box>
                     )}
                 </Box>
@@ -174,6 +194,35 @@ const ContentEdit = () => {
                         multiline
                         rows={4}
                     />
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={formData.is_producer}
+                                onChange={(e) => setFormData({ ...formData, is_producer: e.target.checked })}
+                                name="is_producer"
+                            />
+                        }
+                        label="I've produced this content"
+                        sx={{ mt: 2 }}
+                    />
+                    {formData.is_producer && (
+                        <>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.is_visible}
+                                        onChange={(e) => setFormData({ ...formData, is_visible: e.target.checked })}
+                                        name="is_visible"
+                                    />
+                                }
+                                label="Visible in search results"
+                                sx={{ mt: 1, ml: 4 }}
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 5 }}>
+                                Note: Only the producer of the content can make it invisible in search results.
+                            </Typography>
+                        </>
+                    )}
 
                     <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
                         <Button
@@ -186,7 +235,7 @@ const ContentEdit = () => {
                         <Box>
                             <Button
                                 variant="outlined"
-                                onClick={() => navigate(`/content/${contentId}/library`)}
+                                onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
                                 sx={{ mr: 1 }}
                             >
                                 Cancel

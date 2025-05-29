@@ -4,16 +4,21 @@ import { AuthContext } from '../context/AuthContext.jsx';
 import { apiLogin, checkAuth } from '../api/profilesApi.js';
 import { getUserFromLocalStorage, setUserInLocalStorage,
   setAuthenticationStatus, isAuthenticated } from '../context/localStorageUtils.js';
+import SocialLogin from '../components/SocialLogin';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { setAuthState } = useContext(AuthContext);
+  const { setAuthState, setAccessToken } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
 
   useEffect(() => {
+    // Log environment variables to verify they're accessible
+    console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID);
+    console.log('API URL:', import.meta.env.VITE_API_URL);
+
     const storedUser = getUserFromLocalStorage();
     const localStorageAuth = isAuthenticated();
 
@@ -45,59 +50,83 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting login form with:', { username, password }); // Debugging line
+    console.log('Submitting login form with:', { username, password });
     try {
-      const userData = await apiLogin({ username, password });
-      setUserInLocalStorage(userData); // Save the user data in local storage
-      setAuthenticationStatus(true); // Set the authentication status to true
+      const response = await apiLogin({ username, password });
+      console.log('Login response:', response); // Debug log
+      
+      // Extract access_token and user data from response.data
+      const { access_token, ...userData } = response.data;
+      
+      // Store access token in context
+      setAccessToken(access_token);
+      console.log('Access token set in context:', access_token);
+      
+      // Store user data in localStorage
+      setUserInLocalStorage(userData);
+      setAuthenticationStatus(true);
+      
+      // Update auth state
       setAuthState({
         isAuthenticated: true,
         user: userData,
-      })
-      navigate('/profiles/login_successful'); // Redirect to LoginSuccessful component
+      });
+      
+      // Wait a moment to ensure token is set before redirecting
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      navigate('/profiles/login_successful');
     } catch (error) {
+      console.error('Login error:', error); // Debug log
       const errorMessage =
         error.response?.data?.error ||
-        error.response?.statusText || // Fallback to the HTTP status text
-        'Login failed: ' + error.message; // General fallback
+        error.response?.statusText ||
+        'Login failed: ' + error.message;
       setError(errorMessage);
     }
   };
 
   if (backendAuthStatus) {
     return (
-        <div>
-            <p>Already logged in as {username}, want to
-              <Link to="/profiles/logout"> logout?</Link>
-            </p>
-        </div>
+      <div>
+        <p>Already logged in as {username}, want to
+          <Link to="/profiles/logout"> logout?</Link>
+        </p>
+      </div>
     );
   } else {
     return (
+      <div className="login-container">
         <form onSubmit={handleSubmit}>
-            <div>
-                <label htmlFor="username">Username:</label>
-                <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                />
-            </div>
-            <div>
-                <label htmlFor="password">Password:</label>
-                <input
-                    type="password"
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                />
-            </div>
-            {error && <div style={{ color: 'red' }}>{error}</div>}
-            <button type="submit">Login</button>
+          <div>
+            <label htmlFor="username">Username:</label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="password">Password:</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && <div style={{ color: 'red' }}>{error}</div>}
+          <button type="submit">Login</button>
         </form>
+        
+        <div className="social-login-section">
+          <p>Or continue with</p>
+          <SocialLogin />
+        </div>
+      </div>
     );
-    }
+  }
 };
 
 export default Login;

@@ -2,9 +2,8 @@ from datetime import datetime
 from django.db import models
 from django.contrib.auth.models import User
 
-from star_ratings.models import Rating
 from profiles.models import AcceptedCrypto, Profile
-from taggit.managers import TaggableManager
+
 
 
 def upload_event_picture(instance, filename):
@@ -39,7 +38,6 @@ class Event(models.Model):
     date_recorded = models.DateTimeField(null=True, blank=True)
     schedule_description = models.CharField(max_length=1000, blank=True)  # da flexibilidad
     deleted = models.BooleanField(default=False, blank=True)
-    tags = TaggableManager(blank=True)
 
     def __str__(self):
         return self.title + " - " + self.owner.username
@@ -61,3 +59,4 @@ class ConnectionPlatform(models.Model):
 
     def __str__(self):
         return self.get_name_display()  # Displays the friendly name instead of the code
+    

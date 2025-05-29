@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Card, Typography, Box, Chip, Divider, Button, Breadcrumbs } from '@mui/material';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Card, Typography, Box, Chip, Divider, Button, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import PersonIcon from '@mui/icons-material/Person';
 import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
@@ -17,20 +19,28 @@ const ContentDetailsLibrary = () => {
     const [references, setReferences] = useState(null);
     const { contentId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
 
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Get context parameters from location state or query params
+                const searchParams = new URLSearchParams(location.search);
+                const context = searchParams.get('context') || 'library';
+                const contextId = searchParams.get('userId') || currentUser?.id;
+
                 const [contentData, referencesData] = await Promise.all([
-                    contentApi.getContentDetails(contentId),
+                    contentApi.getContentDetails(contentId, context, contextId),
                     contentApi.getContentReferences(contentId)
                 ]);
                 
                 setContent(contentData);
                 setReferences(referencesData);
             } catch (err) {
+                console.error('Error in ContentDetailsLibrary:', err);
+                console.error('Error response:', err.response);
                 setError(err.message);
             } finally {
                 setLoading(false);
@@ -38,7 +48,7 @@ const ContentDetailsLibrary = () => {
         };
 
         fetchData();
-    }, [contentId]);
+    }, [contentId, location.search, currentUser]);
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
@@ -47,84 +57,37 @@ const ContentDetailsLibrary = () => {
     const profile = content.selected_profile;
     
     // Determine if the current user is the owner of the profile
-    const isOwner = profile?.user && currentUser && profile.user === currentUser.id;
+    const isOwner = profile?.user && currentUser && parseInt(profile.user) === parseInt(currentUser.id);
     
     // Get the username for the button text
     const ownerUsername = profile?.user_username || 'User';
 
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
-            {/* Navigation Breadcrumbs */}
-            <Box sx={{ mb: 2 }}>
-                <Breadcrumbs 
-                    separator={<NavigateNextIcon fontSize="small" />}
-                    aria-label="content navigation"
-                >
-                    <Link 
-                        to="/content/library_user"
-                        style={{ 
-                            color: 'inherit', 
-                            textDecoration: 'none',
-                            '&:hover': { textDecoration: 'underline' }
-                        }}
-                    >
-                        My Library
-                    </Link>
-                    
-                    {profile?.collection_name && (
-                        <Link
-                            to={`/content/collections/${profile.collection}`}
-                            style={{ 
-                                color: 'inherit', 
-                                textDecoration: 'none',
-                                '&:hover': { textDecoration: 'underline' }
-                            }}
-                        >
-                            {profile.collection_name}
-                        </Link>
-                    )}
-                    
-                    <Typography color="text.primary">
-                        {profile?.title}
-                    </Typography>
-                </Breadcrumbs>
-            </Box>
-
             {/* Action Buttons */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Button
                     variant="outlined"
                     startIcon={<ArrowBackIcon />}
-                    onClick={() => {
-                        if (profile?.user) {
-                            navigate(`/content/library/${profile.user}`);
-                        }
-                    }}
+                    onClick={() => navigate(`/content/library_user${isOwner ? '' : `/${profile?.user}`}`)}
                 >
                     {isOwner ? "Go to your library" : `Go to ${ownerUsername}'s library`}
                 </Button>
-                <Button
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    onClick={() => navigate(`/content/${contentId}/edit`)}
-                >
-                    Edit Content
-                </Button>
+                {isOwner && (
+                    <Button
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        onClick={() => navigate(`/content/${contentId}/edit`)}
+                    >
+                        Edit Content
+                    </Button>
+                )}
             </Box>
 
             <Card sx={{ padding: 3 }}>
                 {/* Content Display */}
                 <ContentDisplay 
-                    content_profile={{
-                        title: profile?.title || content?.original_title,
-                        author: profile?.author || content?.original_author,
-                        content: {
-                            media_type: content?.media_type,
-                            file_details: content?.file_details,
-                            original_title: content?.original_title,
-                            original_author: content?.original_author
-                        }
-                    }}
+                    content={content}
                     variant="detailed"
                     showAuthor={true}
                 />
@@ -144,6 +107,24 @@ const ContentDetailsLibrary = () => {
                             <Typography variant="body2">
                                 <strong>Collection:</strong> {profile.collection_name}
                             </Typography>
+                        )}
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="body2">
+                                <strong>Visibility:</strong>
+                            </Typography>
+                            {profile?.is_visible ? (
+                                <VisibilityIcon color="success" />
+                            ) : (
+                                <VisibilityOffIcon color="error" />
+                            )}
+                        </Stack>
+                        {profile?.is_producer && (
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <PersonIcon color="primary" />
+                                <Typography variant="body2">
+                                    You are the producer of this content
+                                </Typography>
+                            </Stack>
                         )}
                     </Box>
                 </Box>

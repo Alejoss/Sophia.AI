@@ -18,7 +18,7 @@ def upload_profile_picture(instance, filename):
 class Profile(models.Model):
     # Represents user profiles with personal details, preferences, and a custom uploaded profile picture.
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     interests = models.CharField(max_length=250, blank=True)
     profile_description = models.TextField(max_length=2500, blank=True)
     timezone = models.CharField(max_length=30, blank=True)

@@ -1,0 +1,55 @@
+.welcome-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  min-height: calc(100vh - 100px); /* Adjust based on header/footer */
+  box-sizing: border-box;
+}
+
+.welcome-container h2 {
+  color: #333;
+  font-size: 28px;
+  margin-bottom: 15px;
+}
+
+.status-message {
+  font-size: 18px;
+  margin-bottom: 30px;
+}
+
+.status-message.success {
+  color: #28a745; /* Green for success */
+}
+
+.status-message.error {
+  color: #dc3545; /* Red for error */
+}
+
+.welcome-actions {
+  margin-top: 20px;
+}
+
+.welcome-actions p {
+  margin-bottom: 15px;
+  font-size: 16px;
+  color: #555;
+}
+
+.welcome-link {
+  display: inline-block;
+  margin: 0 10px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background-color 0.2s ease-in-out;
+  font-size: 16px;
+}
+
+.welcome-link:hover {
+  background-color: #0056b3;
+} 

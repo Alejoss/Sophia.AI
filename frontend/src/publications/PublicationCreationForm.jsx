@@ -44,7 +44,7 @@ const PublicationCreationForm = () => {
       };
       console.log('Sending publication data:', publicationData);
       await contentApi.createPublication(publicationData);
-      navigate('/profiles/profile');
+      navigate('/profiles/my_profile');
     } catch (err) {
       setError('Failed to create publication');
       console.error('Error creating publication:', err);
@@ -54,7 +54,7 @@ const PublicationCreationForm = () => {
   };
 
   const handleCancel = () => {
-    navigate('/profiles/profile');
+    navigate('/profiles/my_profile');
   };
 
   const handleUploadClick = () => {
@@ -68,7 +68,7 @@ const PublicationCreationForm = () => {
         Create New Publication
       </Typography>
       
-      {showContentOptions && (
+      {showContentOptions && !content && (
         <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
           <Typography variant="h6" gutterBottom align="center">
             Choose Content Source (Optional)

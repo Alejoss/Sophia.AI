@@ -40,14 +40,16 @@ INSTALLED_APPS = [
     'comments',
     'quizzes',
     'votes',
-    'star_ratings',
-    'taggit',
+    'knowledge_paths',
+    'search',
     'corsheaders',
     'storages',
     'rest_framework',
+    'rest_framework.authtoken',  # Required for dj-rest-auth
+    'dj_rest_auth',  # Add dj-rest-auth
+    'dj_rest_auth.registration',  # Add registration support
     'rest_framework_simplejwt',
-    'drf_yasg',
-    'knowledge_paths',
+    'drf_yasg'
 ]
 
 MIDDLEWARE = [
@@ -62,17 +64,35 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-CSRF_COOKIE_NAME = 'csrftoken'
-CSRF_COOKIE_HTTPONLY = False  # Allows JavaScript to read the CSRF cookie
-CSRF_COOKIE_SAMESITE = 'Lax'  # Helps mitigate CSRF attacks
-
+# CORS settings
+# TODO CORS settings are repetitive
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite dev server
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:[0-9]+$",
+    r"^http://127.0.0.1:[0-9]+$",
+]
 
+# CSRF settings
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173',
-    # Add other trusted origins if needed
+    'http://127.0.0.1:5173',
 ]
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read the CSRF cookie
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_NAME = 'csrftoken'
+
+# Session settings
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+
+# Security settings
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # This will fix the Cross-Origin-Opener-Policy error
 
 ROOT_URLCONF = 'academia_blockchain.urls'
 
@@ -173,11 +193,7 @@ LOGGING = {
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'profiles.authentication.CustomAuthentication',  # Custom class for HttpOnly cookies
-        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
@@ -185,10 +201,32 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
 }
 
+# dj-rest-auth settings
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'acbc_jwt',
+    'JWT_AUTH_REFRESH_COOKIE': 'acbc_refresh_token',
+    'JWT_AUTH_HTTPONLY': True,
+    'JWT_AUTH_SAMESITE': 'Lax',
+    'JWT_AUTH_SECURE': False,  # Set to True in production with HTTPS
+    'TOKEN_MODEL': None,  # We're using JWT, not token authentication
+}
+
+# Allauth settings (already present, but adding some additional settings)
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = True
+ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
+ACCOUNT_EMAIL_SUBJECT_PREFIX = 'Academia Blockchain - '
+
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -196,8 +234,12 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-
-    'AUTH_COOKIE': 'jwt',  # custom
+    'AUTH_COOKIE': 'acbc_jwt',
+    'REFRESH_COOKIE': 'acbc_refresh_token',
+    'AUTH_COOKIE_SECURE': False,
+    'AUTH_COOKIE_HTTP_ONLY': True,
+    'AUTH_COOKIE_PATH': '/',
+    'AUTH_COOKIE_SAMESITE': 'Lax',
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -241,10 +283,10 @@ if ENVIRONMENT == "PRODUCTION":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "ACADEMIA_BLOCKCHAIN_DB",
+            "NAME": os.getenv("DB_NAME", "ACADEMIA_BLOCKCHAIN_DB"),
             "USER": os.getenv("POSTGRES_USER", "postgres"),
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
-            "HOST": "postgres",  # The service name in Docker Compose
+            "HOST": os.getenv("DB_HOST", "postgres"),  # Use DB_HOST environment variable
             "PORT": "5432",
         }
     }
@@ -274,10 +316,10 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "academia_blockchain_db",
+            "NAME": os.getenv("DB_NAME", "ACADEMIA_BLOCKCHAIN_DB"),
             "USER": os.getenv("POSTGRES_USER", "postgres"),
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
-            "HOST": "postgres",  # The service name in Docker Compose
+            "HOST": os.getenv("DB_HOST", "postgres"),  # Use DB_HOST environment variable
             "PORT": "5432",
         }
     }

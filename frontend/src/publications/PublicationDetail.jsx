@@ -108,17 +108,10 @@ const PublicationDetail = () => {
                         
                         <Box sx={{ mb: 2 }}>
                             <ContentDisplay 
-                                content_profile={{
-                                    ...publication.content_profile,
-                                    content: {
-                                        ...publication.content_profile.content,
-                                        file_details: publication.content_profile.content.file_details,
-                                        url: publication.content_profile.content.file_details?.url
-                                    }
-                                }}
+                                content={publication.content_profile.content}
                                 variant="detailed"
                                 showAuthor={true}
-                                onClick={() => navigate(`/content/${publication.content_profile.content.id}/library`)}
+                                onClick={() => navigate(`/content/${publication.content_profile.content.id}/library?context=publication&id=${publicationId}`)}
                             />
                         </Box>
                     </Box>

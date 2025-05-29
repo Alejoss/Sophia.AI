@@ -5,11 +5,20 @@ from rest_framework import exceptions
 
 class CustomAuthentication(JWTAuthentication):
     def authenticate(self, request):
-        raw_token = request.COOKIES.get(settings.SIMPLE_JWT['AUTH_COOKIE']) or None
-        print("Raw token from cookie:", raw_token)
+        # Try to get token from Authorization header first
+        auth_header = request.headers.get('Authorization')
+        print("Auth header:", auth_header)
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            raw_token = auth_header.split(' ')[1]
+            print("Token from Authorization header:", raw_token)
+        else:
+            # Fallback to cookie
+            raw_token = request.COOKIES.get(settings.SIMPLE_JWT['AUTH_COOKIE']) or None
+            print("Token from cookie:", raw_token)
 
         if raw_token is None:
-            print("No token found in cookies.")
+            print("No token found in either header or cookie.")
             return None
 
         try:

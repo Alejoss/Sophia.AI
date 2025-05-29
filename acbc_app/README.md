@@ -7,6 +7,8 @@ A descentralized, blockchain-backed library that uses AI to interact with and to
 run the docker containers and build the image from the root directory of acbc_app:
 
 docker-compose up --build
+docker-compose up --build backend
+docker-compose up --build frontend
 
 **DATABASE CONFIGURATION**
 
@@ -31,9 +33,13 @@ docker-compose exec backend python manage.py migrate
 
 docker-compose exec backend python manage.py create_admin
 
-*Load fixtures*
+*Load fixtures or use the populate command*
 
 docker-compose exec backend python manage.py load_fixtures
+docker-compose exec backend python manage.py populate_test_data --clear  # limpia la base de datos
+docker-compose exec backend python manage.py populate_test_data --skip-existing  # crea nuevos objetos aún si existen
+docker-compose exec backend python manage.py ensure_topic_content  # mas contenido por tema
+docker-compose exec backend python manage.py check_duplicate_votecounts
 
 *Load the libraries database with initial test data*
 
@@ -41,4 +47,5 @@ docker-compose exec backend python manage.py load_libraries
 
 *To run the django tests in the docker container run*
 
-docker-compose exec backend python manage.py test
+docker-compose exec backend python manage.py test -v 2
+docker-compose exec backend python manage.py test quizzes -v 2

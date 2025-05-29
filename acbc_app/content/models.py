@@ -48,25 +48,48 @@ class Content(models.Model):
     def __str__(self):
         return f"Content: {self.original_title}"
 
-    @property
-    def vote_count(self):
-        """Get the current vote count"""
+    def get_vote_count(self, topic=None):
+        """Get the current vote count, optionally filtered by topic"""
+        print(f"\n=== Content.get_vote_count ===")
+        print(f"Content ID: {self.id}")
+        print(f"Topic: {topic.id if topic else 'None'}")
+        
         VoteCount = apps.get_model('votes', 'VoteCount')
         content_type = ContentType.objects.get_for_model(self)
+        print(f"Content Type: {content_type.model}")
+        
         vote_count = VoteCount.objects.filter(
             content_type=content_type,
-            object_id=self.id
+            object_id=self.id,
+            topic=topic
         ).first()
-        return vote_count.vote_count if vote_count else 0
+        
+        print(f"VoteCount object found: {vote_count is not None}")
+        if vote_count:
+            print(f"VoteCount ID: {vote_count.id}")
+            print(f"VoteCount value: {vote_count.vote_count}")
+        else:
+            print("No VoteCount object found")
+            
+        result = vote_count.vote_count if vote_count else 0
+        print(f"Returning vote count: {result}")
+        print("=== End Content.get_vote_count ===\n")
+        return result
 
-    def get_user_vote(self, user):
-        """Get the user's vote status"""
+    @property
+    def vote_count(self):
+        """Get the global vote count (for backward compatibility)"""
+        return self.get_vote_count()
+
+    def get_user_vote(self, user, topic=None):
+        """Get the user's vote status, optionally filtered by topic"""
         Vote = apps.get_model('votes', 'Vote')
         content_type = ContentType.objects.get_for_model(self)
         vote = Vote.objects.filter(
             user=user,
             content_type=content_type,
-            object_id=self.id
+            object_id=self.id,
+            topic=topic
         ).first()
         return vote.value if vote else 0
 
@@ -84,7 +107,8 @@ class ContentProfile(models.Model):
     title = models.CharField(max_length=255, blank=True, null=True)  # User's custom title
     author = models.CharField(max_length=255, blank=True, null=True)  # User's attribution
     personal_note = models.TextField(blank=True, null=True)
-    is_visible = models.BooleanField(default=True)
+    is_visible = models.BooleanField(default=True)  # Controls whether this content appears in search results
+    is_producer = models.BooleanField(default=False)  # Indicates whether this user is the producer of the content
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

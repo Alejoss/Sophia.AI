@@ -32,9 +32,13 @@ const contentApi = {
         }
     },
 
-    getContentDetails: async (contentId) => {
+    getContentDetails: async (contentId, context = null, contextId = null) => {
         try {
-            const response = await axiosInstance.get(`/content/content_details/${contentId}/`);
+            let url = `/content/content_details/${contentId}/`;
+            if (context && contextId) {
+                url += `?context=${context}&id=${contextId}`;
+            }
+            const response = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
             console.error('Error fetching content details:', error);
@@ -193,7 +197,7 @@ const contentApi = {
 
     getRecentContent: async () => {
         try {
-            const response = await axiosInstance.get('/content/recent-content/');
+            const response = await axiosInstance.get('/content/recent-user-content/');
             return response.data;
         } catch (error) {
             console.error('Error fetching recent content:', error);
@@ -236,6 +240,16 @@ const contentApi = {
     getUserPublications: async () => {
         try {
             const response = await axiosInstance.get('/content/publications/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user publications:', error);
+            throw error;
+        }
+    },
+
+    getUserPublicationsById: async (userId) => {
+        try {
+            const response = await axiosInstance.get(`/content/publications/user/${userId}/`);
             return response.data;
         } catch (error) {
             console.error('Error fetching user publications:', error);

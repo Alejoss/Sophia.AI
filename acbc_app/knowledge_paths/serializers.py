@@ -14,7 +14,7 @@ class FileDetailsSerializer(serializers.ModelSerializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
-    content_profile = serializers.SerializerMethodField()
+    content_profile_id = serializers.PrimaryKeyRelatedField(source='content_profile', read_only=True)
     is_available = serializers.SerializerMethodField()
     is_completed = serializers.SerializerMethodField()
     quizzes = QuizSerializer(many=True, read_only=True)
@@ -22,42 +22,8 @@ class NodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Node
         fields = ['id', 'title', 'description', 'order', 'media_type', 
-                 'is_available', 'is_completed', 'content_profile', 'quizzes']
-        read_only_fields = ['id', 'order', 'content_profile', 'knowledge_path', 'media_type']
-
-    def get_content_profile(self, obj):
-        content_profile = obj.content_profile
-        if not content_profile:
-            return None
-
-        content = content_profile.content
-        if not content:
-            return None
-
-        file_details = None
-        try:
-            if content.file_details:
-                file_details = {
-                    'url': content.file_details.file.url if content.file_details.file else None,
-                    'name': content.file_details.file.name if content.file_details.file else None,
-                    'size': content.file_details.file.size if content.file_details.file else None,
-                }
-                print(f"Constructed file_details for content {content.id}: {file_details}")
-        except FileDetails.DoesNotExist:
-            pass
-
-        result = {
-            'id': content_profile.id,
-            'title': content_profile.title,
-            'content': {
-                'id': content.id,
-                'media_type': content.media_type,
-                'file_details': file_details,
-                'url': file_details['url'] if file_details else None,
-            }
-        }
-        print(f"Returning content profile for node {obj.id}: {result}")
-        return result
+                 'is_available', 'is_completed', 'content_profile_id', 'quizzes']
+        read_only_fields = ['id', 'order', 'content_profile_id', 'knowledge_path', 'media_type']
 
     def get_is_available(self, obj):
         request = self.context.get('request')
@@ -126,6 +92,24 @@ class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgePath
         fields = ['id', 'title']
+
+
+class KnowledgePathListSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source='author.username', read_only=True)
+    author_id = serializers.IntegerField(source='author.id', read_only=True)
+    vote_count = serializers.SerializerMethodField()
+    user_vote = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KnowledgePath
+        fields = ['id', 'title', 'description', 'author', 'author_id', 
+                 'created_at', 'vote_count', 'user_vote']
+
+    def get_vote_count(self, obj):
+        return getattr(obj, '_vote_count', 0)
+
+    def get_user_vote(self, obj):
+        return getattr(obj, '_user_vote', 0)
 
 
 # Add a new serializer for reordering

@@ -23,7 +23,8 @@ class CommentSerializer(serializers.ModelSerializer):
             'reply_count',
             'is_active',
             'vote_count',
-            'user_vote'
+            'user_vote',
+            'parent'  # Added parent field
         ]
         read_only_fields = ['created_at', 'updated_at', 'is_edited', 'is_active']
 

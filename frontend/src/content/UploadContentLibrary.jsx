@@ -1,7 +1,6 @@
 import React from 'react';
 import { Grid } from '@mui/material';
 import UploadContentForm from './UploadContentForm';
-import ContentRecentlyUploaded from './ContentRecentlyUploaded';
 import './UploadContentLibrary.css';
 
 const UploadContentLibrary = () => {
@@ -9,11 +8,8 @@ const UploadContentLibrary = () => {
     <div className="upload-content-library">
       <h1>Upload Content</h1>
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12}>
           <UploadContentForm />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <ContentRecentlyUploaded />
         </Grid>
       </Grid>
     </div>

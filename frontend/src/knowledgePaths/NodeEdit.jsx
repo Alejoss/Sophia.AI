@@ -20,25 +20,80 @@ const NodeEdit = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('Fetching data for node edit');
         // Fetch both the knowledge path and node data
         const [pathData, nodeData] = await Promise.all([
           knowledgePathsApi.getKnowledgePathBasic(pathId),
           knowledgePathsApi.getNode(pathId, nodeId)
         ]);
 
+        console.log('Node data:', nodeData);
         setKnowledgePath(pathData);
+        
+        // Check if there's a content_profile_id
+        const hasContentProfile = nodeData.content_profile_id !== null && nodeData.content_profile_id !== undefined;
+        console.log('Has content profile?', hasContentProfile, 'content_profile_id:', nodeData.content_profile_id);
+        
+        // Set initial form data with the node information
         setFormData({
           title: nodeData.title,
-          description: nodeData.description || ''
+          description: nodeData.description || '',
+          content_profile_id: hasContentProfile ? nodeData.content_profile_id : null
         });
-        // Set selected content info for display
-        setSelectedContent({
-          id: nodeData.content_id,
-          original_title: nodeData.title,
-          media_type: nodeData.media_type,
-          file_details: nodeData.file_details
-        });
+        
+        // If we have a content profile ID, fetch the content details
+        if (hasContentProfile) {
+          try {
+            console.log('Fetching content profile:', nodeData.content_profile_id);
+            const contentProfileData = await knowledgePathsApi.getNodeContent(nodeData.content_profile_id);
+            console.log('Content profile data (full):', JSON.stringify(contentProfileData, null, 2));
+            
+            // Check if content exists in the response
+            if (!contentProfileData.content) {
+              console.error('Content field missing in contentProfileData', contentProfileData);
+              throw new Error('Content data missing in the response');
+            }
+            
+            // Check if we have required content fields
+            const contentData = contentProfileData.content;
+            console.log('Content data structure:', {
+              id: contentData.id,
+              media_type: contentData.media_type,
+              hasFileDetails: !!contentData.file_details,
+              fileDetailsData: contentData.file_details
+            });
+            
+            // Set selected content info for display
+            setSelectedContent({
+              id: contentData.id,
+              original_title: contentProfileData.title || nodeData.title,
+              media_type: contentData.media_type,
+              file_details: contentData.file_details,
+              url: contentData.url // Add URL in case it's available directly on content
+            });
+          } catch (contentErr) {
+            console.error('Error fetching content profile:', contentErr);
+            console.error('Error details:', contentErr.response?.data || contentErr.message);
+            // Don't fail the whole component if just the content profile fails
+            setSelectedContent({
+              id: null,
+              original_title: nodeData.title,
+              media_type: nodeData.media_type,
+              file_details: null
+            });
+          }
+        } else {
+          // There's no content profile - use node info only
+          setSelectedContent({
+            id: null,
+            original_title: nodeData.title,
+            media_type: nodeData.media_type,
+            file_details: null
+          });
+        }
       } catch (err) {
+        console.error('Failed to load data:', err);
+        console.error('Error details:', err.response?.data || err.message);
         setError('Failed to load data');
       } finally {
         setLoading(false);
@@ -53,25 +108,37 @@ const NodeEdit = () => {
     setError(null);
 
     try {
+      console.log('Submitting form data:', formData);
       await knowledgePathsApi.updateNode(pathId, nodeId, formData);
       navigate(`/knowledge_path/${pathId}/edit`);
     } catch (err) {
+      console.error('Error updating node:', err);
+      console.error('Error details:', err.response?.data || err.message);
       setError(err.message || 'Failed to update node');
     }
   };
 
   const handleSelectContent = async (content) => {
+    console.log('Selected content:', content);
+    
+    // Make sure we have the content_profile_id
+    const contentProfileId = content.profile_id || content.id;
+    console.log('Using content_profile_id:', contentProfileId);
+    
     setSelectedContent({
       id: content.id,
       original_title: content.original_title || content.title,
       media_type: content.media_type,
-      file_details: content.file_details
+      file_details: content.file_details,
+      url: content.url // Include URL if available
     });
+    
     setFormData(prev => ({
       ...prev,
-      content_id: content.id,
+      content_profile_id: contentProfileId,
       title: content.original_title || content.title || 'Untitled',
     }));
+    
     setIsModalOpen(false);
   };
 
@@ -93,9 +160,18 @@ const NodeEdit = () => {
               onClick={() => setIsModalOpen(true)}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
             >
-              Change Content
+              {selectedContent?.id ? "Change Content" : "Select Content"}
             </button>
-            <ContentDisplay content={selectedContent} />
+            
+            {selectedContent ? (
+              <>
+                <ContentDisplay content={selectedContent} variant="simple" />
+              </>
+            ) : (
+              <div className="mt-4 p-4 bg-gray-100 rounded-lg text-gray-600">
+                No content selected. Please choose content for this node.
+              </div>
+            )}
           </div>
 
           {/* Title Input */}

@@ -92,7 +92,7 @@ const LibraryUser = () => {
                             variant="contained" 
                             color="primary"
                             startIcon={<UploadFileIcon />}
-                            onClick={() => navigate('/content/upload_content_library')}
+                            onClick={() => navigate('/content/upload_content')}
                         >
                             Upload Content
                         </Button>
@@ -120,7 +120,7 @@ const LibraryUser = () => {
                                         borderBottom: '1px solid #eee',
                                         cursor: 'pointer'
                                     }}
-                                    onClick={() => navigate(`/content/${contentProfile.content.id}/library`)}
+                                    onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${userId || currentUser.id}`)}
                                 >
                                     <td style={{ padding: '12px' }}>{contentProfile.title}</td>
                                     <td style={{ padding: '12px' }}>{contentProfile.author}</td>
@@ -154,7 +154,7 @@ const LibraryUser = () => {
                         <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={contentProfile.id}>
                             <Card 
                                 sx={{ cursor: 'pointer' }}
-                                onClick={() => navigate(`/content/${contentProfile.content.id}/library`)}
+                                onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${userId || currentUser.id}`)}
                             >
                                 {contentProfile.content.media_type === 'IMAGE' && contentProfile.content.file_details?.file && (
                                     <Box sx={{ 

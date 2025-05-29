@@ -75,9 +75,21 @@ const apiLogout = async () => {
 const apiLogin = async ({ username, password }) => {
   try {
     const response = await axiosInstance.post('/profiles/login/', { username, password });
-    return response.data; // Ensure this returns the user data
+    console.log('Login API response:', response); // Debug log
+    return response; // Return the full response
   } catch (error) {
+    console.error('Login API error:', error);
     throw error;
+  }
+};
+
+const apiRegister = async (userData) => {
+  try {
+    const response = await axiosInstance.post('/profiles/register/', userData);
+    return response.data; // Or response if you need status for 201 check elsewhere
+  } catch (error) {
+    console.error('Registration API error:', error.response || error);
+    throw error; // Re-throw to be handled by the calling component
   }
 };
 
@@ -99,4 +111,4 @@ async function setCsrfToken() {
   }
 }
 
-export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth, getProfileById, updateProfile };
+export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth, getProfileById, updateProfile, apiRegister };
