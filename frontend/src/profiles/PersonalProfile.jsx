@@ -61,12 +61,12 @@ const PersonalProfile = () => {
           </Link>
           {/* TODO: Add country flag component */}
           <div className="favorite-cryptos">
-            <h3>Cryptos favoritas:</h3>
+            <h3>Favorite Cryptos:</h3>
             <div className="crypto-icons">
               {/* TODO: Replace with actual crypto icons from profile data */}
               <span className="crypto-icon bitcoin">₿</span>
               <span className="crypto-icon ethereum">Ξ</span>
-              <Link to="/profile/cryptos" className="view-all">Ver todas &gt;</Link>
+              <Link to="/profile/cryptos" className="view-all">View all &gt;</Link>
             </div>
           </div>
         </div>
@@ -74,23 +74,23 @@ const PersonalProfile = () => {
         {/* Navigation Menu */}
         <nav className="profile-nav">
           <Link to="/profiles/profile_certificates" className="nav-item">
-            <span>Certificados</span>
+            <span>Certificates</span>
             <span className="arrow">›</span>
           </Link>
           <Link to="/profiles/certificate-requests" className="nav-item">
-            <span>Solicitudes de certificados</span>
+            <span>Certificate Requests</span>
             <span className="arrow">›</span>
           </Link>
           <Link to="/content/library_user" className="nav-item">
-            <span>Librería</span>
+            <span>Library</span>
             <span className="arrow">›</span>
           </Link>
           <Link to="/profiles/profile_bookmarks" className="nav-item">
-            <span>Guardados</span>
+            <span>Saved Items</span>
             <span className="arrow">›</span>
           </Link>
           <Link to="/profiles/security" className="nav-item">
-            <span>Seguridad</span>
+            <span>Security</span>
             <span className="arrow">›</span>
           </Link>
         </nav>

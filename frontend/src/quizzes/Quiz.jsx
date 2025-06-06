@@ -16,6 +16,7 @@ const Quiz = () => {
   const [hasPerfectScore, setHasPerfectScore] = useState(false);
   const [nextNode, setNextNode] = useState(null);
   const [attemptsExhausted, setAttemptsExhausted] = useState(false);
+  const [lastAttemptAnswers, setLastAttemptAnswers] = useState({});
 
   useEffect(() => {
     const fetchQuiz = async () => {
@@ -36,6 +37,15 @@ const Quiz = () => {
           if (todayAttempts >= quizData.max_attempts_per_day) {
             setAttemptsExhausted(true);
           }
+        }
+
+        // Set last attempt answers if available
+        if (quizData.last_attempt && quizData.last_attempt.answers) {
+          const answers = {};
+          quizData.last_attempt.answers.forEach(answer => {
+            answers[answer.question] = answer.selected_options;
+          });
+          setLastAttemptAnswers(answers);
         }
 
         // Check if user has a perfect score in previous attempts
@@ -142,7 +152,7 @@ const Quiz = () => {
         </h2>
         {previousAttempts.map((attempt, index) => (
           <div key={attempt.id} className="mt-2">
-            <p>Attempt {index + 1}: Score {attempt.score}%</p>
+            <p className="text-gray-900">Attempt {index + 1}: Score {attempt.score}%</p>
             <p className="text-sm text-gray-600">
               Completed on: {new Date(attempt.completed_on).toLocaleDateString()}
             </p>
@@ -167,16 +177,15 @@ const Quiz = () => {
     if (hasPerfectScore) {
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4">Quiz Results</h2>
+          <h2 className="text-2xl font-bold mb-4 text-gray-900">Quiz Results</h2>
           <div className="text-center p-6 bg-green-50 rounded-lg mb-6 border border-green-300">
             <p className="text-4xl font-bold text-green-600 mb-2">
               Score: 100%
             </p>
-            <p className="text-lg mb-4">
+            <p className="text-lg mb-4 text-gray-900">
               You have already successfully completed this quiz!
             </p>
             
-            {/* Modified navigation buttons */}
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => navigate(`/knowledge_path/${quiz.knowledge_path}`)}
@@ -195,10 +204,9 @@ const Quiz = () => {
             </div>
           </div>
 
-          {/* Display questions with correct answers */}
           {quiz.questions.map((question, index) => (
             <div key={question.id} className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3">
+              <h3 className="text-lg font-semibold mb-3 text-gray-900">
                 {index + 1}. {question.text}
               </h3>
               
@@ -215,21 +223,26 @@ const Quiz = () => {
               <div className="space-y-2">
                 {question.options.map(option => {
                   const isCorrect = question.correct_answers.includes(option.id);
+                  const wasSelected = lastAttemptAnswers[question.id]?.includes(option.id);
                   
-                  let optionClassName = "flex items-center p-3 border rounded";
-                  if (isCorrect) {
-                    optionClassName += " bg-green-50 border-green-300";
+                  let optionClassName = "flex items-center p-3 border rounded text-gray-900";
+                  if (wasSelected) {
+                    optionClassName += isCorrect ? " bg-green-50 border-green-300" : " bg-red-50 border-red-300";
                   }
 
                   return (
                     <div key={option.id} className={optionClassName}>
                       <div className="mr-3">
-                        {isCorrect && <span className="text-green-600">✓</span>}
+                        {wasSelected && (
+                          isCorrect ? 
+                            <span className="text-green-600">✓</span> : 
+                            <span className="text-red-600">✗</span>
+                        )}
                       </div>
                       <span>{option.text}</span>
-                      {isCorrect && (
-                        <span className="ml-auto text-green-600 text-sm">
-                          Correct Answer
+                      {wasSelected && (
+                        <span className={`ml-auto text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                          {isCorrect ? 'Correct' : 'Incorrect'}
                         </span>
                       )}
                     </div>
@@ -250,35 +263,30 @@ const Quiz = () => {
 
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4">Quiz Results</h2>
+          <h2 className="text-2xl font-bold mb-4 text-gray-900">Quiz Results</h2>
           <div className={`text-center p-6 ${bgColor} rounded-lg mb-6 border ${borderColor}`}>
             <p className={`text-4xl font-bold ${textColor} mb-2`}>
               Score: {quizResult.attempt.score}%
             </p>
             {isPerfectScore ? (
               <>
-                <p className="text-lg mb-4">
+                <p className="text-lg mb-4 text-gray-900">
                   Congratulations! You have successfully completed this quiz.
                 </p>
                 {quizResult.next_node && (
-                  <p className="text-sm mb-4">
+                  <p className="text-sm mb-4 text-gray-700">
                     Redirecting to next node in 10 seconds...
                   </p>
                 )}
               </>
             ) : (
               <>
-                <p className="text-lg mb-2">
+                <p className="text-lg mb-2 text-gray-900">
                   You got {quizResult.correct_answers} out of {quizResult.total_questions} questions correct.
                 </p>
-                <p className="text-lg mb-4">
+                <p className="text-lg mb-4 text-gray-900">
                   Attempts remaining today: {quizResult.attempts_remaining}
                 </p>
-                {quizResult.attempts_remaining > 0 && (
-                  <p className="text-sm mb-4">
-                    Reloading quiz in 10 seconds for another attempt...
-                  </p>
-                )}
               </>
             )}
             <button
@@ -289,10 +297,9 @@ const Quiz = () => {
             </button>
           </div>
 
-          {/* Display questions with correct answers */}
           {quiz.questions.map((question, index) => (
             <div key={question.id} className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3">
+              <h3 className="text-lg font-semibold mb-3 text-gray-900">
                 {index + 1}. {question.text}
               </h3>
               
@@ -311,23 +318,24 @@ const Quiz = () => {
                   const isCorrect = question.correct_answers.includes(option.id);
                   const wasSelected = currentAnswers[question.id]?.includes(option.id);
                   
-                  let optionClassName = "flex items-center p-3 border rounded";
-                  if (isCorrect) {
-                    optionClassName += " bg-green-50 border-green-300";
-                  } else if (wasSelected && !isCorrect) {
-                    optionClassName += " bg-red-50 border-red-300";
+                  let optionClassName = "flex items-center p-3 border rounded text-gray-900";
+                  if (wasSelected) {
+                    optionClassName += isCorrect ? " bg-green-50 border-green-300" : " bg-red-50 border-red-300";
                   }
 
                   return (
                     <div key={option.id} className={optionClassName}>
                       <div className="mr-3">
-                        {isCorrect && <span className="text-green-600">✓</span>}
-                        {wasSelected && !isCorrect && <span className="text-red-600">✗</span>}
+                        {wasSelected && (
+                          isCorrect ? 
+                            <span className="text-green-600">✓</span> : 
+                            <span className="text-red-600">✗</span>
+                        )}
                       </div>
                       <span>{option.text}</span>
-                      {isCorrect && (
-                        <span className="ml-auto text-green-600 text-sm">
-                          Correct Answer
+                      {wasSelected && (
+                        <span className={`ml-auto text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                          {isCorrect ? 'Correct' : 'Incorrect'}
                         </span>
                       )}
                     </div>
@@ -344,7 +352,7 @@ const Quiz = () => {
       <form onSubmit={handleSubmit}>
         {quiz.questions.map((question, index) => (
           <div key={question.id} className="mb-8 p-4 bg-white rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">
               {index + 1}. {question.text}
             </h2>
             
@@ -362,7 +370,7 @@ const Quiz = () => {
               {question.options.map(option => (
                 <label 
                   key={option.id} 
-                  className={`flex items-center p-3 border rounded ${
+                  className={`flex items-center p-3 border rounded text-gray-900 ${
                     attemptsExhausted ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
                   }`}
                 >
@@ -405,12 +413,12 @@ const Quiz = () => {
     );
   };
 
-  if (loading) return <div className="container mx-auto p-4">Loading...</div>;
-  if (!quiz) return <div className="container mx-auto p-4">Quiz not found</div>;
+  if (loading) return <div className="container mx-auto p-4 text-gray-900">Loading...</div>;
+  if (!quiz) return <div className="container mx-auto p-4 text-gray-900">Quiz not found</div>;
 
   return (
     <div className="container mx-auto p-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
         {/* Error Message Display */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -418,9 +426,9 @@ const Quiz = () => {
           </div>
         )}
 
-        <h1 className="text-2xl font-bold mb-6">{quiz.title}</h1>
+        <h1 className="text-2xl font-bold mb-6 text-gray-900">{quiz.title}</h1>
         {quiz.description && (
-          <p className="text-gray-600 mb-6">{quiz.description}</p>
+          <p className="text-gray-700 mb-6">{quiz.description}</p>
         )}
 
         {/* Show previous attempts */}

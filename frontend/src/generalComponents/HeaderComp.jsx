@@ -7,8 +7,6 @@ import '/src/styles/dropdown.css';
 const HeaderComp = () => {
   const { authState } = useContext(AuthContext);
   const { isAuthenticated, user } = authState;
-  console.log("isAuthenticated in header component:");
-  console.log(isAuthenticated);
 
   return (
     <nav className="nav">

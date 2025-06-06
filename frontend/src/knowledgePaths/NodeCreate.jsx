@@ -15,6 +15,7 @@ const NodeCreate = () => {
   const [selectedContent, setSelectedContent] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -33,24 +34,34 @@ const NodeCreate = () => {
 
   const handleContentSelected = (content_profile) => {
     console.log('Selected content profile:', content_profile);
+    console.log('Content profile title:', content_profile.title);
+    console.log('Content profile original title:', content_profile.content?.original_title);
+    console.log('Current form data:', formData);
+    
     setSelectedContent(content_profile);
-    setFormData(prev => ({
-      ...prev,
-      content_profile_id: content_profile.id,
-      title: content_profile.selected_profile?.title || content_profile.original_title || 'Untitled',
-      description: content_profile.description || ''
-    }));
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        content_profile_id: content_profile.id,
+        title: prev.title || content_profile.title || content_profile.content?.original_title || 'Untitled'
+      };
+      console.log('New form data being set:', newFormData);
+      return newFormData;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
 
     try {
       await knowledgePathsApi.addNode(pathId, formData);
       navigate(`/knowledge_path/${pathId}/edit`);
     } catch (err) {
       setError(err.message || 'Failed to add node');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -78,9 +89,7 @@ const NodeCreate = () => {
               setSelectedContent(null);
               setFormData(prev => ({
                 ...prev,
-                content_profile_id: null,
-                title: '',
-                description: ''
+                content_profile_id: null
               }));
             }}
             previewVariant="detailed"
@@ -117,14 +126,14 @@ const NodeCreate = () => {
             <div className="flex gap-4">
               <button
                 type="submit"
-                disabled={!formData.content_profile_id}
+                disabled={!formData.content_profile_id || submitting}
                 className={`px-4 py-2 rounded-lg ${
-                  formData.content_profile_id
+                  formData.content_profile_id && !submitting
                     ? 'bg-green-500 hover:bg-green-600 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Add Node
+                {submitting ? 'Adding...' : 'Add Node'}
               </button>
               <button
                 type="button"

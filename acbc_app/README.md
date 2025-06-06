@@ -28,6 +28,7 @@ GRANT ALL PRIVILEGES ON DATABASE academia_blockchain_db TO postgres;
 
 docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py setup_google_oauth.py
 
 *Optionally create a superuser:*
 
@@ -49,3 +50,4 @@ docker-compose exec backend python manage.py load_libraries
 
 docker-compose exec backend python manage.py test -v 2
 docker-compose exec backend python manage.py test quizzes -v 2
+docker-compose exec backend python manage.py test profiles.tests.test_token_refresh -v 2

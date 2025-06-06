@@ -33,7 +33,6 @@ class KnowledgePathPagination(PageNumberPagination):
     max_page_size = 100
 
 class KnowledgePathListView(APIView):
-    permission_classes = [IsAuthenticated]
     pagination_class = KnowledgePathPagination
 
     def get(self, request):
@@ -50,30 +49,25 @@ class KnowledgePathListView(APIView):
             )
         }
         
-        # Get user votes in a single query
-        user_votes = {
-            v.object_id: v.value 
-            for v in Vote.objects.filter(
-                content_type=content_type,
-                user=request.user
-            )
-        }
+        # Get user votes in a single query only if user is authenticated
+        user_votes = {}
+        if request.user and request.user.is_authenticated:
+            user_votes = {
+                v.object_id: v.value 
+                for v in Vote.objects.filter(
+                    content_type=content_type,
+                    user_id=request.user.id
+                )
+            }
         
-        # Get knowledge paths and annotate with vote count
-        knowledge_paths = KnowledgePath.objects.select_related('author').all()
+        # Get knowledge paths and annotate with vote count, ordered by creation date (newest first)
+        knowledge_paths = KnowledgePath.objects.select_related('author').order_by('-created_at')
         
         # Add vote data to each knowledge path
         for path in knowledge_paths:
             path._vote_count = vote_counts.get(path.id, 0)
             path._user_vote = user_votes.get(path.id, 0)
             print(f"Path {path.id}: vote_count={path._vote_count}, user_vote={path._user_vote}")
-        
-        # Sort knowledge paths by vote count (descending)
-        knowledge_paths = sorted(
-            knowledge_paths,
-            key=lambda x: getattr(x, '_vote_count', 0),
-            reverse=True
-        )
         
         # Initialize paginator
         paginator = self.pagination_class()
@@ -100,8 +94,17 @@ class KnowledgePathDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
+        print("KnowledgePathDetailView.get - Starting")
+        print(f"Request user: {request.user}")
+        print(f"Request auth: {request.auth}")
+        print(f"Request headers: {request.headers}")
+        
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        print(f"Found knowledge path: {knowledge_path.id} - {knowledge_path.title}")
+        
         serializer = KnowledgePathSerializer(knowledge_path, context={'request': request})
+        print("Serialized data:", serializer.data)
+        
         return Response(serializer.data)
 
     def put(self, request, pk):

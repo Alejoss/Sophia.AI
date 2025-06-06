@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'votes',
     'knowledge_paths',
     'search',
+    'user_messages',
     'corsheaders',
     'storages',
     'rest_framework',
@@ -226,8 +227,8 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_EMAIL_SUBJECT_PREFIX = 'Academia Blockchain - '
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # 15 minutes
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),    # 30 days
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',

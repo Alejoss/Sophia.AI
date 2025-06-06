@@ -6,9 +6,13 @@ import { getUserFromLocalStorage, setUserInLocalStorage,
   setAuthenticationStatus, isAuthenticated } from '../context/localStorageUtils.js';
 import SocialLogin from '../components/SocialLogin';
 
+/**
+ * Regular Login Component
+ * Handles traditional username/password login
+ */
 const Login = () => {
   const navigate = useNavigate();
-  const { setAuthState, setAccessToken } = useContext(AuthContext);
+  const { setAuthState, setAccessToken, updateAuthState } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -53,27 +57,10 @@ const Login = () => {
     console.log('Submitting login form with:', { username, password });
     try {
       const response = await apiLogin({ username, password });
-      console.log('Login response:', response); // Debug log
-      
-      // Extract access_token and user data from response.data
       const { access_token, ...userData } = response.data;
       
-      // Store access token in context
-      setAccessToken(access_token);
-      console.log('Access token set in context:', access_token);
-      
-      // Store user data in localStorage
-      setUserInLocalStorage(userData);
-      setAuthenticationStatus(true);
-      
-      // Update auth state
-      setAuthState({
-        isAuthenticated: true,
-        user: userData,
-      });
-      
-      // Wait a moment to ensure token is set before redirecting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Use centralized auth state update
+      updateAuthState(userData, access_token);
       
       navigate('/profiles/login_successful');
     } catch (error) {
@@ -122,7 +109,7 @@ const Login = () => {
         
         <div className="social-login-section">
           <p>Or continue with</p>
-          <SocialLogin />
+           <SocialLogin />
         </div>
       </div>
     );

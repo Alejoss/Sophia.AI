@@ -150,7 +150,7 @@ const QuizForm = () => {
         text: '',
         questionType: 'SINGLE',
         options: [
-          { text: '', isCorrect: false },
+          { text: '', isCorrect: true },
           { text: '', isCorrect: false }
         ]
       }]
@@ -159,23 +159,57 @@ const QuizForm = () => {
 
   const handleQuestionChange = (index, field, value) => {
     const updatedQuestions = [...quizData.questions];
-    updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
+    const question = updatedQuestions[index];
+    
+    if (field === 'questionType') {
+      // When changing question type, ensure proper option selection
+      if (value === 'SINGLE') {
+        // For Single Choice, ensure exactly one option is correct
+        const hasCorrectOption = question.options.some(opt => opt.isCorrect);
+        if (!hasCorrectOption && question.options.length > 0) {
+          // If no option is correct, make the first one correct
+          question.options[0].isCorrect = true;
+        }
+      }
+    }
+    
+    updatedQuestions[index] = { ...question, [field]: value };
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
   };
 
   const handleOptionChange = (questionIndex, optionIndex, field, value) => {
     const updatedQuestions = [...quizData.questions];
-    updatedQuestions[questionIndex].options[optionIndex] = {
-      ...updatedQuestions[questionIndex].options[optionIndex],
+    const question = updatedQuestions[questionIndex];
+
+    if (field === 'isCorrect' && question.questionType === 'SINGLE') {
+      // For Single Choice, ensure exactly one option is correct
+      if (value) {
+        // If setting this option as correct, uncheck all others
+        question.options.forEach((option, idx) => {
+          option.isCorrect = idx === optionIndex;
+        });
+      } else {
+        // If unchecking the only correct option, prevent it
+        const correctOptionsCount = question.options.filter(opt => opt.isCorrect).length;
+        if (correctOptionsCount <= 1) {
+          return; // Don't allow unchecking if it's the only correct option
+        }
+      }
+    }
+
+    // Update the specific option
+    question.options[optionIndex] = {
+      ...question.options[optionIndex],
       [field]: value
     };
+
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
   };
 
   if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 bg-white">
       <div className="mb-6">
         <button
           onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
@@ -185,7 +219,7 @@ const QuizForm = () => {
         </button>
       </div>
 
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="text-2xl font-bold mb-4 text-gray-900">
         {mode === 'create' ? 'Create Quiz' : 'Edit Quiz'}
       </h1>
       
@@ -195,16 +229,16 @@ const QuizForm = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
         <div>
-          <label className="block text-gray-700 font-bold mb-2">
+          <label className="block text-gray-900 font-bold mb-2">
             Select Preceding Node
           </label>
           <select
             value={quizData.precedingNodeId}
             onChange={(e) => setQuizData(prev => ({ ...prev, precedingNodeId: e.target.value }))}
             required
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded text-gray-900"
           >
             <option value="">Select a node...</option>
             {nodes.map(node => (
@@ -216,7 +250,7 @@ const QuizForm = () => {
         </div>
 
         <div>
-          <label className="block text-gray-700 font-bold mb-2">
+          <label className="block text-gray-900 font-bold mb-2">
             Quiz Title
           </label>
           <input
@@ -224,47 +258,47 @@ const QuizForm = () => {
             value={quizData.title}
             onChange={(e) => setQuizData(prev => ({ ...prev, title: e.target.value }))}
             required
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded text-gray-900"
           />
         </div>
 
         <div>
-          <label className="block text-gray-700 font-bold mb-2">
+          <label className="block text-gray-900 font-bold mb-2">
             Quiz Description
           </label>
           <textarea
             value={quizData.description}
             onChange={(e) => setQuizData(prev => ({ ...prev, description: e.target.value }))}
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded text-gray-900"
             rows="3"
           />
         </div>
 
         <div className="space-y-6">
-          <h2 className="text-xl font-bold">Questions</h2>
+          <h2 className="text-xl font-bold text-gray-900">Questions</h2>
           
           {quizData.questions.map((question, qIndex) => (
             <div key={qIndex} className="p-4 border rounded space-y-4">
               <div>
-                <label className="block text-gray-700 font-bold mb-2">
+                <label className="block text-gray-900 font-bold mb-2">
                   Question Text
                 </label>
                 <textarea
                   value={question.text}
                   onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-gray-900"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-2">
+                <label className="block text-gray-900 font-bold mb-2">
                   Question Type
                 </label>
                 <select
                   value={question.questionType}
                   onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-gray-900"
                 >
                   <option value="SINGLE">Single Choice</option>
                   <option value="MULTIPLE">Multiple Choice</option>
@@ -272,7 +306,7 @@ const QuizForm = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-gray-700 font-bold mb-2">
+                <label className="block text-gray-900 font-bold mb-2">
                   Options
                 </label>
                 {question.options.map((option, oIndex) => (
@@ -282,12 +316,13 @@ const QuizForm = () => {
                       checked={option.isCorrect}
                       onChange={(e) => handleOptionChange(qIndex, oIndex, 'isCorrect', e.target.checked)}
                       name={`question-${qIndex}-correct`}
+                      className="text-blue-600"
                     />
                     <input
                       type="text"
                       value={option.text}
                       onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
-                      className="flex-1 p-2 border rounded"
+                      className="flex-1 p-2 border rounded text-gray-900"
                       placeholder="Option text"
                       required
                     />
@@ -329,7 +364,7 @@ const QuizForm = () => {
         </div>
 
         <div>
-          <label className="block text-gray-700 font-bold mb-2">
+          <label className="block text-gray-900 font-bold mb-2">
             Maximum Attempts Per Day
           </label>
           <select
@@ -344,7 +379,7 @@ const QuizForm = () => {
               });
             }}
             required
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded text-gray-900"
           >
             {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
               <option key={num} value={num}>

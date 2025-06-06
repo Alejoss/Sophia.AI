@@ -22,9 +22,20 @@ from django.contrib.auth import authenticate, login
 from django.conf import settings
 from django.core.cache import cache
 from datetime import timedelta
+from django.core.files.base import ContentFile
+import requests
+from datetime import datetime
+import jwt
+import json
 
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer
 from profiles.models import Profile
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from dj_rest_auth.registration.views import SocialLoginView
+from allauth.socialaccount.providers.google.provider import GoogleProvider
+from allauth.socialaccount.models import SocialApp, SocialToken
+from allauth.socialaccount.models import SocialAccount
 
 logger = logging.getLogger('app_logger')
 
@@ -191,10 +202,21 @@ def set_jwt_token(user):
 
 
 class LoginView(APIView):
+    """
+    Handles user authentication and JWT token generation.
+    
+    Flow:
+    1. Receives username/password credentials
+    2. Validates credentials using Django's authenticate
+    3. Generates JWT tokens (access and refresh)
+    4. Sets refresh token in HTTP-only cookie
+    5. Returns user data and access token in response
+    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def get_client_ip(self, request):
+        """Extracts client IP for rate limiting purposes."""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0]
@@ -204,20 +226,26 @@ class LoginView(APIView):
 
     def post(self, request):
         """
-        Log in a user with the provided credentials and set both access and refresh tokens.
+        Authenticates user and generates JWT tokens.
+        
+        Args:
+            request: Contains username and password in request.data
+            
+        Returns:
+            Response with:
+            - User data (id, username, email, etc.)
+            - Access token in response body
+            - Refresh token in HTTP-only cookie
         """
         username = request.data.get('username')
         password = request.data.get('password')
         client_ip = self.get_client_ip(request)
 
-        print('Login attempt with username:', username, 'from IP:', client_ip)
-
-        # Check rate limiting
+        # Rate limiting check
         cache_key = f'login_attempts_{client_ip}'
         attempts = cache.get(cache_key, 0)
         
-        if attempts >= 5:  # Maximum 5 attempts
-            print(f'Too many login attempts from IP: {client_ip}')
+        if attempts >= 5:
             return Response(
                 {'error': 'Too many login attempts. Please try again later.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS
@@ -226,25 +254,21 @@ class LoginView(APIView):
         user = authenticate(request, username=username, password=password)
 
         if user:
-            print('User authenticated successfully:', user)
             login(request, user)
-            
-            # Reset rate limiting on successful login
-            cache.delete(cache_key)
+            cache.delete(cache_key)  # Reset rate limiting on success
 
             try:
-                # Generate both tokens
+                # Generate JWT tokens
                 refresh = RefreshToken.for_user(user)
                 access_token = str(refresh.access_token)
                 refresh_token = str(refresh)
 
-                # Create response data
+                # Prepare response data
                 response_data = {
                     **UserSerializer(user).data,
                     'access_token': access_token
                 }
 
-                # Create response with data
                 response = Response(response_data)
 
                 # Set refresh token in HTTP-only cookie
@@ -257,10 +281,8 @@ class LoginView(APIView):
                     path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
                 )
 
-                print('Tokens set successfully')
                 return response
             except Exception as e:
-                print('Error while generating tokens:', str(e))
                 return Response(
                     {'error': 'Failed to generate tokens'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -268,12 +290,9 @@ class LoginView(APIView):
         else:
             # Increment failed attempts
             cache.set(cache_key, attempts + 1, timeout=300)  # 5 minutes timeout
-            
-            print('Invalid credentials for username:', username)
             return Response(
                 {'error': 'Invalid credentials'},
-                status=status.HTTP_401_UNAUTHORIZED,
-                content_type='application/json',
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
 
@@ -401,35 +420,272 @@ class RegisterView(APIView):
 
 
 class RefreshTokenView(APIView):
+    """
+    Handles JWT token refresh.
+    
+    Flow:
+    1. Gets refresh token from HTTP-only cookie
+    2. Validates refresh token
+    3. Generates new access token
+    4. Returns new access token in response
+    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request):
         """
-        Refresh the access token using the refresh token from the HTTP-only cookie.
+        Refreshes the access token using the refresh token from cookie.
+        
+        Returns:
+            Response with new access token
         """
         try:
-            # Get refresh token from cookie
+            print("\n=== Token Refresh Attempt ===")
             refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
             
             if not refresh_token:
+                print("❌ No refresh token found in cookies")
                 return Response(
                     {'error': 'No refresh token found'},
-                    status=status.HTTP_401_UNAUTHORIZED
+                    status=status.HTTP_403_FORBIDDEN
                 )
 
-            # Validate refresh token and get new access token
+            print("✅ Found refresh token in cookies")
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
+            print("✅ Generated new access token")
 
-            # Return new access token
             return Response({
                 'access_token': access_token
             })
 
         except Exception as e:
-            logger.error(f"Token refresh failed: {str(e)}")
+            print(f"❌ Token refresh failed: {str(e)}")
             return Response(
                 {'error': 'Invalid refresh token'},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+class GoogleLoginView(SocialLoginView):
+    """
+    Handles Google OAuth authentication and JWT token generation.
+    """
+    adapter_class = GoogleOAuth2Adapter
+    client_class = OAuth2Client
+    callback_url = None
+
+    def post(self, request, *args, **kwargs):
+        logger.info("Starting Google login process")
+        
+        # Check for access token
+        id_token = request.data.get('access_token')
+        if not id_token:
+            logger.error("No access token provided in request")
+            return Response(
+                {'error': 'No access token provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get Google's public keys
+        try:
+            logger.info("Fetching Google public keys")
+            response = requests.get('https://www.googleapis.com/oauth2/v3/certs')
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch Google public keys. Status code: {response.status_code}")
+                return Response(
+                    {'error': 'Failed to fetch Google public keys'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+            public_keys = response.json()
+        except requests.RequestException as e:
+            logger.error(f"Request error while fetching Google public keys: {str(e)}")
+            return Response(
+                {'error': 'Failed to connect to Google services'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        
+        # Verify and decode the ID token
+        try:
+            logger.info("Verifying ID token")
+            unverified_header = jwt.get_unverified_header(id_token)
+            key_id = unverified_header['kid']
+            
+            # Find matching public key
+            public_key = None
+            for key in public_keys['keys']:
+                if key['kid'] == key_id:
+                    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
+                    break
+            
+            if not public_key:
+                logger.error("No matching public key found for token")
+                return Response(
+                    {'error': 'No matching public key found for token'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get Google OAuth client ID from settings
+            client_id = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id']
+            if not client_id:
+                logger.error("Google OAuth client ID not configured in settings")
+                return Response(
+                    {'error': 'Google OAuth client ID not configured'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Verify token
+            try:
+                decoded_token = jwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=['RS256'],
+                    audience=client_id,
+                    issuer='https://accounts.google.com',
+                    options={
+                        'verify_iat': False,  # Don't verify issued at time
+                        'verify_exp': True,   # Still verify expiration
+                        'leeway': 10          # Allow 10 seconds of clock skew
+                    }
+                )
+                logger.info("Successfully decoded and verified ID token")
+            except jwt.ExpiredSignatureError:
+                logger.error("Token has expired")
+                return Response(
+                    {'error': 'Token has expired. Please try logging in again.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            except jwt.InvalidTokenError as e:
+                logger.error(f"Invalid token error: {str(e)}")
+                return Response(
+                    {'error': f'Invalid ID token: {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception as e:
+                logger.error(f"Unexpected error during token verification: {str(e)}")
+                return Response(
+                    {'error': 'Failed to verify token'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except Exception as e:
+            logger.error(f"Error during token verification: {str(e)}")
+            return Response(
+                {'error': 'Failed to verify token'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get or create user
+        try:
+            logger.info("Looking up social account")
+            social_account = SocialAccount.objects.get(
+                provider=GoogleProvider.id, 
+                uid=decoded_token['sub']
+            )
+            user = social_account.user
+            logger.info(f"Found existing user: {user.username}")
+        except SocialAccount.DoesNotExist:
+            logger.info("No existing social account found, creating new user")
+            # Create new user
+            email = decoded_token.get('email')
+            if not email:
+                logger.error("No email provided in Google token")
+                return Response(
+                    {'error': 'Email not provided by Google'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                user = User.objects.get(email=email)
+                logger.info(f"Found existing user with email: {email}")
+            except User.DoesNotExist:
+                logger.info(f"Creating new user with email: {email}")
+                username = email.split('@')[0]
+                # Ensure unique username
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=decoded_token.get('given_name', ''),
+                    last_name=decoded_token.get('family_name', '')
+                )
+                logger.info(f"Created new user: {username}")
+            
+            # Create social account
+            social_account = SocialAccount.objects.create(
+                user=user,
+                provider=GoogleProvider.id,
+                uid=decoded_token['sub'],
+                extra_data=decoded_token
+            )
+            logger.info(f"Created social account for user: {user.username}")
+
+        # Handle profile picture
+        try:
+            # Get profile picture URL from Google token
+            picture_url = decoded_token.get('picture')
+            logger.info(f"Profile picture URL from token: {picture_url}")
+            
+            if picture_url:
+                # Download the image
+                logger.info("Downloading profile picture")
+                picture_response = requests.get(picture_url)
+                if picture_response.status_code == 200:
+                    # Get or create profile
+                    profile, created = Profile.objects.get_or_create(user=user)
+                    logger.info(f"{'Created' if created else 'Found'} profile for user: {user.username}")
+                    
+                    # Save the profile picture
+                    filename = f"{user.username}_{datetime.today().strftime('%h-%d-%y')}.jpeg"
+                    logger.info(f"Saving profile picture as: {filename}")
+                    profile.profile_picture.save(
+                        filename,
+                        ContentFile(picture_response.content),
+                        save=True
+                    )
+                    logger.info(f"Successfully saved profile picture for user {user.username}")
+                else:
+                    logger.error(f"Failed to download profile picture. Status code: {picture_response.status_code}")
+        except requests.RequestException as e:
+            logger.error(f"Request error while downloading profile picture: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing profile picture for user {user.username}: {str(e)}")
+            # Continue with login process even if picture fails
+
+        try:
+            # Generate JWT tokens
+            logger.info("Generating JWT tokens")
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            # Prepare response
+            response_data = {
+                **UserSerializer(user).data,
+                'access_token': access_token
+            }
+
+            response = Response(response_data)
+
+            # Set refresh token in HTTP-only cookie
+            response.set_cookie(
+                settings.SIMPLE_JWT['REFRESH_COOKIE'],
+                refresh_token,
+                httponly=True,
+                secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+                samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
+                path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+            )
+            logger.info("Successfully completed Google login process")
+            return response
+        except Exception as e:
+            logger.error(f"Error generating tokens or creating response: {str(e)}")
+            return Response(
+                {'error': 'Failed to complete login process'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

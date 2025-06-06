@@ -1,9 +1,35 @@
-import React, { createContext, useState, useEffect, useRef } from 'react';
-import { getUserFromLocalStorage, isAuthenticated } from './localStorageUtils';
+import React, { createContext, useState, useEffect, useRef, useContext } from 'react';
+import { getUserFromLocalStorage, isAuthenticated, setUserInLocalStorage, setAuthenticationStatus, 
+  getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus } from './localStorageUtils';
 import { checkAuth } from '../api/profilesApi';
 import { jwtDecode } from 'jwt-decode';
+import axiosInstance from '../api/axiosConfig';
 
 export const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+/**
+ * Authentication Context Provider
+ * 
+ * This component manages the application's authentication state, including:
+ * - User authentication status
+ * - Access token management (in memory)
+ * - User data persistence (in localStorage for UX)
+ * - Token refresh scheduling
+ * 
+ * The context provides the following functionality:
+ * - updateAuthState: Centralized function to update auth state across all login methods
+ * - setAccessToken: Stores access token in memory and schedules refresh
+ * - getAccessToken: Retrieves the current access token
+ * - clearAccessToken: Clears the access token and cancels refresh
+ */
 
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState({
@@ -11,24 +37,61 @@ export const AuthProvider = ({ children }) => {
     user: null,
   });
   
-  // Store access token in a ref to prevent unnecessary re-renders
   const accessTokenRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
 
+  const updateAuthState = (userData, accessToken) => {
+    console.log('Updating auth state with:', { userData, hasAccessToken: !!accessToken });
+    
+    // Store access token in memory and localStorage
+    if (accessToken) {
+      setAccessToken(accessToken);
+      setAccessTokenInLocalStorage(accessToken);
+    }
+
+    // Store user data in localStorage for UX purposes
+    setUserInLocalStorage(userData);
+    setAuthenticationStatus(true);
+
+    // Update React context state - ensure both user and isAuthenticated are set together
+    setAuthState({
+      isAuthenticated: true,
+      user: userData
+    });
+    console.log('Auth state updated:', { isAuthenticated: true, user: userData });
+  };
+
+  const clearAuthState = () => {
+    console.log('Clearing auth state');
+    clearAccessToken();
+    removeAccessTokenFromLocalStorage();
+    // Don't remove user data from localStorage, only clear auth status
+    clearAuthenticationStatus();
+    
+    // Always clear both isAuthenticated and user together
+    setAuthState({
+      isAuthenticated: false,
+      user: null
+    });
+  };
+
   const setAccessToken = (token) => {
+    console.log('Setting access token in memory:', token ? 'Token exists' : 'No token');
     accessTokenRef.current = token;
     if (token) {
-      // Schedule token refresh before it expires
       scheduleTokenRefresh(token);
     }
   };
 
   const getAccessToken = () => {
+    console.log('Getting access token from memory:', accessTokenRef.current ? 'Token exists' : 'No token');
     return accessTokenRef.current;
   };
 
   const clearAccessToken = () => {
+    console.log('Clearing access token from memory');
     accessTokenRef.current = null;
+    removeAccessTokenFromLocalStorage();
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
       refreshTimeoutRef.current = null;
@@ -37,30 +100,28 @@ export const AuthProvider = ({ children }) => {
 
   const scheduleTokenRefresh = (token) => {
     try {
+      console.log('Scheduling token refresh');
       const decodedToken = jwtDecode(token);
-      const expiresAt = decodedToken.exp * 1000; // Convert to milliseconds
+      const expiresAt = decodedToken.exp * 1000;
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
-      
-      // Refresh token 1 minute before it expires
       const refreshTime = Math.max(0, timeUntilExpiry - 60000);
+      
+      console.log('Token refresh scheduled for:', new Date(now + refreshTime));
       
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
       
       refreshTimeoutRef.current = setTimeout(async () => {
+        console.log('Attempting to refresh token');
         try {
-          const response = await fetch('http://localhost:8000/api/profiles/refresh_token/', {
-            method: 'POST',
-            credentials: 'include',
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setAccessToken(data.access_token);
+          const response = await axiosInstance.post('/profiles/refresh_token/');
+          if (response.data.access_token) {
+            console.log('Token refresh successful');
+            setAccessToken(response.data.access_token);
           } else {
-            // If refresh fails, clear auth state
+            console.log('Token refresh failed - no new token received');
             clearAccessToken();
             setAuthState({ isAuthenticated: false, user: null });
           }
@@ -75,62 +136,90 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Expose auth context to window for axios interceptors
-  useEffect(() => {
-    window.authContext = {
-      getAccessToken,
-      setAccessToken,
-      clearAccessToken,
-      setAuthState,
-      authState
-    };
-  }, [authState]);
-
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log('Initializing authentication state');
       try {
         const backendAuthStatus = await checkAuth();
+        console.log('Backend auth status:', backendAuthStatus);
+        
         const storedUser = getUserFromLocalStorage();
+        console.log('Stored user:', storedUser);
+        
         const localStorageAuth = isAuthenticated();
+        console.log('LocalStorage auth status:', localStorageAuth);
+        
+        const storedAccessToken = getAccessTokenFromLocalStorage();
+        console.log('Stored access token:', storedAccessToken ? 'Token exists' : 'No token');
 
-        if (backendAuthStatus && localStorageAuth) {
+        if (backendAuthStatus && storedUser && storedAccessToken) {
+          console.log('All auth components present, restoring session');
+          // Restore access token to memory
+          setAccessToken(storedAccessToken);
+          
+          // Set both isAuthenticated and user together
           setAuthState({
             isAuthenticated: true,
             user: storedUser
           });
+          console.log('Session restored successfully');
         } else {
-          // If either backend or localStorage auth fails, consider user not authenticated
-          setAuthState({
-            isAuthenticated: false,
-            user: storedUser // Keep the user info for convenience
+          console.log('Missing auth components, clearing session:', {
+            backendAuthStatus,
+            hasStoredUser: !!storedUser,
+            hasStoredToken: !!storedAccessToken
           });
+          // Clear everything if any part is missing
+          clearAuthState();
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
-        setAuthState({
-          isAuthenticated: false,
-          user: null
-        });
+        clearAuthState();
       }
     };
 
     initializeAuth();
 
-    // Cleanup on unmount
     return () => {
       if (refreshTimeoutRef.current) {
+        console.log('Cleaning up token refresh timeout');
         clearTimeout(refreshTimeoutRef.current);
       }
     };
   }, []);
 
+  // Expose auth context to window for axios interceptors
+  useEffect(() => {
+    window.authContext = {
+      getAccessToken: () => accessTokenRef.current,
+      setAccessToken: (token) => {
+        setAccessToken(token);
+      },
+      clearAccessToken: () => {
+        clearAccessToken();
+      },
+      setAuthState: (newState) => {
+        // Ensure isAuthenticated and user are always set together
+        setAuthState({
+          isAuthenticated: !!newState.user,
+          user: newState.user
+        });
+      },
+      authState
+    };
+  }, [authState]);
+
   return (
     <AuthContext.Provider value={{ 
       authState, 
-      setAuthState, 
+      setAuthState,
+      updateAuthState,
       setAccessToken, 
       getAccessToken, 
-      clearAccessToken 
+      clearAccessToken,
+      clearAuthState,
+      user: authState.user,
+      isAuthenticated: authState.isAuthenticated
     }}>
       {children}
     </AuthContext.Provider>

@@ -16,17 +16,28 @@ const MessageThread = () => {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
+  const getOtherUser = () => {
+    if (!thread || !currentUser) return null;
+    return thread.participant1.id === currentUser.id ? thread.participant2 : thread.participant1;
+  };
+
   useEffect(() => {
     const loadThreadAndMessages = async () => {
       setLoading(true);
       try {
         const threadRes = await fetchOrCreateThread(userId);
+        if (!threadRes.data) {
+          throw new Error('Failed to create or fetch thread');
+        }
         setThread(threadRes.data);
         const threadId = threadRes.data.id;
         const messagesRes = await fetchMessages(threadId);
-        setMessages(messagesRes.data);
+        // Ensure messages is an array
+        const messagesData = Array.isArray(messagesRes.data) ? messagesRes.data : [];
+        setMessages(messagesData);
         setError(null);
       } catch (err) {
+        console.error('Error loading messages:', err);
         setError('Failed to load messages.');
       } finally {
         setLoading(false);
@@ -41,9 +52,12 @@ const MessageThread = () => {
     try {
       await sendMessage(thread.id, newMessage);
       const messagesRes = await fetchMessages(thread.id);
-      setMessages(messagesRes.data);
+      // Ensure messages is an array
+      const messagesData = Array.isArray(messagesRes.data) ? messagesRes.data : [];
+      setMessages(messagesData);
       setNewMessage('');
     } catch (err) {
+      console.error('Error sending message:', err);
       setError('Failed to send message.');
     } finally {
       setSending(false);
@@ -60,29 +74,48 @@ const MessageThread = () => {
   if (error) return <Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>;
   if (!thread) return <Box sx={{ p: 3 }}><Typography>No thread found.</Typography></Box>;
 
+  const otherUser = getOtherUser();
+
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <Typography variant="h5" gutterBottom>
-          Conversation with User #{userId}
+          Conversation with {otherUser ? otherUser.username : 'User'}
         </Typography>
         <List sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
-          {messages.length === 0 && (
+          {(!messages || messages.length === 0) && (
             <ListItem><ListItemText primary="No messages yet." /></ListItem>
           )}
-          {messages.map(msg => (
-            <ListItem key={msg.id} alignItems={msg.sender.id === currentUser.id ? 'right' : 'left'}>
-              <ListItemText
-                primary={msg.text}
-                secondary={
-                  <>
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString()}
-                    </Typography>
-                  </>
-                }
-                sx={{ textAlign: msg.sender.id === currentUser.id ? 'right' : 'left' }}
-              />
+          {messages && messages.map(msg => (
+            <ListItem 
+              key={msg.id}
+              sx={{
+                justifyContent: msg.sender.id === currentUser.id ? 'flex-end' : 'flex-start',
+                mb: 1
+              }}
+            >
+              <Box
+                sx={{
+                  maxWidth: '70%',
+                  backgroundColor: msg.sender.id === currentUser.id ? 'primary.main' : 'grey.200',
+                  color: msg.sender.id === currentUser.id ? 'white' : 'text.primary',
+                  borderRadius: 2,
+                  p: 1.5,
+                  px: 2
+                }}
+              >
+                <Typography variant="body1">{msg.text}</Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    display: 'block',
+                    color: msg.sender.id === currentUser.id ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                    mt: 0.5
+                  }}
+                >
+                  {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString()}
+                </Typography>
+              </Box>
             </ListItem>
           ))}
           <div ref={messagesEndRef} />

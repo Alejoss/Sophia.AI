@@ -3,7 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getProfileById } from '../api/profilesApi';
 import { AuthContext } from '../context/AuthContext';
 import PublicationList from '../publications/PublicationList';
-import { Box, Typography, Paper, Grid, CircularProgress, Tabs, Tab, Button } from '@mui/material';
+import { 
+    Box, 
+    Typography, 
+    Paper, 
+    Grid, 
+    CircularProgress, 
+    Tabs, 
+    Tab, 
+    Button, 
+    Tooltip,
+    IconButton
+} from '@mui/material';
+import MessageIcon from '@mui/icons-material/Message';
 
 const ProfileDetail = () => {
     const { profileId } = useParams();
@@ -11,11 +23,13 @@ const ProfileDetail = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('publications');
+    const [isNavigating, setIsNavigating] = useState(false);
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
     const navigate = useNavigate();
     
     const isOwnProfile = currentUser && currentUser.id === parseInt(profileId);
+    const isAuthenticated = authState.isAuthenticated;
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -36,6 +50,15 @@ const ProfileDetail = () => {
 
         fetchProfile();
     }, [profileId]);
+
+    const handleSendMessage = () => {
+        if (!isAuthenticated) {
+            navigate('/profiles/login');
+            return;
+        }
+        setIsNavigating(true);
+        navigate(`/messages/thread/${profile.user.id}`);
+    };
 
     if (isLoading) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -72,22 +95,36 @@ const ProfileDetail = () => {
                         </Box>
                     </Grid>
                     <Grid item xs={12} md={9}>
-                        <Typography variant="h4" gutterBottom>
-                            {profile.user.username}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Typography variant="h4">
+                                {profile.user.username}
+                            </Typography>
+                            {!isOwnProfile && (
+                                <Tooltip title={isAuthenticated ? "Send a message" : "Login to send a message"}>
+                                    <IconButton 
+                                        color="primary"
+                                        onClick={handleSendMessage}
+                                        disabled={isNavigating}
+                                        sx={{ 
+                                            ml: 1,
+                                            '&:hover': {
+                                                backgroundColor: 'primary.light',
+                                                color: 'white'
+                                            }
+                                        }}
+                                    >
+                                        {isNavigating ? (
+                                            <CircularProgress size={24} color="inherit" />
+                                        ) : (
+                                            <MessageIcon />
+                                        )}
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Box>
                         <Typography variant="body1" paragraph>
                             {profile.profile_description || 'No description available.'}
                         </Typography>
-                        {!isOwnProfile && (
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                sx={{ mt: 2 }}
-                                onClick={() => navigate(`/messages/thread/${profile.user.id}`)}
-                            >
-                                Send Message
-                            </Button>
-                        )}
                     </Grid>
                 </Grid>
             </Paper>

@@ -1,75 +1,104 @@
-import { useState, useEffect } from 'react';
-import { getUserProfile } from "../api/profilesApi.js"; // Importa la función desde el archivo
+import React, { useState, useEffect, useContext } from 'react';
+import { Link } from 'react-router-dom';
+import certificatesApi from '../api/certificatesApi';
+import { AuthContext } from '../context/AuthContext';
+import {
+  Card,
+  CardContent,
+  Typography,
+  CircularProgress,
+  Alert,
+  Box,
+  Chip,
+  Button
+} from '@mui/material';
 
 const Certificates = () => {
-  const [certificates, setCertificates] = useState({
-    greenDiamonds: 0,
-    yellowDiamonds: 0,
-    purpleDiamonds: 0,
-    blueDiamonds: 0
-  });
-
-  // Recupera el nombre de usuario almacenado (asumiendo que se almacena en localStorage)
-  // TODO esto debe ir en un slice de redux
-  const storedUsername = localStorage.getItem('userName');
+  const [certificates, setCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { authState } = useContext(AuthContext);
 
   useEffect(() => {
-    const SetProfileData = async () => {
-      try {
-        console.log('Fetching profile data');
-        const { user } = await getUserProfile(storedUsername);
+    fetchCertificates();
+  }, []);
 
-        if (user) {
-          setCertificates({
-            greenDiamonds: user.green_diamonds || 0,
-            yellowDiamonds: user.yellow_diamonds || 0,
-            purpleDiamonds: user.purple_diamonds || 0,
-            blueDiamonds: user.blue_diamonds || 0
-          });
-        }
-      } catch (error) {
-        console.error('Error al buscar perfiles:', error);
-      }
-    };
+  const fetchCertificates = async () => {
+    try {
+      setLoading(true);
+      const data = await certificatesApi.getCertificates();
+      setCertificates(data);
+    } catch (err) {
+      setError('Failed to load certificates');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    SetProfileData();
-  }, [storedUsername]);
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
 
   return (
-    <div>
-      <p>
-        Here you can find your certificates. Remember that to receive a certificate, you must request it (you can do this on the event page).
-        The creator must accept your request.
-      </p>
+    <div className="container mx-auto p-4">
+      <Typography variant="h4" gutterBottom>
+        My Certificates
+      </Typography>
 
-      <h3>Your Certificates</h3>
-      <div className="container">
-        <div className="row">
-          <div className="col-md">
-            <h4>Green Diamonds</h4>
-            <p>{certificates.greenDiamonds}</p>
-          </div>
-          <div className="col-md">
-            <h4>Yellow Diamonds</h4>
-            <p>{certificates.yellowDiamonds}</p>
-          </div>
-          <div className="col-md">
-            <h4>Purple Diamonds</h4>
-            <p>{certificates.purpleDiamonds}</p>
-          </div>
-          <div className="col-md">
-            <h4>Blue Diamonds</h4>
-            <p>{certificates.blueDiamonds}</p>
-          </div>
+      {certificates.length === 0 ? (
+        <Typography variant="body1" color="textSecondary">
+          You haven't earned any certificates yet. Complete knowledge paths to earn certificates!
+        </Typography>
+      ) : (
+        <div className="grid gap-4">
+          {certificates.map((certificate) => (
+            <Card key={certificate.id} className="mb-4">
+              <CardContent>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <Typography variant="h6">
+                      {certificate.knowledge_path_title}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Issued on: {new Date(certificate.issued_on).toLocaleDateString()}
+                    </Typography>
+                    {certificate.blockchain_hash && (
+                      <Chip
+                        label="On Blockchain"
+                        color="success"
+                        size="small"
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                  {certificate.download_url && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      href={certificate.download_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="certificate-block">
-          <h4>Certificate on Blockchain for Modern Corporations</h4>
-          <a href="#">Send to the Blockchain</a>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
 
 export default Certificates;
-

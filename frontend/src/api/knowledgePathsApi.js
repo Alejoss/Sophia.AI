@@ -35,7 +35,9 @@ const knowledgePathsApi = {
         try {
             console.log('Sending request to add node:', { pathId, nodeData });
             const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/`, {
-                content_profile_id: nodeData.content_profile_id
+                content_profile_id: nodeData.content_profile_id,
+                title: nodeData.title,
+                description: nodeData.description
             });
             console.log('Response from add node:', response.data);
             return response.data;

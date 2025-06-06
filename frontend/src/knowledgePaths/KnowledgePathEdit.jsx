@@ -233,7 +233,7 @@ const KnowledgePathEdit = () => {
               onClick={handleAddActivityRequirement}
               className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
             >
-              Add Activity Requirement
+              Add Quiz
             </button>
           )}
         </div>
@@ -269,16 +269,16 @@ const KnowledgePathEdit = () => {
                   console.log('Node quizzes:', quizzes[node.id]); // Log quizzes for each node
                   return (
                     <tr key={node.id}>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         {index + 1}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         {node.title || 'Untitled'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         {node.media_type}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         {quizzes[node.id] && quizzes[node.id].length > 0 ? (
                           quizzes[node.id].map((quiz, quizIndex) => (
                             <Link
@@ -291,7 +291,7 @@ const KnowledgePathEdit = () => {
                           ))
                         ) : 'No'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         <Link
                           to={`/knowledge_path/${pathId}/nodes/${node.id}`}
                           target="_blank"
@@ -303,13 +303,13 @@ const KnowledgePathEdit = () => {
                           <OpenInNewIcon className="w-4 h-4" />
                         </Link>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         <div className="flex gap-2">
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleMoveNode(node.id, 'up')}
                               disabled={isReordering || index === 0}
-                              className={`p-1 rounded hover:bg-gray-100 transition-colors
+                              className={`p-1 rounded hover:bg-gray-100 transition-colors text-gray-700
                                 ${(isReordering || index === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                               <ArrowUpwardIcon className="w-4 h-4" />
@@ -317,7 +317,7 @@ const KnowledgePathEdit = () => {
                             <button
                               onClick={() => handleMoveNode(node.id, 'down')}
                               disabled={isReordering || index === nodes.length - 1}
-                              className={`p-1 rounded hover:bg-gray-100 transition-colors
+                              className={`p-1 rounded hover:bg-gray-100 transition-colors text-gray-700
                                 ${(isReordering || index === nodes.length - 1) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                               <ArrowDownwardIcon className="w-4 h-4" />

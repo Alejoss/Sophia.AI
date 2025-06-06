@@ -10,6 +10,7 @@ import PersonalProfile from './profiles/PersonalProfile.jsx';
 import EditProfile from './profiles/EditProfile.jsx';
 import Bookmarks from './profiles/Bookmarks.jsx';
 import Certificates from './profiles/Certificates.jsx';
+import CertificateRequests from './profiles/CertificateRequests.jsx';
 import Events from './profiles/Events.jsx';
 import Login from './profiles/Login.jsx';
 import LoginSuccessful from './profiles/LoginSuccessful.jsx';
@@ -49,6 +50,7 @@ import UploadContentLibrary from './content/UploadContentLibrary';
 import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import MessageThread from './messages/MessageThread.jsx';
+import ThreadList from './messages/ThreadList.jsx';
 
 const App = () => {
   return (
@@ -71,6 +73,7 @@ const App = () => {
               <Route path="login_successful" element={<LoginSuccessful />} />
               <Route path="logout" element={<Logout />} />              
               <Route path="profile_certificates" element={<Certificates />} />
+              <Route path="certificate-requests" element={<CertificateRequests />} />
               <Route path="my_profile" element={<PersonalProfile />} />
               <Route path="my_profile/edit" element={<EditProfile />} />
               <Route path="profile_events" element={<Events />} />
@@ -120,6 +123,7 @@ const App = () => {
             <Route path="search" element={<MainSearch />} />
             <Route path="welcome" element={<Welcome />} />
             <Route path="messages">
+              <Route path="" element={<ThreadList />} />
               <Route path="thread/:userId" element={<MessageThread />} />
             </Route>
           </Route>

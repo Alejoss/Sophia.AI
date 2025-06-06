@@ -4,12 +4,20 @@ import { useNavigate } from 'react-router-dom';
 
 const baseURL = import.meta.env.VITE_API_URL;
 
+// Initialize with stored token if available
+const storedToken = localStorage.getItem('access_token');
+const initialHeaders = {
+  'Content-Type': 'application/json'
+};
+
+if (storedToken) {
+  initialHeaders['Authorization'] = `Bearer ${storedToken}`;
+}
+
 // Create a single axios instance
 const axiosInstance = axios.create({
   baseURL: baseURL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
+  headers: initialHeaders,
   withCredentials: true
 });
 
@@ -39,18 +47,15 @@ axiosInstance.interceptors.request.use(
 
     if (csrfToken) {
       config.headers['X-CSRFToken'] = csrfToken;
-      console.log('CSRF token added to request:', config.url);
     }
 
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
 
-    console.log(`Request made to URL: ${baseURL}${config.url}`);
     return config;
   },
   function (error) {
-    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -60,90 +65,56 @@ axiosInstance.interceptors.request.use(
   (config) => {
     if (window.authContext) {
       const token = window.authContext.getAccessToken();
-      console.log('Access token from context:', token ? 'Present' : 'Not present');
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
-        console.log('Authorization header added to request:', config.url);
       }
-    } else {
-      console.log('No auth context found for request:', config.url);
     }
     return config;
   },
   (error) => {
-    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor
+/**
+ * Response interceptor to handle authentication and token refresh
+ */
 axiosInstance.interceptors.response.use(
   (response) => {
-    console.log('Response received:', {
-      url: response.config.url,
-      status: response.status,
-      statusText: response.statusText
-    });
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
-    console.log('Response error:', {
-      url: originalRequest.url,
-      status: error.response?.status,
-      statusText: error.response?.statusText
-    });
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      console.log('Not a 401 or already retried, rejecting');
+    // Don't retry if:
+    // 1. It's not a 401 error
+    // 2. The request has already been retried
+    // 3. The request is for the refresh token endpoint
+    if (error.response?.status !== 401 || 
+        originalRequest._retry || 
+        originalRequest.url === '/profiles/refresh_token/') {
       return Promise.reject(error);
     }
 
-    if (isRefreshing) {
-      console.log('Token refresh in progress, queueing request');
-      return new Promise((resolve, reject) => {
-        failedQueue.push({ resolve, reject });
-      })
-        .then((token) => {
-          console.log('Request queued, retrying with new token');
-          originalRequest.headers['Authorization'] = `Bearer ${token}`;
-          return axiosInstance(originalRequest);
-        })
-        .catch((err) => {
-          console.error('Queued request failed:', err);
-          return Promise.reject(err);
-        });
-    }
-
+    // Mark request as retried
     originalRequest._retry = true;
-    isRefreshing = true;
-    console.log('Starting token refresh process');
 
     try {
-      console.log('Calling refresh token endpoint');
+      // Try to refresh the token
       const response = await axiosInstance.post('/profiles/refresh_token/');
-      console.log('Refresh token response received');
       const { access_token } = response.data;
 
+      // Update auth context with new token
       if (window.authContext) {
-        console.log('Updating access token in context');
         window.authContext.setAccessToken(access_token);
       }
 
+      // Retry the original request with new token
       originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-      console.log('Updated request headers with new token');
-
-      processQueue(null, access_token);
-      console.log('Processed queued requests');
-
-      console.log('Retrying original request');
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      console.error('Token refresh failed:', refreshError);
-      processQueue(refreshError, null);
-      
+      // If refresh fails, clear auth and redirect to login
       if (window.authContext) {
-        console.log('Clearing auth state and redirecting to login');
         window.authContext.setAuthState({
           isAuthenticated: false,
           user: null
@@ -152,10 +123,7 @@ axiosInstance.interceptors.response.use(
       }
       
       window.location.href = '/profiles/login';
-      
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   }
 );

@@ -2,9 +2,8 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { socialAuthService } from '../services/socialAuthService';
+import { socialLogin } from '../api/profilesApi';
 import { GoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
 
 const SocialLoginContainer = styled.div`
     display: flex;
@@ -23,62 +22,36 @@ const ErrorMessage = styled.div`
     font-size: 0.875rem;
 `;
 
+/**
+ * Social Login Component
+ * Handles Google OAuth login
+ */
 const SocialLogin = () => {
     const navigate = useNavigate();
-    const { setAuthState } = useContext(AuthContext);
+    const { updateAuthState } = useContext(AuthContext);
     const [error, setError] = useState(null);
-
-    useEffect(() => {
-        // Log CSRF token on mount
-        const csrfToken = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('csrftoken='))
-            ?.split('=')[1];
-        console.log('CSRF Token on mount:', csrfToken);
-    }, []);
 
     const handleCredentialResponse = useCallback(async (response) => {
         console.log('Google OAuth response received:', response);
-        setError(null); // Clear any previous errors
-        
-        // Log CSRF token before making the request
-        const csrfToken = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('csrftoken='))
-            ?.split('=')[1];
-        console.log('CSRF Token before request:', csrfToken);
-        
-        // Log all cookies for debugging
-        console.log('All cookies:', document.cookie);
+        setError(null);
 
         try {
             console.log('Attempting to login with Google credential...');
-            const data = await socialAuthService.google.login(response.credential);
-            console.log('Social login successful, user data:', data);
+            const data = await socialLogin(response.credential);
+            console.log('Social login successful, raw response data:', data);
             
-            if (!data || !data.user) {
+            if (!data || !data.id || !data.username || !data.email) {
+                console.error('Invalid user data structure:', data);
                 throw new Error('Invalid user data received from server');
             }
             
-            setAuthState({
-                isAuthenticated: true,
-                user: data.user
-            });
-            console.log('Auth state updated with user data');
-            
+            updateAuthState(data, data.access_token);
             navigate('/profiles/login_successful');
-            console.log('Redirecting to login success page');
         } catch (error) {
             console.error('Google login failed:', error);
             setError(error.message || 'Failed to login with Google');
-            console.error('Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers
-            });
         }
-    }, [setAuthState, navigate]);
+    }, [updateAuthState, navigate]);
 
     return (
         <SocialLoginContainer>

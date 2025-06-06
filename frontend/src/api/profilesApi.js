@@ -1,25 +1,29 @@
 // src/api/profilesAPI.js
 import axiosInstance from './axiosConfig.js';
 import Cookies from "js-cookie";
+import { getUserFromLocalStorage } from '../context/localStorageUtils';
 
 const checkAuth = async () => {
   try {
-    const response = await axiosInstance.get('/profiles/check_auth/');
-    console.log("Check Auth response:")
-    console.log(response);
-    if(response.status === 200) {
-      return response.data.is_authenticated === true;
-    } else if (response.status === 401) {
-      return false;
-    } else {
-      throw new Error('Unexpected response status');
+    // Get the stored token
+    const storedToken = localStorage.getItem('access_token');
+    if (storedToken) {
+      // Set the token in axios headers
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
     }
+
+    const response = await axiosInstance.get('/profiles/check_auth/');
+    console.log('Auth check response:', response.data);
+    
+    if (response.status === 200) {
+      return response.data.is_authenticated === true;
+    }
+    return false;
   } catch(error) {
-    // TODO: Handle error, if the server is down, we should show a message to the user
-    console.error('Error:', error);
-    throw error;
+    console.error('Auth check error:', error);
+    return false;
   }
-}
+};
 
 const getUserProfile = async () => {
   try {
@@ -66,8 +70,15 @@ const apiLogout = async () => {
     console.log('Making API call to logout...');
     const response = await axiosInstance.post('/profiles/logout/');
     console.log('Logout API response:', response);
+    
+    // Clear axios headers after successful logout
+    delete axiosInstance.defaults.headers.common['Authorization'];
+    
+    return response;
   } catch (error) {
     console.error('Failed to logout:', error);
+    // Even if the API call fails, clear the headers
+    delete axiosInstance.defaults.headers.common['Authorization'];
     throw new Error('Logout failed');
   }
 };
@@ -76,6 +87,21 @@ const apiLogin = async ({ username, password }) => {
   try {
     const response = await axiosInstance.post('/profiles/login/', { username, password });
     console.log('Login API response:', response); // Debug log
+    
+    // Make sure we have an access token
+    if (response.data.access_token) {
+      // Set the token in the axios instance
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+      
+      // Set the token in AuthContext
+      if (window.authContext) {
+        console.log('Setting token in AuthContext');
+        window.authContext.setAccessToken(response.data.access_token);
+      } else {
+        console.error('AuthContext not available');
+      }
+    }
+    
     return response; // Return the full response
   } catch (error) {
     console.error('Login API error:', error);
@@ -111,4 +137,38 @@ async function setCsrfToken() {
   }
 }
 
-export { getUserProfile, apiLogout, setCsrfToken, apiLogin, checkAuth, getProfileById, updateProfile, apiRegister };
+const refreshToken = async () => {
+  try {
+    const response = await axiosInstance.post('/profiles/refresh_token/');
+    return response.data;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    throw error;
+  }
+};
+
+const socialLogin = async (credential) => {
+  try {
+    const response = await axiosInstance.post(
+      '/rest-auth/google/login/',
+      { access_token: credential }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Social login failed:', error);
+    throw error;
+  }
+};
+
+export { 
+  getUserProfile, 
+  apiLogout, 
+  setCsrfToken, 
+  apiLogin, 
+  checkAuth, 
+  getProfileById, 
+  updateProfile, 
+  apiRegister, 
+  refreshToken,
+  socialLogin
+};

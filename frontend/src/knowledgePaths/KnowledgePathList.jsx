@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
+import { AuthContext } from '../context/AuthContext';
 
 const KnowledgePathList = () => {
+  const { authState } = useContext(AuthContext);
   const [knowledgePaths, setKnowledgePaths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -45,12 +47,14 @@ const KnowledgePathList = () => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Knowledge Paths</h1>
-        <Link 
-          to="/knowledge_path/create"
-          className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
-        >
-          Create New Path
-        </Link>
+        {authState.isAuthenticated && (
+          <Link 
+            to="/knowledge_path/create"
+            className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+          >
+            Create New Path
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

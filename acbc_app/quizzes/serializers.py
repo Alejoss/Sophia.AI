@@ -22,10 +22,21 @@ class QuestionSerializer(serializers.ModelSerializer):
         return [opt.id for opt in obj.options.filter(is_correct=True)]
 
 
+class AnswerSerializer(serializers.ModelSerializer):
+    selected_options = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    question = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Answer
+        fields = ['question', 'selected_options']
+
+
 class UserQuizAttemptSerializer(serializers.ModelSerializer):
+    answers = AnswerSerializer(many=True, read_only=True)
+
     class Meta:
         model = UserQuizAttempt
-        fields = ['id', 'completed_on', 'score']
+        fields = ['id', 'completed_on', 'score', 'answers']
 
 
 class QuizSerializer(serializers.ModelSerializer):
@@ -36,11 +47,12 @@ class QuizSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField()
     next_node = serializers.SerializerMethodField()
     max_attempts_per_day = serializers.IntegerField(min_value=2, max_value=9)
+    last_attempt = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
         fields = ['id', 'node', 'title', 'description', 'questions', 'knowledge_path', 
-                 'user_attempts', 'max_attempts_per_day', 'is_completed', 'next_node']
+                 'user_attempts', 'max_attempts_per_day', 'is_completed', 'next_node', 'last_attempt']
 
     def validate_max_attempts_per_day(self, value):
         print("Validating max_attempts_per_day:", value)
@@ -86,6 +98,17 @@ class QuizSerializer(serializers.ModelSerializer):
                 'title': next_node.title,
                 'knowledge_path': next_node.knowledge_path_id
             }
+        return None
+
+    def get_last_attempt(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            last_attempt = UserQuizAttempt.objects.filter(
+                quiz=obj,
+                user=request.user
+            ).order_by('-completed_on').first()
+            if last_attempt:
+                return UserQuizAttemptSerializer(last_attempt).data
         return None
 
     def create(self, validated_data):
