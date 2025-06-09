@@ -131,10 +131,23 @@ const CertificateRequests = () => {
                       size="small"
                       className="mt-2"
                     />
+                    {request.notes && 
+                     ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
+                      (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
+                      <Typography variant="body2" className="mt-2">
+                        Notes: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
+                      </Typography>
+                    )}
                   </div>
 
                   {request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username && (
                     <div className="flex gap-2">
+                      {console.log('Request details:', {
+                        status: request.status,
+                        author: request.knowledge_path_author,
+                        currentUser: authState.user?.username,
+                        shouldShow: request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username
+                      })}
                       <Button
                         variant="contained"
                         color="success"

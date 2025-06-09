@@ -1,7 +1,7 @@
 import { useEffect, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiLogout } from '../api/profilesApi.js';
-import { getUserFromLocalStorage } from '../context/localStorageUtils.js';
+import { getUserFromLocalStorage, clearAuthenticationStatus } from '../context/localStorageUtils.js';
 import { AuthContext } from '../context/AuthContext.jsx';
 
 const Logout = () => {
@@ -9,6 +9,7 @@ const Logout = () => {
   const [username, setUsername] = useState('');
   const [error, setError] = useState(null);
   const { clearAuthState } = useContext(AuthContext);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const storedUser = getUserFromLocalStorage();
@@ -17,30 +18,31 @@ const Logout = () => {
     }
 
     const logoutUser = async () => {
+      if (isLoggingOut) return; // Prevent multiple logout attempts
+      
       try {
+        setIsLoggingOut(true);
         console.log('Attempting to logout...');
-        
-        // First clear the auth state
-        clearAuthState();
-        
-        // Then call the API to logout
         await apiLogout();
-        
-        console.log('Logout successful, redirecting to login.');
-        navigate('/profiles/login/');
+        clearAuthState();
+        clearAuthenticationStatus();
+        window.location.href = '/profiles/login/';
       } catch (error) {
         console.error('Logout failed:', error);
         setError(error.message || 'Failed to logout');
-        
-        // Even if the API call fails, we've already cleared the auth state
-        // Just wait a moment before redirecting
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        navigate('/profiles/login/');
+        clearAuthState();
+        clearAuthenticationStatus();
+        window.location.href = '/profiles/login/';
       }
     };
 
     logoutUser();
-  }, [navigate, clearAuthState]);
+
+    // Cleanup function
+    return () => {
+      setIsLoggingOut(false);
+    };
+  }, []); // Remove clearAuthState from dependencies
 
   return (
     <div>

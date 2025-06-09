@@ -12,7 +12,7 @@ import SocialLogin from '../components/SocialLogin';
  */
 const Login = () => {
   const navigate = useNavigate();
-  const { setAuthState, setAccessToken, updateAuthState } = useContext(AuthContext);
+  const { setAuthState, updateAuthState } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -57,14 +57,16 @@ const Login = () => {
     console.log('Submitting login form with:', { username, password });
     try {
       const response = await apiLogin({ username, password });
-      const { access_token, ...userData } = response.data;
+      console.log('Login API response:', response);
       
-      // Use centralized auth state update
-      updateAuthState(userData, access_token);
-      
-      navigate('/profiles/login_successful');
+      if (response.data) {
+        const { access_token, ...userData } = response.data;
+        // Use centralized auth state update
+        updateAuthState(userData, access_token);
+        navigate('/profiles/login_successful');
+      }
     } catch (error) {
-      console.error('Login error:', error); // Debug log
+      console.error('Login error:', error);
       const errorMessage =
         error.response?.data?.error ||
         error.response?.statusText ||

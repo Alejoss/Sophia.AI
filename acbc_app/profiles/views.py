@@ -292,7 +292,7 @@ class LoginView(APIView):
             cache.set(cache_key, attempts + 1, timeout=300)  # 5 minutes timeout
             return Response(
                 {'error': 'Invalid credentials'},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_403_FORBIDDEN
             )
 
 

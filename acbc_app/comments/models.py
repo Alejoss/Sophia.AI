@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
+from django.conf import settings
 
 from content.models import Topic
 from certificates.models import Certificate
@@ -14,7 +15,7 @@ from content.models import Topic
 
 
 class Comment(models.Model):    
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -47,27 +48,22 @@ class Comment(models.Model):
 
     @property
     def vote_count(self):
-        """Get the current vote count"""
         VoteCount = apps.get_model('votes', 'VoteCount')
-        content_type = ContentType.objects.get_for_model(self)
         vote_count = VoteCount.objects.filter(
-            content_type=content_type,
+            content_type=ContentType.objects.get_for_model(self),
             object_id=self.id
         ).first()
-        print(f"Comment {self.id} vote_count query result: {vote_count}")
-        print(f"Vote count value: {vote_count.vote_count if vote_count else 0}")
         return vote_count.vote_count if vote_count else 0
 
     def get_user_vote(self, user):
-        """Get the user's vote status"""
+        if not user.is_authenticated:
+            return 0
         Vote = apps.get_model('votes', 'Vote')
-        content_type = ContentType.objects.get_for_model(self)
         vote = Vote.objects.filter(
-            user=user,
-            content_type=content_type,
-            object_id=self.id
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.id,
+            user=user
         ).first()
-        print(f"Comment {self.id} get_user_vote for user {user.id}: {vote.value if vote else 0}")
         return vote.value if vote else 0
 
     @property

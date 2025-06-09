@@ -36,10 +36,8 @@ class KnowledgePathListView(APIView):
     pagination_class = KnowledgePathPagination
 
     def get(self, request):
-        print("Starting KnowledgePathListView.get")
         # Get the content type for KnowledgePath
         content_type = ContentType.objects.get_for_model(KnowledgePath)
-        print(f"Content type: {content_type}")
         
         # Get all vote counts in a single query
         vote_counts = {
@@ -67,12 +65,10 @@ class KnowledgePathListView(APIView):
         for path in knowledge_paths:
             path._vote_count = vote_counts.get(path.id, 0)
             path._user_vote = user_votes.get(path.id, 0)
-            print(f"Path {path.id}: vote_count={path._vote_count}, user_vote={path._user_vote}")
         
         # Initialize paginator
         paginator = self.pagination_class()
         paginated_paths = paginator.paginate_queryset(knowledge_paths, request)
-        print(f"Paginated paths count: {len(paginated_paths)}")
         
         # Serialize the paginated data with request context
         serializer = KnowledgePathListSerializer(
@@ -80,12 +76,9 @@ class KnowledgePathListView(APIView):
             many=True, 
             context={'request': request}
         )
-        print(f"Serialized data: {serializer.data}")
         
         # Return paginated response
-        response = paginator.get_paginated_response(serializer.data)
-        print(f"Response data: {response.data}")
-        return response
+        return paginator.get_paginated_response(serializer.data)
 
 class KnowledgePathDetailView(APIView):
     """
@@ -94,17 +87,8 @@ class KnowledgePathDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        print("KnowledgePathDetailView.get - Starting")
-        print(f"Request user: {request.user}")
-        print(f"Request auth: {request.auth}")
-        print(f"Request headers: {request.headers}")
-        
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-        print(f"Found knowledge path: {knowledge_path.id} - {knowledge_path.title}")
-        
         serializer = KnowledgePathSerializer(knowledge_path, context={'request': request})
-        print("Serialized data:", serializer.data)
-        
         return Response(serializer.data)
 
     def put(self, request, pk):

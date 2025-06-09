@@ -1,45 +1,27 @@
 // src/api/axiosConfig.ts
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const baseURL = import.meta.env.VITE_API_URL;
 
-// Initialize with stored token if available
-const storedToken = localStorage.getItem('access_token');
-const initialHeaders = {
-  'Content-Type': 'application/json'
-};
-
-if (storedToken) {
-  initialHeaders['Authorization'] = `Bearer ${storedToken}`;
-}
-
-// Create a single axios instance
+// Create a single axios instance with basic configuration
 const axiosInstance = axios.create({
   baseURL: baseURL,
-  headers: initialHeaders,
+  headers: {
+    'Content-Type': 'application/json'
+  },
   withCredentials: true
 });
 
-// Flag to prevent multiple refresh attempts
-let isRefreshing = false;
-// Queue to store requests that need to be retried
-let failedQueue = [];
-
-const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-// Add the request interceptor for CSRF
+// Request interceptor to add access token to requests
 axiosInstance.interceptors.request.use(
-  function (config) {
+  (config) => {
+    // Get token from localStorage
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add CSRF token if available
     const csrfToken = document.cookie
       .split('; ')
       .find(row => row.startsWith('csrftoken='))
@@ -49,26 +31,11 @@ axiosInstance.interceptors.request.use(
       config.headers['X-CSRFToken'] = csrfToken;
     }
 
+    // Handle FormData content type
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
 
-    return config;
-  },
-  function (error) {
-    return Promise.reject(error);
-  }
-);
-
-// Request interceptor to add access token to requests
-axiosInstance.interceptors.request.use(
-  (config) => {
-    if (window.authContext) {
-      const token = window.authContext.getAccessToken();
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-      }
-    }
     return config;
   },
   (error) => {
@@ -90,9 +57,11 @@ axiosInstance.interceptors.response.use(
     // 1. It's not a 401 error
     // 2. The request has already been retried
     // 3. The request is for the refresh token endpoint
+    // 4. The request is for the logout endpoint
     if (error.response?.status !== 401 || 
         originalRequest._retry || 
-        originalRequest.url === '/profiles/refresh_token/') {
+        originalRequest.url === '/profiles/refresh_token/' ||
+        originalRequest.url === '/profiles/logout/') {
       return Promise.reject(error);
     }
 
@@ -104,23 +73,17 @@ axiosInstance.interceptors.response.use(
       const response = await axiosInstance.post('/profiles/refresh_token/');
       const { access_token } = response.data;
 
-      // Update auth context with new token
-      if (window.authContext) {
-        window.authContext.setAccessToken(access_token);
-      }
+      // Store new token in localStorage
+      localStorage.setItem('access_token', access_token);
 
       // Retry the original request with new token
       originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
       return axiosInstance(originalRequest);
     } catch (refreshError) {
       // If refresh fails, clear auth and redirect to login
-      if (window.authContext) {
-        window.authContext.setAuthState({
-          isAuthenticated: false,
-          user: null
-        });
-        window.authContext.clearAccessToken();
-      }
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      localStorage.setItem('is_authenticated', 'false');
       
       window.location.href = '/profiles/login';
       return Promise.reject(refreshError);

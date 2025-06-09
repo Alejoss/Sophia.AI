@@ -37,23 +37,22 @@ export const AuthProvider = ({ children }) => {
     user: null,
   });
   
-  const accessTokenRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
 
   const updateAuthState = (userData, accessToken) => {
     console.log('Updating auth state with:', { userData, hasAccessToken: !!accessToken });
     
-    // Store access token in memory and localStorage
+    // Store access token in localStorage
     if (accessToken) {
-      setAccessToken(accessToken);
       setAccessTokenInLocalStorage(accessToken);
+      scheduleTokenRefresh(accessToken);
     }
 
-    // Store user data in localStorage for UX purposes
+    // Store user data in localStorage
     setUserInLocalStorage(userData);
     setAuthenticationStatus(true);
 
-    // Update React context state - ensure both user and isAuthenticated are set together
+    // Update React context state
     setAuthState({
       isAuthenticated: true,
       user: userData
@@ -63,35 +62,26 @@ export const AuthProvider = ({ children }) => {
 
   const clearAuthState = () => {
     console.log('Clearing auth state');
-    clearAccessToken();
     removeAccessTokenFromLocalStorage();
-    // Don't remove user data from localStorage, only clear auth status
     clearAuthenticationStatus();
     
-    // Always clear both isAuthenticated and user together
+    // Preserve username before removing user data
+    const storedUser = getUserFromLocalStorage();
+    const username = storedUser ? storedUser.username : null;
+    removeUserFromLocalStorage();
+    
+    // Store just the username back in localStorage
+    if (username) {
+      localStorage.setItem('user', JSON.stringify({ username }));
+    }
+    
+    // Clear React context state
     setAuthState({
       isAuthenticated: false,
       user: null
     });
-  };
 
-  const setAccessToken = (token) => {
-    console.log('Setting access token in memory:', token ? 'Token exists' : 'No token');
-    accessTokenRef.current = token;
-    if (token) {
-      scheduleTokenRefresh(token);
-    }
-  };
-
-  const getAccessToken = () => {
-    console.log('Getting access token from memory:', accessTokenRef.current ? 'Token exists' : 'No token');
-    return accessTokenRef.current;
-  };
-
-  const clearAccessToken = () => {
-    console.log('Clearing access token from memory');
-    accessTokenRef.current = null;
-    removeAccessTokenFromLocalStorage();
+    // Clear any pending refresh
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
       refreshTimeoutRef.current = null;
@@ -105,7 +95,7 @@ export const AuthProvider = ({ children }) => {
       const expiresAt = decodedToken.exp * 1000;
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
-      const refreshTime = Math.max(0, timeUntilExpiry - 60000);
+      const refreshTime = Math.max(0, timeUntilExpiry - 60000); // Refresh 1 minute before expiry
       
       console.log('Token refresh scheduled for:', new Date(now + refreshTime));
       
@@ -119,16 +109,15 @@ export const AuthProvider = ({ children }) => {
           const response = await axiosInstance.post('/profiles/refresh_token/');
           if (response.data.access_token) {
             console.log('Token refresh successful');
-            setAccessToken(response.data.access_token);
+            setAccessTokenInLocalStorage(response.data.access_token);
+            scheduleTokenRefresh(response.data.access_token);
           } else {
             console.log('Token refresh failed - no new token received');
-            clearAccessToken();
-            setAuthState({ isAuthenticated: false, user: null });
+            clearAuthState();
           }
         } catch (error) {
           console.error('Token refresh failed:', error);
-          clearAccessToken();
-          setAuthState({ isAuthenticated: false, user: null });
+          clearAuthState();
         }
       }, refreshTime);
     } catch (error) {
@@ -154,10 +143,11 @@ export const AuthProvider = ({ children }) => {
 
         if (backendAuthStatus && storedUser && storedAccessToken) {
           console.log('All auth components present, restoring session');
-          // Restore access token to memory
-          setAccessToken(storedAccessToken);
           
-          // Set both isAuthenticated and user together
+          // Schedule token refresh
+          scheduleTokenRefresh(storedAccessToken);
+          
+          // Set auth state
           setAuthState({
             isAuthenticated: true,
             user: storedUser
@@ -169,7 +159,6 @@ export const AuthProvider = ({ children }) => {
             hasStoredUser: !!storedUser,
             hasStoredToken: !!storedAccessToken
           });
-          // Clear everything if any part is missing
           clearAuthState();
         }
       } catch (error) {
@@ -191,20 +180,8 @@ export const AuthProvider = ({ children }) => {
   // Expose auth context to window for axios interceptors
   useEffect(() => {
     window.authContext = {
-      getAccessToken: () => accessTokenRef.current,
-      setAccessToken: (token) => {
-        setAccessToken(token);
-      },
-      clearAccessToken: () => {
-        clearAccessToken();
-      },
-      setAuthState: (newState) => {
-        // Ensure isAuthenticated and user are always set together
-        setAuthState({
-          isAuthenticated: !!newState.user,
-          user: newState.user
-        });
-      },
+      updateAuthState,
+      clearAuthState,
       authState
     };
   }, [authState]);
@@ -214,9 +191,6 @@ export const AuthProvider = ({ children }) => {
       authState, 
       setAuthState,
       updateAuthState,
-      setAccessToken, 
-      getAccessToken, 
-      clearAccessToken,
       clearAuthState,
       user: authState.user,
       isAuthenticated: authState.isAuthenticated

@@ -41,11 +41,6 @@ const KnowledgePathDetail = () => {
   useEffect(() => {
     const fetchKnowledgePath = async () => {
       try {
-        // Wait for auth state to be initialized
-        if (authState.user === null && !authState.isAuthenticated) {
-          return; // Don't show error, just wait for auth to initialize
-        }
-
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
         setKnowledgePath(data);
         setIsCreator(user?.username === data.author);
@@ -63,7 +58,12 @@ const KnowledgePathDetail = () => {
           }
         }
       } catch (err) {
-        setError('Failed to load knowledge path');
+        if (err.response?.status === 401) {
+          // The axios interceptor will handle the redirect to login
+          setError('Please log in to view this knowledge path');
+        } else {
+          setError('Failed to load knowledge path');
+        }
       } finally {
         setLoading(false);
         setLoadingStatus(false);
@@ -102,6 +102,8 @@ const KnowledgePathDetail = () => {
       setErrorDetails(null);
       await certificatesApi.requestCertificate(pathId, { notes: requestNote });
       setCertificateRequested(true);
+      const statusData = await certificatesApi.getCertificateRequestStatus(pathId);
+      setCertificateStatus(statusData);
       handleCloseModal();
     } catch (error) {
       console.error('Error requesting certificate:', error);
@@ -116,6 +118,18 @@ const KnowledgePathDetail = () => {
 
   const renderCertificateStatus = () => {
     if (!hasCompleted) return null;
+
+    // If there's an approved request, treat it as having a certificate
+    if (certificateStatus?.certificate_request?.status === 'APPROVED') {
+      return (
+        <div className="mt-6 text-center">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
+            <CheckCircle className="mr-2" />
+            <span>You have earned a certificate for completing this knowledge path</span>
+          </div>
+        </div>
+      );
+    }
 
     if (certificateStatus?.has_certificate) {
       return (
@@ -173,9 +187,16 @@ const KnowledgePathDetail = () => {
     );
   };
 
+  // Memoize the certificate status section to prevent unnecessary re-renders
+  const certificateStatusSection = React.useMemo(() => renderCertificateStatus(), [
+    hasCompleted,
+    certificateStatus,
+    requestingCertificate
+  ]);
+
   if (loading) return <div className="text-center py-8">Loading...</div>;
   if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
-  if (!knowledgePath) return <div className="text-center py-8">Knowledge path not found</div>;
+  if (!knowledgePath && !error) return <div className="text-center py-8">Knowledge path not found</div>;
 
   return (
     <div className="container mx-auto p-4">
@@ -230,7 +251,7 @@ const KnowledgePathDetail = () => {
                 Completed
               </span>
             )}
-          </div>Already logged in as Thrall, want to logout?
+          </div>
           {knowledgePath.nodes?.length > 0 ? (
             <div className="space-y-4">
               {knowledgePath.nodes.map((node, index) => {
@@ -268,7 +289,7 @@ const KnowledgePathDetail = () => {
           )}
 
           {/* Certificate Status Section */}
-          {renderCertificateStatus()}
+          {certificateStatusSection}
         </div>
 
         {/* Certificate Request Modal */}

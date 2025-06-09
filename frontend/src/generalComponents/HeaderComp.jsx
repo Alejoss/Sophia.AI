@@ -29,7 +29,7 @@ const HeaderComp = () => {
                 <Link className="nav-link" to="/profiles/my_profile">{user.username}</Link>
               </li>
               <li className="nav-item">
-                <Link className="nav-link" to="/profiles/logout">Cerrar sesión</Link>
+                <Link className="nav-link" to="/profiles/logout">Logout</Link>
               </li>
             </>
         ) : (

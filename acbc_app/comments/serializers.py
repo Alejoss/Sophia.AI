@@ -44,7 +44,6 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_vote_count(self, obj):
         count = obj.vote_count
-        print(f"Serializer get_vote_count for comment {obj.id}: {count}")
         return count
 
     def get_user_vote(self, obj):
@@ -52,7 +51,6 @@ class CommentSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return 0
         vote = obj.get_user_vote(request.user)
-        print(f"Serializer get_user_vote for comment {obj.id}: {vote}")
         return vote
 
 

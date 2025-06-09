@@ -86,23 +86,24 @@ const apiLogout = async () => {
 const apiLogin = async ({ username, password }) => {
   try {
     const response = await axiosInstance.post('/profiles/login/', { username, password });
-    console.log('Login API response:', response); // Debug log
+    console.log('Login API response:', response);
     
     // Make sure we have an access token
     if (response.data.access_token) {
       // Set the token in the axios instance
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
       
-      // Set the token in AuthContext
+      // Set the token in AuthContext using the new approach
       if (window.authContext) {
         console.log('Setting token in AuthContext');
-        window.authContext.setAccessToken(response.data.access_token);
+        const { access_token, ...userData } = response.data;
+        window.authContext.updateAuthState(userData, access_token);
       } else {
         console.error('AuthContext not available');
       }
     }
     
-    return response; // Return the full response
+    return response;
   } catch (error) {
     console.error('Login API error:', error);
     throw error;

@@ -35,9 +35,7 @@ class NodeSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
-        
         is_completed = is_node_completed_by_user(obj, request.user)
-        print(f"Node {obj.id} is_completed for user {request.user}: {is_completed}")
         return is_completed
 
 
