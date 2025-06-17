@@ -1,119 +1,148 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    Box,
-    Typography,
-    Paper,
+import { 
+    Box, 
+    Typography, 
+    IconButton,
     Button,
-    Divider,
-    CircularProgress,
-    Container
+    Paper
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
+import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
+import BookmarkButton from '../bookmarks/BookmarkButton';
 import ContentDisplay from './ContentDisplay';
-import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
+import AddToLibraryModal from '../components/AddToLibraryModal';
+import TopicHeader from '../topics/TopicHeader';
 
 const ContentDetailsTopic = () => {
     const { contentId, topicId } = useParams();
     const navigate = useNavigate();
     const [content, setContent] = useState(null);
+    const [topic, setTopic] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const fetchContent = async () => {
+        const fetchContentAndTopic = async () => {
             try {
-                const data = await contentApi.getContentDetails(contentId, 'topic', topicId);
-                setContent(data);
+                console.log(`Fetching content ${contentId} and topic ${topicId}...`);
+                const [contentData, topicData] = await Promise.all([
+                    contentApi.getContentDetails(contentId),
+                    contentApi.getTopicDetails(topicId)
+                ]);
+                
+                console.log('Received content data:', contentData);
+                console.log('Received topic data:', topicData);
+                
+                setContent(contentData);
+                setTopic(topicData);
+                setLoading(false);
             } catch (err) {
-                setError('Failed to load content');
-            } finally {
+                console.error('Error fetching data:', err);
+                console.error('Error details:', {
+                    message: err.message,
+                    status: err.response?.status,
+                    data: err.response?.data
+                });
+                setError('Failed to fetch content or topic details');
                 setLoading(false);
             }
         };
 
-        fetchContent();
+        fetchContentAndTopic();
     }, [contentId, topicId]);
 
-    if (loading) return (
-        <Container sx={{ pt: 12, display: 'flex', justifyContent: 'center' }}>
-            <CircularProgress />
-        </Container>
-    );
-    
-    if (error) return (
-        <Container sx={{ pt: 12 }}>
-            <Typography color="error">{error}</Typography>
-        </Container>
-    );
-    
-    if (!content) return (
-        <Container sx={{ pt: 12 }}>
-            <Typography>Content not found</Typography>
-        </Container>
-    );
+    const handleAddToLibrarySuccess = () => {
+        // Refresh content data after adding to library
+        contentApi.getContentDetails(contentId)
+            .then(updatedContent => {
+                setContent(updatedContent);
+            })
+            .catch(err => {
+                console.error('Error refreshing content:', err);
+            });
+    };
+
+    if (loading) return <Typography>Loading content...</Typography>;
+    if (error) return <Typography color="error">{error}</Typography>;
+    if (!content || !topic) return <Typography>Content or topic not found</Typography>;
 
     return (
-        <Container maxWidth="lg" sx={{ pt: 12, pb: 4 }}>
-            <Button
-                startIcon={<ArrowBackIcon />}
-                onClick={() => navigate(`/content/topics/${topicId}`)}
-                sx={{ mb: 3 }}
-            >
-                Back to Topic
-            </Button>
+        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+            <TopicHeader 
+                topic={topic}
+                onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
+            />
 
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Box>
-                        <Typography variant="h4" gutterBottom>
-                            {content.selected_profile?.title || content.original_title || 'Untitled Content'}
-                        </Typography>
-
-                        {content.selected_profile?.author && (
-                            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                                By {content.selected_profile.author}
-                            </Typography>
-                        )}
-                    </Box>
-                    <VoteComponent 
-                        type="content"
-                        ids={{ topicId, contentId }}
-                        initialVoteCount={content.vote_count}
-                        initialUserVote={content.user_vote}
-                    />
+            <Paper sx={{ p: 3, mb: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <IconButton 
+                        onClick={() => navigate(`/content/topics/${topicId}`)}
+                        sx={{ mr: 2 }}
+                    >
+                        <ArrowBackIcon />
+                    </IconButton>
+                    <Typography variant="h5">
+                        {content.selected_profile?.title || content.original_title || 'Untitled'}
+                    </Typography>
                 </Box>
 
-                <Divider sx={{ my: 2 }} />
+                {/* Action Buttons */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    gap: 2, 
+                    mb: 3,
+                    '& .MuiButton-root': {
+                        color: 'primary.main',
+                        borderColor: 'primary.main',
+                        '&:hover': {
+                            borderColor: 'primary.dark',
+                            backgroundColor: 'primary.light',
+                            color: 'primary.dark'
+                        }
+                    },
+                    '& .MuiIconButton-root': {
+                        color: 'primary.main',
+                        '&:hover': {
+                            backgroundColor: 'primary.light'
+                        }
+                    }
+                }}>
+                    <AddToLibraryModal
+                        content={content}
+                        onSuccess={handleAddToLibrarySuccess}
+                    />
+                    <BookmarkButton
+                        type="content"
+                        ids={{
+                            topicId: topicId,
+                            contentId: contentId
+                        }}
+                        initialIsBookmarked={content.is_bookmarked}
+                    />
+                    <VoteComponent
+                        type="content"
+                        ids={{
+                            topicId: topicId,
+                            contentId: contentId
+                        }}
+                        initialVoteCount={content.vote_count || 0}
+                        initialUserVote={content.user_vote || 0}
+                    />
+                </Box>
 
                 {/* Content Display */}
                 <ContentDisplay 
                     content={content}
                     variant="detailed"
-                    showAuthor={true}
                 />
-
-                {/* Personal Note Section */}
-                {content.selected_profile?.personal_note && (
-                    <Box sx={{ mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Personal Notes
-                        </Typography>
-                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(0, 0, 0, 0.02)' }}>
-                            <Typography variant="body1">
-                                {content.selected_profile.personal_note}
-                            </Typography>
-                        </Paper>
-                    </Box>
-                )}
             </Paper>
 
-            {/* Comments Section */}
-            <CommentSection topicId={topicId} contentId={contentId} />
-        </Container>
+            <CommentSection topicId={topicId} />
+        </Box>
     );
 };
 

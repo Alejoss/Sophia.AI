@@ -1,24 +1,21 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getProfileById } from '../api/profilesApi';
 import { AuthContext } from '../context/AuthContext';
 import PublicationList from '../publications/PublicationList';
+import ProfileHeader from './ProfileHeader';
 import { 
     Box, 
     Typography, 
     Paper, 
-    Grid, 
     CircularProgress, 
     Tabs, 
-    Tab, 
-    Button, 
-    Tooltip,
-    IconButton
+    Tab
 } from '@mui/material';
-import MessageIcon from '@mui/icons-material/Message';
 
 const ProfileDetail = () => {
-    const { profileId } = useParams();
+    const { profileId: paramProfileId } = useParams();
+    const location = useLocation();
     const [profile, setProfile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -28,19 +25,19 @@ const ProfileDetail = () => {
     const currentUser = authState.user;
     const navigate = useNavigate();
     
-    const isOwnProfile = currentUser && currentUser.id === parseInt(profileId);
+    const isOwnProfile = currentUser && profile && currentUser.id === profile.user.id;
     const isAuthenticated = authState.isAuthenticated;
 
     useEffect(() => {
         const fetchProfile = async () => {
             setIsLoading(true);
             try {
-                const profileData = await getProfileById(profileId);
+                const profileData = await getProfileById(paramProfileId);
                 console.log('Profile data received:', profileData);
-                console.log('Profile picture URL:', profileData?.profile_picture);
                 setProfile(profileData);
                 setError(null);
             } catch (err) {
+                console.error('Error fetching profile:', err);
                 setError(err.message);
                 setProfile(null);
             } finally {
@@ -49,7 +46,7 @@ const ProfileDetail = () => {
         };
 
         fetchProfile();
-    }, [profileId]);
+    }, [paramProfileId]);
 
     const handleSendMessage = () => {
         if (!isAuthenticated) {
@@ -78,56 +75,15 @@ const ProfileDetail = () => {
         </Box>
     );
 
-    console.log('Current profile state:', profile);
-    console.log('Profile picture being used in render:', profile.profile_picture || '/default-avatar.png');
-
     return (
         <Box sx={{ p: 3 }}>
-            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={3}>
-                        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                            <img 
-                                src={profile.profile_picture || '/default-avatar.png'} 
-                                alt="Profile" 
-                                style={{ width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover' }}
-                            />
-                        </Box>
-                    </Grid>
-                    <Grid item xs={12} md={9}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Typography variant="h4">
-                                {profile.user.username}
-                            </Typography>
-                            {!isOwnProfile && (
-                                <Tooltip title={isAuthenticated ? "Send a message" : "Login to send a message"}>
-                                    <IconButton 
-                                        color="primary"
-                                        onClick={handleSendMessage}
-                                        disabled={isNavigating}
-                                        sx={{ 
-                                            ml: 1,
-                                            '&:hover': {
-                                                backgroundColor: 'primary.light',
-                                                color: 'white'
-                                            }
-                                        }}
-                                    >
-                                        {isNavigating ? (
-                                            <CircularProgress size={24} color="inherit" />
-                                        ) : (
-                                            <MessageIcon />
-                                        )}
-                                    </IconButton>
-                                </Tooltip>
-                            )}
-                        </Box>
-                        <Typography variant="body1" paragraph>
-                            {profile.profile_description || 'No description available.'}
-                        </Typography>
-                    </Grid>
-                </Grid>
-            </Paper>
+            <ProfileHeader 
+                profile={profile}
+                isOwnProfile={isOwnProfile}
+                isAuthenticated={isAuthenticated}
+                onSendMessage={handleSendMessage}
+                isNavigating={isNavigating}
+            />
             
             {/* Tabs */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>

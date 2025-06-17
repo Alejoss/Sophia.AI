@@ -1,8 +1,8 @@
 import { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
-import '/src/styles/header.css';
-import '/src/styles/dropdown.css';
+import '../styles/header.css';
+import '../styles/dropdown.css';
 
 const HeaderComp = () => {
   const { authState } = useContext(AuthContext);

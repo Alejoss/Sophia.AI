@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import CertificateRequest, Certificate
-from .serializers import CertificateRequestSerializer
+from .serializers import CertificateRequestSerializer, CertificateSerializer
 from knowledge_paths.models import KnowledgePath
 from django.db import models
 
@@ -25,7 +25,7 @@ class CertificateRequestView(APIView):
                 knowledge_path=knowledge_path
             ).first()
             
-            if existing_request:
+            if existing_request and existing_request.status != 'CANCELLED':
                 return Response(
                     {
                         'error': 'You have already requested a certificate for this knowledge path',
@@ -34,6 +34,10 @@ class CertificateRequestView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # If there's a cancelled request, delete it
+            if existing_request and existing_request.status == 'CANCELLED':
+                existing_request.delete()
             
             # Create new certificate request with notes
             serializer = CertificateRequestSerializer(
@@ -69,9 +73,12 @@ class CertificateRequestListView(APIView):
 
     def get(self, request):
         # Get requests where user is either the requester or the knowledge path author
+        # Exclude cancelled requests
         requests = CertificateRequest.objects.filter(
             models.Q(requester=request.user) |  # User's own requests
             models.Q(knowledge_path__author=request.user)  # Requests for user's knowledge paths
+        ).exclude(
+            status='CANCELLED'  # Exclude cancelled requests
         ).select_related('knowledge_path', 'requester').order_by('-request_date')
 
         serializer = CertificateRequestSerializer(requests, many=True)
@@ -81,7 +88,7 @@ class CertificateRequestActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, request_id, action):
-        if action not in ['approve', 'reject']:
+        if action not in ['approve', 'reject', 'cancel']:
             return Response(
                 {'error': 'Invalid action'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -92,18 +99,29 @@ class CertificateRequestActionView(APIView):
             id=request_id
         )
 
-        # Check if user is the author of the knowledge path
-        if certificate_request.knowledge_path.author != request.user:
-            return Response(
-                {'error': 'You are not authorized to perform this action'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        if action == 'approve':
-            certificate_request.approve(request.user)
+        # For cancel action, check if user is the requester
+        if action == 'cancel':
+            if certificate_request.requester != request.user:
+                return Response(
+                    {'error': 'You are not authorized to cancel this request'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            certificate_request.cancel()
         else:
-            reason = request.data.get('reason', '')
-            certificate_request.reject(request.user, reason)
+            # For approve/reject, check if user is the author of the knowledge path
+            if certificate_request.knowledge_path.author != request.user:
+                return Response(
+                    {'error': 'You are not authorized to perform this action'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if action == 'approve':
+                note = request.data.get('note', '')
+                certificate_request.approve(request.user, note)
+            else:
+                reason = request.data.get('reason', '')
+                note = request.data.get('note', '')
+                certificate_request.reject(request.user, reason, note)
 
         serializer = CertificateRequestSerializer(certificate_request)
         return Response(serializer.data)
@@ -153,3 +171,40 @@ class CertificateRequestStatusView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+class KnowledgePathCertificateRequestsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, path_id):
+        # Get the knowledge path
+        knowledge_path = get_object_or_404(KnowledgePath, id=path_id)
+        
+        # Check if user is the author
+        if knowledge_path.author != request.user:
+            return Response(
+                {'error': 'You are not authorized to view these requests'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get pending requests for this knowledge path
+        requests = CertificateRequest.objects.filter(
+            knowledge_path=knowledge_path,
+            status='PENDING'
+        ).select_related('requester').order_by('-request_date')
+        
+        serializer = CertificateRequestSerializer(requests, many=True)
+        return Response({
+            'count': requests.count(),
+            'requests': serializer.data
+        })
+
+class CertificateListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        certificates = Certificate.objects.filter(
+            user=request.user
+        ).select_related('knowledge_path', 'template').order_by('-issued_on')
+
+        serializer = CertificateSerializer(certificates, many=True)
+        return Response(serializer.data)

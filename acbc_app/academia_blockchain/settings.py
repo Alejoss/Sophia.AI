@@ -50,7 +50,9 @@ INSTALLED_APPS = [
     'dj_rest_auth',  # Add dj-rest-auth
     'dj_rest_auth.registration',  # Add registration support
     'rest_framework_simplejwt',
-    'drf_yasg'
+    'drf_yasg',
+    'bookmarks',
+    'notifications'
 ]
 
 MIDDLEWARE = [

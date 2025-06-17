@@ -13,70 +13,56 @@ const checkAuth = async () => {
     }
 
     const response = await axiosInstance.get('/profiles/check_auth/');
-    console.log('Auth check response:', response.data);
     
     if (response.status === 200) {
       return response.data.is_authenticated === true;
     }
     return false;
   } catch(error) {
-    console.error('Auth check error:', error);
     return false;
   }
 };
 
 const getUserProfile = async () => {
   try {
-    console.log('getUserProfile: Making API call to fetch user profile');
     const response = await axiosInstance.get('/profiles/user_profile/');
-    console.log('getUserProfile: API response received', response.data);
-    return response.data; // Assuming the API returns the profile directly
+    return response.data;
   } catch (error) {
-    console.error('getUserProfile: Failed to fetch user profile:', error);
-    return null; // Simply return null on error
+    return null;
   }
 }
 
 const getProfileById = async (profileId) => {
   try {
-    console.log(`getProfileById: Making API call to fetch profile ${profileId}`);
     const response = await axiosInstance.get(`/profiles/${profileId}/`);
-    console.log('getProfileById: API response received', response.data);
     return response.data;
   } catch (error) {
-    console.error('getProfileById: Failed to fetch profile:', error);
     throw error;
   }
 };
 
 const updateProfile = async (formData) => {
   try {
-    console.log('updateProfile: Making API call to update profile');
     const response = await axiosInstance.put('/profiles/user_profile/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    console.log('updateProfile: API response received', response.data);
     return response.data;
   } catch (error) {
-    console.error('updateProfile: Failed to update profile:', error);
     throw error;
   }
 };
 
 const apiLogout = async () => {
   try {
-    console.log('Making API call to logout...');
     const response = await axiosInstance.post('/profiles/logout/');
-    console.log('Logout API response:', response);
     
     // Clear axios headers after successful logout
     delete axiosInstance.defaults.headers.common['Authorization'];
     
     return response;
   } catch (error) {
-    console.error('Failed to logout:', error);
     // Even if the API call fails, clear the headers
     delete axiosInstance.defaults.headers.common['Authorization'];
     throw new Error('Logout failed');
@@ -86,7 +72,6 @@ const apiLogout = async () => {
 const apiLogin = async ({ username, password }) => {
   try {
     const response = await axiosInstance.post('/profiles/login/', { username, password });
-    console.log('Login API response:', response);
     
     // Make sure we have an access token
     if (response.data.access_token) {
@@ -95,17 +80,13 @@ const apiLogin = async ({ username, password }) => {
       
       // Set the token in AuthContext using the new approach
       if (window.authContext) {
-        console.log('Setting token in AuthContext');
         const { access_token, ...userData } = response.data;
         window.authContext.updateAuthState(userData, access_token);
-      } else {
-        console.error('AuthContext not available');
       }
     }
     
     return response;
   } catch (error) {
-    console.error('Login API error:', error);
     throw error;
   }
 };
@@ -113,28 +94,21 @@ const apiLogin = async ({ username, password }) => {
 const apiRegister = async (userData) => {
   try {
     const response = await axiosInstance.post('/profiles/register/', userData);
-    return response.data; // Or response if you need status for 201 check elsewhere
+    return response.data;
   } catch (error) {
-    console.error('Registration API error:', error.response || error);
-    throw error; // Re-throw to be handled by the calling component
+    throw error;
   }
 };
 
 async function setCsrfToken() {
   try {
     const response = await axiosInstance.get(`/profiles/get_csrf_token/`);
-    console.log('Response from CSRF token endpoint:', response.data);
     const csrftoken = Cookies.get('csrftoken');
-    console.log('CSRF token retrieved from cookies:', csrftoken);
     if (csrftoken) {
       axiosInstance.defaults.headers.common['X-CSRFToken'] = csrftoken;
-      console.log('CSRF token set in axios instance');
-      console.log('CSRF just set:', axiosInstance.defaults.headers.common['X-CSRFToken']);
-    } else {
-      console.error('No CSRF token found in cookies');
     }
   } catch (error) {
-    console.error('Error initializing CSRF token:', error);
+    // Error initializing CSRF token
   }
 }
 
@@ -143,7 +117,6 @@ const refreshToken = async () => {
     const response = await axiosInstance.post('/profiles/refresh_token/');
     return response.data;
   } catch (error) {
-    console.error('Token refresh failed:', error);
     throw error;
   }
 };
@@ -156,7 +129,71 @@ const socialLogin = async (credential) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Social login failed:', error);
+    throw error;
+  }
+};
+
+const getNotifications = async () => {
+  console.log('getNotifications called');
+  try {
+    console.log('Making API request to /profiles/notifications/');
+    const response = await axiosInstance.get('/profiles/notifications/');
+    console.log('Notifications API response:', response.data);
+    return response.data.notifications;
+  } catch (error) {
+    console.error('Error in getNotifications:', error);
+    throw error;
+  }
+};
+
+const markNotificationAsRead = async (notificationId) => {
+  console.log('markNotificationAsRead called for ID:', notificationId);
+  try {
+    console.log('Making API request to mark notification as read');
+    const response = await axiosInstance.post(`/profiles/notifications/${notificationId}/mark-as-read/`);
+    console.log('Mark as read API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error in markNotificationAsRead:', error);
+    throw error;
+  }
+};
+
+const deleteNotification = async (notificationId) => {
+  console.log('deleteNotification called for ID:', notificationId);
+  try {
+    console.log('Making API request to delete notification');
+    const response = await axiosInstance.delete(`/profiles/notifications/${notificationId}/delete/`);
+    console.log('Delete notification API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error in deleteNotification:', error);
+    throw error;
+  }
+};
+
+const cleanupNotifications = async () => {
+  console.log('cleanupNotifications called');
+  try {
+    console.log('Making API request to cleanup notifications');
+    const response = await axiosInstance.delete('/profiles/notifications/cleanup/');
+    console.log('Cleanup notifications API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error in cleanupNotifications:', error);
+    throw error;
+  }
+};
+
+const markAllNotificationsAsRead = async () => {
+  console.log('markAllNotificationsAsRead called');
+  try {
+    console.log('Making API request to mark all notifications as read');
+    const response = await axiosInstance.post('/profiles/notifications/mark-all-as-read/');
+    console.log('Mark all as read API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error in markAllNotificationsAsRead:', error);
     throw error;
   }
 };
@@ -171,5 +208,10 @@ export {
   updateProfile, 
   apiRegister, 
   refreshToken,
-  socialLogin
+  socialLogin,
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  cleanupNotifications
 };

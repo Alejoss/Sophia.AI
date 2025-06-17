@@ -22,6 +22,7 @@ import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorag
 import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
+import TopicHeader from './TopicHeader';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
@@ -242,46 +243,10 @@ const TopicDetail = () => {
 
     return (
         <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3 }}>
-                    {/* Topic Image */}
-                    <Box sx={{ width: 200, height: 200 }}>
-                        <img
-                            src={topic.topic_image || `https://picsum.photos/400/400?random=${topic.id}`}
-                            alt={topic.title}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                borderRadius: '4px'
-                            }}
-                        />
-                    </Box>
-
-                    {/* Topic Info */}
-                    <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <Typography variant="h4" gutterBottom>
-                                {topic.title}
-                            </Typography>
-                            {isAuthenticated() && topic.creator === user?.id && (
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<EditIcon />}
-                                    onClick={() => navigate(`/content/topics/${topicId}/edit`)}
-                                >
-                                    Edit Topic
-                                </Button>
-                            )}
-                        </Box>
-                        {topic.description && (
-                            <Typography variant="body1" sx={{ mt: 2 }}>
-                                {topic.description}
-                            </Typography>
-                        )}
-                    </Box>
-                </Box>
-            </Paper>
+            <TopicHeader 
+                topic={topic}
+                onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
+            />
 
             {/* Content sections by type */}
             {renderContentSection('image', contentByType.image)}

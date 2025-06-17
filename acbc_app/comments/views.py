@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.http import Http404
+from notifications.signals import notify
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +8,7 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsAuthor
+from utils.notification_utils import notify_comment_reply
 
 from comments.managers import CommentManager
 from content.models import Topic, Content
@@ -99,6 +101,17 @@ class KnowledgePathCommentsView(APIView):
         serializer = CommentCreateSerializer(data=comment_data)
         if serializer.is_valid():
             comment = serializer.save()
+            
+            # Send notification to knowledge path author if this is a top-level comment
+            if not comment.parent and knowledge_path.author and knowledge_path.author != request.user:
+                notify.send(
+                    sender=request.user,
+                    recipient=knowledge_path.author,
+                    verb='commented on your knowledge path',
+                    description=f'{request.user.username} commented on your knowledge path "{knowledge_path.title}": {comment.body[:50]}...',
+                    level='info'
+                )
+            
             return_serializer = KnowledgePathCommentSerializer(comment, context={'request': request})
             return Response(return_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -346,7 +359,10 @@ class CommentRepliesView(APIView):
 
     def post(self, request, pk):
         """Add a reply to a comment"""
+        print("\n=== Adding Comment Reply ===")
         parent_comment = get_object_or_404(Comment, pk=pk)
+        print(f"Parent Comment ID: {parent_comment.id}")
+        print(f"Parent Comment Author: {parent_comment.author.username}")
         
         # Inherit content_type and object_id from parent comment
         comment_data = {
@@ -358,10 +374,20 @@ class CommentRepliesView(APIView):
             'topic': parent_comment.topic_id  # Will be None for non-topic comments
         }
         
+        print(f"Creating reply with data: {comment_data}")
+        
         serializer = CommentCreateSerializer(data=comment_data)
         if serializer.is_valid():
             comment = serializer.save()
+            print(f"Reply created successfully. Comment ID: {comment.id}")
+            
+            # Send notification for the new reply
+            print("Triggering notification for reply")
+            notify_comment_reply(comment)
+            
             # Use CommentSerializer for the response to include all fields
             return_serializer = CommentSerializer(comment, context={'request': request})
             return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+        
+        print(f"Serializer errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

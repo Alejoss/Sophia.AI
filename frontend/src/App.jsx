@@ -1,10 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 
 import Home from './generalComponents/Home.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
+import ProfileLayout from './layouts/ProfileLayout.jsx';
 import ProfileDetail from './profiles/ProfileDetail.jsx';
 import PersonalProfile from './profiles/PersonalProfile.jsx';
 import EditProfile from './profiles/EditProfile.jsx';
@@ -18,7 +19,7 @@ import Logout from './profiles/Logout.jsx';
 import Register from './profiles/Register.jsx';
 import Welcome from './profiles/Welcome.jsx';
 import UploadContentForm from './content/UploadContentForm.jsx';
-import UploadContent from './content/UploadContent.jsx';
+import LibraryUploadContent from './content/LibraryUploadContent.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
 import CollectionsUser from './content/CollectionsUser.jsx';
 import CreateCollectionForm from './content/CreateCollectionForm.jsx';
@@ -51,6 +52,8 @@ import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
+import MessagesLayout from './messages/MessagesLayout';
+import Notifications from './profiles/Notifications';
 
 const App = () => {
   return (
@@ -71,13 +74,18 @@ const App = () => {
                 </GoogleOAuthInitializer>
               } />
               <Route path="login_successful" element={<LoginSuccessful />} />
-              <Route path="logout" element={<Logout />} />              
-              <Route path="profile_certificates" element={<Certificates />} />
-              <Route path="certificate-requests" element={<CertificateRequests />} />
-              <Route path="my_profile" element={<PersonalProfile />} />
-              <Route path="my_profile/edit" element={<EditProfile />} />
-              <Route path="profile_events" element={<Events />} />
-              <Route path="profile_bookmarks" element={<Bookmarks />} />          
+              <Route path="logout" element={<Logout />} />
+              <Route path="notifications" element={<Notifications />} />
+              
+              <Route element={<ProfileLayout />}>
+                <Route path="profile_certificates" element={<Certificates />} />
+                <Route path="certificate-requests" element={<CertificateRequests />} />
+                <Route path="my_profile" element={<PersonalProfile />} />
+                <Route path="my_profile/edit" element={<EditProfile />} />
+                <Route path="profile_events" element={<Events />} />
+                <Route path="profile_bookmarks" element={<Bookmarks />} />
+              </Route>
+              
               <Route path="user_profile/:profileId" element={<ProfileDetail />} />
             </Route>
             <Route path="content">
@@ -99,7 +107,7 @@ const App = () => {
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />
               <Route path=":contentId/edit" element={<ContentEdit />} />
-              <Route path="upload_content" element={<UploadContent />} />
+              <Route path="library_upload_content" element={<LibraryUploadContent />} />
             </Route>
             <Route path="knowledge_path">
               <Route path="" element={<KnowledgePathList />} />
@@ -117,13 +125,12 @@ const App = () => {
             </Route>
             <Route path="publications">
               <Route path="create" element={<PublicationCreationForm />} />
-              <Route path=":publicationId" element={<PublicationDetail />} />
               <Route path=":publicationId/edit" element={<PublicationEditForm />} />
+              <Route path=":publicationId" element={<PublicationDetail />} />
             </Route>
             <Route path="search" element={<MainSearch />} />
             <Route path="welcome" element={<Welcome />} />
-            <Route path="messages">
-              <Route path="" element={<ThreadList />} />
+            <Route path="messages" element={<MessagesLayout />}>
               <Route path="thread/:userId" element={<MessageThread />} />
             </Route>
           </Route>

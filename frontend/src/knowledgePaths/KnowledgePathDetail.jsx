@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import certificatesApi from '../api/certificatesApi';
 import commentsApi from '../api/commentsApi';
@@ -7,6 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 import { Lock, LockOpen, CheckCircle } from '@mui/icons-material';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
+import BookmarkButton from '../bookmarks/BookmarkButton';
 import {
   Dialog,
   DialogTitle,
@@ -21,6 +22,7 @@ import {
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
   const { pathId } = useParams();
+  const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const user = authState.user;
   const [knowledgePath, setKnowledgePath] = useState(null);
@@ -37,6 +39,7 @@ const KnowledgePathDetail = () => {
   const [requestNote, setRequestNote] = useState('');
   const [certificateStatus, setCertificateStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState(0);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -45,6 +48,16 @@ const KnowledgePathDetail = () => {
         setKnowledgePath(data);
         setIsCreator(user?.username === data.author);
         setHasCompleted(data.progress?.is_completed || false);
+
+        // If user is the author, fetch pending certificate requests
+        if (user?.username === data.author) {
+          try {
+            const requestsData = await certificatesApi.getKnowledgePathCertificateRequests(pathId);
+            setPendingRequests(requestsData.count);
+          } catch (error) {
+            console.error('Error fetching pending certificate requests:', error);
+          }
+        }
 
         if (data.progress?.is_completed) {
           const commentsData = await commentsApi.getKnowledgePathComments(pathId);
@@ -116,6 +129,48 @@ const KnowledgePathDetail = () => {
     }
   };
 
+  const handleCancelRequest = async () => {
+    try {
+      setRequestingCertificate(true);
+      setError(null);
+      setErrorDetails(null);
+      await certificatesApi.cancelCertificateRequest(certificateStatus.certificate_request.id);
+      const statusData = await certificatesApi.getCertificateRequestStatus(pathId);
+      setCertificateStatus(statusData);
+    } catch (error) {
+      console.error('Error cancelling certificate request:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to cancel certificate request';
+      const errorDetails = error.response?.data?.details || error.message;
+      setError(errorMessage);
+      setErrorDetails(errorDetails);
+    } finally {
+      setRequestingCertificate(false);
+    }
+  };
+
+  const handleAcceptRejectedRequest = async () => {
+    try {
+      setRequestingCertificate(true);
+      setError(null);
+      setErrorDetails(null);
+      await certificatesApi.approveCertificateRequest(certificateStatus.certificate_request.id);
+      const statusData = await certificatesApi.getCertificateRequestStatus(pathId);
+      setCertificateStatus(statusData);
+    } catch (error) {
+      console.error('Error accepting certificate request:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to accept certificate request';
+      const errorDetails = error.response?.data?.details || error.message;
+      setError(errorMessage);
+      setErrorDetails(errorDetails);
+    } finally {
+      setRequestingCertificate(false);
+    }
+  };
+
+  const handleViewCertificateRequests = () => {
+    navigate('/profiles/certificate-requests');
+  };
+
   const renderCertificateStatus = () => {
     if (!hasCompleted) return null;
 
@@ -151,19 +206,59 @@ const KnowledgePathDetail = () => {
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-yellow-100 text-yellow-800">
                 <span>Certificate request pending review</span>
               </div>
+              <button
+                onClick={handleCancelRequest}
+                disabled={requestingCertificate}
+                className="mt-2 px-4 py-1 text-sm text-red-600 hover:text-red-800"
+              >
+                {requestingCertificate ? 'Cancelling...' : 'Cancel Request'}
+              </button>
             </div>
           );
         case 'REJECTED':
           return (
             <div className="mt-6 text-center">
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-red-100 text-red-800">
+              <div className="inline-flex flex-col items-center px-4 py-2 rounded-full bg-red-100 text-red-800">
                 <span>Certificate request was rejected</span>
                 {request.rejection_reason && (
-                  <div className="mt-2 text-sm">
+                  <div className="mt-2 text-sm font-medium">
                     Reason: {request.rejection_reason}
                   </div>
                 )}
               </div>
+              {isCreator && (
+                <button
+                  onClick={handleAcceptRejectedRequest}
+                  disabled={requestingCertificate}
+                  className="mt-2 px-4 py-1 text-sm text-green-600 hover:text-green-800"
+                >
+                  {requestingCertificate ? 'Accepting...' : 'Accept Request'}
+                </button>
+              )}
+              {!isCreator && (
+                <button
+                  onClick={handleOpenModal}
+                  disabled={requestingCertificate}
+                  className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  {requestingCertificate ? 'Requesting...' : 'Request Again'}
+                </button>
+              )}
+            </div>
+          );
+        case 'CANCELLED':
+          return (
+            <div className="mt-6 text-center">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-800">
+                <span>Certificate request was cancelled</span>
+              </div>
+              <button
+                onClick={handleOpenModal}
+                disabled={requestingCertificate}
+                className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
+              >
+                {requestingCertificate ? 'Requesting...' : 'Request Again'}
+              </button>
             </div>
           );
         default:
@@ -205,8 +300,20 @@ const KnowledgePathDetail = () => {
           <div>
             <h1 className="text-3xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
             <p className="text-gray-600">Created by {knowledgePath.author}</p>
+            {isCreator && pendingRequests > 0 && (
+              <button
+                onClick={handleViewCertificateRequests}
+                className="mt-2 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
+              >
+                <span>You have {pendingRequests} pending certificate request{pendingRequests !== 1 ? 's' : ''}</span>
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-4">
+            <BookmarkButton 
+              contentId={pathId}
+              contentType="knowledgepath"
+            />
             <VoteComponent 
               type="knowledge_path"
               ids={{ pathId }}

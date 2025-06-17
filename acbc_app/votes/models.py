@@ -114,7 +114,7 @@ class VoteCount(models.Model):
         ]
 
     def __str__(self):
-        topic_str = f" in {self.topic}" if self.topic else ""
+        topic_str = f" in {self.topic}" if self.topic else " in all topics"
         return f"{self.vote_count} votes for {self.content_object}{topic_str}"
 
     def update_vote_count(self, obj=None):

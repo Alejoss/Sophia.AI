@@ -117,7 +117,13 @@ class KnowledgePathAPITests(APITestCase):
         url = reverse('knowledge_paths:knowledge-path-list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        # Check that our test knowledge path is in the results
+        self.assertTrue(any(path['id'] == self.knowledge_path.id for path in response.data['results']))
+        # Verify pagination structure
+        self.assertIn('count', response.data)
+        self.assertIn('next', response.data)
+        self.assertIn('previous', response.data)
+        self.assertIn('results', response.data)
 
     def test_get_knowledge_path_detail(self):
         """Test retrieving a specific knowledge path via API"""

@@ -4,6 +4,7 @@ import { Box, Typography, Paper, Button, Grid, CircularProgress, Divider } from 
 import contentApi from '../api/contentApi';
 import { createContentDetailUrl, CONTEXT_TYPES } from '../utils/urlUtils';
 import ContentDisplay from '../content/ContentDisplay';
+import BookmarkButton from '../bookmarks/BookmarkButton';
 
 const PublicationList = ({ isOwnProfile = false, userId = null }) => {
   const [publications, setPublications] = useState([]);
@@ -75,17 +76,23 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                     </Typography>
                   </Box>
                   
-                  {isOwnProfile && (
-                    <Button 
-                      component={Link} 
-                      to={`/publications/${publication.id}/edit`} 
-                      variant="outlined" 
-                      color="primary"
-                      size="small"
-                    >
-                      Edit
-                    </Button>
-                  )}
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <BookmarkButton 
+                      contentId={publication.id}
+                      contentType="publication"
+                    />
+                    {isOwnProfile && (
+                      <Button 
+                        component={Link} 
+                        to={`/publications/${publication.id}/edit`} 
+                        variant="outlined" 
+                        color="primary"
+                        size="small"
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
                 
                 <Divider sx={{ my: 2 }} />
@@ -96,27 +103,25 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                       Referenced Content:
                     </Typography>
                     
-                    <Box sx={{ mb: 2 }}>
-                      <ContentDisplay 
-                        content={publication.content}
-                        variant="detailed"
-                        maxImageHeight={200}
-                        showAuthor={true}
-                        additionalActions={
-                          contentId && (
-                            <Button 
-                              component={Link}
-                              to={createContentDetailUrl(contentId, CONTEXT_TYPES.PUBLICATION, publication.id)}
-                              variant="outlined"
-                              size="small"
-                              sx={{ mt: 1 }}
-                            >
-                              View Content Details
-                            </Button>
-                          )
-                        }
-                      />
-                    </Box>
+                    <ContentDisplay 
+                      content={publication.content}
+                      variant="detailed"
+                      maxImageHeight={200}
+                      showAuthor={true}
+                      additionalActions={
+                        contentId && (
+                          <Button 
+                            component={Link}
+                            to={createContentDetailUrl(contentId, CONTEXT_TYPES.PUBLICATION, publication.id)}
+                            variant="outlined"
+                            size="small"
+                            sx={{ mt: 1 }}
+                          >
+                            View Content Details
+                          </Button>
+                        )
+                      }
+                    />
                   </Box>
                 )}
                 

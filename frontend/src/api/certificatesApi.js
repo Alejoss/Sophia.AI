@@ -33,9 +33,9 @@ const certificatesApi = {
         }
     },
 
-    approveCertificateRequest: async (requestId) => {
+    approveCertificateRequest: async (requestId, note = '') => {
         try {
-            const response = await axiosInstance.post(`/certificates/requests/${requestId}/approve/`);
+            const response = await axiosInstance.post(`/certificates/requests/${requestId}/approve/`, { note });
             return response.data;
         } catch (error) {
             console.error('Error approving certificate request:', error);
@@ -43,12 +43,22 @@ const certificatesApi = {
         }
     },
 
-    rejectCertificateRequest: async (requestId, reason) => {
+    rejectCertificateRequest: async (requestId, reason, note = '') => {
         try {
-            const response = await axiosInstance.post(`/certificates/requests/${requestId}/reject/`, { reason });
+            const response = await axiosInstance.post(`/certificates/requests/${requestId}/reject/`, { reason, note });
             return response.data;
         } catch (error) {
             console.error('Error rejecting certificate request:', error);
+            throw error;
+        }
+    },
+
+    cancelCertificateRequest: async (requestId) => {
+        try {
+            const response = await axiosInstance.post(`/certificates/requests/${requestId}/cancel/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error cancelling certificate request:', error);
             throw error;
         }
     },
@@ -59,6 +69,16 @@ const certificatesApi = {
             return response.data;
         } catch (error) {
             console.error('Error getting certificates:', error);
+            throw error;
+        }
+    },
+
+    getKnowledgePathCertificateRequests: async (pathId) => {
+        try {
+            const response = await axiosInstance.get(`/certificates/requests/knowledge-path/${pathId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching knowledge path certificate requests:', error);
             throw error;
         }
     }

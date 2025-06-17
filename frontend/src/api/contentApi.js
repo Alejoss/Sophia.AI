@@ -24,10 +24,34 @@ const contentApi = {
     // Add other content-related API calls here
     uploadContent: async (contentData) => {
         try {
-            const response = await axiosInstance.post('/content/upload/', contentData);
+            // Debug logging
+            console.log('\n=== Content Upload Request ===');
+            if (contentData instanceof FormData) {
+                console.log('FormData contents:');
+                for (let [key, value] of contentData.entries()) {
+                    if (value instanceof File) {
+                        console.log(`${key}: File(name=${value.name}, type=${value.type}, size=${value.size})`);
+                    } else {
+                        console.log(`${key}: ${value}`);
+                    }
+                }
+            } else {
+                console.log('Content data:', contentData);
+            }
+
+            const response = await axiosInstance.post('/content/upload-content/', contentData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            
+            console.log('Upload response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error uploading content:', error);
+            if (error.response) {
+                console.error('Error response:', error.response.data);
+            }
             throw error;
         }
     },
@@ -197,7 +221,7 @@ const contentApi = {
 
     getRecentContent: async () => {
         try {
-            const response = await axiosInstance.get('/content/recent-user-content/');
+            const response = await axiosInstance.get('/content/recent-content/');
             return response.data;
         } catch (error) {
             console.error('Error fetching recent content:', error);
@@ -306,6 +330,172 @@ const contentApi = {
             throw error;
         }
     },
+
+    createContentProfile: async (contentId, profileData) => {
+        try {
+            const response = await axiosInstance.post(`/content/content-profiles/`, {
+                content: contentId,
+                ...profileData
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error creating content profile:', error);
+            throw error;
+        }
+    },
+
+    fetchUrlMetadata: async (url) => {
+        console.log('\n=== Fetching URL Metadata ===');
+        console.log('URL:', url);
+        
+        try {
+            // First try server-side proxy if CORS allows
+            try {
+                console.log('Attempting server-side proxy...');
+                const response = await axiosInstance.post('/content/preview-url/', { url });
+                console.log('Server proxy successful:', response.data);
+                return response.data;
+            } catch (error) {
+                // Log the full error for debugging
+                console.log('Server proxy failed:', error.response?.data?.error || error.message);
+                
+                // If we got an error message from the server, use it
+                if (error.response?.data?.error) {
+                    throw new Error(error.response.data.error);
+                }
+                
+                console.log('Falling back to client-side fetch');
+            }
+
+            // Only try client-side fetch for certain domains that we know support CORS
+            const allowedDomains = ['youtube.com', 'youtu.be', 'github.com', 'githubusercontent.com'];
+            const urlDomain = new URL(url).hostname;
+            const isAllowedDomain = allowedDomains.some(domain => urlDomain.includes(domain));
+
+            if (!isAllowedDomain) {
+                throw new Error('Unable to fetch preview for this URL');
+            }
+
+            // Fallback to direct fetch if server fails
+            console.log('Making direct fetch request...');
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Failed to fetch URL data');
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('text/html')) {
+                throw new Error('URL must point to a webpage');
+            }
+
+            const html = await response.text();
+            console.log('Parsing HTML content...');
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+
+            // Extract Open Graph metadata
+            console.log('Extracting metadata...');
+            const metadata = {
+                title: getMetaContent(doc, 'og:title') || doc.title,
+                description: getMetaContent(doc, 'og:description') || getMetaContent(doc, 'description'),
+                image: getMetaContent(doc, 'og:image'),
+                siteName: getMetaContent(doc, 'og:site_name'),
+                type: getMetaContent(doc, 'og:type') || 'website',
+                favicon: getFavicon(doc, url)
+            };
+
+            console.log('Initial metadata:', metadata);
+
+            // Special handling for YouTube
+            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                console.log('Detected YouTube URL, fetching additional data...');
+                const videoId = extractYouTubeId(url);
+                if (videoId) {
+                    console.log('YouTube video ID:', videoId);
+                    metadata.image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                    metadata.type = 'video';
+                    metadata.siteName = 'YouTube';
+                    
+                    try {
+                        console.log('Fetching YouTube oEmbed data...');
+                        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+                        const oembedResponse = await fetch(oembedUrl);
+                        if (!oembedResponse.ok) {
+                            throw new Error('Failed to fetch YouTube data');
+                        }
+                        const oembedData = await oembedResponse.json();
+                        if (oembedData.title) {
+                            console.log('YouTube title:', oembedData.title);
+                            metadata.title = oembedData.title;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch YouTube oEmbed data:', e.message);
+                    }
+                }
+            }
+
+            // Validate required fields
+            if (!metadata.title && !metadata.description && !metadata.image) {
+                throw new Error('Could not extract preview information from this URL');
+            }
+
+            console.log('Final metadata:', metadata);
+            return metadata;
+        } catch (error) {
+            // Log the full error for debugging
+            console.error('Error fetching URL metadata:', error);
+            
+            // Return a user-friendly error message
+            throw new Error(error.message || 'Failed to fetch URL data');
+        }
+    }
 };
+
+// Helper functions
+function getMetaContent(doc, property) {
+    // Try Open Graph meta first
+    const ogMeta = doc.querySelector(`meta[property="${property}"]`);
+    if (ogMeta) return ogMeta.getAttribute('content');
+
+    // Try name attribute as fallback
+    const nameMeta = doc.querySelector(`meta[name="${property}"]`);
+    if (nameMeta) return nameMeta.getAttribute('content');
+
+    return null;
+}
+
+function getFavicon(doc, url) {
+    // Try standard favicon locations
+    const links = Array.from(doc.querySelectorAll('link[rel*="icon"]'));
+    if (links.length > 0) {
+        // Sort by size preference if specified
+        links.sort((a, b) => {
+            const sizeA = parseInt(a.getAttribute('sizes')?.split('x')[0] || '0');
+            const sizeB = parseInt(b.getAttribute('sizes')?.split('x')[0] || '0');
+            return sizeB - sizeA;
+        });
+        const href = links[0].getAttribute('href');
+        if (href) {
+            return href.startsWith('http') ? href : new URL(href, url).href;
+        }
+    }
+
+    // Fallback to default favicon location
+    const urlObj = new URL(url);
+    return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
+}
+
+function extractYouTubeId(url) {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/,
+        /^[^&?/]+$/  // Direct video ID
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+
+    return null;
+}
 
 export default contentApi;

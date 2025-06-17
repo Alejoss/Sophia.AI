@@ -12,13 +12,17 @@ import {
     Typography, 
     Paper, 
     CircularProgress,
-    Divider
+    Divider,
+    InputBase,
+    IconButton
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 
-const ThreadList = () => {
+const ThreadList = ({ onThreadSelect }) => {
     const [threads, setThreads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
     const navigate = useNavigate();
@@ -27,9 +31,12 @@ const ThreadList = () => {
         const loadThreads = async () => {
             try {
                 const response = await fetchThreads();
-                setThreads(response.data);
+                const threadsData = Array.isArray(response.data) ? response.data : 
+                                  response.data.results ? response.data.results : [];
+                setThreads(threadsData);
                 setError(null);
             } catch (err) {
+                console.error('Error loading threads:', err);
                 setError('Failed to load conversations.');
             } finally {
                 setLoading(false);
@@ -39,10 +46,16 @@ const ThreadList = () => {
     }, []);
 
     const getOtherParticipant = (thread) => {
+        if (!thread || !currentUser) return null;
         return thread.participant1.id === currentUser.id 
             ? thread.participant2 
             : thread.participant1;
     };
+
+    const filteredThreads = threads.filter(thread => {
+        const otherUser = getOtherParticipant(thread);
+        return otherUser && otherUser.username.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
     if (loading) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -57,56 +70,92 @@ const ThreadList = () => {
     );
 
     return (
-        <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
-            <Paper elevation={2}>
-                <List>
-                    {threads.length === 0 ? (
-                        <ListItem>
-                            <ListItemText 
-                                primary="No conversations yet" 
-                                secondary="Start a conversation by visiting someone's profile"
-                            />
-                        </ListItem>
-                    ) : (
-                        threads.map((thread, index) => {
-                            const otherUser = getOtherParticipant(thread);
-                            return (
-                                <React.Fragment key={thread.id}>
-                                    <ListItem 
-                                        button 
-                                        onClick={() => navigate(`/messages/thread/${otherUser.id}`)}
-                                    >
-                                        <ListItemAvatar>
-                                            <Avatar src={otherUser.profile_picture}>
-                                                {otherUser.username[0].toUpperCase()}
-                                            </Avatar>
-                                        </ListItemAvatar>
-                                        <ListItemText
-                                            primary={otherUser.username}
-                                            secondary={
-                                                thread.last_message ? (
-                                                    <>
-                                                        <Typography
-                                                            component="span"
-                                                            variant="body2"
-                                                            color="text.primary"
-                                                            sx={{ display: 'block' }}
-                                                        >
-                                                            {thread.last_message.text}
-                                                        </Typography>
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Messages</Typography>
+                <Paper
+                    component="form"
+                    sx={{ p: '2px 4px', display: 'flex', alignItems: 'center' }}
+                >
+                    <InputBase
+                        sx={{ ml: 1, flex: 1 }}
+                        placeholder="Search conversations"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <IconButton type="button" sx={{ p: '10px' }}>
+                        <SearchIcon />
+                    </IconButton>
+                </Paper>
+            </Box>
+
+            {/* Thread List */}
+            <List sx={{ flex: 1, overflow: 'auto' }}>
+                {!filteredThreads || filteredThreads.length === 0 ? (
+                    <ListItem>
+                        <ListItemText 
+                            primary="No conversations found" 
+                            secondary={searchQuery ? "Try a different search term" : "No conversations yet"}
+                        />
+                    </ListItem>
+                ) : (
+                    filteredThreads.map((thread, index) => {
+                        const otherUser = getOtherParticipant(thread);
+                        if (!otherUser) return null;
+                        
+                        return (
+                            <React.Fragment key={thread.id}>
+                                <ListItem 
+                                    button 
+                                    onClick={() => onThreadSelect(otherUser.id)}
+                                    sx={{
+                                        '&:hover': {
+                                            backgroundColor: 'action.hover'
+                                        }
+                                    }}
+                                >
+                                    <ListItemAvatar>
+                                        <Avatar src={otherUser.profile_picture}>
+                                            {otherUser.username[0].toUpperCase()}
+                                        </Avatar>
+                                    </ListItemAvatar>
+                                    <ListItemText
+                                        primary={otherUser.username}
+                                        secondary={
+                                            thread.last_message ? (
+                                                <>
+                                                    <Typography
+                                                        component="span"
+                                                        variant="body2"
+                                                        color="text.primary"
+                                                        sx={{ 
+                                                            display: 'block',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap'
+                                                        }}
+                                                    >
+                                                        {thread.last_message.text}
+                                                    </Typography>
+                                                    <Typography
+                                                        component="span"
+                                                        variant="caption"
+                                                        color="text.secondary"
+                                                    >
                                                         {new Date(thread.last_message.timestamp).toLocaleString()}
-                                                    </>
-                                                ) : 'No messages yet'
-                                            }
-                                        />
-                                    </ListItem>
-                                    {index < threads.length - 1 && <Divider />}
-                                </React.Fragment>
-                            );
-                        })
-                    )}
-                </List>
-            </Paper>
+                                                    </Typography>
+                                                </>
+                                            ) : 'No messages yet'
+                                        }
+                                    />
+                                </ListItem>
+                                {index < filteredThreads.length - 1 && <Divider />}
+                            </React.Fragment>
+                        );
+                    })
+                )}
+            </List>
         </Box>
     );
 };

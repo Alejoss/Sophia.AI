@@ -39,6 +39,7 @@ class Content(models.Model):
     media_type = models.CharField(max_length=5, choices=MEDIA_TYPES, default='TEXT')
     original_title = models.CharField(max_length=255, blank=True, null=True)  # The original title when first uploaded
     original_author = models.CharField(max_length=255, blank=True, null=True)  # Original creator/author
+    url = models.URLField(max_length=2000, blank=True, null=True)  # For URL-based content
     
     # Content classification
     topics = models.ManyToManyField('Topic', related_name='contents', blank=True)
@@ -47,6 +48,11 @@ class Content(models.Model):
 
     def __str__(self):
         return f"Content: {self.original_title}"
+
+    @property
+    def is_url_content(self):
+        """Returns whether this content is URL-based"""
+        return bool(self.url)
 
     def get_vote_count(self, topic=None):
         """Get the current vote count, optionally filtered by topic"""
@@ -133,7 +139,7 @@ class ContentProfile(models.Model):
 class FileDetails(models.Model):
     """Handles file storage and content analysis"""
     content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='file_details')
-    file = models.FileField(upload_to='files/')
+    file = models.FileField(upload_to='files/', blank=True, null=True)  # Optional for URL content
     file_size = models.PositiveIntegerField(blank=True, null=True)
     
     # Text analysis (for text-based content)
@@ -141,16 +147,30 @@ class FileDetails(models.Model):
     text_length = models.PositiveIntegerField(blank=True, null=True)
     text_hash = models.CharField(max_length=64, blank=True, null=True)
     
+    # Open Graph metadata (automatically extracted for URLs)
+    og_description = models.TextField(blank=True, null=True)
+    og_image = models.URLField(max_length=2000, blank=True, null=True)
+    og_type = models.CharField(max_length=50, blank=True, null=True)
+    og_site_name = models.CharField(max_length=255, blank=True, null=True)
+    
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"File for {self.content.original_title}"
+        return f"Details for {self.content.original_title}"
 
     @property
     def url(self):
+        """Returns the content URL - either file URL or content URL"""
+        if self.content.is_url_content:
+            return self.content.url
         if self.file:
             return self.file.url
         return None
+
+    @property 
+    def display_description(self):
+        """Returns the Open Graph description if available"""
+        return self.og_description
 
 
 class BlockchainInteraction(models.Model):

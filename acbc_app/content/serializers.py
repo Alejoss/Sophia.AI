@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication
 from knowledge_paths.models import KnowledgePath, Node
+from profiles.serializers import UserSerializer
 
 
 class LibrarySerializer(serializers.ModelSerializer):
@@ -17,7 +18,10 @@ class FileDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FileDetails
-        fields = ['file', 'file_size', 'uploaded_at', 'url']
+        fields = [
+            'file', 'file_size', 'uploaded_at', 'url',
+            'og_description', 'og_image', 'og_type', 'og_site_name'
+        ]
     
     def get_url(self, obj):
         if obj.file:
@@ -55,11 +59,21 @@ class ContentSerializer(serializers.ModelSerializer):
     
     def get_url(self, obj):
         try:
+            # First check if this is URL-based content
+            if obj.url:
+                return obj.url
+                
+            # Then check for file-based content
             if obj.file_details and obj.file_details.file:
                 return obj.file_details.file.url
+                
+            return None
         except Content.file_details.RelatedObjectDoesNotExist:
-            pass
-        return None
+            # If no file_details exist but we have a URL, return it
+            return obj.url if obj.url else None
+        except Exception as e:
+            print(f"Error getting URL: {str(e)}")
+            return None
 
     def get_vote_count(self, obj):
         topic = self.context.get('topic')
@@ -79,6 +93,7 @@ class ContentProfileSerializer(serializers.ModelSerializer):
     content = ContentSerializer(read_only=True)
     is_visible = serializers.BooleanField(default=True)
     is_producer = serializers.BooleanField(default=False)
+    user = UserSerializer(read_only=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -197,10 +212,11 @@ class PublicationSerializer(serializers.ModelSerializer):
     )
     content = serializers.SerializerMethodField()
     username = serializers.CharField(source='user.username', read_only=True)
+    content_profile = ContentProfileSerializer(read_only=True)
     
     class Meta:
         model = Publication
-        fields = ['id', 'content_profile_id', 'content', 'text_content', 'status', 'published_at', 'updated_at', 'username']
+        fields = ['id', 'content_profile_id', 'content_profile', 'content', 'text_content', 'status', 'published_at', 'updated_at', 'username']
         read_only_fields = ['published_at', 'updated_at']
 
     def get_content(self, instance):
@@ -257,3 +273,83 @@ class ContentReferencesSerializer(serializers.Serializer):
         self.fields['knowledge_paths'] = KnowledgePathBasicSerializer(many=True)
         self.fields['topics'] = TopicIdTitleSerializer(many=True)
         self.fields['publications'] = PublicationBasicSerializer(many=True)
+
+
+class ContentBasicSerializer(serializers.ModelSerializer):
+    """
+    A lightweight serializer that provides only the essential content data
+    needed for basic display purposes, particularly for RecentUserContent.
+    """
+    url = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+    favicon = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Content
+        fields = ['id', 'media_type', 'url', 'file_url', 'original_title', 'favicon']
+    
+    def get_url(self, obj):
+        return obj.url if obj.url else None
+    
+    def get_file_url(self, obj):
+        try:
+            if hasattr(obj, 'file_details') and obj.file_details and obj.file_details.file:
+                if 'request' in self.context:
+                    return self.context['request'].build_absolute_uri(obj.file_details.file.url)
+                return obj.file_details.file.url
+            return None
+        except Content.file_details.RelatedObjectDoesNotExist:
+            return None
+        
+    def get_favicon(self, obj):
+        """Get favicon URL for URL-based content"""
+        try:
+            if not obj.url or obj.media_type != 'TEXT':
+                return None
+                
+            # Special cases for known platforms
+            if 'youtube.com' in obj.url or 'youtu.be' in obj.url:
+                return 'https://www.youtube.com/favicon.ico'
+            if 'medium.com' in obj.url:
+                return 'https://medium.com/favicon.ico'
+            if 'patreon.com' in obj.url:
+                return 'https://www.patreon.com/favicon.ico'
+                
+            # Get from Open Graph metadata if available
+            if hasattr(obj, 'file_details') and obj.file_details and obj.file_details.og_site_name:
+                try:
+                    from urllib.parse import urlparse
+                    hostname = urlparse(obj.url).hostname
+                    return f'https://{hostname}/favicon.ico'
+                except:
+                    pass
+            return None
+        except Content.file_details.RelatedObjectDoesNotExist:
+            # If no file_details exist but we have a URL, try to get favicon from URL
+            if obj.url:
+                try:
+                    from urllib.parse import urlparse
+                    hostname = urlparse(obj.url).hostname
+                    return f'https://{hostname}/favicon.ico'
+                except:
+                    pass
+            return None
+
+
+class ContentProfileBasicSerializer(serializers.ModelSerializer):
+    """
+    A lightweight serializer for ContentProfile that includes only the data
+    needed for basic display in components like RecentUserContent.
+    """
+    content = ContentBasicSerializer(read_only=True)
+    
+    class Meta:
+        model = ContentProfile
+        fields = ['id', 'title', 'author', 'content']
+        
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Ensure title falls back to original_title if not set
+        if not data['title']:
+            data['title'] = data['content']['original_title']
+        return data

@@ -26,7 +26,8 @@ from content.serializers import (
     ContentWithSelectedProfileSerializer,
     TopicBasicSerializer,
     TopicDetailSerializer,
-    ContentProfileSerializer
+    ContentProfileSerializer,
+    ContentProfileBasicSerializer
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
@@ -34,6 +35,12 @@ from knowledge_paths.serializers import (
 )
 from .serializers import PublicationSerializer, ContentReferencesSerializer
 from content.utils import get_top_voted_contents
+from bs4 import BeautifulSoup
+import requests
+import re
+from urllib.parse import urlparse, urljoin
+from django.core.validators import URLValidator
+from django.core.exceptions import ValidationError
 
 # Library Views
 class LibraryListView(APIView):
@@ -166,66 +173,181 @@ class UploadContentView(APIView):
 
     def post(self, request):
         try:
-            file = request.FILES.get('file')
-            if not file:
-                return Response(
-                    {'error': 'No file provided'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
+            print("\n=== Content Upload Request ===")
             print("Request data:", request.data)
-            print("Media type from request:", request.data.get('media_type'))
-            print("File type:", file.content_type)
-
-            media_type = request.data.get('media_type')
-            if not media_type:
+            
+            # Validate input
+            url = request.data.get('url')
+            file = request.FILES.get('file')
+            
+            # Check if both URL and file are provided
+            if url and file:
                 return Response(
-                    {'error': 'Media type not detected'}, 
+                    {'error': 'Cannot provide both file and URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Check if neither URL nor file is provided
+            if not url and not file:
+                return Response(
+                    {'error': 'No file or URL provided'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # If URL is provided, validate its format
+            if url:
+                validator = URLValidator()
+                try:
+                    validator(url)
+                except ValidationError:
+                    return Response(
+                        {'error': 'Invalid URL format'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                print("\n=== Processing URL Upload ===")
+                print("URL:", url)
+                print("Title:", request.data.get('title'))
+                print("Author:", request.data.get('author'))
+                print("\nMetadata received:")
+                print("og_description:", request.data.get('og_description'))
+                print("og_image:", request.data.get('og_image'))
+                print("og_type:", request.data.get('og_type'))
+                print("og_site_name:", request.data.get('og_site_name'))
+                
+                # For URL content, we don't need a file
+                media_type = 'TEXT'  # Default to TEXT for URL content
+                title = request.data.get('title', url)
+                
+                print("\nCreating Content object...")
+                content = Content.objects.create(
+                    uploaded_by=request.user,
+                    media_type=media_type,
+                    original_title=title,
+                    original_author=request.data.get('author'),
+                    url=url  # Store the URL
+                )
+                print("Content created:", {
+                    'id': content.id,
+                    'url': content.url,
+                    'media_type': content.media_type,
+                    'title': content.original_title
+                })
 
-            # Get title from request or use filename if not provided
-            title = request.data.get('title')
-            if not title:
-                # Use the filename without extension as the title
-                filename = os.path.splitext(file.name)[0]
-                title = filename
+                print("\nCreating ContentProfile...")
+                content_profile = ContentProfile.objects.create(
+                    content=content,
+                    title=title,
+                    author=request.data.get('author'),
+                    personal_note=request.data.get('personalNote'),
+                    user=request.user,
+                    is_visible=True,  # URLs are always visible
+                    is_producer=False  # URLs can't be produced content
+                )
+                print("ContentProfile created:", {
+                    'id': content_profile.id,
+                    'title': content_profile.title,
+                    'author': content_profile.author
+                })
 
-            # Convert string booleans to actual booleans
-            is_visible = request.data.get('is_visible')
-            if isinstance(is_visible, str):
-                is_visible = is_visible.lower() == 'true'
+                print("\nCreating FileDetails...")
+                file_details = FileDetails.objects.create(
+                    content=content,
+                    og_description=request.data.get('og_description'),
+                    og_image=request.data.get('og_image'),
+                    og_type=request.data.get('og_type'),
+                    og_site_name=request.data.get('og_site_name')
+                )
+                print("FileDetails created:", {
+                    'id': file_details.id,
+                    'og_site_name': file_details.og_site_name,
+                    'og_image': file_details.og_image,
+                    'og_type': file_details.og_type
+                })
+
+                # Serialize the content profile to return in the response
+                content_profile_serializer = ContentProfileSerializer(
+                    content_profile,
+                    context={'request': request}
+                )
+                
+                print("\nFinal response data:", {
+                    'content_id': content.id,
+                    'url': content.url,
+                    'file_details': {
+                        'og_site_name': file_details.og_site_name,
+                        'og_image': file_details.og_image
+                    }
+                })
+
+                return Response({
+                    'message': 'Content uploaded successfully',
+                    'content_id': content.id,
+                    'content_profile': content_profile_serializer.data
+                }, status=status.HTTP_201_CREATED)
+
             else:
-                is_visible = bool(is_visible)
+                print("Processing file upload")
+                # Handle file upload
+                file = request.FILES.get('file')
+                if not file:
+                    return Response(
+                        {'error': 'No file provided'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            is_producer = request.data.get('is_producer')
-            if isinstance(is_producer, str):
-                is_producer = is_producer.lower() == 'true'
-            else:
-                is_producer = bool(is_producer)
+                print("Media type from request:", request.data.get('media_type'))
+                print("File type:", file.content_type)
 
-            content = Content.objects.create(
-                uploaded_by=request.user,
-                media_type=media_type,
-                original_title=title,
-                original_author=request.data.get('author')
-            )
+                media_type = request.data.get('media_type')
+                if not media_type:
+                    return Response(
+                        {'error': 'Media type not detected'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            content_profile = ContentProfile.objects.create(
-                content=content,
-                title=title,
-                author=request.data.get('author'),
-                personal_note=request.data.get('personalNote'),
-                user=request.user,
-                is_visible=is_visible,
-                is_producer=is_producer
-            )
+                # Get title from request or use filename if not provided
+                title = request.data.get('title')
+                if not title:
+                    # Use the filename without extension as the title
+                    filename = os.path.splitext(file.name)[0]
+                    title = filename
 
-            file_details = FileDetails.objects.create(
-                content=content,
-                file=file,
-                file_size=file.size
-            )
+                # Convert string booleans to actual booleans
+                is_visible = request.data.get('is_visible')
+                if isinstance(is_visible, str):
+                    is_visible = is_visible.lower() == 'true'
+                else:
+                    is_visible = bool(is_visible)
+
+                is_producer = request.data.get('is_producer')
+                if isinstance(is_producer, str):
+                    is_producer = is_producer.lower() == 'true'
+                else:
+                    is_producer = bool(is_producer)
+
+                content = Content.objects.create(
+                    uploaded_by=request.user,
+                    media_type=media_type,
+                    original_title=title,
+                    original_author=request.data.get('author')
+                )
+
+                content_profile = ContentProfile.objects.create(
+                    content=content,
+                    title=title,
+                    author=request.data.get('author'),
+                    personal_note=request.data.get('personalNote'),
+                    user=request.user,
+                    is_visible=is_visible,
+                    is_producer=is_producer
+                )
+
+                file_details = FileDetails.objects.create(
+                    content=content,
+                    file=file,
+                    file_size=file.size
+                )
 
             # Serialize the content profile to return in the response
             content_profile_serializer = ContentProfileSerializer(
@@ -321,7 +443,11 @@ class RecentUserContentView(APIView):
             '-created_at'
         )[:4]
         
-        serializer = ContentProfileSerializer(recent_content, many=True, context={'request': request})
+        serializer = ContentProfileBasicSerializer(
+            recent_content, 
+            many=True, 
+            context={'request': request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -758,16 +884,37 @@ class PublicationListView(APIView):
 class PublicationDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_object(self, pk):
-        return get_object_or_404(Publication, pk=pk, user=self.request.user)
-
     def get(self, request, pk):
-        publication = self.get_object(pk)
-        serializer = PublicationSerializer(publication, context={'request': request})
-        return Response(serializer.data)
+        print(f"\n=== PublicationDetailView.get ===")
+        print(f"Requested publication ID: {pk}")
+        print(f"User: {request.user}")
+        print(f"Request path: {request.path}")
+        print(f"Request method: {request.method}")
+        print(f"Request headers: {request.headers}")
+        
+        try:
+            publication = Publication.objects.get(id=pk)
+            print(f"Found publication: {publication}")
+            
+            serializer = PublicationSerializer(publication)
+            print(f"Serialized data: {serializer.data}")
+            
+            return Response(serializer.data)
+        except Publication.DoesNotExist:
+            print(f"❌ Publication not found with ID: {pk}")
+            return Response(
+                {'error': 'Publication not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"❌ Unexpected error: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def put(self, request, pk):
-        publication = self.get_object(pk)
+        publication = get_object_or_404(Publication, pk=pk)
         serializer = PublicationSerializer(publication, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -775,7 +922,7 @@ class PublicationDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        publication = self.get_object(pk)
+        publication = get_object_or_404(Publication, pk=pk)
         publication.deleted = True
         publication.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -887,3 +1034,275 @@ class ContentProfileDetailView(APIView):
                 {"error": "Content profile not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class ContentProfileCreateView(APIView):
+    """API view to create a new content profile for a user."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            content_id = request.data.get('content')
+            if not content_id:
+                return Response(
+                    {'error': 'Content ID is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if content exists
+            content = get_object_or_404(Content, id=content_id)
+
+            # Check if user already has a profile for this content
+            existing_profile = ContentProfile.objects.filter(
+                content=content,
+                user=request.user
+            ).first()
+
+            if existing_profile:
+                return Response(
+                    {'error': 'You already have a profile for this content'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create new content profile
+            content_profile = ContentProfile.objects.create(
+                content=content,
+                user=request.user,
+                title=request.data.get('title', content.original_title),
+                author=request.data.get('author', content.original_author),
+                personal_note=request.data.get('personalNote', ''),
+                is_visible=request.data.get('isVisible', True),
+                is_producer=request.data.get('isProducer', False)
+            )
+
+            serializer = ContentProfileSerializer(
+                content_profile,
+                context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class URLPreviewView(APIView):
+    """API view to get preview data for a URL."""
+    permission_classes = [IsAuthenticated]
+
+    def extract_favicon(self, soup, base_url):
+        """Extract favicon URL from HTML."""
+        print(f"\n=== Extracting favicon for {base_url} ===")
+        
+        # Try standard favicon locations
+        favicon_link = soup.find('link', rel=lambda r: r and ('icon' in r or 'shortcut icon' in r))
+        if favicon_link and favicon_link.get('href'):
+            favicon_url = urljoin(base_url, favicon_link['href'])
+            print(f"Found favicon in link tag: {favicon_url}")
+            return favicon_url
+        
+        # Try default location
+        parsed_url = urlparse(base_url)
+        default_favicon = f"{parsed_url.scheme}://{parsed_url.netloc}/favicon.ico"
+        try:
+            print(f"Trying default favicon location: {default_favicon}")
+            response = requests.head(default_favicon)
+            if response.status_code == 200:
+                print("Default favicon exists")
+                return default_favicon
+            print(f"Default favicon request failed with status: {response.status_code}")
+        except Exception as e:
+            print(f"Error checking default favicon: {str(e)}")
+        
+        print("No favicon found")
+        return None
+
+    def extract_youtube_data(self, url):
+        """Extract metadata from YouTube URLs."""
+        print(f"\n=== Extracting YouTube data for {url} ===")
+        
+        # Extract video ID from URL
+        video_id = None
+        patterns = [
+            r'youtube\.com/watch\?v=([^&]+)',
+            r'youtu\.be/([^?]+)',
+            r'youtube\.com/embed/([^?]+)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                video_id = match.group(1)
+                print(f"Found YouTube video ID: {video_id}")
+                break
+        
+        if not video_id:
+            print("No YouTube video ID found")
+            return None
+
+        try:
+            # Get oEmbed data from YouTube
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            print(f"Fetching YouTube oEmbed data from: {oembed_url}")
+            
+            response = requests.get(oembed_url, timeout=5)
+            print(f"oEmbed response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                print("Successfully fetched YouTube metadata:")
+                print(f"- Title: {data.get('title')}")
+                print(f"- Thumbnail: https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
+                
+                return {
+                    'title': data.get('title'),
+                    'description': None,
+                    'image': f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
+                    'favicon': "https://www.youtube.com/favicon.ico",
+                    'siteName': "YouTube",
+                    'type': 'VIDEO'
+                }
+        except Exception as e:
+            print(f"Error fetching YouTube metadata: {str(e)}")
+        return None
+
+    def post(self, request):
+        print("\n=== URL Preview Request ===")
+        print(f"User: {request.user.username}")
+        
+        url = request.data.get('url')
+        print(f"URL: {url}")
+        
+        if not url:
+            print("Error: No URL provided")
+            return Response(
+                {'error': 'URL is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Check if it's a YouTube URL first
+            if 'youtube.com' in url or 'youtu.be' in url:
+                print("Detected YouTube URL")
+                youtube_data = self.extract_youtube_data(url)
+                if youtube_data:
+                    print("Returning YouTube metadata")
+                    return Response(youtube_data)
+                print("YouTube metadata extraction failed, falling back to regular extraction")
+
+            # Make request with browser-like headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            print(f"\nFetching URL with headers: {headers}")
+            response = requests.get(url, headers=headers, timeout=5, verify=True)
+            print(f"Response status code: {response.status_code}")
+
+            if response.status_code == 403:
+                print("Access forbidden")
+                return Response(
+                    {'error': 'Unable to access this URL'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            response.raise_for_status()
+            
+            # Check content type
+            content_type = response.headers.get('content-type', '').lower()
+            print(f"Content-Type: {content_type}")
+            
+            if not content_type.startswith('text/html'):
+                print(f"Error: Invalid content type: {content_type}")
+                return Response({
+                    'error': 'URL must point to a webpage'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Parse HTML
+            print("\nParsing HTML content")
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract Open Graph metadata
+            metadata = {
+                'title': None,
+                'description': None,
+                'image': None,
+                'siteName': None,
+                'type': None,
+                'favicon': None
+            }
+            
+            # Get Open Graph metadata
+            og_tags = {
+                'title': ['og:title', 'twitter:title'],
+                'description': ['og:description', 'twitter:description', 'description'],
+                'image': ['og:image', 'twitter:image'],
+                'siteName': ['og:site_name'],
+                'type': ['og:type']
+            }
+            
+            print("\nExtracting metadata:")
+            for key, properties in og_tags.items():
+                for prop in properties:
+                    meta = soup.find('meta', property=prop)
+                    if not meta:
+                        meta = soup.find('meta', attrs={'name': prop})
+                    
+                    if meta and meta.get('content'):
+                        metadata[key] = meta.get('content')
+                        print(f"- {key}: {meta.get('content')} (from {prop})")
+                        break
+            
+            # Fallbacks
+            if not metadata['title']:
+                metadata['title'] = soup.title.string if soup.title else None
+                print(f"Using fallback title: {metadata['title']}")
+                
+            if not metadata['type']:
+                metadata['type'] = 'website'
+                print("Using fallback type: website")
+            
+            # Convert relative URLs to absolute
+            if metadata['image'] and not metadata['image'].startswith(('http://', 'https://')):
+                original_image = metadata['image']
+                metadata['image'] = urljoin(url, metadata['image'])
+                print(f"Converting relative image URL: {original_image} -> {metadata['image']}")
+            
+            # Get favicon
+            metadata['favicon'] = self.extract_favicon(soup, url)
+            
+            # Clean up None values and validate
+            metadata = {k: v for k, v in metadata.items() if v is not None}
+            
+            if not metadata.get('title') and not metadata.get('description') and not metadata.get('image'):
+                print("No metadata found")
+                return Response(
+                    {'error': 'Could not extract preview information from this URL'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            print("\nFinal metadata:")
+            for key, value in metadata.items():
+                print(f"- {key}: {value}")
+            
+            return Response(metadata)
+            
+        except requests.Timeout:
+            print("Error: Request timed out")
+            return Response(
+                {'error': 'Failed to fetch URL data'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except requests.RequestException as e:
+            print(f"Request error: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch URL data'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+

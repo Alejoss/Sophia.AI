@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { fetchOrCreateThread, fetchMessages, sendMessage } from '../api/messagesApi';
 import { Box, Typography, Paper, CircularProgress, TextField, Button, List, ListItem, ListItemText } from '@mui/material';
@@ -32,7 +32,6 @@ const MessageThread = () => {
         setThread(threadRes.data);
         const threadId = threadRes.data.id;
         const messagesRes = await fetchMessages(threadId);
-        // Ensure messages is an array
         const messagesData = Array.isArray(messagesRes.data) ? messagesRes.data : [];
         setMessages(messagesData);
         setError(null);
@@ -52,7 +51,6 @@ const MessageThread = () => {
     try {
       await sendMessage(thread.id, newMessage);
       const messagesRes = await fetchMessages(thread.id);
-      // Ensure messages is an array
       const messagesData = Array.isArray(messagesRes.data) ? messagesRes.data : [];
       setMessages(messagesData);
       setNewMessage('');
@@ -80,7 +78,19 @@ const MessageThread = () => {
     <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <Typography variant="h5" gutterBottom>
-          Conversation with {otherUser ? otherUser.username : 'User'}
+          Conversation with{' '}
+          <Link 
+            to={`/profiles/user_profile/${otherUser?.id}`}
+            style={{ 
+              textDecoration: 'none',
+              color: 'inherit',
+              '&:hover': {
+                textDecoration: 'underline'
+              }
+            }}
+          >
+            {otherUser ? otherUser.username : 'User'}
+          </Link>
         </Typography>
         <List sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
           {(!messages || messages.length === 0) && (

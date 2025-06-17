@@ -92,7 +92,7 @@ const LibraryUser = () => {
                             variant="contained" 
                             color="primary"
                             startIcon={<UploadFileIcon />}
-                            onClick={() => navigate('/content/upload_content')}
+                            onClick={() => navigate('/content/library_upload_content')}
                         >
                             Upload Content
                         </Button>

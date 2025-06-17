@@ -16,6 +16,7 @@ class CertificateTemplate(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    note = models.TextField(blank=True, null=True, help_text="Optional note from the approver")
 
     def __str__(self):
         return f"{self.title} (v{self.version})"
@@ -36,7 +37,7 @@ class Certificate(models.Model):
         null=True,
         blank=True
     )
-    template = models.ForeignKey(CertificateTemplate, on_delete=models.CASCADE)
+    template = models.ForeignKey(CertificateTemplate, on_delete=models.CASCADE, null=True, blank=True)
     issued_on = models.DateTimeField(auto_now_add=True)
     blockchain_hash = models.CharField(
         max_length=255,
@@ -53,13 +54,13 @@ class Certificate(models.Model):
         return f"Certificate {self.certificate_id} for {self.user.username}"
 
 
-
 class CertificateRequest(models.Model):
     # Tracks user requests for certificates based on completed KnowledgePaths or events, managing the request's approval status and related details.
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
         ('APPROVED', 'Approved'),
-        ('REJECTED', 'Rejected')
+        ('REJECTED', 'Rejected'),
+        ('CANCELLED', 'Cancelled')
     ]
 
     requester = models.ForeignKey(
@@ -102,15 +103,41 @@ class CertificateRequest(models.Model):
     def __str__(self):
         return f"{self.requester.username}'s request for {self.knowledge_path.title if self.knowledge_path else 'an event'}"
 
-    def approve(self, reviewer):
+    def approve(self, approver, note=''):
+        if self.status not in ['PENDING', 'REJECTED']:
+            raise ValueError('Can only approve pending or rejected requests')
+        
         self.status = 'APPROVED'
-        self.reviewed_by = reviewer
         self.response_date = timezone.now()
         self.save()
+        
+        # Create certificate template with note
+        template = CertificateTemplate.objects.create(
+            title=f"Certificate for {self.knowledge_path.title}",
+            description=f"Certificate issued for completing {self.knowledge_path.title}",
+            note=note
+        )
+        
+        # Create certificate with template
+        Certificate.objects.create(
+            user=self.requester,
+            knowledge_path=self.knowledge_path,
+            template=template
+        )
 
-    def reject(self, reviewer, reason):
+    def reject(self, rejector, reason='', note=''):
+        if self.status != 'PENDING':
+            raise ValueError('Can only reject pending requests')
+        
         self.status = 'REJECTED'
-        self.reviewed_by = reviewer
+        self.response_date = timezone.now()
         self.rejection_reason = reason
+        self.save()
+
+    def cancel(self):
+        if self.status != 'PENDING':
+            raise ValueError('Can only cancel pending requests')
+        
+        self.status = 'CANCELLED'
         self.response_date = timezone.now()
         self.save()

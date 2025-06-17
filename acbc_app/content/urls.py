@@ -24,7 +24,9 @@ from .views import (
     RecentUserContentView,
     UserContentByIdView,
     ContentReferencesView,
-    ContentProfileDetailView
+    ContentProfileDetailView,
+    ContentProfileCreateView,
+    URLPreviewView
 )
 
 app_name = "content"
@@ -52,10 +54,12 @@ urlpatterns = [
     path('upload-content/', UploadContentView.as_view(), name='upload_content'),
     path('user-content/', UserContentListView.as_view(), name='user-content'),
     path('user-content/<int:user_id>/', UserContentByIdView.as_view(), name='user-content-by-id'),
+    path('content-profiles/', ContentProfileCreateView.as_view(), name='content-profile-create'),
     path('content-profiles/<int:content_profile_id>/', ContentProfileView.as_view(), name='content-profile-view'),
     path('content-profiles/<int:profile_id>/detail/', ContentProfileDetailView.as_view(), name='content-profile-detail'),
     path('topics/<int:pk>/content/', TopicEditContentView.as_view(), name='topic-edit-content'),
     path('topics/<int:pk>/content/<str:media_type>/', TopicContentMediaTypeView.as_view(), name='topic-content-media-type'),
     path('recent-user-content/', RecentUserContentView.as_view(), name='recent-user-content'),
-    path('references/<int:pk>/', ContentReferencesView.as_view(), name='content-references')
+    path('references/<int:pk>/', ContentReferencesView.as_view(), name='content-references'),
+    path('preview-url/', URLPreviewView.as_view(), name='preview-url'),
 ]

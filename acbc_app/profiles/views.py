@@ -5,7 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -36,6 +36,9 @@ from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.provider import GoogleProvider
 from allauth.socialaccount.models import SocialApp, SocialToken
 from allauth.socialaccount.models import SocialAccount
+from notifications.models import Notification
+from django.db import connection
+from django.db.models import Count
 
 logger = logging.getLogger('app_logger')
 
@@ -45,7 +48,20 @@ class CheckAuth(APIView):
 
     @method_decorator(csrf_exempt)
     def get(self, request):
+        # Check if user is authenticated via session
         is_authenticated = request.user.is_authenticated
+        
+        # If not authenticated via session, check for refresh token cookie
+        if not is_authenticated:
+            refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
+            if refresh_token:
+                try:
+                    # Try to validate the refresh token
+                    RefreshToken(refresh_token)
+                    is_authenticated = True
+                except Exception:
+                    pass
+        
         print(f"User authenticated: {is_authenticated}")
         return Response({'is_authenticated': is_authenticated}, status=status.HTTP_200_OK)
 
@@ -689,3 +705,189 @@ class GoogleLoginView(SocialLoginView):
                 {'error': 'Failed to complete login process'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class UserNotificationsView(APIView):
+    """
+    Custom view for user-specific notification functionality.
+    Extends the basic functionality provided by django-notifications.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        print("\n=== Fetching User Notifications ===")
+        print(f"User: {request.user.username}")
+        print(f"User ID: {request.user.id}")
+        
+        # Get show_all parameter from query string
+        show_all = request.query_params.get('show_all', 'false').lower() == 'true'
+        
+        # Clean up old notifications first
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        cutoff_date = timezone.now() - timedelta(days=30)
+        deleted_count = Notification.objects.filter(
+            recipient=request.user,
+            unread=False,
+            timestamp__lt=cutoff_date
+        ).delete()[0]
+        
+        print(f"Cleaned up {deleted_count} old notifications")
+        
+        # Get notifications for the user
+        notifications = Notification.objects.filter(recipient=request.user)
+        
+        # If not showing all, only get unread notifications
+        if not show_all:
+            notifications = notifications.filter(unread=True)
+        
+        # Print the actual SQL query
+        print("\nSQL Query:")
+        print(notifications.query)
+        
+        # Print the count
+        count = notifications.count()
+        print(f"\nFound {count} notifications")
+        
+        # Log some details about the notifications
+        for notification in notifications:
+            print(f"\nNotification ID: {notification.id}")
+            print(f"Verb: {notification.verb}")
+            print(f"Actor: {notification.actor}")
+            print(f"Action Object: {notification.action_object}")
+            print(f"Target: {notification.target}")
+            print(f"Unread: {notification.unread}")
+            print(f"Timestamp: {notification.timestamp}")
+            print("---")
+        
+        # Get notification counts by type
+        notification_types = notifications.values('verb').annotate(count=Count('id'))
+        print("\nNotification types and counts:")
+        for nt in notification_types:
+            print(f"{nt['verb']}: {nt['count']}")
+        
+        # Serialize the notifications
+        notification_data = [{
+            'id': n.id,
+            'actor': n.actor.username if n.actor else None,
+            'verb': n.verb,
+            'description': n.description,
+            'timestamp': n.timestamp,
+            'unread': n.unread,
+            'content_type': n.target._meta.model_name if n.target else None,
+            'target_url': n.target.get_absolute_url() if n.target and hasattr(n.target, 'get_absolute_url') else None,
+        } for n in notifications]
+        
+        print("\nSerialized data being sent:")
+        print(notification_data)
+        
+        print("=== End Fetching Notifications ===\n")
+        return Response({
+            'notifications': notification_data,
+            'cleaned_up_count': deleted_count
+        })
+
+    def post(self, request, notification_id=None):
+        """
+        Mark a notification as read or mark all notifications as read.
+        If notification_id is provided, mark that specific notification as read.
+        Otherwise, mark all notifications as read.
+        """
+        print("\n=== Marking Notifications as Read ===")
+        print(f"User: {request.user.username}")
+        
+        if notification_id:
+            # Mark specific notification as read
+            try:
+                notification = Notification.objects.get(
+                    recipient=request.user,
+                    id=notification_id
+                )
+                print(f"Found notification: {notification.id}")
+                
+                notification.mark_as_read()
+                print("Successfully marked as read")
+                
+                print("=== End Marking Notification as Read ===\n")
+                return Response({'status': 'success'})
+            except Notification.DoesNotExist:
+                print(f"Notification {notification_id} not found")
+                print("=== End Marking Notification as Read ===\n")
+                return Response(
+                    {'error': 'Notification not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Mark all notifications as read
+            try:
+                # Get all unread notifications for the user
+                unread_notifications = Notification.objects.filter(
+                    recipient=request.user,
+                    unread=True
+                )
+                count = unread_notifications.count()
+                print(f"Found {count} unread notifications")
+                
+                # Mark all as read
+                unread_notifications.mark_all_as_read()
+                print(f"Successfully marked {count} notifications as read")
+                
+                print("=== End Marking All Notifications as Read ===\n")
+                return Response({
+                    'status': 'success',
+                    'marked_as_read': count
+                })
+            except Exception as e:
+                print(f"Error marking all notifications as read: {str(e)}")
+                print("=== End Marking All Notifications as Read ===\n")
+                return Response(
+                    {'error': 'Failed to mark notifications as read'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+    def delete(self, request, notification_id=None):
+        """
+        Delete a notification or clean up old notifications.
+        If notification_id is provided, delete that specific notification.
+        Otherwise, delete all read notifications older than 30 days.
+        """
+        print("\n=== Deleting Notifications ===")
+        print(f"User: {request.user.username}")
+        
+        if notification_id:
+            # Delete specific notification
+            try:
+                notification = Notification.objects.get(
+                    recipient=request.user,
+                    id=notification_id
+                )
+                notification.delete()
+                print(f"Deleted notification {notification_id}")
+                return Response({'status': 'success'})
+            except Notification.DoesNotExist:
+                return Response(
+                    {'error': 'Notification not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Delete old read notifications
+            from django.utils import timezone
+            from datetime import timedelta
+            
+            # Delete notifications that are:
+            # 1. Read (unread=False)
+            # 2. Older than 30 days
+            # 3. Belong to the current user
+            cutoff_date = timezone.now() - timedelta(days=30)
+            deleted_count = Notification.objects.filter(
+                recipient=request.user,
+                unread=False,
+                timestamp__lt=cutoff_date
+            ).delete()[0]
+            
+            print(f"Deleted {deleted_count} old notifications")
+            return Response({
+                'status': 'success',
+                'deleted_count': deleted_count
+            })

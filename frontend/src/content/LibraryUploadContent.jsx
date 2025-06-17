@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Grid, Paper, Container, Typography, Box } from '@mui/material';
 import UploadContentForm from './UploadContentForm';
 import RecentUserContent from './RecentUserContent';
 
-const UploadContent = ({ onContentUploaded }) => {
+const LibraryUploadContent = () => {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleContentUploaded = (contentProfile) => {
+    // Increment the refresh trigger to cause RecentUserContent to re-fetch
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
@@ -17,12 +24,12 @@ const UploadContent = ({ onContentUploaded }) => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 3 }}>
-            <UploadContentForm onContentUploaded={onContentUploaded} />
+            <UploadContentForm onContentUploaded={handleContentUploaded} />
           </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 3 }}>
-            <RecentUserContent />
+            <RecentUserContent key={refreshTrigger} />
           </Paper>
         </Grid>
       </Grid>
@@ -30,4 +37,4 @@ const UploadContent = ({ onContentUploaded }) => {
   );
 };
 
-export default UploadContent; 
+export default LibraryUploadContent; 

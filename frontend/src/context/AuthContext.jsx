@@ -40,48 +40,37 @@ export const AuthProvider = ({ children }) => {
   const refreshTimeoutRef = useRef(null);
 
   const updateAuthState = (userData, accessToken) => {
-    console.log('Updating auth state with:', { userData, hasAccessToken: !!accessToken });
-    
-    // Store access token in localStorage
     if (accessToken) {
       setAccessTokenInLocalStorage(accessToken);
       scheduleTokenRefresh(accessToken);
     }
 
-    // Store user data in localStorage
     setUserInLocalStorage(userData);
     setAuthenticationStatus(true);
 
-    // Update React context state
     setAuthState({
       isAuthenticated: true,
       user: userData
     });
-    console.log('Auth state updated:', { isAuthenticated: true, user: userData });
   };
 
   const clearAuthState = () => {
-    console.log('Clearing auth state');
     removeAccessTokenFromLocalStorage();
     clearAuthenticationStatus();
     
-    // Preserve username before removing user data
     const storedUser = getUserFromLocalStorage();
     const username = storedUser ? storedUser.username : null;
     removeUserFromLocalStorage();
     
-    // Store just the username back in localStorage
     if (username) {
       localStorage.setItem('user', JSON.stringify({ username }));
     }
     
-    // Clear React context state
     setAuthState({
       isAuthenticated: false,
       user: null
     });
 
-    // Clear any pending refresh
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current);
       refreshTimeoutRef.current = null;
@@ -90,79 +79,53 @@ export const AuthProvider = ({ children }) => {
 
   const scheduleTokenRefresh = (token) => {
     try {
-      console.log('Scheduling token refresh');
       const decodedToken = jwtDecode(token);
       const expiresAt = decodedToken.exp * 1000;
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
       const refreshTime = Math.max(0, timeUntilExpiry - 60000); // Refresh 1 minute before expiry
       
-      console.log('Token refresh scheduled for:', new Date(now + refreshTime));
-      
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
       
       refreshTimeoutRef.current = setTimeout(async () => {
-        console.log('Attempting to refresh token');
         try {
           const response = await axiosInstance.post('/profiles/refresh_token/');
           if (response.data.access_token) {
-            console.log('Token refresh successful');
             setAccessTokenInLocalStorage(response.data.access_token);
             scheduleTokenRefresh(response.data.access_token);
           } else {
-            console.log('Token refresh failed - no new token received');
             clearAuthState();
           }
         } catch (error) {
-          console.error('Token refresh failed:', error);
           clearAuthState();
         }
       }, refreshTime);
     } catch (error) {
-      console.error('Error scheduling token refresh:', error);
+      // Token refresh scheduling failed
     }
   };
 
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('Initializing authentication state');
       try {
         const backendAuthStatus = await checkAuth();
-        console.log('Backend auth status:', backendAuthStatus);
-        
         const storedUser = getUserFromLocalStorage();
-        console.log('Stored user:', storedUser);
-        
         const localStorageAuth = isAuthenticated();
-        console.log('LocalStorage auth status:', localStorageAuth);
-        
         const storedAccessToken = getAccessTokenFromLocalStorage();
-        console.log('Stored access token:', storedAccessToken ? 'Token exists' : 'No token');
 
         if (backendAuthStatus && storedUser && storedAccessToken) {
-          console.log('All auth components present, restoring session');
-          
-          // Schedule token refresh
           scheduleTokenRefresh(storedAccessToken);
           
-          // Set auth state
           setAuthState({
             isAuthenticated: true,
             user: storedUser
           });
-          console.log('Session restored successfully');
         } else {
-          console.log('Missing auth components, clearing session:', {
-            backendAuthStatus,
-            hasStoredUser: !!storedUser,
-            hasStoredToken: !!storedAccessToken
-          });
           clearAuthState();
         }
       } catch (error) {
-        console.error('Error checking authentication:', error);
         clearAuthState();
       }
     };
@@ -171,13 +134,11 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       if (refreshTimeoutRef.current) {
-        console.log('Cleaning up token refresh timeout');
         clearTimeout(refreshTimeoutRef.current);
       }
     };
   }, []);
 
-  // Expose auth context to window for axios interceptors
   useEffect(() => {
     window.authContext = {
       updateAuthState,
