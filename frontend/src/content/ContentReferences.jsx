@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText, Avatar } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/dateUtils';
 
@@ -28,6 +28,18 @@ const ContentReferences = ({ references }) => {
                                 onClick={() => navigate(`/knowledge_path/${path.id}`)}
                                 sx={{ width: '100%', textAlign: 'left' }}
                             >
+                                <Avatar 
+                                    src={path.image} 
+                                    alt={path.title}
+                                    sx={{ 
+                                        width: 40, 
+                                        height: 40, 
+                                        mr: 2,
+                                        bgcolor: 'grey.300'
+                                    }}
+                                >
+                                    {path.title.charAt(0).toUpperCase()}
+                                </Avatar>
                                 <ListItemText primary={path.title} />
                             </ListItem>
                         ))}
@@ -49,6 +61,18 @@ const ContentReferences = ({ references }) => {
                                 onClick={() => navigate(`/content/topics/${topic.id}`)}
                                 sx={{ width: '100%', textAlign: 'left' }}
                             >
+                                <Avatar 
+                                    src={topic.topic_image} 
+                                    alt={topic.title}
+                                    sx={{ 
+                                        width: 40, 
+                                        height: 40, 
+                                        mr: 2,
+                                        bgcolor: 'grey.300'
+                                    }}
+                                >
+                                    {topic.title.charAt(0).toUpperCase()}
+                                </Avatar>
                                 <ListItemText primary={topic.title} />
                             </ListItem>
                         ))}
@@ -70,6 +94,18 @@ const ContentReferences = ({ references }) => {
                                 onClick={() => navigate(`/publications/${pub.id}`)}
                                 sx={{ width: '100%', textAlign: 'left' }}
                             >
+                                <Avatar 
+                                    src={pub.profile_picture || '/default-avatar.png'} 
+                                    alt={pub.username}
+                                    sx={{ 
+                                        width: 40, 
+                                        height: 40, 
+                                        mr: 2,
+                                        bgcolor: 'grey.300'
+                                    }}
+                                >
+                                    {pub.username.charAt(0).toUpperCase()}
+                                </Avatar>
                                 <ListItemText 
                                     primary={`Publication by ${pub.username}`}
                                     secondary={formatDate(pub.published_at)}

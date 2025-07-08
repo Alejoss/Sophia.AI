@@ -25,9 +25,24 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
         if (event) {
             event.stopPropagation();
         }
+        
+        // Handle different content structures:
+        // 1. From ContentDetailsTopic: content.selected_profile.title/author
+        // 2. From PublicationDetail: content.title/author (profile data)
+        // 3. Fallback to original content data
+        const title = content?.selected_profile?.title || 
+                     content?.title || 
+                     content?.content?.original_title || 
+                     content?.original_title || '';
+        
+        const author = content?.selected_profile?.author || 
+                      content?.author || 
+                      content?.content?.original_author || 
+                      content?.original_author || '';
+        
         setFormData({
-            title: content?.selected_profile?.title || content?.original_title || '',
-            author: content?.selected_profile?.author || content?.original_author || '',
+            title: title,
+            author: author,
             personalNote: ''
         });
         setOpenModal(true);
@@ -47,8 +62,18 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
 
     const handleSubmit = async () => {
         try {
-            if (!content?.id) return;
-            await contentApi.createContentProfile(content.id, formData);
+            // Get the correct content ID based on the content structure
+            // For ContentDetailsTopic: content.id is the Content ID
+            // For PublicationDetail: content.id is the ContentProfile ID, content.content.id is the Content ID
+            const contentId = content?.content?.id || content?.id;
+            
+            if (!contentId) {
+                console.error('AddToLibraryModal: No content ID found in content object:', content);
+                return;
+            }
+            
+            console.log('AddToLibraryModal: Creating content profile for content ID:', contentId);
+            await contentApi.createContentProfile(contentId, formData);
             handleClose();
             if (onSuccess) {
                 onSuccess();
@@ -61,14 +86,26 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
     return (
         <>
             <Tooltip title="Add to library">
-                <IconButton
-                    onClick={handleOpen}
-                    color="primary"
-                    size="small"
-                    {...buttonProps}
-                >
-                    <AddIcon />
-                </IconButton>
+                {buttonProps?.variant ? (
+                    // Show as a button with text when buttonProps are provided
+                    <Button
+                        onClick={handleOpen}
+                        startIcon={<AddIcon />}
+                        {...buttonProps}
+                    >
+                        Add To Library
+                    </Button>
+                ) : (
+                    // Show as an icon button (default behavior)
+                    <IconButton
+                        onClick={handleOpen}
+                        color="primary"
+                        size="small"
+                        {...buttonProps}
+                    >
+                        <AddIcon />
+                    </IconButton>
+                )}
             </Tooltip>
 
             <Dialog 

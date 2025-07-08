@@ -2,6 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from content.models import Publication
+from content.serializers import PublicationSerializer
 
 class PublicationDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -15,7 +17,7 @@ class PublicationDetailView(APIView):
             publication = Publication.objects.get(id=publication_id)
             print(f"Found publication: {publication}")
             
-            serializer = PublicationSerializer(publication)
+            serializer = PublicationSerializer(publication, context={'request': request})
             print(f"Serialized data: {serializer.data}")
             
             return Response(serializer.data)

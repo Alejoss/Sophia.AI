@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Avatar, IconButton, FormControlLabel, Switch, Typography } from '@mui/material';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizzesApi from '../api/quizzesApi';
-import ContentSearchModal from '../content/ContentSearchModal';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -13,27 +14,36 @@ const KnowledgePathEdit = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
-    description: ''
+    description: '',
+    is_visible: false
   });
+  const [knowledgePathImage, setKnowledgePathImage] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddingNode, setIsAddingNode] = useState(false);
   const [isRemovingNode, setIsRemovingNode] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [isReordering, setIsReordering] = useState(false);
   const [quizzes, setQuizzes] = useState({});
+  const [showForm, setShowForm] = useState(false);
+  const [knowledgePath, setKnowledgePath] = useState(null);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
       try {
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
+        setKnowledgePath(data);
         setFormData({
           title: data.title,
-          description: data.description
+          description: data.description,
+          is_visible: data.is_visible || false
         });
+        setKnowledgePathImage(data.image);
         setNodes(data.nodes || []);
+        
+        console.log('KnowledgePathEdit - Loaded knowledge path data:', data);
+        console.log('KnowledgePathEdit - Image URL:', data.image);
+        console.log('KnowledgePathEdit - Can be visible:', data.can_be_visible);
         
         // Fetch quizzes and map them to nodes using the correct attribute
         const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
@@ -59,6 +69,16 @@ const KnowledgePathEdit = () => {
     fetchKnowledgePath();
   }, [pathId]);
 
+  // Refresh data when component becomes visible (e.g., returning from add node)
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshKnowledgePathData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [pathId]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prevState => ({
@@ -67,15 +87,45 @@ const KnowledgePathEdit = () => {
     }));
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setKnowledgePathImage(URL.createObjectURL(file));
+      // Store the file for upload
+      setFormData(prevState => ({
+        ...prevState,
+        image: file
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccessMessage('');
 
+    console.log('KnowledgePathEdit - Submitting form data:', formData);
+    console.log('KnowledgePathEdit - Form data has image:', formData.image instanceof File);
+
     try {
-      await knowledgePathsApi.updateKnowledgePath(pathId, formData);
+      // Remove is_visible from formData since it's handled separately
+      const { is_visible, ...submitData } = formData;
+      const updatedData = await knowledgePathsApi.updateKnowledgePath(pathId, submitData);
       setSuccessMessage('Knowledge path updated successfully');
+      
+      // Update the image display with the new image URL from the response
+      if (updatedData.image) {
+        setKnowledgePathImage(updatedData.image);
+      }
+      
+      // Clear the image file from formData after successful upload
+      setFormData(prevState => {
+        const { image, ...rest } = prevState;
+        return rest;
+      });
+      
     } catch (err) {
+      console.error('KnowledgePathEdit - Error updating knowledge path:', err);
       setError(err.message || 'Failed to update knowledge path');
     }
   };
@@ -84,21 +134,17 @@ const KnowledgePathEdit = () => {
     navigate(`/knowledge_path/${pathId}/add-node`);
   };
 
-  const handleSelectContent = async (contentProfile) => {
-    setIsAddingNode(true);
-    setError(null);
-
+  const refreshKnowledgePathData = async () => {
     try {
-      const newNode = await knowledgePathsApi.addNode(pathId, {
-        content_profile_id: contentProfile.id
-      });
-      setNodes([...nodes, newNode]);
-      setIsModalOpen(false);
+      const updatedData = await knowledgePathsApi.getKnowledgePath(pathId);
+      setKnowledgePath(updatedData);
+      setFormData(prevState => ({
+        ...prevState,
+        is_visible: updatedData.is_visible || false
+      }));
+      setNodes(updatedData.nodes || []);
     } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Failed to add node';
-      setError(errorMessage);
-    } finally {
-      setIsAddingNode(false);
+      console.error('Error refreshing knowledge path data:', err);
     }
   };
 
@@ -109,6 +155,14 @@ const KnowledgePathEdit = () => {
     try {
       await knowledgePathsApi.removeNode(pathId, nodeId);
       setNodes(nodes.filter(node => node.id !== nodeId));
+      
+      // Refresh knowledge path data to get updated visibility status
+      const updatedData = await knowledgePathsApi.getKnowledgePath(pathId);
+      setKnowledgePath(updatedData);
+      setFormData(prevState => ({
+        ...prevState,
+        is_visible: updatedData.is_visible || false
+      }));
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to remove node';
       setError(errorMessage);
@@ -119,6 +173,10 @@ const KnowledgePathEdit = () => {
 
   const handleAddActivityRequirement = () => {
     navigate(`/quizzes/${pathId}/create`);
+  };
+
+  const toggleForm = () => {
+    setShowForm(!showForm);
   };
 
   const handleMoveNode = async (nodeId, direction) => {
@@ -164,24 +222,151 @@ const KnowledgePathEdit = () => {
         >
           ← Back to Path
         </Link>
-        <h1 className="text-2xl font-bold">Edit Knowledge Path</h1>
       </div>
 
-      <div className="mb-4">
-        <Link
-          to={`/knowledge_path/${pathId}`}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+      {/* Knowledge Path Header with Image and Title */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <div className="flex items-start bg-white p-6 rounded-lg shadow">
+          <Avatar 
+            src={knowledgePathImage} 
+            alt={formData.title}
+            sx={{ 
+              width: 100, 
+              height: 100, 
+              mr: 4,
+              bgcolor: 'grey.300',
+              fontSize: '2.5rem',
+              flexShrink: 0
+            }}
+          >
+            {formData.title ? formData.title.charAt(0).toUpperCase() : 'K'}
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">{formData.title}</h1>
+              <Link
+                to={`/knowledge_path/${pathId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700 transition-colors"
+                title="View Knowledge Path"
+              >
+                <OpenInNewIcon />
+              </Link>
+            </div>
+            <p className="text-gray-600 mb-4">{formData.description}</p>
+            <div className="text-sm text-gray-500">
+              Created by {knowledgePath?.author || 'Loading...'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 flex gap-4 items-center">
+        <button
+          onClick={toggleForm}
+          className={`font-bold py-2 px-4 rounded transition-colors ${
+            showForm 
+              ? 'bg-gray-500 hover:bg-gray-700 text-white' 
+              : 'bg-green-500 hover:bg-green-700 text-white'
+          }`}
         >
-          View Knowledge Path
-        </Link>
+          {showForm ? 'Hide Form' : 'Edit Knowledge Path Details'}
+        </button>
+        
+        {/* Visibility Toggle - Independent of form */}
+        <div className="flex items-center gap-2 ml-auto">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.is_visible}
+                disabled={!knowledgePath?.can_be_visible}
+                onChange={async (e) => {
+                  const newVisibility = e.target.checked;
+                  try {
+                    await knowledgePathsApi.updateKnowledgePath(pathId, { is_visible: newVisibility });
+                    setFormData(prevState => ({
+                      ...prevState,
+                      is_visible: newVisibility
+                    }));
+                  } catch (err) {
+                    console.error('Error updating visibility:', err);
+                    // Revert the switch if the update failed
+                    e.target.checked = !newVisibility;
+                  }
+                }}
+                name="is_visible"
+              />
+            }
+            label="Public"
+            sx={{ mb: 0, color: 'text.primary' }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {formData.is_visible ? 'Visible to others' : ''}
+          </Typography>
+          {!knowledgePath?.can_be_visible && (
+            <Typography variant="caption" color="default" sx={{ ml: 1 }}>
+              Knowledge paths need at least two nodes to be visible
+            </Typography>
+          )}
+        </div>
       </div>
 
       {/* Form Section */}
-      <div className="max-w-4xl mx-auto mt-6">
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
+      {showForm && (
+        <div className="max-w-4xl mx-auto mt-6">
+          <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
           {error && (
             <div className="text-red-600 mb-4">{error}</div>
           )}
+
+          {/* Image Section */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-bold mb-2">
+              Cover Image
+            </label>
+            <div className="flex items-center space-x-4">
+              <Avatar 
+                src={knowledgePathImage} 
+                alt={formData.title}
+                sx={{ 
+                  width: 100, 
+                  height: 100, 
+                  bgcolor: 'grey.300',
+                  fontSize: '2rem'
+                }}
+              >
+                {formData.title ? formData.title.charAt(0).toUpperCase() : 'K'}
+              </Avatar>
+              <div>
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="image-upload"
+                  type="file"
+                  onChange={handleImageUpload}
+                />
+                <label htmlFor="image-upload">
+                  <IconButton
+                    color="primary"
+                    aria-label="upload picture"
+                    component="span"
+                    sx={{ 
+                      border: '2px dashed #ccc',
+                      borderRadius: '8px',
+                      padding: '12px'
+                    }}
+                  >
+                    <PhotoCameraIcon />
+                  </IconButton>
+                </label>
+                <p className="text-sm text-gray-500 mt-1">
+                  Click to upload a cover image
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div className="mb-4">
             <label htmlFor="title" className="block text-gray-700 font-bold mb-2">
@@ -220,7 +405,17 @@ const KnowledgePathEdit = () => {
             Update Knowledge Path
           </button>
         </form>
+        
+        {successMessage && (
+          <div className="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            {successMessage}
+          </div>
+        )}
+        </div>
+      )}
 
+      {/* Node Management Section */}
+      <div className="max-w-4xl mx-auto mt-6">
         <div className="mb-4">
           <button
             onClick={handleAddNode}
@@ -346,16 +541,6 @@ const KnowledgePathEdit = () => {
             </table>
           </div>
         )}
-
-        <ContentSearchModal
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setError(null);
-          }}
-          onSelectContent={handleSelectContent}
-          isLoading={isAddingNode}
-        />
       </div>
     </div>
   );

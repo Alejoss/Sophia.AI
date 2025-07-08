@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Avatar } from '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import certificatesApi from '../api/certificatesApi';
 import commentsApi from '../api/commentsApi';
@@ -296,38 +297,66 @@ const KnowledgePathDetail = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
-            <p className="text-gray-600">Created by {knowledgePath.author}</p>
-            {isCreator && pendingRequests > 0 && (
-              <button
-                onClick={handleViewCertificateRequests}
-                className="mt-2 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
-              >
-                <span>You have {pendingRequests} pending certificate request{pendingRequests !== 1 ? 's' : ''}</span>
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            <BookmarkButton 
-              contentId={pathId}
-              contentType="knowledgepath"
-            />
-            <VoteComponent 
-              type="knowledge_path"
-              ids={{ pathId }}
-              initialVoteCount={knowledgePath.vote_count}
-              initialUserVote={knowledgePath.user_vote}
-            />
-            {isCreator && (
-              <Link
-                to={`/knowledge_path/${pathId}/edit`}
-                className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
-              >
-                Edit Path
-              </Link>
-            )}
+        {/* Header with Image */}
+        <div className="flex items-start mb-6">
+          <Avatar 
+            src={knowledgePath.image} 
+            alt={knowledgePath.title}
+            sx={{ 
+              width: 120, 
+              height: 120, 
+              mr: 4,
+              bgcolor: 'grey.300',
+              fontSize: '3rem',
+              flexShrink: 0
+            }}
+          >
+            {knowledgePath.title.charAt(0).toUpperCase()}
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
+                <p className="text-gray-600">
+                  Created by{' '}
+                  <Link 
+                    to={`/profiles/user_profile/${knowledgePath.author_id}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {knowledgePath.author}
+                  </Link>
+                </p>
+                {isCreator && pendingRequests > 0 && (
+                  <button
+                    onClick={handleViewCertificateRequests}
+                    className="mt-2 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
+                  >
+                    <span>You have {pendingRequests} pending certificate request{pendingRequests !== 1 ? 's' : ''}</span>
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <BookmarkButton 
+                  contentId={pathId}
+                  contentType="knowledgepath"
+                />
+                <VoteComponent 
+                  type="knowledge_path"
+                  ids={{ pathId }}
+                  initialVoteCount={Number(knowledgePath.vote_count) || 0}
+                  initialUserVote={Number(knowledgePath.user_vote) || 0}
+                />
+                {isCreator && (
+                  <Link
+                    to={`/knowledge_path/${pathId}/edit`}
+                    className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+                  >
+                    Edit Path
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

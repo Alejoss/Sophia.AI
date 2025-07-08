@@ -133,16 +133,27 @@ const socialLogin = async (credential) => {
   }
 };
 
-const getNotifications = async () => {
+const getNotifications = async (showAll = false) => {
   console.log('getNotifications called');
   try {
     console.log('Making API request to /profiles/notifications/');
-    const response = await axiosInstance.get('/profiles/notifications/');
+    const url = showAll ? '/profiles/notifications/?show_all=true' : '/profiles/notifications/';
+    const response = await axiosInstance.get(url);
     console.log('Notifications API response:', response.data);
     return response.data.notifications;
   } catch (error) {
     console.error('Error in getNotifications:', error);
     throw error;
+  }
+};
+
+const getUnreadNotificationsCount = async () => {
+  try {
+    const response = await axiosInstance.get('/profiles/notifications/unread-count/');
+    return response.data.unread_count;
+  } catch (error) {
+    console.error('Error in getUnreadNotificationsCount:', error);
+    return 0;
   }
 };
 
@@ -198,6 +209,51 @@ const markAllNotificationsAsRead = async () => {
   }
 };
 
+// Cryptocurrency API functions
+const getCryptocurrencies = async () => {
+  try {
+    const response = await axiosInstance.get('/profiles/cryptocurrencies/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching cryptocurrencies:', error);
+    throw error;
+  }
+};
+
+const getUserAcceptedCryptos = async (userId = null) => {
+  try {
+    const url = userId ? `/profiles/accepted-cryptos/${userId}/` : '/profiles/accepted-cryptos/';
+    const response = await axiosInstance.get(url);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching accepted cryptocurrencies:', error);
+    throw error;
+  }
+};
+
+const addAcceptedCrypto = async (cryptoId, address) => {
+  try {
+    const response = await axiosInstance.post('/profiles/accepted-cryptos/', {
+      crypto_id: cryptoId,
+      address: address
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error adding accepted cryptocurrency:', error);
+    throw error;
+  }
+};
+
+const deleteAcceptedCrypto = async (cryptoId) => {
+  try {
+    const response = await axiosInstance.delete(`/profiles/accepted-cryptos/delete/${cryptoId}/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting accepted cryptocurrency:', error);
+    throw error;
+  }
+};
+
 export { 
   getUserProfile, 
   apiLogout, 
@@ -210,8 +266,13 @@ export {
   refreshToken,
   socialLogin,
   getNotifications,
+  getUnreadNotificationsCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-  cleanupNotifications
+  cleanupNotifications,
+  getCryptocurrencies,
+  getUserAcceptedCryptos,
+  addAcceptedCrypto,
+  deleteAcceptedCrypto
 };

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 import contentApi from '../api/contentApi';
 
+// ContentDisplay Mode: Uses SimpleContentProfileSerializer for minimal information in content selection
 const TopicAddContent = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();

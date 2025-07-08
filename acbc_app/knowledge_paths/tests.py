@@ -97,7 +97,8 @@ class KnowledgePathAPITests(APITestCase):
         self.knowledge_path = KnowledgePath.objects.create(
             title='Test Path',
             description='Test Description',
-            author=self.user
+            author=self.user,
+            is_visible=True
         )
 
     def test_create_knowledge_path(self):
@@ -158,7 +159,8 @@ class NodeAPITests(APITestCase):
         self.knowledge_path = KnowledgePath.objects.create(
             title='Test Path',
             description='Test Description',
-            author=self.user
+            author=self.user,
+            is_visible=True
         )
         self.content = Content.objects.create(
             original_title='Test Content',

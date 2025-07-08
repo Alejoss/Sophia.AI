@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
 
+// ContentDisplay Mode: "simple" - Uses SimpleContentProfileSerializer for optimized performance
 const RecentUserContent = () => {
   const [recentContent, setRecentContent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,24 +56,14 @@ const RecentUserContent = () => {
       </Typography>
       <Grid container spacing={2}>
         {recentContent.map((profile) => {
-          const contentData = {
-            ...profile.content,
-            url: profile.content.url || profile.content.file_url,
-            selected_profile: {
-              id: profile.id,
-              title: profile.title,
-              author: profile.author
-            }
-          };
-          
           return (
             <Grid item xs={12} key={profile.id}>
               <ContentDisplay
-                content={contentData}
+                content={profile.content}
                 variant="simple"
-                showAuthor={true}
+                showAuthor={false}
                 maxImageHeight={150}
-                onClick={() => handleContentClick(contentData.id)}
+                onClick={() => handleContentClick(profile.content.id)}
               />
             </Grid>
           );

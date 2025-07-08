@@ -56,30 +56,17 @@ class Content(models.Model):
 
     def get_vote_count(self, topic=None):
         """Get the current vote count, optionally filtered by topic"""
-        print(f"\n=== Content.get_vote_count ===")
-        print(f"Content ID: {self.id}")
-        print(f"Topic: {topic.id if topic else 'None'}")
         
         VoteCount = apps.get_model('votes', 'VoteCount')
         content_type = ContentType.objects.get_for_model(self)
-        print(f"Content Type: {content_type.model}")
         
         vote_count = VoteCount.objects.filter(
             content_type=content_type,
             object_id=self.id,
             topic=topic
         ).first()
-        
-        print(f"VoteCount object found: {vote_count is not None}")
-        if vote_count:
-            print(f"VoteCount ID: {vote_count.id}")
-            print(f"VoteCount value: {vote_count.vote_count}")
-        else:
-            print("No VoteCount object found")
-            
+                    
         result = vote_count.vote_count if vote_count else 0
-        print(f"Returning vote count: {result}")
-        print("=== End Content.get_vote_count ===\n")
         return result
 
     @property
@@ -98,6 +85,30 @@ class Content(models.Model):
             topic=topic
         ).first()
         return vote.value if vote else 0
+
+    def can_be_modified_by(self, user):
+        """
+        Check if the content can be modified by the given user.
+        Content can only be modified if:
+        1. The user is the original uploader
+        2. No other users have added this content to their libraries
+        """
+        if not user or not self.uploaded_by:
+            return False
+        
+        # Check if the user is the original uploader
+        if user.id != self.uploaded_by.id:
+            return False
+        
+        # Check if there are any content profiles from other users
+        other_user_profiles = self.profiles.exclude(user=user)
+        return not other_user_profiles.exists()
+
+    def get_other_user_profiles_count(self):
+        """Get the count of content profiles from users other than the original uploader"""
+        if not self.uploaded_by:
+            return 0
+        return self.profiles.exclude(user=self.uploaded_by).count()
 
 
 class ContentProfile(models.Model):

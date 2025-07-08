@@ -13,80 +13,11 @@ import {
     Stack
 } from '@mui/material';
 import { getBookmarks, deleteBookmark } from '../api/bookmarkApi';
-import ImageIcon from '@mui/icons-material/Image';
-import VideocamIcon from '@mui/icons-material/Videocam';
-import AudiotrackIcon from '@mui/icons-material/Audiotrack';
-import ArticleIcon from '@mui/icons-material/Article';
-import LinkIcon from '@mui/icons-material/Link';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import DescriptionIcon from '@mui/icons-material/Description';
-import DeleteIcon from '@mui/icons-material/Delete';
 import SchoolIcon from '@mui/icons-material/School';
+import ArticleIcon from '@mui/icons-material/Article';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AddToLibraryModal from '../components/AddToLibraryModal';
-
-// Separate component for media type icon
-const MediaTypeIcon = ({ content }) => {
-    console.log('\n=== MediaTypeIcon Component ===');
-    console.log('Content prop:', content);
-    
-    // For content type bookmarks, the data is nested in content.content
-    const contentData = content.content || content;
-    console.log('Content data:', contentData);
-    
-    const hasFavicon = contentData?.favicon;
-    const mediaType = contentData?.media_type;
-    
-    console.log('Has favicon?', !!hasFavicon);
-    console.log('Media type:', mediaType);
-
-    const iconProps = { fontSize: 'large', sx: { opacity: 0.7 } };
-    const [showFallbackIcon, setShowFallbackIcon] = useState(false);
-
-    // First check if content has a favicon
-    if (hasFavicon && mediaType === 'TEXT') {
-        return (
-            <Box sx={{ 
-                width: 24, 
-                height: 24, 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-            }}>
-                {showFallbackIcon ? (
-                    <LinkIcon {...iconProps} />
-                ) : (
-                    <img 
-                        src={contentData.favicon}
-                        alt="Site Icon"
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        onError={() => setShowFallbackIcon(true)}
-                    />
-                )}
-            </Box>
-        );
-    }
-
-    // Handle non-URL content or non-TEXT URL content
-    console.log('Using media type for icon:', mediaType);
-    
-    switch (mediaType) {
-        case 'VIDEO':
-            return <VideocamIcon {...iconProps} />;
-        case 'AUDIO':
-            return <AudiotrackIcon {...iconProps} />;
-        case 'TEXT':
-            if (contentData?.url) {
-                return <LinkIcon {...iconProps} />;
-            }
-            return <ArticleIcon {...iconProps} />;
-        case 'IMAGE':
-            return <ImageIcon {...iconProps} />;
-        default:
-            console.log('Using default icon for media type:', mediaType);
-            return <DescriptionIcon {...iconProps} />;
-    }
-};
+import ContentDisplay from '../content/ContentDisplay';
 
 const Bookmarks = () => {
     const [bookmarks, setBookmarks] = useState([]);
@@ -174,131 +105,138 @@ const Bookmarks = () => {
                         {bookmarks.map((bookmark, index) => {
                             console.log('\n=== Rendering Bookmark ===');
                             console.log('Bookmark:', bookmark);
-                            console.log('Content object:', bookmark.content_object);
+                            console.log('Content type name:', bookmark.content_type_name);
+                            console.log('Content profile:', bookmark.content_profile);
+                            
                             return (
                                 <Box key={bookmark.id}>
-                                    <Box
-                                        onClick={() => handleBookmarkClick(bookmark)}
-                                        sx={{ 
-                                            cursor: 'pointer',
-                                            '&:hover': {
-                                                backgroundColor: 'action.hover'
-                                            },
-                                            p: 2,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 2
-                                        }}
-                                    >
-                                        {bookmark.content_type_name === 'content' && (
-                                            <>
-                                                <Box sx={{ 
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    width: 40,
-                                                    height: 40,
-                                                    backgroundColor: 'background.paper',
-                                                    borderRadius: 1,
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <MediaTypeIcon content={bookmark.content_object} />
-                                                </Box>
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6" color="text.primary">
-                                                        {bookmark.content_object?.title || 
-                                                         bookmark.content_object?.selected_profile?.title || 
-                                                         bookmark.content_object?.original_title || 
-                                                         'Untitled Content'}
-                                                    </Typography>
-                                                    {(bookmark.content_object?.selected_profile?.author || bookmark.content_object?.original_author) && (
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            By {bookmark.content_object.selected_profile?.author || bookmark.content_object.original_author}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                    <AddToLibraryModal 
-                                                        content={bookmark.content_object}
-                                                        onSuccess={fetchBookmarks}
-                                                    />
-                                                    <Tooltip title="Delete bookmark">
-                                                        <IconButton 
-                                                            onClick={(e) => handleDelete(bookmark.id, e)}
-                                                            color="error"
-                                                            size="small"
-                                                        >
-                                                            <DeleteIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Box>
-                                            </>
-                                        )}
-                                        {bookmark.content_type_name === 'knowledgepath' && (
-                                            <>
-                                                <Box sx={{ 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center',
-                                                    width: 60,
-                                                    height: 60,
-                                                    backgroundColor: 'background.paper',
-                                                    borderRadius: 1
-                                                }}>
-                                                    <SchoolIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-                                                </Box>
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6" color="text.primary">
-                                                        {bookmark.content_object?.title || 'Untitled Knowledge Path'}
-                                                    </Typography>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Knowledge Path
-                                                    </Typography>
-                                                </Box>
-                                                <Tooltip title="Delete bookmark">
-                                                    <IconButton 
-                                                        onClick={(e) => handleDelete(bookmark.id, e)}
-                                                        color="error"
-                                                        size="small"
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </>
-                                        )}
-                                        {bookmark.content_type_name === 'publication' && (
-                                            <>
-                                                <Box sx={{ 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'center',
-                                                    width: 60,
-                                                    height: 60,
-                                                    backgroundColor: 'background.paper',
-                                                    borderRadius: 1
-                                                }}>
-                                                    <ArticleIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-                                                </Box>
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6" color="text.primary">
-                                                        {bookmark.content_object?.title || 'Untitled Publication'}
-                                                    </Typography>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Publication
-                                                    </Typography>
-                                                </Box>
-                                                <Tooltip title="Delete bookmark">
-                                                    <IconButton 
-                                                        onClick={(e) => handleDelete(bookmark.id, e)}
-                                                        color="error"
-                                                        size="small"
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </>
-                                        )}
-                                    </Box>
+                                    {bookmark.content_type_name === 'content' && (
+                                        <Box
+                                            onClick={() => handleBookmarkClick(bookmark)}
+                                            sx={{ 
+                                                cursor: 'pointer',
+                                                '&:hover': {
+                                                    backgroundColor: 'action.hover'
+                                                },
+                                                p: 2
+                                            }}
+                                        >
+                                            <ContentDisplay
+                                                content={bookmark.content_profile.content}
+                                                variant="simple"
+                                                showAuthor={true}
+                                                showActions={true}
+                                                additionalActions={
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <AddToLibraryModal 
+                                                            content={bookmark.content_profile}
+                                                            onSuccess={fetchBookmarks}
+                                                        />
+                                                        <Tooltip title="Delete bookmark">
+                                                            <IconButton 
+                                                                onClick={(e) => handleDelete(bookmark.id, e)}
+                                                                color="error"
+                                                                size="small"
+                                                            >
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                }
+                                            />
+                                        </Box>
+                                    )}
+                                    
+                                    {bookmark.content_type_name === 'knowledgepath' && (
+                                        <Box
+                                            onClick={() => handleBookmarkClick(bookmark)}
+                                            sx={{ 
+                                                cursor: 'pointer',
+                                                '&:hover': {
+                                                    backgroundColor: 'action.hover'
+                                                },
+                                                p: 2,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 2
+                                            }}
+                                        >
+                                            <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center',
+                                                width: 60,
+                                                height: 60,
+                                                backgroundColor: 'background.paper',
+                                                borderRadius: 1
+                                            }}>
+                                                <SchoolIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                                            </Box>
+                                            <Box sx={{ flex: 1 }}>
+                                                <Typography variant="h6" color="text.primary">
+                                                    {bookmark.content_profile?.title || 'Untitled Knowledge Path'}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Knowledge Path
+                                                </Typography>
+                                            </Box>
+                                            <Tooltip title="Delete bookmark">
+                                                <IconButton 
+                                                    onClick={(e) => handleDelete(bookmark.id, e)}
+                                                    color="error"
+                                                    size="small"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    )}
+                                    
+                                    {bookmark.content_type_name === 'publication' && (
+                                        <Box
+                                            onClick={() => handleBookmarkClick(bookmark)}
+                                            sx={{ 
+                                                cursor: 'pointer',
+                                                '&:hover': {
+                                                    backgroundColor: 'action.hover'
+                                                },
+                                                p: 2,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 2
+                                            }}
+                                        >
+                                            <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center',
+                                                width: 60,
+                                                height: 60,
+                                                backgroundColor: 'background.paper',
+                                                borderRadius: 1
+                                            }}>
+                                                <ArticleIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                                            </Box>
+                                            <Box sx={{ flex: 1 }}>
+                                                <Typography variant="h6" color="text.primary">
+                                                    {bookmark.content_profile?.title || 'Untitled Publication'}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Publication
+                                                </Typography>
+                                            </Box>
+                                            <Tooltip title="Delete bookmark">
+                                                <IconButton 
+                                                    onClick={(e) => handleDelete(bookmark.id, e)}
+                                                    color="error"
+                                                    size="small"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    )}
+                                    
                                     {index < bookmarks.length - 1 && <Divider />}
                                 </Box>
                             );

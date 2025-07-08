@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
+from content.serializers import SimpleContentProfileSerializer
 from .services import perform_search
 
 # Create your views here.
@@ -51,9 +52,26 @@ class SearchView(APIView):
             # Get search results
             results = perform_search(query, search_type)
             
+            # Serialize results based on type
+            serialized_results = []
+            
+            for result in results:
+                if hasattr(result, 'content'):  # This is a ContentProfile object
+                    # Serialize content profiles using SimpleContentProfileSerializer
+                    serializer = SimpleContentProfileSerializer(result, context={'request': request})
+                    serialized_data = serializer.data
+                    # Add type information for frontend routing
+                    serialized_data['type'] = 'content'
+                    serialized_data['source'] = 'profile'
+                    serialized_data['profile_id'] = result.id
+                    serialized_results.append(serialized_data)
+                else:
+                    # Handle other result types (topics, knowledge paths)
+                    serialized_results.append(result)
+            
             # Paginate the results
             paginator = self.pagination_class()
-            page = paginator.paginate_queryset(results, request)
+            page = paginator.paginate_queryset(serialized_results, request)
             
             # Return paginated response
             return paginator.get_paginated_response(page)

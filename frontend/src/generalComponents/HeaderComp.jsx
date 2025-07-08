@@ -20,11 +20,11 @@ const HeaderComp = () => {
         <li className="nav-item">
           <Link className="nav-link" to="/content/topics">Topics</Link>
         </li>
+        <li className="nav-item">
+          <Link className="nav-link" to="/events">Events</Link>
+        </li>
         {isAuthenticated ? (
             <>
-              <li className="nav-item">
-                <Link className="nav-link" to="/content/library_user">Your Library</Link>
-              </li>
               <li className="nav-item">
                 <Link className="nav-link" to="/profiles/my_profile">{user.username}</Link>
               </li>

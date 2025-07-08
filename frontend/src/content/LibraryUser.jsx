@@ -4,9 +4,10 @@ import NoteIcon from '@mui/icons-material/Note';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { isAuthenticated } from '../context/localStorageUtils';
 import contentApi from '../api/contentApi';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getFileUrl } from '../utils/fileUtils';
 import { AuthContext } from '../context/AuthContext';
+import ContentDisplay from './ContentDisplay';
 
 const LibraryUser = () => {
     // TODO order by most recent by default
@@ -14,54 +15,89 @@ const LibraryUser = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [mediaFilter, setMediaFilter] = useState('ALL');
-    const [userName, setUserName] = useState('');
     const navigate = useNavigate();
-    const { userId } = useParams();
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
-    const isOwnLibrary = !userId || (currentUser && userId === currentUser.id.toString());
 
     useEffect(() => {
         const fetchUserContent = async () => {
             try {
-                let data;
-                if (userId) {
-                    // Fetch content for the specified user
-                    data = await contentApi.getUserContentById(userId);
-                    // You might need to implement this API method
-                } else {
-                    // Fetch content for the current user
-                    data = await contentApi.getUserContent();
-                }
-                setUserContent(data);
+                setLoading(true);
+                setError(null);
+                
+                console.log('Fetching user content for current user');
+                
+                const data = await contentApi.getUserContentWithDetails();
+                
+                console.log('Received data:', data);
+                
+                // Filter out any content items that might be null or undefined
+                const validContent = Array.isArray(data) ? data.filter(item => item && item.content) : [];
+                console.log('Valid content count:', validContent.length);
+                setUserContent(validContent);
                 setLoading(false);
             } catch (err) {
-                setError('Failed to fetch content');
+                console.error('Error fetching user content:', err);
+                setError(err.response?.data?.error || err.message || 'Failed to fetch content');
                 setLoading(false);
             }
         };
 
         if (isAuthenticated()) {
             fetchUserContent();
+        } else {
+            setLoading(false);
         }
-    }, [userId]);
+    }, []);
 
     const handleFilterChange = (event, newFilter) => {
         setMediaFilter(newFilter || 'ALL');
     };
 
-    const filteredContent = userContent.filter(contentProfile => 
-        mediaFilter === 'ALL' || contentProfile.content.media_type === mediaFilter
-    );
+    const filteredContent = userContent.filter(contentProfile => {
+        if (!contentProfile || !contentProfile.content) return false;
+        return mediaFilter === 'ALL' || contentProfile.content.media_type === mediaFilter;
+    });
 
     if (loading) return <Typography>Loading content...</Typography>;
-    if (error) return <Typography color="error">{error}</Typography>;
+    if (error) return (
+        <Box sx={{ pt: 12, px: 3, textAlign: 'center' }}>
+            <Typography color="error" gutterBottom>{error}</Typography>
+            <Button 
+                variant="contained" 
+                onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    // Trigger the useEffect again
+                    const fetchUserContent = async () => {
+                        try {
+                            setLoading(true);
+                            setError(null);
+                            
+                            const data = await contentApi.getUserContentWithDetails();
+                            
+                            const validContent = Array.isArray(data) ? data.filter(item => item && item.content) : [];
+                            setUserContent(validContent);
+                            setLoading(false);
+                        } catch (err) {
+                            console.error('Error fetching user content:', err);
+                            setError(err.response?.data?.error || err.message || 'Failed to fetch content');
+                            setLoading(false);
+                        }
+                    };
+                    fetchUserContent();
+                }}
+            >
+                Retry
+            </Button>
+        </Box>
+    );
     if (!isAuthenticated()) return <Typography>Please login to view content</Typography>;
 
     return (
         <Box sx={{ pt: 12, px: 3 }}>
             <Typography variant="h4" gutterBottom>
-                {isOwnLibrary ? "My Content Library" : `${userName || 'User'}'s Content Library`}
+                My Content Library
             </Typography>
 
             <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -70,6 +106,24 @@ const LibraryUser = () => {
                     exclusive
                     onChange={handleFilterChange}
                     aria-label="media type filter"
+                    sx={{
+                        '& .MuiToggleButton-root': {
+                            color: 'text.primary',
+                            backgroundColor: 'background.paper',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            '&.Mui-selected': {
+                                backgroundColor: 'primary.main',
+                                color: 'primary.contrastText',
+                                '&:hover': {
+                                    backgroundColor: 'primary.dark',
+                                }
+                            },
+                            '&:hover': {
+                                backgroundColor: 'action.hover',
+                            }
+                        }
+                    }}
                 >
                     <ToggleButton value="ALL">All</ToggleButton>
                     <ToggleButton value="IMAGE">Images</ToggleButton>
@@ -78,26 +132,32 @@ const LibraryUser = () => {
                     <ToggleButton value="AUDIO">Audio</ToggleButton>
                 </ToggleButtonGroup>
 
-                {isOwnLibrary && (
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                        <Button 
-                            variant="contained" 
-                            color="primary"
-                            onClick={() => navigate('/content/collections')}
-                        >
-                            Collections
-                        </Button>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button 
+                        variant="contained" 
+                        color="primary"
+                        onClick={() => navigate('/content/collections')}
+                    >
+                        Collections
+                    </Button>
 
-                        <Button 
-                            variant="contained" 
-                            color="primary"
-                            startIcon={<UploadFileIcon />}
-                            onClick={() => navigate('/content/library_upload_content')}
-                        >
-                            Upload Content
-                        </Button>
-                    </Box>
-                )}
+                    <Button 
+                        variant="contained" 
+                        color="primary"
+                        onClick={() => navigate('/profiles/my_profile?section=knowledge-paths')}
+                    >
+                        My Knowledge Paths
+                    </Button>
+
+                    <Button 
+                        variant="contained" 
+                        color="primary"
+                        startIcon={<UploadFileIcon />}
+                        onClick={() => navigate('/content/library_upload_content')}
+                    >
+                        Upload Content
+                    </Button>
+                </Box>
             </Box>
             
             {mediaFilter === 'TEXT' ? (
@@ -120,7 +180,7 @@ const LibraryUser = () => {
                                         borderBottom: '1px solid #eee',
                                         cursor: 'pointer'
                                     }}
-                                    onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${userId || currentUser.id}`)}
+                                    onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${currentUser.id}`)}
                                 >
                                     <td style={{ padding: '12px' }}>{contentProfile.title}</td>
                                     <td style={{ padding: '12px' }}>{contentProfile.author}</td>
@@ -148,62 +208,16 @@ const LibraryUser = () => {
                     </table>
                 </Box>
             ) : (
-                // Grid view for other media types
+                // Grid view using ContentDisplay in card mode
                 <Box display="grid" gridTemplateColumns="repeat(12, 1fr)" gap={3}>
                     {filteredContent.map((contentProfile) => (
                         <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={contentProfile.id}>
-                            <Card 
-                                sx={{ cursor: 'pointer' }}
-                                onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${userId || currentUser.id}`)}
-                            >
-                                {contentProfile.content.media_type === 'IMAGE' && contentProfile.content.file_details?.file && (
-                                    <Box sx={{ 
-                                        width: '100%', 
-                                        height: 200, 
-                                        overflow: 'hidden',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}>
-                                        <img 
-                                            src={getFileUrl(contentProfile.content.file_details.file)} 
-                                            alt={contentProfile.title || 'Content image'}
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover'
-                                            }}
-                                        />
-                                    </Box>
-                                )}
-                                <CardContent>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                        <Typography variant="h6">
-                                            {contentProfile.title || 'Untitled'}
-                                        </Typography>
-                                        {contentProfile.personal_note && (
-                                            <IconButton size="small" title={contentProfile.personal_note}>
-                                                <NoteIcon color="primary" />
-                                            </IconButton>
-                                        )}
-                                    </Box>
-                                    
-                                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                                        <Chip 
-                                            label={contentProfile.content.media_type} 
-                                            size="small"
-                                            color="primary"
-                                        />
-                                        {contentProfile.author && (
-                                            <Chip 
-                                                label={`Author: ${contentProfile.author}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                </CardContent>
-                            </Card>
+                            <ContentDisplay
+                                content={contentProfile}
+                                variant="card"
+                                showAuthor={true}
+                                onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${currentUser.id}`)}
+                            />
                         </Box>
                     ))}
 

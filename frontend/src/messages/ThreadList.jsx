@@ -105,14 +105,14 @@ const ThreadList = ({ onThreadSelect }) => {
                         if (!otherUser) return null;
                         
                         return (
-                            <React.Fragment key={thread.id}>
+                            <React.Fragment key={`thread-${thread.id}-${index}`}>
                                 <ListItem 
-                                    button 
                                     onClick={() => onThreadSelect(otherUser.id)}
                                     sx={{
                                         '&:hover': {
                                             backgroundColor: 'action.hover'
-                                        }
+                                        },
+                                        cursor: 'pointer'
                                     }}
                                 >
                                     <ListItemAvatar>

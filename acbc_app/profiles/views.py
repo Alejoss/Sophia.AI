@@ -28,8 +28,8 @@ from datetime import datetime
 import jwt
 import json
 
-from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer
-from profiles.models import Profile
+from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
@@ -768,16 +768,7 @@ class UserNotificationsView(APIView):
             print(f"{nt['verb']}: {nt['count']}")
         
         # Serialize the notifications
-        notification_data = [{
-            'id': n.id,
-            'actor': n.actor.username if n.actor else None,
-            'verb': n.verb,
-            'description': n.description,
-            'timestamp': n.timestamp,
-            'unread': n.unread,
-            'content_type': n.target._meta.model_name if n.target else None,
-            'target_url': n.target.get_absolute_url() if n.target and hasattr(n.target, 'get_absolute_url') else None,
-        } for n in notifications]
+        notification_data = NotificationSerializer(notifications, many=True).data
         
         print("\nSerialized data being sent:")
         print(notification_data)
@@ -891,3 +882,152 @@ class UserNotificationsView(APIView):
                 'status': 'success',
                 'deleted_count': deleted_count
             })
+
+
+class UnreadNotificationsCountView(APIView):
+    """
+    Lightweight endpoint that only returns the count of unread notifications.
+    Much more efficient than fetching all notifications just to count them.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Simple count query - very lightweight
+            unread_count = Notification.objects.filter(
+                recipient=request.user,
+                unread=True
+            ).count()
+            
+            return Response({
+                'unread_count': unread_count
+            })
+        except Exception as e:
+            logger.error(f"Error getting unread notifications count for user {request.user.username}: {str(e)}")
+            return Response(
+                {'error': 'Failed to get unread count'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CryptoCurrencyListView(APIView):
+    """
+    List all available cryptocurrencies for selection in dropdown
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            cryptocurrencies = CryptoCurrency.objects.all().order_by('name')
+            serializer = CryptoCurrencySerializer(cryptocurrencies, many=True, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error fetching cryptocurrencies: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch cryptocurrencies'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UserAcceptedCryptosView(APIView):
+    """
+    CRUD operations for user's accepted cryptocurrencies
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id=None):
+        """
+        Get accepted cryptocurrencies for a user
+        If user_id is provided, get for that specific user
+        Otherwise, get for the authenticated user
+        """
+        try:
+            target_user_id = user_id if user_id else request.user.id
+            
+            # If requesting another user's cryptos, only show non-deleted ones
+            if user_id and user_id != request.user.id:
+                accepted_cryptos = AcceptedCrypto.objects.filter(
+                    user_id=target_user_id,
+                    deleted=False
+                )
+            else:
+                # For own profile, show all (including deleted for management)
+                accepted_cryptos = AcceptedCrypto.objects.filter(user_id=target_user_id)
+            
+            serializer = AcceptedCryptoSerializer(accepted_cryptos, many=True, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error fetching accepted cryptocurrencies: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch accepted cryptocurrencies'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request):
+        """
+        Add a new accepted cryptocurrency for the authenticated user
+        """
+        try:
+            crypto_id = request.data.get('crypto_id')
+            address = request.data.get('address')
+            
+            if not crypto_id or not address:
+                return Response(
+                    {'error': 'Both crypto_id and address are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if crypto exists
+            try:
+                crypto = CryptoCurrency.objects.get(id=crypto_id)
+            except CryptoCurrency.DoesNotExist:
+                return Response(
+                    {'error': 'Cryptocurrency not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check if user already has this crypto (even if deleted)
+            existing_crypto, created = AcceptedCrypto.objects.get_or_create(
+                user=request.user,
+                crypto=crypto,
+                defaults={'address': address, 'deleted': False}
+            )
+            
+            if not created:
+                # Update existing record
+                existing_crypto.address = address
+                existing_crypto.deleted = False
+                existing_crypto.save()
+            
+            serializer = AcceptedCryptoSerializer(existing_crypto, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error adding accepted cryptocurrency: {str(e)}")
+            return Response(
+                {'error': 'Failed to add cryptocurrency'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def delete(self, request, crypto_id):
+        """
+        Soft delete an accepted cryptocurrency
+        """
+        try:
+            accepted_crypto = get_object_or_404(
+                AcceptedCrypto,
+                user=request.user,
+                crypto_id=crypto_id
+            )
+            
+            accepted_crypto.deleted = True
+            accepted_crypto.save()
+            
+            return Response({'message': 'Cryptocurrency removed successfully'})
+            
+        except Exception as e:
+            logger.error(f"Error removing accepted cryptocurrency: {str(e)}")
+            return Response(
+                {'error': 'Failed to remove cryptocurrency'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

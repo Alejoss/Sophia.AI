@@ -27,18 +27,22 @@ from content.serializers import (
     TopicBasicSerializer,
     TopicDetailSerializer,
     ContentProfileSerializer,
-    ContentProfileBasicSerializer
+    SimpleContentProfileSerializer,
+    PreviewContentProfileSerializer,
+    PreviewContentSerializer,
+    TopicIdTitleSerializer,
+    PublicationBasicSerializer
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
     NodeSerializer
 )
-from .serializers import PublicationSerializer, ContentReferencesSerializer
+from .serializers import PublicationSerializer
 from content.utils import get_top_voted_contents
 from bs4 import BeautifulSoup
 import requests
 import re
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 
@@ -118,6 +122,7 @@ class ContentDetailView(APIView):
             if context == 'topic' and context_id:
                 topic = Topic.objects.get(id=context_id)
             
+            # Always use the full serializer for ContentDetailView
             serializer = ContentWithSelectedProfileSerializer(
                 content,
                 context={
@@ -126,7 +131,9 @@ class ContentDetailView(APIView):
                     'topic': topic  # Pass the topic to the serializer context
                 }
             )
-            return Response(serializer.data)
+            
+            serialized_data = serializer.data
+            return Response(serialized_data)
             
         except Content.DoesNotExist:
             return Response(
@@ -166,6 +173,80 @@ class ContentDetailView(APIView):
             )
 
 
+class ContentPreviewView(APIView):
+    """API view to retrieve content for preview mode display with lighter serializer."""
+    permission_classes = [IsAuthenticated]
+
+    def get_content_profile(self, content, request):
+        """
+        Get the appropriate ContentProfile based on context parameters.
+        Falls back to user's profile and finally to None if no profile is found.
+        """
+        context = request.query_params.get('context')
+        context_id = request.query_params.get('id')
+
+        if not context or not context_id:
+            return None
+
+        try:
+            # Try to get profile based on context
+            if context == 'topic':
+                topic = Topic.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=topic.creator)
+            
+            elif context == 'library':
+                library_owner = User.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=library_owner)
+            
+            elif context == 'publication':
+                publication = Publication.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=publication.user)
+            
+            elif context == 'knowledge_path':
+                path = KnowledgePath.objects.get(id=context_id)
+                return ContentProfile.objects.get(content=content, user=path.author)
+
+        except (Topic.DoesNotExist, User.DoesNotExist, 
+                Publication.DoesNotExist, KnowledgePath.DoesNotExist,
+                ContentProfile.DoesNotExist):
+            pass
+
+        # First fallback: try to get logged user's profile
+        try:
+            return ContentProfile.objects.get(content=content, user=request.user)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Final fallback: return None (serializer will use original content data)
+        return None
+
+    def get(self, request, pk):
+        try:
+            content = Content.objects.get(pk=pk)
+            selected_profile = self.get_content_profile(content, request)
+            
+            if selected_profile:
+                # Use the lightweight PreviewContentProfileSerializer for preview mode
+                serializer = PreviewContentProfileSerializer(
+                    selected_profile,
+                    context={'request': request}
+                )
+            else:
+                # Fallback to original content data with basic serializer
+                serializer = PreviewContentSerializer(
+                    content,
+                    context={'request': request}
+                )
+            
+            return Response(serializer.data)
+            
+        except Content.DoesNotExist:
+            return Response(
+                {'error': 'Content not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
 class UploadContentView(APIView):
     """API view to handle content uploads."""
     permission_classes = [IsAuthenticated]
@@ -173,9 +254,6 @@ class UploadContentView(APIView):
 
     def post(self, request):
         try:
-            print("\n=== Content Upload Request ===")
-            print("Request data:", request.data)
-            
             # Validate input
             url = request.data.get('url')
             file = request.FILES.get('file')
@@ -196,45 +274,39 @@ class UploadContentView(APIView):
             
             # If URL is provided, validate its format
             if url:
+                # Normalize YouTube URLs to remove unnecessary parameters
+                normalized_url = normalize_youtube_url(url)
+                
                 validator = URLValidator()
                 try:
-                    validator(url)
+                    validator(normalized_url)
                 except ValidationError:
                     return Response(
                         {'error': 'Invalid URL format'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
-                print("\n=== Processing URL Upload ===")
-                print("URL:", url)
-                print("Title:", request.data.get('title'))
-                print("Author:", request.data.get('author'))
-                print("\nMetadata received:")
-                print("og_description:", request.data.get('og_description'))
-                print("og_image:", request.data.get('og_image'))
-                print("og_type:", request.data.get('og_type'))
-                print("og_site_name:", request.data.get('og_site_name'))
+                # For URL content, get media_type from request data or default to TEXT
+                media_type = request.data.get('media_type', 'TEXT')
                 
-                # For URL content, we don't need a file
-                media_type = 'TEXT'  # Default to TEXT for URL content
-                title = request.data.get('title', url)
+                # Validate media_type
+                valid_media_types = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
+                if media_type not in valid_media_types:
+                    return Response(
+                        {'error': f'Invalid media type. Must be one of: {", ".join(valid_media_types)}'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 
-                print("\nCreating Content object...")
+                title = request.data.get('title', normalized_url)
+                
                 content = Content.objects.create(
                     uploaded_by=request.user,
                     media_type=media_type,
                     original_title=title,
                     original_author=request.data.get('author'),
-                    url=url  # Store the URL
+                    url=normalized_url  # Store the normalized URL
                 )
-                print("Content created:", {
-                    'id': content.id,
-                    'url': content.url,
-                    'media_type': content.media_type,
-                    'title': content.original_title
-                })
 
-                print("\nCreating ContentProfile...")
                 content_profile = ContentProfile.objects.create(
                     content=content,
                     title=title,
@@ -244,13 +316,7 @@ class UploadContentView(APIView):
                     is_visible=True,  # URLs are always visible
                     is_producer=False  # URLs can't be produced content
                 )
-                print("ContentProfile created:", {
-                    'id': content_profile.id,
-                    'title': content_profile.title,
-                    'author': content_profile.author
-                })
 
-                print("\nCreating FileDetails...")
                 file_details = FileDetails.objects.create(
                     content=content,
                     og_description=request.data.get('og_description'),
@@ -258,27 +324,12 @@ class UploadContentView(APIView):
                     og_type=request.data.get('og_type'),
                     og_site_name=request.data.get('og_site_name')
                 )
-                print("FileDetails created:", {
-                    'id': file_details.id,
-                    'og_site_name': file_details.og_site_name,
-                    'og_image': file_details.og_image,
-                    'og_type': file_details.og_type
-                })
 
                 # Serialize the content profile to return in the response
                 content_profile_serializer = ContentProfileSerializer(
                     content_profile,
                     context={'request': request}
                 )
-                
-                print("\nFinal response data:", {
-                    'content_id': content.id,
-                    'url': content.url,
-                    'file_details': {
-                        'og_site_name': file_details.og_site_name,
-                        'og_image': file_details.og_image
-                    }
-                })
 
                 return Response({
                     'message': 'Content uploaded successfully',
@@ -287,7 +338,6 @@ class UploadContentView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
             else:
-                print("Processing file upload")
                 # Handle file upload
                 file = request.FILES.get('file')
                 if not file:
@@ -295,9 +345,6 @@ class UploadContentView(APIView):
                         {'error': 'No file provided'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
-
-                print("Media type from request:", request.data.get('media_type'))
-                print("File type:", file.content_type)
 
                 media_type = request.data.get('media_type')
                 if not media_type:
@@ -362,7 +409,6 @@ class UploadContentView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            print(f"Error in UploadContentView: {str(e)}")  # Add logging
             return Response(
                 {
                     'error': 'Failed to upload content',
@@ -377,20 +423,61 @@ class UserContentListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        content_profiles = ContentProfile.objects.filter(user=request.user)\
-            .select_related('content', 'content__file_details')\
-            .order_by('title')
-        
-        print(f"Found {content_profiles.count()} content profiles for user {request.user.id}")
-        
-        serializer = ContentProfileSerializer(
-            content_profiles, 
-            many=True,
-            context={'request': request}
-        )
-        response_data = serializer.data
-        
-        return Response(response_data, status=status.HTTP_200_OK)
+        try:
+            content_profiles = ContentProfile.objects.filter(user=request.user)\
+                .select_related('content')\
+                .order_by('title')
+            
+            # Serialize each profile individually to handle errors gracefully
+            response_data = []
+            for profile in content_profiles:
+                try:
+                    serializer = SimpleContentProfileSerializer(
+                        profile, 
+                        context={'request': request}
+                    )
+                    response_data.append(serializer.data)
+                except Exception as e:
+                    # Skip this profile instead of failing the entire request
+                    continue
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': 'An error occurred while fetching content'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UserContentWithDetailsView(APIView):
+    """API view to retrieve all content profiles owned by a user with file details for card mode display."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            content_profiles = ContentProfile.objects.filter(user=request.user)\
+                .select_related('content', 'content__file_details')\
+                .order_by('title')
+            
+            # Serialize each profile individually to handle errors gracefully
+            response_data = []
+            for profile in content_profiles:
+                try:
+                    serializer = ContentProfileSerializer(
+                        profile, 
+                        context={'request': request}
+                    )
+                    response_data.append(serializer.data)
+                except Exception as e:
+                    # Skip this profile instead of failing the entire request
+                    continue
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': 'An error occurred while fetching content'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class UserContentByIdView(APIView):
@@ -407,14 +494,18 @@ class UserContentByIdView(APIView):
                 .select_related('content', 'content__file_details')\
                 .order_by('title')
             
-            print(f"Found {content_profiles.count()} content profiles for user {user_id}")
-            
-            serializer = ContentProfileSerializer(
-                content_profiles, 
-                many=True,
-                context={'request': request}
-            )
-            response_data = serializer.data
+            # Serialize each profile individually to handle errors gracefully
+            response_data = []
+            for profile in content_profiles:
+                try:
+                    serializer = ContentProfileSerializer(
+                        profile, 
+                        context={'request': request}
+                    )
+                    response_data.append(serializer.data)
+                except Exception as e:
+                    # Skip this profile instead of failing the entire request
+                    continue
             
             return Response(response_data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
@@ -424,26 +515,25 @@ class UserContentByIdView(APIView):
             )
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
+                {'error': 'An error occurred while fetching content'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
 class RecentUserContentView(APIView):
-    """Get user's recently uploaded content profiles"""
+    """Get user's recently uploaded content profiles optimized for simple mode display"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         recent_content = ContentProfile.objects.filter(
             user=request.user
         ).select_related(
-            'content',
-            'content__file_details'
+            'content'  # Only select content, not file_details since simple mode doesn't need it
         ).order_by(
             '-created_at'
         )[:4]
         
-        serializer = ContentProfileBasicSerializer(
+        serializer = SimpleContentProfileSerializer(
             recent_content, 
             many=True, 
             context={'request': request}
@@ -490,10 +580,10 @@ class CollectionContentView(APIView):
         
         content_profiles = ContentProfile.objects.filter(
             collection=collection
-        ).select_related('content', 'content__file_details')\
+        ).select_related('content')\
             .order_by('title')
         
-        serializer = ContentProfileSerializer(content_profiles, many=True)
+        serializer = SimpleContentProfileSerializer(content_profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, collection_id):
@@ -557,6 +647,36 @@ class ContentProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, content_profile_id):
+        """Update content profile to reference a different content"""
+        content_profile = get_object_or_404(
+            ContentProfile,
+            id=content_profile_id,
+            user=request.user
+        )
+        
+        new_content_id = request.data.get('content_id')
+        if not new_content_id:
+            return Response(
+                {'error': 'content_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            new_content = Content.objects.get(id=new_content_id)
+        except Content.DoesNotExist:
+            return Response(
+                {'error': 'Content not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Update the content profile to reference the new content
+        content_profile.content = new_content
+        content_profile.save()
+        
+        serializer = ContentProfileSerializer(content_profile, context={'request': request})
+        return Response(serializer.data)
 
 
 # Knowledge Path Views
@@ -668,9 +788,27 @@ class TopicDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_content_profile(self, content, request, topic):
+        """
+        Get the appropriate ContentProfile based on context.
+        For topics, we want the topic creator's profile for the content.
+        """
+        try:
+            # Try to get the topic creator's profile for this content
+            return ContentProfile.objects.get(content=content, user=topic.creator)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Fallback: try to get logged user's profile
+        try:
+            return ContentProfile.objects.get(content=content, user=request.user)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Final fallback: return None (serializer will use original content data)
+        return None
+
     def get(self, request, pk):
-        print(f"\n=== TopicDetailView.get - Starting for topic {pk} ===")
-        
         topic = get_object_or_404(
             Topic.objects.prefetch_related(
                 'contents',
@@ -679,42 +817,52 @@ class TopicDetailView(APIView):
             ),
             pk=pk
         )
-        print(f"Found topic: {topic.title} (ID: {topic.id})")
 
         # Get top 3 most upvoted contents for each media type
         top_contents = {}
         for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
-            print(f"\nProcessing media type: {media_type}")
             contents = get_top_voted_contents(topic, media_type)
-            print(f"Found {len(contents)} top voted contents for {media_type}")
-            for content in contents:
-                print(f"- Content ID: {content.id}, Title: {content.original_title}, Vote Count: {content.vote_count}")
             top_contents[media_type] = contents
 
         # Create ordered list of contents
         ordered_contents = []
         for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
             ordered_contents.extend(top_contents[media_type])
-        
-        print(f"\nTotal ordered contents: {len(ordered_contents)}")
-        print("Ordered contents by type:")
-        for content in ordered_contents:
-            print(f"- Type: {content.media_type}, ID: {content.id}, Title: {content.original_title}, Vote Count: {content.vote_count}")
 
         # Update the topic's contents with the ordered list
         topic.contents.set(ordered_contents)
-        print("\nUpdated topic contents with ordered list")
+        
+        # Reload the contents with file_details prefetched
+        content_ids = [content.id for content in ordered_contents]
+        reloaded_contents = Content.objects.filter(id__in=content_ids).prefetch_related('file_details')
+        
+        # Create a mapping of content objects with file_details loaded
+        content_map = {content.id: content for content in reloaded_contents}
+        
+        # Replace the contents in the topic with the reloaded ones
+        topic.contents.clear()
+        for content_id in content_ids:
+            if content_id in content_map:
+                topic.contents.add(content_map[content_id])
+
+        # Get the appropriate profile for each content
+        contents_with_profiles = []
+        for content in topic.contents.all():
+            selected_profile = self.get_content_profile(content, request, topic)
+            contents_with_profiles.append({
+                'content': content,
+                'selected_profile': selected_profile
+            })
 
         serializer = TopicDetailSerializer(topic, context={
             'request': request,
             'user': request.user,
-            'topic': topic
+            'topic': topic,
+            'selected_profiles': {item['content'].id: item['selected_profile'] for item in contents_with_profiles}
         })
-        print("=== TopicDetailView.get - Completed ===\n")
         return Response(serializer.data)
 
     def patch(self, request, pk):
-        print(f"TopicDetailView.patch - Received request data:", request.data)
         topic = get_object_or_404(Topic, pk=pk)
         
         # Check if user is author or moderator
@@ -747,6 +895,45 @@ class TopicDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class TopicContentSimpleView(APIView):
+    """Topic content view optimized for content management operations"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        topic = get_object_or_404(
+            Topic.objects.prefetch_related('contents'),
+            pk=pk
+        )
+
+        # Get all content profiles for the user that are in this topic
+        content_profiles = ContentProfile.objects.filter(
+            content__in=topic.contents.all(),
+            user=request.user
+        ).select_related('content').order_by('title')
+        
+        # Serialize each profile individually to handle errors gracefully
+        response_data = []
+        for profile in content_profiles:
+            try:
+                serializer = SimpleContentProfileSerializer(
+                    profile, 
+                    context={'request': request}
+                )
+                response_data.append(serializer.data)
+            except Exception as e:
+                # Skip this profile instead of failing the entire request
+                continue
+
+        return Response({
+            'topic': {
+                'id': topic.id,
+                'title': topic.title,
+                'description': topic.description
+            },
+            'contents': response_data
+        }, status=status.HTTP_200_OK)
+
+
 class TopicBasicView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -760,14 +947,9 @@ class TopicEditContentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        print(f"TopicEditContentView.post - Received request to add content to topic {pk}")
-        print(f"Request data: {request.data}")
-        
         topic = get_object_or_404(Topic, pk=pk)
-        print(f"Found topic: {topic.title} (ID: {topic.id})")
         
         content_profile_ids = request.data.get('content_profile_ids', [])
-        print(f"Content profile IDs to add: {content_profile_ids}")
         
         try:
             # Get content profiles and verify they belong to the user
@@ -775,50 +957,35 @@ class TopicEditContentView(APIView):
                 id__in=content_profile_ids,
                 user=request.user
             )
-            print(f"Found {content_profiles.count()} content profiles to add")
             
             # Extract content objects from profiles and add to topic
             contents = [profile.content for profile in content_profiles]
-            print(f"Adding {len(contents)} content objects to topic")
             
             topic.contents.add(*contents)
-            print("Successfully added content to topic")
             
             return Response(
                 {'message': 'Content added successfully'}, 
                 status=status.HTTP_200_OK
             )
         except Exception as e:
-            print(f"Error adding content to topic: {str(e)}")
             return Response(
                 {'error': f'Failed to add content: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
     def patch(self, request, pk):
-        print(f"TopicEditContentView.patch - Received request to remove content from topic {pk}")
-        print(f"Request data: {request.data}")
-        
         topic = get_object_or_404(Topic, pk=pk)
-        print(f"Found topic: {topic.title} (ID: {topic.id})")
         
         content_ids = request.data.get('content_ids', [])
-        print(f"Content IDs to remove: {content_ids}")
         
         try:
             contents = Content.objects.filter(id__in=content_ids)
-            print(f"Found {contents.count()} content objects to remove")
-            for content in contents:
-                print(f"Removing content: {content.original_title} (ID: {content.id})")
-            
             topic.contents.remove(*contents)
-            print("Successfully removed content from topic")
             return Response(
                 {'message': 'Content removed successfully'}, 
                 status=status.HTTP_200_OK
             )
         except Exception as e:
-            print(f"Error removing content from topic: {str(e)}")
             return Response(
                 {'error': f'Failed to remove content: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -828,16 +995,50 @@ class TopicEditContentView(APIView):
 class TopicContentMediaTypeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_content_profile(self, content, request, topic):
+        """
+        Get the appropriate ContentProfile based on context.
+        For topics, we want the topic creator's profile for the content.
+        """
+        try:
+            # Try to get the topic creator's profile for this content
+            return ContentProfile.objects.get(content=content, user=topic.creator)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Fallback: try to get logged user's profile
+        try:
+            return ContentProfile.objects.get(content=content, user=request.user)
+        except ContentProfile.DoesNotExist:
+            pass
+
+        # Final fallback: return None (serializer will use original content data)
+        return None
+
     def get(self, request, pk, media_type):
         topic = get_object_or_404(Topic, pk=pk)
         media_type = media_type.upper()
         contents = topic.contents.filter(media_type=media_type)\
+            .prefetch_related('file_details')\
             .order_by('-created_at')
 
+        # Get the appropriate profile for each content
+        contents_with_profiles = []
+        for content in contents:
+            selected_profile = self.get_content_profile(content, request, topic)
+            contents_with_profiles.append({
+                'content': content,
+                'selected_profile': selected_profile
+            })
+
         serializer = ContentWithSelectedProfileSerializer(
-            contents, 
+            [item['content'] for item in contents_with_profiles], 
             many=True,
-            context={'request': request, 'topic': topic}
+            context={
+                'request': request, 
+                'topic': topic,
+                'selected_profiles': {item['content'].id: item['selected_profile'] for item in contents_with_profiles}
+            }
         )
         
         return Response({
@@ -858,8 +1059,7 @@ class PublicationListView(APIView):
         
         publications = Publication.objects.filter(user=request.user, deleted=False)
         serializer = PublicationSerializer(publications, many=True, context={'request': request})
-        data = serializer.data
-        print("PublicationListView - Returning publications data:", data)
+        data = serializer.data        
         return Response(data)
 
     def post(self, request):
@@ -885,29 +1085,16 @@ class PublicationDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        print(f"\n=== PublicationDetailView.get ===")
-        print(f"Requested publication ID: {pk}")
-        print(f"User: {request.user}")
-        print(f"Request path: {request.path}")
-        print(f"Request method: {request.method}")
-        print(f"Request headers: {request.headers}")
-        
         try:
             publication = Publication.objects.get(id=pk)
-            print(f"Found publication: {publication}")
-            
             serializer = PublicationSerializer(publication)
-            print(f"Serialized data: {serializer.data}")
-            
             return Response(serializer.data)
         except Publication.DoesNotExist:
-            print(f"❌ Publication not found with ID: {pk}")
             return Response(
                 {'error': 'Publication not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            print(f"❌ Unexpected error: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -928,87 +1115,56 @@ class PublicationDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class PublicationVoteView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self, pk):
-        return get_object_or_404(Publication, pk=pk)
-
-    def post(self, request, pk):
-        publication = self.get_object(pk)
-        value = request.data.get('value', 0)
-        
-        if value not in [-1, 0, 1]:
-            return Response(
-                {'error': 'Invalid vote value'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        Vote = apps.get_model('votes', 'Vote')
-        content_type = ContentType.objects.get_for_model(Publication)
-        
-        vote, created = Vote.objects.get_or_create(
-            user=request.user,
-            content_type=content_type,
-            object_id=publication.id,
-            defaults={'value': value}
-        )
-
-        if not created:
-            if value == 0:
-                vote.delete()
-            else:
-                vote.value = value
-                vote.save()
-
-        return Response({'vote_count': publication.vote_count})
-
-
 class ContentReferencesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        print(f"DEBUG: ContentReferencesView called with pk={pk}")
         try:
-            print(f"DEBUG: Attempting to fetch content with id={pk}")
             content = Content.objects.get(pk=pk)
-            print(f"DEBUG: Found content: {content}")
             
             # Get all knowledge paths that reference this content through content_profile
             knowledge_paths = KnowledgePath.objects.filter(
                 nodes__content_profile__content=content
             ).distinct()
-            print(f"DEBUG: Found {knowledge_paths.count()} knowledge paths")
             
             # Get all topics that reference this content
             topics = Topic.objects.filter(
                 contents=content
             ).distinct()
-            print(f"DEBUG: Found {topics.count()} topics")
             
             # Get all publications that reference this content
             publications = Publication.objects.filter(
                 content_profile__content=content
             ).distinct()
-            print(f"DEBUG: Found {publications.count()} publications")
             
+            from knowledge_paths.serializers import KnowledgePathBasicSerializer
+            knowledge_paths_data = KnowledgePathBasicSerializer(
+                knowledge_paths, 
+                many=True, 
+                context={'request': request}
+            ).data
+            topics_data = TopicIdTitleSerializer(
+                topics, 
+                many=True, 
+                context={'request': request}
+            ).data
+            publications_data = PublicationBasicSerializer(
+                publications, 
+                many=True, 
+                context={'request': request}
+            ).data
             data = {
-                'knowledge_paths': knowledge_paths,
-                'topics': topics,
-                'publications': publications
+                'knowledge_paths': knowledge_paths_data,
+                'topics': topics_data,
+                'publications': publications_data
             }
-            
-            serializer = ContentReferencesSerializer(data)
-            return Response(serializer.data)
-            
+            return Response(data)
         except Content.DoesNotExist:
-            print(f"DEBUG: Content with id={pk} not found")
             return Response(
                 {'error': 'Content not found'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            print(f"DEBUG: Unexpected error: {str(e)}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1041,7 +1197,7 @@ class ContentProfileCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        try:
+        try:     # Validate required fields
             content_id = request.data.get('content')
             if not content_id:
                 return Response(
@@ -1050,7 +1206,13 @@ class ContentProfileCreateView(APIView):
                 )
 
             # Check if content exists
-            content = get_object_or_404(Content, id=content_id)
+            try:
+                content = Content.objects.get(id=content_id)
+            except Content.DoesNotExist:
+                return Response(
+                    {'error': f'Content with ID {content_id} not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
             # Check if user already has a profile for this content
             existing_profile = ContentProfile.objects.filter(
@@ -1064,26 +1226,56 @@ class ContentProfileCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Create new content profile
-            content_profile = ContentProfile.objects.create(
-                content=content,
-                user=request.user,
-                title=request.data.get('title', content.original_title),
-                author=request.data.get('author', content.original_author),
-                personal_note=request.data.get('personalNote', ''),
-                is_visible=request.data.get('isVisible', True),
-                is_producer=request.data.get('isProducer', False)
-            )
+            # Extract and validate profile data
+            title = request.data.get('title', content.original_title)
+            author = request.data.get('author', content.original_author)
+            personal_note = request.data.get('personalNote', '')
+            is_visible = request.data.get('isVisible', True)
+            is_producer = request.data.get('isProducer', False)
 
-            serializer = ContentProfileSerializer(
-                content_profile,
-                context={'request': request}
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # Create new content profile
+            try:
+                content_profile = ContentProfile.objects.create(
+                    content=content,
+                    user=request.user,
+                    title=title,
+                    author=author,
+                    personal_note=personal_note,
+                    is_visible=is_visible,
+                    is_producer=is_producer
+                )
+            except Exception as e:
+                return Response(
+                    {
+                        'error': 'Failed to create content profile',
+                        'details': 'Database error occurred while creating the profile'
+                    }, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Serialize the response
+            try:
+                serializer = ContentProfileSerializer(
+                    content_profile,
+                    context={'request': request}
+                )
+                response_data = serializer.data
+                return Response(response_data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response(
+                    {
+                        'error': 'Failed to serialize content profile',
+                        'details': 'Error occurred while preparing the response'
+                    }, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         except Exception as e:
             return Response(
-                {'error': str(e)}, 
+                {
+                    'error': 'An unexpected error occurred',
+                    'details': 'Please check the server logs for more information'
+                }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1094,35 +1286,26 @@ class URLPreviewView(APIView):
 
     def extract_favicon(self, soup, base_url):
         """Extract favicon URL from HTML."""
-        print(f"\n=== Extracting favicon for {base_url} ===")
-        
         # Try standard favicon locations
         favicon_link = soup.find('link', rel=lambda r: r and ('icon' in r or 'shortcut icon' in r))
         if favicon_link and favicon_link.get('href'):
             favicon_url = urljoin(base_url, favicon_link['href'])
-            print(f"Found favicon in link tag: {favicon_url}")
             return favicon_url
         
         # Try default location
         parsed_url = urlparse(base_url)
         default_favicon = f"{parsed_url.scheme}://{parsed_url.netloc}/favicon.ico"
         try:
-            print(f"Trying default favicon location: {default_favicon}")
             response = requests.head(default_favicon)
             if response.status_code == 200:
-                print("Default favicon exists")
                 return default_favicon
-            print(f"Default favicon request failed with status: {response.status_code}")
-        except Exception as e:
-            print(f"Error checking default favicon: {str(e)}")
+        except Exception:
+            pass
         
-        print("No favicon found")
         return None
 
     def extract_youtube_data(self, url):
         """Extract metadata from YouTube URLs."""
-        print(f"\n=== Extracting YouTube data for {url} ===")
-        
         # Extract video ID from URL
         video_id = None
         patterns = [
@@ -1134,27 +1317,18 @@ class URLPreviewView(APIView):
             match = re.search(pattern, url)
             if match:
                 video_id = match.group(1)
-                print(f"Found YouTube video ID: {video_id}")
                 break
         
         if not video_id:
-            print("No YouTube video ID found")
             return None
 
         try:
             # Get oEmbed data from YouTube
             oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
-            print(f"Fetching YouTube oEmbed data from: {oembed_url}")
-            
             response = requests.get(oembed_url, timeout=5)
-            print(f"oEmbed response status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                print("Successfully fetched YouTube metadata:")
-                print(f"- Title: {data.get('title')}")
-                print(f"- Thumbnail: https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
-                
                 return {
                     'title': data.get('title'),
                     'description': None,
@@ -1163,19 +1337,14 @@ class URLPreviewView(APIView):
                     'siteName': "YouTube",
                     'type': 'VIDEO'
                 }
-        except Exception as e:
-            print(f"Error fetching YouTube metadata: {str(e)}")
+        except Exception:
+            pass
         return None
 
     def post(self, request):
-        print("\n=== URL Preview Request ===")
-        print(f"User: {request.user.username}")
-        
         url = request.data.get('url')
-        print(f"URL: {url}")
         
         if not url:
-            print("Error: No URL provided")
             return Response(
                 {'error': 'URL is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -1184,12 +1353,9 @@ class URLPreviewView(APIView):
         try:
             # Check if it's a YouTube URL first
             if 'youtube.com' in url or 'youtu.be' in url:
-                print("Detected YouTube URL")
                 youtube_data = self.extract_youtube_data(url)
                 if youtube_data:
-                    print("Returning YouTube metadata")
                     return Response(youtube_data)
-                print("YouTube metadata extraction failed, falling back to regular extraction")
 
             # Make request with browser-like headers
             headers = {
@@ -1201,12 +1367,9 @@ class URLPreviewView(APIView):
                 'Upgrade-Insecure-Requests': '1',
             }
             
-            print(f"\nFetching URL with headers: {headers}")
             response = requests.get(url, headers=headers, timeout=5, verify=True)
-            print(f"Response status code: {response.status_code}")
 
             if response.status_code == 403:
-                print("Access forbidden")
                 return Response(
                     {'error': 'Unable to access this URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -1216,16 +1379,13 @@ class URLPreviewView(APIView):
             
             # Check content type
             content_type = response.headers.get('content-type', '').lower()
-            print(f"Content-Type: {content_type}")
             
             if not content_type.startswith('text/html'):
-                print(f"Error: Invalid content type: {content_type}")
                 return Response({
                     'error': 'URL must point to a webpage'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Parse HTML
-            print("\nParsing HTML content")
             soup = BeautifulSoup(response.text, 'html.parser')
             
             # Extract Open Graph metadata
@@ -1247,7 +1407,6 @@ class URLPreviewView(APIView):
                 'type': ['og:type']
             }
             
-            print("\nExtracting metadata:")
             for key, properties in og_tags.items():
                 for prop in properties:
                     meta = soup.find('meta', property=prop)
@@ -1256,23 +1415,18 @@ class URLPreviewView(APIView):
                     
                     if meta and meta.get('content'):
                         metadata[key] = meta.get('content')
-                        print(f"- {key}: {meta.get('content')} (from {prop})")
                         break
             
             # Fallbacks
             if not metadata['title']:
                 metadata['title'] = soup.title.string if soup.title else None
-                print(f"Using fallback title: {metadata['title']}")
                 
             if not metadata['type']:
                 metadata['type'] = 'website'
-                print("Using fallback type: website")
             
             # Convert relative URLs to absolute
             if metadata['image'] and not metadata['image'].startswith(('http://', 'https://')):
-                original_image = metadata['image']
                 metadata['image'] = urljoin(url, metadata['image'])
-                print(f"Converting relative image URL: {original_image} -> {metadata['image']}")
             
             # Get favicon
             metadata['favicon'] = self.extract_favicon(soup, url)
@@ -1281,28 +1435,183 @@ class URLPreviewView(APIView):
             metadata = {k: v for k, v in metadata.items() if v is not None}
             
             if not metadata.get('title') and not metadata.get('description') and not metadata.get('image'):
-                print("No metadata found")
                 return Response(
                     {'error': 'Could not extract preview information from this URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            print("\nFinal metadata:")
-            for key, value in metadata.items():
-                print(f"- {key}: {value}")
-            
             return Response(metadata)
             
         except requests.Timeout:
-            print("Error: Request timed out")
             return Response(
                 {'error': 'Failed to fetch URL data'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except requests.RequestException as e:
-            print(f"Request error: {str(e)}")
             return Response(
                 {'error': 'Failed to fetch URL data'}, 
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+def normalize_youtube_url(url):
+    """
+    Normalize YouTube URLs by removing unnecessary parameters and keeping only essential ones.
+    This ensures consistent behavior for YouTube metadata extraction.
+    """
+    if not url or ('youtube.com' not in url and 'youtu.be' not in url):
+        return url
+    
+    try:
+        parsed = urlparse(url)
+        
+        # Handle youtu.be URLs
+        if parsed.netloc == 'youtu.be':
+            video_id = parsed.path.lstrip('/')
+            return f"https://www.youtube.com/watch?v={video_id}"
+        
+        # Handle youtube.com URLs
+        if parsed.netloc in ['www.youtube.com', 'youtube.com'] and parsed.path == '/watch':
+            query_params = parse_qs(parsed.query)
+            
+            # Keep only essential parameters
+            essential_params = {}
+            if 'v' in query_params:
+                essential_params['v'] = query_params['v'][0]
+            
+            # Rebuild the URL with only essential parameters
+            clean_query = urlencode(essential_params)
+            clean_url = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                clean_query,
+                parsed.fragment
+            ))
+            
+            return clean_url
+        
+        return url
+    except Exception:
+        # If parsing fails, return the original URL
+        return url
+
+
+class ContentModificationCheckView(APIView):
+    """API view to check if content can be modified by the current user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            content = Content.objects.get(pk=pk)
+            
+            can_modify = content.can_be_modified_by(request.user)
+            other_users_count = content.get_other_user_profiles_count()
+            
+            return Response({
+                'can_modify': can_modify,
+                'other_users_count': other_users_count,
+                'is_original_uploader': content.uploaded_by and content.uploaded_by.id == request.user.id,
+                'message': (
+                    f"Cannot change the source of this content because {other_users_count} other user(s) have added it to their libraries"
+                    if not can_modify and other_users_count > 0
+                    else "Content can be modified"
+                )
+            })
+            
+        except Content.DoesNotExist:
+            return Response(
+                {'error': 'Content not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ContentUpdateView(APIView):
+    """API view to update a specific Content instance."""
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            print(f"\n=== ContentUpdateView PUT request ===")
+            print(f"Content ID: {pk}")
+            print(f"Request data: {request.data}")
+            print(f"Request user: {request.user}")
+            
+            content = get_object_or_404(Content, pk=pk)
+            print(f"Found content: {content}")
+            print(f"Current content URL: {content.url}")
+            print(f"Current content media_type: {content.media_type}")
+            print(f"Current content original_title: {content.original_title}")
+            print(f"Current content original_author: {content.original_author}")
+            
+            # Check if the user has a profile for this content (i.e., owns it)
+            try:
+                content_profile = ContentProfile.objects.get(content=content, user=request.user)
+                print(f"Found content profile: {content_profile}")
+            except ContentProfile.DoesNotExist:
+                print("Content profile not found for user")
+                return Response(
+                    {'error': 'You do not have permission to edit this content'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Validate media_type if provided
+            if 'media_type' in request.data:
+                print(f"Media type in request: {request.data['media_type']}")
+                valid_media_types = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
+                if request.data['media_type'] not in valid_media_types:
+                    return Response(
+                        {'error': f'Invalid media type. Must be one of: {", ".join(valid_media_types)}'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Validate URL if provided
+            if 'url' in request.data and request.data['url']:
+                print(f"URL in request: {request.data['url']}")
+                validator = URLValidator()
+                try:
+                    validator(request.data['url'])
+                    print("URL validation passed")
+                except ValidationError:
+                    print("URL validation failed")
+                    return Response(
+                        {'error': 'Invalid URL format'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Update the content
+            print("About to update content with data:", request.data)
+            serializer = ContentSerializer(content, data=request.data, partial=True)
+            if serializer.is_valid():
+                print("Serializer is valid")
+                print("Serializer validated data:", serializer.validated_data)
+                updated_content = serializer.save()
+                print(f"Content updated successfully")
+                print(f"Updated content URL: {updated_content.url}")
+                print(f"Updated content media_type: {updated_content.media_type}")
+                print(f"Updated content original_title: {updated_content.original_title}")
+                print(f"Updated content original_author: {updated_content.original_author}")
+                return Response(serializer.data)
+            else:
+                print("Serializer errors:", serializer.errors)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Content.DoesNotExist:
+            print("Content not found")
+            return Response(
+                {'error': 'Content not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

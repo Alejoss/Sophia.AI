@@ -214,7 +214,7 @@ const PublicationEditForm = () => {
               <Box sx={{ mb: 2 }}>
                 <ContentDisplay 
                   content={selectedContent} 
-                  variant="detailed"
+                  variant="preview"
                   maxImageHeight={300}
                   showAuthor={true}
                 />

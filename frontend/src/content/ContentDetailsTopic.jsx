@@ -17,6 +17,7 @@ import ContentDisplay from './ContentDisplay';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import TopicHeader from '../topics/TopicHeader';
 
+// ContentDisplay Mode: "preview" - Basic preview for topic content detail
 const ContentDetailsTopic = () => {
     const { contentId, topicId } = useParams();
     const navigate = useNavigate();
@@ -28,21 +29,18 @@ const ContentDetailsTopic = () => {
     useEffect(() => {
         const fetchContentAndTopic = async () => {
             try {
-                console.log(`Fetching content ${contentId} and topic ${topicId}...`);
+                console.log(`ContentDetailsTopic: Fetching content ${contentId} and topic ${topicId}...`);
                 const [contentData, topicData] = await Promise.all([
-                    contentApi.getContentDetails(contentId),
+                    contentApi.getContentDetails(contentId, 'topic', topicId),
                     contentApi.getTopicDetails(topicId)
                 ]);
-                
-                console.log('Received content data:', contentData);
-                console.log('Received topic data:', topicData);
                 
                 setContent(contentData);
                 setTopic(topicData);
                 setLoading(false);
             } catch (err) {
-                console.error('Error fetching data:', err);
-                console.error('Error details:', {
+                console.error('ContentDetailsTopic: Error fetching data:', err);
+                console.error('ContentDetailsTopic: Error details:', {
                     message: err.message,
                     status: err.response?.status,
                     data: err.response?.data
@@ -57,7 +55,7 @@ const ContentDetailsTopic = () => {
 
     const handleAddToLibrarySuccess = () => {
         // Refresh content data after adding to library
-        contentApi.getContentDetails(contentId)
+        contentApi.getContentDetails(contentId, 'topic', topicId)
             .then(updatedContent => {
                 setContent(updatedContent);
             })
@@ -71,25 +69,34 @@ const ContentDetailsTopic = () => {
     if (!content || !topic) return <Typography>Content or topic not found</Typography>;
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+        <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
+            {/* Back Button at the very top */}
+            <Box sx={{ mb: 2 }}>
+                <IconButton 
+                    onClick={() => navigate(`/content/topics/${topicId}`)}
+                    sx={{ 
+                        mr: 2,
+                        color: 'primary.main',
+                        backgroundColor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': {
+                            backgroundColor: 'primary.light',
+                            color: 'primary.contrastText'
+                        }
+                    }}
+                >
+                    <ArrowBackIcon />
+                </IconButton>
+            </Box>
+
             <TopicHeader 
                 topic={topic}
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
+                size="small"
             />
 
             <Paper sx={{ p: 3, mb: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <IconButton 
-                        onClick={() => navigate(`/content/topics/${topicId}`)}
-                        sx={{ mr: 2 }}
-                    >
-                        <ArrowBackIcon />
-                    </IconButton>
-                    <Typography variant="h5">
-                        {content.selected_profile?.title || content.original_title || 'Untitled'}
-                    </Typography>
-                </Box>
-
                 {/* Action Buttons */}
                 <Box sx={{ 
                     display: 'flex', 
@@ -134,10 +141,27 @@ const ContentDetailsTopic = () => {
                     />
                 </Box>
 
+                {/* Debug logging for VoteComponent props */}
+                {(() => {
+                    console.log('=== ContentDetailsTopic: VoteComponent props ===');
+                    console.log('VoteComponent props:', {
+                        type: 'content',
+                        ids: { topicId, contentId },
+                        initialVoteCount: content.vote_count || 0,
+                        initialUserVote: content.user_vote || 0,
+                        voteCountType: typeof content.vote_count,
+                        userVoteType: typeof content.user_vote,
+                        voteCountValue: content.vote_count,
+                        userVoteValue: content.user_vote
+                    });
+                    console.log('=== End ContentDetailsTopic VoteComponent props ===');
+                    return null;
+                })()}
+
                 {/* Content Display */}
                 <ContentDisplay 
                     content={content}
-                    variant="detailed"
+                    variant="preview"
                 />
             </Paper>
 

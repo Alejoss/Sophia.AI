@@ -7,6 +7,22 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error('Error fetching user content:', error);
+            if (error.code === 'ECONNABORTED') {
+                throw new Error('Request timed out. Please try again.');
+            }
+            throw error;
+        }
+    },
+
+    getUserContentWithDetails: async () => {
+        try {
+            const response = await axiosInstance.get('/content/user-content-with-details/');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user content with details:', error);
+            if (error.code === 'ECONNABORTED') {
+                throw new Error('Request timed out. Please try again.');
+            }
             throw error;
         }
     },
@@ -17,6 +33,12 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error(`Error fetching content for user ${userId}:`, error);
+            if (error.code === 'ECONNABORTED') {
+                throw new Error('Request timed out. Please try again.');
+            }
+            if (error.response?.status === 404) {
+                throw new Error(`User with ID ${userId} not found.`);
+            }
             throw error;
         }
     },
@@ -66,6 +88,20 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error('Error fetching content details:', error);
+            throw error;
+        }
+    },
+
+    getContentPreview: async (contentId, context = null, contextId = null) => {
+        try {
+            let url = `/content/content_preview/${contentId}/`;
+            if (context && contextId) {
+                url += `?context=${context}&id=${contextId}`;
+            }
+            const response = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching content preview:', error);
             throw error;
         }
     },
@@ -147,6 +183,16 @@ const contentApi = {
         }
     },
 
+    getTopicDetailsSimple: async (topicId) => {
+        try {
+            const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching topic details (simple):', error);
+            throw error;
+        }
+    },
+
     updateTopicImage: async (topicId, formData) => {
         try {
             const response = await axiosInstance.patch(
@@ -221,7 +267,7 @@ const contentApi = {
 
     getRecentContent: async () => {
         try {
-            const response = await axiosInstance.get('/content/recent-content/');
+            const response = await axiosInstance.get('/content/recent-user-content/');
             return response.data;
         } catch (error) {
             console.error('Error fetching recent content:', error);
@@ -238,6 +284,45 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error('Error updating content profile:', error);
+            throw error;
+        }
+    },
+
+    updateContentProfileContent: async (profileId, contentId) => {
+        try {
+            const response = await axiosInstance.put(
+                `/content/content-profiles/${profileId}/`,
+                { content_id: contentId }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error updating content profile content reference:', error);
+            throw error;
+        }
+    },
+
+    updateContent: async (contentId, contentData) => {
+        try {
+            console.log('contentApi.updateContent called with:', { contentId, contentData });
+            const response = await axiosInstance.put(
+                `/content/content_update/${contentId}/`,
+                contentData
+            );
+            console.log('contentApi.updateContent response:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating content:', error);
+            console.error('Error response:', error.response?.data);
+            throw error;
+        }
+    },
+
+    checkContentModification: async (contentId) => {
+        try {
+            const response = await axiosInstance.get(`/content/content_modification_check/${contentId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error checking content modification:', error);
             throw error;
         }
     },

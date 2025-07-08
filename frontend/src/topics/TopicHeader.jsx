@@ -7,22 +7,42 @@ import {
     Button
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
+import { useAuth } from '../context/AuthContext';
 
-const TopicHeader = ({ topic, onEdit }) => {
+const TopicHeader = ({ topic, onEdit, size = 'large' }) => {
     const navigate = useNavigate();
-    const user = getUserFromLocalStorage();
-    const isCreator = isAuthenticated() && topic.creator === user?.id;
+    const { user, isAuthenticated } = useAuth();
+    const isCreator = isAuthenticated && topic.creator === user?.id;
 
     const handleTitleClick = () => {
         navigate(`/content/topics/${topic.id}`);
     };
 
+    // Size configurations
+    const sizeConfig = {
+        small: {
+            imageSize: 80,
+            titleVariant: 'h6',
+            padding: 2,
+            marginBottom: 2,
+            descriptionVariant: 'body2'
+        },
+        large: {
+            imageSize: 200,
+            titleVariant: 'h4',
+            padding: 3,
+            marginBottom: 3,
+            descriptionVariant: 'body1'
+        }
+    };
+
+    const config = sizeConfig[size];
+
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3 }}>
+        <Paper sx={{ p: config.padding, mb: config.marginBottom }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: config.marginBottom }}>
                 {/* Topic Image */}
-                <Box sx={{ width: 200, height: 200 }}>
+                <Box sx={{ width: config.imageSize, height: config.imageSize }}>
                     <img
                         src={topic.topic_image || `https://picsum.photos/400/400?random=${topic.id}`}
                         alt={topic.title}
@@ -39,7 +59,7 @@ const TopicHeader = ({ topic, onEdit }) => {
                 <Box sx={{ flex: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <Typography 
-                            variant="h4" 
+                            variant={config.titleVariant} 
                             gutterBottom
                             onClick={handleTitleClick}
                             sx={{ 
@@ -56,13 +76,14 @@ const TopicHeader = ({ topic, onEdit }) => {
                                 variant="outlined"
                                 startIcon={<EditIcon />}
                                 onClick={onEdit}
+                                size={size === 'small' ? 'small' : 'medium'}
                             >
                                 Edit Topic
                             </Button>
                         )}
                     </Box>
                     {topic.description && (
-                        <Typography variant="body1" sx={{ mt: 2 }}>
+                        <Typography variant={config.descriptionVariant} sx={{ mt: 2 }}>
                             {topic.description}
                         </Typography>
                     )}

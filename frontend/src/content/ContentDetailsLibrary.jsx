@@ -11,7 +11,9 @@ import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentReferences from './ContentReferences';
 import ContentDisplay from './ContentDisplay';
+import AddToLibraryModal from '../components/AddToLibraryModal';
 
+// ContentDisplay Mode: "detailed" - Full content detail view in library context
 const ContentDetailsLibrary = () => {
     const [content, setContent] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -66,21 +68,37 @@ const ContentDetailsLibrary = () => {
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
             {/* Action Buttons */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Button
-                    variant="outlined"
-                    startIcon={<ArrowBackIcon />}
-                    onClick={() => navigate(`/content/library_user${isOwner ? '' : `/${profile?.user}`}`)}
-                >
-                    {isOwner ? "Go to your library" : `Go to ${ownerUsername}'s library`}
-                </Button>
-                {isOwner && (
-                    <Button
-                        variant="outlined"
-                        startIcon={<EditIcon />}
-                        onClick={() => navigate(`/content/${contentId}/edit`)}
-                    >
-                        Edit Content
-                    </Button>
+                {isOwner ? (
+                    // Owner actions
+                    <>
+                        <Button
+                            variant="outlined"
+                            startIcon={<ArrowBackIcon />}
+                            onClick={() => navigate('/content/library_user')}
+                        >
+                            Go to your library
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            onClick={() => navigate(`/content/${contentId}/edit`)}
+                        >
+                            Edit Content Profile
+                        </Button>
+                    </>
+                ) : (
+                    // Non-owner actions - only Add to Library button
+                    <AddToLibraryModal
+                        content={content}
+                        onSuccess={() => {
+                            // Optionally refresh the content or show success message
+                            console.log('Content added to library successfully');
+                        }}
+                        buttonProps={{
+                            variant: 'outlined',
+                            size: 'medium'
+                        }}
+                    />
                 )}
             </Box>
 
@@ -91,57 +109,6 @@ const ContentDetailsLibrary = () => {
                     variant="detailed"
                     showAuthor={true}
                 />
-
-                <Divider sx={{ my: 3 }} />
-
-                {/* Content Details Section */}
-                <Box sx={{ mt: 3 }}>
-                    <Typography variant="h6" gutterBottom color="text.secondary">
-                        Content Details
-                    </Typography>
-                    <Box sx={{ display: 'grid', gap: 2 }}>
-                        <Typography variant="body2">
-                            <strong>Added to Library:</strong> {formatDate(content?.created_at)}
-                        </Typography>
-                        {profile?.collection_name && (
-                            <Typography variant="body2">
-                                <strong>Collection:</strong> {profile.collection_name}
-                            </Typography>
-                        )}
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="body2">
-                                <strong>Visibility:</strong>
-                            </Typography>
-                            {profile?.is_visible ? (
-                                <VisibilityIcon color="success" />
-                            ) : (
-                                <VisibilityOffIcon color="error" />
-                            )}
-                        </Stack>
-                        {profile?.is_producer && (
-                            <Stack direction="row" spacing={1} alignItems="center">
-                                <PersonIcon color="primary" />
-                                <Typography variant="body2">
-                                    You are the producer of this content
-                                </Typography>
-                            </Stack>
-                        )}
-                    </Box>
-                </Box>
-
-                {/* Personal Notes Section */}
-                {profile?.personal_note && (
-                    <Box sx={{ mt: 3 }}>
-                        <Typography variant="h6" gutterBottom color="text.secondary">
-                            Personal Notes
-                        </Typography>
-                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                                {profile.personal_note}
-                            </Typography>
-                        </Box>
-                    </Box>
-                )}
 
                 {/* Content References Section */}
                 {references && (

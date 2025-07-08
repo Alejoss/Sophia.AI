@@ -4,6 +4,7 @@ import ContentSearchModal from './ContentSearchModal';
 import UploadContentForm from './UploadContentForm';
 import ContentDisplay from './ContentDisplay';
 
+// ContentDisplay Mode: "simple" - Fast loading for content selection interface
 const ContentSelector = ({ 
   onContentSelected,
   selectedContent,
@@ -86,7 +87,7 @@ const ContentSelector = ({
       {selectedContent && showPreview && (
         <ContentDisplay 
           content={selectedContent}
-          variant={previewVariant}
+          variant="simple"
           showActions={true}
           onRemove={handleRemoveContent}
           onEdit={() => setShowContentOptions(true)}

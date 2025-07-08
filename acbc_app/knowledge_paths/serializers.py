@@ -46,13 +46,18 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     author_id = serializers.IntegerField(source='author.id', read_only=True)
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    can_be_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
         fields = [
             'id', 'title', 'author', 'author_id', 'description', 'created_at', 
-            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote'
+            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image', 'is_visible', 'can_be_visible'
         ]
+
+    def get_can_be_visible(self, obj):
+        return obj.can_be_visible()
 
     def get_progress(self, obj):
         request = self.context.get('request')
@@ -77,19 +82,100 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return 0
         return obj.get_user_vote(request.user)
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class KnowledgePathCreateSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True)
+    can_be_visible = serializers.SerializerMethodField()
+    
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'created_at']
+        fields = ['id', 'title', 'description', 'author', 'created_at', 'image', 'is_visible', 'can_be_visible']
         read_only_fields = ['author', 'created_at']
+
+    def get_can_be_visible(self, obj):
+        return obj.can_be_visible()
+
+    def validate_is_visible(self, value):
+        """Validate that knowledge path can be made visible"""
+        if value and not self.instance.can_be_visible():
+            raise serializers.ValidationError(
+                "Knowledge paths need at least two nodes to be visible"
+            )
+        return value
+
+    def create(self, validated_data):
+        """Override create to ensure visibility is False for new knowledge paths"""
+        validated_data['is_visible'] = False  # New knowledge paths start as not visible
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        # Handle image upload specifically
+        if 'image' in validated_data:
+            # Delete old image if it exists
+            if instance.image:
+                instance.image.delete(save=False)
+            instance.image = validated_data['image']
+        
+        # Update other fields
+        instance.title = validated_data.get('title', instance.title)
+        instance.description = validated_data.get('description', instance.description)
+        
+        # Handle visibility with validation
+        if 'is_visible' in validated_data:
+            new_visibility = validated_data['is_visible']
+            if new_visibility and not instance.can_be_visible():
+                raise serializers.ValidationError({
+                    'is_visible': "Knowledge paths need at least two nodes to be visible"
+                })
+            instance.is_visible = new_visibility
+        
+        instance.save()
+        
+        return instance
 
 
 class KnowledgePathBasicSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title']
+        fields = ['id', 'title', 'image']
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+
+class KnowledgePathEngagedSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source='author.username', read_only=True)
+    author_id = serializers.IntegerField(source='author.id', read_only=True)
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KnowledgePath
+        fields = ['id', 'title', 'description', 'author', 'author_id', 'created_at', 'image']
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class KnowledgePathListSerializer(serializers.ModelSerializer):
@@ -97,17 +183,33 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
     author_id = serializers.IntegerField(source='author.id', read_only=True)
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    can_be_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
         fields = ['id', 'title', 'description', 'author', 'author_id', 
-                 'created_at', 'vote_count', 'user_vote']
+                 'created_at', 'vote_count', 'user_vote', 'image', 'is_visible', 'can_be_visible']
+
+    def get_can_be_visible(self, obj):
+        return obj.can_be_visible()
 
     def get_vote_count(self, obj):
         return getattr(obj, '_vote_count', 0)
 
     def get_user_vote(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
         return getattr(obj, '_user_vote', 0)
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 # Add a new serializer for reordering

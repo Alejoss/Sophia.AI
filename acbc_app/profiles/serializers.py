@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
+from notifications.models import Notification
 
 # UserRegistrationSerializer (moved from views.py)
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -39,9 +40,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class CryptoCurrencySerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+    
     class Meta:
         model = CryptoCurrency
-        fields = ['id', 'name', 'code']
+        fields = ['id', 'name', 'code', 'thumbnail']
+    
+    def get_thumbnail(self, obj):
+        if obj.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url
+        return None
 
 
 class AcceptedCryptoSerializer(serializers.ModelSerializer):
@@ -86,3 +97,138 @@ class ProfileSerializer(serializers.ModelSerializer):
         cryptos = AcceptedCrypto.objects.filter(user=obj.user, deleted=False)
         # Serialize the data
         return AcceptedCryptoSerializer(cryptos, many=True).data
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor = serializers.SerializerMethodField()
+    actor_id = serializers.SerializerMethodField()
+    content_type = serializers.SerializerMethodField()
+    target_url = serializers.SerializerMethodField()
+    context_title = serializers.SerializerMethodField()
+    target = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'actor', 'actor_id', 'verb', 'description',
+            'timestamp', 'unread', 'content_type', 'target_url',
+            'context_title', 'target'
+        ]
+
+    def get_actor(self, obj):
+        return obj.actor.username if obj.actor else None
+
+    def get_actor_id(self, obj):
+        return obj.actor.id if obj.actor else None
+
+    def get_content_type(self, obj):
+        if obj.action_object_content_type:
+            return obj.action_object_content_type.model
+        return None
+
+    def get_target(self, obj):
+        if obj.target:
+            return {
+                'id': obj.target.id,
+                'title': obj.target.title if hasattr(obj.target, 'title') else None
+            }
+        return None
+
+    def get_context_title(self, obj):
+        try:
+            # For knowledge path comments
+            if obj.verb == 'commented on your knowledge path' and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+            
+            # For comment replies
+            if obj.verb == 'replied to' and obj.action_object:
+                comment = obj.action_object
+                if comment and comment.content_object:
+                    if hasattr(comment.content_object, 'title'):
+                        return comment.content_object.title
+                    elif hasattr(comment.content_object, 'name'):
+                        return comment.content_object.name
+            
+            # For event registrations
+            if obj.verb == 'registered for your event' and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+            
+            # For payment accepted
+            if obj.verb == 'accepted your payment for' and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+            
+            # For certificate sent
+            if obj.verb == 'sent you a certificate for' and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+                
+            return None
+        except Exception as e:
+            print(f"Error getting context title: {str(e)}")
+            return None
+
+    def get_target_url(self, obj):
+        try:
+            # For knowledge path comments
+            if obj.verb == 'commented on your knowledge path' and obj.target:
+                return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For knowledge path completion
+            if obj.verb == 'completed your knowledge path' and obj.target:
+                return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For comment replies
+            if obj.verb == 'replied to' and obj.action_object:
+                comment = obj.action_object
+                if comment and comment.content_object:
+                    if hasattr(comment.content_object, 'id'):
+                        return f'/knowledge_path/{comment.content_object.id}'
+            
+            # For content upvotes
+            if obj.verb == 'upvoted your content' and obj.target:
+                return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
+            
+            # For knowledge path upvotes
+            if obj.verb == 'upvoted your knowledge path' and obj.target:
+                return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For event registrations
+            if obj.verb == 'registered for your event' and obj.target:
+                return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For payment accepted
+            if obj.verb == 'accepted your payment for' and obj.target:
+                return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For certificate sent
+            if obj.verb == 'sent you a certificate for' and obj.target:
+                return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
+                
+            return None
+        except Exception as e:
+            print(f"Error getting target URL: {str(e)}")
+            return None
+
+    def getNotificationDescription(self, notification):
+        if notification.verb == 'commented on your knowledge path':
+            return f"{notification.actor} commented on your knowledge path {notification.context_title}"
+        elif notification.verb == 'replied to':
+            return f"{notification.actor} replied to your comment in {notification.context_title}"
+        elif notification.verb == 'completed your knowledge path':
+            return notification.description
+        elif notification.verb == 'requested a certificate for your knowledge path':
+            return notification.description
+        elif notification.verb == 'approved your certificate request for':
+            return notification.description
+        elif notification.verb == 'rejected your certificate request for':
+            return notification.description
+        elif notification.verb == 'upvoted your content':
+            return notification.description
+        elif notification.verb == 'upvoted your knowledge path':
+            return notification.description
+        elif notification.verb == 'registered for your event':
+            return notification.description
+        elif notification.verb == 'accepted your payment for':
+            return notification.description
+        elif notification.verb == 'sent you a certificate for':
+            return notification.description
+        else:
+            return f"{notification.actor} {notification.verb} your comment in {notification.context_title}"

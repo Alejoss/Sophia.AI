@@ -95,8 +95,7 @@ class CertificateRequestFlowTest(TestCase):
         reject_url = reverse('certificates:certificate-request-action', 
                            args=[request_id, 'reject'])
         reject_data = {
-            'reason': 'Incomplete work',
-            'note': 'Please complete all requirements'
+            'rejection_reason': 'Incomplete work'
         }
         response = self.client.post(reject_url, reject_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -213,7 +212,7 @@ class CertificateRequestFlowTest(TestCase):
         request_id = response.data['id']
         self.client.force_authenticate(user=self.teacher)
         reject_url = reverse('certificates:certificate-request-action', args=[request_id, 'reject'])
-        self.client.post(reject_url, {'reason': 'Rejected', 'note': 'Not good enough'}, format='json')
+        self.client.post(reject_url, {'rejection_reason': 'Rejected'}, format='json')
         
         # Create and cancel third request
         self.client.force_authenticate(user=self.student)

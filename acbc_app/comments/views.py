@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsAuthor
-from utils.notification_utils import notify_comment_reply
+from utils.notification_utils import notify_comment_reply, notify_knowledge_path_comment, notify_content_comment
 
 from comments.managers import CommentManager
 from content.models import Topic, Content
@@ -104,13 +104,7 @@ class KnowledgePathCommentsView(APIView):
             
             # Send notification to knowledge path author if this is a top-level comment
             if not comment.parent and knowledge_path.author and knowledge_path.author != request.user:
-                notify.send(
-                    sender=request.user,
-                    recipient=knowledge_path.author,
-                    verb='commented on your knowledge path',
-                    description=f'{request.user.username} commented on your knowledge path "{knowledge_path.title}": {comment.body[:50]}...',
-                    level='info'
-                )
+                notify_knowledge_path_comment(comment)
             
             return_serializer = KnowledgePathCommentSerializer(comment, context={'request': request})
             return Response(return_serializer.data, status=status.HTTP_201_CREATED)
@@ -187,6 +181,18 @@ class ContentTopicCommentsView(BaseCommentView):
             content_type=ContentType.objects.get_for_model(Content),
             topic=topic
         )
+        
+        # Get the content profile for this content
+        content_profile = content.profiles.filter(user=content.uploaded_by).first()
+        if content_profile:
+            # Set the content_object to the content profile for notification purposes
+            comment.content_object = content_profile
+            comment.save()
+            
+            # Send notification to content owner if this is a top-level comment
+            if not comment.parent and content_profile.user and content_profile.user != self.request.user:
+                notify_content_comment(comment)
+        
         return comment
 
 

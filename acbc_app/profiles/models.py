@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
@@ -13,6 +13,36 @@ from quizzes.models import Quiz
 def upload_profile_picture(instance, filename):
     # TODO use django utils timezone
     return "profile_pictures/" + instance.user.username + "_" + datetime.today().strftime('%h-%d-%y') + ".jpeg"
+
+
+def upload_crypto_thumbnail(instance, filename):
+    # Generate a unique filename for cryptocurrency thumbnails
+    # Use the cryptocurrency code and current timestamp
+    import os
+    from django.utils import timezone
+    
+    # Get file extension
+    ext = filename.split('.')[-1]
+    # Create filename with crypto code and timestamp
+    filename = f"crypto_thumbnails/{instance.code.lower()}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+    return filename
+
+
+def validate_image_or_svg_file(value):
+    """Custom validator to accept both image files and SVG files"""
+    import os
+    from django.core.exceptions import ValidationError
+    
+    # Get file extension
+    ext = os.path.splitext(value.name)[1].lower()
+    
+    # Allowed extensions
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+    
+    if ext not in allowed_extensions:
+        raise ValidationError(
+            f'File type not supported. Allowed types: {", ".join(allowed_extensions)}'
+        )
 
 
 class Profile(models.Model):
@@ -34,6 +64,13 @@ class CryptoCurrency(models.Model):
 
     name = models.CharField(max_length=50, blank=True, unique=True)
     code = models.CharField(max_length=10, blank=True)
+    thumbnail = models.FileField(
+        upload_to=upload_crypto_thumbnail, 
+        null=True, 
+        blank=True, 
+        help_text="Cryptocurrency logo/thumbnail (supports JPG, PNG, GIF, SVG)",
+        validators=[validate_image_or_svg_file]
+    )
 
     def __str__(self):
         return self.name
@@ -70,17 +107,6 @@ class ContactMethod(models.Model):
 
     def __str__(self):
         return self.name + " " + self.user.username
-
-
-class UserActivityStatus(models.Model):
-    # Keeps track of user completions for specific activities within a knowledge path, recording completion status and time.
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_completed = models.BooleanField(default=False)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        status = 'Completed' if self.is_completed else 'Pending'
-        return f"{self.user.username} - {status}"
 
 
 class UserNodeCompletion(models.Model):

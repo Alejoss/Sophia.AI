@@ -7,9 +7,6 @@ import {
     Button,
     Divider,
     Grid,
-    Card,
-    CardContent,
-    CardMedia,
     Chip,
     IconButton,
     Link
@@ -18,15 +15,17 @@ import EditIcon from '@mui/icons-material/Edit';
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import contentApi from '../api/contentApi';
-import { isAuthenticated, getUserFromLocalStorage } from '../context/localStorageUtils';
+import { useAuth } from '../context/AuthContext';
 import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import TopicHeader from './TopicHeader';
+import ContentDisplay from '../content/ContentDisplay';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
+    const { user, isAuthenticated } = useAuth();
     const [topic, setTopic] = useState(null);
     const [contentByType, setContentByType] = useState({});
     const [loading, setLoading] = useState(true);
@@ -90,67 +89,39 @@ const TopicDetail = () => {
         switch (type) {
             case 'image':
                 return (
-                    <CardMedia
-                        component="img"
-                        sx={{ 
-                            height: 200,
-                            width: '100%',
-                            objectFit: 'cover'
-                        }}
-                        image={content.file_details?.url || `https://picsum.photos/800/600?random=${content.id}`}
-                        alt={content.selected_profile?.title || 'Content image'}
+                    <ContentDisplay
+                        content={content}
+                        variant="image"
+                        showAuthor={true}
+                        onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                     />
                 );
             case 'text':
                 return (
-                    <CardContent>
-                        <Typography variant="body2" color="text.secondary" noWrap>
-                            {content.file_details?.text || 'No preview available'}
-                        </Typography>
-                    </CardContent>
+                    <ContentDisplay
+                        content={content}
+                        variant="text"
+                        showAuthor={true}
+                        onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
+                    />
                 );
             case 'video':
                 return (
-                    <Box sx={{ position: 'relative', height: 200 }}>
-                        <CardMedia
-                            component="video"
-                            sx={{ 
-                                height: '100%',
-                                width: '100%',
-                                objectFit: 'cover'
-                            }}
-                            image={content.file_details?.url}
-                        />
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: 'rgba(0, 0, 0, 0.3)',
-                            }}
-                        >
-                            <Typography variant="body1" color="white">
-                                Click to play video
-                            </Typography>
-                        </Box>
-                    </Box>
+                    <ContentDisplay
+                        content={content}
+                        variant="video"
+                        showAuthor={true}
+                        onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
+                    />
                 );
             case 'audio':
                 return (
-                    <Box sx={{ p: 2 }}>
-                        <audio
-                            controls
-                            style={{ width: '100%' }}
-                        >
-                            <source src={content.file_details?.url} type="audio/mpeg" />
-                            Your browser does not support the audio element.
-                        </audio>
-                    </Box>
+                    <ContentDisplay
+                        content={content}
+                        variant="audio"
+                        showAuthor={true}
+                        onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
+                    />
                 );
             default:
                 return null;
@@ -183,44 +154,12 @@ const TopicDetail = () => {
                 <Grid container spacing={3}>
                     {displayContents.map((content) => (
                         <Grid item xs={12} sm={6} md={4} key={content.id}>
-                            <Card 
-                                sx={{ 
-                                    height: '100%', 
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    cursor: 'pointer'
-                                }}
+                            <ContentDisplay
+                                content={content}
+                                variant="card"
+                                showAuthor={true}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
-                            >
-                                {renderContentPreview(content, type)}
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Typography variant="h6" gutterBottom>
-                                        {content.selected_profile?.title || content.original_title || 'Untitled'}
-                                    </Typography>
-                                    {content.selected_profile?.author && (
-                                        <Chip 
-                                            label={`Author: ${content.selected_profile.author}`}
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ mt: 1 }}
-                                        />
-                                    )}
-                                    <Box 
-                                        sx={{ mt: 2 }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <VoteComponent
-                                            type="content"
-                                            ids={{
-                                                topicId: topicId,
-                                                contentId: content.id
-                                            }}
-                                            initialVoteCount={content.vote_count || 0}
-                                            initialUserVote={content.user_vote || 0}
-                                        />
-                                    </Box>
-                                </CardContent>
-                            </Card>
+                            />
                         </Grid>
                     ))}
                 </Grid>
@@ -232,13 +171,11 @@ const TopicDetail = () => {
     if (error) return <Typography color="error">{error}</Typography>;
     if (!topic) return <Typography>Topic not found</Typography>;
 
-    const user = getUserFromLocalStorage();
-
     console.log('Auth check:', {
-        isAuthenticated: isAuthenticated(),
+        isAuthenticated: isAuthenticated,
         topicCreator: topic.creator,
-        localStorageUser: user,
-        condition: isAuthenticated() && topic.creator === user?.id
+        authUser: user,
+        condition: isAuthenticated && topic.creator === user?.id
     });
 
     return (

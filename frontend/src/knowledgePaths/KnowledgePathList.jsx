@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { Avatar } from '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
@@ -48,43 +49,82 @@ const KnowledgePathList = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Knowledge Paths</h1>
         {authState.isAuthenticated && (
-          <Link 
-            to="/knowledge_path/create"
-            className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
-          >
-            Create New Path
-          </Link>
+          <div className="flex gap-3">
+            <Link 
+              to="/profiles/my_profile?section=knowledge-paths"
+              className="bg-gray-500 hover:bg-gray-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+            >
+              My Knowledge Paths
+            </Link>
+            <Link 
+              to="/knowledge_path/create"
+              className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+            >
+              Create New Path
+            </Link>
+          </div>
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {knowledgePaths.map((path) => {
-          console.log('Rendering path:', path);
-          console.log('Path vote count:', path.vote_count);
-          console.log('Path user vote:', path.user_vote);
+          console.log('=== KnowledgePathList: VoteComponent props ===');
+          console.log('VoteComponent props:', {
+            type: 'knowledge_path',
+            ids: { pathId: path.id },
+            initialVoteCount: path.vote_count,
+            initialUserVote: path.user_vote,
+            voteCountType: typeof path.vote_count,
+            userVoteType: typeof path.user_vote,
+            voteCountValue: path.vote_count,
+            userVoteValue: path.user_vote
+          });
+          console.log('=== End KnowledgePathList VoteComponent props ===');
+          
           return (
             <div 
               key={path.id}
-              className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow"
+              className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px]"
             >
-              {/* Title and Vote Section */}
-              <div className="flex justify-between items-start mb-4">
-                <Link 
-                  to={`/knowledge_path/${path.id}`}
-                  className="text-xl font-semibold hover:text-blue-500 transition-colors"
+              {/* Image and Title Section */}
+              <div className="flex items-start mb-4">
+                <Avatar 
+                  src={path.image} 
+                  alt={path.title}
+                  sx={{ 
+                    width: 80, 
+                    height: 80, 
+                    mr: 3,
+                    bgcolor: 'grey.300',
+                    flexShrink: 0
+                  }}
                 >
-                  {path.title}
-                </Link>
-                <VoteComponent 
-                  type="knowledge_path"
-                  ids={{ pathId: path.id }}
-                  initialVoteCount={path.vote_count}
-                  initialUserVote={path.user_vote}
-                />
-              </div>
+                  {path.title.charAt(0).toUpperCase()}
+                </Avatar>
+                
+                <div className="flex-1 min-w-0">
+                  {/* Title Section */}
+                  <Link 
+                    to={`/knowledge_path/${path.id}`}
+                    className="text-xl font-semibold hover:text-blue-500 transition-colors break-words block mb-3"
+                  >
+                    {path.title}
+                  </Link>
 
-              {/* Description */}
-              <p className="text-gray-600 mb-4">{path.description}</p>
+                  {/* Description */}
+                  <p className="text-gray-600 mb-3 line-clamp-3">{path.description}</p>
+
+                  {/* Vote Component */}
+                  <div className="flex justify-end">
+                    <VoteComponent 
+                      type="knowledge_path"
+                      ids={{ pathId: path.id }}
+                      initialVoteCount={Number(path.vote_count) || 0}
+                      initialUserVote={Number(path.user_vote) || 0}
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Author and Date */}
               <div className="flex justify-between text-sm text-gray-500">

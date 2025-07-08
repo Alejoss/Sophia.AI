@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import generalApi from '../api/generalApi';
+import ContentDisplay from '../content/ContentDisplay';
 import '/src/styles/search.css';
 
 // Import icons for different result types
-import ContentIcon from '@mui/icons-material/Article';
 import TopicIcon from '@mui/icons-material/Label';
 import KnowledgePathIcon from '@mui/icons-material/AccountTree';
-import ImageIcon from '@mui/icons-material/Image';
-import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import AudiotrackIcon from '@mui/icons-material/Audiotrack';
 
 const MainSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,9 +58,9 @@ const MainSearch = () => {
     if (result.type === 'content') {
       // If it's a content profile, include the profile ID in the URL
       if (result.source === 'profile' && result.profile_id) {
-        url = `/content/search/${result.id}?profile=${result.profile_id}`;
+        url = `/content/search/${result.content.id}?profile=${result.profile_id}`;
       } else {
-        url = `/content/search/${result.id}`;
+        url = `/content/search/${result.content.id}`;
       }
     } else if (result.type === 'topic') {
       url = `/content/topics/${result.id}`;
@@ -79,74 +75,59 @@ const MainSearch = () => {
   };
 
   // Get icon for result type
-  const getResultTypeIcon = (type, mediaType) => {
-    if (type === 'content') {
-      // Return media type specific icon
-      switch (mediaType) {
-        case 'IMAGE':
-          return <ImageIcon className="result-type-icon" />;
-        case 'VIDEO':
-          return <VideoLibraryIcon className="result-type-icon" />;
-        case 'TEXT':
-          return <TextSnippetIcon className="result-type-icon" />;
-        case 'AUDIO':
-          return <AudiotrackIcon className="result-type-icon" />;
-        default:
-          return <ContentIcon className="result-type-icon" />;
-      }
-    } else if (type === 'topic') {
+  const getResultTypeIcon = (type) => {
+    if (type === 'topic') {
       return <TopicIcon className="result-type-icon" />;
     } else if (type === 'knowledge_path') {
       return <KnowledgePathIcon className="result-type-icon" />;
     } else {
-      return <ContentIcon className="result-type-icon" />;
-    }
-  };
-
-  // Get media type label
-  const getMediaTypeLabel = (mediaType) => {
-    switch (mediaType) {
-      case 'IMAGE':
-        return 'Image';
-      case 'VIDEO':
-        return 'Video';
-      case 'TEXT':
-        return 'Text';
-      case 'AUDIO':
-        return 'Audio';
-      default:
-        return 'Content';
+      return null; // ContentDisplay will handle content icons
     }
   };
 
   // Render search result item
   const renderResultItem = (result) => {
-    return (
-      <li 
-        key={result.id} 
-        className="result-item"
-        onClick={() => handleResultClick(result)}
-      >
-        <div className="result-item-header">
-          <div className="result-type-badge">
-            {getResultTypeIcon(result.type, result.media_type)}
-            <span className="result-type-text">
-              {result.type === 'content' ? getMediaTypeLabel(result.media_type) : result.type}
-            </span>
+    if (result.type === 'content') {
+      // Use ContentDisplay for content results
+      return (
+        <li key={result.id} className="result-item">
+          <ContentDisplay
+            content={result}
+            variant="simple"
+            onClick={() => handleResultClick(result)}
+            showActions={false}
+          />
+        </li>
+      );
+    } else {
+      // Render topics and knowledge paths with the original format
+      return (
+        <li 
+          key={result.id} 
+          className="result-item"
+          onClick={() => handleResultClick(result)}
+        >
+          <div className="result-item-header">
+            <div className="result-type-badge">
+              {getResultTypeIcon(result.type)}
+              <span className="result-type-text">
+                {result.type}
+              </span>
+            </div>
           </div>
-        </div>
-        
-        <h3 className="result-title">{result.title}</h3>
-        
-        {result.author && (
-          <p className="result-author">By {result.author}</p>
-        )}
-        
-        <div className="result-footer">
-          <button className="view-details-button">View Details</button>
-        </div>
-      </li>
-    );
+          
+          <h3 className="result-title">{result.title}</h3>
+          
+          {result.description && (
+            <p className="result-description">{result.description}</p>
+          )}
+          
+          <div className="result-footer">
+            <button className="view-details-button">View Details</button>
+          </div>
+        </li>
+      );
+    }
   };
 
   return (

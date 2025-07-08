@@ -23,7 +23,9 @@ import {
   CardMedia,
   CardContent,
   Avatar,
-  Skeleton
+  Skeleton,
+  Select,
+  MenuItem
 } from '@mui/material';
 
 const getMediaType = (file) => {
@@ -190,6 +192,11 @@ const schema = yup.object({
     then: () => yup.string().url('Must be a valid URL').required('URL is required'),
     otherwise: () => yup.string().nullable()
   }),
+  media_type: yup.string().when('isUrlMode', {
+    is: true,
+    then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], 'Please select a valid media type').required('Media type is required'),
+    otherwise: () => yup.string().nullable()
+  }),
   title: yup.string().max(100, 'Title must not exceed 100 characters'),
   author: yup.string().max(100, 'Author must not exceed 100 characters'),
   is_producer: yup.boolean(),
@@ -197,9 +204,9 @@ const schema = yup.object({
   isUrlMode: yup.boolean()
 }).required();
 
-const UploadContentForm = ({ onContentUploaded }) => {
+const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [isUrlMode, setIsUrlMode] = useState(false);
+  const [isUrlMode, setIsUrlMode] = useState(!!initialData?.url);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
@@ -215,17 +222,55 @@ const UploadContentForm = ({ onContentUploaded }) => {
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
-      title: '',
-      author: '',
+      title: initialData?.title || '',
+      author: initialData?.author || '',
       is_producer: false,
       is_visible: true,
-      isUrlMode: false
+      isUrlMode: !!initialData?.url,
+      media_type: initialData?.media_type || '',
+      url: initialData?.url || ''
     }
   });
 
   // Watch the URL field for changes
   const url = watch('url');
   const urlDebounceTimeout = React.useRef(null);
+
+  // Initialize form with initialData when in edit mode
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      console.log('Initializing form with initialData:', initialData);
+      const isUrlContent = !!initialData.url;
+      console.log('isUrlContent:', isUrlContent);
+      
+      setIsUrlMode(isUrlContent);
+      setValue('isUrlMode', isUrlContent);
+      
+      // Set form values
+      setValue('title', initialData.title || '');
+      setValue('author', initialData.author || '');
+      setValue('media_type', initialData.media_type || '');
+      setValue('url', initialData.url || '');
+      
+      console.log('Form values set:', {
+        title: initialData.title || '',
+        author: initialData.author || '',
+        media_type: initialData.media_type || '',
+        url: initialData.url || ''
+      });
+      
+      // If it's URL content, fetch preview
+      if (isUrlContent && initialData.url) {
+        contentApi.fetchUrlMetadata(initialData.url)
+          .then(metadata => {
+            setPreviewData(metadata);
+          })
+          .catch(error => {
+            console.error('Failed to fetch initial preview:', error);
+          });
+      }
+    }
+  }, [isEditMode, initialData, setValue]);
 
   // Effect to fetch preview when URL changes
   useEffect(() => {
@@ -296,59 +341,132 @@ const UploadContentForm = ({ onContentUploaded }) => {
     try {
       console.log('\n=== Form Submit ===');
       console.log('Form data:', data);
+      console.log('isUrlMode:', isUrlMode);
+      console.log('isEditMode:', isEditMode);
+      console.log('contentId:', contentId);
       
-      const formData = new FormData();
-      
-      if (isUrlMode) {
-        console.log('URL mode submission');
-        // URL mode - send URL and preview data
-        formData.append('url', data.url);
-        formData.append('is_producer', false);
-        formData.append('is_visible', true);
+      if (isEditMode && contentId) {
+        // Edit mode - update existing content
+        console.log('Edit mode - updating existing content');
         
-        // Add preview metadata if available
-        if (previewData) {
-          formData.append('og_description', previewData.description || '');
-          formData.append('og_image', previewData.image || '');
-          formData.append('og_type', previewData.type || '');
-          formData.append('og_site_name', previewData.siteName || '');
+        if (!isUrlMode) {
+          // File upload in edit mode - create new content and update profile
+          console.log('File upload in edit mode - creating new content');
+          
+          const formData = new FormData();
+          const file = data.file[0];
+          if (!file) {
+            throw new Error('No file selected');
+          }
+          
+          formData.append('file', file);
+          formData.append('is_producer', false);
+          formData.append('is_visible', true);
+          
+          const mediaType = getMediaType(file);
+          if (!mediaType) {
+            throw new Error('Unsupported file type');
+          }
+          formData.append('media_type', mediaType);
+          formData.append('title', data.title || '');
+          formData.append('author', data.author || '');
+          
+          // Create new content
+          const response = await contentApi.uploadContent(formData);
+          console.log('New content created:', response);
+          
+          // Update the existing content profile to reference the new content
+          if (contentProfileId && response.content_id) {
+            await contentApi.updateContentProfileContent(contentProfileId, response.content_id);
+            console.log('Content profile updated to reference new content');
+          }
+          
+          if (onContentUploaded) {
+            onContentUploaded(response.content_profile);
+          }
+          
+          alert('New content created successfully! The content profile has been updated to reference the new file.');
+        } else {
+          // URL update - update existing content
+          console.log('URL update mode - updating existing content');
+          console.log('URL from form data:', data.url);
+          console.log('Media type from form data:', data.media_type);
+          console.log('Title from form data:', data.title);
+          console.log('Author from form data:', data.author);
+          
+          const updateData = {
+            media_type: data.media_type,
+            original_title: data.title || '',
+            original_author: data.author || '',
+            url: data.url
+          };
+          
+          console.log('Update data being sent to API:', updateData);
+          const response = await contentApi.updateContent(contentId, updateData);
+          console.log('Update Response:', response);
+          
+          if (onContentUploaded) {
+            onContentUploaded(response);
+          }
+          
+          alert('Content updated successfully!');
         }
       } else {
-        console.log('File mode submission');
-        // File mode - send file data
-        const file = data.file[0];
-        if (!file) {
-          throw new Error('No file selected');
-        }
-        console.log('Selected file:', file);
+        // Create new content
+        const formData = new FormData();
         
-        formData.append('file', file);
-        formData.append('is_producer', data.is_producer || false);
-        formData.append('is_visible', data.is_visible || true);
-        
-        const mediaType = getMediaType(file);
-        console.log('Detected media type:', mediaType);
-        if (!mediaType) {
-          throw new Error('Unsupported file type');
+        if (isUrlMode) {
+          console.log('URL mode submission');
+          // URL mode - send URL and preview data
+          formData.append('url', data.url);
+          formData.append('media_type', data.media_type);
+          formData.append('is_producer', false);
+          formData.append('is_visible', true);
+          
+          // Add preview metadata if available
+          if (previewData) {
+            formData.append('og_description', previewData.description || '');
+            formData.append('og_image', previewData.image || '');
+            formData.append('og_type', previewData.type || '');
+            formData.append('og_site_name', previewData.siteName || '');
+          }
+        } else {
+          console.log('File mode submission');
+          // File mode - send file data
+          const file = data.file[0];
+          if (!file) {
+            throw new Error('No file selected');
+          }
+          console.log('Selected file:', file);
+          
+          formData.append('file', file);
+          formData.append('is_producer', data.is_producer || false);
+          formData.append('is_visible', data.is_visible || true);
+          
+          const mediaType = getMediaType(file);
+          console.log('Detected media type:', mediaType);
+          if (!mediaType) {
+            throw new Error('Unsupported file type');
+          }
+          formData.append('media_type', mediaType);
         }
-        formData.append('media_type', mediaType);
+
+        // Common fields
+        formData.append('title', data.title || '');
+        formData.append('author', data.author || '');
+
+        console.log('Submitting to API...');
+        const response = await contentApi.uploadContent(formData);
+        console.log('API Response:', response);
+        
+        if (onContentUploaded) {
+          onContentUploaded(response.content_profile);
+        }
+
+        reset();
+        setPreviewData(null);
+        alert('Content uploaded successfully!');
       }
-
-      // Common fields
-      formData.append('title', data.title || '');
-      formData.append('author', data.author || '');
-
-      console.log('Submitting to API...');
-      const response = await contentApi.uploadContent(formData);
-      console.log('API Response:', response);
-      
-      if (onContentUploaded) {
-        onContentUploaded(response.content_profile);
-      }
-
-      reset();
-      setPreviewData(null);
-      alert('Content uploaded successfully!');
     } catch (error) {
       console.error('Upload failed:', error);
       alert(error.response?.data?.error || error.message || 'Failed to upload content. Please try again.');
@@ -359,25 +477,50 @@ const UploadContentForm = ({ onContentUploaded }) => {
 
   // Update the mode toggle handlers
   const handleModeToggle = (newMode) => {
+    console.log('handleModeToggle called with newMode:', newMode);
+    console.log('Current form values before reset:', {
+      title: watch('title'),
+      author: watch('author'),
+      url: watch('url'),
+      media_type: watch('media_type')
+    });
+    
     setIsUrlMode(newMode);
     setValue('isUrlMode', newMode);
     setPreviewData(null);
     setPreviewError(null);
+    
+    // Preserve title, author, URL, and media_type when switching modes
+    const currentTitle = watch('title');
+    const currentAuthor = watch('author');
+    const currentUrl = watch('url');
+    const currentMediaType = watch('media_type');
+    
+    console.log('Values to preserve:', {
+      currentTitle,
+      currentAuthor,
+      currentUrl,
+      currentMediaType
+    });
+    
     reset({
-      title: '',
-      author: '',
+      title: currentTitle || '',
+      author: currentAuthor || '',
       is_producer: false,
       is_visible: true,
       isUrlMode: newMode,
-      url: '',
-      file: null
+      url: newMode ? (currentUrl || '') : '',
+      file: null,
+      media_type: newMode ? (currentMediaType || '') : ''
     });
+    
+    console.log('Form reset completed');
   };
 
   return (
     <Box sx={{ width: '100%', '& .MuiFormControl-root': { marginBottom: 2 } }}>
       <Typography variant="h6" gutterBottom>
-        Upload Content
+        {isEditMode ? 'Change Content Source' : 'Upload Content'}
       </Typography>
 
       {/* Toggle Buttons */}
@@ -422,10 +565,33 @@ const UploadContentForm = ({ onContentUploaded }) => {
                 label="URL"
                 variant="outlined"
                 {...register('url')}
+                value={watch('url') || ''}
                 error={!!errors.url}
                 helperText={errors.url?.message}
                 disabled={isLoadingPreview}
               />
+            </FormControl>
+            
+            {/* Media Type Selector for URL Content */}
+            <FormControl fullWidth error={!!errors.media_type}>
+              <InputLabel id="media-type-label">Content Type</InputLabel>
+              <Select
+                labelId="media-type-label"
+                label="Content Type"
+                {...register('media_type')}
+                value={watch('media_type')}
+                onChange={(e) => setValue('media_type', e.target.value)}
+              >
+                <MenuItem value="VIDEO">Video</MenuItem>
+                <MenuItem value="AUDIO">Audio</MenuItem>
+                <MenuItem value="TEXT">Text</MenuItem>
+                <MenuItem value="IMAGE">Image</MenuItem>
+              </Select>
+              {errors.media_type && (
+                <FormHelperText error>
+                  {errors.media_type.message}
+                </FormHelperText>
+              )}
             </FormControl>
             
             <URLPreview 
@@ -439,7 +605,7 @@ const UploadContentForm = ({ onContentUploaded }) => {
         {/* Common Fields */}
         <FormControl fullWidth>
           <TextField
-            label="Title (optional)"
+            label="Original Title"
             variant="outlined"
             {...register('title')}
             error={!!errors.title}
@@ -449,7 +615,7 @@ const UploadContentForm = ({ onContentUploaded }) => {
 
         <FormControl fullWidth>
           <TextField
-            label="Author (optional)"
+            label="Original Author"
             variant="outlined"
             {...register('author')}
             error={!!errors.author}
@@ -498,7 +664,7 @@ const UploadContentForm = ({ onContentUploaded }) => {
           disabled={isUploading || isLoadingPreview}
           sx={{ mt: 3 }}
         >
-          {isUploading ? 'Uploading...' : 'Upload Content'}
+          {isUploading ? 'Uploading...' : (isEditMode ? 'Update Content' : 'Upload Content')}
         </Button>
       </form>
     </Box>

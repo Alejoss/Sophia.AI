@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from content.models import Content, Topic, ContentProfile
 from knowledge_paths.models import KnowledgePath
 from profiles.models import Profile
+from content.serializers import SimpleContentProfileSerializer
 from .serializers import (
     SearchResultSerializer, 
     ContentSearchSerializer, 
@@ -46,41 +47,25 @@ def perform_search(query, search_type='all'):
 def search_content(query):
     """
     Search for content items through visible ContentProfiles with optimized queries.
-    This function searches in the ContentProfile model's customized fields
-    and only returns results from visible profiles.
+    This function searches in both ContentProfile model's customized fields AND
+    the original Content fields, and only returns results from visible profiles.
+    Returns ContentProfile objects that can be serialized with SimpleContentProfileSerializer.
     """
     # Base query for ContentProfiles - only search visible ones
-    profile_query = (Q(title__icontains=query) | Q(author__icontains=query)) & Q(is_visible=True)
+    # Search in both ContentProfile fields AND original Content fields
+    profile_query = (
+        Q(title__icontains=query) | 
+        Q(author__icontains=query) |
+        Q(content__original_title__icontains=query) |
+        Q(content__original_author__icontains=query)
+    ) & Q(is_visible=True)
     
     # Search in ContentProfile model with optimized query
     content_profiles = ContentProfile.objects.filter(profile_query).select_related(
-        'content'
-    ).only(
-        'id', 'title', 'author', 'content_id', 'user_id', 'is_visible',
-        'content__id', 'content__original_title', 'content__original_author', 
-        'content__media_type'
+        'content', 'content__file_details'
     ).order_by('-updated_at')
     
-    results = []
-    
-    # Add results from content profiles
-    for profile in content_profiles:
-        content = profile.content
-        
-        # Use the customized title and author from the profile
-        result = {
-            'id': content.id,
-            'title': profile.title or content.original_title,
-            'author': profile.author or content.original_author,
-            'media_type': content.media_type,
-            'type': 'content',
-            'source': 'profile',
-            'profile_id': profile.id,
-            'user_id': profile.user_id if profile.user else None
-        }
-        results.append(result)
-    
-    return results
+    return content_profiles
 
 def search_topics(query):
     """

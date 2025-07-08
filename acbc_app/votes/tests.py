@@ -160,7 +160,7 @@ class KnowledgePathVoteAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('vote_count', response.data)
-        self.assertIn('vote', response.data)
+        self.assertIn('user_vote', response.data)
 
     def test_upvote(self):
         """Test upvoting a knowledge path"""
@@ -168,7 +168,7 @@ class KnowledgePathVoteAPITests(APITestCase):
         data = {'action': 'upvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], 1)
+        self.assertEqual(response.data['user_vote'], 1)
         self.assertEqual(response.data['vote_count'], 1)
 
     def test_downvote(self):
@@ -177,7 +177,7 @@ class KnowledgePathVoteAPITests(APITestCase):
         data = {'action': 'downvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], -1)
+        self.assertEqual(response.data['user_vote'], -1)
         self.assertEqual(response.data['vote_count'], -1)
 
     def test_invalid_action(self):
@@ -217,7 +217,7 @@ class ContentVoteAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('vote_count', response.data)
-        self.assertIn('vote', response.data)
+        self.assertIn('user_vote', response.data)
 
     def test_upvote(self):
         """Test upvoting content"""
@@ -225,7 +225,7 @@ class ContentVoteAPITests(APITestCase):
         data = {'action': 'upvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], 1)
+        self.assertEqual(response.data['user_vote'], 1)
         self.assertEqual(response.data['vote_count'], 1)
 
     def test_downvote(self):
@@ -234,7 +234,7 @@ class ContentVoteAPITests(APITestCase):
         data = {'action': 'downvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], -1)
+        self.assertEqual(response.data['user_vote'], -1)
         self.assertEqual(response.data['vote_count'], -1)
 
 
@@ -267,7 +267,7 @@ class CommentVoteAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('vote_count', response.data)
-        self.assertIn('vote', response.data)
+        self.assertIn('user_vote', response.data)
 
     def test_upvote(self):
         """Test upvoting a comment"""
@@ -275,7 +275,7 @@ class CommentVoteAPITests(APITestCase):
         data = {'action': 'upvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], 1)
+        self.assertEqual(response.data['user_vote'], 1)
         self.assertEqual(response.data['vote_count'], 1)
 
     def test_downvote(self):
@@ -284,5 +284,5 @@ class CommentVoteAPITests(APITestCase):
         data = {'action': 'downvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['vote'], -1)
+        self.assertEqual(response.data['user_vote'], -1)
         self.assertEqual(response.data['vote_count'], -1)

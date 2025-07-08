@@ -1,8 +1,9 @@
-from profiles.models import UserActivityStatus, UserNodeCompletion
+from profiles.models import UserNodeCompletion
 from knowledge_paths.models import Node, KnowledgePath
 from quizzes.models import UserQuizAttempt
 from django.utils import timezone
 from django.db.models import Count
+from utils.notification_utils import notify_knowledge_path_completion
 
 
 def has_completed_quiz(user, quiz):
@@ -99,6 +100,7 @@ def mark_node_as_completed(user, node):
 def is_knowledge_path_completed(user, knowledge_path):
     """
     Check if a user has completed all nodes and passed all quizzes in a knowledge path.
+    If completed, notify the knowledge path author.
     
     Args:
         user: The user to check
@@ -129,6 +131,11 @@ def is_knowledge_path_completed(user, knowledge_path):
         if quiz and not has_completed_quiz(user, quiz):
             return False
 
+    # If we get here, the path is completed
+    # Notify the knowledge path author
+    print("Notifying knowledge path completion !!!!!!!!!!!!!!!!")
+    notify_knowledge_path_completion(user, knowledge_path)
+    
     return True
 
 

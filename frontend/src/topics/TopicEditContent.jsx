@@ -23,6 +23,7 @@ import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 
+// ContentDisplay Mode: Uses SimpleContentProfileSerializer for minimal information in content management
 const TopicEditContent = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ const TopicEditContent = () => {
     useEffect(() => {
         const fetchTopicContent = async () => {
             try {
-                const data = await contentApi.getTopicDetails(topicId);
+                const data = await contentApi.getTopicDetailsSimple(topicId);
                 setTopicData(data);
                 setLoading(false);
             } catch (err) {
@@ -51,10 +52,9 @@ const TopicEditContent = () => {
         try {
             setSaving(true);
             await contentApi.removeContentFromTopic(topicId, [contentId]);
-            setTopicData(prev => ({
-                ...prev,
-                contents: prev.contents.filter(content => content.id !== contentId)
-            }));
+            // Refresh the topic data to ensure UI is updated
+            const data = await contentApi.getTopicDetailsSimple(topicId);
+            setTopicData(data);
             setSaving(false);
         } catch (err) {
             setError('Failed to remove content from topic');
@@ -72,7 +72,7 @@ const TopicEditContent = () => {
             // Make a single API call with all selected content profile IDs
             await contentApi.addContentToTopic(topicId, selectedContentProfileIds);
             // Refresh topic content
-            const data = await contentApi.getTopicDetails(topicId);
+            const data = await contentApi.getTopicDetailsSimple(topicId);
             setTopicData(data);
             setShowAddContent(false);
             setSaving(false);
@@ -165,24 +165,24 @@ const TopicEditContent = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {topicData.contents.map((content) => (
+                            {topicData.contents.map((contentProfile) => (
                                 <TableRow 
-                                    key={content.id}
+                                    key={contentProfile.id}
                                     hover
                                     sx={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{content.selected_profile?.title || content.original_title || 'Untitled'}</TableCell>
+                                    <TableCell>{contentProfile.title || 'Untitled'}</TableCell>
                                     <TableCell>
                                         <Chip 
-                                            label={content.media_type} 
+                                            label={contentProfile.content.media_type} 
                                             size="small"
                                             color="primary"
                                         />
                                     </TableCell>
-                                    <TableCell>{content.selected_profile?.author || content.original_author || 'Unknown'}</TableCell>
+                                    <TableCell>{contentProfile.author || 'Unknown'}</TableCell>
                                     <TableCell>
                                         <MuiLink
-                                            href={`/content/${content.id}`}
+                                            href={`/content/${contentProfile.content.id}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             sx={{ 
@@ -205,7 +205,7 @@ const TopicEditContent = () => {
                                             variant="outlined"
                                             color="error"
                                             size="small"
-                                            onClick={() => handleContentRemove(content.id)}
+                                            onClick={() => handleContentRemove(contentProfile.content.id)}
                                             disabled={saving}
                                         >
                                             Remove

@@ -94,3 +94,6 @@ class Comment(models.Model):
         if self.id:  # If this is an update
             self.is_edited = True
         super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return f"/comments/{self.id}/"

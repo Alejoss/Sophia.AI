@@ -28,7 +28,6 @@ const CertificateRequests = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approveNote, setApproveNote] = useState('');
-  const [rejectNote, setRejectNote] = useState('');
   const { authState } = useContext(AuthContext);
 
   useEffect(() => {
@@ -67,10 +66,9 @@ const CertificateRequests = () => {
     if (!selectedRequest) return;
 
     try {
-      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason, rejectNote);
+      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason);
       setRejectDialogOpen(false);
       setRejectReason('');
-      setRejectNote('');
       setSelectedRequest(null);
       fetchRequests(); // Refresh the list
     } catch (err) {
@@ -147,7 +145,19 @@ const CertificateRequests = () => {
                   {request.knowledge_path_title}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  {isTeacherView ? `Requested by: ${request.requester}` : `Requested on: ${new Date(request.request_date).toLocaleDateString()}`}
+                  {isTeacherView ? (
+                    <>
+                      Requested by:{' '}
+                      <Link 
+                        to={`/profiles/user_profile/${request.requester_id}`}
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {request.requester}
+                      </Link>
+                    </>
+                  ) : (
+                    `Requested on: ${new Date(request.request_date).toLocaleDateString()}`
+                  )}
                 </Typography>
                 {!isTeacherView && (
                   <Typography variant="body2" color="textSecondary">
@@ -331,17 +341,6 @@ const CertificateRequests = () => {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               required
-            />
-            <TextField
-              fullWidth
-              margin="dense"
-              label="Optional note"
-              multiline
-              rows={4}
-              placeholder="Optionally add a note to the student"
-              value={rejectNote}
-              onChange={(e) => setRejectNote(e.target.value)}
-              sx={{ mt: 2 }}
             />
           </Box>
         </DialogContent>

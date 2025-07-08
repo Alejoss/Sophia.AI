@@ -1,24 +1,24 @@
 from rest_framework import serializers
 from .models import Bookmark
 from django.contrib.contenttypes.models import ContentType
-from content.serializers import TopicBasicSerializer, ContentBasicSerializer, ContentProfileBasicSerializer
+from content.serializers import TopicBasicSerializer, SimpleContentSerializer, SimpleContentProfileSerializer
 from content.models import Content, ContentProfile
 
 class BookmarkSerializer(serializers.ModelSerializer):
     content_type_name = serializers.SerializerMethodField()
-    content_object = serializers.SerializerMethodField()
+    content_profile = serializers.SerializerMethodField()
     topic = TopicBasicSerializer(read_only=True)
     
     class Meta:
         model = Bookmark
         fields = ['id', 'content_type', 'object_id', 'content_type_name', 
-                 'content_object', 'topic', 'deleted', 'created_at', 'updated_at']
+                 'content_profile', 'topic', 'deleted', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_content_type_name(self, obj):
         return obj.content_type.model
     
-    def get_content_object(self, obj):
+    def get_content_profile(self, obj):
         # Get the actual object being bookmarked
         content_object = obj.content_object
         if not content_object:
@@ -32,15 +32,15 @@ class BookmarkSerializer(serializers.ModelSerializer):
                     content=content_object,
                     user=obj.user
                 )
-                # Use ContentProfileBasicSerializer for consistent serialization
-                serializer = ContentProfileBasicSerializer(
+                # Use SimpleContentProfileSerializer for consistent serialization with RecentUserContent
+                serializer = SimpleContentProfileSerializer(
                     profile,
                     context={'request': self.context.get('request')}
                 )
                 return serializer.data
             except ContentProfile.DoesNotExist:
-                # If no profile exists, use ContentBasicSerializer
-                serializer = ContentBasicSerializer(
+                # If no profile exists, use SimpleContentSerializer for consistency
+                serializer = SimpleContentSerializer(
                     content_object,
                     context={'request': self.context.get('request')}
                 )

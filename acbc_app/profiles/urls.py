@@ -22,8 +22,15 @@ urlpatterns = [
     path('refresh_token/', views.RefreshTokenView.as_view(), name='refresh_token'),
 
     path('notifications/', views.UserNotificationsView.as_view(), name='notifications'),
+    path('notifications/unread-count/', views.UnreadNotificationsCountView.as_view(), name='notifications_unread_count'),
     path('notifications/<int:notification_id>/mark-as-read/', views.UserNotificationsView.as_view(), name='mark_notification_read'),
     path('notifications/<int:notification_id>/delete/', views.UserNotificationsView.as_view(), name='delete_notification'),
     path('notifications/cleanup/', views.UserNotificationsView.as_view(), name='cleanup_notifications'),
     path('notifications/mark-all-as-read/', views.UserNotificationsView.as_view(), name='mark_all_notifications_read'),
+    
+    # Cryptocurrency endpoints
+    path('cryptocurrencies/', views.CryptoCurrencyListView.as_view(), name='cryptocurrencies'),
+    path('accepted-cryptos/', views.UserAcceptedCryptosView.as_view(), name='accepted_cryptos'),
+    path('accepted-cryptos/<int:user_id>/', views.UserAcceptedCryptosView.as_view(), name='user_accepted_cryptos'),
+    path('accepted-cryptos/delete/<int:crypto_id>/', views.UserAcceptedCryptosView.as_view(), name='delete_accepted_crypto'),
 ]

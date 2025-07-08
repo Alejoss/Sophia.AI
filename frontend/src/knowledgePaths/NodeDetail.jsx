@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
 import { Box, Typography, Alert, Chip, CircularProgress } from '@mui/material';
@@ -63,12 +64,20 @@ const NodeDetail = () => {
         setNextNode(nextAvailableNode);
         setPrevNode(previousNode);
         
-        // If content_profile_id exists, fetch content details in a separate call
+        // If content_profile_id exists, fetch content details using the same endpoint as ContentDetailsTopic
         if (nodeData.content_profile_id) {
-          const contentData = await knowledgePathsApi.getNodeContent(nodeData.content_profile_id);
-          if (isMounted) {
-            console.log('Content data loaded:', contentData);
-            setNodeContent(contentData);
+          // Get the content ID from the content profile
+          const contentProfile = await knowledgePathsApi.getNodeContent(nodeData.content_profile_id);
+          if (contentProfile && contentProfile.content && contentProfile.content.id) {
+            const contentId = contentProfile.content.id;
+            console.log('Fetching content details with context=knowledge_path:', contentId);
+            
+            // Use the same endpoint as ContentDetailsTopic but with knowledge_path context
+            const contentData = await contentApi.getContentPreview(contentId, 'knowledge_path', pathId);
+            if (isMounted) {
+              console.log('Content data loaded:', contentData);
+              setNodeContent(contentData);
+            }
           }
         }
         
@@ -175,12 +184,8 @@ const NodeDetail = () => {
                 {console.log('🖼️ Rendering ContentDisplay with:', nodeContent.content)}
                 <ContentDisplay 
                   content={nodeContent.content}
-                  variant="detailed"
+                  variant="preview"
                   showAuthor={true}
-                  onClick={() => {
-                    console.log('ContentDisplay clicked');
-                    navigate(`/content/${nodeContent.content.id}/library?context=knowledge_path&id=${pathId}`);
-                  }}
                 />
               </>
             ) : (

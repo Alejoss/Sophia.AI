@@ -16,6 +16,7 @@ import VoteComponent from '../votes/VoteComponent';
 import ContentDisplay from './ContentDisplay';
 import ContentReferences from './ContentReferences';
 
+// ContentDisplay Mode: "detailed" - Full content detail view from search results
 const ContentDetailsSearch = () => {
     const { contentId } = useParams();
     const navigate = useNavigate();
@@ -79,13 +80,6 @@ const ContentDetailsSearch = () => {
         <Container maxWidth="lg" sx={{ pt: 12, pb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={() => navigate(-1)}
-                >
-                    Back
-                </Button>
-                
-                <Button
                     variant="contained"
                     startIcon={<SearchIcon />}
                     onClick={handleBackToSearch}
@@ -115,12 +109,6 @@ const ContentDetailsSearch = () => {
                             </Typography>
                         )}
                     </Box>
-                    <VoteComponent 
-                        type="content"
-                        ids={{ contentId }}
-                        initialVoteCount={content.vote_count}
-                        initialUserVote={content.user_vote}
-                    />
                 </Box>
 
                 <Divider sx={{ my: 2 }} />

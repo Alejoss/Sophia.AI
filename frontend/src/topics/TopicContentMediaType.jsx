@@ -4,9 +4,6 @@ import {
     Box, 
     Typography, 
     Grid,
-    Card,
-    CardContent,
-    CardMedia,
     Chip,
     IconButton,
     Link
@@ -17,6 +14,7 @@ import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import TopicHeader from './TopicHeader';
+import ContentDisplay from '../content/ContentDisplay';
 
 const TopicContentMediaType = () => {
     const { topicId, mediaType } = useParams();
@@ -138,6 +136,7 @@ const TopicContentMediaType = () => {
             <TopicHeader 
                 topic={topic}
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
+                size="small"
             />
 
             <Box sx={{ mb: 4 }}>
@@ -156,44 +155,12 @@ const TopicContentMediaType = () => {
                 <Grid container spacing={3}>
                     {contents.map((content) => (
                         <Grid item xs={12} sm={6} md={4} key={content.id}>
-                            <Card 
-                                sx={{ 
-                                    height: '100%', 
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    cursor: 'pointer'
-                                }}
+                            <ContentDisplay
+                                content={content}
+                                variant="card"
+                                showAuthor={true}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
-                            >
-                                {renderContentPreview(content)}
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Typography variant="h6" gutterBottom>
-                                        {content.selected_profile?.title || content.original_title || 'Untitled'}
-                                    </Typography>
-                                    {content.selected_profile?.author && (
-                                        <Chip 
-                                            label={`Author: ${content.selected_profile.author}`}
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ mt: 1 }}
-                                        />
-                                    )}
-                                    <Box 
-                                        sx={{ mt: 2 }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <VoteComponent
-                                            type="content"
-                                            ids={{
-                                                topicId: topicId,
-                                                contentId: content.id
-                                            }}
-                                            initialVoteCount={content.vote_count || 0}
-                                            initialUserVote={content.user_vote || 0}
-                                        />
-                                    </Box>
-                                </CardContent>
-                            </Card>
+                            />
                         </Grid>
                     ))}
                 </Grid>

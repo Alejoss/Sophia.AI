@@ -3,9 +3,10 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, ContactMethod, UserActivityStatus, UserNodeCompletion
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, ContactMethod, UserNodeCompletion
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath, Node
+from certificates.models import CertificateRequest, Certificate, CertificateTemplate
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
@@ -14,6 +15,7 @@ import time
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from django.contrib.contenttypes.models import ContentType
+from content.models import Content, Topic
 
 
 class ProfileModelTests(TestCase):
@@ -114,24 +116,6 @@ class ContactMethodModelTests(TestCase):
         # Test invalid URL
         self.contact.url_link = 'invalid-url'
         self.assertFalse(self.contact.has_contact_url())
-
-
-class UserActivityStatusModelTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123'
-        )
-        self.activity_status = UserActivityStatus.objects.create(
-            user=self.user,
-            is_completed=True
-        )
-
-    def test_activity_status_creation(self):
-        """Test activity status creation and string representation"""
-        self.assertEqual(str(self.activity_status), f"{self.user.username} - Completed")
-        self.assertTrue(self.activity_status.is_completed)
 
 
 class UserNodeCompletionModelTests(TestCase):
@@ -725,7 +709,7 @@ class NotificationTests(APITestCase):
         comment_data = {
             'body': 'This is a test comment on the knowledge path'
         }
-        response = self.client.post(url, comment_data)
+        response = self.client.post(url, comment_data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
@@ -746,3 +730,398 @@ class NotificationTests(APITestCase):
         self.assertIn('testuser commented on your knowledge path', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
+
+    def test_certificate_request_notification(self):
+        """Test notification when a student requests a certificate"""
+        # Create a teacher (knowledge path author)
+        teacher = User.objects.create_user(
+            username='teacher',
+            email='teacher@example.com',
+            password='testpass123'
+        )
+        
+        # Create a knowledge path
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=teacher
+        )
+        
+        # Student requests a certificate
+        url = reverse('certificates:certificate-request', args=[knowledge_path.id])
+        request_data = {
+            'notes': {'message': 'Please review my completion'}
+        }
+        response = self.client.post(url, request_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Get notifications for the teacher
+        self.client.force_authenticate(user=teacher)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have one notification
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'requested a certificate for your knowledge path')
+        self.assertIn('testuser requested a certificate for your knowledge path', notification['description'])
+        self.assertIn('Test Knowledge Path', notification['description'])
+        self.assertTrue(notification['unread'])
+
+    def test_certificate_approval_notification(self):
+        """Test notification when a teacher approves a certificate request"""
+        # Create a student
+        student = User.objects.create_user(
+            username='student',
+            email='student@example.com',
+            password='testpass123'
+        )
+        
+        # Create a knowledge path
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=self.user  # Current user is the teacher
+        )
+        
+        # Create a certificate request
+        certificate_request = CertificateRequest.objects.create(
+            requester=student,
+            knowledge_path=knowledge_path,
+            status='PENDING'
+        )
+        
+        # Teacher approves the request
+        url = reverse('certificates:certificate-request-action', args=[certificate_request.id, 'approve'])
+        approve_data = {'note': 'Great work!'}
+        response = self.client.post(url, approve_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the student
+        self.client.force_authenticate(user=student)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have one notification
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'approved your certificate request for')
+        self.assertIn('testuser approved your certificate request for', notification['description'])
+        self.assertIn('Test Knowledge Path', notification['description'])
+        self.assertTrue(notification['unread'])
+
+    def test_certificate_rejection_notification(self):
+        """Test notification when a teacher rejects a certificate request"""
+        # Create a student
+        student = User.objects.create_user(
+            username='student',
+            email='student@example.com',
+            password='testpass123'
+        )
+        
+        # Create a knowledge path
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=self.user  # Current user is the teacher
+        )
+        
+        # Create a certificate request
+        certificate_request = CertificateRequest.objects.create(
+            requester=student,
+            knowledge_path=knowledge_path,
+            status='PENDING'
+        )
+        
+        # Teacher rejects the request
+        url = reverse('certificates:certificate-request-action', args=[certificate_request.id, 'reject'])
+        reject_data = {'rejection_reason': 'Incomplete work'}
+        response = self.client.post(url, reject_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the student
+        self.client.force_authenticate(user=student)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have one notification
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'rejected your certificate request for')
+        self.assertIn('testuser rejected your certificate request for', notification['description'])
+        self.assertIn('Test Knowledge Path', notification['description'])
+        self.assertTrue(notification['unread'])
+
+    def test_certificate_request_notification_spam_protection(self):
+        """Test that multiple certificate requests within 1 hour don't create duplicate notifications"""
+        # Create a teacher (knowledge path author)
+        teacher = User.objects.create_user(
+            username='teacher',
+            email='teacher@example.com',
+            password='testpass123'
+        )
+        
+        # Create a knowledge path
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=teacher
+        )
+        
+        # Student requests a certificate
+        url = reverse('certificates:certificate-request', args=[knowledge_path.id])
+        request_data = {
+            'notes': {'message': 'First request'}
+        }
+        response = self.client.post(url, request_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Get the request ID
+        request_id = response.data['id']
+        
+        # Cancel the request
+        cancel_url = reverse('certificates:certificate-request-action', args=[request_id, 'cancel'])
+        self.client.post(cancel_url)
+        
+        # Request again immediately (should not create duplicate notification due to spam protection)
+        request_data2 = {
+            'notes': {'message': 'Second request'}
+        }
+        response2 = self.client.post(url, request_data2, format='json')
+        self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
+        
+        # Get notifications for the teacher
+        self.client.force_authenticate(user=teacher)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have only one notification due to spam protection
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'requested a certificate for your knowledge path')
+        self.assertTrue(notification['unread'])
+
+    def test_certificate_notification_no_self_notification(self):
+        """Test that users don't get notifications for their own actions"""
+        # Create a knowledge path where the current user is the author
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=self.user  # Current user is the author
+        )
+        
+        # User requests a certificate for their own knowledge path
+        url = reverse('certificates:certificate-request', args=[knowledge_path.id])
+        request_data = {
+            'notes': {'message': 'My own request'}
+        }
+        response = self.client.post(url, request_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Get notifications for the user
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have no certificate request notifications (no self-notification)
+        # But may have other notifications from setUp
+        certificate_notifications = [n for n in notifications if n['verb'] == 'requested a certificate for your knowledge path']
+        self.assertEqual(len(certificate_notifications), 0)
+
+    def test_content_upvote_notification(self):
+        """Test notification when someone upvotes content"""
+        # Create another user who will be the content owner
+        content_owner = User.objects.create_user(
+            username='contentowner',
+            email='contentowner@example.com',
+            password='testpass123'
+        )
+        
+        # Create a topic for the content
+        topic = Topic.objects.create(
+            title='Test Topic',
+            description='Test Topic Description',
+            creator=self.user
+        )
+        
+        # Create content owned by content_owner
+        content = Content.objects.create(
+            original_title='Test Content',
+            uploaded_by=content_owner
+        )
+        
+        # Current user upvotes the content
+        url = reverse('votes:content-vote', args=[topic.id, content.id])
+        vote_data = {'action': 'upvote'}
+        response = self.client.post(url, vote_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the content owner
+        self.client.force_authenticate(user=content_owner)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have one notification
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'upvoted your content')
+        self.assertIn('testuser upvoted your content', notification['description'])
+        self.assertIn('Test Content', notification['description'])
+        self.assertTrue(notification['unread'])
+
+    def test_knowledge_path_upvote_notification(self):
+        """Test notification when someone upvotes a knowledge path"""
+        # Create another user who will be the knowledge path author
+        path_author = User.objects.create_user(
+            username='pathauthor',
+            email='pathauthor@example.com',
+            password='testpass123'
+        )
+        
+        # Create a knowledge path
+        knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=path_author
+        )
+        
+        # Current user upvotes the knowledge path
+        url = reverse('votes:knowledge-path-vote', args=[knowledge_path.id])
+        vote_data = {'action': 'upvote'}
+        response = self.client.post(url, vote_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the path author
+        self.client.force_authenticate(user=path_author)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have one notification
+        self.assertEqual(len(notifications), 1)
+        
+        # Verify notification content
+        notification = notifications[0]
+        self.assertEqual(notification['verb'], 'upvoted your knowledge path')
+        self.assertIn('testuser upvoted your knowledge path', notification['description'])
+        self.assertIn('Test Knowledge Path', notification['description'])
+        self.assertTrue(notification['unread'])
+
+    def test_upvote_notification_no_self_notification(self):
+        """Test that users don't get notifications for their own upvotes"""
+        # Create a topic for the content
+        topic = Topic.objects.create(
+            title='Test Topic',
+            description='Test Topic Description',
+            creator=self.user
+        )
+        
+        # Create content where the current user is the owner
+        content = Content.objects.create(
+            original_title='My Own Content',
+            uploaded_by=self.user
+        )
+        
+        # User upvotes their own content
+        url = reverse('votes:content-vote', args=[topic.id, content.id])
+        vote_data = {'action': 'upvote'}
+        response = self.client.post(url, vote_data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the user
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have no upvote notifications (no self-notification)
+        # But may have other notifications from setUp
+        upvote_notifications = [n for n in notifications if n['verb'] == 'upvoted your content']
+        self.assertEqual(len(upvote_notifications), 0)
+
+    def test_upvote_notification_duplicate_prevention(self):
+        """Test that multiple upvotes don't create duplicate notifications"""
+        # Create another user who will be the content owner
+        content_owner = User.objects.create_user(
+            username='contentowner',
+            email='contentowner@example.com',
+            password='testpass123'
+        )
+        
+        # Create a topic for the content
+        topic = Topic.objects.create(
+            title='Test Topic',
+            description='Test Topic Description',
+            creator=self.user
+        )
+        
+        # Create content owned by content_owner
+        content = Content.objects.create(
+            original_title='Test Content',
+            uploaded_by=content_owner
+        )
+        
+        # Current user upvotes the content
+        url = reverse('votes:content-vote', args=[topic.id, content.id])
+        vote_data = {'action': 'upvote'}
+        response = self.client.post(url, vote_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Remove the upvote
+        vote_data = {'action': 'remove'}
+        response = self.client.post(url, vote_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Upvote again (should not create duplicate notification)
+        vote_data = {'action': 'upvote'}
+        response = self.client.post(url, vote_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Get notifications for the content owner
+        self.client.force_authenticate(user=content_owner)
+        notifications_url = reverse('profiles:notifications')
+        notifications_response = self.client.get(notifications_url)
+        
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = notifications_response.data['notifications']
+        
+        # Should have only one notification due to duplicate prevention
+        upvote_notifications = [n for n in notifications if n['verb'] == 'upvoted your content']
+        self.assertEqual(len(upvote_notifications), 1)

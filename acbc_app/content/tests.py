@@ -41,6 +41,78 @@ class ContentModelTests(TestCase):
         """Test string representation of content"""
         self.assertEqual(str(self.content), 'Content: Test Content')
 
+    def test_can_be_modified_by_original_uploader(self):
+        """Test that content can be modified by the original uploader when no other users have it"""
+        # Should be able to modify since user is the original uploader and no other profiles exist
+        self.assertTrue(self.content.can_be_modified_by(self.user))
+        self.assertEqual(self.content.get_other_user_profiles_count(), 0)
+
+    def test_can_be_modified_by_other_user(self):
+        """Test that content cannot be modified by users who are not the original uploader"""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        self.assertFalse(self.content.can_be_modified_by(other_user))
+
+    def test_can_be_modified_with_other_profiles(self):
+        """Test that content cannot be modified when other users have added it to their libraries"""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        
+        # Create a profile for another user
+        ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            title='Other User Profile'
+        )
+        
+        # Original uploader should not be able to modify
+        self.assertFalse(self.content.can_be_modified_by(self.user))
+        self.assertEqual(self.content.get_other_user_profiles_count(), 1)
+
+    def test_can_be_modified_with_multiple_other_profiles(self):
+        """Test that content cannot be modified when multiple other users have added it"""
+        other_user1 = User.objects.create_user(
+            username='otheruser1',
+            email='other1@example.com',
+            password='testpass123'
+        )
+        other_user2 = User.objects.create_user(
+            username='otheruser2',
+            email='other2@example.com',
+            password='testpass123'
+        )
+        
+        # Create profiles for other users
+        ContentProfile.objects.create(
+            content=self.content,
+            user=other_user1,
+            title='Other User 1 Profile'
+        )
+        ContentProfile.objects.create(
+            content=self.content,
+            user=other_user2,
+            title='Other User 2 Profile'
+        )
+        
+        # Original uploader should not be able to modify
+        self.assertFalse(self.content.can_be_modified_by(self.user))
+        self.assertEqual(self.content.get_other_user_profiles_count(), 2)
+
+    def test_can_be_modified_no_uploader(self):
+        """Test that content cannot be modified when there's no original uploader"""
+        content_no_uploader = Content.objects.create(
+            media_type='TEXT',
+            original_title='No Uploader Content'
+        )
+        self.assertFalse(content_no_uploader.can_be_modified_by(self.user))
+        self.assertEqual(content_no_uploader.get_other_user_profiles_count(), 0)
+
     def test_direct_content_profile_creation(self):
         """Test creating a ContentProfile directly"""
         profile = ContentProfile.objects.create(
@@ -252,6 +324,144 @@ class ContentAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
+    def test_update_content_profile(self):
+        """Test updating a content profile"""
+        url = f'/api/content/content-profiles/{self.content_profile.id}/'
+        data = {
+            'title': 'Updated Title',
+            'author': 'Updated Author',
+            'personal_note': 'Updated note',
+            'is_visible': False,
+            'is_producer': True
+        }
+        response = self.client.patch(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from database
+        self.content_profile.refresh_from_db()
+        self.assertEqual(self.content_profile.title, 'Updated Title')
+        self.assertEqual(self.content_profile.author, 'Updated Author')
+        self.assertEqual(self.content_profile.personal_note, 'Updated note')
+        self.assertFalse(self.content_profile.is_visible)
+        self.assertTrue(self.content_profile.is_producer)
+
+    def test_update_content_profile_visibility_without_producer_claim(self):
+        """Test that visibility cannot be changed without claiming to be the producer"""
+        url = f'/api/content/content-profiles/{self.content_profile.id}/'
+        data = {
+            'is_visible': False,
+            'is_producer': False  # Not claiming to be producer
+        }
+        response = self.client.patch(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('You must claim to be the producer to change visibility', response.data['error'])
+
+    def test_update_content_profile_visibility_with_producer_claim(self):
+        """Test that visibility can be changed when claiming to be the producer"""
+        url = f'/api/content/content-profiles/{self.content_profile.id}/'
+        data = {
+            'is_visible': False,
+            'is_producer': True  # Claiming to be producer
+        }
+        response = self.client.patch(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from database
+        self.content_profile.refresh_from_db()
+        self.assertFalse(self.content_profile.is_visible)
+        self.assertTrue(self.content_profile.is_producer)
+
+    def test_update_content_source_url(self):
+        """Test updating content source URL (the fix we implemented)"""
+        # Create content with URL
+        url_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='URL Content',
+            url='https://old-url.com'
+        )
+        
+        # Create a ContentProfile for the user to edit this content
+        ContentProfile.objects.create(
+            content=url_content,
+            user=self.user,
+            title='URL Content Profile'
+        )
+        
+        update_url = f'/api/content/content_update/{url_content.id}/'
+        data = {
+            'url': 'https://new-url.com',
+            'original_title': 'Updated URL Content',
+            'original_author': 'Updated Author'
+        }
+        
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from database
+        url_content.refresh_from_db()
+        self.assertEqual(url_content.url, 'https://new-url.com')
+        self.assertEqual(url_content.original_title, 'Updated URL Content')
+        self.assertEqual(url_content.original_author, 'Updated Author')
+
+    def test_update_content_source_media_type(self):
+        """Test updating content media type"""
+        update_url = f'/api/content/content_update/{self.content.id}/'
+        data = {
+            'media_type': 'AUDIO',
+            'original_title': 'Updated Audio Content'
+        }
+        
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from database
+        self.content.refresh_from_db()
+        self.assertEqual(self.content.media_type, 'AUDIO')
+        self.assertEqual(self.content.original_title, 'Updated Audio Content')
+
+    def test_update_content_invalid_media_type(self):
+        """Test updating content with invalid media type"""
+        update_url = f'/api/content/content_update/{self.content.id}/'
+        data = {
+            'media_type': 'INVALID_TYPE'
+        }
+        
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Invalid media type', response.data['error'])
+
+    def test_update_content_invalid_url(self):
+        """Test updating content with invalid URL"""
+        update_url = f'/api/content/content_update/{self.content.id}/'
+        data = {
+            'url': 'not-a-valid-url'
+        }
+        
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Invalid URL format', response.data['error'])
+
+    def test_update_content_not_owner(self):
+        """Test that non-owners cannot update content"""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        
+        # Authenticate as other user
+        self.client.force_authenticate(user=other_user)
+        
+        update_url = f'/api/content/content_update/{self.content.id}/'
+        data = {
+            'original_title': 'Unauthorized Update'
+        }
+        
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('You do not have permission to edit this content', response.data['error'])
+
     def test_upload_url_content_basic(self):
         """Test basic URL content upload with minimal data."""
         url = 'https://example.com/article'
@@ -361,6 +571,67 @@ class ContentAPITests(APITestCase):
 
         # Clean up test file
         os.remove('test_file.txt')
+
+    def test_content_modification_check_endpoint(self):
+        """Test the content modification check API endpoint"""
+        url = f'/api/content/content_modification_check/{self.content.id}/'
+        
+        # Test when content can be modified
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['can_modify'])
+        self.assertEqual(response.data['other_users_count'], 0)
+        self.assertTrue(response.data['is_original_uploader'])
+        self.assertEqual(response.data['message'], 'Content can be modified')
+
+    def test_content_modification_check_with_other_profiles(self):
+        """Test the content modification check when other users have the content"""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        
+        # Create a profile for another user
+        ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            title='Other User Profile'
+        )
+        
+        url = f'/api/content/content_modification_check/{self.content.id}/'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['can_modify'])
+        self.assertEqual(response.data['other_users_count'], 1)
+        self.assertTrue(response.data['is_original_uploader'])
+        self.assertIn('Cannot change the source of this content because 1 other user(s) have added it to their libraries', response.data['message'])
+
+    def test_content_modification_check_not_original_uploader(self):
+        """Test the content modification check when user is not the original uploader"""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        
+        # Authenticate as other user
+        self.client.force_authenticate(user=other_user)
+        
+        url = f'/api/content/content_modification_check/{self.content.id}/'
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['can_modify'])
+        self.assertEqual(response.data['other_users_count'], 0)
+        self.assertFalse(response.data['is_original_uploader'])
+
+    def test_content_modification_check_content_not_found(self):
+        """Test the content modification check with non-existent content"""
+        url = '/api/content/content_modification_check/99999/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_upload_url_content_permissions(self):
         """Test permissions for URL content upload."""
@@ -520,26 +791,26 @@ class PublicationAPITests(APITestCase):
 
     def test_vote_publication(self):
         """Test voting on a publication"""
-        url = reverse('content:publication-vote', args=[self.publication.id])
+        url = reverse('votes:publication-vote', args=[self.publication.id])
         
         # Test upvote
-        data = {'value': 1}
+        data = {'action': 'upvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('vote_count', response.data)
         
         # Test removing vote
-        data = {'value': 0}
+        data = {'action': 'remove'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Test downvote
-        data = {'value': -1}
+        data = {'action': 'downvote'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Test invalid vote value
-        data = {'value': 2}
+        # Test invalid vote action
+        data = {'action': 'invalid'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -634,3 +905,103 @@ class ContentProfileAPITest(APITestCase):
             print(f"DEBUG - Error during test: {str(e)}")
             # We won't fail the test yet since we're still figuring things out
             print("DEBUG - Skipping test until we get the correct URL")
+
+
+class ContentSourceEditTests(APITestCase):
+    """Test suite specifically for content source edit functionality"""
+    
+    def setUp(self):
+        """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.user)
+        
+        # Create content that can be modified
+        self.modifiable_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Modifiable Content',
+            url='https://example.com'
+        )
+        self.modifiable_profile = ContentProfile.objects.create(
+            content=self.modifiable_content,
+            user=self.user,
+            title='Modifiable Profile'
+        )
+        
+        # Create content that cannot be modified (other user has it)
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        self.non_modifiable_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Non-Modifiable Content',
+            url='https://example2.com'
+        )
+        self.non_modifiable_profile = ContentProfile.objects.create(
+            content=self.non_modifiable_content,
+            user=self.user,
+            title='Non-Modifiable Profile'
+        )
+        # Add profile for other user
+        ContentProfile.objects.create(
+            content=self.non_modifiable_content,
+            user=self.other_user,
+            title='Other User Profile'
+        )
+
+    def test_content_source_edit_modifiable_content(self):
+        """Test that modifiable content shows the edit form"""
+        # Test the modification check endpoint
+        check_url = f'/api/content/content_modification_check/{self.modifiable_content.id}/'
+        response = self.client.get(check_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['can_modify'])
+        self.assertEqual(response.data['other_users_count'], 0)
+        
+        # Test the content detail endpoint (used by ContentSourceEdit)
+        detail_url = f'/api/content/content_details/{self.modifiable_content.id}/?context=library&id={self.user.id}'
+        response = self.client.get(detail_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('selected_profile', response.data)
+
+    def test_content_source_edit_non_modifiable_content(self):
+        """Test that non-modifiable content shows the warning message"""
+        # Test the modification check endpoint
+        check_url = f'/api/content/content_modification_check/{self.non_modifiable_content.id}/'
+        response = self.client.get(check_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['can_modify'])
+        self.assertEqual(response.data['other_users_count'], 1)
+        self.assertIn('Cannot change the source of this content because 1 other user(s) have added it to their libraries', response.data['message'])
+
+    def test_content_source_edit_not_original_uploader(self):
+        """Test that non-original uploaders cannot modify content"""
+        # Authenticate as other user
+        self.client.force_authenticate(user=self.other_user)
+        
+        check_url = f'/api/content/content_modification_check/{self.modifiable_content.id}/'
+        response = self.client.get(check_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['can_modify'])
+        self.assertFalse(response.data['is_original_uploader'])
+
+    def test_content_source_edit_unauthorized_access(self):
+        """Test that unauthorized users cannot access modification check"""
+        # Logout user
+        self.client.force_authenticate(user=None)
+        
+        check_url = f'/api/content/content_modification_check/{self.modifiable_content.id}/'
+        response = self.client.get(check_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

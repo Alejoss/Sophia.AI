@@ -13,10 +13,13 @@ import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import BookmarkButton from '../bookmarks/BookmarkButton';
+import VoteComponent from '../votes/VoteComponent';
 import ProfileHeader from '../profiles/ProfileHeader';
+import AddToLibraryModal from '../components/AddToLibraryModal';
 import { getProfileById } from '../api/profilesApi';
 import { useAuth } from '../context/AuthContext';
 
+// ContentDisplay Mode: "card" - Rich card display for publication content
 const PublicationDetail = () => {
     const [publication, setPublication] = useState(null);
     const [profile, setProfile] = useState(null);
@@ -56,6 +59,17 @@ const PublicationDetail = () => {
         navigate(`/messages/thread/${profile.user.id}`);
     };
 
+    const handleAddToLibrarySuccess = () => {
+        // Refresh publication data after adding to library
+        contentApi.getPublicationDetails(publicationId)
+            .then(updatedPublication => {
+                setPublication(updatedPublication);
+            })
+            .catch(err => {
+                console.error('Error refreshing publication:', err);
+            });
+    };
+
     if (loading) return (
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
             <CircularProgress />
@@ -90,8 +104,22 @@ const PublicationDetail = () => {
 
             <Paper elevation={2} sx={{ p: 3 }}>
                 {/* Action Buttons */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <VoteComponent
+                        type="publication"
+                        ids={{ publicationId: publicationId }}
+                        initialVoteCount={publication.vote_count || 0}
+                        initialUserVote={publication.user_vote || 0}
+                    />
+                    
                     <Box sx={{ display: 'flex', gap: 1 }}>
+                        {/* Add to Library Button - Only show if there's referenced content */}
+                        {publication.content && (
+                            <AddToLibraryModal
+                                content={publication.content}
+                                onSuccess={handleAddToLibrarySuccess}
+                            />
+                        )}
                         <BookmarkButton 
                             contentId={publicationId}
                             contentType="publication"
@@ -125,9 +153,8 @@ const PublicationDetail = () => {
                         <Box sx={{ mb: 2 }}>
                             <ContentDisplay 
                                 content={publication.content}
-                                variant="detailed"
+                                variant="preview"
                                 showAuthor={true}
-                                onClick={() => navigate(`/content/${publication.content.id}/library?context=publication&id=${publicationId}`)}
                             />
                         </Box>
                     </Box>

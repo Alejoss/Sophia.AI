@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import certificatesApi from '../api/certificatesApi';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -14,10 +15,12 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  Tabs,
+  Tab
 } from '@mui/material';
 
-const Certificates = () => {
+const Certificates = ({ isOwnProfile = false, userId = null }) => {
   const [activeTab, setActiveTab] = useState('certificates');
   const [certificates, setCertificates] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -29,8 +32,8 @@ const Certificates = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approveNote, setApproveNote] = useState('');
-  const [rejectNote, setRejectNote] = useState('');
   const { authState } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (activeTab === 'certificates') {
@@ -38,12 +41,18 @@ const Certificates = () => {
     } else if (activeTab === 'requests') {
       fetchRequests();
     }
-  }, [activeTab]);
+  }, [activeTab, isOwnProfile, userId]);
 
   const fetchCertificates = async () => {
     try {
       setCertificatesLoading(true);
-      const data = await certificatesApi.getCertificates();
+      let data;
+      if (isOwnProfile || !userId) {
+        data = await certificatesApi.getCertificates();
+      } else {
+        data = await certificatesApi.getUserCertificatesById(userId);
+      }
+      console.log('DEBUG: Fetched certificates:', data);
       setCertificates(data);
     } catch (err) {
       setError('Failed to load certificates');
@@ -56,8 +65,14 @@ const Certificates = () => {
   const fetchRequests = async () => {
     try {
       setRequestsLoading(true);
-      const data = await certificatesApi.getCertificateRequests();
-      setRequests(data);
+      // Only fetch requests for owners, not visitors
+      if (isOwnProfile || !userId) {
+        const data = await certificatesApi.getCertificateRequests();
+        setRequests(data);
+      } else {
+        // For visitors, don't show certificate requests
+        setRequests([]);
+      }
     } catch (err) {
       setError('Failed to load certificate requests');
       console.error(err);
@@ -85,10 +100,9 @@ const Certificates = () => {
     if (!selectedRequest) return;
 
     try {
-      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason, rejectNote);
+      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason);
       setRejectDialogOpen(false);
       setRejectReason('');
-      setRejectNote('');
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
@@ -137,27 +151,75 @@ const Certificates = () => {
     return [...pendingRequests, ...nonPendingRequests];
   };
 
+  const getCertificateTitle = (certificate) => {
+    if (certificate.knowledge_path_title) {
+      return certificate.knowledge_path_title;
+    } else if (certificate.event_title) {
+      return certificate.event_title;
+    } else {
+      return 'Certificate';
+    }
+  };
+
+  const getCertificateType = (certificate) => {
+    if (certificate.knowledge_path_title) {
+      return 'Knowledge Path';
+    } else if (certificate.event_title) {
+      return 'Event';
+    } else {
+      return 'Certificate';
+    }
+  };
+
+  const getRequestTitle = (request) => {
+    if (request.knowledge_path_title) {
+      return request.knowledge_path_title;
+    } else if (request.event_title) {
+      return request.event_title;
+    } else {
+      return 'Certificate Request';
+    }
+  };
+
+  const getRequestType = (request) => {
+    if (request.knowledge_path_title) {
+      return 'Knowledge Path';
+    } else if (request.event_title) {
+      return 'Event';
+    } else {
+      return 'Certificate';
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
-    <div>
-      {/* Tabs */}
-      <div className="profile-tabs">
-        <button 
-          className={`tab ${activeTab === 'certificates' ? 'active' : ''}`}
-          onClick={() => setActiveTab('certificates')}
-        >
-          My Certificates
-        </button>
-        <button 
-          className={`tab ${activeTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setActiveTab('requests')}
-        >
-          Certificate Requests
-        </button>
-      </div>
+    <Box>
+      {/* Material-UI Tabs - Only show requests tab for owners */}
+      {isOwnProfile ? (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={handleTabChange}
+          >
+            <Tab label="My Certificates" value="certificates" />
+            <Tab label="Certificate Requests" value="requests" />
+          </Tabs>
+        </Box>
+      ) : (
+        // For visitors, show a simple header
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            Certificates ({certificates.length})
+          </Typography>
+        </Box>
+      )}
 
       {/* Tab Content */}
-      <div className="tab-content">
-        {activeTab === 'certificates' && (
+      <Box>
+        {(activeTab === 'certificates' || !isOwnProfile) && (
           <div className="certificates">
             {certificatesLoading ? (
               <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -167,7 +229,10 @@ const Certificates = () => {
               <Alert severity="error">{error}</Alert>
             ) : certificates.length === 0 ? (
               <Typography variant="body1" color="textSecondary">
-                You haven't earned any certificates yet. Complete knowledge paths to earn certificates!
+                {isOwnProfile 
+                  ? "You haven't earned any certificates yet. Complete knowledge paths or attend events to earn certificates!"
+                  : "No certificates found."
+                }
               </Typography>
             ) : (
               <div className="grid gap-4">
@@ -177,7 +242,10 @@ const Certificates = () => {
                       <div className="flex justify-between items-start">
                         <div>
                           <Typography variant="h6">
-                            {certificate.knowledge_path_title}
+                            {getCertificateTitle(certificate)}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Type: {getCertificateType(certificate)}
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
                             Issued on: {new Date(certificate.issued_on).toLocaleDateString()}
@@ -210,7 +278,7 @@ const Certificates = () => {
             )}
           </div>
         )}
-        {activeTab === 'requests' && (
+        {isOwnProfile && activeTab === 'requests' && (
           <div className="requests">
             {requestsLoading ? (
               <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -219,9 +287,27 @@ const Certificates = () => {
             ) : error ? (
               <Alert severity="error">{error}</Alert>
             ) : requests.length === 0 ? (
-              <Typography variant="body1" color="textSecondary">
-                No certificate requests found.
-              </Typography>
+              <Box textAlign="center" py={4}>
+                <Typography variant="h6" color="textSecondary" gutterBottom>
+                  ¿Got something to teach? Create a Knowledge Path or an Event and issue certificates
+                </Typography>
+                <Box mt={3} display="flex" gap={2} justifyContent="center">
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => navigate('/knowledge_path/create')}
+                  >
+                    Create Knowledge Path
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => navigate('/events/create')}
+                  >
+                    Create an Event
+                  </Button>
+                </Box>
+              </Box>
             ) : (
               <div className="space-y-8">
                 {/* Teacher View */}
@@ -236,10 +322,19 @@ const Certificates = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <Typography variant="h6">
-                                {request.knowledge_path_title}
+                                {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Requested by: {request.requester}
+                                Requested by:{' '}
+                                <Link 
+                                  to={`/profiles/user_profile/${request.requester_id}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  {request.requester}
+                                </Link>
+                              </Typography>
+                              <Typography variant="body2" color="textSecondary">
+                                Type: {getRequestType(request)}
                               </Typography>
                               <Chip
                                 label={request.status}
@@ -310,13 +405,22 @@ const Certificates = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <Typography variant="h6">
-                                {request.knowledge_path_title}
+                                {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
                                 Requested on: {new Date(request.request_date).toLocaleDateString()}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Author: {request.knowledge_path_author}
+                                Author:{' '}
+                                <Link 
+                                  to={`/profiles/user_profile/${request.knowledge_path_author_id || request.event_owner_id}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  {request.knowledge_path_author || request.event_owner}
+                                </Link>
+                              </Typography>
+                              <Typography variant="body2" color="textSecondary">
+                                Type: {getRequestType(request)}
                               </Typography>
                               <Chip
                                 label={request.status}
@@ -356,7 +460,7 @@ const Certificates = () => {
             )}
           </div>
         )}
-      </div>
+      </Box>
 
       {/* Approve Dialog */}
       <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)}>
@@ -398,16 +502,6 @@ const Certificates = () => {
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
           />
-          <TextField
-            margin="dense"
-            label="Note (optional)"
-            type="text"
-            fullWidth
-            multiline
-            rows={4}
-            value={rejectNote}
-            onChange={(e) => setRejectNote(e.target.value)}
-          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
@@ -416,7 +510,7 @@ const Certificates = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Box>
   );
 };
 

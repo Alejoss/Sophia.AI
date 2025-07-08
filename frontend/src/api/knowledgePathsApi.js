@@ -3,10 +3,43 @@ import axiosInstance from './axiosConfig';
 const knowledgePathsApi = {
     createKnowledgePath: async (knowledgePathData) => {
         try {
-            const response = await axiosInstance.post('/knowledge_paths/create/', knowledgePathData);
+            console.log('knowledgePathsApi.createKnowledgePath - Input data:', knowledgePathData);
+            
+            // Check if there's an image file to upload
+            const hasImage = knowledgePathData.image instanceof File;
+            console.log('knowledgePathsApi.createKnowledgePath - Has image:', hasImage);
+            
+            let response;
+            if (hasImage) {
+                // Use FormData for file upload
+                const formData = new FormData();
+                formData.append('title', knowledgePathData.title);
+                formData.append('description', knowledgePathData.description);
+                formData.append('image', knowledgePathData.image);
+                
+                console.log('knowledgePathsApi.createKnowledgePath - Using FormData');
+                console.log('knowledgePathsApi.createKnowledgePath - FormData contents:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}:`, value);
+                }
+                
+                response = await axiosInstance.post('/knowledge_paths/create/', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+            } else {
+                // Use JSON for regular creation
+                const { image, ...jsonData } = knowledgePathData;
+                console.log('knowledgePathsApi.createKnowledgePath - Using JSON data:', jsonData);
+                response = await axiosInstance.post('/knowledge_paths/create/', jsonData);
+            }
+            
+            console.log('knowledgePathsApi.createKnowledgePath - Response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error creating knowledge path:', error);
+            console.error('Error response:', error.response?.data);
             throw error;
         }
     },
@@ -23,10 +56,43 @@ const knowledgePathsApi = {
 
     updateKnowledgePath: async (pathId, knowledgePathData) => {
         try {
-            const response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, knowledgePathData);
+            console.log('knowledgePathsApi.updateKnowledgePath - Input data:', knowledgePathData);
+            
+            // Check if there's an image file to upload
+            const hasImage = knowledgePathData.image instanceof File;
+            console.log('knowledgePathsApi.updateKnowledgePath - Has image:', hasImage);
+            
+            let response;
+            if (hasImage) {
+                // Use FormData for file upload
+                const formData = new FormData();
+                formData.append('title', knowledgePathData.title);
+                formData.append('description', knowledgePathData.description);
+                formData.append('image', knowledgePathData.image);
+                
+                console.log('knowledgePathsApi.updateKnowledgePath - Using FormData');
+                console.log('knowledgePathsApi.updateKnowledgePath - FormData contents:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}:`, value);
+                }
+                
+                response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+            } else {
+                // Use JSON for regular updates
+                const { image, ...jsonData } = knowledgePathData;
+                console.log('knowledgePathsApi.updateKnowledgePath - Using JSON data:', jsonData);
+                response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, jsonData);
+            }
+            
+            console.log('knowledgePathsApi.updateKnowledgePath - Response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error updating knowledge path:', error);
+            console.error('Error response:', error.response?.data);
             throw error;
         }
     },
@@ -58,6 +124,51 @@ const knowledgePathsApi = {
             return response.data;
         } catch (error) {
             console.error('Error fetching knowledge paths:', error);
+            throw error;
+        }
+    },
+
+    getUserKnowledgePaths: async (page = 1, pageSize = 9) => {
+        try {
+            const response = await axiosInstance.get('/knowledge_paths/my/', {
+                params: {
+                    page,
+                    page_size: pageSize
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user knowledge paths:', error);
+            throw error;
+        }
+    },
+
+    getUserEngagedKnowledgePaths: async (page = 1, pageSize = 9) => {
+        try {
+            const response = await axiosInstance.get('/knowledge_paths/engaged/', {
+                params: {
+                    page,
+                    page_size: pageSize
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user engaged knowledge paths:', error);
+            throw error;
+        }
+    },
+
+    getUserKnowledgePathsById: async (userId, page = 1, pageSize = 9) => {
+        try {
+            const response = await axiosInstance.get(`/knowledge_paths/user/${userId}/`, {
+                params: {
+                    page,
+                    page_size: pageSize
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching knowledge paths by user ID:', error);
             throw error;
         }
     },

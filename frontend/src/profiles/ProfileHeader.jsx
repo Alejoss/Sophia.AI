@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
@@ -7,16 +7,20 @@ import {
     Paper, 
     Grid, 
     Tooltip,
-    CircularProgress
+    CircularProgress,
+    IconButton
 } from '@mui/material';
 import MessageIcon from '@mui/icons-material/Message';
+import SettingsIcon from '@mui/icons-material/Settings';
+import EditIcon from '@mui/icons-material/Edit';
 
 const ProfileHeader = ({ 
     profile, 
     isOwnProfile, 
     isAuthenticated, 
     onSendMessage, 
-    isNavigating 
+    isNavigating,
+    onSecurityClick
 }) => {
     const navigate = useNavigate();
 
@@ -25,7 +29,28 @@ const ProfileHeader = ({
     };
 
     return (
-        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+        <Paper elevation={2} sx={{ p: 3, mb: 3, position: 'relative' }}>
+            {/* Configuration Icon - Top Right Corner */}
+            {isOwnProfile && (
+                <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
+                    <Tooltip title="Settings">
+                        <IconButton
+                            onClick={onSecurityClick}
+                            size="small"
+                            sx={{
+                                color: 'text.secondary',
+                                '&:hover': {
+                                    color: 'primary.main',
+                                    backgroundColor: 'action.hover'
+                                }
+                            }}
+                        >
+                            <SettingsIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            )}
+
             <Grid container spacing={3}>
                 <Grid item xs={12} md={3}>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -44,7 +69,7 @@ const ProfileHeader = ({
                     </Box>
                 </Grid>
                 <Grid item xs={12} md={9}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                         <Typography 
                             variant="h4" 
                             onClick={handleProfileClick}
@@ -57,29 +82,48 @@ const ProfileHeader = ({
                         >
                             {profile.user.username}
                         </Typography>
-                        {!isOwnProfile && (
-                            <Tooltip title={isAuthenticated ? "Send a message" : "Login to send a message"}>
-                                <Button 
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={onSendMessage}
-                                    disabled={isNavigating}
-                                    startIcon={isNavigating ? <CircularProgress size={20} color="inherit" /> : <MessageIcon />}
-                                    sx={{ 
-                                        ml: 1,
-                                        '&:hover': {
-                                            backgroundColor: 'primary.dark'
-                                        }
-                                    }}
-                                >
-                                    Send Message
-                                </Button>
-                            </Tooltip>
-                        )}
+                        
+                        {/* Action Buttons */}
+                        <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                            {!isOwnProfile && (
+                                <Tooltip title={isAuthenticated ? "Send a message" : "Login to send a message"}>
+                                    <Button 
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={onSendMessage}
+                                        disabled={isNavigating}
+                                        startIcon={isNavigating ? <CircularProgress size={20} color="inherit" /> : <MessageIcon />}
+                                        sx={{ 
+                                            '&:hover': {
+                                                backgroundColor: 'primary.dark'
+                                            }
+                                        }}
+                                    >
+                                        Send Message
+                                    </Button>
+                                </Tooltip>
+                            )}
+                        </Box>
                     </Box>
                     <Typography variant="body1" paragraph>
                         {profile.profile_description || 'No description available.'}
                     </Typography>
+                    
+                    {/* Edit Profile Button - Below Description */}
+                    {isOwnProfile && (
+                        <Box sx={{ mt: 2 }}>
+                            <Button
+                                component={Link}
+                                to="/profiles/my_profile/edit"
+                                variant="outlined"
+                                color="primary"
+                                startIcon={<EditIcon />}
+                                size="small"
+                            >
+                                Edit Profile
+                            </Button>
+                        </Box>
+                    )}
                 </Grid>
             </Grid>
         </Paper>
