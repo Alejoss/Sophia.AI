@@ -1,9 +1,13 @@
 from rest_framework import serializers
+import logging
 
 from django.contrib.auth.models import User
 
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
 from notifications.models import Notification
+
+# Get logger for profiles serializers
+logger = logging.getLogger('academia_blockchain.profiles.serializers')
 
 # UserRegistrationSerializer (moved from views.py)
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -162,7 +166,11 @@ class NotificationSerializer(serializers.ModelSerializer):
                 
             return None
         except Exception as e:
-            print(f"Error getting context title: {str(e)}")
+            logger.error("Error getting context title", extra={
+                'notification_id': obj.id,
+                'verb': obj.verb,
+                'error': str(e),
+            }, exc_info=True)
             return None
 
     def get_target_url(self, obj):
@@ -204,7 +212,11 @@ class NotificationSerializer(serializers.ModelSerializer):
                 
             return None
         except Exception as e:
-            print(f"Error getting target URL: {str(e)}")
+            logger.error("Error getting target URL", extra={
+                'notification_id': obj.id,
+                'verb': obj.verb,
+                'error': str(e),
+            }, exc_info=True)
             return None
 
     def getNotificationDescription(self, notification):

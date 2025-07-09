@@ -101,9 +101,6 @@ class EventLifecycleIntegrationTest(TestCase):
         }
         
         response = self.client.post('/api/events/', event_data, format='json')
-        if response.status_code != status.HTTP_201_CREATED:
-            print(f"Event creation failed with status {response.status_code}")
-            print(f"Response data: {response.data}")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
         # Now test with image
@@ -119,9 +116,6 @@ class EventLifecycleIntegrationTest(TestCase):
         }
         
         response = self.client.post('/api/events/', event_data_with_image, format='multipart')
-        if response.status_code != status.HTTP_201_CREATED:
-            print(f"Event creation with image failed with status {response.status_code}")
-            print(f"Response data: {response.data}")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('image', response.data)
 

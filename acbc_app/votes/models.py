@@ -4,9 +4,13 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Sum
 from django.apps import apps
+import logging
 
 from content.models import Topic, Content
 from knowledge_paths.models import KnowledgePath
+
+# Get logger for votes models
+logger = logging.getLogger('academia_blockchain.votes.models')
 
 
 class Vote(models.Model):
@@ -35,47 +39,79 @@ class Vote(models.Model):
 
     def upvote(self):
         """Changes the vote to upvote or removes it if it already exists."""
-        print(f"\n=== Vote.upvote ===")
-        print(f"Current vote value: {self.value}")
+        logger.debug("Vote upvote operation", extra={
+            'vote_id': self.id,
+            'user_id': self.user.id,
+            'current_value': self.value,
+            'content_type': self.content_type.model,
+            'object_id': self.object_id,
+        })
         
         if self.value == 1:
-            print("Removing upvote")
+            logger.info("Removing existing upvote", extra={
+                'vote_id': self.id,
+                'user_id': self.user.id,
+            })
             self.value = 0  # Removes the upvote
             self.save()
-            print("Vote saved with value 0")
+            logger.debug("Vote saved with value 0", extra={'vote_id': self.id})
             return -1 # Return -1 to indicate the vote was removed
 
         old_value = self.value
-        print(f"Changing vote from {old_value} to 1")
+        logger.info("Changing vote value", extra={
+            'vote_id': self.id,
+            'user_id': self.user.id,
+            'old_value': old_value,
+            'new_value': 1,
+        })
         self.value = 1
         self.save()
-        print("Vote saved with value 1")
+        logger.debug("Vote saved with value 1", extra={'vote_id': self.id})
 
         if old_value == -1:
-            print("Changed from downvote to upvote")
+            logger.info("Changed from downvote to upvote", extra={
+                'vote_id': self.id,
+                'user_id': self.user.id,
+            })
             return 2 # Return 2 to indicate the vote was changed from downvote to upvote
         return 1 # Return 1 to indicate a new upvote
 
     def downvote(self):
         """Changes the vote to downvote or removes it if it already exists."""
-        print(f"\n=== Vote.downvote ===")
-        print(f"Current vote value: {self.value}")
+        logger.debug("Vote downvote operation", extra={
+            'vote_id': self.id,
+            'user_id': self.user.id,
+            'current_value': self.value,
+            'content_type': self.content_type.model,
+            'object_id': self.object_id,
+        })
         
         if self.value == -1:
-            print("Removing downvote")
+            logger.info("Removing existing downvote", extra={
+                'vote_id': self.id,
+                'user_id': self.user.id,
+            })
             self.value = 0  # Removes the downvote
             self.save()
-            print("Vote saved with value 0")
+            logger.debug("Vote saved with value 0", extra={'vote_id': self.id})
             return 1 # Return 1 to indicate the vote was removed
 
         old_value = self.value
-        print(f"Changing vote from {old_value} to -1")
+        logger.info("Changing vote value", extra={
+            'vote_id': self.id,
+            'user_id': self.user.id,
+            'old_value': old_value,
+            'new_value': -1,
+        })
         self.value = -1
         self.save()
-        print("Vote saved with value -1")
+        logger.debug("Vote saved with value -1", extra={'vote_id': self.id})
 
         if old_value == 1:
-            print("Changed from upvote to downvote")
+            logger.info("Changed from upvote to downvote", extra={
+                'vote_id': self.id,
+                'user_id': self.user.id,
+            })
             return -2  # Return -2 to indicate the vote was changed from upvote to downvote
         return -1 # Return -1 to indicate a new downvote
 
@@ -119,14 +155,15 @@ class VoteCount(models.Model):
 
     def update_vote_count(self, obj=None):
         """Update vote count for the object, considering topic if specified"""
-        print(f"\n=== VoteCount.update_vote_count ===")
-        print(f"Content Type: {self.content_type.model}")
-        print(f"Object ID: {self.object_id}")
-        print(f"Topic: {self.topic.id if self.topic else 'None'}")
+        logger.debug("Updating vote count", extra={
+            'content_type': self.content_type.model,
+            'object_id': self.object_id,
+            'topic_id': self.topic.id if self.topic else None,
+        })
         
         if obj is None:
             obj = self.content_object
-            print(f"Using content object: {obj.id}")
+            logger.debug("Using content object", extra={'object_id': obj.id})
 
         # Calculate total votes using Vote model
         vote_query = Vote.objects.filter(
@@ -137,36 +174,45 @@ class VoteCount(models.Model):
         # If this is a topic-specific vote count, filter by topic
         if self.topic:
             vote_query = vote_query.filter(topic=self.topic)
-            print(f"Filtering votes for topic: {self.topic.id}")
+            logger.debug("Filtering votes for topic", extra={'topic_id': self.topic.id})
         else:
             # For non-topic-specific votes, only count votes that are also non-topic-specific
             vote_query = vote_query.filter(topic__isnull=True)
-            print("Filtering for non-topic-specific votes")
+            logger.debug("Filtering for non-topic-specific votes")
 
         # Get all votes with user information
         votes = vote_query.select_related('user').values('user__username', 'value')
-        print("\nDetailed vote information:")
-        print("------------------------")
+        
+        # Log detailed vote information at debug level
         for vote in votes:
             vote_type = "upvote" if vote['value'] > 0 else "downvote" if vote['value'] < 0 else "no vote"
-            print(f"User: {vote['user__username']}, Vote: {vote['value']} ({vote_type})")
-        print("------------------------")
+            logger.debug("Vote details", extra={
+                'user': vote['user__username'],
+                'vote_value': vote['value'],
+                'vote_type': vote_type,
+            })
         
         # Get just the values for sum calculation
         vote_values = [vote['value'] for vote in votes]
-        print(f"\nFound {len(vote_values)} votes")
-        print(f"Vote values: {vote_values}")
+        logger.debug("Vote count calculation", extra={
+            'vote_count': len(vote_values),
+            'vote_values': vote_values,
+        })
         
         # Calculate the sum
         vote_sum = sum(vote_values)
-        print(f"Calculated vote sum: {vote_sum}")
+        logger.debug("Calculated vote sum", extra={'vote_sum': vote_sum})
 
         # Update the vote count
         old_count = self.vote_count
         self.vote_count = vote_sum
         self.save()
-        print(f"Updated vote count from {old_count} to {self.vote_count}")
-        print("=== End VoteCount.update_vote_count ===\n")
+        logger.info("Vote count updated", extra={
+            'old_count': old_count,
+            'new_count': self.vote_count,
+            'content_type': self.content_type.model,
+            'object_id': self.object_id,
+        })
         
         return self.vote_count
 

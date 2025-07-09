@@ -1,5 +1,9 @@
 from django.contrib import admin
+import logging
 from .models import Quiz, Question, Option, UserQuizAttempt, Answer
+
+# Get logger for quizzes admin
+logger = logging.getLogger('academia_blockchain.quizzes.admin')
 
 
 class OptionInline(admin.TabularInline):
@@ -39,12 +43,21 @@ class OptionAdmin(admin.ModelAdmin):
     search_fields = ('text', 'question__text')
 
     def save_model(self, request, obj, form, change):
-        print("\nAdmin save_model:")
-        print(f"Saving option: {obj.text}")
-        print(f"Is correct: {obj.is_correct}")
+        logger.debug("Admin save_model", extra={
+            'option_id': obj.pk,
+            'option_text': obj.text,
+            'is_correct': obj.is_correct,
+            'question_id': obj.question.id,
+            'user_id': request.user.id,
+        })
         
         # If marking as correct in a single choice question
         if obj.is_correct and obj.question.question_type == 'SINGLE':
+            logger.info("Updating other options to not correct for single choice question in admin", extra={
+                'option_id': obj.pk,
+                'question_id': obj.question.id,
+                'user_id': request.user.id,
+            })
             # Update other options first
             Option.objects.filter(question=obj.question).exclude(pk=obj.pk).update(is_correct=False)
         

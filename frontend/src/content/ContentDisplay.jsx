@@ -723,25 +723,7 @@ const ContentDisplay = ({
         );
       }
 
-      // Mode indicator component
-      const ModeIndicator = () => (
-        <Box sx={{ 
-          position: 'absolute', 
-          top: 8, 
-          right: 8, 
-          zIndex: 1,
-          bgcolor: 'primary.main',
-          color: 'white',
-          px: 1,
-          py: 0.5,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 'bold',
-          opacity: 0.8
-        }}>
-          {variant.toUpperCase()}
-        </Box>
-      );
+
 
       switch (variant) {
         case 'simple':
@@ -755,7 +737,6 @@ const ContentDisplay = ({
             }} 
             onClick={onClick}
           >
-            <ModeIndicator />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ 
                 display: 'flex',
@@ -876,7 +857,6 @@ const ContentDisplay = ({
                 backgroundColor: 'background.paper'
               }}
             >
-              <ModeIndicator />
               
               {/* Media Preview Section */}
               <Box sx={{ 
@@ -1162,7 +1142,6 @@ const ContentDisplay = ({
                 'Click to view content'
               }
             >
-              <ModeIndicator />
               <CardMedia
                 component="div"
                 sx={{
@@ -1322,7 +1301,6 @@ const ContentDisplay = ({
         case 'detailed':
           return (
             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', position: 'relative' }}>
-              <ModeIndicator />
               <Box>
                 <Typography variant="h6" gutterBottom>
                   {title}

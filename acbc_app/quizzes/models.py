@@ -1,8 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+import logging
 from knowledge_paths.models import Node
 from content.models import Content
+
+# Get logger for quizzes models
+logger = logging.getLogger('academia_blockchain.quizzes.models')
 
 
 def upload_question_image(instance, filename):
@@ -40,17 +44,28 @@ class Question(models.Model):
         return self.text
 
     def clean(self):
-        print(f"\nQuestion clean method:")
-        print(f"Question ID: {self.pk}")
-        print(f"Question type: {self.question_type}")
+        logger.debug("Question clean method", extra={
+            'question_id': self.pk,
+            'question_type': self.question_type,
+        })
         
         if self.pk:  # Only check for existing questions
             correct_options = self.options.filter(is_correct=True).count()
-            print(f"Number of correct options: {correct_options}")
+            logger.debug("Question validation", extra={
+                'question_id': self.pk,
+                'correct_options_count': correct_options,
+            })
             
             if correct_options == 0:
+                logger.warning("Question validation failed - no correct options", extra={
+                    'question_id': self.pk,
+                })
                 raise ValidationError("Question must have at least one correct option")
             if self.question_type == 'SINGLE' and correct_options > 1:
+                logger.warning("Question validation failed - multiple correct options for single choice", extra={
+                    'question_id': self.pk,
+                    'correct_options_count': correct_options,
+                })
                 raise ValidationError("Single choice questions can only have one correct option")
 
     def delete(self, *args, **kwargs):
@@ -69,11 +84,12 @@ class Option(models.Model):
         return f"{self.text} ({'correct' if self.is_correct else 'incorrect'})"
 
     def clean(self):
-        print(f"\nOption clean method:")
-        print(f"Option ID: {self.pk}")
-        print(f"Option text: {self.text}")
-        print(f"Is correct: {self.is_correct}")
-        print(f"Question type: {self.question.question_type}")
+        logger.debug("Option clean method", extra={
+            'option_id': self.pk,
+            'option_text': self.text,
+            'is_correct': self.is_correct,
+            'question_type': self.question.question_type,
+        })
         
         # Only perform this validation if we're setting this option as correct
         if self.is_correct and self.question.question_type == 'SINGLE':
@@ -85,7 +101,10 @@ class Option(models.Model):
                     is_correct=True
                 ).exclude(pk=self.pk)
                 
-                print(f"Found {current_correct.count()} other correct options")
+                logger.debug("Option validation", extra={
+                    'option_id': self.pk,
+                    'other_correct_options_count': current_correct.count(),
+                })
                 if current_correct.exists():
                     # Instead of raising an error, we'll handle this in save()
                     pass
@@ -93,13 +112,20 @@ class Option(models.Model):
                 pass
 
     def save(self, *args, **kwargs):
-        print(f"\nOption save method:")
-        print(f"Saving option: {self.text}")
-        print(f"Is correct: {self.is_correct}")
+        logger.debug("Option save method", extra={
+            'option_id': self.pk,
+            'option_text': self.text,
+            'is_correct': self.is_correct,
+            'question_id': self.question.id,
+        })
         
         # If this is a single choice question and we're marking this option as correct
         if self.is_correct and self.question.question_type == 'SINGLE':
-            print(f"Updating other options to not correct for question: {self.question.text}")
+            logger.info("Updating other options to not correct for single choice question", extra={
+                'option_id': self.pk,
+                'question_id': self.question.id,
+                'question_text': self.question.text,
+            })
             # First, update all other options to be incorrect
             Option.objects.filter(question=self.question).exclude(pk=self.pk).update(is_correct=False)
         

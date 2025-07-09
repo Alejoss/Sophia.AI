@@ -1,6 +1,10 @@
 from rest_framework import serializers
+import logging
 from .models import Quiz, Question, Option, UserQuizAttempt, Answer
 from knowledge_paths.services.node_user_activity_service import has_completed_quiz
+
+# Get logger for quizzes serializers
+logger = logging.getLogger('academia_blockchain.quizzes.serializers')
 
 
 class OptionSerializer(serializers.ModelSerializer):
@@ -55,15 +59,27 @@ class QuizSerializer(serializers.ModelSerializer):
                  'user_attempts', 'max_attempts_per_day', 'is_completed', 'next_node', 'last_attempt']
 
     def validate_max_attempts_per_day(self, value):
-        print("Validating max_attempts_per_day:", value)
-        print("Type of value:", type(value))
+        logger.debug("Validating max_attempts_per_day", extra={
+            'value': value,
+            'value_type': type(value).__name__,
+        })
         if not isinstance(value, int):
             try:
                 value = int(value)
+                logger.debug("Converted value to int", extra={'converted_value': value})
             except (ValueError, TypeError):
+                logger.warning("Failed to convert max_attempts_per_day to int", extra={
+                    'value': value,
+                    'value_type': type(value).__name__,
+                })
                 raise serializers.ValidationError('Must be a valid number')
         
         if value < 2 or value > 9:
+            logger.warning("max_attempts_per_day validation failed - out of range", extra={
+                'value': value,
+                'min_allowed': 2,
+                'max_allowed': 9,
+            })
             raise serializers.ValidationError('Value must be between 2 and 9')
         return value
 

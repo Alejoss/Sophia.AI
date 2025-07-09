@@ -1,6 +1,10 @@
 from django.contrib.contenttypes.models import ContentType
+import logging
 from content.models import Content
 from votes.models import VoteCount
+
+# Get logger for content utils
+logger = logging.getLogger('academia_blockchain.content.utils')
 
 def get_top_voted_contents(topic, media_type, limit=None):
     """
@@ -14,11 +18,19 @@ def get_top_voted_contents(topic, media_type, limit=None):
     Returns:
         List of Content objects ordered by vote count
     """
-    print(f"\n=== get_top_voted_contents for {media_type} ===")    
+    logger.debug("Getting top voted contents", extra={
+        'topic_id': topic.id,
+        'media_type': media_type,
+        'limit': limit,
+    })
     
     # Get all contents of this media type for the topic
     contents = list(topic.contents.filter(media_type=media_type))
-    print(f"\nFound {len(contents)} contents of type {media_type}")
+    logger.debug("Found contents for topic", extra={
+        'topic_id': topic.id,
+        'media_type': media_type,
+        'content_count': len(contents),
+    })
     
     # Get vote counts for all these contents in this specific topic
     content_type = ContentType.objects.get_for_model(Content)
@@ -27,13 +39,15 @@ def get_top_voted_contents(topic, media_type, limit=None):
         object_id__in=[c.id for c in contents],
         topic=topic  # Filter by specific topic
     )
-    print(f"\nFound {vote_counts.count()} vote count records")
+    logger.debug("Found vote count records", extra={
+        'vote_count_records': vote_counts.count(),
+    })
     
     # Create a dictionary of vote counts
     vote_count_dict = {vc.object_id: vc.vote_count for vc in vote_counts}
-    print("\nVote count dictionary:")
-    for content_id, count in vote_count_dict.items():
-        print(f"- Content ID: {content_id}, Vote Count: {count}")
+    logger.debug("Vote count dictionary created", extra={
+        'vote_count_entries': len(vote_count_dict),
+    })
     
     # Sort contents by vote count (defaulting to 0 if no votes)
     sorted_contents = sorted(
@@ -41,17 +55,16 @@ def get_top_voted_contents(topic, media_type, limit=None):
         key=lambda c: vote_count_dict.get(c.id, 0),
         reverse=True
     )
-    print("\nSorted contents:")
-    for content in sorted_contents:
-        vote_count = vote_count_dict.get(content.id, 0)
-        print(f"- Content ID: {content.id}, Title: {content.original_title}, Vote Count: {vote_count}")
+    logger.debug("Contents sorted by vote count", extra={
+        'sorted_content_count': len(sorted_contents),
+    })
     
     # Return all contents if no limit specified, otherwise return top N
     result = sorted_contents[:limit] if limit else sorted_contents
-    print(f"\nReturning {len(result)} contents:")
-    for content in result:
-        vote_count = vote_count_dict.get(content.id, 0)
-        print(f"- Content ID: {content.id}, Title: {content.original_title}, Vote Count: {vote_count}")
-    
-    print("=== End get_top_voted_contents ===\n")
+    logger.info("Returning top voted contents", extra={
+        'topic_id': topic.id,
+        'media_type': media_type,
+        'result_count': len(result),
+        'limit_applied': limit is not None,
+    })
     return result

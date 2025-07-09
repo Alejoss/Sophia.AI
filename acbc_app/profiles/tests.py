@@ -343,15 +343,11 @@ class TokenRefreshTest(TestCase):
         2. The new access token is valid and contains correct user information
         3. The response has the correct status code and format
         """
-        print("\n=== Testing successful token refresh ===")
-        
         # Set the refresh token in cookies
         self.client.cookies[settings.SIMPLE_JWT['REFRESH_COOKIE']] = str(self.refresh_token)
         
         # Try to refresh the token
         response = self.client.post(self.refresh_url)
-        print(f"Refresh response status: {response.status_code}")
-        print(f"Refresh response data: {response.data}")
         
         self.assertEqual(response.status_code, 200)
         self.assertIn('access_token', response.data)
@@ -374,14 +370,10 @@ class TokenRefreshTest(TestCase):
         2. The correct error response is returned
         3. The response has the correct status code and format
         """
-        print("\n=== Testing invalid refresh token ===")
-        
         # Set invalid refresh token
         self.client.cookies[settings.SIMPLE_JWT['REFRESH_COOKIE']] = 'invalid.token'
         
         response = self.client.post(self.refresh_url)
-        print(f"Invalid token response status: {response.status_code}")
-        print(f"Invalid token response data: {response.data}")
         
         self.assertEqual(response.status_code, 403)
         self.assertIn('error', response.data)
@@ -395,12 +387,8 @@ class TokenRefreshTest(TestCase):
         2. The correct error response is returned
         3. The response has the correct status code and format
         """
-        print("\n=== Testing missing refresh token ===")
-        
         # Don't set any refresh token
         response = self.client.post(self.refresh_url)
-        print(f"Missing token response status: {response.status_code}")
-        print(f"Missing token response data: {response.data}")
         
         self.assertEqual(response.status_code, 403)
         self.assertIn('error', response.data)
@@ -419,8 +407,6 @@ class TokenRefreshTest(TestCase):
         2. Waits for it to expire
         3. Attempts to use it
         """
-        print("\n=== Testing expired refresh token ===")
-        
         # Create a token with very short lifetime (1 second)
         with patch('rest_framework_simplejwt.tokens.RefreshToken.lifetime', new=timedelta(seconds=1)):
             expired_token = RefreshToken.for_user(self.user)
@@ -433,8 +419,6 @@ class TokenRefreshTest(TestCase):
             
             # Try to refresh
             response = self.client.post(self.refresh_url)
-            print(f"Expired token response status: {response.status_code}")
-            print(f"Expired token response data: {response.data}")
             
             # Should fail with 403
             self.assertEqual(response.status_code, 403)
@@ -447,15 +431,11 @@ class TokenRefreshTest(TestCase):
                     settings.SIMPLE_JWT['SIGNING_KEY'],
                     algorithms=[settings.SIMPLE_JWT['ALGORITHM']]
                 )
-                print(f"Token expiration time: {datetime.fromtimestamp(decoded['exp'])}")
-                print(f"Current time: {datetime.utcnow()}")
                 self.assertTrue(datetime.fromtimestamp(decoded['exp']) < datetime.utcnow())
             except jwt.ExpiredSignatureError:
                 # This is actually what we want - the token should be expired
-                print("✅ Token is expired as expected")
                 pass
             except Exception as e:
-                print(f"Unexpected error decoding token: {str(e)}")
                 self.fail(f"Unexpected error: {str(e)}")
         
     def test_protected_endpoint_with_refresh(self):
@@ -471,15 +451,12 @@ class TokenRefreshTest(TestCase):
         makes a request with an expired token and the system
         automatically refreshes it.
         """
-        print("\n=== Testing protected endpoint with refresh flow ===")
-        
         # Set up initial tokens
         self.client.cookies[settings.SIMPLE_JWT['REFRESH_COOKIE']] = str(self.refresh_token)
         
         # First request with valid access token
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.get(self.protected_url)
-        print(f"Initial request status: {response.status_code}")
         
         self.assertEqual(response.status_code, 200)
         
@@ -489,7 +466,6 @@ class TokenRefreshTest(TestCase):
         
         # Make request that should trigger refresh
         response = self.client.get(self.protected_url)
-        print(f"Request after refresh status: {response.status_code}")
         
         # Should still succeed due to automatic refresh
         self.assertEqual(response.status_code, 200)
@@ -503,8 +479,6 @@ class TokenRefreshTest(TestCase):
         2. Each request gets a unique access token
         3. All requests succeed
         """
-        print("\n=== Testing concurrent refresh requests ===")
-        
         # Set up initial tokens
         self.client.cookies[settings.SIMPLE_JWT['REFRESH_COOKIE']] = str(self.refresh_token)
         
@@ -513,7 +487,6 @@ class TokenRefreshTest(TestCase):
         for _ in range(3):
             response = self.client.post(self.refresh_url)
             responses.append(response)
-            print(f"Concurrent request status: {response.status_code}")
         
         # All requests should succeed
         for response in responses:

@@ -3,7 +3,11 @@ from knowledge_paths.models import Node, KnowledgePath
 from quizzes.models import UserQuizAttempt
 from django.utils import timezone
 from django.db.models import Count
+import logging
 from utils.notification_utils import notify_knowledge_path_completion
+
+# Get logger for node user activity service
+logger = logging.getLogger('academia_blockchain.knowledge_paths.services.node_user_activity_service')
 
 
 def has_completed_quiz(user, quiz):
@@ -133,7 +137,11 @@ def is_knowledge_path_completed(user, knowledge_path):
 
     # If we get here, the path is completed
     # Notify the knowledge path author
-    print("Notifying knowledge path completion !!!!!!!!!!!!!!!!")
+    logger.info("Knowledge path completed, notifying author", extra={
+        'user_id': user.id,
+        'knowledge_path_id': knowledge_path.id,
+        'knowledge_path_title': knowledge_path.title,
+    })
     notify_knowledge_path_completion(user, knowledge_path)
     
     return True

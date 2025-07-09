@@ -14,6 +14,7 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models
+import logging
 
 from utils.permissions import IsAuthor
 from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication
@@ -45,6 +46,10 @@ import re
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+import time
+
+# Django-standard logger
+logger = logging.getLogger('content')
 
 # Library Views
 class LibraryListView(APIView):
@@ -111,6 +116,18 @@ class ContentDetailView(APIView):
         return None
 
     def get(self, request, pk):
+        user_id = request.user.id if request.user.is_authenticated else None
+        
+        logger.info(
+            "Content detail request",
+            extra={
+                'user_id': user_id,
+                'content_id': pk,
+                'context': request.query_params.get('context'),
+                'context_id': request.query_params.get('id'),
+            }
+        )
+        
         try:
             content = Content.objects.get(pk=pk)
             selected_profile = self.get_content_profile(content, request)
@@ -133,19 +150,70 @@ class ContentDetailView(APIView):
             )
             
             serialized_data = serializer.data
+            logger.info(
+                "Content detail retrieved successfully",
+                extra={
+                    'user_id': user_id,
+                    'content_id': pk,
+                    'has_profile': selected_profile is not None,
+                }
+            )
             return Response(serialized_data)
             
         except Content.DoesNotExist:
+            logger.warning(
+                "Content not found",
+                extra={
+                    'user_id': user_id,
+                    'content_id': pk,
+                }
+            )
             return Response(
                 {'error': 'Content not found'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+        except Exception as e:
+            logger.error(
+                f"Error retrieving content detail: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'content_id': pk,
+                },
+                exc_info=True
+            )
+            return Response(
+                {'error': 'Internal server error'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def delete(self, request, pk):
+        user_id = request.user.id
+        username = request.user.username
+        
+        logger.info(
+            "Content deletion request",
+            extra={
+                'user_id': user_id,
+                'username': username,
+                'content_id': pk,
+            }
+        )
+        
         try:
             content = get_object_or_404(Content, pk=pk)
             # Check if the user has permission to delete this content
             content_profile = ContentProfile.objects.get(content=content, user=request.user)
+            
+            logger.info(
+                "Deleting content profile",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'content_id': pk,
+                    'content_title': content.original_title,
+                    'media_type': content.media_type,
+                }
+            )
             
             # Delete the content profile first
             content_profile.delete()
@@ -153,20 +221,57 @@ class ContentDetailView(APIView):
             # Only delete the content and file if this was the last profile
             remaining_profiles = ContentProfile.objects.filter(content=content).count()
             if remaining_profiles == 0:
+                logger.info(
+                    "Deleting content and file (last profile removed)",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': pk,
+                        'has_file_details': bool(content.file_details),
+                        'has_file': bool(content.file_details.file) if content.file_details else False,
+                    }
+                )
                 # No more profiles exist, safe to delete the content and file
                 if content.file_details:
                     if content.file_details.file:
                         content.file_details.file.delete()
                     content.file_details.delete()
                 content.delete()
+            else:
+                logger.info(
+                    "Content profile deleted, content remains (other profiles exist)",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': pk,
+                        'remaining_profiles': remaining_profiles,
+                    }
+                )
             
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ContentProfile.DoesNotExist:
+            logger.warning(
+                "Content deletion failed: permission denied",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'content_id': pk,
+                }
+            )
             return Response(
                 {'error': 'You do not have permission to delete this content'},
                 status=status.HTTP_403_FORBIDDEN
             )
         except Exception as e:
+            logger.error(
+                f"Content deletion failed: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'content_id': pk,
+                },
+                exc_info=True
+            )
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -253,6 +358,21 @@ class UploadContentView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
+        start_time = time.time()
+        user_id = request.user.id
+        username = request.user.username
+        
+        logger.info(
+            "Content upload request started",
+            extra={
+                'user_id': user_id,
+                'username': username,
+                'has_url': bool(request.data.get('url')),
+                'has_file': bool(request.FILES.get('file')),
+                'media_type': request.data.get('media_type'),
+            }
+        )
+        
         try:
             # Validate input
             url = request.data.get('url')
@@ -260,6 +380,10 @@ class UploadContentView(APIView):
             
             # Check if both URL and file are provided
             if url and file:
+                logger.warning(
+                    "Upload validation failed: both URL and file provided",
+                    extra={'user_id': user_id, 'username': username}
+                )
                 return Response(
                     {'error': 'Cannot provide both file and URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -267,6 +391,10 @@ class UploadContentView(APIView):
             
             # Check if neither URL nor file is provided
             if not url and not file:
+                logger.warning(
+                    "Upload validation failed: no file or URL provided",
+                    extra={'user_id': user_id, 'username': username}
+                )
                 return Response(
                     {'error': 'No file or URL provided'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -409,6 +537,18 @@ class UploadContentView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            logger.error(
+                f"Content upload failed: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'has_url': bool(request.data.get('url')),
+                    'has_file': bool(request.FILES.get('file')),
+                    'media_type': request.data.get('media_type'),
+                    'duration': time.time() - start_time
+                },
+                exc_info=True  # This will be captured by Sentry
+            )
             return Response(
                 {
                     'error': 'Failed to upload content',
@@ -423,13 +563,34 @@ class UserContentListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user_id = request.user.id
+        username = request.user.username
+        
+        logger.info(
+            "User content list request",
+            extra={
+                'user_id': user_id,
+                'username': username,
+            }
+        )
+        
         try:
             content_profiles = ContentProfile.objects.filter(user=request.user)\
                 .select_related('content')\
                 .order_by('title')
             
+            logger.info(
+                "Retrieved user content profiles",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'profile_count': content_profiles.count(),
+                }
+            )
+            
             # Serialize each profile individually to handle errors gracefully
             response_data = []
+            skipped_profiles = 0
             for profile in content_profiles:
                 try:
                     serializer = SimpleContentProfileSerializer(
@@ -439,10 +600,39 @@ class UserContentListView(APIView):
                     response_data.append(serializer.data)
                 except Exception as e:
                     # Skip this profile instead of failing the entire request
+                    logger.warning(
+                        f"Failed to serialize content profile {profile.id}: {str(e)}",
+                        extra={
+                            'user_id': user_id,
+                            'username': username,
+                            'profile_id': profile.id,
+                            'content_id': profile.content.id if profile.content else None,
+                        }
+                    )
+                    skipped_profiles += 1
                     continue
+            
+            if skipped_profiles > 0:
+                logger.warning(
+                    f"Skipped {skipped_profiles} profiles due to serialization errors",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'skipped_count': skipped_profiles,
+                        'successful_count': len(response_data),
+                    }
+                )
             
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(
+                f"Error fetching user content: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                },
+                exc_info=True
+            )
             return Response(
                 {'error': 'An error occurred while fetching content'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1197,9 +1387,28 @@ class ContentProfileCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user_id = request.user.id
+        username = request.user.username
+        
+        logger.info(
+            "Content profile creation request",
+            extra={
+                'user_id': user_id,
+                'username': username,
+                'content_id': request.data.get('content'),
+            }
+        )
+        
         try:     # Validate required fields
             content_id = request.data.get('content')
             if not content_id:
+                logger.warning(
+                    "Content profile creation failed: no content ID",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                    }
+                )
                 return Response(
                     {'error': 'Content ID is required'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -1209,6 +1418,14 @@ class ContentProfileCreateView(APIView):
             try:
                 content = Content.objects.get(id=content_id)
             except Content.DoesNotExist:
+                logger.warning(
+                    "Content profile creation failed: content not found",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': content_id,
+                    }
+                )
                 return Response(
                     {'error': f'Content with ID {content_id} not found'}, 
                     status=status.HTTP_404_NOT_FOUND
@@ -1221,6 +1438,15 @@ class ContentProfileCreateView(APIView):
             ).first()
 
             if existing_profile:
+                logger.warning(
+                    "Content profile creation failed: profile already exists",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': content_id,
+                        'existing_profile_id': existing_profile.id,
+                    }
+                )
                 return Response(
                     {'error': 'You already have a profile for this content'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -1244,7 +1470,30 @@ class ContentProfileCreateView(APIView):
                     is_visible=is_visible,
                     is_producer=is_producer
                 )
+                
+                logger.info(
+                    "Content profile created successfully",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': content_id,
+                        'profile_id': content_profile.id,
+                        'title': title,
+                        'is_visible': is_visible,
+                        'is_producer': is_producer,
+                    }
+                )
+                
             except Exception as e:
+                logger.error(
+                    f"Failed to create content profile: {str(e)}",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': content_id,
+                    },
+                    exc_info=True
+                )
                 return Response(
                     {
                         'error': 'Failed to create content profile',
@@ -1262,6 +1511,16 @@ class ContentProfileCreateView(APIView):
                 response_data = serializer.data
                 return Response(response_data, status=status.HTTP_201_CREATED)
             except Exception as e:
+                logger.error(
+                    f"Failed to serialize content profile: {str(e)}",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': content_id,
+                        'profile_id': content_profile.id,
+                    },
+                    exc_info=True
+                )
                 return Response(
                     {
                         'error': 'Failed to serialize content profile',
@@ -1271,6 +1530,15 @@ class ContentProfileCreateView(APIView):
                 )
 
         except Exception as e:
+            logger.error(
+                f"Content profile creation unexpected error: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'content_id': request.data.get('content'),
+                },
+                exc_info=True
+            )
             return Response(
                 {
                     'error': 'An unexpected error occurred',
@@ -1342,9 +1610,28 @@ class URLPreviewView(APIView):
         return None
 
     def post(self, request):
+        user_id = request.user.id
+        username = request.user.username
         url = request.data.get('url')
         
+        logger.info(
+            "URL preview request",
+            extra={
+                'user_id': user_id,
+                'username': username,
+                'url': url,
+                'is_youtube': 'youtube.com' in url or 'youtu.be' in url if url else False,
+            }
+        )
+        
         if not url:
+            logger.warning(
+                "URL preview failed: no URL provided",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                }
+            )
             return Response(
                 {'error': 'URL is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -1353,11 +1640,46 @@ class URLPreviewView(APIView):
         try:
             # Check if it's a YouTube URL first
             if 'youtube.com' in url or 'youtu.be' in url:
+                logger.info(
+                    "Processing YouTube URL",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                    }
+                )
                 youtube_data = self.extract_youtube_data(url)
                 if youtube_data:
+                    logger.info(
+                        "YouTube data extracted successfully",
+                        extra={
+                            'user_id': user_id,
+                            'username': username,
+                            'url': url,
+                            'title': youtube_data.get('title'),
+                        }
+                    )
                     return Response(youtube_data)
+                else:
+                    logger.warning(
+                        "Failed to extract YouTube data",
+                        extra={
+                            'user_id': user_id,
+                            'username': username,
+                            'url': url,
+                        }
+                    )
 
             # Make request with browser-like headers
+            logger.info(
+                "Fetching URL content",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'url': url,
+                }
+            )
+            
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -1367,20 +1689,81 @@ class URLPreviewView(APIView):
                 'Upgrade-Insecure-Requests': '1',
             }
             
-            response = requests.get(url, headers=headers, timeout=5, verify=True)
+            try:
+                response = requests.get(url, headers=headers, timeout=5, verify=True)
+            except requests.exceptions.Timeout:
+                logger.error(
+                    "URL preview timeout",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                    }
+                )
+                return Response(
+                    {'error': 'Request timeout'}, 
+                    status=status.HTTP_408_REQUEST_TIMEOUT
+                )
+            except requests.exceptions.RequestException as e:
+                logger.error(
+                    f"URL preview request failed: {str(e)}",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                    },
+                    exc_info=True
+                )
+                return Response(
+                    {'error': 'Unable to access this URL'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             if response.status_code == 403:
+                logger.warning(
+                    "URL preview access denied (403)",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                        'status_code': response.status_code,
+                    }
+                )
                 return Response(
                     {'error': 'Unable to access this URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                logger.error(
+                    f"URL preview HTTP error: {str(e)}",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                        'status_code': response.status_code,
+                    }
+                )
+                return Response(
+                    {'error': 'Unable to access this URL'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Check content type
             content_type = response.headers.get('content-type', '').lower()
             
             if not content_type.startswith('text/html'):
+                logger.warning(
+                    "URL preview failed: not HTML content",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                        'content_type': content_type,
+                    }
+                )
                 return Response({
                     'error': 'URL must point to a webpage'
                 }, status=status.HTTP_400_BAD_REQUEST)
@@ -1435,19 +1818,72 @@ class URLPreviewView(APIView):
             metadata = {k: v for k, v in metadata.items() if v is not None}
             
             if not metadata.get('title') and not metadata.get('description') and not metadata.get('image'):
+                logger.warning(
+                    "URL preview failed: no metadata extracted",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                        'metadata_keys': list(metadata.keys()),
+                    }
+                )
                 return Response(
                     {'error': 'Could not extract preview information from this URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            logger.info(
+                "URL preview successful",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'url': url,
+                    'title': metadata.get('title'),
+                    'has_description': bool(metadata.get('description')),
+                    'has_image': bool(metadata.get('image')),
+                    'has_favicon': bool(metadata.get('favicon')),
+                }
+            )
+            
             return Response(metadata)
             
         except requests.Timeout:
+            logger.error(
+                "URL preview timeout",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'url': url,
+                }
+            )
             return Response(
                 {'error': 'Failed to fetch URL data'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except requests.RequestException as e:
+            logger.error(
+                f"URL preview request exception: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'url': url,
+                },
+                exc_info=True
+            )
+            return Response(
+                {'error': 'Failed to fetch URL data'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(
+                f"URL preview unexpected error: {str(e)}",
+                extra={
+                    'user_id': user_id,
+                    'username': username,
+                    'url': url,
+                },
+                exc_info=True
+            )
             return Response(
                 {'error': 'Failed to fetch URL data'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -1538,24 +1974,33 @@ class ContentUpdateView(APIView):
 
     def put(self, request, pk):
         try:
-            print(f"\n=== ContentUpdateView PUT request ===")
-            print(f"Content ID: {pk}")
-            print(f"Request data: {request.data}")
-            print(f"Request user: {request.user}")
+            logger.info("ContentUpdateView PUT request", extra={
+                'content_id': pk,
+                'user_id': request.user.id,
+                'request_data_keys': list(request.data.keys()) if request.data else [],
+            })
             
             content = get_object_or_404(Content, pk=pk)
-            print(f"Found content: {content}")
-            print(f"Current content URL: {content.url}")
-            print(f"Current content media_type: {content.media_type}")
-            print(f"Current content original_title: {content.original_title}")
-            print(f"Current content original_author: {content.original_author}")
+            logger.debug("Found content for update", extra={
+                'content_id': content.id,
+                'current_url': content.url,
+                'current_media_type': content.media_type,
+                'current_title': content.original_title,
+                'current_author': content.original_author,
+            })
             
             # Check if the user has a profile for this content (i.e., owns it)
             try:
                 content_profile = ContentProfile.objects.get(content=content, user=request.user)
-                print(f"Found content profile: {content_profile}")
+                logger.debug("Found content profile for user", extra={
+                    'content_profile_id': content_profile.id,
+                    'user_id': request.user.id,
+                })
             except ContentProfile.DoesNotExist:
-                print("Content profile not found for user")
+                logger.warning("Content profile not found for user", extra={
+                    'content_id': pk,
+                    'user_id': request.user.id,
+                })
                 return Response(
                     {'error': 'You do not have permission to edit this content'},
                     status=status.HTTP_403_FORBIDDEN
@@ -1563,9 +2008,15 @@ class ContentUpdateView(APIView):
             
             # Validate media_type if provided
             if 'media_type' in request.data:
-                print(f"Media type in request: {request.data['media_type']}")
+                logger.debug("Validating media type", extra={
+                    'media_type': request.data['media_type'],
+                })
                 valid_media_types = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
                 if request.data['media_type'] not in valid_media_types:
+                    logger.warning("Invalid media type provided", extra={
+                        'media_type': request.data['media_type'],
+                        'valid_types': valid_media_types,
+                    })
                     return Response(
                         {'error': f'Invalid media type. Must be one of: {", ".join(valid_media_types)}'}, 
                         status=status.HTTP_400_BAD_REQUEST
@@ -1573,43 +2024,63 @@ class ContentUpdateView(APIView):
             
             # Validate URL if provided
             if 'url' in request.data and request.data['url']:
-                print(f"URL in request: {request.data['url']}")
+                logger.debug("Validating URL", extra={
+                    'url': request.data['url'],
+                })
                 validator = URLValidator()
                 try:
                     validator(request.data['url'])
-                    print("URL validation passed")
+                    logger.debug("URL validation passed")
                 except ValidationError:
-                    print("URL validation failed")
+                    logger.warning("URL validation failed", extra={
+                        'url': request.data['url'],
+                    })
                     return Response(
                         {'error': 'Invalid URL format'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
             # Update the content
-            print("About to update content with data:", request.data)
+            logger.debug("Updating content", extra={
+                'content_id': pk,
+                'update_data': request.data,
+            })
             serializer = ContentSerializer(content, data=request.data, partial=True)
             if serializer.is_valid():
-                print("Serializer is valid")
-                print("Serializer validated data:", serializer.validated_data)
+                logger.debug("Content serializer is valid", extra={
+                    'validated_data': serializer.validated_data,
+                })
                 updated_content = serializer.save()
-                print(f"Content updated successfully")
-                print(f"Updated content URL: {updated_content.url}")
-                print(f"Updated content media_type: {updated_content.media_type}")
-                print(f"Updated content original_title: {updated_content.original_title}")
-                print(f"Updated content original_author: {updated_content.original_author}")
+                logger.info("Content updated successfully", extra={
+                    'content_id': updated_content.id,
+                    'updated_url': updated_content.url,
+                    'updated_media_type': updated_content.media_type,
+                    'updated_title': updated_content.original_title,
+                    'updated_author': updated_content.original_author,
+                })
                 return Response(serializer.data)
             else:
-                print("Serializer errors:", serializer.errors)
+                logger.warning("Content serializer validation failed", extra={
+                    'content_id': pk,
+                    'serializer_errors': serializer.errors,
+                })
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
         except Content.DoesNotExist:
-            print("Content not found")
+            logger.warning("Content not found for update", extra={
+                'content_id': pk,
+                'user_id': request.user.id,
+            })
             return Response(
                 {'error': 'Content not found'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            print(f"Unexpected error: {str(e)}")
+            logger.error("Unexpected error in content update", extra={
+                'content_id': pk,
+                'user_id': request.user.id,
+                'error': str(e),
+            }, exc_info=True)
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

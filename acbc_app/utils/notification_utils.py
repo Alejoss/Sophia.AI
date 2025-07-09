@@ -6,24 +6,30 @@ from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath
 from content.models import ContentProfile
 import traceback
+import logging
+
+# Get logger for notifications
+logger = logging.getLogger('academia_blockchain.notifications')
 
 def notify_comment_reply(comment):
     """
     Create a notification when someone replies to a comment.
     """
-    print("\n=== Creating Comment Reply Notification ===")
-    print(f"Comment ID: {comment.id}")
-    print(f"Author: {comment.author.username}")
-    print(f"Parent Comment ID: {comment.parent.id if comment.parent else 'None'}")
-    print(f"Parent Comment Author: {comment.parent.author.username if comment.parent else 'None'}")
+    logger.info("Creating comment reply notification", extra={
+        'comment_id': comment.id,
+        'author_id': comment.author.id,
+        'author_username': comment.author.username,
+        'parent_comment_id': comment.parent.id if comment.parent else None,
+        'parent_author_id': comment.parent.author.id if comment.parent else None,
+        'parent_author_username': comment.parent.author.username if comment.parent else None,
+    })
     
     if comment.parent:
         try:
             # Get content types for debugging
             comment_ct = ContentType.objects.get_for_model(comment)
             parent_ct = ContentType.objects.get_for_model(comment.parent)
-            print(f"Comment Content Type: {comment_ct}")
-            print(f"Parent Comment Content Type: {parent_ct}")
+            logger.debug(f"Content types - Comment: {comment_ct}, Parent: {parent_ct}")
             
             # Check if notification already exists
             existing_notifications = Notification.objects.filter(
@@ -36,10 +42,13 @@ def notify_comment_reply(comment):
                 target_content_type=parent_ct,
                 target_object_id=comment.parent.id
             )
-            print(f"Existing notifications count: {existing_notifications.count()}")
+            logger.debug(f"Existing notifications count: {existing_notifications.count()}")
             
             if existing_notifications.exists():
-                print("Notification already exists - skipping creation")
+                logger.info("Notification already exists - skipping creation", extra={
+                    'comment_id': comment.id,
+                    'parent_comment_id': comment.parent.id,
+                })
                 return
             
             # Create the notification directly
@@ -54,31 +63,42 @@ def notify_comment_reply(comment):
                 target_object_id=comment.parent.id,
                 description=f'{comment.author.username} replied to your comment'
             )
-            print("Notification created successfully")
+            logger.info("Comment reply notification created successfully", extra={
+                'notification_id': notification.id,
+                'comment_id': comment.id,
+                'recipient_id': notification.recipient.id,
+                'actor_id': notification.actor.id,
+                'target_id': notification.target_object_id,
+            })
             
             # Verify the notification was created
             if notification:
-                print(f"Verified notification exists with ID: {notification.id}")
-                print(f"Notification details:")
-                print(f"- Recipient: {notification.recipient.username}")
-                print(f"- Actor: {notification.actor.username}")
-                print(f"- Verb: {notification.verb}")
-                print(f"- Timestamp: {notification.timestamp}")
-                print(f"- Unread: {notification.unread}")
-                print(f"- Target: {notification.target}")
-                print(f"- Target Content Type: {notification.target_content_type}")
-                print(f"- Target Object ID: {notification.target_object_id}")
+                logger.debug("Notification verification successful", extra={
+                    'notification_id': notification.id,
+                    'recipient': notification.recipient.username,
+                    'actor': notification.actor.username,
+                    'verb': notification.verb,
+                    'timestamp': notification.timestamp.isoformat(),
+                    'unread': notification.unread,
+                    'target_content_type': str(notification.target_content_type),
+                    'target_object_id': notification.target_object_id,
+                })
             else:
-                print("WARNING: Notification not found in database after creation!")
+                logger.warning("Notification not found in database after creation", extra={
+                    'comment_id': comment.id,
+                    'parent_comment_id': comment.parent.id,
+                })
                 
         except Exception as e:
-            print(f"Error creating notification: {str(e)}")
-            print("Full traceback:")
-            print(traceback.format_exc())
+            logger.error(f"Error creating comment reply notification: {str(e)}", extra={
+                'comment_id': comment.id,
+                'parent_comment_id': comment.parent.id if comment.parent else None,
+                'author_id': comment.author.id,
+            }, exc_info=True)
     else:
-        print("No parent comment found - skipping notification")
-    
-    print("=== End Notification Creation ===\n")
+        logger.info("No parent comment found - skipping notification", extra={
+            'comment_id': comment.id,
+        })
 
 def notify_knowledge_path_comment(comment):
     """
@@ -88,36 +108,46 @@ def notify_knowledge_path_comment(comment):
     Args:
         comment: The Comment instance that was created
     """
-    print("\n=== Creating Knowledge Path Comment Notification ===")
-    print(f"Comment ID: {comment.id}")
-    print(f"Author: {comment.author.username}")
+    logger.info("Creating knowledge path comment notification", extra={
+        'comment_id': comment.id,
+        'author_id': comment.author.id,
+        'author_username': comment.author.username,
+        'parent_comment_id': comment.parent.id if comment.parent else None,
+    })
     
     # Only notify for top-level comments (not replies)
     if comment.parent:
-        print("Comment is a reply - skipping notification")
+        logger.info("Comment is a reply - skipping notification", extra={
+            'comment_id': comment.id,
+            'parent_comment_id': comment.parent.id,
+        })
         return
         
     try:
         # Verify this is a knowledge path comment
         if not isinstance(comment.content_object, KnowledgePath):
-            print("Comment is not on a knowledge path - skipping notification")
+            logger.info("Comment is not on a knowledge path - skipping notification", extra={
+                'comment_id': comment.id,
+                'content_object_type': type(comment.content_object).__name__,
+            })
             return
             
         knowledge_path = comment.content_object
-        print(f"Knowledge Path ID: {knowledge_path.id}")
-        print(f"Knowledge Path Title: {knowledge_path.title}")
-        print(f"Knowledge Path Author: {knowledge_path.author.username}")
+        logger.debug(f"Knowledge path details - ID: {knowledge_path.id}, Title: {knowledge_path.title}, Author: {knowledge_path.author.username}")
         
         # Don't notify if user comments on their own knowledge path
         if comment.author == knowledge_path.author:
-            print("User is commenting on their own knowledge path - skipping notification")
+            logger.info("User is commenting on their own knowledge path - skipping notification", extra={
+                'comment_id': comment.id,
+                'knowledge_path_id': knowledge_path.id,
+                'author_id': comment.author.id,
+            })
             return
             
         # Get content types for debugging
         comment_ct = ContentType.objects.get_for_model(comment)
         knowledge_path_ct = ContentType.objects.get_for_model(knowledge_path)
-        print(f"Comment Content Type: {comment_ct}")
-        print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+        logger.debug(f"Content types - Comment: {comment_ct}, Knowledge Path: {knowledge_path_ct}")
         
         # Check if notification already exists
         existing_notifications = Notification.objects.filter(
@@ -130,10 +160,13 @@ def notify_knowledge_path_comment(comment):
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'comment_id': comment.id,
+                'knowledge_path_id': knowledge_path.id,
+            })
             return
         
         # Create the notification directly
@@ -148,29 +181,38 @@ def notify_knowledge_path_comment(comment):
             target_object_id=knowledge_path.id,
             description=f'{comment.author.username} commented on your knowledge path "{knowledge_path.title}": {comment.body[:50]}...'
         )
-        print("Notification created successfully")
+        logger.info("Knowledge path comment notification created successfully", extra={
+            'notification_id': notification.id,
+            'comment_id': comment.id,
+            'knowledge_path_id': knowledge_path.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
-            print(f"- Target Content Type: {notification.target_content_type}")
-            print(f"- Target Object ID: {notification.target_object_id}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'comment_id': comment.id,
+                'knowledge_path_id': knowledge_path.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating knowledge path comment notification: {str(e)}", extra={
+            'comment_id': comment.id,
+            'knowledge_path_id': knowledge_path.id if 'knowledge_path' in locals() else None,
+            'author_id': comment.author.id,
+        }, exc_info=True)
 
 def notify_content_comment(comment):
     """
@@ -180,36 +222,46 @@ def notify_content_comment(comment):
     Args:
         comment: The Comment instance that was created
     """
-    print("\n=== Creating Content Comment Notification ===")
-    print(f"Comment ID: {comment.id}")
-    print(f"Author: {comment.author.username}")
+    logger.info("Creating content comment notification", extra={
+        'comment_id': comment.id,
+        'author_id': comment.author.id,
+        'author_username': comment.author.username,
+        'parent_comment_id': comment.parent.id if comment.parent else None,
+    })
     
     # Only notify for top-level comments (not replies)
     if comment.parent:
-        print("Comment is a reply - skipping notification")
+        logger.info("Comment is a reply - skipping notification", extra={
+            'comment_id': comment.id,
+            'parent_comment_id': comment.parent.id,
+        })
         return
         
     try:
         # Verify this is a content comment
         if not isinstance(comment.content_object, ContentProfile):
-            print("Comment is not on a content - skipping notification")
+            logger.info("Comment is not on a content - skipping notification", extra={
+                'comment_id': comment.id,
+                'content_object_type': type(comment.content_object).__name__,
+            })
             return
             
         content_profile = comment.content_object
-        print(f"Content Profile ID: {content_profile.id}")
-        print(f"Content Title: {content_profile.display_title}")
-        print(f"Content Owner: {content_profile.user.username}")
+        logger.debug(f"Content profile details - ID: {content_profile.id}, Title: {content_profile.display_title}, Owner: {content_profile.user.username}")
         
         # Don't notify if user comments on their own content
         if comment.author == content_profile.user:
-            print("User is commenting on their own content - skipping notification")
+            logger.info("User is commenting on their own content - skipping notification", extra={
+                'comment_id': comment.id,
+                'content_profile_id': content_profile.id,
+                'author_id': comment.author.id,
+            })
             return
             
         # Get content types for debugging
         comment_ct = ContentType.objects.get_for_model(comment)
         content_profile_ct = ContentType.objects.get_for_model(content_profile)
-        print(f"Comment Content Type: {comment_ct}")
-        print(f"Content Profile Content Type: {content_profile_ct}")
+        logger.debug(f"Content types - Comment: {comment_ct}, Content Profile: {content_profile_ct}")
         
         # Check if notification already exists
         existing_notifications = Notification.objects.filter(
@@ -222,10 +274,13 @@ def notify_content_comment(comment):
             target_content_type=content_profile_ct,
             target_object_id=content_profile.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'comment_id': comment.id,
+                'content_profile_id': content_profile.id,
+            })
             return
         
         # Create the notification directly
@@ -240,29 +295,38 @@ def notify_content_comment(comment):
             target_object_id=content_profile.id,
             description=f'{comment.author.username} commented on your content "{content_profile.display_title}": {comment.body[:50]}...'
         )
-        print("Notification created successfully")
+        logger.info("Content comment notification created successfully", extra={
+            'notification_id': notification.id,
+            'comment_id': comment.id,
+            'content_profile_id': content_profile.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
-            print(f"- Target Content Type: {notification.target_content_type}")
-            print(f"- Target Object ID: {notification.target_object_id}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'comment_id': comment.id,
+                'content_profile_id': content_profile.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating content comment notification: {str(e)}", extra={
+            'comment_id': comment.id,
+            'content_profile_id': content_profile.id if 'content_profile' in locals() else None,
+            'author_id': comment.author.id,
+        }, exc_info=True)
 
 def notify_knowledge_path_completion(user, knowledge_path):
     """
@@ -273,22 +337,27 @@ def notify_knowledge_path_completion(user, knowledge_path):
         user: The User instance who completed the path
         knowledge_path: The KnowledgePath instance that was completed
     """
-    print("\n=== Creating Knowledge Path Completion Notification ===")
-    print(f"User: {user.username}")
-    print(f"Knowledge Path ID: {knowledge_path.id}")
-    print(f"Knowledge Path Title: {knowledge_path.title}")
-    print(f"Knowledge Path Author: {knowledge_path.author.username}")
+    logger.info("Creating knowledge path completion notification", extra={
+        'user_id': user.id,
+        'user_username': user.username,
+        'knowledge_path_id': knowledge_path.id,
+        'knowledge_path_title': knowledge_path.title,
+        'knowledge_path_author_id': knowledge_path.author.id,
+        'knowledge_path_author_username': knowledge_path.author.username,
+    })
     
     # Don't notify if user is the author
     if user == knowledge_path.author:
-        print("User is the author - skipping notification")
+        logger.info("User is the author - skipping notification", extra={
+            'user_id': user.id,
+            'knowledge_path_id': knowledge_path.id,
+        })
         return
         
     # Get content types
     user_ct = ContentType.objects.get_for_model(user)
     knowledge_path_ct = ContentType.objects.get_for_model(knowledge_path)
-    print(f"User Content Type: {user_ct}")
-    print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+    logger.debug(f"Content types - User: {user_ct}, Knowledge Path: {knowledge_path_ct}")
     
     # Check if notification already exists
     existing_notifications = Notification.objects.filter(
@@ -299,10 +368,13 @@ def notify_knowledge_path_completion(user, knowledge_path):
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id
     )
-    print(f"Existing notifications count: {existing_notifications.count()}")
+    logger.debug(f"Existing notifications count: {existing_notifications.count()}")
     
     if existing_notifications.exists():
-        print("Notification already exists - skipping creation")
+        logger.info("Notification already exists - skipping creation", extra={
+            'user_id': user.id,
+            'knowledge_path_id': knowledge_path.id,
+        })
         return
     
     # Create the notification
@@ -315,24 +387,31 @@ def notify_knowledge_path_completion(user, knowledge_path):
         target_object_id=knowledge_path.id,
         description=f'{user.username} completed your knowledge path "{knowledge_path.title}"'
     )
-    print("Notification created successfully")
+    logger.info("Knowledge path completion notification created successfully", extra={
+        'notification_id': notification.id,
+        'user_id': user.id,
+        'knowledge_path_id': knowledge_path.id,
+        'recipient_id': notification.recipient.id,
+        'actor_id': notification.actor.id,
+    })
     
     # Verify the notification was created
     if notification:
-        print(f"Verified notification exists with ID: {notification.id}")
-        print(f"Notification details:")
-        print(f"- Recipient: {notification.recipient.username}")
-        print(f"- Actor: {notification.actor.username}")
-        print(f"- Verb: {notification.verb}")
-        print(f"- Timestamp: {notification.timestamp}")
-        print(f"- Unread: {notification.unread}")
-        print(f"- Target: {notification.target}")
-        print(f"- Target Content Type: {notification.target_content_type}")
-        print(f"- Target Object ID: {notification.target_object_id}")
+        logger.debug("Notification verification successful", extra={
+            'notification_id': notification.id,
+            'recipient': notification.recipient.username,
+            'actor': notification.actor.username,
+            'verb': notification.verb,
+            'timestamp': notification.timestamp.isoformat(),
+            'unread': notification.unread,
+            'target_content_type': str(notification.target_content_type),
+            'target_object_id': notification.target_object_id,
+        })
     else:
-        print("WARNING: Notification not found in database after creation!")
-    
-    print("=== End Notification Creation ===\n")
+        logger.warning("Notification not found in database after creation", extra={
+            'user_id': user.id,
+            'knowledge_path_id': knowledge_path.id,
+        })
 
 def notify_certificate_request(certificate_request):
     """
@@ -342,22 +421,27 @@ def notify_certificate_request(certificate_request):
     Args:
         certificate_request: The CertificateRequest instance that was created
     """
-    print("\n=== Creating Certificate Request Notification ===")
-    print(f"Requester: {certificate_request.requester.username}")
-    print(f"Knowledge Path ID: {certificate_request.knowledge_path.id}")
-    print(f"Knowledge Path Title: {certificate_request.knowledge_path.title}")
-    print(f"Knowledge Path Author: {certificate_request.knowledge_path.author.username}")
+    logger.info("Creating certificate request notification", extra={
+        'requester_id': certificate_request.requester.id,
+        'requester_username': certificate_request.requester.username,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'knowledge_path_title': certificate_request.knowledge_path.title,
+        'knowledge_path_author_id': certificate_request.knowledge_path.author.id,
+        'knowledge_path_author_username': certificate_request.knowledge_path.author.username,
+    })
     
     # Don't notify if requester is the author
     if certificate_request.requester == certificate_request.knowledge_path.author:
-        print("Requester is the author - skipping notification")
+        logger.info("Requester is the author - skipping notification", extra={
+            'requester_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
         return
         
     # Get content types
     requester_ct = ContentType.objects.get_for_model(certificate_request.requester)
     knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    print(f"Requester Content Type: {requester_ct}")
-    print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+    logger.debug(f"Content types - Requester: {requester_ct}, Knowledge Path: {knowledge_path_ct}")
     
     # Check if notification already exists for this specific request
     # We'll check for recent notifications (within the last hour) to avoid spam
@@ -374,10 +458,13 @@ def notify_certificate_request(certificate_request):
         target_object_id=certificate_request.knowledge_path.id,
         timestamp__gte=recent_cutoff
     )
-    print(f"Recent existing notifications count: {existing_notifications.count()}")
+    logger.debug(f"Recent existing notifications count: {existing_notifications.count()}")
     
     if existing_notifications.exists():
-        print("Recent notification already exists - skipping creation")
+        logger.info("Recent notification already exists - skipping creation", extra={
+            'requester_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
         return
     
     # Create the notification
@@ -390,24 +477,31 @@ def notify_certificate_request(certificate_request):
         target_object_id=certificate_request.knowledge_path.id,
         description=f'{certificate_request.requester.username} requested a certificate for your knowledge path "{certificate_request.knowledge_path.title}"'
     )
-    print("Notification created successfully")
+    logger.info("Certificate request notification created successfully", extra={
+        'notification_id': notification.id,
+        'requester_id': certificate_request.requester.id,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'recipient_id': notification.recipient.id,
+        'actor_id': notification.actor.id,
+    })
     
     # Verify the notification was created
     if notification:
-        print(f"Verified notification exists with ID: {notification.id}")
-        print(f"Notification details:")
-        print(f"- Recipient: {notification.recipient.username}")
-        print(f"- Actor: {notification.actor.username}")
-        print(f"- Verb: {notification.verb}")
-        print(f"- Timestamp: {notification.timestamp}")
-        print(f"- Unread: {notification.unread}")
-        print(f"- Target: {notification.target}")
-        print(f"- Target Content Type: {notification.target_content_type}")
-        print(f"- Target Object ID: {notification.target_object_id}")
+        logger.debug("Notification verification successful", extra={
+            'notification_id': notification.id,
+            'recipient': notification.recipient.username,
+            'actor': notification.actor.username,
+            'verb': notification.verb,
+            'timestamp': notification.timestamp.isoformat(),
+            'unread': notification.unread,
+            'target_content_type': str(notification.target_content_type),
+            'target_object_id': notification.target_object_id,
+        })
     else:
-        print("WARNING: Notification not found in database after creation!")
-    
-    print("=== End Notification Creation ===\n")
+        logger.warning("Notification not found in database after creation", extra={
+            'requester_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
 
 def notify_certificate_approval(certificate_request):
     """
@@ -417,17 +511,19 @@ def notify_certificate_approval(certificate_request):
     Args:
         certificate_request: The CertificateRequest instance that was approved
     """
-    print("\n=== Creating Certificate Approval Notification ===")
-    print(f"Student: {certificate_request.requester.username}")
-    print(f"Knowledge Path ID: {certificate_request.knowledge_path.id}")
-    print(f"Knowledge Path Title: {certificate_request.knowledge_path.title}")
-    print(f"Approver: {certificate_request.knowledge_path.author.username}")
+    logger.info("Creating certificate approval notification", extra={
+        'student_id': certificate_request.requester.id,
+        'student_username': certificate_request.requester.username,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'knowledge_path_title': certificate_request.knowledge_path.title,
+        'approver_id': certificate_request.knowledge_path.author.id,
+        'approver_username': certificate_request.knowledge_path.author.username,
+    })
     
     # Get content types
     approver_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path.author)
     knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    print(f"Approver Content Type: {approver_ct}")
-    print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+    logger.debug(f"Content types - Approver: {approver_ct}, Knowledge Path: {knowledge_path_ct}")
     
     # Check if notification already exists
     existing_notifications = Notification.objects.filter(
@@ -438,10 +534,13 @@ def notify_certificate_approval(certificate_request):
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id
     )
-    print(f"Existing notifications count: {existing_notifications.count()}")
+    logger.debug(f"Existing notifications count: {existing_notifications.count()}")
     
     if existing_notifications.exists():
-        print("Notification already exists - skipping creation")
+        logger.info("Notification already exists - skipping creation", extra={
+            'student_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
         return
     
     # Create the notification
@@ -454,24 +553,31 @@ def notify_certificate_approval(certificate_request):
         target_object_id=certificate_request.knowledge_path.id,
         description=f'{certificate_request.knowledge_path.author.username} approved your certificate request for "{certificate_request.knowledge_path.title}"'
     )
-    print("Notification created successfully")
+    logger.info("Certificate approval notification created successfully", extra={
+        'notification_id': notification.id,
+        'student_id': certificate_request.requester.id,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'recipient_id': notification.recipient.id,
+        'actor_id': notification.actor.id,
+    })
     
     # Verify the notification was created
     if notification:
-        print(f"Verified notification exists with ID: {notification.id}")
-        print(f"Notification details:")
-        print(f"- Recipient: {notification.recipient.username}")
-        print(f"- Actor: {notification.actor.username}")
-        print(f"- Verb: {notification.verb}")
-        print(f"- Timestamp: {notification.timestamp}")
-        print(f"- Unread: {notification.unread}")
-        print(f"- Target: {notification.target}")
-        print(f"- Target Content Type: {notification.target_content_type}")
-        print(f"- Target Object ID: {notification.target_object_id}")
+        logger.debug("Notification verification successful", extra={
+            'notification_id': notification.id,
+            'recipient': notification.recipient.username,
+            'actor': notification.actor.username,
+            'verb': notification.verb,
+            'timestamp': notification.timestamp.isoformat(),
+            'unread': notification.unread,
+            'target_content_type': str(notification.target_content_type),
+            'target_object_id': notification.target_object_id,
+        })
     else:
-        print("WARNING: Notification not found in database after creation!")
-    
-    print("=== End Notification Creation ===\n")
+        logger.warning("Notification not found in database after creation", extra={
+            'student_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
 
 def notify_certificate_rejection(certificate_request):
     """
@@ -481,17 +587,19 @@ def notify_certificate_rejection(certificate_request):
     Args:
         certificate_request: The CertificateRequest instance that was rejected
     """
-    print("\n=== Creating Certificate Rejection Notification ===")
-    print(f"Student: {certificate_request.requester.username}")
-    print(f"Knowledge Path ID: {certificate_request.knowledge_path.id}")
-    print(f"Knowledge Path Title: {certificate_request.knowledge_path.title}")
-    print(f"Rejector: {certificate_request.knowledge_path.author.username}")
+    logger.info("Creating certificate rejection notification", extra={
+        'student_id': certificate_request.requester.id,
+        'student_username': certificate_request.requester.username,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'knowledge_path_title': certificate_request.knowledge_path.title,
+        'rejector_id': certificate_request.knowledge_path.author.id,
+        'rejector_username': certificate_request.knowledge_path.author.username,
+    })
     
     # Get content types
     rejector_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path.author)
     knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    print(f"Rejector Content Type: {rejector_ct}")
-    print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+    logger.debug(f"Content types - Rejector: {rejector_ct}, Knowledge Path: {knowledge_path_ct}")
     
     # Check if notification already exists
     existing_notifications = Notification.objects.filter(
@@ -502,10 +610,13 @@ def notify_certificate_rejection(certificate_request):
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id
     )
-    print(f"Existing notifications count: {existing_notifications.count()}")
+    logger.debug(f"Existing notifications count: {existing_notifications.count()}")
     
     if existing_notifications.exists():
-        print("Notification already exists - skipping creation")
+        logger.info("Notification already exists - skipping creation", extra={
+            'student_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
         return
     
     # Create the notification
@@ -518,24 +629,31 @@ def notify_certificate_rejection(certificate_request):
         target_object_id=certificate_request.knowledge_path.id,
         description=f'{certificate_request.knowledge_path.author.username} rejected your certificate request for "{certificate_request.knowledge_path.title}"'
     )
-    print("Notification created successfully")
+    logger.info("Certificate rejection notification created successfully", extra={
+        'notification_id': notification.id,
+        'student_id': certificate_request.requester.id,
+        'knowledge_path_id': certificate_request.knowledge_path.id,
+        'recipient_id': notification.recipient.id,
+        'actor_id': notification.actor.id,
+    })
     
     # Verify the notification was created
     if notification:
-        print(f"Verified notification exists with ID: {notification.id}")
-        print(f"Notification details:")
-        print(f"- Recipient: {notification.recipient.username}")
-        print(f"- Actor: {notification.actor.username}")
-        print(f"- Verb: {notification.verb}")
-        print(f"- Timestamp: {notification.timestamp}")
-        print(f"- Unread: {notification.unread}")
-        print(f"- Target: {notification.target}")
-        print(f"- Target Content Type: {notification.target_content_type}")
-        print(f"- Target Object ID: {notification.target_object_id}")
+        logger.debug("Notification verification successful", extra={
+            'notification_id': notification.id,
+            'recipient': notification.recipient.username,
+            'actor': notification.actor.username,
+            'verb': notification.verb,
+            'timestamp': notification.timestamp.isoformat(),
+            'unread': notification.unread,
+            'target_content_type': str(notification.target_content_type),
+            'target_object_id': notification.target_object_id,
+        })
     else:
-        print("WARNING: Notification not found in database after creation!")
-    
-    print("=== End Notification Creation ===\n")
+        logger.warning("Notification not found in database after creation", extra={
+            'student_id': certificate_request.requester.id,
+            'knowledge_path_id': certificate_request.knowledge_path.id,
+        })
 
 def notify_content_upvote(vote):
     """
@@ -545,38 +663,46 @@ def notify_content_upvote(vote):
     Args:
         vote: The Vote instance that was created/updated
     """
-    print("\n=== Creating Content Upvote Notification ===")
-    print(f"Vote ID: {vote.id}")
-    print(f"Voter: {vote.user.username}")
-    print(f"Content Type: {vote.content_type.model}")
-    print(f"Object ID: {vote.object_id}")
+    logger.info("Creating content upvote notification", extra={
+        'vote_id': vote.id,
+        'voter_id': vote.user.id,
+        'voter_username': vote.user.username,
+        'content_type': vote.content_type.model,
+        'object_id': vote.object_id,
+    })
     
     try:
         # Get the content object
         content = vote.content_object
         if not content:
-            print("Content object not found - skipping notification")
+            logger.info("Content object not found - skipping notification", extra={
+                'vote_id': vote.id,
+            })
             return
             
-        print(f"Content ID: {content.id}")
-        print(f"Content Title: {content.original_title}")
-        print(f"Content Owner: {content.uploaded_by.username if content.uploaded_by else 'None'}")
+        logger.debug(f"Content details - ID: {content.id}, Title: {content.original_title}, Owner: {content.uploaded_by.username if content.uploaded_by else 'None'}")
         
         # Don't notify if user upvotes their own content
         if vote.user == content.uploaded_by:
-            print("User is upvoting their own content - skipping notification")
+            logger.info("User is upvoting their own content - skipping notification", extra={
+                'vote_id': vote.id,
+                'content_id': content.id,
+                'voter_id': vote.user.id,
+            })
             return
             
         # Don't notify if content has no owner
         if not content.uploaded_by:
-            print("Content has no owner - skipping notification")
+            logger.info("Content has no owner - skipping notification", extra={
+                'vote_id': vote.id,
+                'content_id': content.id,
+            })
             return
             
         # Get content types for debugging
         voter_ct = ContentType.objects.get_for_model(vote.user)
         content_ct = ContentType.objects.get_for_model(content)
-        print(f"Voter Content Type: {voter_ct}")
-        print(f"Content Content Type: {content_ct}")
+        logger.debug(f"Content types - Voter: {voter_ct}, Content: {content_ct}")
         
         # Check if notification already exists for this specific vote
         existing_notifications = Notification.objects.filter(
@@ -587,10 +713,13 @@ def notify_content_upvote(vote):
             target_content_type=content_ct,
             target_object_id=content.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'vote_id': vote.id,
+                'content_id': content.id,
+            })
             return
         
         # Create the notification
@@ -603,27 +732,37 @@ def notify_content_upvote(vote):
             target_object_id=content.id,
             description=f'{vote.user.username} upvoted your content "{content.original_title}"'
         )
-        print("Notification created successfully")
+        logger.info("Content upvote notification created successfully", extra={
+            'notification_id': notification.id,
+            'vote_id': vote.id,
+            'content_id': content.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target': str(notification.target),
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'vote_id': vote.id,
+                'content_id': content.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating content upvote notification: {str(e)}", extra={
+            'vote_id': vote.id,
+            'content_id': content.id if 'content' in locals() else None,
+            'voter_id': vote.user.id,
+        }, exc_info=True)
 
 def notify_knowledge_path_upvote(vote):
     """
@@ -633,38 +772,46 @@ def notify_knowledge_path_upvote(vote):
     Args:
         vote: The Vote instance that was created/updated
     """
-    print("\n=== Creating Knowledge Path Upvote Notification ===")
-    print(f"Vote ID: {vote.id}")
-    print(f"Voter: {vote.user.username}")
-    print(f"Content Type: {vote.content_type.model}")
-    print(f"Object ID: {vote.object_id}")
+    logger.info("Creating knowledge path upvote notification", extra={
+        'vote_id': vote.id,
+        'voter_id': vote.user.id,
+        'voter_username': vote.user.username,
+        'content_type': vote.content_type.model,
+        'object_id': vote.object_id,
+    })
     
     try:
         # Get the knowledge path object
         knowledge_path = vote.content_object
         if not knowledge_path:
-            print("Knowledge path object not found - skipping notification")
+            logger.info("Knowledge path object not found - skipping notification", extra={
+                'vote_id': vote.id,
+            })
             return
             
-        print(f"Knowledge Path ID: {knowledge_path.id}")
-        print(f"Knowledge Path Title: {knowledge_path.title}")
-        print(f"Knowledge Path Author: {knowledge_path.author.username if knowledge_path.author else 'None'}")
+        logger.debug(f"Knowledge path details - ID: {knowledge_path.id}, Title: {knowledge_path.title}, Author: {knowledge_path.author.username if knowledge_path.author else 'None'}")
         
         # Don't notify if user upvotes their own knowledge path
         if vote.user == knowledge_path.author:
-            print("User is upvoting their own knowledge path - skipping notification")
+            logger.info("User is upvoting their own knowledge path - skipping notification", extra={
+                'vote_id': vote.id,
+                'knowledge_path_id': knowledge_path.id,
+                'voter_id': vote.user.id,
+            })
             return
             
         # Don't notify if knowledge path has no author
         if not knowledge_path.author:
-            print("Knowledge path has no author - skipping notification")
+            logger.info("Knowledge path has no author - skipping notification", extra={
+                'vote_id': vote.id,
+                'knowledge_path_id': knowledge_path.id,
+            })
             return
             
         # Get content types for debugging
         voter_ct = ContentType.objects.get_for_model(vote.user)
         knowledge_path_ct = ContentType.objects.get_for_model(knowledge_path)
-        print(f"Voter Content Type: {voter_ct}")
-        print(f"Knowledge Path Content Type: {knowledge_path_ct}")
+        logger.debug(f"Content types - Voter: {voter_ct}, Knowledge Path: {knowledge_path_ct}")
         
         # Check if notification already exists for this specific vote
         existing_notifications = Notification.objects.filter(
@@ -675,10 +822,13 @@ def notify_knowledge_path_upvote(vote):
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'vote_id': vote.id,
+                'knowledge_path_id': knowledge_path.id,
+            })
             return
         
         # Create the notification
@@ -691,27 +841,37 @@ def notify_knowledge_path_upvote(vote):
             target_object_id=knowledge_path.id,
             description=f'{vote.user.username} upvoted your knowledge path "{knowledge_path.title}"'
         )
-        print("Notification created successfully")
+        logger.info("Knowledge path upvote notification created successfully", extra={
+            'notification_id': notification.id,
+            'vote_id': vote.id,
+            'knowledge_path_id': knowledge_path.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target': str(notification.target),
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'vote_id': vote.id,
+                'knowledge_path_id': knowledge_path.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating knowledge path upvote notification: {str(e)}", extra={
+            'vote_id': vote.id,
+            'knowledge_path_id': knowledge_path.id if 'knowledge_path' in locals() else None,
+            'voter_id': vote.user.id,
+        }, exc_info=True)
 
 def notify_event_registration(registration):
     """
@@ -721,29 +881,38 @@ def notify_event_registration(registration):
     Args:
         registration: The EventRegistration instance that was created
     """
-    print("\n=== Creating Event Registration Notification ===")
-    print(f"Registration ID: {registration.id}")
-    print(f"Registrant: {registration.user.username}")
-    print(f"Event ID: {registration.event.id}")
-    print(f"Event Title: {registration.event.title}")
-    print(f"Event Creator: {registration.event.owner.username if registration.event.owner else 'None'}")
+    logger.info("Creating event registration notification", extra={
+        'registration_id': registration.id,
+        'registrant_id': registration.user.id,
+        'registrant_username': registration.user.username,
+        'event_id': registration.event.id,
+        'event_title': registration.event.title,
+        'event_creator_id': registration.event.owner.id if registration.event.owner else None,
+        'event_creator_username': registration.event.owner.username if registration.event.owner else None,
+    })
     
     # Don't notify if registrant is the event creator
     if registration.user == registration.event.owner:
-        print("User is registering for their own event - skipping notification")
+        logger.info("User is registering for their own event - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'registrant_id': registration.user.id,
+        })
         return
         
     # Don't notify if event has no owner
     if not registration.event.owner:
-        print("Event has no owner - skipping notification")
+        logger.info("Event has no owner - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+        })
         return
         
     try:
         # Get content types for debugging
         registrant_ct = ContentType.objects.get_for_model(registration.user)
         event_ct = ContentType.objects.get_for_model(registration.event)
-        print(f"Registrant Content Type: {registrant_ct}")
-        print(f"Event Content Type: {event_ct}")
+        logger.debug(f"Content types - Registrant: {registrant_ct}, Event: {event_ct}")
         
         # Check if notification already exists for this specific registration
         existing_notifications = Notification.objects.filter(
@@ -754,10 +923,13 @@ def notify_event_registration(registration):
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             return
         
         # Create the notification
@@ -770,29 +942,38 @@ def notify_event_registration(registration):
             target_object_id=registration.event.id,
             description=f'{registration.user.username} registered for your event "{registration.event.title}"'
         )
-        print("Notification created successfully")
+        logger.info("Event registration notification created successfully", extra={
+            'notification_id': notification.id,
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
-            print(f"- Target Content Type: {notification.target_content_type}")
-            print(f"- Target Object ID: {notification.target_object_id}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating event registration notification: {str(e)}", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'registrant_id': registration.user.id,
+        }, exc_info=True)
 
 def notify_payment_accepted(registration):
     """
@@ -802,29 +983,38 @@ def notify_payment_accepted(registration):
     Args:
         registration: The EventRegistration instance that was updated
     """
-    print("\n=== Creating Payment Accepted Notification ===")
-    print(f"Registration ID: {registration.id}")
-    print(f"Student: {registration.user.username}")
-    print(f"Event ID: {registration.event.id}")
-    print(f"Event Title: {registration.event.title}")
-    print(f"Event Creator: {registration.event.owner.username if registration.event.owner else 'None'}")
+    logger.info("Creating payment accepted notification", extra={
+        'registration_id': registration.id,
+        'student_id': registration.user.id,
+        'student_username': registration.user.username,
+        'event_id': registration.event.id,
+        'event_title': registration.event.title,
+        'teacher_id': registration.event.owner.id if registration.event.owner else None,
+        'teacher_username': registration.event.owner.username if registration.event.owner else None,
+    })
     
     # Don't notify if student is the event creator
     if registration.user == registration.event.owner:
-        print("Student is the event creator - skipping notification")
+        logger.info("Student is the event creator - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'student_id': registration.user.id,
+        })
         return
         
     # Don't notify if event has no owner
     if not registration.event.owner:
-        print("Event has no owner - skipping notification")
+        logger.info("Event has no owner - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+        })
         return
         
     try:
         # Get content types for debugging
         teacher_ct = ContentType.objects.get_for_model(registration.event.owner)
         event_ct = ContentType.objects.get_for_model(registration.event)
-        print(f"Teacher Content Type: {teacher_ct}")
-        print(f"Event Content Type: {event_ct}")
+        logger.debug(f"Content types - Teacher: {teacher_ct}, Event: {event_ct}")
         
         # Check if notification already exists for this specific payment acceptance
         existing_notifications = Notification.objects.filter(
@@ -835,10 +1025,13 @@ def notify_payment_accepted(registration):
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             return
         
         # Create the notification
@@ -851,29 +1044,38 @@ def notify_payment_accepted(registration):
             target_object_id=registration.event.id,
             description=f'{registration.event.owner.username} accepted your payment for "{registration.event.title}"'
         )
-        print("Notification created successfully")
+        logger.info("Payment accepted notification created successfully", extra={
+            'notification_id': notification.id,
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
-            print(f"- Target Content Type: {notification.target_content_type}")
-            print(f"- Target Object ID: {notification.target_object_id}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n")
+        logger.error(f"Error creating payment accepted notification: {str(e)}", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'student_id': registration.user.id,
+        }, exc_info=True)
 
 def notify_certificate_sent(registration):
     """
@@ -883,29 +1085,38 @@ def notify_certificate_sent(registration):
     Args:
         registration: The EventRegistration instance that was updated
     """
-    print("\n=== Creating Certificate Sent Notification ===")
-    print(f"Registration ID: {registration.id}")
-    print(f"Student: {registration.user.username}")
-    print(f"Event ID: {registration.event.id}")
-    print(f"Event Title: {registration.event.title}")
-    print(f"Event Creator: {registration.event.owner.username if registration.event.owner else 'None'}")
+    logger.info("Creating certificate sent notification", extra={
+        'registration_id': registration.id,
+        'student_id': registration.user.id,
+        'student_username': registration.user.username,
+        'event_id': registration.event.id,
+        'event_title': registration.event.title,
+        'teacher_id': registration.event.owner.id if registration.event.owner else None,
+        'teacher_username': registration.event.owner.username if registration.event.owner else None,
+    })
     
     # Don't notify if student is the event creator
     if registration.user == registration.event.owner:
-        print("Student is the event creator - skipping notification")
+        logger.info("Student is the event creator - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'student_id': registration.user.id,
+        })
         return
         
     # Don't notify if event has no owner
     if not registration.event.owner:
-        print("Event has no owner - skipping notification")
+        logger.info("Event has no owner - skipping notification", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+        })
         return
         
     try:
         # Get content types for debugging
         teacher_ct = ContentType.objects.get_for_model(registration.event.owner)
         event_ct = ContentType.objects.get_for_model(registration.event)
-        print(f"Teacher Content Type: {teacher_ct}")
-        print(f"Event Content Type: {event_ct}")
+        logger.debug(f"Content types - Teacher: {teacher_ct}, Event: {event_ct}")
         
         # Check if notification already exists for this specific certificate sending
         existing_notifications = Notification.objects.filter(
@@ -916,10 +1127,13 @@ def notify_certificate_sent(registration):
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
-        print(f"Existing notifications count: {existing_notifications.count()}")
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
         
         if existing_notifications.exists():
-            print("Notification already exists - skipping creation")
+            logger.info("Notification already exists - skipping creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             return
         
         # Create the notification
@@ -932,26 +1146,35 @@ def notify_certificate_sent(registration):
             target_object_id=registration.event.id,
             description=f'{registration.event.owner.username} sent you a certificate for "{registration.event.title}"'
         )
-        print("Notification created successfully")
+        logger.info("Certificate sent notification created successfully", extra={
+            'notification_id': notification.id,
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
         
         # Verify the notification was created
         if notification:
-            print(f"Verified notification exists with ID: {notification.id}")
-            print(f"Notification details:")
-            print(f"- Recipient: {notification.recipient.username}")
-            print(f"- Actor: {notification.actor.username}")
-            print(f"- Verb: {notification.verb}")
-            print(f"- Timestamp: {notification.timestamp}")
-            print(f"- Unread: {notification.unread}")
-            print(f"- Target: {notification.target}")
-            print(f"- Target Content Type: {notification.target_content_type}")
-            print(f"- Target Object ID: {notification.target_object_id}")
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
         else:
-            print("WARNING: Notification not found in database after creation!")
+            logger.warning("Notification not found in database after creation", extra={
+                'registration_id': registration.id,
+                'event_id': registration.event.id,
+            })
             
     except Exception as e:
-        print(f"Error creating notification: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
-    
-    print("=== End Notification Creation ===\n") 
+        logger.error(f"Error creating certificate sent notification: {str(e)}", extra={
+            'registration_id': registration.id,
+            'event_id': registration.event.id,
+            'student_id': registration.user.id,
+        }, exc_info=True) 

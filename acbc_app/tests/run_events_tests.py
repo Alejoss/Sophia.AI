@@ -34,14 +34,9 @@ def run_events_tests():
     return failures
 
 if __name__ == '__main__':
-    print("Running Events Tests...")
-    print("=" * 50)
-    
     failures = run_events_tests()
     
     if failures:
-        print(f"\n❌ {failures} test(s) failed!")
         sys.exit(1)
     else:
-        print("\n✅ All events tests passed!")
         sys.exit(0) 

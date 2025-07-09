@@ -40,7 +40,7 @@ from notifications.models import Notification
 from django.db import connection
 from django.db.models import Count
 
-logger = logging.getLogger('app_logger')
+logger = logging.getLogger(__name__)
 
 
 class CheckAuth(APIView):
@@ -48,6 +48,8 @@ class CheckAuth(APIView):
 
     @method_decorator(csrf_exempt)
     def get(self, request):
+        logger.debug(f"Authentication check requested - User: {request.user.username if request.user.is_authenticated else 'anonymous'}")
+        
         # Check if user is authenticated via session
         is_authenticated = request.user.is_authenticated
         
@@ -59,10 +61,11 @@ class CheckAuth(APIView):
                     # Try to validate the refresh token
                     RefreshToken(refresh_token)
                     is_authenticated = True
-                except Exception:
-                    pass
+                    logger.debug("User authenticated via refresh token")
+                except Exception as e:
+                    logger.debug(f"Refresh token validation failed: {str(e)}")
         
-        print(f"User authenticated: {is_authenticated}")
+        logger.info(f"Authentication check completed - User: {request.user.username if request.user.is_authenticated else 'anonymous'}, Is authenticated: {is_authenticated}")
         return Response({'is_authenticated': is_authenticated}, status=status.HTTP_200_OK)
 
 
@@ -70,110 +73,222 @@ class UserProfileView(APIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get(self, request, format=None):
-        # Fetch the profile of the authenticated user
-        user_profile = Profile.objects.filter(user=request.user).first()
-        if not user_profile:
-            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = ProfileSerializer(user_profile, context={'request': request})
-        return Response(serializer.data)
-
-    def put(self, request, format=None):
-        # Get the profile of the authenticated user
-        user_profile = Profile.objects.filter(user=request.user).first()
-        if not user_profile:
-            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Handle profile picture upload if present
-        if 'profile_picture' in request.FILES:
-            profile_picture = request.FILES.get('profile_picture')
-            user_profile.profile_picture = profile_picture
-
-        # Handle text fields update from request.data
-        # This will work for JSON and FormParser/MultiPartParser for non-file fields
-        profile_description = request.data.get('profile_description')
-        if profile_description is not None:
-            user_profile.profile_description = profile_description
+        logger.info(f"User profile requested - User: {request.user.username}")
         
-        interests = request.data.get('interests')
-        if interests is not None:
-            user_profile.interests = interests
-
         try:
-            user_profile.save()
+            # Fetch the profile of the authenticated user
+            user_profile = Profile.objects.filter(user=request.user).first()
+            if not user_profile:
+                logger.warning(f"Profile not found for user {request.user.username}")
+                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
             serializer = ProfileSerializer(user_profile, context={'request': request})
+            logger.debug(f"User profile retrieved successfully for user {request.user.username}")
             return Response(serializer.data)
         except Exception as e:
+            logger.error(f"Error retrieving user profile for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request, format=None):
+        logger.info(f"User profile update requested - User: {request.user.username}")
+        logger.debug(f"Profile update data: {request.data}")
+        
+        try:
+            # Get the profile of the authenticated user
+            user_profile = Profile.objects.filter(user=request.user).first()
+            if not user_profile:
+                logger.warning(f"Profile not found for user {request.user.username}")
+                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Handle profile picture upload if present
+            if 'profile_picture' in request.FILES:
+                profile_picture = request.FILES.get('profile_picture')
+                user_profile.profile_picture = profile_picture
+                logger.debug(f"Profile picture updated for user {request.user.username}")
+
+            # Handle text fields update from request.data
+            # This will work for JSON and FormParser/MultiPartParser for non-file fields
+            profile_description = request.data.get('profile_description')
+            if profile_description is not None:
+                user_profile.profile_description = profile_description
+                logger.debug(f"Profile description updated for user {request.user.username}")
+            
+            interests = request.data.get('interests')
+            if interests is not None:
+                user_profile.interests = interests
+                logger.debug(f"Interests updated for user {request.user.username}")
+
+            user_profile.save()
+            serializer = ProfileSerializer(user_profile, context={'request': request})
+            logger.info(f"User profile updated successfully for user {request.user.username}")
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error updating user profile for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Failed to update profile: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
     def post(self, request, format=None):
-        # Update or create a profile for the authenticated user
-        serializer = ProfileSerializer(data=request.data, instance=request.user.profile)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        logger.info(f"User profile creation requested - User: {request.user.username}")
+        logger.debug(f"Profile creation data: {request.data}")
+        
+        try:
+            # Update or create a profile for the authenticated user
+            serializer = ProfileSerializer(data=request.data, instance=request.user.profile)
+            if serializer.is_valid():
+                profile = serializer.save()
+                logger.info(f"User profile created/updated successfully for user {request.user.username}")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                logger.warning(f"Profile creation failed - validation errors for user {request.user.username}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating user profile for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to create profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ProfileList(APIView):
     def get(self, request, format=None):
-        profiles = Profile.objects.all()
-        serializer = ProfileSerializer(profiles, many=True)
-        return Response(serializer.data)
+        logger.info(f"Profile list requested by user {request.user.username}")
+        
+        try:
+            profiles = Profile.objects.all()
+            serializer = ProfileSerializer(profiles, many=True)
+            logger.info(f"Successfully retrieved {len(serializer.data)} profiles")
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error retrieving profile list: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve profiles'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def post(self, request, format=None):
-        serializer = ProfileSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        logger.info(f"Profile creation requested by user {request.user.username}")
+        logger.debug(f"Profile creation data: {request.data}")
+        
+        try:
+            serializer = ProfileSerializer(data=request.data)
+            if serializer.is_valid():
+                profile = serializer.save()
+                logger.info(f"Profile created successfully - ID: {profile.id}, User: {profile.user.username}")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                logger.warning(f"Profile creation failed - validation errors from user {request.user.username}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating profile for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to create profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class UserDetailView(APIView):
     def get(self, request, pk, format=None):
-        # Obtén un usuario específico por su pk (ID)
-        user = get_object_or_404(User, pk=pk)
-        # Serializa los datos del usuario
-        serializer = UserSerializer(user)
-        # Devuelve los datos serializados
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        logger.info(f"User detail requested - User ID: {pk}, Requested by: {request.user.username}")
+        
+        try:
+            # Obtén un usuario específico por su pk (ID)
+            user = get_object_or_404(User, pk=pk)
+            # Serializa los datos del usuario
+            serializer = UserSerializer(user)
+            logger.debug(f"User detail retrieved successfully - User: {user.username}")
+            # Devuelve los datos serializados
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error retrieving user detail for user ID {pk}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def put(self, request, pk, format=None):
-        # Obtén un usuario específico por su pk (ID)
-        user = get_object_or_404(User, pk=pk)
-        # Serializa los datos del usuario con los datos actualizados
-        serializer = UserSerializer(user, data=request.data,
-                                    partial=True)  # `partial=True` para permitir actualizaciones parciales
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        logger.info(f"User update requested - User ID: {pk}, Updated by: {request.user.username}")
+        logger.debug(f"User update data: {request.data}")
+        
+        try:
+            # Obtén un usuario específico por su pk (ID)
+            user = get_object_or_404(User, pk=pk)
+            # Serializa los datos del usuario con los datos actualizados
+            serializer = UserSerializer(user, data=request.data,
+                                        partial=True)  # `partial=True` para permitir actualizaciones parciales
+            if serializer.is_valid():
+                updated_user = serializer.save()
+                logger.info(f"User updated successfully - User ID: {pk}, Updated by: {request.user.username}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                logger.warning(f"User update failed - validation errors for user {pk} from user {request.user.username}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error updating user {pk} for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ProfileDetail(APIView):
     def get(self, request, pk, format=None):
-        # Look up profile by user_id instead of profile_id
-        profile = get_object_or_404(Profile, user_id=pk)
-        serializer = ProfileSerializer(profile, context={'request': request})
-        return Response(serializer.data)
+        logger.info(f"Profile detail requested - User ID: {pk}, Requested by: {request.user.username}")
+        
+        try:
+            # Look up profile by user_id instead of profile_id
+            profile = get_object_or_404(Profile, user_id=pk)
+            serializer = ProfileSerializer(profile, context={'request': request})
+            logger.debug(f"Profile detail retrieved successfully - User: {profile.user.username}")
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error retrieving profile detail for user ID {pk}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def put(self, request, pk, format=None):
-        # Update to also use user_id
-        profile = get_object_or_404(Profile, user_id=pk)
-        serializer = ProfileSerializer(profile, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        logger.info(f"Profile update requested - User ID: {pk}, Updated by: {request.user.username}")
+        logger.debug(f"Profile update data: {request.data}")
+        
+        try:
+            # Update to also use user_id
+            profile = get_object_or_404(Profile, user_id=pk)
+            serializer = ProfileSerializer(profile, data=request.data, context={'request': request})
+            if serializer.is_valid():
+                updated_profile = serializer.save()
+                logger.info(f"Profile updated successfully - User ID: {pk}, Updated by: {request.user.username}")
+                return Response(serializer.data)
+            else:
+                logger.warning(f"Profile update failed - validation errors for user {pk} from user {request.user.username}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error updating profile for user {pk} by user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to update profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def delete(self, request, pk, format=None):
-        # Update to also use user_id
-        profile = get_object_or_404(Profile, user_id=pk)
-        profile.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        logger.info(f"Profile deletion requested - User ID: {pk}, Deleted by: {request.user.username}")
+        
+        try:
+            # Update to also use user_id
+            profile = get_object_or_404(Profile, user_id=pk)
+            profile.delete()
+            logger.info(f"Profile deleted successfully - User ID: {pk}, Deleted by: {request.user.username}")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error(f"Error deleting profile for user {pk} by user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to delete profile'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 def set_jwt_token(user):
@@ -187,19 +302,18 @@ def set_jwt_token(user):
         JsonResponse: A response containing the JWT token.
     """
     try:
-        # Debug: Check if user is authenticated
-        print('User authenticated:', user.is_authenticated)
+        logger.debug(f'Generating JWT tokens for user: {user.username}')
 
         if not user.is_authenticated:
-            print('User not authenticated, returning error.')
+            logger.warning(f'JWT token generation failed - user not authenticated: {user.username}')
             return JsonResponse({'error': 'User not authenticated'}, status=401)
 
         # Debug: Log that the tokens are being created
-        print('Creating refresh and access tokens for user:', user)
+        logger.debug(f'Creating refresh and access tokens for user: {user.username}')
         access_token = str(AccessToken.for_user(user))
 
         # Debug: Log the setting of the JWT cookie
-        print('Setting JWT cookie with access token:', access_token)
+        logger.debug(f'Setting JWT cookie with access token: {access_token}')
         response = JsonResponse({'token': access_token})
         response.set_cookie(
             'jwt',
@@ -213,7 +327,7 @@ def set_jwt_token(user):
 
         return response
     except Exception as e:
-        print('Error in set_jwt_token:', str(e))
+        logger.error(f'Error in set_jwt_token: {str(e)}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -299,6 +413,7 @@ class LoginView(APIView):
 
                 return response
             except Exception as e:
+                logger.error(f"Error generating tokens during login for user {user.username}: {str(e)}", exc_info=True)
                 return Response(
                     {'error': 'Failed to generate tokens'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -306,6 +421,7 @@ class LoginView(APIView):
         else:
             # Increment failed attempts
             cache.set(cache_key, attempts + 1, timeout=300)  # 5 minutes timeout
+            logger.warning(f"Invalid credentials for user {username} from IP {client_ip}")
             return Response(
                 {'error': 'Invalid credentials'},
                 status=status.HTTP_403_FORBIDDEN
@@ -320,6 +436,7 @@ class GetCsrfToken(APIView):
         Ensure a CSRF cookie is set and return a simple JSON message.
         """
         get_token(request)  # This will set the CSRF cookie if it is not already set
+        logger.debug(f"CSRF token requested by user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         return Response({'message': 'CSRF cookie set'})
 
 
@@ -364,6 +481,7 @@ def activate_account(request, uid, token):
         return render(request, template, context)
     else:
         # If the token is not valid, inform the user
+        logger.warning(f"Activation link is invalid for user {user.username if user else 'unknown'} with token {token}")
         return HttpResponse('Activation link is invalid!')
 
 
@@ -373,12 +491,12 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            print("Processing logout request")
+            logger.info(f"Processing logout request for user {request.user.username}")
             response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
             
             # Get the refresh token cookie name from settings
             refresh_cookie_name = settings.SIMPLE_JWT['REFRESH_COOKIE']
-            print(f"Attempting to delete cookie: {refresh_cookie_name}")
+            logger.debug(f"Attempting to delete cookie: {refresh_cookie_name}")
             
             # Delete the refresh token cookie
             response.delete_cookie(
@@ -387,10 +505,10 @@ class LogoutView(APIView):
                 domain=None  # Let the browser determine the domain
             )
             
-            print("Logout successful")
+            logger.info(f"Logout successful for user {request.user.username}")
             return response
         except Exception as e:
-            print(f"Logout error: {str(e)}")
+            logger.error(f"Logout error for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Logout failed: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -427,7 +545,7 @@ class RegisterView(APIView):
                 return response
             except Exception as e:
                 # Log this error, as it's a server-side issue during token generation/setting
-                logger.error(f"Error generating or setting JWT token during registration for user {user.username}: {str(e)}")
+                logger.error(f"Error generating or setting JWT token during registration for user {user.username}: {str(e)}", exc_info=True)
                 # Still return a 201 as user was created, but indicate token issue if desired, or just return user data.
                 # For simplicity, we'll return the user data, but the client won't be auto-logged in via cookie.
                 return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
@@ -456,27 +574,27 @@ class RefreshTokenView(APIView):
             Response with new access token
         """
         try:
-            print("\n=== Token Refresh Attempt ===")
+            logger.debug(f"Token refresh attempt for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
             
             if not refresh_token:
-                print("❌ No refresh token found in cookies")
+                logger.warning(f"No refresh token found in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'No refresh token found'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            print("✅ Found refresh token in cookies")
+            logger.debug(f"Found refresh token in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
-            print("✅ Generated new access token")
+            logger.debug(f"Generated new access token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
 
             return Response({
                 'access_token': access_token
             })
 
         except Exception as e:
-            print(f"❌ Token refresh failed: {str(e)}")
+            logger.error(f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Invalid refresh token'},
                 status=status.HTTP_403_FORBIDDEN
@@ -492,12 +610,12 @@ class GoogleLoginView(SocialLoginView):
     callback_url = None
 
     def post(self, request, *args, **kwargs):
-        logger.info("Starting Google login process")
+        logger.info(f"Starting Google login process for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         
         # Check for access token
         id_token = request.data.get('access_token')
         if not id_token:
-            logger.error("No access token provided in request")
+            logger.error(f"No access token provided in request for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return Response(
                 {'error': 'No access token provided'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -505,17 +623,17 @@ class GoogleLoginView(SocialLoginView):
 
         # Get Google's public keys
         try:
-            logger.info("Fetching Google public keys")
+            logger.info(f"Fetching Google public keys for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             response = requests.get('https://www.googleapis.com/oauth2/v3/certs')
             if response.status_code != 200:
-                logger.error(f"Failed to fetch Google public keys. Status code: {response.status_code}")
+                logger.error(f"Failed to fetch Google public keys. Status code: {response.status_code} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'Failed to fetch Google public keys'},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE
                 )
             public_keys = response.json()
         except requests.RequestException as e:
-            logger.error(f"Request error while fetching Google public keys: {str(e)}")
+            logger.error(f"Request error while fetching Google public keys for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to connect to Google services'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
@@ -523,7 +641,7 @@ class GoogleLoginView(SocialLoginView):
         
         # Verify and decode the ID token
         try:
-            logger.info("Verifying ID token")
+            logger.info(f"Verifying ID token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             unverified_header = jwt.get_unverified_header(id_token)
             key_id = unverified_header['kid']
             
@@ -535,7 +653,7 @@ class GoogleLoginView(SocialLoginView):
                     break
             
             if not public_key:
-                logger.error("No matching public key found for token")
+                logger.error(f"No matching public key found for token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'No matching public key found for token'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -544,7 +662,7 @@ class GoogleLoginView(SocialLoginView):
             # Get Google OAuth client ID from settings
             client_id = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id']
             if not client_id:
-                logger.error("Google OAuth client ID not configured in settings")
+                logger.error(f"Google OAuth client ID not configured in settings for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'Google OAuth client ID not configured'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -564,28 +682,28 @@ class GoogleLoginView(SocialLoginView):
                         'leeway': 10          # Allow 10 seconds of clock skew
                     }
                 )
-                logger.info("Successfully decoded and verified ID token")
+                logger.info(f"Successfully decoded and verified ID token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             except jwt.ExpiredSignatureError:
-                logger.error("Token has expired")
+                logger.error(f"Token has expired for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'Token has expired. Please try logging in again.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except jwt.InvalidTokenError as e:
-                logger.error(f"Invalid token error: {str(e)}")
+                logger.error(f"Invalid token error for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
                 return Response(
                     {'error': f'Invalid ID token: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except Exception as e:
-                logger.error(f"Unexpected error during token verification: {str(e)}")
+                logger.error(f"Unexpected error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
                 return Response(
                     {'error': 'Failed to verify token'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
         except Exception as e:
-            logger.error(f"Error during token verification: {str(e)}")
+            logger.error(f"Error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to verify token'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -593,19 +711,19 @@ class GoogleLoginView(SocialLoginView):
 
         # Get or create user
         try:
-            logger.info("Looking up social account")
+            logger.info(f"Looking up social account for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             social_account = SocialAccount.objects.get(
                 provider=GoogleProvider.id, 
                 uid=decoded_token['sub']
             )
             user = social_account.user
-            logger.info(f"Found existing user: {user.username}")
+            logger.info(f"Found existing user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         except SocialAccount.DoesNotExist:
-            logger.info("No existing social account found, creating new user")
+            logger.info(f"No existing social account found for user {request.user.username if request.user.is_authenticated else 'anonymous'}, creating new user")
             # Create new user
             email = decoded_token.get('email')
             if not email:
-                logger.error("No email provided in Google token")
+                logger.error(f"No email provided in Google token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'Email not provided by Google'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -613,9 +731,9 @@ class GoogleLoginView(SocialLoginView):
             
             try:
                 user = User.objects.get(email=email)
-                logger.info(f"Found existing user with email: {email}")
+                logger.info(f"Found existing user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             except User.DoesNotExist:
-                logger.info(f"Creating new user with email: {email}")
+                logger.info(f"Creating new user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 username = email.split('@')[0]
                 # Ensure unique username
                 base_username = username
@@ -630,7 +748,7 @@ class GoogleLoginView(SocialLoginView):
                     first_name=decoded_token.get('given_name', ''),
                     last_name=decoded_token.get('family_name', '')
                 )
-                logger.info(f"Created new user: {username}")
+                logger.info(f"Created new user: {username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             
             # Create social account
             social_account = SocialAccount.objects.create(
@@ -639,43 +757,43 @@ class GoogleLoginView(SocialLoginView):
                 uid=decoded_token['sub'],
                 extra_data=decoded_token
             )
-            logger.info(f"Created social account for user: {user.username}")
+            logger.info(f"Created social account for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
 
         # Handle profile picture
         try:
             # Get profile picture URL from Google token
             picture_url = decoded_token.get('picture')
-            logger.info(f"Profile picture URL from token: {picture_url}")
+            logger.debug(f"Profile picture URL from token for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {picture_url}")
             
             if picture_url:
                 # Download the image
-                logger.info("Downloading profile picture")
+                logger.info(f"Downloading profile picture for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 picture_response = requests.get(picture_url)
                 if picture_response.status_code == 200:
                     # Get or create profile
                     profile, created = Profile.objects.get_or_create(user=user)
-                    logger.info(f"{'Created' if created else 'Found'} profile for user: {user.username}")
+                    logger.info(f"{'Created' if created else 'Found'} profile for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                     
                     # Save the profile picture
                     filename = f"{user.username}_{datetime.today().strftime('%h-%d-%y')}.jpeg"
-                    logger.info(f"Saving profile picture as: {filename}")
+                    logger.info(f"Saving profile picture as: {filename} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                     profile.profile_picture.save(
                         filename,
                         ContentFile(picture_response.content),
                         save=True
                     )
-                    logger.info(f"Successfully saved profile picture for user {user.username}")
+                    logger.info(f"Successfully saved profile picture for user {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 else:
-                    logger.error(f"Failed to download profile picture. Status code: {picture_response.status_code}")
+                    logger.error(f"Failed to download profile picture. Status code: {picture_response.status_code} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         except requests.RequestException as e:
-            logger.error(f"Request error while downloading profile picture: {str(e)}")
+            logger.error(f"Request error while downloading profile picture for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
         except Exception as e:
-            logger.error(f"Error processing profile picture for user {user.username}: {str(e)}")
+            logger.error(f"Error processing profile picture for user {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             # Continue with login process even if picture fails
 
         try:
             # Generate JWT tokens
-            logger.info("Generating JWT tokens")
+            logger.info(f"Generating JWT tokens for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
@@ -697,10 +815,10 @@ class GoogleLoginView(SocialLoginView):
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
                 path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
             )
-            logger.info("Successfully completed Google login process")
+            logger.info(f"Successfully completed Google login process for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return response
         except Exception as e:
-            logger.error(f"Error generating tokens or creating response: {str(e)}")
+            logger.error(f"Error generating tokens or creating response for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to complete login process'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -715,9 +833,7 @@ class UserNotificationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        print("\n=== Fetching User Notifications ===")
-        print(f"User: {request.user.username}")
-        print(f"User ID: {request.user.id}")
+        logger.info(f"Fetching user notifications for user {request.user.username}")
         
         # Get show_all parameter from query string
         show_all = request.query_params.get('show_all', 'false').lower() == 'true'
@@ -733,7 +849,7 @@ class UserNotificationsView(APIView):
             timestamp__lt=cutoff_date
         ).delete()[0]
         
-        print(f"Cleaned up {deleted_count} old notifications")
+        logger.debug(f"Cleaned up {deleted_count} old notifications for user {request.user.username}")
         
         # Get notifications for the user
         notifications = Notification.objects.filter(recipient=request.user)
@@ -743,37 +859,37 @@ class UserNotificationsView(APIView):
             notifications = notifications.filter(unread=True)
         
         # Print the actual SQL query
-        print("\nSQL Query:")
-        print(notifications.query)
+        logger.debug(f"SQL Query for notifications for user {request.user.username}:")
+        logger.debug(notifications.query)
         
         # Print the count
         count = notifications.count()
-        print(f"\nFound {count} notifications")
+        logger.info(f"Found {count} notifications for user {request.user.username}")
         
         # Log some details about the notifications
         for notification in notifications:
-            print(f"\nNotification ID: {notification.id}")
-            print(f"Verb: {notification.verb}")
-            print(f"Actor: {notification.actor}")
-            print(f"Action Object: {notification.action_object}")
-            print(f"Target: {notification.target}")
-            print(f"Unread: {notification.unread}")
-            print(f"Timestamp: {notification.timestamp}")
-            print("---")
+            logger.debug(f"\nNotification ID: {notification.id} for user {request.user.username}")
+            logger.debug(f"Verb: {notification.verb}")
+            logger.debug(f"Actor: {notification.actor}")
+            logger.debug(f"Action Object: {notification.action_object}")
+            logger.debug(f"Target: {notification.target}")
+            logger.debug(f"Unread: {notification.unread}")
+            logger.debug(f"Timestamp: {notification.timestamp}")
+            logger.debug("---")
         
         # Get notification counts by type
         notification_types = notifications.values('verb').annotate(count=Count('id'))
-        print("\nNotification types and counts:")
+        logger.debug("\nNotification types and counts for user {request.user.username}:")
         for nt in notification_types:
-            print(f"{nt['verb']}: {nt['count']}")
+            logger.debug(f"{nt['verb']}: {nt['count']}")
         
         # Serialize the notifications
         notification_data = NotificationSerializer(notifications, many=True).data
         
-        print("\nSerialized data being sent:")
-        print(notification_data)
+        logger.debug("\nSerialized data being sent for user {request.user.username}:")
+        logger.debug(notification_data)
         
-        print("=== End Fetching Notifications ===\n")
+        logger.info("=== End Fetching Notifications ===")
         return Response({
             'notifications': notification_data,
             'cleaned_up_count': deleted_count
@@ -785,8 +901,7 @@ class UserNotificationsView(APIView):
         If notification_id is provided, mark that specific notification as read.
         Otherwise, mark all notifications as read.
         """
-        print("\n=== Marking Notifications as Read ===")
-        print(f"User: {request.user.username}")
+        logger.info(f"Marking notifications as read for user {request.user.username}")
         
         if notification_id:
             # Mark specific notification as read
@@ -795,16 +910,16 @@ class UserNotificationsView(APIView):
                     recipient=request.user,
                     id=notification_id
                 )
-                print(f"Found notification: {notification.id}")
+                logger.debug(f"Found notification: {notification.id} for user {request.user.username}")
                 
                 notification.mark_as_read()
-                print("Successfully marked as read")
+                logger.debug(f"Successfully marked as read for user {request.user.username}")
                 
-                print("=== End Marking Notification as Read ===\n")
+                logger.info("=== End Marking Notification as Read ===")
                 return Response({'status': 'success'})
             except Notification.DoesNotExist:
-                print(f"Notification {notification_id} not found")
-                print("=== End Marking Notification as Read ===\n")
+                logger.warning(f"Notification {notification_id} not found for user {request.user.username}")
+                logger.info("=== End Marking Notification as Read ===")
                 return Response(
                     {'error': 'Notification not found'},
                     status=status.HTTP_404_NOT_FOUND
@@ -818,20 +933,20 @@ class UserNotificationsView(APIView):
                     unread=True
                 )
                 count = unread_notifications.count()
-                print(f"Found {count} unread notifications")
+                logger.debug(f"Found {count} unread notifications for user {request.user.username}")
                 
                 # Mark all as read
                 unread_notifications.mark_all_as_read()
-                print(f"Successfully marked {count} notifications as read")
+                logger.debug(f"Successfully marked {count} notifications as read for user {request.user.username}")
                 
-                print("=== End Marking All Notifications as Read ===\n")
+                logger.info("=== End Marking All Notifications as Read ===")
                 return Response({
                     'status': 'success',
                     'marked_as_read': count
                 })
             except Exception as e:
-                print(f"Error marking all notifications as read: {str(e)}")
-                print("=== End Marking All Notifications as Read ===\n")
+                logger.error(f"Error marking all notifications as read for user {request.user.username}: {str(e)}", exc_info=True)
+                logger.info("=== End Marking All Notifications as Read ===")
                 return Response(
                     {'error': 'Failed to mark notifications as read'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -843,8 +958,7 @@ class UserNotificationsView(APIView):
         If notification_id is provided, delete that specific notification.
         Otherwise, delete all read notifications older than 30 days.
         """
-        print("\n=== Deleting Notifications ===")
-        print(f"User: {request.user.username}")
+        logger.info(f"Deleting notifications for user {request.user.username}")
         
         if notification_id:
             # Delete specific notification
@@ -854,7 +968,7 @@ class UserNotificationsView(APIView):
                     id=notification_id
                 )
                 notification.delete()
-                print(f"Deleted notification {notification_id}")
+                logger.debug(f"Deleted notification {notification_id} for user {request.user.username}")
                 return Response({'status': 'success'})
             except Notification.DoesNotExist:
                 return Response(
@@ -877,7 +991,7 @@ class UserNotificationsView(APIView):
                 timestamp__lt=cutoff_date
             ).delete()[0]
             
-            print(f"Deleted {deleted_count} old notifications")
+            logger.debug(f"Deleted {deleted_count} old notifications for user {request.user.username}")
             return Response({
                 'status': 'success',
                 'deleted_count': deleted_count
@@ -903,7 +1017,7 @@ class UnreadNotificationsCountView(APIView):
                 'unread_count': unread_count
             })
         except Exception as e:
-            logger.error(f"Error getting unread notifications count for user {request.user.username}: {str(e)}")
+            logger.error(f"Error getting unread notifications count for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to get unread count'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -917,12 +1031,14 @@ class CryptoCurrencyListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        logger.info(f"Fetching cryptocurrency list for user {request.user.username}")
         try:
             cryptocurrencies = CryptoCurrency.objects.all().order_by('name')
             serializer = CryptoCurrencySerializer(cryptocurrencies, many=True, context={'request': request})
+            logger.info(f"Successfully retrieved {len(serializer.data)} cryptocurrencies for user {request.user.username}")
             return Response(serializer.data)
         except Exception as e:
-            logger.error(f"Error fetching cryptocurrencies: {str(e)}")
+            logger.error(f"Error fetching cryptocurrencies for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to fetch cryptocurrencies'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -941,6 +1057,7 @@ class UserAcceptedCryptosView(APIView):
         If user_id is provided, get for that specific user
         Otherwise, get for the authenticated user
         """
+        logger.info(f"Fetching accepted cryptocurrencies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         try:
             target_user_id = user_id if user_id else request.user.id
             
@@ -955,9 +1072,10 @@ class UserAcceptedCryptosView(APIView):
                 accepted_cryptos = AcceptedCrypto.objects.filter(user_id=target_user_id)
             
             serializer = AcceptedCryptoSerializer(accepted_cryptos, many=True, context={'request': request})
+            logger.info(f"Successfully retrieved {len(serializer.data)} accepted cryptocurrencies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return Response(serializer.data)
         except Exception as e:
-            logger.error(f"Error fetching accepted cryptocurrencies: {str(e)}")
+            logger.error(f"Error fetching accepted cryptocurrencies for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to fetch accepted cryptocurrencies'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -967,11 +1085,15 @@ class UserAcceptedCryptosView(APIView):
         """
         Add a new accepted cryptocurrency for the authenticated user
         """
+        logger.info(f"Adding accepted cryptocurrency for user {request.user.username}")
+        logger.debug(f"Accepted cryptocurrency data: {request.data}")
+        
         try:
             crypto_id = request.data.get('crypto_id')
             address = request.data.get('address')
             
             if not crypto_id or not address:
+                logger.warning(f"Invalid data for adding accepted cryptocurrency for user {request.user.username}")
                 return Response(
                     {'error': 'Both crypto_id and address are required'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -981,6 +1103,7 @@ class UserAcceptedCryptosView(APIView):
             try:
                 crypto = CryptoCurrency.objects.get(id=crypto_id)
             except CryptoCurrency.DoesNotExist:
+                logger.warning(f"Cryptocurrency not found for user {request.user.username}: crypto_id={crypto_id}")
                 return Response(
                     {'error': 'Cryptocurrency not found'},
                     status=status.HTTP_404_NOT_FOUND
@@ -1000,10 +1123,11 @@ class UserAcceptedCryptosView(APIView):
                 existing_crypto.save()
             
             serializer = AcceptedCryptoSerializer(existing_crypto, context={'request': request})
+            logger.info(f"Accepted cryptocurrency added successfully for user {request.user.username}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            logger.error(f"Error adding accepted cryptocurrency: {str(e)}")
+            logger.error(f"Error adding accepted cryptocurrency for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to add cryptocurrency'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1013,6 +1137,7 @@ class UserAcceptedCryptosView(APIView):
         """
         Soft delete an accepted cryptocurrency
         """
+        logger.info(f"Soft deleting accepted cryptocurrency for user {request.user.username}")
         try:
             accepted_crypto = get_object_or_404(
                 AcceptedCrypto,
@@ -1023,10 +1148,11 @@ class UserAcceptedCryptosView(APIView):
             accepted_crypto.deleted = True
             accepted_crypto.save()
             
+            logger.info(f"Accepted cryptocurrency removed successfully for user {request.user.username}")
             return Response({'message': 'Cryptocurrency removed successfully'})
             
         except Exception as e:
-            logger.error(f"Error removing accepted cryptocurrency: {str(e)}")
+            logger.error(f"Error removing accepted cryptocurrency for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Failed to remove cryptocurrency'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
