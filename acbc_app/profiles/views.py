@@ -527,19 +527,27 @@ class RegisterView(APIView):
 
             # Log the user in and set JWT token
             try:
-                # Generate JWT tokens
-                access_token = str(AccessToken.for_user(user))
+                # Generate JWT tokens (same as login endpoint)
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
 
-                # Set the JWT token in an HTTP-only cookie
-                response_data = UserSerializer(user).data
+                # Prepare response data with access token (same as login endpoint)
+                response_data = {
+                    **UserSerializer(user).data,
+                    'access_token': access_token
+                }
+
                 response = Response(response_data, status=status.HTTP_201_CREATED)
+
+                # Set refresh token in HTTP-only cookie (same as login endpoint)
                 response.set_cookie(
-                    'jwt',
-                    access_token,
+                    settings.SIMPLE_JWT['REFRESH_COOKIE'],
+                    refresh_token,
                     httponly=True,
-                    secure=False,  # Set to True in production over HTTPS (use settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'])
-                    samesite='Lax', # Or settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
-                    path='/',
+                    secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+                    samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
+                    path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
                 )
                 # TODO: Implement email activation sending here if needed
                 return response
