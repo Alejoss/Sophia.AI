@@ -75,16 +75,19 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
+    "https://sophia-ai.algobeat.com",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:[0-9]+$",
     r"^http://127.0.0.1:[0-9]+$",
+    "https://sophia-ai.algobeat.com",
 ]
 
 # CSRF settings
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://sophia-ai.algobeat.com",
 ]
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read the CSRF cookie
