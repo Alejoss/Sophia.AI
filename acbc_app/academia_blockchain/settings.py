@@ -543,11 +543,17 @@ if ENVIRONMENT == "PRODUCTION":
     AWS_S3_USE_SSL = True
     AWS_S3_VERIFY = True
 
-    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
-    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    # STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+    # STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    # MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    # DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR + "/media/"
+    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+    STATIC_URL = "/static/"
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
     if SECRET_KEY == 'django-insecure-development-key-123':
         raise ValueError("Please set a proper SECRET_KEY in production!")
