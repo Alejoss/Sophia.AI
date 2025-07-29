@@ -8,7 +8,8 @@ services:
     volumes:
       - ./acbc_app:/app
       - static_volume:/app/static
-      - ./staticfiles:/app/staticfiles
+      - /var/www/sophia-ai/staticfiles:/app/staticfiles
+      - /var/www/sophia-ai/media:/app/media
     command: python manage.py runserver 0.0.0.0:8000
     env_file:
       - ./acbc_app/.env
@@ -32,7 +33,6 @@ services:
       - NODE_ENV=development
     networks:
       - app_network
-
   postgres:
     image: postgres
     env_file:
@@ -41,11 +41,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
-
 networks:
   app_network:
     driver: bridge
-
 volumes:
   postgres_data:
   static_volume:
