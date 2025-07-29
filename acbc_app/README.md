@@ -1,6 +1,10 @@
 # Sophia.AI
 A descentralized, blockchain-backed library that uses AI to interact with and to certify documents.
 
+**Test Server**
+https://sophia-ai.algobeat.com/
+https://sophia-ai-api.algobeat.com/
+ssh root@46.62.163.3
 
 **Installation**
 

@@ -11,20 +11,21 @@ def upload_knowledge_path_image(instance, filename):
     # Generate path: knowledge_path_images/path_<id>_<filename>
     import os
     name, ext = os.path.splitext(filename)
-    
+
     # Truncate filename if it's too long (keep it reasonable)
     max_name_length = 80  # Increased limit since we increased max_length to 255
-    
+
     if len(name) > max_name_length:
         name = name[:max_name_length]
-    
+
     safe_filename = f"{name}{ext}"
-    
+
     if hasattr(instance, 'id') and instance.id:
         return f"knowledge_path_images/path_{instance.id}_{safe_filename}"
     else:
         # For new instances, use a temporary path
         return f"knowledge_path_images/temp_{safe_filename}"
+
 
 class KnowledgePath(models.Model):
     title = models.CharField(max_length=200)
@@ -33,8 +34,8 @@ class KnowledgePath(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     image = models.ImageField(
-        upload_to=upload_knowledge_path_image, 
-        null=True, 
+        upload_to=upload_knowledge_path_image,
+        null=True,
         blank=True,
         max_length=255,  # Increase max length to handle longer filenames
         help_text="Cover image for the knowledge path"
@@ -82,25 +83,25 @@ class KnowledgePath(models.Model):
         if self.image and 'temp_' in str(self.image):
             import os
             from django.core.files.storage import default_storage
-            
+
             # Get the current temporary path
             temp_path = str(self.image)
-            
+
             # Create the new path with the actual ID
             filename = os.path.basename(temp_path)
             if filename.startswith('temp_'):
                 filename = filename[5:]  # Remove 'temp_' prefix
-            
+
             new_path = f"knowledge_path_images/path_{self.id}_{filename}"
-            
+
             # Move the file to the new location
             if default_storage.exists(temp_path):
                 with default_storage.open(temp_path, 'rb') as source:
                     self.image.save(new_path, source, save=False)
-                
+
                 # Delete the temporary file
                 default_storage.delete(temp_path)
-        
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -116,6 +117,7 @@ class KnowledgePath(models.Model):
         if self.image:
             self.image.delete()
         super().delete(*args, **kwargs)
+
 
 class Node(models.Model):
     MEDIA_TYPES = [
