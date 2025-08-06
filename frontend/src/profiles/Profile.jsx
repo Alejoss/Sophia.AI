@@ -178,7 +178,24 @@ const Profile = () => {
     const renderSectionContent = () => {
         switch (activeSection) {
             case 'publications':
-                return <PublicationList isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
+                return (
+                    <Box>
+                        {isOwnProfile && (
+                            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button
+                                    component={Link}
+                                    to="/publications/create"
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<EditIcon />}
+                                >
+                                    Create Publication
+                                </Button>
+                            </Box>
+                        )}
+                        <PublicationList isOwnProfile={isOwnProfile} userId={profile?.user?.id} />
+                    </Box>
+                );
             case 'notifications':
                 if (isOwnProfile) {
                     const unreadCount = notifications.filter(n => n.unread).length;
