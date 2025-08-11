@@ -62,7 +62,7 @@ jobs:
         echo "DEBUG=True" >> $GITHUB_ENV
         echo "CI=True" >> $GITHUB_ENV
         echo "ENVIRONMENT=CI" >> $GITHUB_ENV
-        echo "DJANGO_SETTINGS_MODULE=acbc_app.settings" >> $GITHUB_ENV
+        echo "DJANGO_SETTINGS_MODULE=academia_blockchain.settings" >> $GITHUB_ENV
 
     - name: Install PostgreSQL client
       run: |
