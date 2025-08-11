@@ -61,6 +61,10 @@ jobs:
         echo "VITE_API_URL=http://localhost:8000" >> $GITHUB_ENV
         echo "DEBUG=True" >> $GITHUB_ENV
 
+    - name: Create logs directory
+      run: |
+        mkdir -p acbc_app/logs
+
     - name: Run Django migrations
       run: |
         cd acbc_app
