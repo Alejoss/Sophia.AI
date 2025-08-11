@@ -53,18 +53,49 @@ jobs:
       run: |
         echo "ACADEMIA_BLOCKCHAIN_SKEY=test-secret-key-for-ci" >> $GITHUB_ENV
         echo "POSTGRES_PASSWORD=any_password" >> $GITHUB_ENV
-        echo "POSTGRES_DB=ACADEMIA_BLOCKCHAIN_DB" >> $GITHUB_ENV
+        echo "DB_NAME=ACADEMIA_BLOCKCHAIN_DB" >> $GITHUB_ENV
         echo "POSTGRES_USER=postgres" >> $GITHUB_ENV
-        echo "POSTGRES_HOST=localhost" >> $GITHUB_ENV
+        echo "DB_HOST=localhost" >> $GITHUB_ENV
         echo "POSTGRES_PORT=5432" >> $GITHUB_ENV
         echo "GOOGLE_OAUTH_CLIENT_ID=647602001183-2u5t54maog49bc53tf8hkltmv5hhb07s.apps.googleusercontent.com" >> $GITHUB_ENV
         echo "VITE_API_URL=http://localhost:8000" >> $GITHUB_ENV
         echo "DEBUG=True" >> $GITHUB_ENV
         echo "CI=True" >> $GITHUB_ENV
+        echo "ENVIRONMENT=CI" >> $GITHUB_ENV
+
+    - name: Install PostgreSQL client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
 
     - name: Create logs directory
       run: |
         mkdir -p acbc_app/logs
+
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        echo "PostgreSQL is ready!"
+
+    - name: Test database connection
+      run: |
+        cd acbc_app
+        python -c "
+        import os
+        print('Environment variables:')
+        for key in ['DB_HOST', 'POSTGRES_PORT', 'DB_NAME', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'ENVIRONMENT']:
+            print(f'{key}: {os.environ.get(key)}')
+
+        # Test if we can import Django settings
+        import django
+        from django.conf import settings
+        django.setup()
+        print('Django database config:')
+        print(settings.DATABASES)
+        "
 
     - name: Run Django migrations
       run: |
