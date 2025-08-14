@@ -11,6 +11,14 @@ from datetime import timedelta
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure logs directory exists even when /app is volume-mounted
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+try:
+    os.makedirs(LOGS_DIR, exist_ok=True)
+except Exception:
+    # Fallback to tmp if repo mount prevents creating /app/logs
+    LOGS_DIR = "/tmp/academia_blockchain_logs"
+    os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
@@ -195,14 +203,14 @@ if ENVIRONMENT == "PRODUCTION":
             },
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(BASE_DIR, "logs", "academia_blockchain.log"),
+                "filename": os.path.join(LOGS_DIR, "academia_blockchain.log"),
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5,
                 "formatter": "verbose",
             },
             "error_file": {
                 "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(BASE_DIR, "logs", "errors.log"),
+                "filename": os.path.join(LOGS_DIR, "errors.log"),
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5,
                 "formatter": "verbose",
@@ -333,7 +341,7 @@ else:
             },
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(BASE_DIR, "logs", "academia_blockchain.log"),
+                "filename": os.path.join(LOGS_DIR, "academia_blockchain.log"),
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 3,
                 "formatter": "verbose",
