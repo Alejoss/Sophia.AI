@@ -21,13 +21,19 @@ const KnowledgePathList = () => {
         const data = await knowledgePathsApi.getKnowledgePaths(currentPage);
         console.log('API Response:', data);
         console.log('Knowledge Paths:', data.results);
-        setKnowledgePaths(data.results);
-        setTotalPages(Math.ceil(data.count / 9));
+        
+        // Safety check: ensure data.results is always an array
+        const results = Array.isArray(data.results) ? data.results : [];
+        setKnowledgePaths(results);
+        
+        setTotalPages(Math.ceil((data.count || 0) / 9));
         setHasNext(!!data.next);
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths:', err);
         setError('Failed to load knowledge paths');
+        // Set empty array on error to prevent map error
+        setKnowledgePaths([]);
       } finally {
         setLoading(false);
       }
@@ -67,7 +73,7 @@ const KnowledgePathList = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-        {knowledgePaths.map((path) => {
+        {(knowledgePaths || []).map((path) => {
           console.log('=== KnowledgePathList: VoteComponent props ===');
           console.log('VoteComponent props:', {
             type: 'knowledge_path',
