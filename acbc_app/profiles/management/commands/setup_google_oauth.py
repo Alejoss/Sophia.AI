@@ -1,3 +1,4 @@
+import os
 from django.core.management.base import BaseCommand
 from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
@@ -17,21 +18,42 @@ class Command(BaseCommand):
             }
         )
         
+        # Check if Google OAuth environment variables are set
+        client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+        secret_key = os.environ.get('GOOGLE_OAUTH_SECRET_KEY')
+        
+        if not client_id or not secret_key:
+            self.stdout.write(
+                self.style.WARNING(
+                    'Google OAuth environment variables are not set. '
+                    'Skipping Google OAuth setup.\n'
+                    'To enable Google OAuth, set the following environment variables:\n'
+                    '- GOOGLE_OAUTH_CLIENT_ID\n'
+                    '- GOOGLE_OAUTH_SECRET_KEY\n'
+                    'Or create a .env file in the acbc_app directory with these variables.'
+                )
+            )
+            return
+        
         # Get or create the Google social app
         app, created = SocialApp.objects.get_or_create(
             provider=GoogleProvider.id,
             defaults={
                 'name': 'Google OAuth2',
-                'client_id': settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id'],
-                'secret': settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['secret'],
-                'key': settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['key']
+                'client_id': client_id,
+                'secret': secret_key,
+                'key': ''
             }
         )
         
-        # Add the site to the app's sites
-        app.sites.add(site)
-        
-        if created:
-            self.stdout.write(self.style.SUCCESS('Successfully created Google OAuth application'))
+        # Update existing app if credentials changed
+        if not created:
+            app.client_id = client_id
+            app.secret = secret_key
+            app.save()
+            self.stdout.write(self.style.SUCCESS('Updated existing Google OAuth application'))
         else:
-            self.stdout.write(self.style.SUCCESS('Google OAuth application already exists')) 
+            self.stdout.write(self.style.SUCCESS('Successfully created Google OAuth application'))
+        
+        # Add the site to the app's sites
+        app.sites.add(site) 

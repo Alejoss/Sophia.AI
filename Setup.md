@@ -26,9 +26,9 @@ docker --version
 docker-compose --version
 ```
 
-## Step 3: Create Environment Files (Optional)
+## Step 3: Create Environment Files
 
-The Docker Compose configuration now includes default environment variables, so you can skip this step for basic setup. However, if you want to customize settings or add Google OAuth, create the following files:
+The Docker Compose configuration includes default environment variables for basic functionality. However, you'll need to create environment files if you want to use Google OAuth or customize settings.
 
 ### Frontend Environment File (Required for Google OAuth)
 
@@ -49,9 +49,9 @@ VITE_API_URL=http://localhost:8000
 VITE_GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 ```
 
-### Backend Environment File (Optional - for custom settings)
+### Backend Environment File (Required for Google OAuth)
 
-If you need to customize database settings or add Google OAuth, create a `.env` file in the `acbc_app` directory:
+Create a `.env` file in the `acbc_app` directory for Google OAuth credentials:
 
 ```bash
 # Create the file
@@ -61,7 +61,7 @@ touch acbc_app/.env
 Add the following content to `acbc_app/.env`:
 
 ```env
-# Google OAuth (optional - only if you want social login)
+# Google OAuth (required for social login)
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_SECRET_KEY=your-google-oauth-secret-key
 
@@ -70,7 +70,9 @@ GOOGLE_OAUTH_SECRET_KEY=your-google-oauth-secret-key
 # ENVIRONMENT=development
 ```
 
-**Note**: The database configuration is now handled directly in the Docker Compose file, so you don't need to specify database credentials in the `.env` file.
+**Note**: 
+- The database configuration is handled directly in the Docker Compose file, so you don't need to specify database credentials in the `.env` file.
+- The `.env` file should be added to `.gitignore` to keep your credentials secure.
 
 ## Step 4: Build and Start Containers
 
@@ -98,17 +100,20 @@ Once the containers are running, execute the following commands:
 
 ```bash
 # Run Django migrations
-docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
 ```
 
-## Step 6: Setup Google OAuth (Required)
+## Step 6: Setup Google OAuth (Optional)
 
 Set up Google OAuth for social login functionality:
 
 ```bash
 docker-compose exec backend python manage.py setup_google_oauth
 ```
+
+**Note**: 
+- This step is optional. If you don't have Google OAuth credentials, the command will show a warning and skip the setup. You can still use the application with regular username/password authentication.
+- If you want to use Google OAuth, make sure you've created the `.env` file in the `acbc_app` directory with your Google OAuth credentials.
 
 ## Step 7: Create Admin User (Optional)
 
@@ -175,6 +180,10 @@ Once everything is set up, you can access:
 4. **Port Already in Use**
    - Stop other services using ports 8000 or 5173
    - Or modify the ports in `docker-compose.yml`
+
+5. **Docker Compose Version Warning**
+   - The warning about `version` being obsolete is harmless
+   - You can ignore it or remove the `version: '3.8'` line from `docker-compose.yml`
 
 ### Useful Commands
 
