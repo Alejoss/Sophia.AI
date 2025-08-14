@@ -165,7 +165,7 @@ Once everything is set up, you can access:
    - Verify PostgreSQL container is running: `docker-compose ps`
    - Check logs: `docker-compose logs postgres`
    - If you have a custom `.env` file, make sure database credentials match
-   - Run the debug script: `docker-compose exec backend python debug_db.py`
+   - Test database connection manually (see troubleshooting commands below)
 
 3. **Missing Logs Directory**
    ```bash
@@ -179,6 +179,9 @@ Once everything is set up, you can access:
 ### Useful Commands
 
 ```bash
+# Check if all containers are running
+docker-compose ps
+
 # View logs
 docker-compose logs -f backend
 docker-compose logs -f frontend
@@ -200,7 +203,31 @@ docker-compose exec postgres bash
 
 # Run tests
 docker-compose exec backend python manage.py test -v 2
-```
+
+# Database troubleshooting commands
+# Connect to PostgreSQL container
+docker-compose exec postgres bash
+
+# Inside PostgreSQL container, connect to psql
+psql -U postgres
+
+# List databases
+\l
+
+# Create database if it doesn't exist
+CREATE DATABASE acbc_db;
+
+# Create user if needed
+CREATE USER postgres WITH PASSWORD 'postgres';
+
+# Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE acbc_db TO postgres;
+
+# Test connection from backend container
+docker-compose exec backend psql -h postgres -U postgres -d acbc_db
+
+# Check PostgreSQL logs
+docker-compose logs postgres | grep -i "password\|authentication\|error"
 
 ## Google OAuth Setup
 

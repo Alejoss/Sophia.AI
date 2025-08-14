@@ -28,6 +28,9 @@ ALLOWED_HOSTS = ["*"]
 DEBUG = True
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
 
+# Debug: Print environment setting
+print(f"=== DEBUG: ENVIRONMENT = {ENVIRONMENT} ===")
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -573,6 +576,15 @@ if ENVIRONMENT == "PRODUCTION":
         raise ValueError("Please set a proper SECRET_KEY in production!")
 
 else:
+    # Debug: Print environment variables
+    print("=== DEBUG: Environment Variables ===")
+    print(f"DB_NAME: {os.getenv('DB_NAME', 'NOT SET')}")
+    print(f"DB_USER: {os.getenv('DB_USER', 'NOT SET')}")
+    print(f"DB_PASSWORD: {os.getenv('DB_PASSWORD', 'NOT SET')}")
+    print(f"DB_HOST: {os.getenv('DB_HOST', 'NOT SET')}")
+    print(f"POSTGRES_USER: {os.getenv('POSTGRES_USER', 'NOT SET')}")
+    print(f"POSTGRES_PASSWORD: {os.getenv('POSTGRES_PASSWORD', 'NOT SET')}")
+    print("=====================================")
 
     DATABASES = {
         "default": {
@@ -584,6 +596,11 @@ else:
             "PORT": "5432",
         }
     }
+    
+    # Debug: Print final database configuration
+    print("=== DEBUG: Database Configuration ===")
+    print(f"DATABASES['default']: {DATABASES['default']}")
+    print("=====================================")
 
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR + "/media/"

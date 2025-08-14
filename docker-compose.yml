@@ -20,6 +20,7 @@ services:
       - DEBUG=True
       - SECRET_KEY=django-insecure-development-key-123
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - ENVIRONMENT=DEVELOPMENT
       # Add these to match Django settings expectations
       - POSTGRES_DB=acbc_db
       - POSTGRES_USER=postgres
