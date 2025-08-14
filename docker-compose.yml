@@ -11,8 +11,15 @@ services:
       - /var/www/sophia-ai/staticfiles:/app/staticfiles
       - /var/www/sophia-ai/media:/app/media
     command: python manage.py runserver 0.0.0.0:8000
-    env_file:
-      - ./acbc_app/.env
+    environment:
+      - DB_NAME=acbc_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-development-key-123
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     ports:
       - "8000:8000"
     depends_on:
@@ -35,8 +42,10 @@ services:
       - app_network
   postgres:
     image: postgres
-    env_file:
-      - ./acbc_app/.env
+    environment:
+      - POSTGRES_DB=acbc_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
