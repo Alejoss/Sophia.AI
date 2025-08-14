@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   backend:
     build:
@@ -9,14 +10,13 @@ services:
       - static_volume:/app/static
       - /var/www/sophia-ai/staticfiles:/app/staticfiles
       - /var/www/sophia-ai/media:/app/media
-    command: bash -lc "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: python manage.py runserver 0.0.0.0:8000
     env_file:
       - ./acbc_app/.env
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     networks:
       - app_network
   frontend:
@@ -31,7 +31,6 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://backend:8000
     networks:
       - app_network
   postgres:
@@ -40,11 +39,6 @@ services:
       - ./acbc_app/.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
     networks:
       - app_network
 networks:
