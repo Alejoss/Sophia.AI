@@ -759,7 +759,10 @@ class CommentView(APIView):
                 'user_id': request.user.id,
                 'comment_id': pk,
             })
-            raise
+            return Response(
+                {'error': 'Comment not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             log_error(e, "Error deleting comment", request.user.id, {
                 'comment_id': pk,

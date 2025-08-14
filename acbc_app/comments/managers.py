@@ -11,7 +11,7 @@ class CommentManager(models.Manager):
         """Logically delete a comment and all its replies by setting is_active to False."""
         logger.info("Starting logical delete for comment", extra={
             'comment_id': comment.id,
-            'user_id': comment.user.id,
+            'user_id': comment.author.id,
         })
         
         # Recursively delete replies

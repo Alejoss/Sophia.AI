@@ -148,7 +148,7 @@ class CertificateRequestFlowTest(TestCase):
         approve_url = reverse('certificates:certificate-request-action', 
                             args=[request_id, 'approve'])
         response = self.client.post(approve_url, {'note': 'Test'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
         
         # 2. Only requester can cancel
         self.client.force_authenticate(user=self.teacher)

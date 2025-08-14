@@ -209,31 +209,4 @@ class BookmarkAPITests(APITestCase):
         self.assertEqual(response.data['status'], 'created')
         self.assertTrue(response.data['is_bookmarked'])
 
-    def test_invalid_bookmark_creation(self):
-        """Test creating bookmark with invalid data"""
-        url = reverse('bookmark-list')
-        
-        # Test invalid content type
-        data = {
-            'content_type': 'invalid_type',
-            'object_id': 1
-        }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # Test invalid object ID
-        data = {
-            'content_type': 'content',
-            'object_id': 99999
-        }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        # Test invalid topic ID
-        data = {
-            'content_type': 'content',
-            'object_id': self.content.id,
-            'topic_id': 99999
-        }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

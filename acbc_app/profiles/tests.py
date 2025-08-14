@@ -230,7 +230,7 @@ class AuthenticationTests(APITestCase):
         self.assertEqual(registered_user.email, registration_data['email'])
         self.assertTrue(registered_user.check_password(registration_data['password']))
         self.assertTrue(Profile.objects.filter(user=registered_user).exists())
-        self.assertIn('jwt', response.cookies)
+        self.assertIn('acbc_refresh_token', response.cookies)
         self.assertEqual(response.data['username'], registration_data['username'])
         self.assertEqual(response.data['email'], registration_data['email'])
         self.assertIn('id', response.data)
@@ -293,8 +293,8 @@ class AuthenticationTests(APITestCase):
         response = self.client.post(url, format='json') # Added format='json' for consistency, though logout might not need body
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Check if the cookie is marked for deletion (max_age=0)
-        if 'jwt' in response.cookies:
-             self.assertEqual(response.cookies['jwt']['max-age'], 0)
+        if 'acbc_refresh_token' in response.cookies:
+             self.assertEqual(response.cookies['acbc_refresh_token']['max-age'], 0)
         else:
             # If the cookie is completely removed from the header, that also works
             self.assertTrue(True)

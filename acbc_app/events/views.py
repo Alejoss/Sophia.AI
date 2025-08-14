@@ -87,6 +87,12 @@ class EventDetail(APIView):
             
             logger.debug(f"Event detail retrieved successfully - Event: {event.title}, Owner: {event.owner.username}")
             return Response(serializer.data)
+        except Event.DoesNotExist:
+            logger.warning(f"Event not found - Event ID: {pk}")
+            return Response(
+                {'error': 'Event not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             logger.error(f"Error retrieving event detail for event {pk}: {str(e)}", exc_info=True)
             return Response(

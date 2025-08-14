@@ -66,10 +66,26 @@ class BookmarkCreateSerializer(serializers.Serializer):
         except ContentType.DoesNotExist:
             raise serializers.ValidationError(f"Content type '{value}' does not exist")
     
+    def validate_object_id(self, value):
+        # This validation will be done in create method, but we need to ensure it's a positive integer
+        if value <= 0:
+            raise serializers.ValidationError("Object ID must be a positive integer")
+        return value
+    
+    def validate_topic_id(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Topic ID must be a positive integer")
+        return value
+    
     def create(self, validated_data):
         user = self.context['request'].user
-        content_type = ContentType.objects.get(model=validated_data['content_type'])
-        model_class = content_type.model_class()
+        
+        # Get the content type (already validated)
+        try:
+            content_type = ContentType.objects.get(model=validated_data['content_type'])
+            model_class = content_type.model_class()
+        except ContentType.DoesNotExist:
+            raise serializers.ValidationError(f"Content type '{validated_data['content_type']}' does not exist")
         
         try:
             obj = model_class.objects.get(id=validated_data['object_id'])

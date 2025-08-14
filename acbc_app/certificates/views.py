@@ -245,7 +245,7 @@ class CertificateRequestActionView(APIView):
                     )
                 
                 # Create a new certificate template with the note
-                note = request.data.get('note', '')
+                note = request.data.get('note', '') if request.data else ''
                 if certificate_request.knowledge_path:
                     template = CertificateTemplate.objects.create(
                         title=f"Certificate for {certificate_request.knowledge_path.title}",
