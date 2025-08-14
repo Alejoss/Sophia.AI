@@ -153,7 +153,7 @@ Once everything is set up, you can access:
 
 ### Common Issues
 
-1. **Permission Denied Error (Frontend)**
+1. **Clean up after error**
    ```bash
    # Clean up volumes and rebuild
    docker-compose down -v
@@ -165,6 +165,7 @@ Once everything is set up, you can access:
    - Verify PostgreSQL container is running: `docker-compose ps`
    - Check logs: `docker-compose logs postgres`
    - If you have a custom `.env` file, make sure database credentials match
+   - Run the debug script: `docker-compose exec backend python debug_db.py`
 
 3. **Missing Logs Directory**
    ```bash
