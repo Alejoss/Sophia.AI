@@ -17,6 +17,9 @@ RUN pip install -r requirements.txt
 # Copy project files into the Docker image
 COPY . /app
 
+# Create logs directory
+RUN mkdir -p /app/logs
+
 # Set Python path
 ENV PYTHONPATH=/app
 

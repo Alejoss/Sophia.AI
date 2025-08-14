@@ -34,6 +34,10 @@ docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
 docker-compose exec backend python manage.py setup_google_oauth
 
+*Troubleshooting: If you get a logging error about missing logs directory, run:*
+
+docker-compose exec backend mkdir -p /app/logs
+
 *Optionally create a superuser:*
 
 docker-compose exec backend python manage.py create_admin
