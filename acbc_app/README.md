@@ -38,17 +38,36 @@ docker-compose exec backend python manage.py setup_google_oauth
 
 docker-compose exec backend python manage.py create_admin
 
-*Load fixtures or use the populate command*
-
-docker-compose exec backend python manage.py load_fixtures
-docker-compose exec backend python manage.py populate_test_data --clear  # limpia la base de datos
-docker-compose exec backend python manage.py populate_test_data --skip-existing  # crea nuevos objetos aún si existen
-docker-compose exec backend python manage.py ensure_topic_content  # mas contenido por tema
-docker-compose exec backend python manage.py check_duplicate_votecounts
+*Populate the Database*
 
 *Load the libraries database with initial test data*
 
 docker-compose exec backend python manage.py load_libraries
+
+*Populate the database with test data in the correct order:*
+
+# 1. Create admin user (optional)
+docker-compose exec backend python manage.py create_admin
+
+# 2. Setup Google OAuth (required for social login)
+docker-compose exec backend python manage.py setup_google_oauth
+
+# 3. Populate cryptocurrencies (required for user profiles)
+docker-compose exec backend python manage.py populate_cryptocurrencies
+
+# 4. Populate users and profiles (foundation for everything else)
+docker-compose exec backend python manage.py populate_users
+
+# 5. Populate content, topics, libraries, publications, and events
+docker-compose exec backend python manage.py populate_content
+
+# 6. Populate knowledge paths, nodes, and quizzes
+docker-compose exec backend python manage.py populate_knowledge_paths
+
+# 7. Populate user interactions (comments, votes, bookmarks)
+docker-compose exec backend python manage.py populate_interactions
+
+*Note: Run these commands in order as they have dependencies on each other. You can add --clear flag to any command to clear existing data before populating, or --skip-existing to skip objects that already exist.*
 
 *To run the django tests in the docker container run*
 
