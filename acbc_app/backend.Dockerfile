@@ -1,9 +1,12 @@
-### Build and install packages
-FROM python:3.12
+### Use stable Python base on Debian Bookworm
+FROM python:3.12-slim-bookworm
 
 # Update and install system dependencies
 RUN apt-get update -y \
-  && apt-get install -y gettext libpq-dev postgresql-client \
+  && apt-get install -y --no-install-recommends \
+     gettext \
+     libpq-dev \
+     postgresql-client \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -12,7 +15,7 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt /app/
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files into the Docker image
 COPY . /app

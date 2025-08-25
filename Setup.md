@@ -43,7 +43,7 @@ Add the following content to `frontend/.env`:
 
 ```env
 # API Configuration
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8000/api
 
 # Google OAuth (optional - only if you want social login)
 VITE_GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
