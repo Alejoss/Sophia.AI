@@ -14,7 +14,6 @@ CONFIG = {
     'knowledge_paths': {
         'paths_per_user': 2,
         'nodes_per_path': 5,
-        'is_visible_probability': 0.7,  # 70% chance of being visible
     },
     'quizzes': {
         'questions_per_quiz': (3, 6),  # (min, max)
@@ -27,11 +26,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true', help='Clear existing knowledge paths data before populating')
+        parser.add_argument('--delete-existing', action='store_true', help='Delete existing knowledge paths before populating')
         parser.add_argument('--skip-existing', action='store_true', dest='skip_existing', help='Skip creation of objects that already exist')
 
     def handle(self, *args, **options):
         if options['clear']:
             self.clear_database()
+        elif options['delete_existing']:
+            self.delete_existing_knowledge_paths()
         
         self.stdout.write('Starting knowledge paths population...')
         self.skip_existing = options.get('skip_existing', False)
@@ -61,6 +63,19 @@ class Command(BaseCommand):
         
         self.stdout.write('Knowledge paths data cleared successfully')
 
+    def delete_existing_knowledge_paths(self):
+        """Delete existing knowledge paths only (preserves other data)"""
+        self.stdout.write('Deleting existing knowledge paths...')
+        
+        # Delete in reverse order of dependencies
+        Option.objects.all().delete()
+        Question.objects.all().delete()
+        Quiz.objects.all().delete()
+        Node.objects.all().delete()
+        KnowledgePath.objects.all().delete()
+        
+        self.stdout.write('Existing knowledge paths deleted successfully')
+
     def create_knowledge_paths_for_user(self, user):
         """Create knowledge paths for a specific user"""
         for path_num in range(CONFIG['knowledge_paths']['paths_per_user']):
@@ -76,11 +91,16 @@ class Command(BaseCommand):
                     title=title,
                     description=fake.text(max_nb_chars=1000),
                     author=user,
-                    is_visible=True  # Always visible
+                    is_visible=False  # Start as invisible, will be set to visible after nodes are created
                 )
                 
                 # Create nodes for the path
                 nodes = self.create_nodes_for_path(path)
+                
+                # Set visibility to True after nodes are created (since we have at least 2 nodes)
+                if len(nodes) >= 2:
+                    path.is_visible = True
+                    path.save(update_fields=['is_visible'])
                 
                 # Create quizzes (one at the end, one in the middle)
                 self.create_quizzes_for_path(path, nodes)
