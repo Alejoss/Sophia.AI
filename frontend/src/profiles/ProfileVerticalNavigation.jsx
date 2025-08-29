@@ -112,10 +112,10 @@ const ProfileVerticalNavigation = ({
                   sx={{
                     borderRadius: 1,
                     mx: 1,
-                    backgroundColor: isItemActive ? 'primary.light' : 'transparent',
-                    color: isItemActive ? 'primary.main' : 'text.primary',
+                    backgroundColor: isItemActive ? 'primary.light text-white' : 'transparent',
+                    color: isItemActive ? 'text-white' : 'text-white',
                     '&:hover': {
-                      backgroundColor: isItemActive ? 'primary.light' : 'action.hover',
+                      backgroundColor: isItemActive ? 'text-white' : 'action.hover',
                     },
                     '&.Mui-selected': {
                       backgroundColor: 'primary.light',

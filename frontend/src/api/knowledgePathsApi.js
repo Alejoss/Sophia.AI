@@ -121,6 +121,7 @@ const knowledgePathsApi = {
                     page_size: pageSize
                 }
             });
+
             return response.data;
         } catch (error) {
             console.error('Error fetching knowledge paths:', error);

@@ -57,8 +57,8 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
+      <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
+        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">
           Knowledge Paths by {authorName}
         </h1>
       </div>

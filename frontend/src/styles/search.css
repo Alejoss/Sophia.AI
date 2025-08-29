@@ -26,6 +26,7 @@
   font-size: 1rem;
   border: 2px solid #ddd;
   border-radius: 4px;
+  color: #333;
   transition: border-color 0.3s ease;
 }
 
@@ -51,20 +52,24 @@
 
 .search-filters {
   display: flex;
-  gap: 1.5rem;
+  gap: 2rem;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 2rem;
 }
 
 .search-filters label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 10px;
   cursor: pointer;
+  color: #0056b3;
+  font-size: 16px;
 }
 
 .search-filters input[type="radio"] {
   margin: 0;
+  width: 20px;
+  height: 20px;
 }
 
 .results-summary {
@@ -223,4 +228,32 @@
 .pagination-info {
   color: #666;
   font-size: 0.9rem;
-} 
+}
+
+@media screen and (max-width: 768px) {
+  .search-container {
+    padding: 0rem !important;
+  }
+
+  .search-filters {
+    flex-wrap: wrap;
+  }
+
+  .css-1tfhgxj {
+    padding-top: 30px !important;
+  }
+
+  .search-container h1 {
+    font-size: 36px;
+  }
+
+  .event-header {
+    flex-wrap: wrap;
+    flex-direction: column-reverse;
+    grid-gap: 20px;
+  }
+
+  .event-type {
+    margin-left: 0px !important;
+  }
+}

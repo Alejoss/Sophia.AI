@@ -1,10 +1,14 @@
-import {useState, useEffect, useContext} from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { apiLogin, checkAuth } from '../api/profilesApi.js';
-import { getUserFromLocalStorage, setUserInLocalStorage,
-  setAuthenticationStatus, isAuthenticated } from '../context/localStorageUtils.js';
-import SocialLogin from '../components/SocialLogin';
+import { useState, useEffect, useContext } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext.jsx";
+import { apiLogin, checkAuth } from "../api/profilesApi.js";
+import {
+  getUserFromLocalStorage,
+  setUserInLocalStorage,
+  setAuthenticationStatus,
+  isAuthenticated,
+} from "../context/localStorageUtils.js";
+import SocialLogin from "../components/SocialLogin";
 
 /**
  * Regular Login Component
@@ -13,15 +17,18 @@ import SocialLogin from '../components/SocialLogin';
 const Login = () => {
   const navigate = useNavigate();
   const { setAuthState, updateAuthState } = useContext(AuthContext);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
 
   useEffect(() => {
     // Log environment variables to verify they're accessible
-    console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID);
-    console.log('API URL:', import.meta.env.VITE_API_URL);
+    console.log(
+      "Google Client ID:",
+      import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID
+    );
+    console.log("API URL:", import.meta.env.VITE_API_URL);
 
     const storedUser = getUserFromLocalStorage();
     const localStorageAuth = isAuthenticated();
@@ -30,19 +37,19 @@ const Login = () => {
     checkAuth().then((backendAuthStatus) => {
       setBackendAuthStatus(backendAuthStatus);
       if (localStorageAuth && backendAuthStatus) {
-        console.log("User is already authenticated")
+        console.log("User is already authenticated");
       } else if (backendAuthStatus && !localStorageAuth) {
         setAuthenticationStatus(true);
         setAuthState({
           isAuthenticated: true,
-          user: storedUser
+          user: storedUser,
         });
       } else if (!backendAuthStatus && localStorageAuth) {
-        console.log("User is authenticated but backend is not")
+        console.log("User is authenticated but backend is not");
         setAuthenticationStatus(false);
         setAuthState({
           isAuthenticated: false,
-          user: storedUser
+          user: storedUser,
         });
       }
     });
@@ -54,23 +61,23 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting login form with:', { username, password });
+    console.log("Submitting login form with:", { username, password });
     try {
       const response = await apiLogin({ username, password });
-      console.log('Login API response:', response);
-      
+      console.log("Login API response:", response);
+
       if (response.data) {
         const { access_token, ...userData } = response.data;
         // Use centralized auth state update
         updateAuthState(userData, access_token);
-        navigate('/profiles/login_successful');
+        navigate("/profiles/login_successful");
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       const errorMessage =
         error.response?.data?.error ||
         error.response?.statusText ||
-        'Login failed: ' + error.message;
+        "Login failed: " + error.message;
       setError(errorMessage);
     }
   };
@@ -78,7 +85,8 @@ const Login = () => {
   if (backendAuthStatus) {
     return (
       <div>
-        <p>Already logged in as {username}, want to
+        <p>
+          Already logged in as {username}, want to
           <Link to="/profiles/logout"> logout?</Link>
         </p>
       </div>
@@ -86,32 +94,48 @@ const Login = () => {
   } else {
     return (
       <div className="login-container">
-        <form onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="username">Username:</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
+        <div className="login-wrapper">
+          <div className="order-m-2">
+            <img src="/images/login-img.png" alt="" />
           </div>
           <div>
-            <label htmlFor="password">Password:</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <h2 className="heading-2 text-center">Login</h2>
+            <form onSubmit={handleSubmit}>
+              <div className="mb-5">
+                <label className="form-label" htmlFor="username">
+                  Username:
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  className="form-control"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="mb-5">
+                <label htmlFor="password" className="form-label">
+                  Password:
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  className="form-control"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              {error && <div style={{ color: "red" }}>{error}</div>}
+              <button type="submit" className="btn-primary">
+                Login
+              </button>
+            </form>
+
+            <div className="social-login-section">
+              <p>Or continue with</p>
+              <SocialLogin />
+            </div>
           </div>
-          {error && <div style={{ color: 'red' }}>{error}</div>}
-          <button type="submit">Login</button>
-        </form>
-        
-        <div className="social-login-section">
-          <p>Or continue with</p>
-           <SocialLogin />
         </div>
       </div>
     );

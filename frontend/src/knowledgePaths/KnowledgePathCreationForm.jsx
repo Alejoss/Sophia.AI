@@ -52,7 +52,7 @@ const KnowledgePathCreationForm = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-white">Create Knowledge Path</h1>
+        <h1 className="md:!text-3xl !text-2xl font-bold mb-6 text-gray-900">Create Knowledge Path</h1>
         
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
@@ -140,7 +140,7 @@ const KnowledgePathCreationForm = () => {
             />
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex md:flex-nowrap flex-wrap gap-4">
             <button
               type="submit"
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline transition-colors"

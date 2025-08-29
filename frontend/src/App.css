@@ -40,3 +40,8 @@
 .read-the-docs {
   color: #888;
 }
+
+.login-wrapper{
+  display: grid;
+  grid-template-columns: 6fr 6fr;
+}

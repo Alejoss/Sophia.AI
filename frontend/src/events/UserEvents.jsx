@@ -156,7 +156,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         <div className="tab-content">
           {registrations.length === 0 ? (
             <div className="text-center">
-              <p>You're not registered for any events yet.</p>
+              <p className='mb-5'>You're not registered for any events yet.</p>
               <Link to="/events" className="btn btn-primary">
                 Browse Events
               </Link>

@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   backend:
     build:
@@ -47,6 +48,8 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true   # 👈 force file watching inside Docker
+    command: npm run dev -- --host 0.0.0.0   # 👈 run vite dev on 0.0.0.0
     networks:
       - app_network
 

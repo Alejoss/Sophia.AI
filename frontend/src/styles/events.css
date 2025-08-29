@@ -635,6 +635,7 @@
 .btn-secondary {
   background-color: #6c757d;
   color: white;
+  min-width: 200px;
 }
 
 .btn-secondary:hover {

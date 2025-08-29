@@ -350,7 +350,7 @@ const KnowledgePathDetail = () => {
                 {isCreator && (
                   <Link
                     to={`/knowledge_path/${pathId}/edit`}
-                    className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+                    className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
                   >
                     Edit Path
                   </Link>

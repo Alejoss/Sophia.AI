@@ -76,7 +76,7 @@ const NodeCreate = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-2">Add Content Node</h1>
+        <h1 className="text-2xl font-bold mb-2 !text-gray-900">Add Content Node</h1>
         <h2 className="text-gray-600 mb-6">
           to Knowledge Path: {knowledgePath?.title}
         </h2>
@@ -123,7 +123,7 @@ const NodeCreate = () => {
               />
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 md:flex-nowrap flex-wrap">
               <button
                 type="submit"
                 disabled={!formData.content_profile_id || submitting}

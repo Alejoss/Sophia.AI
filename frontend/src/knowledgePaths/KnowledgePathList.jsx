@@ -52,19 +52,19 @@ const KnowledgePathList = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Knowledge Paths</h1>
+      <div className="flex justify-between items-center mb-6 md:flex-nowrap flex-wrap">
+        <h1 className="md:!text-2xl !text-xl md:mb-0 mb-4 font-bold !text-gray-900">Knowledge Paths</h1>
         {authState.isAuthenticated && (
           <div className="flex gap-3">
             <Link 
               to="/profiles/my_profile?section=knowledge-paths"
-              className="bg-gray-500 hover:bg-gray-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              className="bg-gray-500 hover:bg-gray-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
             >
               My Knowledge Paths
             </Link>
             <Link 
               to="/knowledge_path/create"
-              className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
             >
               Create New Path
             </Link>

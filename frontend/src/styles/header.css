@@ -1,6 +1,7 @@
 .nav {
-  background-color: #333;
+  background-color: #fff;
   padding: 1rem;
+  box-shadow: 0 2px 4px rgba(6, 17, 118, .08), 0 4px 12px rgba(6, 17, 118, .08);
   width: 100%;
   position: fixed;
   top: 0;
@@ -16,7 +17,7 @@
   display: flex;
   justify-content: space-around;
   width: 100%;
-  max-width: 1200px; /* Limitar el ancho máximo para que no se estire demasiado en pantallas grandes */
+  max-width: 1200px;
   margin: 0;
   padding: 0;
 }
@@ -26,11 +27,47 @@
 }
 
 .nav-link {
-  color: white;
+  color: #2a2b3f;
   text-decoration: none;
-  font-size: 1.4rem;
+  font-size: 16px;
+  font-weight: normal;
+  padding: 5px 20px 7px;
+  border-radius: 10px;
+  display: block;
 }
 
 .nav-link:hover {
-  text-decoration: underline;
+  color: #6d28d2;
+  background-color: #6d28d21f;
+
+
+}
+
+@media screen and (max-width: 768px) {
+  .nav-link {
+    font-size: 10px;
+    padding: 5px 7px 7px;
+  }
+
+  .nav-item {
+    margin: 0;
+  }
+
+  .text-box h1 {
+    font-size: 28px !important;
+    line-height: 35px !important;
+    margin-bottom: 48px !important;
+  }
+
+  .login-wrapper img {
+    height: auto !important;
+  }
+
+  .order-m-2 {
+    order: 2;
+  }
+
+  .login-wrapper {
+    grid-template-columns: 6fr !important;
+  }
 }

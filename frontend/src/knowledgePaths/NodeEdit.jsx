@@ -101,7 +101,7 @@ const NodeEdit = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-2">Edit Content Node</h1>
+        <h1 className="text-2xl font-bold !text-gray-900 mb-2">Edit Content Node</h1>
         <h2 className="text-gray-600 mb-6">
           in Knowledge Path: {knowledgePath?.title}
         </h2>
@@ -151,7 +151,7 @@ const NodeEdit = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 md:flex-nowrap flex-wrap">
               <button
                 type="submit"
                 className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg"

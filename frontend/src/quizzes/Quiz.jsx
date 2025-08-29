@@ -177,7 +177,7 @@ const Quiz = () => {
     if (hasPerfectScore) {
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">Quiz Results</h2>
+          <h2 className="text-2xl font-bold  mb-4 text-gray-900">Quiz Results</h2>
           <div className="text-center p-6 bg-green-50 rounded-lg mb-6 border border-green-300">
             <p className="text-4xl font-bold text-green-600 mb-2">
               Score: 100%
@@ -389,7 +389,7 @@ const Quiz = () => {
             </div>
           </div>
         ))}
-        <div className="mt-6 flex gap-4">
+        <div className="mt-6 md:flex-nowrap flex-wrap flex gap-4">
           <button
             type="submit"
             className={`font-bold py-2 px-4 rounded ${

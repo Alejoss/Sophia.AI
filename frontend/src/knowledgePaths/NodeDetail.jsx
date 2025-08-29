@@ -175,7 +175,7 @@ const NodeDetail = () => {
 
         {/* Node Content */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h1 className="text-2xl font-bold mb-4">{node.title}</h1>
+          <h1 className="text-2xl font-bold !text-gray-900 mb-4">{node.title}</h1>
           
           {/* Content Display */}
           <div className="mb-6">
@@ -226,7 +226,7 @@ const NodeDetail = () => {
           )}
 
           {/* Action Buttons */}
-          <div className="mt-6 flex gap-4">
+          <div className="mt-6 md:flex-nowrap flex-wrap flex gap-4">
             {prevNode && (
               <button
                 onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}`)}

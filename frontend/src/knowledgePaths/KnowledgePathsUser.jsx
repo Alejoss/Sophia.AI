@@ -87,11 +87,11 @@ const KnowledgePathsUser = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Knowledge Paths</h1>
+      <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
+        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">My Knowledge Paths</h1>
         <Link 
           to="/knowledge_path/create"
-          className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+          className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
         >
           Create New Path
         </Link>
@@ -207,7 +207,7 @@ const KnowledgePathsUser = () => {
               <p className="text-gray-500 mb-6">Start creating your first knowledge path to organize and share your learning journey.</p>
               <Link 
                 to="/knowledge_path/create"
-                className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
+                className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 Create Your First Path
               </Link>
@@ -306,11 +306,11 @@ const KnowledgePathsUser = () => {
           {/* No Engaged Knowledge Paths Message */}
           {engagedPaths.length === 0 && (
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">No engaged knowledge paths yet</h3>
+              <h3 className="text-xl font-semibold !text-gray-600 mb-4">No engaged knowledge paths yet</h3>
               <p className="text-gray-500 mb-6">Start exploring knowledge paths created by other users to begin your learning journey.</p>
               <Link 
                 to="/knowledge_path"
-                className="bg-blue-500 hover:bg-blue-700 text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
+                className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 Browse Knowledge Paths
               </Link>

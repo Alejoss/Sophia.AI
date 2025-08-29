@@ -85,11 +85,6 @@ class Command(BaseCommand):
                 # Create quizzes (one at the end, one in the middle)
                 self.create_quizzes_for_path(path, nodes)
                 
-                # Ensure the path is visible after all nodes are created
-                if len(nodes) >= 2:
-                    path.is_visible = True
-                    path.save(update_fields=['is_visible'])
-                
                 self.stdout.write(f'Created knowledge path: {path.title} with {len(nodes)} nodes')
             except IntegrityError:
                 self.stdout.write(self.style.WARNING(f'Failed to create knowledge path: {title}'))
