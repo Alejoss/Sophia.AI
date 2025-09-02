@@ -39,7 +39,17 @@ const TopicCreationForm = () => {
     return (
         <Box sx={{ pt: 12, px: 3, maxWidth: 600, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
-                <Typography variant="h4" gutterBottom>
+           <Typography
+  variant="h4"
+  gutterBottom
+  sx={{
+    fontSize: {
+      xs: "1.25rem", // ~20px on mobile
+      sm: "1.5rem",  // ~24px on small screens
+      md: "2rem",    // ~32px on medium+
+    },
+  }}
+>
                     Create New Topic
                 </Typography>
 

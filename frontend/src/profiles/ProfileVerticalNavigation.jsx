@@ -1,4 +1,6 @@
-import React from 'react';
+
+import React, { useState } from "react";
+
 import {
   Box,
   List,
@@ -24,6 +26,7 @@ import {
 } from '@mui/icons-material';
 
 const ProfileVerticalNavigation = ({ 
+  
   isOwnProfile = false, 
   userId = null,
   activeSection = 'publications',
@@ -34,7 +37,7 @@ const ProfileVerticalNavigation = ({
   const handleSectionClick = (section) => {
     onSectionChange(null, section);
   };
-
+const [isOpen, setIsOpen] = useState(false);
   // Define menu items - Events visible to both owners and visitors
   const getMenuItems = () => {
     const baseItems = [
@@ -79,7 +82,10 @@ const ProfileVerticalNavigation = ({
     <Paper 
       elevation={1} 
       sx={{ 
-        width: 280, 
+        width: {
+      xs: "100%", // full width on mobile
+      md: 280,    // fixed 280px on md+
+    },
         minHeight: 'fit-content',
         backgroundColor: 'background.paper',
         ...sx 
@@ -100,6 +106,22 @@ const ProfileVerticalNavigation = ({
         
         <Divider sx={{ mb: 2 }} />
         
+        {/* Hamburger */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="md:hidden block"
+      >
+        <img
+          src="/images/hamburger.svg"
+          className="w-5 h-5 md:hidden block mb-5"
+          alt="Menu"
+        />
+      </button>
+         <div
+        className={`${
+          isOpen ? "block" : "hidden"
+        } md:block`}
+      >
         <List sx={{ p: 0 }}>
           {menuItems.map((item, index) => {
             const IconComponent = item.icon;
@@ -244,6 +266,7 @@ const ProfileVerticalNavigation = ({
             </ListItem>
           )}
         </List>
+        </div>
       </Box>
     </Paper>
   );

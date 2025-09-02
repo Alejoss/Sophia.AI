@@ -119,7 +119,22 @@ const TopicEditContent = () => {
     return (
         <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Box
+  sx={{
+    display: {
+      xs: "block", // mobile → stacked
+      md: "flex",  // md and up → flex row
+    },
+    alignItems: "center",
+    mb: 3,
+    "& > *:not(:last-child)": {
+      mb: {
+        xs: 2, // vertical spacing between children on mobile
+        md: 0, // no spacing when flex row
+      },
+    },
+  }}
+>
                     <IconButton 
                         onClick={() => navigate(`/content/topics/${topicId}/edit`)}
                         sx={{ mr: 2 }}
