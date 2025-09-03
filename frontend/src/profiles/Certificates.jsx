@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import certificatesApi from '../api/certificatesApi';
-import { AuthContext } from '../context/AuthContext';
+import React, { useState, useEffect, useContext } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import certificatesApi from "../api/certificatesApi";
+import { AuthContext } from "../context/AuthContext";
 import {
   Card,
   CardContent,
@@ -17,11 +17,11 @@ import {
   DialogActions,
   TextField,
   Tabs,
-  Tab
-} from '@mui/material';
+  Tab,
+} from "@mui/material";
 
 const Certificates = ({ isOwnProfile = false, userId = null }) => {
-  const [activeTab, setActiveTab] = useState('certificates');
+  const [activeTab, setActiveTab] = useState("certificates");
   const [certificates, setCertificates] = useState([]);
   const [requests, setRequests] = useState([]);
   const [certificatesLoading, setCertificatesLoading] = useState(true);
@@ -30,15 +30,15 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [approveNote, setApproveNote] = useState('');
+  const [rejectReason, setRejectReason] = useState("");
+  const [approveNote, setApproveNote] = useState("");
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (activeTab === 'certificates') {
+    if (activeTab === "certificates") {
       fetchCertificates();
-    } else if (activeTab === 'requests') {
+    } else if (activeTab === "requests") {
       fetchRequests();
     }
   }, [activeTab, isOwnProfile, userId]);
@@ -52,10 +52,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       } else {
         data = await certificatesApi.getUserCertificatesById(userId);
       }
-      console.log('DEBUG: Fetched certificates:', data);
+      console.log("DEBUG: Fetched certificates:", data);
       setCertificates(data);
     } catch (err) {
-      setError('Failed to load certificates');
+      setError("Failed to load certificates");
       console.error(err);
     } finally {
       setCertificatesLoading(false);
@@ -74,7 +74,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         setRequests([]);
       }
     } catch (err) {
-      setError('Failed to load certificate requests');
+      setError("Failed to load certificate requests");
       console.error(err);
     } finally {
       setRequestsLoading(false);
@@ -85,13 +85,16 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     if (!selectedRequest) return;
 
     try {
-      await certificatesApi.approveCertificateRequest(selectedRequest.id, approveNote);
+      await certificatesApi.approveCertificateRequest(
+        selectedRequest.id,
+        approveNote
+      );
       setApproveDialogOpen(false);
-      setApproveNote('');
+      setApproveNote("");
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
-      setError('Failed to approve request');
+      setError("Failed to approve request");
       console.error(err);
     }
   };
@@ -100,13 +103,16 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     if (!selectedRequest) return;
 
     try {
-      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason);
+      await certificatesApi.rejectCertificateRequest(
+        selectedRequest.id,
+        rejectReason
+      );
       setRejectDialogOpen(false);
-      setRejectReason('');
+      setRejectReason("");
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
-      setError('Failed to reject request');
+      setError("Failed to reject request");
       console.error(err);
     }
   };
@@ -116,7 +122,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       await certificatesApi.cancelCertificateRequest(requestId);
       fetchRequests();
     } catch (err) {
-      setError('Failed to cancel request');
+      setError("Failed to cancel request");
       console.error(err);
     }
   };
@@ -133,21 +139,25 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'PENDING':
-        return 'warning';
-      case 'APPROVED':
-        return 'success';
-      case 'REJECTED':
-        return 'error';
+      case "PENDING":
+        return "warning";
+      case "APPROVED":
+        return "success";
+      case "REJECTED":
+        return "error";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const sortRequests = (requests) => {
-    const pendingRequests = requests.filter(req => req.status === 'PENDING');
-    const nonPendingRequests = requests.filter(req => req.status !== 'PENDING');
-    nonPendingRequests.sort((a, b) => new Date(b.request_date) - new Date(a.request_date));
+    const pendingRequests = requests.filter((req) => req.status === "PENDING");
+    const nonPendingRequests = requests.filter(
+      (req) => req.status !== "PENDING"
+    );
+    nonPendingRequests.sort(
+      (a, b) => new Date(b.request_date) - new Date(a.request_date)
+    );
     return [...pendingRequests, ...nonPendingRequests];
   };
 
@@ -157,17 +167,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (certificate.event_title) {
       return certificate.event_title;
     } else {
-      return 'Certificate';
+      return "Certificate";
     }
   };
 
   const getCertificateType = (certificate) => {
     if (certificate.knowledge_path_title) {
-      return 'Knowledge Path';
+      return "Knowledge Path";
     } else if (certificate.event_title) {
-      return 'Event';
+      return "Event";
     } else {
-      return 'Certificate';
+      return "Certificate";
     }
   };
 
@@ -177,17 +187,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (request.event_title) {
       return request.event_title;
     } else {
-      return 'Certificate Request';
+      return "Certificate Request";
     }
   };
 
   const getRequestType = (request) => {
     if (request.knowledge_path_title) {
-      return 'Knowledge Path';
+      return "Knowledge Path";
     } else if (request.event_title) {
-      return 'Event';
+      return "Event";
     } else {
-      return 'Certificate';
+      return "Certificate";
     }
   };
 
@@ -199,11 +209,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     <Box>
       {/* Material-UI Tabs - Only show requests tab for owners */}
       {isOwnProfile ? (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange}
-          >
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+          <Tabs value={activeTab} onChange={handleTabChange}>
             <Tab label="My Certificates" value="certificates" />
             <Tab label="Certificate Requests" value="requests" />
           </Tabs>
@@ -219,20 +226,24 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
       {/* Tab Content */}
       <Box>
-        {(activeTab === 'certificates' || !isOwnProfile) && (
+        {(activeTab === "certificates" || !isOwnProfile) && (
           <div className="certificates">
             {certificatesLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight="200px"
+              >
                 <CircularProgress />
               </Box>
             ) : error ? (
               <Alert severity="error">{error}</Alert>
             ) : certificates.length === 0 ? (
               <Typography variant="body1" color="textSecondary">
-                {isOwnProfile 
+                {isOwnProfile
                   ? "You haven't earned any certificates yet. Complete knowledge paths or attend events to earn certificates!"
-                  : "No certificates found."
-                }
+                  : "No certificates found."}
               </Typography>
             ) : (
               <div className="grid gap-4">
@@ -248,7 +259,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             Type: {getCertificateType(certificate)}
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
-                            Issued on: {new Date(certificate.issued_on).toLocaleDateString()}
+                            Issued on:{" "}
+                            {new Date(
+                              certificate.issued_on
+                            ).toLocaleDateString()}
                           </Typography>
                           {certificate.blockchain_hash && (
                             <Chip
@@ -278,10 +292,15 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             )}
           </div>
         )}
-        {isOwnProfile && activeTab === 'requests' && (
+        {isOwnProfile && activeTab === "requests" && (
           <div className="requests">
             {requestsLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight="200px"
+              >
                 <CircularProgress />
               </Box>
             ) : error ? (
@@ -289,20 +308,37 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : requests.length === 0 ? (
               <Box textAlign="center" py={4}>
                 <Typography variant="h6" color="textSecondary" gutterBottom>
-                  ¿Got something to teach? Create a Knowledge Path or an Event and issue certificates
+                  ¿Got something to teach? Create a Knowledge Path or an Event
+                  and issue certificates
                 </Typography>
-                <Box mt={3} display="flex" gap={2} justifyContent="center">
+                <Box
+                  mt={3}
+                  sx={{
+                    display: {
+                      xs: "block", // mobile → stacked
+                      md: "flex", // md and up → flex row
+                    },
+                  }}
+                  gap={2}
+                  justifyContent="center"
+                >
                   <Button
+                    sx={{
+                      mb: {
+                        xs: 2, // vertical spacing between children on mobile
+                        md: 0, // no spacing when flex row
+                      },
+                    }}
                     variant="contained"
                     color="primary"
-                    onClick={() => navigate('/knowledge_path/create')}
+                    onClick={() => navigate("/knowledge_path/create")}
                   >
                     Create Knowledge Path
                   </Button>
                   <Button
                     variant="contained"
                     color="secondary"
-                    onClick={() => navigate('/events/create')}
+                    onClick={() => navigate("/events/create")}
                   >
                     Create an Event
                   </Button>
@@ -311,12 +347,20 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : (
               <div className="space-y-8">
                 {/* Teacher View */}
-                {requests.filter(req => req.knowledge_path_author === authState.user?.username).length > 0 && (
+                {requests.filter(
+                  (req) =>
+                    req.knowledge_path_author === authState.user?.username
+                ).length > 0 && (
                   <div>
                     <Typography variant="h5" gutterBottom>
                       Requests to Review
                     </Typography>
-                    {sortRequests(requests.filter(req => req.knowledge_path_author === authState.user?.username)).map((request) => (
+                    {sortRequests(
+                      requests.filter(
+                        (req) =>
+                          req.knowledge_path_author === authState.user?.username
+                      )
+                    ).map((request) => (
                       <Card key={request.id} className="mb-4">
                         <CardContent>
                           <div className="flex justify-between items-start">
@@ -325,8 +369,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Requested by:{' '}
-                                <Link 
+                                Requested by:{" "}
+                                <Link
                                   to={`/profiles/user_profile/${request.requester_id}`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline"
                                 >
@@ -342,17 +386,22 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 size="small"
                                 className="mt-2"
                               />
-                              {request.notes && 
-                               ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
-                                (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
-                                <Typography variant="body2" className="mt-2">
-                                  Notes: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
-                                </Typography>
-                              )}
+                              {request.notes &&
+                                ((typeof request.notes === "object" &&
+                                  Object.keys(request.notes).length > 0) ||
+                                  (typeof request.notes === "string" &&
+                                    request.notes.trim() !== "")) && (
+                                  <Typography variant="body2" className="mt-2">
+                                    Notes:{" "}
+                                    {typeof request.notes === "object"
+                                      ? JSON.stringify(request.notes)
+                                      : request.notes}
+                                  </Typography>
+                                )}
                             </div>
 
                             <div className="flex gap-2">
-                              {request.status === 'PENDING' && (
+                              {request.status === "PENDING" && (
                                 <>
                                   <Button
                                     variant="contained"
@@ -370,7 +419,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                   </Button>
                                 </>
                               )}
-                              {request.status === 'REJECTED' && (
+                              {request.status === "REJECTED" && (
                                 <Button
                                   variant="contained"
                                   color="success"
@@ -383,7 +432,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                           </div>
 
                           {request.rejection_reason && (
-                            <Typography variant="body2" color="error" className="mt-2">
+                            <Typography
+                              variant="body2"
+                              color="error"
+                              className="mt-2"
+                            >
                               Rejection reason: {request.rejection_reason}
                             </Typography>
                           )}
@@ -394,12 +447,18 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 )}
 
                 {/* Student View */}
-                {requests.filter(req => req.requester === authState.user?.username).length > 0 && (
+                {requests.filter(
+                  (req) => req.requester === authState.user?.username
+                ).length > 0 && (
                   <div>
                     <Typography variant="h5" gutterBottom>
                       My Requests
                     </Typography>
-                    {sortRequests(requests.filter(req => req.requester === authState.user?.username)).map((request) => (
+                    {sortRequests(
+                      requests.filter(
+                        (req) => req.requester === authState.user?.username
+                      )
+                    ).map((request) => (
                       <Card key={request.id} className="mb-4">
                         <CardContent>
                           <div className="flex justify-between items-start">
@@ -408,15 +467,22 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Requested on: {new Date(request.request_date).toLocaleDateString()}
+                                Requested on:{" "}
+                                {new Date(
+                                  request.request_date
+                                ).toLocaleDateString()}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Author:{' '}
-                                <Link 
-                                  to={`/profiles/user_profile/${request.knowledge_path_author_id || request.event_owner_id}`}
+                                Author:{" "}
+                                <Link
+                                  to={`/profiles/user_profile/${
+                                    request.knowledge_path_author_id ||
+                                    request.event_owner_id
+                                  }`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline"
                                 >
-                                  {request.knowledge_path_author || request.event_owner}
+                                  {request.knowledge_path_author ||
+                                    request.event_owner}
                                 </Link>
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
@@ -428,15 +494,20 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 size="small"
                                 className="mt-2"
                               />
-                              {request.notes && 
-                               ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
-                                (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
-                                <Typography variant="body2" className="mt-2">
-                                  Notes: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
-                                </Typography>
-                              )}
+                              {request.notes &&
+                                ((typeof request.notes === "object" &&
+                                  Object.keys(request.notes).length > 0) ||
+                                  (typeof request.notes === "string" &&
+                                    request.notes.trim() !== "")) && (
+                                  <Typography variant="body2" className="mt-2">
+                                    Notes:{" "}
+                                    {typeof request.notes === "object"
+                                      ? JSON.stringify(request.notes)
+                                      : request.notes}
+                                  </Typography>
+                                )}
                             </div>
-                            {request.status === 'PENDING' && (
+                            {request.status === "PENDING" && (
                               <Button
                                 variant="outlined"
                                 color="error"
@@ -447,7 +518,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             )}
                           </div>
                           {request.rejection_reason && (
-                            <Typography variant="body2" color="error" className="mt-2">
+                            <Typography
+                              variant="body2"
+                              color="error"
+                              className="mt-2"
+                            >
                               Rejection reason: {request.rejection_reason}
                             </Typography>
                           )}
@@ -463,7 +538,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       </Box>
 
       {/* Approve Dialog */}
-      <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)}>
+      <Dialog
+        open={approveDialogOpen}
+        onClose={() => setApproveDialogOpen(false)}
+      >
         <DialogTitle>Approve Certificate Request</DialogTitle>
         <DialogContent>
           <TextField
@@ -487,7 +565,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)}>
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={() => setRejectDialogOpen(false)}
+      >
         <DialogTitle>Reject Certificate Request</DialogTitle>
         <DialogContent>
           <TextField

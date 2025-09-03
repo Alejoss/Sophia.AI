@@ -295,10 +295,10 @@ const KnowledgePathDetail = () => {
   if (!knowledgePath && !error) return <div className="text-center py-8">Knowledge path not found</div>;
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="container mx-auto md:p-4">
+      <div className="bg-white rounded-lg shadow-lg md:p-6 px-2 py-4">
         {/* Header with Image */}
-        <div className="flex items-start mb-6">
+        <div className="md:flex items-start mb-6">
           <Avatar 
             src={knowledgePath.image} 
             alt={knowledgePath.title}
@@ -314,10 +314,10 @@ const KnowledgePathDetail = () => {
             {knowledgePath.title.charAt(0).toUpperCase()}
           </Avatar>
           
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start">
+          <div className="md:flex-1 md:mt-0 mt-4 min-w-0">
+            <div className="md:flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
+                <h1 className="md:!text-3xl !text-xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
                 <p className="text-gray-600">
                   Created by{' '}
                   <Link 

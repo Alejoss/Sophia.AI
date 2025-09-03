@@ -95,8 +95,8 @@ const Login = () => {
     return (
       <div className="login-container">
         <div className="login-wrapper">
-          <div className="order-m-2">
-            <img src="/images/login-img.png" alt="" />
+          <div className="order-m-2 text-center">
+            <img src="/images/login-img.png" className="inline-block" alt="" />
           </div>
           <div>
             <h2 className="heading-2 text-center">Login</h2>

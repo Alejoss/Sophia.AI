@@ -181,7 +181,7 @@ const Profile = () => {
                 return (
                     <Box>
                         {isOwnProfile && (
-                            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                            <Box sx={{ mb: 3, display: 'flex', flexwrap:'wrap', justifyContent: 'flex-end' }}>
                                 <Button
                                     component={Link}
                                     to="/publications/create"

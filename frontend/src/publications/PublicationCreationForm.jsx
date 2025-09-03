@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Grid, TextField, Button, Box, Typography, Paper, Divider } from '@mui/material';
-import UploadContentForm from '../content/UploadContentForm';
-import ContentSearchModal from '../content/ContentSearchModal';
-import contentApi from '../api/contentApi';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Grid,
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Paper,
+  Divider,
+} from "@mui/material";
+import UploadContentForm from "../content/UploadContentForm";
+import ContentSearchModal from "../content/ContentSearchModal";
+import contentApi from "../api/contentApi";
 
 const PublicationCreationForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    text_content: '',
-    status: 'PUBLISHED'
+    text_content: "",
+    status: "PUBLISHED",
   });
   const [content, setContent] = useState(null);
   const [error, setError] = useState(null);
@@ -20,7 +28,7 @@ const PublicationCreationForm = () => {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleContentUpload = (uploadedContent) => {
-    console.log('Uploaded content received:', uploadedContent);
+    console.log("Uploaded content received:", uploadedContent);
     setContent(uploadedContent);
     setShowUploadForm(false);
     setShowContentOptions(false);
@@ -28,7 +36,7 @@ const PublicationCreationForm = () => {
   };
 
   const handleContentSelect = (selectedContent) => {
-    console.log('Selected content received:', selectedContent);
+    console.log("Selected content received:", selectedContent);
     setContent(selectedContent);
     setShowContentModal(false);
     setShowContentOptions(false);
@@ -40,21 +48,21 @@ const PublicationCreationForm = () => {
       setIsLoading(true);
       const publicationData = {
         ...formData,
-        content_profile_id: content?.id || null
+        content_profile_id: content?.id || null,
       };
-      console.log('Sending publication data:', publicationData);
+      console.log("Sending publication data:", publicationData);
       await contentApi.createPublication(publicationData);
-      navigate('/profiles/my_profile');
+      navigate("/profiles/my_profile");
     } catch (err) {
-      setError('Failed to create publication');
-      console.error('Error creating publication:', err);
+      setError("Failed to create publication");
+      console.error("Error creating publication:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCancel = () => {
-    navigate('/profiles/my_profile');
+    navigate("/profiles/my_profile");
   };
 
   const handleUploadClick = () => {
@@ -64,27 +72,70 @@ const PublicationCreationForm = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+<Typography
+  variant="h4"
+  color="#000"
+  gutterBottom
+  sx={{
+    fontSize: {
+      xs: "1.5rem",  // ~24px on mobile
+      sm: "1.75rem", // ~28px on small screens
+      md: "2.125rem" // ~34px (default h4) on desktop
+    },
+    fontWeight: 600, // optional if you want it bolder
+  }}
+>
         Create New Publication
       </Typography>
-      
+
       {showContentOptions && !content && (
-        <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
+        <Paper
+          elevation={2}
+          sx={{
+             p: {
+              xs: 1.25, // 10px on mobile (xs–sm) → 1.25 * 8px = 10px
+              md: 4, // 0 on desktop (md+)
+            },
+            mb: {
+              xs: 1.25, // 10px on mobile (xs–sm) → 1.25 * 8px = 10px
+              md: 4, // 0 on desktop (md+)
+            },
+          }}
+        >
           <Typography variant="h6" gutterBottom align="center">
             Choose Content Source (Optional)
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
-            <Button 
-              variant="contained" 
-              color="primary" 
+          <Box
+            sx={{
+              display: {
+                xs: "block", // mobile
+                md: "flex", // md and up
+              },
+              justifyContent: "center",
+              gap: 2,
+              mt: {
+                xs: 1.25, // 10px on mobile (xs–sm) → 1.25 * 8px = 10px
+                md: 3, // 0 on desktop (md+)
+              },
+            }}
+          >
+            <Button
+              sx={{
+                mb: {
+                  xs: 1.25, // 10px on mobile (xs–sm) → 1.25 * 8px = 10px
+                  md: 0, // 0 on desktop (md+)
+                },
+              }}
+              variant="contained"
+              color="primary"
               size="large"
               onClick={() => setShowContentModal(true)}
             >
               Choose Content from Library
             </Button>
-            <Button 
-              variant="contained" 
-              color="secondary" 
+            <Button
+              variant="contained"
+              color="secondary"
               size="large"
               onClick={handleUploadClick}
             >
@@ -96,8 +147,8 @@ const PublicationCreationForm = () => {
 
       {showUploadForm && (
         <Box sx={{ mb: 4 }}>
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             onClick={() => {
               setShowUploadForm(false);
               setIsUploading(false);
@@ -114,67 +165,91 @@ const PublicationCreationForm = () => {
         <Typography variant="h6" gutterBottom>
           Publication Details
         </Typography>
-        
+
         {content && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
               Selected Content:
             </Typography>
-            {console.log('Content being displayed:', content)}
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
-              {content.content?.media_type === 'IMAGE' && content.content?.file_details?.url && (
-                <Box sx={{ 
-                  mb: 2, 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  width: '100%',
-                  overflow: 'hidden',
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}>
-                  <img 
-                    src={content.content.file_details.url} 
-                    alt={content.title || content.content?.original_title || 'Untitled'} 
-                    style={{ 
-                      maxWidth: '100%', 
-                      maxHeight: '300px', 
-                      objectFit: 'contain',
-                      borderRadius: '4px 4px 0 0',
-                      transition: 'transform 0.3s ease',
-                      cursor: 'pointer'
-                    }}
-                    onError={(e) => {
-                      console.error('Image failed to load:', content.content.file_details.url);
-                      e.target.style.display = 'none';
-                    }}
-                    onClick={() => window.open(content.content.file_details.url, '_blank')}
-                    onMouseOver={(e) => e.target.style.transform = 'scale(1.02)'}
-                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                  />
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      mt: 1, 
-                      textAlign: 'center', 
-                      color: 'text.secondary',
-                      fontStyle: 'italic'
+            {console.log("Content being displayed:", content)}
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, bgcolor: "background.default" }}
+            >
+              {content.content?.media_type === "IMAGE" &&
+                content.content?.file_details?.url && (
+                  <Box
+                    sx={{
+                      mb: 2,
+                       display: {
+                xs: "block", // mobile
+                md: "flex", // md and up
+              },
+                      flexDirection: "column",
+                      alignItems: "center",
+                      width: "100%",
+                      overflow: "hidden",
+                      borderRadius: "4px",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                     }}
                   >
-                    {content.title || content.content?.original_title || 'Untitled'}
-                  </Typography>
-                </Box>
-              )}
+                    <img
+                      src={content.content.file_details.url}
+                      alt={
+                        content.title ||
+                        content.content?.original_title ||
+                        "Untitled"
+                      }
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "300px",
+                        objectFit: "contain",
+                        borderRadius: "4px 4px 0 0",
+                        transition: "transform 0.3s ease",
+                        cursor: "pointer",
+                      }}
+                      onError={(e) => {
+                        console.error(
+                          "Image failed to load:",
+                          content.content.file_details.url
+                        );
+                        e.target.style.display = "none";
+                      }}
+                      onClick={() =>
+                        window.open(content.content.file_details.url, "_blank")
+                      }
+                      onMouseOver={(e) =>
+                        (e.target.style.transform = "scale(1.02)")
+                      }
+                      onMouseOut={(e) =>
+                        (e.target.style.transform = "scale(1)")
+                      }
+                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        mt: 1,
+                        textAlign: "center",
+                        color: "text.secondary",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {content.title ||
+                        content.content?.original_title ||
+                        "Untitled"}
+                    </Typography>
+                  </Box>
+                )}
               <Typography variant="body1">
-                {content.title || content.content?.original_title || 'Untitled'}
+                {content.title || content.content?.original_title || "Untitled"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Type: {content.content?.media_type}
               </Typography>
             </Paper>
-            <Button 
-              variant="text" 
-              color="primary" 
+            <Button
+              variant="text"
+              color="primary"
               onClick={() => {
                 setContent(null);
                 setShowContentOptions(true);
@@ -185,22 +260,32 @@ const PublicationCreationForm = () => {
             </Button>
           </Box>
         )}
-        
+
         <TextField
           fullWidth
           multiline
           rows={4}
           label="Text Content"
           value={formData.text_content}
-          onChange={(e) => setFormData({ ...formData, text_content: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, text_content: e.target.value })
+          }
           required
           sx={{ mb: 3 }}
         />
 
         <Divider sx={{ my: 3 }} />
 
-        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-          <Button
+        <Box sx={{ display: {
+                xs: "block", // mobile
+                md: "flex", // md and up
+              }, gap: 2, justifyContent: "flex-end" }}>
+          <Button  sx={{
+                mb: {
+                  xs: 1.25, // 10px on mobile (xs–sm) → 1.25 * 8px = 10px
+                  md: 0, // 0 on desktop (md+)
+                },
+              }}
             variant="outlined"
             onClick={handleCancel}
             disabled={isLoading || isUploading}
@@ -212,7 +297,7 @@ const PublicationCreationForm = () => {
             onClick={handleSubmit}
             disabled={isLoading || isUploading}
           >
-            {isLoading ? 'Creating...' : 'Create Publication'}
+            {isLoading ? "Creating..." : "Create Publication"}
           </Button>
         </Box>
       </Paper>
@@ -223,9 +308,9 @@ const PublicationCreationForm = () => {
         </Typography>
       )}
 
-      <ContentSearchModal 
-        isOpen={showContentModal} 
-        onClose={() => setShowContentModal(false)} 
+      <ContentSearchModal
+        isOpen={showContentModal}
+        onClose={() => setShowContentModal(false)}
         onSelectContent={handleContentSelect}
         isLoading={isLoading}
       />
@@ -233,4 +318,4 @@ const PublicationCreationForm = () => {
   );
 };
 
-export default PublicationCreationForm; 
+export default PublicationCreationForm;

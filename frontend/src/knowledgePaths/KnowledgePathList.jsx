@@ -55,16 +55,16 @@ const KnowledgePathList = () => {
       <div className="flex justify-between items-center mb-6 md:flex-nowrap flex-wrap">
         <h1 className="md:!text-2xl !text-xl md:mb-0 mb-4 font-bold !text-gray-900">Knowledge Paths</h1>
         {authState.isAuthenticated && (
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link 
               to="/profiles/my_profile?section=knowledge-paths"
-              className="bg-gray-500 hover:bg-gray-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              className="bg-gray-500 md:w-auto w-full text-center hover:bg-gray-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
             >
               My Knowledge Paths
             </Link>
             <Link 
               to="/knowledge_path/create"
-              className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              className="bg-blue-500 md:w-auto w-full text-center hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
             >
               Create New Path
             </Link>
@@ -93,7 +93,7 @@ const KnowledgePathList = () => {
               className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px]"
             >
               {/* Image and Title Section */}
-              <div className="flex items-start mb-4">
+              <div className=" mb-4">
                 <Avatar 
                   src={path.image} 
                   alt={path.title}
@@ -108,7 +108,7 @@ const KnowledgePathList = () => {
                   {path.title.charAt(0).toUpperCase()}
                 </Avatar>
                 
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 mt-4">
                   {/* Title Section */}
                   <Link 
                     to={`/knowledge_path/${path.id}`}
