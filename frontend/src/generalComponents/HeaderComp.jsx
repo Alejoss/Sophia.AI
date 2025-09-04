@@ -74,7 +74,7 @@ const HeaderComp = () => {
         onClick={() => setIsOpen(!isOpen)}
       >
         <img
-          src="images/hamburger.svg"
+          src="/images/hamburger.svg"
           className="w-6 h-6"
           alt="Menu"
         />
