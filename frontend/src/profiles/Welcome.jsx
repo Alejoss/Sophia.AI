@@ -9,7 +9,7 @@ const Welcome = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { authState, setAuthState } = useContext(AuthContext);
-  const [message, setMessage] = useState('Verifying your session...');
+  const [message, setMessage] = useState('Verificando tu sesión...');
   const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ const Welcome = () => {
         // If no state is passed (e.g. direct navigation or refresh), rely on AuthContext's initial check or redirect
         // For now, we'll check auth again, or guide to login if authState isn't set.
         if (authState.isAuthenticated) {
-            setMessage(`Welcome back, ${authState.user?.username || 'User'}! You are logged in.`);
+            setMessage(`¡Bienvenido de nuevo, ${authState.user?.username || 'Usuario'}! Has iniciado sesión.`);
             setIsVerified(true);
         } else {
             // If no user data passed via state and context not authed, check with backend
@@ -79,17 +79,17 @@ const Welcome = () => {
 
   return (
     <div className="welcome-container">
-      <h2>Welcome!</h2>
+      <h2>¡Bienvenido!</h2>
       <p className={`status-message ${isVerified ? 'success' : 'error'}`}>{message}</p>
       {isVerified && authState.user && (
         <div className="welcome-actions">
-          <p>What would you like to do next?</p>
-          <Link to="/profiles/my_profile" className="welcome-link">View Your Profile</Link>
+          <p>¿Qué te gustaría hacer ahora?</p>
+          <Link to="/profiles/my_profile" className="welcome-link">Ver tu perfil</Link>
         </div>
       )}
       {!isVerified && (
         <div className="welcome-actions">
-            <Link to="/profiles/login" className="welcome-link">Go to Login</Link>
+            <Link to="/profiles/login" className="welcome-link">Ir a iniciar sesión</Link>
         </div>
       )}
     </div>

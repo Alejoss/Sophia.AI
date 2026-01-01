@@ -194,11 +194,11 @@ const schema = yup.object({
   }),
   media_type: yup.string().when('isUrlMode', {
     is: true,
-    then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], 'Please select a valid media type').required('Media type is required'),
+    then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], 'Por favor selecciona un tipo de medio válido').required('El tipo de medio es requerido'),
     otherwise: () => yup.string().nullable()
   }),
-  title: yup.string().max(100, 'Title must not exceed 100 characters'),
-  author: yup.string().max(100, 'Author must not exceed 100 characters'),
+  title: yup.string().max(100, 'El título no debe exceder 100 caracteres'),
+  author: yup.string().max(100, 'El autor no debe exceder 100 caracteres'),
   is_producer: yup.boolean(),
   is_visible: yup.boolean(),
   isUrlMode: yup.boolean()
@@ -320,7 +320,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           } catch (error) {
             console.error('Preview fetch error:', error);
             setPreviewData(null);  // Clear any previous preview data
-            setPreviewError(error.message || 'Could not load preview for this URL');
+            setPreviewError(error.message || 'No se pudo cargar la vista previa para esta URL');
           } finally {
             setIsLoadingPreview(false);
           }
@@ -356,7 +356,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           const formData = new FormData();
           const file = data.file[0];
           if (!file) {
-            throw new Error('No file selected');
+            throw new Error('No se seleccionó ningún archivo');
           }
           
           formData.append('file', file);
@@ -365,7 +365,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           
           const mediaType = getMediaType(file);
           if (!mediaType) {
-            throw new Error('Unsupported file type');
+            throw new Error('Tipo de archivo no soportado');
           }
           formData.append('media_type', mediaType);
           formData.append('title', data.title || '');
@@ -385,7 +385,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response.content_profile);
           }
           
-          alert('New content created successfully! The content profile has been updated to reference the new file.');
+          alert('¡Nuevo contenido creado exitosamente! El perfil de contenido ha sido actualizado para referenciar el nuevo archivo.');
         } else {
           // URL update - update existing content
           console.log('URL update mode - updating existing content');
@@ -409,7 +409,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response);
           }
           
-          alert('Content updated successfully!');
+          alert('¡Contenido actualizado exitosamente!');
         }
       } else {
         // Create new content
@@ -435,7 +435,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           // File mode - send file data
           const file = data.file[0];
           if (!file) {
-            throw new Error('No file selected');
+            throw new Error('No se seleccionó ningún archivo');
           }
           console.log('Selected file:', file);
           
@@ -446,7 +446,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           const mediaType = getMediaType(file);
           console.log('Detected media type:', mediaType);
           if (!mediaType) {
-            throw new Error('Unsupported file type');
+            throw new Error('Tipo de archivo no soportado');
           }
           formData.append('media_type', mediaType);
         }
@@ -465,11 +465,11 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
         reset();
         setPreviewData(null);
-        alert('Content uploaded successfully!');
+        alert('¡Contenido subido exitosamente!');
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      alert(error.response?.data?.error || error.message || 'Failed to upload content. Please try again.');
+      alert(error.response?.data?.error || error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.');
     } finally {
       setIsUploading(false);
     }
@@ -520,7 +520,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   return (
     <Box sx={{ width: '100%', '& .MuiFormControl-root': { marginBottom: 2 } }}>
       <Typography variant="h6" gutterBottom>
-        {isEditMode ? 'Change Content Source' : 'Upload Content'}
+        {isEditMode ? 'Cambiar fuente del contenido' : 'Subir contenido'}
       </Typography>
 
       {/* Toggle Buttons */}
@@ -530,14 +530,14 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           onClick={() => handleModeToggle(false)}
           size="large"
         >
-          Upload File
+          Subir archivo
         </Button>
         <Button
           variant={isUrlMode ? "contained" : "outlined"}
           onClick={() => handleModeToggle(true)}
           size="large"
         >
-          Add from URL
+          Agregar desde URL
         </Button>
       </Box>
 
@@ -546,7 +546,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         {!isUrlMode ? (
           <FormControl fullWidth error={!!errors.file}>
             <Typography variant="subtitle2" gutterBottom>
-              File:
+              Archivo:
             </Typography>
             <input
               type="file"
@@ -574,18 +574,18 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             
             {/* Media Type Selector for URL Content */}
             <FormControl fullWidth error={!!errors.media_type}>
-              <InputLabel id="media-type-label">Content Type</InputLabel>
+              <InputLabel id="media-type-label">Tipo de contenido</InputLabel>
               <Select
                 labelId="media-type-label"
-                label="Content Type"
+                label="Tipo de contenido"
                 {...register('media_type')}
                 value={watch('media_type')}
                 onChange={(e) => setValue('media_type', e.target.value)}
               >
                 <MenuItem value="VIDEO">Video</MenuItem>
                 <MenuItem value="AUDIO">Audio</MenuItem>
-                <MenuItem value="TEXT">Text</MenuItem>
-                <MenuItem value="IMAGE">Image</MenuItem>
+                <MenuItem value="TEXT">Texto</MenuItem>
+                <MenuItem value="IMAGE">Imagen</MenuItem>
               </Select>
               {errors.media_type && (
                 <FormHelperText error>
@@ -605,7 +605,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         {/* Common Fields */}
         <FormControl fullWidth>
           <TextField
-            label="Original Title"
+            label="Título original"
             variant="outlined"
             {...register('title')}
             error={!!errors.title}
@@ -615,7 +615,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
         <FormControl fullWidth>
           <TextField
-            label="Original Author"
+            label="Autor original"
             variant="outlined"
             {...register('author')}
             error={!!errors.author}
@@ -634,7 +634,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                   {...register('is_producer')}
                 />
               }
-              label="I've produced this content"
+              label="He producido este contenido"
             />
             {watch('is_producer') && (
               <Box sx={{ ml: 3 }}>
@@ -646,10 +646,10 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                       {...register('is_visible')}
                     />
                   }
-                  label="Visible in search results"
+                  label="Visible en los resultados de búsqueda"
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                  Note: Only the producer of the content can make it invisible in search results.
+                  Nota: Solo el productor del contenido puede hacerlo invisible en los resultados de búsqueda.
                 </Typography>
               </Box>
             )}
@@ -664,7 +664,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           disabled={isUploading || isLoadingPreview}
           sx={{ mt: 3 }}
         >
-          {isUploading ? 'Uploading...' : (isEditMode ? 'Update Content' : 'Upload Content')}
+          {isUploading ? 'Subiendo...' : (isEditMode ? 'Actualizar contenido' : 'Subir contenido')}
         </Button>
       </form>
     </Box>

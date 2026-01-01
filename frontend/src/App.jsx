@@ -1,6 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 
 import Home from './generalComponents/Home.jsx';
@@ -62,11 +65,15 @@ import EventEdit from './events/EventEdit.jsx';
 import UserEvents from './events/UserEvents.jsx';
 import ManageEvent from './events/ManageEvent.jsx';
 
-const App = () => {
+const AppContent = () => {
+  const { theme } = useThemeMode();
+  
   return (
-    <Router>
-      <AuthProvider>
-        <Routes>
+    <MuiThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <AuthProvider>
+          <Routes>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="profiles">
@@ -149,9 +156,18 @@ const App = () => {
             <Route path="profiles/my_events" element={<UserEvents />} />
             <Route path="profiles/profile_bookmarks" element={<Bookmarks />} />
           </Route>
-        </Routes>
-      </AuthProvider>
-    </Router>
+          </Routes>
+        </AuthProvider>
+      </Router>
+    </MuiThemeProvider>
+  );
+};
+
+const App = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 

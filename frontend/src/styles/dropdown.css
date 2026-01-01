@@ -17,7 +17,7 @@
   position: absolute;
   top: 100%;
   left: 0;
-  background-color: white;
+  background-color: var(--bg-primary);
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   z-index: 1000;
   min-width: 10rem;
@@ -31,7 +31,7 @@
   padding: 0.25rem 1.5rem;
   clear: both;
   font-weight: 400;
-  color: #212529;
+  color: var(--text-primary);
   text-align: inherit;
   white-space: nowrap;
   background-color: transparent;
@@ -40,7 +40,7 @@
 }
 
 .dropdown-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--bg-secondary);
 }
 
 .nav-item:hover .dropdown-menu {

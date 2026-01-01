@@ -15,9 +15,9 @@ const PLATFORM_CHOICES = [
 ];
 
 const EVENT_TYPES = [
-  { value: 'LIVE_COURSE', label: 'Live Course' },
-  { value: 'LIVE_CERTIFICATION', label: 'Live Certification' },
-  { value: 'LIVE_MASTER_CLASS', label: 'Live Master Class' },
+  { value: 'LIVE_COURSE', label: 'Curso en Vivo' },
+  { value: 'LIVE_CERTIFICATION', label: 'Certificación en Vivo' },
+  { value: 'LIVE_MASTER_CLASS', label: 'Clase Magistral en Vivo' },
 ];
 
 const EventEdit = () => {
@@ -74,7 +74,7 @@ const EventEdit = () => {
         }
       } catch (err) {
         console.error('Error loading event:', err);
-        setError('Failed to load event. Please try again.');
+        setError('Error al cargar el evento. Por favor, inténtelo de nuevo.');
       } finally {
         setFetchLoading(false);
       }
@@ -87,30 +87,30 @@ const EventEdit = () => {
     const newErrors = {};
 
     if (!form.title.trim()) {
-      newErrors.title = 'Title is required';
+      newErrors.title = 'El título es obligatorio';
     }
 
     if (!form.description.trim()) {
-      newErrors.description = 'Description is required';
+      newErrors.description = 'La descripción es obligatoria';
     }
 
     if (!form.event_type) {
-      newErrors.event_type = 'Event type is required';
+      newErrors.event_type = 'El tipo de evento es obligatorio';
     }
 
     if (!form.platform) {
-      newErrors.platform = 'Platform is required';
+      newErrors.platform = 'La plataforma es obligatoria';
     }
 
     if (form.platform === 'other' && !form.other_platform.trim()) {
-      newErrors.other_platform = 'Other platform name is required';
+      newErrors.other_platform = 'El nombre de la otra plataforma es obligatorio';
     }
 
     if (form.date_start && form.date_end) {
       const startDate = new Date(form.date_start);
       const endDate = new Date(form.date_end);
       if (endDate <= startDate) {
-        newErrors.date_end = 'End date must be after start date';
+        newErrors.date_end = 'La fecha de fin debe ser posterior a la fecha de inicio';
       }
     }
 
@@ -136,13 +136,13 @@ const EventEdit = () => {
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, image: 'Please select a valid image file' }));
+        setErrors(prev => ({ ...prev, image: 'Por favor, seleccione un archivo de imagen válido' }));
         return;
       }
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: 'Image size must be less than 5MB' }));
+        setErrors(prev => ({ ...prev, image: 'El tamaño de la imagen debe ser menor a 5MB' }));
         return;
       }
 
@@ -194,7 +194,7 @@ const EventEdit = () => {
       }
       
       const updatedEvent = await updateEvent(eventId, formData);
-      setSuccess('Event updated successfully!');
+      setSuccess('¡Evento actualizado exitosamente!');
       
       // Navigate to the updated event after a short delay
       setTimeout(() => {
@@ -213,7 +213,7 @@ const EventEdit = () => {
       } else if (typeof err === 'string') {
         setError(err);
       } else {
-        setError('Failed to update event. Please try again.');
+        setError('Error al actualizar el evento. Por favor, inténtelo de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -224,8 +224,8 @@ const EventEdit = () => {
     return (
       <div className="event-create-container">
         <div className="text-center">
-          <h2>Edit Event</h2>
-          <div className="loading-spinner">Loading event...</div>
+          <h2>Editar Evento</h2>
+          <div className="loading-spinner">Cargando evento...</div>
         </div>
       </div>
     );
@@ -235,10 +235,10 @@ const EventEdit = () => {
     return (
       <div className="event-create-container">
         <div className="text-center">
-          <h2>Edit Event</h2>
+          <h2>Editar Evento</h2>
           <div className="error-message">{error}</div>
           <button onClick={() => navigate('/events')} className="btn btn-primary">
-            Back to Events
+            Volver a Eventos
           </button>
         </div>
       </div>
@@ -247,34 +247,34 @@ const EventEdit = () => {
 
   return (
     <div className="event-create-container">
-      <h2>Edit Event</h2>
+      <h2>Editar Evento</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Title: *</label>
+          <label>Título: *</label>
           <input 
             name="title" 
             value={form.title} 
             onChange={handleChange} 
             className={errors.title ? 'error' : ''}
-            placeholder="Enter event title"
+            placeholder="Ingrese el título del evento"
           />
           {errors.title && <span className="error-message">{errors.title}</span>}
         </div>
         
         <div className="form-group">
-          <label>Description: *</label>
+          <label>Descripción: *</label>
           <textarea 
             name="description" 
             value={form.description} 
             onChange={handleChange}
             className={errors.description ? 'error' : ''}
-            placeholder="Describe your event..."
+            placeholder="Describa su evento..."
           />
           {errors.description && <span className="error-message">{errors.description}</span>}
         </div>
         
         <div className="form-group">
-          <label>Event Image:</label>
+          <label>Imagen del Evento:</label>
           <div className="image-upload-container">
             <input 
               type="file" 
@@ -284,13 +284,13 @@ const EventEdit = () => {
               id="event-image"
             />
             <label htmlFor="event-image" className="image-upload-label">
-              {imagePreview ? 'Change Image' : 'Choose Image'}
+              {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
             </label>
             {imagePreview && (
               <div className="image-preview-container">
                 <img src={imagePreview} alt="Preview" className="image-preview" />
                 <button type="button" onClick={removeImage} className="remove-image-btn">
-                  Remove
+                  Eliminar
                 </button>
               </div>
             )}
@@ -300,14 +300,14 @@ const EventEdit = () => {
         
         <div className="form-row">
           <div className="form-group">
-            <label>Event Type: *</label>
+            <label>Tipo de Evento: *</label>
             <select 
               name="event_type" 
               value={form.event_type} 
               onChange={handleChange}
               className={errors.event_type ? 'error' : ''}
             >
-              <option value="">Select type</option>
+              <option value="">Seleccionar tipo</option>
               {EVENT_TYPES.map((et) => (
                 <option key={et.value} value={et.value}>{et.label}</option>
               ))}
@@ -316,14 +316,14 @@ const EventEdit = () => {
           </div>
           
           <div className="form-group">
-            <label>Platform: *</label>
+            <label>Plataforma: *</label>
             <select 
               name="platform" 
               value={form.platform} 
               onChange={handleChange}
               className={errors.platform ? 'error' : ''}
             >
-              <option value="">Select platform</option>
+              <option value="">Seleccionar plataforma</option>
               {PLATFORM_CHOICES.map((p) => (
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
@@ -334,20 +334,20 @@ const EventEdit = () => {
         
         {form.platform === 'other' && (
           <div className="form-group">
-            <label>Other Platform: *</label>
+            <label>Otra Plataforma: *</label>
             <input 
               name="other_platform" 
               value={form.other_platform} 
               onChange={handleChange}
               className={errors.other_platform ? 'error' : ''}
-              placeholder="Enter platform name"
+              placeholder="Ingrese el nombre de la plataforma"
             />
             {errors.other_platform && <span className="error-message">{errors.other_platform}</span>}
           </div>
         )}
         
         <div className="form-group">
-          <label>Reference Price (USD):</label>
+          <label>Precio de Referencia (USD):</label>
           <input 
             name="reference_price" 
             type="text" 
@@ -359,7 +359,7 @@ const EventEdit = () => {
         
         <div className="form-row">
           <div className="form-group">
-            <label>Start Date/Time:</label>
+            <label>Fecha/Hora de Inicio:</label>
             <input 
               name="date_start" 
               type="datetime-local" 
@@ -369,7 +369,7 @@ const EventEdit = () => {
           </div>
           
           <div className="form-group">
-            <label>End Date/Time:</label>
+            <label>Fecha/Hora de Fin:</label>
             <input 
               name="date_end" 
               type="datetime-local" 
@@ -382,22 +382,22 @@ const EventEdit = () => {
         </div>
         
         <div className="form-group">
-          <label>Schedule Description:</label>
+          <label>Descripción del Horario:</label>
           <textarea 
             name="schedule_description" 
             value={form.schedule_description} 
             onChange={handleChange}
-            placeholder="e.g., Every Tuesday for 5 weeks"
+            placeholder="ej., Todos los martes durante 5 semanas"
             rows="3"
           />
         </div>
         
         <div className="form-actions">
           <button type="button" onClick={() => navigate(`/events/${eventId}`)} className="btn btn-secondary">
-            Cancel
+            Cancelar
           </button>
           <button type="submit" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Event'}
+            {loading ? 'Actualizando...' : 'Actualizar Evento'}
           </button>
         </div>
       </form>

@@ -18,7 +18,7 @@ const CollectionsUser = () => {
                 setCollections(data);
                 setLoading(false);
             } catch (err) {
-                setError('Failed to fetch your collections');
+                setError('Error al obtener tus colecciones');
                 setLoading(false);
             }
         };
@@ -28,12 +28,12 @@ const CollectionsUser = () => {
         }
     }, []);
 
-    if (loading) return <Typography>Loading your collections...</Typography>;
+    if (loading) return <Typography>Cargando tus colecciones...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!isAuthenticated()) return <Typography>Please login to view your collections</Typography>;
+    if (!isAuthenticated()) return <Typography>Por favor inicia sesión para ver tus colecciones</Typography>;
 
     return (
-        <Box sx={{ pt: 12, px: 3 }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, color: "text.primary" }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <IconButton 
@@ -42,8 +42,16 @@ const CollectionsUser = () => {
                     >
                         <ArrowBackIcon />
                     </IconButton>
-                    <Typography variant="h4">
-                        My Collections
+                    <Typography 
+                        variant="h4" 
+                        color="text.primary"
+                        sx={{
+                            fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                            fontWeight: 400,
+                            fontSize: "24px"
+                        }}
+                    >
+                        Mis colecciones
                     </Typography>
                 </Box>
                 <Button 
@@ -51,7 +59,7 @@ const CollectionsUser = () => {
                     color="primary"
                     onClick={() => navigate('/content/collections/create')}
                 >
-                    Create Collection
+                    Crear colección
                 </Button>
             </Box>
 
@@ -67,7 +75,7 @@ const CollectionsUser = () => {
                                     {collection.name}
                                 </Typography>
                                 <Typography color="text.secondary">
-                                    {collection.content_count} {collection.content_count === 1 ? 'item' : 'items'}
+                                    {collection.content_count} {collection.content_count === 1 ? 'elemento' : 'elementos'}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -77,7 +85,7 @@ const CollectionsUser = () => {
                 {collections.length === 0 && (
                     <Box gridColumn="span 12">
                         <Typography variant="body1" color="text.secondary" align="center">
-                            You haven't created any collections yet.
+                            Aún no has creado ninguna colección.
                         </Typography>
                     </Box>
                 )}

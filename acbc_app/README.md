@@ -1,10 +1,15 @@
-# Sophia.AI
-A descentralized, blockchain-backed library that uses AI to interact with and to certify documents.
+# Sophia.AI Academia Blockchain - Backend
+
+Django REST Framework backend for the Sophia.AI Academia Blockchain platform.
+
+> **Note**: For comprehensive documentation, see the [main documentation](../docs/README.md).
 
 **Test Server**
 https://sophia-ai.algobeat.com/
 https://sophia-ai-api.algobeat.com/
 ssh root@46.62.163.3
+
+## Quick Start
 
 **Installation**
 
@@ -78,3 +83,11 @@ docker-compose exec backend python manage.py populate_interactions
 docker-compose exec backend python manage.py test -v 2
 docker-compose exec backend python manage.py test quizzes -v 2
 docker-compose exec backend python manage.py test profiles.tests.test_token_refresh -v 2
+
+## Documentation
+
+- [Main Documentation](../docs/README.md)
+- [Backend Development](../docs/development/backend/)
+- [API Documentation](../docs/api/README.md)
+- [Architecture](../docs/architecture/overview.md)
+- [Local Development Setup](../docs/deployment/local-development.md)

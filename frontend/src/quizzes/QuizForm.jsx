@@ -35,7 +35,7 @@ const QuizForm = () => {
           
           if (!quizData.node) {
             console.error('Quiz is missing node information:', quizData);
-            setError('Quiz is missing node information');
+            setError('Al cuestionario le falta información del nodo');
             return;
           }
           
@@ -74,7 +74,7 @@ const QuizForm = () => {
           response: err.response?.data,
           status: err.response?.status
         });
-        setError('Failed to load data');
+        setError('Error al cargar los datos');
       } finally {
         setLoading(false);
       }
@@ -118,7 +118,7 @@ const QuizForm = () => {
         headers: err.response?.headers
       });
       // Parse the error response
-      let errorMessage = `Failed to ${mode} quiz`;
+      let errorMessage = `Error al ${mode === 'create' ? 'crear' : 'actualizar'} el cuestionario`;
       
       if (err?.response?.data) {
         const errors = err.response.data;
@@ -207,7 +207,7 @@ const QuizForm = () => {
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>Cargando...</div>;
 
   return (
     <div className="container mx-auto p-4 bg-white">
@@ -216,12 +216,12 @@ const QuizForm = () => {
           onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
           className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
         >
-          ← Back to Knowledge Path
+          ← Volver a la Ruta de Conocimiento
         </button>
       </div>
 
       <h1 className="text-2xl font-bold mb-4 text-gray-900">
-        {mode === 'create' ? 'Create Quiz' : 'Edit Quiz'}
+        {mode === 'create' ? 'Crear Cuestionario' : 'Editar Cuestionario'}
       </h1>
       
       {error && (
@@ -233,7 +233,7 @@ const QuizForm = () => {
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
         <div>
           <label className="block text-gray-900 font-bold mb-2">
-            Select Preceding Node
+            Seleccionar Nodo Precedente
           </label>
           <select
             value={quizData.precedingNodeId}
@@ -241,7 +241,7 @@ const QuizForm = () => {
             required
             className="w-full p-2 border rounded text-gray-900"
           >
-            <option value="">Select a node...</option>
+            <option value="">Seleccionar un nodo...</option>
             {nodes.map(node => (
               <option key={node.id} value={node.id}>
                 {node.title}
@@ -252,7 +252,7 @@ const QuizForm = () => {
 
         <div>
           <label className="block text-gray-900 font-bold mb-2">
-            Quiz Title
+            Título del Cuestionario
           </label>
           <input
             type="text"
@@ -265,7 +265,7 @@ const QuizForm = () => {
 
         <div>
           <label className="block text-gray-900 font-bold mb-2">
-            Quiz Description
+            Descripción del Cuestionario
           </label>
           <textarea
             value={quizData.description}
@@ -276,13 +276,13 @@ const QuizForm = () => {
         </div>
 
         <div className="space-y-6">
-          <h2 className="text-xl font-bold text-gray-900">Questions</h2>
+          <h2 className="text-xl font-bold text-gray-900">Preguntas</h2>
           
           {quizData.questions.map((question, qIndex) => (
             <div key={qIndex} className="p-4 border rounded space-y-4">
               <div>
                 <label className="block text-gray-900 font-bold mb-2">
-                  Question Text
+                  Texto de la Pregunta
                 </label>
                 <textarea
                   value={question.text}
@@ -294,21 +294,21 @@ const QuizForm = () => {
 
               <div>
                 <label className="block text-gray-900 font-bold mb-2">
-                  Question Type
+                  Tipo de Pregunta
                 </label>
                 <select
                   value={question.questionType}
                   onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
                   className="w-full p-2 border rounded text-gray-900"
                 >
-                  <option value="SINGLE">Single Choice</option>
-                  <option value="MULTIPLE">Multiple Choice</option>
+                  <option value="SINGLE">Opción Única</option>
+                  <option value="MULTIPLE">Opción Múltiple</option>
                 </select>
               </div>
 
               <div className="space-y-2">
                 <label className="block text-gray-900 font-bold mb-2">
-                  Options
+                  Opciones
                 </label>
                 {question.options.map((option, oIndex) => (
                   <div key={oIndex} className="flex items-center space-x-2">
@@ -324,7 +324,7 @@ const QuizForm = () => {
                       value={option.text}
                       onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
                       className="flex-1 p-2 border rounded text-gray-900"
-                      placeholder="Option text"
+                      placeholder="Texto de la opción"
                       required
                     />
                     <button
@@ -336,7 +336,7 @@ const QuizForm = () => {
                       }}
                       className="text-red-600"
                     >
-                      Remove
+                      Eliminar
                     </button>
                   </div>
                 ))}
@@ -349,7 +349,7 @@ const QuizForm = () => {
                   }}
                   className="text-blue-600"
                 >
-                  Add Option
+                  Agregar Opción
                 </button>
               </div>
             </div>
@@ -360,13 +360,13 @@ const QuizForm = () => {
             onClick={handleAddQuestion}
             className="bg-green-500 text-white px-4 py-2 rounded"
           >
-            Add Question
+            Agregar Pregunta
           </button>
         </div>
 
         <div>
           <label className="block text-gray-900 font-bold mb-2">
-            Maximum Attempts Per Day
+            Intentos Máximos por Día
           </label>
           <select
             value={quizData.max_attempts_per_day}
@@ -384,12 +384,12 @@ const QuizForm = () => {
           >
             {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
               <option key={num} value={num}>
-                {num} attempts
+                {num} intentos
               </option>
             ))}
           </select>
           <p className="text-sm text-gray-600 mt-1">
-            Set how many times a student can attempt this quiz per day
+            Establezca cuántas veces un estudiante puede intentar este cuestionario por día
           </p>
         </div>
 
@@ -398,7 +398,7 @@ const QuizForm = () => {
             type="submit"
             className="bg-blue-500 text-white px-6 py-2 rounded"
           >
-            {mode === 'create' ? 'Create Quiz' : 'Update Quiz'}
+            {mode === 'create' ? 'Crear Cuestionario' : 'Actualizar Cuestionario'}
           </button>
         </div>
       </form>

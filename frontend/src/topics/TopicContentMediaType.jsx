@@ -46,7 +46,7 @@ const TopicContentMediaType = () => {
                     status: err.response?.status,
                     data: err.response?.data
                 });
-                setError('Failed to fetch topic or content details');
+                setError('Error al cargar los detalles del tema o del contenido');
                 setLoading(false);
             }
         };
@@ -75,7 +75,7 @@ const TopicContentMediaType = () => {
                 return (
                     <CardContent>
                         <Typography variant="body2" color="text.secondary" noWrap>
-                            {content.file_details?.text || 'No preview available'}
+                            {content.file_details?.text || 'Vista previa no disponible'}
                         </Typography>
                     </CardContent>
                 );
@@ -105,7 +105,7 @@ const TopicContentMediaType = () => {
                             }}
                         >
                             <Typography variant="body1" color="white">
-                                Click to play video
+                                Haz clic para reproducir el video
                             </Typography>
                         </Box>
                     </Box>
@@ -118,7 +118,7 @@ const TopicContentMediaType = () => {
                             style={{ width: '100%' }}
                         >
                             <source src={content.file_details?.url} type="audio/mpeg" />
-                            Your browser does not support the audio element.
+                            Tu navegador no soporta el elemento de audio.
                         </audio>
                     </Box>
                 );
@@ -127,12 +127,12 @@ const TopicContentMediaType = () => {
         }
     };
 
-    if (loading) return <Typography>Loading content...</Typography>;
+    if (loading) return <Typography>Cargando contenido...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!topic) return <Typography>Topic not found</Typography>;
+    if (!topic) return <Typography>Tema no encontrado</Typography>;
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
             <TopicHeader 
                 topic={topic}
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
@@ -147,8 +147,17 @@ const TopicContentMediaType = () => {
                     >
                         <ArrowBackIcon />
                     </IconButton>
-                    <Typography variant="h5" sx={{ textTransform: 'capitalize' }}>
-                        All {mediaType}s
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        textTransform: 'capitalize',
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "20px"
+                      }} 
+                      color="text.primary"
+                    >
+                        Todos los {mediaType}s
                     </Typography>
                 </Box>
 

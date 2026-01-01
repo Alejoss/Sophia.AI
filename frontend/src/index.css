@@ -1,18 +1,111 @@
-@import "tailwindcss";
-
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #fff;
+  
+  /* CSS Variables for Light Mode (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --text-primary: #213547;
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --border-color: #ddd;
+  --input-bg: #ffffff;
+  --input-text: #213547;
+  --input-placeholder: rgba(33, 53, 71, 0.5);
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark Mode CSS Variables - Comfortable colors for eyes */
+[data-theme="dark"] {
+  --bg-primary: #121212; /* Very dark gray (not pure black) */
+  --bg-secondary: #1E1E1E; /* Slightly lighter for cards/surfaces */
+  --text-primary: #E0E0E0; /* Off-white, easier on eyes */
+  --text-secondary: #B0B0B0; /* Softer gray for secondary text */
+  --border-color: #2C2C2C; /* Subtle border color */
+  --input-bg: #1E1E1E; /* Input background matches paper */
+  --input-text: #E0E0E0; /* Input text matches primary text */
+  --input-placeholder: rgba(176, 176, 176, 0.6); /* Softer placeholder */
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+/* Ensure all input elements have visible text */
+input,
+textarea,
+select {
+  color: var(--input-text) !important;
+  background-color: var(--input-bg) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder) !important;
+  opacity: 1;
+}
+
+/* Override any Tailwind or other classes that might hide text */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  color: var(--input-text) !important;
+  background-color: var(--input-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Radio buttons and checkboxes should not have white background */
+input[type="radio"],
+input[type="checkbox"] {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] input[type="radio"],
+[data-theme="dark"] input[type="checkbox"] {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Ensure input text is visible even with Tailwind classes (now removed but might be cached) */
+.text-gray-900,
+.text-gray-700,
+.text-gray-600,
+input.text-gray-900,
+input.text-gray-700,
+input.text-gray-600,
+textarea.text-gray-900,
+textarea.text-gray-700,
+textarea.text-gray-600,
+select.text-gray-900,
+select.text-gray-700,
+select.text-gray-600 {
+  color: var(--input-text) !important;
+  background-color: var(--input-bg) !important;
+}
+
+/* Ensure all inputs with common Tailwind-like classes have visible text */
+input[class*="text-"],
+textarea[class*="text-"],
+select[class*="text-"] {
+  color: var(--input-text) !important;
+  background-color: var(--input-bg) !important;
 }
 
 a {
@@ -36,20 +129,18 @@ h1 {
   line-height: 1.1;
 }
 
-/* Remove default button styles to let Tailwind handle them */
 button {
   cursor: pointer;
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-
   a:hover {
     color: #747bff;
   }
+}
+
+[data-theme="dark"] a:hover {
+  color: #747bff;
 }
 
 .login-wrapper {

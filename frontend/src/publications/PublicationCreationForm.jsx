@@ -54,7 +54,7 @@ const PublicationCreationForm = () => {
       await contentApi.createPublication(publicationData);
       navigate("/profiles/my_profile");
     } catch (err) {
-      setError("Failed to create publication");
+      setError("Error al crear la publicación");
       console.error("Error creating publication:", err);
     } finally {
       setIsLoading(false);
@@ -85,7 +85,7 @@ const PublicationCreationForm = () => {
     fontWeight: 600, // optional if you want it bolder
   }}
 >
-        Create New Publication
+        Crear Nueva Publicación
       </Typography>
 
       {showContentOptions && !content && (
@@ -103,7 +103,7 @@ const PublicationCreationForm = () => {
           }}
         >
           <Typography variant="h6" gutterBottom align="center">
-            Choose Content Source (Optional)
+            Elegir Fuente de Contenido (Opcional)
           </Typography>
           <Box
             sx={{
@@ -131,7 +131,7 @@ const PublicationCreationForm = () => {
               size="large"
               onClick={() => setShowContentModal(true)}
             >
-              Choose Content from Library
+              Elegir Contenido de la Biblioteca
             </Button>
             <Button
               variant="contained"
@@ -139,7 +139,7 @@ const PublicationCreationForm = () => {
               size="large"
               onClick={handleUploadClick}
             >
-              Upload New Content
+              Subir Nuevo Contenido
             </Button>
           </Box>
         </Paper>
@@ -155,7 +155,7 @@ const PublicationCreationForm = () => {
             }}
             sx={{ mb: 2 }}
           >
-            ← Back
+            ← Volver
           </Button>
           <UploadContentForm onContentUploaded={handleContentUpload} />
         </Box>
@@ -163,13 +163,13 @@ const PublicationCreationForm = () => {
 
       <Paper elevation={2} sx={{ p: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Publication Details
+          Detalles de la Publicación
         </Typography>
 
         {content && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
-              Selected Content:
+              Contenido Seleccionado:
             </Typography>
             {console.log("Content being displayed:", content)}
             <Paper
@@ -198,7 +198,7 @@ const PublicationCreationForm = () => {
                       alt={
                         content.title ||
                         content.content?.original_title ||
-                        "Untitled"
+                        "Sin título"
                       }
                       style={{
                         maxWidth: "100%",
@@ -236,7 +236,7 @@ const PublicationCreationForm = () => {
                     >
                       {content.title ||
                         content.content?.original_title ||
-                        "Untitled"}
+                        "Sin título"}
                     </Typography>
                   </Box>
                 )}
@@ -244,7 +244,7 @@ const PublicationCreationForm = () => {
                 {content.title || content.content?.original_title || "Untitled"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Type: {content.content?.media_type}
+                Tipo: {content.content?.media_type}
               </Typography>
             </Paper>
             <Button
@@ -256,7 +256,7 @@ const PublicationCreationForm = () => {
               }}
               sx={{ mt: 1 }}
             >
-              Remove Content
+              Eliminar Contenido
             </Button>
           </Box>
         )}
@@ -265,7 +265,7 @@ const PublicationCreationForm = () => {
           fullWidth
           multiline
           rows={4}
-          label="Text Content"
+          label="Contenido de Texto"
           value={formData.text_content}
           onChange={(e) =>
             setFormData({ ...formData, text_content: e.target.value })
@@ -290,14 +290,14 @@ const PublicationCreationForm = () => {
             onClick={handleCancel}
             disabled={isLoading || isUploading}
           >
-            Cancel
+            Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
             disabled={isLoading || isUploading}
           >
-            {isLoading ? "Creating..." : "Create Publication"}
+            {isLoading ? "Creando..." : "Crear Publicación"}
           </Button>
         </Box>
       </Paper>

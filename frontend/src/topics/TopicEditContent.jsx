@@ -40,7 +40,7 @@ const TopicEditContent = () => {
                 setTopicData(data);
                 setLoading(false);
             } catch (err) {
-                setError('Failed to fetch topic content');
+                setError('Error al cargar el contenido del tema');
                 setLoading(false);
             }
         };
@@ -57,7 +57,7 @@ const TopicEditContent = () => {
             setTopicData(data);
             setSaving(false);
         } catch (err) {
-            setError('Failed to remove content from topic');
+            setError('Error al eliminar contenido del tema');
             setSaving(false);
         }
     };
@@ -78,7 +78,7 @@ const TopicEditContent = () => {
             setSaving(false);
         } catch (error) {
             console.error('Failed to add content to topic:', error);
-            setError('Failed to add content to topic');
+            setError('Error al agregar contenido al tema');
             setSaving(false);
         }
     };
@@ -99,15 +99,15 @@ const TopicEditContent = () => {
         return !isInTopic;
     };
 
-    if (loading) return <Typography>Loading topic content...</Typography>;
+    if (loading) return <Typography>Cargando contenido del tema...</Typography>;
     if (error) return <Alert severity="error">{error}</Alert>;
-    if (!topicData) return <Alert severity="error">Topic not found</Alert>;
+    if (!topicData) return <Alert severity="error">Tema no encontrado</Alert>;
 
     if (showAddContent) {
         return (
             <LibrarySelectMultiple
-                title="Add Content to Topic"
-                description="Select content from your library to add to this topic"
+                title="Agregar Contenido al Tema"
+                description="Selecciona contenido de tu biblioteca para agregar a este tema"
                 onCancel={handleCancelAdd}
                 onSave={handleSaveAdd}
                 filterFunction={filterContent}
@@ -117,7 +117,7 @@ const TopicEditContent = () => {
     }
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
           <Box
   sx={{
@@ -141,7 +141,16 @@ const TopicEditContent = () => {
                     >
                         <ArrowBackIcon />
                     </IconButton>
-                    <Typography variant="h4" sx={{ flexGrow: 1 }}>
+                    <Typography 
+                      variant="h4" 
+                      sx={{ 
+                        flexGrow: 1,
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "24px"
+                      }} 
+                      color="text.primary"
+                    >
                         {topicData.title}
                     </Typography>
                     <Button
@@ -150,7 +159,7 @@ const TopicEditContent = () => {
                         startIcon={<AddIcon />}
                         onClick={() => setShowAddContent(true)}
                     >
-                        Add content from your library
+                        Agregar contenido de tu biblioteca
                     </Button>
                 </Box>
 
@@ -164,19 +173,28 @@ const TopicEditContent = () => {
 
                 <Divider sx={{ my: 3 }} />
 
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Content in Topic ({topicData.contents.length})
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    mb: 2,
+                    fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "18px"
+                  }} 
+                  color="text.primary"
+                >
+                    Contenido en el Tema ({topicData.contents.length})
                 </Typography>
 
                 <TableContainer>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Title</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Author</TableCell>
-                                <TableCell>View</TableCell>
-                                <TableCell>Actions</TableCell>
+                                <TableCell>Título</TableCell>
+                                <TableCell>Tipo</TableCell>
+                                <TableCell>Autor</TableCell>
+                                <TableCell>Ver</TableCell>
+                                <TableCell>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -186,7 +204,7 @@ const TopicEditContent = () => {
                                     hover
                                     sx={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{contentProfile.title || 'Untitled'}</TableCell>
+                                    <TableCell>{contentProfile.title || 'Sin título'}</TableCell>
                                     <TableCell>
                                         <Chip 
                                             label={contentProfile.content.media_type} 
@@ -194,7 +212,7 @@ const TopicEditContent = () => {
                                             color="primary"
                                         />
                                     </TableCell>
-                                    <TableCell>{contentProfile.author || 'Unknown'}</TableCell>
+                                    <TableCell>{contentProfile.author || 'Desconocido'}</TableCell>
                                     <TableCell>
                                         <MuiLink
                                             href={`/content/${contentProfile.content.id}`}
@@ -211,7 +229,7 @@ const TopicEditContent = () => {
                                                 }
                                             }}
                                         >
-                                            View
+                                            Ver
                                             <OpenInNewIcon fontSize="small" />
                                         </MuiLink>
                                     </TableCell>
@@ -223,7 +241,7 @@ const TopicEditContent = () => {
                                             onClick={() => handleContentRemove(contentProfile.content.id)}
                                             disabled={saving}
                                         >
-                                            Remove
+                                            Eliminar
                                         </Button>
                                     </TableCell>
                                 </TableRow>

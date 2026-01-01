@@ -86,7 +86,7 @@ const NodeDetail = () => {
       } catch (err) {
         console.error('❌ Error fetching data:', err);
         if (isMounted) {
-          setError('Failed to load node');
+          setError('Error al cargar el nodo');
         }
       } finally {
         if (isMounted) {
@@ -113,7 +113,7 @@ const NodeDetail = () => {
       console.log('Response from marking node completed:', response);
     } catch (error) {
       console.error('Error marking node as completed:', error);
-      setError('Failed to mark node as completed');
+      setError('Error al marcar el nodo como completado');
       return;
     }
 
@@ -138,7 +138,7 @@ const NodeDetail = () => {
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh"><CircularProgress /></Box>;
   if (error) return <Box className="container mx-auto p-4 text-red-600">{error}</Box>;
-  if (!node) return <Box className="container mx-auto p-4">Node not found</Box>;
+  if (!node) return <Box className="container mx-auto p-4">Nodo no encontrado</Box>;
 
   console.log('🧩 Ready to render with node:', {
     id: node.id, 
@@ -192,12 +192,12 @@ const NodeDetail = () => {
               <Alert severity="info" sx={{ mb: 2 }}>
                 <div>
                   <Typography variant="body1" gutterBottom>
-                    This node doesn't have any attached content.
+                    Este nodo no tiene contenido adjunto.
                   </Typography>
                   {node.media_type && (
                     <Chip 
                       icon={getMediaTypeIcon(node.media_type)} 
-                      label={`Media type: ${node.media_type}`} 
+                      label={`Tipo de medio: ${node.media_type}`} 
                       color="primary" 
                       variant="outlined" 
                     />
@@ -210,7 +210,7 @@ const NodeDetail = () => {
           {/* Description */}
           {node.description && (
             <div className="mt-4">
-              <Typography variant="h6" sx={{ mb: 1 }}>Node Description</Typography>
+              <Typography variant="h6" sx={{ mb: 1 }}>Descripción del Nodo</Typography>
               <Typography>{node.description}</Typography>
             </div>
           )}
@@ -219,9 +219,9 @@ const NodeDetail = () => {
           {node.quizzes && node.quizzes.length > 0 && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <h2 className="text-lg font-semibold text-blue-700">
-                Quiz: {node.quizzes[0].title || "Node includes a quiz"}                
+                Cuestionario: {node.quizzes[0].title || "El nodo incluye un cuestionario"}                
               </h2>
-              <p>Mark the node as completed to take the quiz</p>
+              <p>Marca el nodo como completado para realizar el cuestionario</p>
             </div>
           )}
 
@@ -232,7 +232,7 @@ const NodeDetail = () => {
                 onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}`)}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
               >
-                ← Previous
+                ← Anterior
               </button>
             )}
             {user && user.username === knowledgePath?.author && (
@@ -240,14 +240,14 @@ const NodeDetail = () => {
                 to={`/knowledge_path/${pathId}/nodes/${nodeId}/edit`}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
               >
-                Edit Node
+                Editar Nodo
               </Link>
             )}
             <Link
               to={`/knowledge_path/${pathId}`}
               className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg transition-colors"
             >
-              Back to Path
+              Volver a la Ruta
             </Link>
             {node.is_completed ? (
               <button
@@ -262,14 +262,14 @@ const NodeDetail = () => {
                 className={`${nextNode ? 'bg-green-500 hover:bg-green-700' : 'bg-gray-500'} text-white font-bold py-2 px-4 rounded`}
                 disabled={!nextNode && !node.quizzes?.length}
               >
-                Already Completed {nextNode ? ': Next →' : ''}
+                Ya Completado {nextNode ? ': Siguiente →' : ''}
               </button>
             ) : (
               <button
                 onClick={handleComplete}
                 className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
               >
-                Mark as Completed
+                Marcar como Completado
               </button>
             )}
           </div>

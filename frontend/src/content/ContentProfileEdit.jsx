@@ -61,7 +61,7 @@ const ContentProfileEdit = () => {
                     is_producer: profile?.is_producer ?? false,
                 });
             } catch (err) {
-                setError('Failed to load content');
+                setError('Error al cargar el contenido');
                 console.error(err);
             }
         };
@@ -79,16 +79,16 @@ const ContentProfileEdit = () => {
         e.preventDefault();
         try {
             if (!content.selected_profile?.id) {
-                setError('No content profile found');
+                setError('No se encontró el perfil de contenido');
                 return;
             }
             await contentApi.updateContentProfile(content.selected_profile.id, formData);
             navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`);
         } catch (err) {
             if (err.response?.data?.error?.includes('producer')) {
-                setError('You must claim to be the producer to change visibility');
+                setError('Debes reclamar ser el productor para cambiar la visibilidad');
             } else {
-                setError('Failed to update content');
+                setError('Error al actualizar el contenido');
             }
             console.error(err);
         }
@@ -99,25 +99,25 @@ const ContentProfileEdit = () => {
             await contentApi.deleteContent(contentId);
             navigate('/content/library_user');
         } catch (err) {
-            setError('Failed to delete content');
+            setError('Error al eliminar el contenido');
             console.error(err);
         }
     };
 
-    if (!content) return <div>Loading...</div>;
+    if (!content) return <div>Cargando...</div>;
 
     return (
         <Box sx={{ maxWidth: 1400, margin: '0 auto', padding: 2, pt: 12 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4" gutterBottom>
-                    Edit Content Profile
+                    Editar perfil de contenido
                 </Typography>
                 <Button
                     variant="outlined"
                     size="small"
                     onClick={() => navigate(`/content/${contentId}/source-edit`)}
                 >
-                    Edit content source
+                    Editar fuente del contenido
                 </Button>
             </Box>
 
@@ -132,17 +132,17 @@ const ContentProfileEdit = () => {
                 <Grid item xs={12} md={6}>
                     <Card sx={{ padding: 3, height: 'fit-content' }}>
                         <Typography variant="h6" gutterBottom>
-                            Content Profile Information
+                            Información del perfil de contenido
                         </Typography>
                         
                         <Box sx={{ mb: 2 }}>
                             <Chip 
-                                label={content.media_type || content.content?.media_type || 'UNKNOWN'} 
+                                label={content.media_type || content.content?.media_type || 'DESCONOCIDO'} 
                                 color="primary" 
                                 sx={{ mr: 1 }}
                             />
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                Uploaded: {formatDate(content.created_at)}
+                                Subido: {formatDate(content.created_at)}
                             </Typography>
                         </Box>
 
@@ -150,10 +150,10 @@ const ContentProfileEdit = () => {
                         {content.file_details && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                    File Details:
+                                    Detalles del archivo:
                                 </Typography>
                                 <Typography variant="body2">
-                                    Size: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
+                                    Tamaño: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
                                 </Typography>
                                 {content.file_details.file && (
                                     <Button
@@ -165,7 +165,7 @@ const ContentProfileEdit = () => {
                                         download
                                         sx={{ mt: 1 }}
                                     >
-                                        Download File
+                                        Descargar archivo
                                     </Button>
                                 )}
                             </Box>
@@ -177,25 +177,25 @@ const ContentProfileEdit = () => {
                         <form onSubmit={handleSubmit}>
                             <TextField
                                 fullWidth
-                                label="Title"
+                                label="Título"
                                 name="title"
                                 value={formData.title}
                                 onChange={handleChange}
                                 margin="normal"
-                                helperText={content.original_title && `Original title: ${content.original_title}`}
+                                helperText={content.original_title && `Título original: ${content.original_title}`}
                             />
                             <TextField
                                 fullWidth
-                                label="Author"
+                                label="Autor"
                                 name="author"
                                 value={formData.author}
                                 onChange={handleChange}
                                 margin="normal"
-                                helperText={content.original_author && `Original author: ${content.original_author}`}
+                                helperText={content.original_author && `Autor original: ${content.original_author}`}
                             />
                             <TextField
                                 fullWidth
-                                label="Personal Note"
+                                label="Nota personal"
                                 name="personal_note"
                                 value={formData.personal_note}
                                 onChange={handleChange}
@@ -211,7 +211,7 @@ const ContentProfileEdit = () => {
                                         name="is_producer"
                                     />
                                 }
-                                label="I've produced this content"
+                                label="He producido este contenido"
                                 sx={{ mt: 2 }}
                             />
                             {formData.is_producer && (
@@ -224,11 +224,11 @@ const ContentProfileEdit = () => {
                                                 name="is_visible"
                                             />
                                         }
-                                        label="Visible in search results"
+                                        label="Visible en los resultados de búsqueda"
                                         sx={{ mt: 1, ml: 4 }}
                                     />
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 5 }}>
-                                        Note: Only the producer of the content can make it invisible in search results.
+                                        Nota: Solo el productor del contenido puede hacerlo invisible en los resultados de búsqueda.
                                     </Typography>
                                 </>
                             )}
@@ -239,7 +239,7 @@ const ContentProfileEdit = () => {
                                     color="error"
                                     onClick={() => setDeleteDialogOpen(true)}
                                 >
-                                    Delete Content
+                                    Eliminar contenido
                                 </Button>
                                 <Box>
                                     <Button
@@ -247,14 +247,14 @@ const ContentProfileEdit = () => {
                                         onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
                                         sx={{ mr: 1 }}
                                     >
-                                        Cancel
+                                        Cancelar
                                     </Button>
                                     <Button
                                         variant="contained"
                                         color="primary"
                                         type="submit"
                                     >
-                                        Save Changes
+                                        Guardar cambios
                                     </Button>
                                 </Box>
                             </Box>
@@ -266,7 +266,7 @@ const ContentProfileEdit = () => {
                 <Grid item xs={12} md={6}>
                     <Card sx={{ padding: 3 }}>
                         <Typography variant="h6" gutterBottom>
-                            Content Preview
+                            Vista previa del contenido
                         </Typography>
                         <ContentDisplay 
                             content={content}
@@ -282,14 +282,14 @@ const ContentProfileEdit = () => {
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
             >
-                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogTitle>Confirmar eliminación</DialogTitle>
                 <DialogContent>
-                    Are you sure you want to delete this content? This action cannot be undone.
+                    ¿Estás seguro de que deseas eliminar este contenido? Esta acción no se puede deshacer.
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
                     <Button onClick={handleDelete} color="error">
-                        Delete
+                        Eliminar
                     </Button>
                 </DialogActions>
             </Dialog>

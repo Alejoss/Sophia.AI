@@ -36,7 +36,7 @@ def notify_comment_reply(comment):
                 recipient=comment.parent.author,
                 actor_content_type=ContentType.objects.get_for_model(comment.author),
                 actor_object_id=comment.author.id,
-                verb='replied to',
+                verb='respondió a',
                 action_object_content_type=comment_ct,
                 action_object_object_id=comment.id,
                 target_content_type=parent_ct,
@@ -56,12 +56,12 @@ def notify_comment_reply(comment):
                 recipient=comment.parent.author,
                 actor_content_type=ContentType.objects.get_for_model(comment.author),
                 actor_object_id=comment.author.id,
-                verb='replied to',
+                verb='respondió a',
                 action_object_content_type=comment_ct,
                 action_object_object_id=comment.id,
                 target_content_type=parent_ct,
                 target_object_id=comment.parent.id,
-                description=f'{comment.author.username} replied to your comment'
+                description=f'{comment.author.username} respondió a tu comentario'
             )
             logger.info("Comment reply notification created successfully", extra={
                 'notification_id': notification.id,
@@ -154,7 +154,7 @@ def notify_knowledge_path_comment(comment):
             recipient=knowledge_path.author,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='commented on your knowledge path',
+            verb='comentó en tu ruta de conocimiento',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=knowledge_path_ct,
@@ -174,12 +174,12 @@ def notify_knowledge_path_comment(comment):
             recipient=knowledge_path.author,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='commented on your knowledge path',
+            verb='comentó en tu ruta de conocimiento',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id,
-            description=f'{comment.author.username} commented on your knowledge path "{knowledge_path.title}": {comment.body[:50]}...'
+            description=f'{comment.author.username} comentó en tu ruta de conocimiento "{knowledge_path.title}": {comment.body[:50]}...'
         )
         logger.info("Knowledge path comment notification created successfully", extra={
             'notification_id': notification.id,
@@ -268,7 +268,7 @@ def notify_content_comment(comment):
             recipient=content_profile.user,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='commented on your content',
+            verb='comentó en tu contenido',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=content_profile_ct,
@@ -288,12 +288,12 @@ def notify_content_comment(comment):
             recipient=content_profile.user,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='commented on your content',
+            verb='comentó en tu contenido',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=content_profile_ct,
             target_object_id=content_profile.id,
-            description=f'{comment.author.username} commented on your content "{content_profile.display_title}": {comment.body[:50]}...'
+            description=f'{comment.author.username} comentó en tu contenido "{content_profile.display_title}": {comment.body[:50]}...'
         )
         logger.info("Content comment notification created successfully", extra={
             'notification_id': notification.id,
@@ -364,7 +364,7 @@ def notify_knowledge_path_completion(user, knowledge_path):
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completed your knowledge path',
+        verb='completó tu ruta de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id
     )
@@ -382,10 +382,10 @@ def notify_knowledge_path_completion(user, knowledge_path):
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completed your knowledge path',
+        verb='completó tu ruta de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id,
-        description=f'{user.username} completed your knowledge path "{knowledge_path.title}"'
+        description=f'{user.username} completó tu ruta de conocimiento "{knowledge_path.title}"'
     )
     logger.info("Knowledge path completion notification created successfully", extra={
         'notification_id': notification.id,
@@ -453,7 +453,7 @@ def notify_certificate_request(certificate_request):
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='requested a certificate for your knowledge path',
+        verb='solicitó un certificado para tu ruta de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
         timestamp__gte=recent_cutoff
@@ -472,10 +472,10 @@ def notify_certificate_request(certificate_request):
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='requested a certificate for your knowledge path',
+        verb='solicitó un certificado para tu ruta de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.requester.username} requested a certificate for your knowledge path "{certificate_request.knowledge_path.title}"'
+        description=f'{certificate_request.requester.username} solicitó un certificado para tu ruta de conocimiento "{certificate_request.knowledge_path.title}"'
     )
     logger.info("Certificate request notification created successfully", extra={
         'notification_id': notification.id,
@@ -530,7 +530,7 @@ def notify_certificate_approval(certificate_request):
         recipient=certificate_request.requester,
         actor_content_type=approver_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='approved your certificate request for',
+        verb='aprobó tu solicitud de certificado para',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id
     )
@@ -548,10 +548,10 @@ def notify_certificate_approval(certificate_request):
         recipient=certificate_request.requester,
         actor_content_type=approver_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='approved your certificate request for',
+        verb='aprobó tu solicitud de certificado para',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.knowledge_path.author.username} approved your certificate request for "{certificate_request.knowledge_path.title}"'
+        description=f'{certificate_request.knowledge_path.author.username} aprobó tu solicitud de certificado para "{certificate_request.knowledge_path.title}"'
     )
     logger.info("Certificate approval notification created successfully", extra={
         'notification_id': notification.id,
@@ -606,7 +606,7 @@ def notify_certificate_rejection(certificate_request):
         recipient=certificate_request.requester,
         actor_content_type=rejector_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='rejected your certificate request for',
+        verb='rechazó tu solicitud de certificado para',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id
     )
@@ -624,10 +624,10 @@ def notify_certificate_rejection(certificate_request):
         recipient=certificate_request.requester,
         actor_content_type=rejector_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='rejected your certificate request for',
+        verb='rechazó tu solicitud de certificado para',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.knowledge_path.author.username} rejected your certificate request for "{certificate_request.knowledge_path.title}"'
+        description=f'{certificate_request.knowledge_path.author.username} rechazó tu solicitud de certificado para "{certificate_request.knowledge_path.title}"'
     )
     logger.info("Certificate rejection notification created successfully", extra={
         'notification_id': notification.id,
@@ -709,7 +709,7 @@ def notify_content_upvote(vote):
             recipient=content.uploaded_by,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='upvoted your content',
+            verb='votó positivamente tu contenido',
             target_content_type=content_ct,
             target_object_id=content.id
         )
@@ -727,10 +727,10 @@ def notify_content_upvote(vote):
             recipient=content.uploaded_by,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='upvoted your content',
+            verb='votó positivamente tu contenido',
             target_content_type=content_ct,
             target_object_id=content.id,
-            description=f'{vote.user.username} upvoted your content "{content.original_title}"'
+            description=f'{vote.user.username} votó positivamente tu contenido "{content.original_title}"'
         )
         logger.info("Content upvote notification created successfully", extra={
             'notification_id': notification.id,
@@ -818,7 +818,7 @@ def notify_knowledge_path_upvote(vote):
             recipient=knowledge_path.author,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='upvoted your knowledge path',
+            verb='votó positivamente tu ruta de conocimiento',
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id
         )
@@ -836,10 +836,10 @@ def notify_knowledge_path_upvote(vote):
             recipient=knowledge_path.author,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='upvoted your knowledge path',
+            verb='votó positivamente tu ruta de conocimiento',
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id,
-            description=f'{vote.user.username} upvoted your knowledge path "{knowledge_path.title}"'
+            description=f'{vote.user.username} votó positivamente tu ruta de conocimiento "{knowledge_path.title}"'
         )
         logger.info("Knowledge path upvote notification created successfully", extra={
             'notification_id': notification.id,
@@ -919,7 +919,7 @@ def notify_event_registration(registration):
             recipient=registration.event.owner,
             actor_content_type=registrant_ct,
             actor_object_id=registration.user.id,
-            verb='registered for your event',
+            verb='se registró en tu evento',
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
@@ -937,10 +937,10 @@ def notify_event_registration(registration):
             recipient=registration.event.owner,
             actor_content_type=registrant_ct,
             actor_object_id=registration.user.id,
-            verb='registered for your event',
+            verb='se registró en tu evento',
             target_content_type=event_ct,
             target_object_id=registration.event.id,
-            description=f'{registration.user.username} registered for your event "{registration.event.title}"'
+            description=f'{registration.user.username} se registró en tu evento "{registration.event.title}"'
         )
         logger.info("Event registration notification created successfully", extra={
             'notification_id': notification.id,
@@ -1021,7 +1021,7 @@ def notify_payment_accepted(registration):
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
-            verb='accepted your payment for',
+            verb='aceptó tu pago para',
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
@@ -1039,10 +1039,10 @@ def notify_payment_accepted(registration):
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
-            verb='accepted your payment for',
+            verb='aceptó tu pago para',
             target_content_type=event_ct,
             target_object_id=registration.event.id,
-            description=f'{registration.event.owner.username} accepted your payment for "{registration.event.title}"'
+            description=f'{registration.event.owner.username} aceptó tu pago para "{registration.event.title}"'
         )
         logger.info("Payment accepted notification created successfully", extra={
             'notification_id': notification.id,
@@ -1123,7 +1123,7 @@ def notify_certificate_sent(registration):
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
-            verb='sent you a certificate for',
+            verb='te envió un certificado para',
             target_content_type=event_ct,
             target_object_id=registration.event.id
         )
@@ -1141,10 +1141,10 @@ def notify_certificate_sent(registration):
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
-            verb='sent you a certificate for',
+            verb='te envió un certificado para',
             target_content_type=event_ct,
             target_object_id=registration.event.id,
-            description=f'{registration.event.owner.username} sent you a certificate for "{registration.event.title}"'
+            description=f'{registration.event.owner.username} te envió un certificado para "{registration.event.title}"'
         )
         logger.info("Certificate sent notification created successfully", extra={
             'notification_id': notification.id,

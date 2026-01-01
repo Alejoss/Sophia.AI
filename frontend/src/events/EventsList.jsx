@@ -21,7 +21,7 @@ const EventsList = () => {
       } else if (typeof err === 'string') {
         setError(err);
       } else {
-        setError('Failed to load events. Please try again.');
+        setError('Error al cargar eventos. Por favor, inténtelo de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -35,7 +35,7 @@ const EventsList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -43,15 +43,15 @@ const EventsList = () => {
         minute: '2-digit'
       });
     } catch (error) {
-      return 'Invalid Date';
+      return 'Fecha inválida';
     }
   };
 
   const getEventTypeLabel = (eventType) => {
     const typeMap = {
-      'LIVE_COURSE': 'Live Course',
-      'LIVE_CERTIFICATION': 'Live Certification',
-      'LIVE_MASTER_CLASS': 'Live Master Class'
+      'LIVE_COURSE': 'Curso en Vivo',
+      'LIVE_CERTIFICATION': 'Certificación en Vivo',
+      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
     };
     return typeMap[eventType] || eventType;
   };
@@ -74,8 +74,8 @@ const EventsList = () => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>Events</h2>
-          <div className="loading-spinner">Loading events...</div>
+          <h2>Eventos</h2>
+          <div className="loading-spinner">Cargando eventos...</div>
         </div>
       </div>
     );
@@ -85,10 +85,10 @@ const EventsList = () => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>Events</h2>
+          <h2>Eventos</h2>
           <div className="error-message">{error}</div>
           <button onClick={loadEvents} className="btn btn-primary">
-            Try Again
+            Intentar de nuevo
           </button>
         </div>
       </div>
@@ -98,22 +98,22 @@ const EventsList = () => {
   return (
     <div className="events-list-container">
       <div className="events-header">
-        <h2>Events</h2>
+        <h2>Eventos</h2>
         <div className="events-header-actions">
           <Link to="/profiles/my_events" className="btn btn-secondary">
-            My Events
+            Mis Eventos
           </Link>
           <Link to="/events/create" className="btn btn-primary">
-            Create Event
+            Crear Evento
           </Link>
         </div>
       </div>
 
       {events.length === 0 ? (
         <div className="text-center">
-          <p>No events found.</p>
+          <p>No se encontraron eventos.</p>
           <Link to="/events/create" className="btn btn-primary">
-            Create Your First Event
+            Crear tu Primer Evento
           </Link>
         </div>
       ) : (
@@ -140,7 +140,7 @@ const EventsList = () => {
                 </div>
               )}
               <div className="event-header">
-                <h3>{event.title || 'Untitled Event'}</h3>
+                <h3>{event.title || 'Evento sin título'}</h3>
                 <span className={`event-type ${event.event_type?.toLowerCase() || 'unknown'}`}>
                   {getEventTypeLabel(event.event_type)}
                 </span>
@@ -152,17 +152,17 @@ const EventsList = () => {
                     ? (event.description.length > 150 
                         ? `${event.description.substring(0, 150)}...` 
                         : event.description)
-                    : 'No description available'}
+                    : 'No hay descripción disponible'}
                 </p>
                 
                 <div className="event-meta">
                   <div className="event-info">
-                    <strong>Host:</strong> {event.owner?.username || 'Unknown'}
+                    <strong>Anfitrión:</strong> {event.owner?.username || 'Desconocido'}
                   </div>
                   
                   {event.platform && (
                     <div className="event-info">
-                      <strong>Platform:</strong> {getPlatformLabel(event.platform)}
+                      <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
                       {event.platform === 'other' && event.other_platform && (
                         <span> ({event.other_platform})</span>
                       )}
@@ -171,17 +171,17 @@ const EventsList = () => {
                   
                   {event.reference_price > 0 && (
                     <div className="event-info">
-                      <strong>Price:</strong> ${event.reference_price}
+                      <strong>Precio:</strong> ${event.reference_price}
                     </div>
                   )}
                   
                   <div className="event-info">
-                    <strong>Start:</strong> {formatDate(event.date_start)}
+                    <strong>Inicio:</strong> {formatDate(event.date_start)}
                   </div>
                   
                   {event.date_end && (
                     <div className="event-info">
-                      <strong>End:</strong> {formatDate(event.date_end)}
+                      <strong>Fin:</strong> {formatDate(event.date_end)}
                     </div>
                   )}
                   
@@ -191,7 +191,7 @@ const EventsList = () => {
               
               <div className="event-actions">
                 <Link to={`/events/${event.id}`} className="btn btn-secondary">
-                  View Details
+                  Ver Detalles
                 </Link>
               </div>
             </div>

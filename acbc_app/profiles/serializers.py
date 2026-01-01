@@ -21,12 +21,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("A user with that email already exists.")
+            raise serializers.ValidationError("Ya existe un usuario con ese correo electrónico.")
         return value
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with that username already exists.")
+            raise serializers.ValidationError("Ya existe un usuario con ese nombre de usuario.")
         return value
 
     def create(self, validated_data):
@@ -140,11 +140,11 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_context_title(self, obj):
         try:
             # For knowledge path comments
-            if obj.verb == 'commented on your knowledge path' and obj.target:
+            if obj.verb == 'comentó en tu ruta de conocimiento' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
             
             # For comment replies
-            if obj.verb == 'replied to' and obj.action_object:
+            if obj.verb == 'respondió a' and obj.action_object:
                 comment = obj.action_object
                 if comment and comment.content_object:
                     if hasattr(comment.content_object, 'title'):
@@ -153,15 +153,15 @@ class NotificationSerializer(serializers.ModelSerializer):
                         return comment.content_object.name
             
             # For event registrations
-            if obj.verb == 'registered for your event' and obj.target:
+            if obj.verb == 'se registró en tu evento' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
             
             # For payment accepted
-            if obj.verb == 'accepted your payment for' and obj.target:
+            if obj.verb == 'aceptó tu pago para' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
             
             # For certificate sent
-            if obj.verb == 'sent you a certificate for' and obj.target:
+            if obj.verb == 'te envió un certificado para' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
                 
             return None
@@ -176,38 +176,38 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_target_url(self, obj):
         try:
             # For knowledge path comments
-            if obj.verb == 'commented on your knowledge path' and obj.target:
+            if obj.verb == 'comentó en tu ruta de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For knowledge path completion
-            if obj.verb == 'completed your knowledge path' and obj.target:
+            if obj.verb == 'completó tu ruta de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For comment replies
-            if obj.verb == 'replied to' and obj.action_object:
+            if obj.verb == 'respondió a' and obj.action_object:
                 comment = obj.action_object
                 if comment and comment.content_object:
                     if hasattr(comment.content_object, 'id'):
                         return f'/knowledge_path/{comment.content_object.id}'
             
             # For content upvotes
-            if obj.verb == 'upvoted your content' and obj.target:
+            if obj.verb == 'votó positivamente tu contenido' and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
             
             # For knowledge path upvotes
-            if obj.verb == 'upvoted your knowledge path' and obj.target:
+            if obj.verb == 'votó positivamente tu ruta de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For event registrations
-            if obj.verb == 'registered for your event' and obj.target:
+            if obj.verb == 'se registró en tu evento' and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For payment accepted
-            if obj.verb == 'accepted your payment for' and obj.target:
+            if obj.verb == 'aceptó tu pago para' and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For certificate sent
-            if obj.verb == 'sent you a certificate for' and obj.target:
+            if obj.verb == 'te envió un certificado para' and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
                 
             return None
@@ -220,27 +220,27 @@ class NotificationSerializer(serializers.ModelSerializer):
             return None
 
     def getNotificationDescription(self, notification):
-        if notification.verb == 'commented on your knowledge path':
-            return f"{notification.actor} commented on your knowledge path {notification.context_title}"
-        elif notification.verb == 'replied to':
-            return f"{notification.actor} replied to your comment in {notification.context_title}"
-        elif notification.verb == 'completed your knowledge path':
+        if notification.verb == 'comentó en tu ruta de conocimiento':
+            return f"{notification.actor} comentó en tu ruta de conocimiento {notification.context_title}"
+        elif notification.verb == 'respondió a':
+            return f"{notification.actor} respondió a tu comentario en {notification.context_title}"
+        elif notification.verb == 'completó tu ruta de conocimiento':
             return notification.description
-        elif notification.verb == 'requested a certificate for your knowledge path':
+        elif notification.verb == 'solicitó un certificado para tu ruta de conocimiento':
             return notification.description
-        elif notification.verb == 'approved your certificate request for':
+        elif notification.verb == 'aprobó tu solicitud de certificado para':
             return notification.description
-        elif notification.verb == 'rejected your certificate request for':
+        elif notification.verb == 'rechazó tu solicitud de certificado para':
             return notification.description
-        elif notification.verb == 'upvoted your content':
+        elif notification.verb == 'votó positivamente tu contenido':
             return notification.description
-        elif notification.verb == 'upvoted your knowledge path':
+        elif notification.verb == 'votó positivamente tu ruta de conocimiento':
             return notification.description
-        elif notification.verb == 'registered for your event':
+        elif notification.verb == 'se registró en tu evento':
             return notification.description
-        elif notification.verb == 'accepted your payment for':
+        elif notification.verb == 'aceptó tu pago para':
             return notification.description
-        elif notification.verb == 'sent you a certificate for':
+        elif notification.verb == 'te envió un certificado para':
             return notification.description
         else:
-            return f"{notification.actor} {notification.verb} your comment in {notification.context_title}"
+            return f"{notification.actor} {notification.verb} tu comentario en {notification.context_title}"

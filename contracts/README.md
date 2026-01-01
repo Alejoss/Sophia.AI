@@ -1,6 +1,12 @@
-# Sophia.AI contracts
+# Sophia.AI Smart Contracts
 
-This contains the contracts that are related to the Sophia.AI project.
+Smart contracts for the Sophia.AI Academia Blockchain platform.
+
+> **Note**: For comprehensive documentation, see the [main documentation](../docs/README.md).
+
+## Overview
+
+This directory contains the Solidity smart contracts that handle blockchain functionality for the platform, including document certification and parameter management.
 
 ## Install everything
 
@@ -114,4 +120,12 @@ The console commands are:
 const Params = await ethers.getContractFactory("SophiaAIParams");
 const contract = Params.attach(ctAddr); // Considering that you took notes of the deployed address
 await contract.transferOwnership(mmAddr);
+```
+
+## Documentation
+
+- [Main Documentation](../docs/README.md)
+- [Contract Development](../docs/development/contracts/)
+- [Blockchain Integration](../docs/architecture/blockchain-integration.md)
+- [Contract Deployment](../docs/development/contracts/deployment.md)
 ```

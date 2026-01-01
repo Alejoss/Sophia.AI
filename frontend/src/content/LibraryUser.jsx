@@ -51,7 +51,7 @@ const LibraryUser = () => {
       } catch (err) {
         console.error("Error fetching user content:", err);
         setError(
-          err.response?.data?.error || err.message || "Failed to fetch content"
+          err.response?.data?.error || err.message || "Error al obtener el contenido"
         );
         setLoading(false);
       }
@@ -75,7 +75,7 @@ const LibraryUser = () => {
     );
   });
 
-  if (loading) return <Typography>Loading content...</Typography>;
+  if (loading) return <Typography color="text.primary">Cargando contenido...</Typography>;
   if (error)
     return (
       <Box sx={{ pt: 12, px: 3, textAlign: "center" }}>
@@ -113,80 +113,44 @@ const LibraryUser = () => {
             fetchUserContent();
           }}
         >
-          Retry
+          Reintentar
         </Button>
       </Box>
     );
   if (!isAuthenticated())
-    return <Typography>Please login to view content</Typography>;
+    return <Typography color="text.primary">Por favor inicia sesión para ver el contenido</Typography>;
 
   return (
     <Box
       sx={{
-        pt: 12,
-        px: 3,
         pt: {
-          xs: 6,
-          md: 12,
+          xs: 2,
+          md: 4,
         },
-         px: {
+        px: {
           xs: 1,
           md: 3,
         },
+        color: "text.primary",
       }}
     >
-      <Typography variant="h4" gutterBottom>
-        My Content Library
-      </Typography>
-
-      <Box
+      <Typography 
+        variant="h4" 
+        color="text.primary" 
+        gutterBottom
         sx={{
-          mb: 3,
-          display: {
-            xs: "block", // mobile → stacked
-            md: "flex", // md and up → flex row
-          },
-          alignItems: "center",
-          gap: 2,
+          fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+          fontWeight: 400,
+          fontSize: "24px"
         }}
       >
-        <ToggleButtonGroup
-          value={mediaFilter}
-          exclusive
-          onChange={handleFilterChange}
-          aria-label="media type filter"
-          sx={{
-            mb: {
-              xs: 2,
-              md: 0,
-            },
-            "& .MuiToggleButton-root": {
-              color: "text.primary",
-              backgroundColor: "background.paper",
-              border: "1px solid",
-              borderColor: "divider",
-              "&.Mui-selected": {
-                backgroundColor: "primary.main",
-                color: "primary.contrastText",
-                "&:hover": {
-                  backgroundColor: "primary.dark",
-                },
-              },
-              "&:hover": {
-                backgroundColor: "action.hover",
-              },
-            },
-          }}
-        >
-          <ToggleButton value="ALL">All</ToggleButton>
-          <ToggleButton value="IMAGE">Images</ToggleButton>
-          <ToggleButton value="TEXT">Text</ToggleButton>
-          <ToggleButton value="VIDEO">Video</ToggleButton>
-          <ToggleButton value="AUDIO">Audio</ToggleButton>
-        </ToggleButtonGroup>
+        Mi biblioteca de contenido
+      </Typography>
 
+      <Box sx={{ mb: 3 }}>
         <Box
           sx={{
+            mb: 2,
             display: {
               xs: "block", // mobile → stacked
               md: "flex", // md and up → flex row
@@ -209,7 +173,7 @@ const LibraryUser = () => {
             color="primary"
             onClick={() => navigate("/content/collections")}
           >
-            Collections
+            Colecciones
           </Button>
 
           <Button
@@ -229,7 +193,7 @@ const LibraryUser = () => {
               navigate("/profiles/my_profile?section=knowledge-paths")
             }
           >
-            My Knowledge Paths
+            Mis rutas de conocimiento
           </Button>
 
           <Button
@@ -248,9 +212,40 @@ const LibraryUser = () => {
             startIcon={<UploadFileIcon />}
             onClick={() => navigate("/content/library_upload_content")}
           >
-            Upload Content
+            Subir contenido
           </Button>
         </Box>
+
+        <ToggleButtonGroup
+          value={mediaFilter}
+          exclusive
+          onChange={handleFilterChange}
+          aria-label="media type filter"
+          sx={{
+            "& .MuiToggleButton-root": {
+              color: "text.primary",
+              backgroundColor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
+              "&.Mui-selected": {
+                backgroundColor: "primary.main",
+                color: "primary.contrastText",
+                "&:hover": {
+                  backgroundColor: "primary.dark",
+                },
+              },
+              "&:hover": {
+                backgroundColor: "action.hover",
+              },
+            },
+          }}
+        >
+          <ToggleButton value="ALL">Todos</ToggleButton>
+          <ToggleButton value="IMAGE">Imágenes</ToggleButton>
+          <ToggleButton value="TEXT">Texto</ToggleButton>
+          <ToggleButton value="VIDEO">Video</ToggleButton>
+          <ToggleButton value="AUDIO">Audio</ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {mediaFilter === "TEXT" ? (
@@ -259,10 +254,10 @@ const LibraryUser = () => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "12px" }}>Title</th>
-                <th style={{ textAlign: "left", padding: "12px" }}>Author</th>
-                <th style={{ textAlign: "left", padding: "12px" }}>Notes</th>
-                <th style={{ textAlign: "left", padding: "12px" }}>File</th>
+                <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>Título</th>
+                <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>Autor</th>
+                <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>Notas</th>
+                <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>Archivo</th>
               </tr>
             </thead>
             <tbody>
@@ -279,9 +274,9 @@ const LibraryUser = () => {
                     )
                   }
                 >
-                  <td style={{ padding: "12px" }}>{contentProfile.title}</td>
-                  <td style={{ padding: "12px" }}>{contentProfile.author}</td>
-                  <td style={{ padding: "12px" }}>
+                  <td style={{ padding: "12px", color: "inherit" }}>{contentProfile.title}</td>
+                  <td style={{ padding: "12px", color: "inherit" }}>{contentProfile.author}</td>
+                  <td style={{ padding: "12px", color: "inherit" }}>
                     {contentProfile.personal_note && (
                       <IconButton
                         size="small"
@@ -291,7 +286,7 @@ const LibraryUser = () => {
                       </IconButton>
                     )}
                   </td>
-                  <td style={{ padding: "12px" }}>
+                  <td style={{ padding: "12px", color: "inherit" }}>
                     {contentProfile.content.file_details?.file && (
                       <a
                         href={getFileUrl(
@@ -299,8 +294,9 @@ const LibraryUser = () => {
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
+                        style={{ color: "inherit", textDecoration: "underline" }}
                       >
-                        Download
+                        Descargar
                       </a>
                     )}
                   </td>
@@ -333,7 +329,7 @@ const LibraryUser = () => {
           {filteredContent.length === 0 && (
             <Box gridColumn={{ xs: "span 12" }}>
               <Typography variant="body1" color="text.secondary" align="center">
-                No content found for the selected filter.
+                No se encontró contenido para el filtro seleccionado.
               </Typography>
             </Box>
           )}

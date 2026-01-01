@@ -72,7 +72,7 @@ class QuizSerializer(serializers.ModelSerializer):
                     'value': value,
                     'value_type': type(value).__name__,
                 })
-                raise serializers.ValidationError('Must be a valid number')
+                raise serializers.ValidationError('Debe ser un número válido')
         
         if value < 2 or value > 9:
             logger.warning("max_attempts_per_day validation failed - out of range", extra={
@@ -80,7 +80,7 @@ class QuizSerializer(serializers.ModelSerializer):
                 'min_allowed': 2,
                 'max_allowed': 9,
             })
-            raise serializers.ValidationError('Value must be between 2 and 9')
+            raise serializers.ValidationError('El valor debe estar entre 2 y 9')
         return value
 
     def get_knowledge_path(self, obj):
@@ -192,14 +192,14 @@ class QuizSubmissionSerializer(serializers.Serializer):
     def validate_answers(self, answers):
         quiz_id = self.context.get('quiz_id')
         if not quiz_id:
-            raise serializers.ValidationError("Quiz ID is required")
+            raise serializers.ValidationError("El ID del cuestionario es requerido")
 
         # Validate that all question IDs exist in this quiz
         quiz_question_ids = set(Question.objects.filter(quiz_id=quiz_id).values_list('id', flat=True))
         submitted_question_ids = set(map(int, answers.keys()))
         
         if not submitted_question_ids.issubset(quiz_question_ids):
-            raise serializers.ValidationError("Invalid question IDs submitted")
+            raise serializers.ValidationError("IDs de preguntas inválidos enviados")
 
         # Validate that all option IDs exist and belong to their respective questions
         for question_id, option_ids in answers.items():
@@ -208,11 +208,11 @@ class QuizSubmissionSerializer(serializers.Serializer):
             submitted_option_ids = set(option_ids)
 
             if not submitted_option_ids.issubset(valid_option_ids):
-                raise serializers.ValidationError(f"Invalid option IDs for question {question_id}")
+                raise serializers.ValidationError(f"IDs de opciones inválidos para la pregunta {question_id}")
 
             # Validate single choice questions have exactly one answer
             if question.question_type == 'SINGLE' and len(option_ids) != 1:
-                raise serializers.ValidationError(f"Single choice question {question_id} must have exactly one answer")
+                raise serializers.ValidationError(f"La pregunta de opción única {question_id} debe tener exactamente una respuesta")
 
         return answers
 

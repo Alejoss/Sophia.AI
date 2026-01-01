@@ -52,9 +52,9 @@ const ContentDetailsLibrary = () => {
         fetchData();
     }, [contentId, location.search, currentUser]);
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div>Cargando...</div>;
     if (error) return <div>Error: {error}</div>;
-    if (!content) return <div>No content found</div>;
+    if (!content) return <div>No se encontró contenido</div>;
 
     const profile = content.selected_profile;
     
@@ -76,14 +76,14 @@ const ContentDetailsLibrary = () => {
                             startIcon={<ArrowBackIcon />}
                             onClick={() => navigate('/content/library_user')}
                         >
-                            Go to your library
+                            Ir a tu biblioteca
                         </Button>
                         <Button
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => navigate(`/content/${contentId}/edit`)}
                         >
-                            Edit Content Profile
+                            Editar perfil de contenido
                         </Button>
                     </>
                 ) : (
@@ -122,7 +122,7 @@ const ContentDetailsLibrary = () => {
 };
 
 const formatFileSize = (bytes) => {
-    if (!bytes || isNaN(bytes)) return 'Unknown size';
+    if (!bytes || isNaN(bytes)) return 'Tamaño desconocido';
     
     const size = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
     

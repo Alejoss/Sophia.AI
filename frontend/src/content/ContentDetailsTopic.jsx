@@ -45,7 +45,7 @@ const ContentDetailsTopic = () => {
                     status: err.response?.status,
                     data: err.response?.data
                 });
-                setError('Failed to fetch content or topic details');
+                setError('Error al obtener los detalles del contenido o tema');
                 setLoading(false);
             }
         };
@@ -64,9 +64,9 @@ const ContentDetailsTopic = () => {
             });
     };
 
-    if (loading) return <Typography>Loading content...</Typography>;
+    if (loading) return <Typography>Cargando contenido...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!content || !topic) return <Typography>Content or topic not found</Typography>;
+    if (!content || !topic) return <Typography>Contenido o tema no encontrado</Typography>;
 
     return (
         <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>

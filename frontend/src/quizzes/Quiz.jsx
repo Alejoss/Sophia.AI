@@ -63,7 +63,7 @@ const Quiz = () => {
         });
         setCurrentAnswers(initialAnswers);
       } catch (err) {
-        setError('Failed to load quiz');
+        setError('Error al cargar el cuestionario');
       } finally {
         setLoading(false);
       }
@@ -99,7 +99,7 @@ const Quiz = () => {
     );
 
     if (unansweredQuestions.length > 0) {
-      setError('Please answer all questions before submitting');
+      setError('Por favor, responda todas las preguntas antes de enviar');
       return;
     }
 
@@ -121,7 +121,7 @@ const Quiz = () => {
       }
       
     } catch (error) {
-      const errorMessage = error.message || 'An unexpected error occurred';
+      const errorMessage = error.message || 'Ocurrió un error inesperado';
       setError(errorMessage);
       setSubmitted(false);
     }
@@ -148,24 +148,24 @@ const Quiz = () => {
     return (
       <div className={`mb-6 p-4 rounded-lg ${attemptsExhausted ? 'bg-red-50 border border-red-200' : 'bg-blue-50'}`}>
         <h2 className={`text-lg font-semibold ${attemptsExhausted ? 'text-red-700' : 'text-blue-700'}`}>
-          Previous Attempts
+          Intentos Anteriores
         </h2>
         {previousAttempts.map((attempt, index) => (
           <div key={attempt.id} className="mt-2">
-            <p className="text-gray-900">Attempt {index + 1}: Score {attempt.score}%</p>
+            <p className="text-gray-900">Intento {index + 1}: Puntuación {attempt.score}%</p>
             <p className="text-sm text-gray-600">
-              Completed on: {new Date(attempt.completed_on).toLocaleDateString()}
+              Completado el: {new Date(attempt.completed_on).toLocaleDateString('es-ES')}
             </p>
           </div>
         ))}
         {attemptsExhausted && (
           <div className="mt-4 p-3 bg-red-100 rounded border border-red-300">
             <p className="text-red-700 font-medium">
-              You have reached the maximum number of attempts ({quiz.max_attempts_per_day}) for today.
-              Please try again tomorrow.
+              Ha alcanzado el número máximo de intentos ({quiz.max_attempts_per_day}) para hoy.
+              Por favor, inténtelo de nuevo mañana.
             </p>
             <p className="text-sm text-red-600 mt-1">
-              Today's attempts: {todayAttempts.length}/{quiz.max_attempts_per_day}
+              Intentos de hoy: {todayAttempts.length}/{quiz.max_attempts_per_day}
             </p>
           </div>
         )}
@@ -177,13 +177,13 @@ const Quiz = () => {
     if (hasPerfectScore) {
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold  mb-4 text-gray-900">Quiz Results</h2>
+          <h2 className="text-2xl font-bold  mb-4 text-gray-900">Resultados del Cuestionario</h2>
           <div className="text-center p-6 bg-green-50 rounded-lg mb-6 border border-green-300">
             <p className="text-4xl font-bold text-green-600 mb-2">
-              Score: 100%
+              Puntuación: 100%
             </p>
             <p className="text-lg mb-4 text-gray-900">
-              You have already successfully completed this quiz!
+              ¡Ya ha completado exitosamente este cuestionario!
             </p>
             
             <div className="flex justify-center gap-4">
@@ -191,14 +191,14 @@ const Quiz = () => {
                 onClick={() => navigate(`/knowledge_path/${quiz.knowledge_path}`)}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
               >
-                Go to Knowledge Path
+                Ir a la Ruta de Conocimiento
               </button>
               {quiz.next_node && (
                 <button
                   onClick={() => navigate(`/knowledge_path/${quiz.next_node.knowledge_path}/nodes/${quiz.next_node.id}`)}
                   className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                 >
-                  Continue to Next Node: {quiz.next_node.title}
+                  Continuar al Siguiente Nodo: {quiz.next_node.title}
                 </button>
               )}
             </div>
@@ -214,7 +214,7 @@ const Quiz = () => {
                 <div className="mb-4">
                   <img 
                     src={question.image} 
-                    alt={question.image_description || 'Question image'} 
+                    alt={question.image_description || 'Imagen de la pregunta'} 
                     className="max-w-full h-auto rounded"
                   />
                 </div>
@@ -242,7 +242,7 @@ const Quiz = () => {
                       <span>{option.text}</span>
                       {wasSelected && (
                         <span className={`ml-auto text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                          {isCorrect ? 'Correct' : 'Incorrect'}
+                          {isCorrect ? 'Correcto' : 'Incorrecto'}
                         </span>
                       )}
                     </div>
@@ -263,29 +263,29 @@ const Quiz = () => {
 
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">Quiz Results</h2>
+          <h2 className="text-2xl font-bold mb-4 text-gray-900">Resultados del Cuestionario</h2>
           <div className={`text-center p-6 ${bgColor} rounded-lg mb-6 border ${borderColor}`}>
             <p className={`text-4xl font-bold ${textColor} mb-2`}>
-              Score: {quizResult.attempt.score}%
+              Puntuación: {quizResult.attempt.score}%
             </p>
             {isPerfectScore ? (
               <>
                 <p className="text-lg mb-4 text-gray-900">
-                  Congratulations! You have successfully completed this quiz.
+                  ¡Felicidades! Ha completado exitosamente este cuestionario.
                 </p>
                 {quizResult.next_node && (
                   <p className="text-sm mb-4 text-gray-700">
-                    Redirecting to next node in 10 seconds...
+                    Redirigiendo al siguiente nodo en 10 segundos...
                   </p>
                 )}
               </>
             ) : (
               <>
                 <p className="text-lg mb-2 text-gray-900">
-                  You got {quizResult.correct_answers} out of {quizResult.total_questions} questions correct.
+                  Respondió correctamente {quizResult.correct_answers} de {quizResult.total_questions} preguntas.
                 </p>
                 <p className="text-lg mb-4 text-gray-900">
-                  Attempts remaining today: {quizResult.attempts_remaining}
+                  Intentos restantes hoy: {quizResult.attempts_remaining}
                 </p>
               </>
             )}
@@ -293,7 +293,7 @@ const Quiz = () => {
               onClick={() => navigate(-1)}
               className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
             >
-              Return to Previous Page
+              Volver a la Página Anterior
             </button>
           </div>
 
@@ -307,7 +307,7 @@ const Quiz = () => {
                 <div className="mb-4">
                   <img 
                     src={question.image} 
-                    alt={question.image_description || 'Question image'} 
+                    alt={question.image_description || 'Imagen de la pregunta'} 
                     className="max-w-full h-auto rounded"
                   />
                 </div>
@@ -335,7 +335,7 @@ const Quiz = () => {
                       <span>{option.text}</span>
                       {wasSelected && (
                         <span className={`ml-auto text-sm ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                          {isCorrect ? 'Correct' : 'Incorrect'}
+                          {isCorrect ? 'Correcto' : 'Incorrecto'}
                         </span>
                       )}
                     </div>
@@ -399,22 +399,22 @@ const Quiz = () => {
             }`}
             disabled={submitted || attemptsExhausted}
           >
-            {attemptsExhausted ? 'No Attempts Remaining' : 'Submit Quiz'}
+            {attemptsExhausted ? 'No Quedan Intentos' : 'Enviar Cuestionario'}
           </button>
           <button
             type="button"
             onClick={() => navigate(-1)}
             className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded"
           >
-            Back
+            Volver
           </button>
         </div>
       </form>
     );
   };
 
-  if (loading) return <div className="container mx-auto p-4 text-gray-900">Loading...</div>;
-  if (!quiz) return <div className="container mx-auto p-4 text-gray-900">Quiz not found</div>;
+  if (loading) return <div className="container mx-auto p-4 text-gray-900">Cargando...</div>;
+  if (!quiz) return <div className="container mx-auto p-4 text-gray-900">Cuestionario no encontrado</div>;
 
   return (
     <div className="container mx-auto p-4">

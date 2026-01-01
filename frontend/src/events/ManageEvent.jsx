@@ -47,7 +47,7 @@ const ManageEvent = () => {
       setParticipants(participantsData);
     } catch (err) {
       console.error('Error loading event data:', err);
-      setError(err.error || 'Failed to load event data');
+      setError(err.error || 'Error al cargar los datos del evento');
     } finally {
       setLoading(false);
     }
@@ -55,7 +55,7 @@ const ManageEvent = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Not specified';
-    return new Date(dateString).toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -66,17 +66,17 @@ const ManageEvent = () => {
 
   const getPaymentStatusLabel = (paymentStatus) => {
     const statusMap = {
-      'PENDING': 'Payment Pending',
-      'PAID': 'Payment Accepted',
-      'REFUNDED': 'Payment Refunded'
+      'PENDING': 'Pago Pendiente',
+      'PAID': 'Pago Aceptado',
+      'REFUNDED': 'Pago Reembolsado'
     };
     return statusMap[paymentStatus] || paymentStatus;
   };
 
   const getRegistrationStatusLabel = (registrationStatus) => {
     const statusMap = {
-      'REGISTERED': 'Registered',
-      'CANCELLED': 'Cancelled'
+      'REGISTERED': 'Registrado',
+      'CANCELLED': 'Cancelado'
     };
     return statusMap[registrationStatus] || registrationStatus;
   };
@@ -129,16 +129,16 @@ const ManageEvent = () => {
       if (action === 'send_certificate') {
         setSnackbar({
           open: true,
-          message: 'Certificate generated and sent successfully!',
+          message: '¡Certificado generado y enviado exitosamente!',
           severity: 'success'
         });
       }
     } catch (err) {
       console.error('Error updating participant status:', err);
-      setError(err.error || 'Failed to update participant status');
+      setError(err.error || 'Error al actualizar el estado del participante');
       setSnackbar({
         open: true,
-        message: err.error || 'Failed to update participant status',
+        message: err.error || 'Error al actualizar el estado del participante',
         severity: 'error'
       });
     } finally {
@@ -173,12 +173,12 @@ const ManageEvent = () => {
       
       setSnackbar({
         open: true,
-        message: 'Payment accepted successfully!',
+        message: '¡Pago aceptado exitosamente!',
         severity: 'success'
       });
     } catch (err) {
       console.error('Error accepting payment:', err);
-      const errorMessage = err.error || 'Failed to accept payment';
+      const errorMessage = err.error || 'Error al aceptar el pago';
       setError(errorMessage);
       setSnackbar({
         open: true,
@@ -212,14 +212,14 @@ const ManageEvent = () => {
       const participantsData = await getEventParticipants(eventId);
       setParticipants(participantsData);
       
-      setSnackbar({
-        open: true,
-        message: 'Certificate generated and sent successfully!',
-        severity: 'success'
-      });
+        setSnackbar({
+          open: true,
+          message: '¡Certificado generado y enviado exitosamente!',
+          severity: 'success'
+        });
     } catch (err) {
       console.error('Error generating certificate:', err);
-      const errorMessage = err.error || err.details || 'Failed to generate certificate';
+      const errorMessage = err.error || err.details || 'Error al generar el certificado';
       setError(errorMessage);
       setSnackbar({
         open: true,
@@ -240,8 +240,8 @@ const ManageEvent = () => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>Manage Event</h2>
-          <div className="loading-spinner">Loading event data...</div>
+          <h2>Gestionar Evento</h2>
+          <div className="loading-spinner">Cargando datos del evento...</div>
         </div>
       </div>
     );
@@ -251,10 +251,10 @@ const ManageEvent = () => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>Manage Event</h2>
+          <h2>Gestionar Evento</h2>
           <div className="error-message">{error}</div>
           <Link to="/events" className="btn btn-primary">
-            Back to Events
+            Volver a Eventos
           </Link>
         </div>
       </div>
@@ -265,10 +265,10 @@ const ManageEvent = () => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>Manage Event</h2>
-          <p>Event not found.</p>
+          <h2>Gestionar Evento</h2>
+          <p>Evento no encontrado.</p>
           <Link to="/events" className="btn btn-primary">
-            Back to Events
+            Volver a Eventos
           </Link>
         </div>
       </div>
@@ -278,13 +278,13 @@ const ManageEvent = () => {
   return (
     <div className="events-list-container">
       <div className="events-header">
-        <h2>Manage Event: {event.title}</h2>
+        <h2>Gestionar Evento: {event.title}</h2>
         <div className="events-header-actions">
           <Link to={`/events/${eventId}`} className="btn btn-secondary">
-            View Event
+            Ver Evento
           </Link>
           <Link to={`/events/${eventId}/edit`} className="btn btn-primary">
-            Edit Event
+            Editar Evento
           </Link>
         </div>
       </div>
@@ -292,32 +292,32 @@ const ManageEvent = () => {
       {/* Event Summary */}
       <div className="event-summary-card">
         <div className="event-summary-header">
-          <h3>Event Summary</h3>
+          <h3>Resumen del Evento</h3>
         </div>
         <div className="event-summary-content">
           <div className="summary-grid">
             <div className="summary-item">
-              <strong>Event Type:</strong>
+              <strong>Tipo de Evento:</strong>
               <span>{event.event_type}</span>
             </div>
             <div className="summary-item">
-              <strong>Start Date:</strong>
+              <strong>Fecha de Inicio:</strong>
               <span>{formatDate(event.date_start)}</span>
             </div>
             <div className="summary-item">
-              <strong>End Date:</strong>
+              <strong>Fecha de Fin:</strong>
               <span>{formatDate(event.date_end)}</span>
             </div>
             <div className="summary-item">
-              <strong>Platform:</strong>
-              <span>{event.platform || 'Not specified'}</span>
+              <strong>Plataforma:</strong>
+              <span>{event.platform || 'No especificado'}</span>
             </div>
             <div className="summary-item">
-              <strong>Price:</strong>
-              <span>{event.reference_price > 0 ? `$${event.reference_price}` : 'Free'}</span>
+              <strong>Precio:</strong>
+              <span>{event.reference_price > 0 ? `$${event.reference_price}` : 'Gratis'}</span>
             </div>
             <div className="summary-item">
-              <strong>Participants:</strong>
+              <strong>Participantes:</strong>
               <span>{participants.length}</span>
             </div>
           </div>
@@ -330,7 +330,7 @@ const ManageEvent = () => {
           className={`tab-button ${activeTab === 'participants' ? 'active' : ''}`}
           onClick={() => setActiveTab('participants')}
         >
-          Participants ({participants.length})
+          Participantes ({participants.length})
         </button>
       </div>
 
@@ -340,7 +340,7 @@ const ManageEvent = () => {
           <div>
             {participants.length === 0 ? (
               <div className="text-center">
-                <p>No participants registered yet.</p>
+                <p>Aún no hay participantes registrados.</p>
               </div>
             ) : (
               <div className="participants-list">
@@ -362,14 +362,14 @@ const ManageEvent = () => {
                     </div>
                     <div className="participant-actions">
                       <div className="participant-date">
-                        Registered: {formatDate(registration.registered_at)}
+                        Registrado: {formatDate(registration.registered_at)}
                       </div>
                       <div className="participant-buttons">
                         <button 
                           className="btn btn-primary message-btn"
                           onClick={() => handleMessageUser(registration.user.id)}
                         >
-                          Message User
+                          Enviar Mensaje
                         </button>
                         
                         {/* Only show actions for registered participants */}
@@ -382,7 +382,7 @@ const ManageEvent = () => {
                                 onClick={() => openPaymentConfirmationDialog(registration)}
                                 disabled={updatingStatus === registration.id}
                               >
-                                {updatingStatus === registration.id ? 'Updating...' : 'Accept Payment'}
+                                {updatingStatus === registration.id ? 'Actualizando...' : 'Aceptar Pago'}
                               </button>
                             )}
                             
@@ -393,8 +393,8 @@ const ManageEvent = () => {
                                 onClick={() => hasCertificate(registration) ? null : openCertificateDialog(registration)}
                                 disabled={updatingStatus === registration.id || hasCertificate(registration)}
                               >
-                                {updatingStatus === registration.id ? 'Sending...' : 
-                                 hasCertificate(registration) ? 'Certificate Sent' : 'Send Certificate'}
+                                {updatingStatus === registration.id ? 'Enviando...' : 
+                                 hasCertificate(registration) ? 'Certificado Enviado' : 'Enviar Certificado'}
                               </button>
                             )}
                             
@@ -405,7 +405,7 @@ const ManageEvent = () => {
                                 onClick={() => handleStatusUpdate(registration.id, 'cancel_registration')}
                                 disabled={updatingStatus === registration.id}
                               >
-                                {updatingStatus === registration.id ? 'Cancelling...' : 'Cancel Registration'}
+                                {updatingStatus === registration.id ? 'Cancelando...' : 'Cancelar Registro'}
                               </button>
                             )}
                           </>
@@ -427,18 +427,18 @@ const ManageEvent = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Send Certificate</DialogTitle>
+        <DialogTitle>Enviar Certificado</DialogTitle>
         <DialogContent>
           <div style={{ marginTop: '16px' }}>
             <Alert severity="info" style={{ marginBottom: '16px' }}>
-              <strong>Note:</strong> Any message you add below will be visible to the student on their certificate.
+              <strong>Nota:</strong> Cualquier mensaje que agregue a continuación será visible para el estudiante en su certificado.
             </Alert>
             <TextField
               fullWidth
               multiline
               rows={4}
-              label="Personal Message (optional)"
-              placeholder="Add a personal message to congratulate the student or add any special notes..."
+              label="Mensaje Personal (opcional)"
+              placeholder="Agregue un mensaje personal para felicitar al estudiante o agregar notas especiales..."
               value={certificateNote}
               onChange={(e) => setCertificateNote(e.target.value)}
               variant="outlined"
@@ -447,14 +447,14 @@ const ManageEvent = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertificateDialogOpen(false)}>
-            Cancel
+            Cancelar
           </Button>
           <Button 
             onClick={handleGenerateCertificate}
             variant="contained"
             color="primary"
           >
-            Send Certificate
+            Enviar Certificado
           </Button>
         </DialogActions>
       </Dialog>
@@ -466,33 +466,33 @@ const ManageEvent = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Confirm Payment Acceptance</DialogTitle>
+        <DialogTitle>Confirmar Aceptación de Pago</DialogTitle>
         <DialogContent>
           <div style={{ marginTop: '16px' }}>
             <Alert severity="warning" style={{ marginBottom: '16px' }}>
-              <strong>Important:</strong> This action will mark the payment as accepted and cannot be undone.
+              <strong>Importante:</strong> Esta acción marcará el pago como aceptado y no se puede deshacer.
             </Alert>
             {selectedPaymentRegistration && (
               <div style={{ marginBottom: '16px' }}>
-                <p><strong>User:</strong> {selectedPaymentRegistration.user.username}</p>
-                <p><strong>Email:</strong> {selectedPaymentRegistration.user_email}</p>
-                <p><strong>Event:</strong> {event.title}</p>
-                <p><strong>Amount:</strong> ${event.reference_price}</p>
+                <p><strong>Usuario:</strong> {selectedPaymentRegistration.user.username}</p>
+                <p><strong>Correo:</strong> {selectedPaymentRegistration.user_email}</p>
+                <p><strong>Evento:</strong> {event.title}</p>
+                <p><strong>Cantidad:</strong> ${event.reference_price}</p>
               </div>
             )}
-            <p>Are you sure you want to accept this payment?</p>
+            <p>¿Está seguro de que desea aceptar este pago?</p>
           </div>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPaymentConfirmationDialog(false)}>
-            Cancel
+            Cancelar
           </Button>
           <Button 
             onClick={handleConfirmPayment}
             variant="contained"
             color="success"
           >
-            Accept Payment
+            Aceptar Pago
           </Button>
         </DialogActions>
       </Dialog>

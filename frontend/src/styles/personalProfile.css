@@ -14,7 +14,7 @@
 }
 
 .notification-count {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9em;
 }
 
@@ -27,14 +27,15 @@
 .notification-item {
   padding: 15px;
   border-radius: 8px;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   transition: all 0.3s ease;
 }
 
 .notification-item.unread {
-  background: #e3f2fd;
-  border-color: #bbdefb;
+  background: var(--bg-secondary);
+  border-color: #007bff;
+  opacity: 0.9;
 }
 
 .notification-content {
@@ -50,17 +51,17 @@
 
 .notification-text {
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .notification-timestamp {
   font-size: 0.85em;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .notification-description {
-  color: #666;
+  color: var(--text-secondary);
   margin: 5px 0 0 0;
   font-size: 0.95em;
 }
@@ -89,7 +90,7 @@
 .loading-spinner {
   text-align: center;
   padding: 20px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .error-message {
@@ -101,7 +102,7 @@
 .empty-state {
   text-align: center;
   padding: 40px;
-  color: #666;
-  background: #f8f9fa;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
   border-radius: 8px;
 } 

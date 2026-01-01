@@ -42,7 +42,7 @@ const KnowledgePathsUser = () => {
         setCreatedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching created knowledge paths:', err);
-        setCreatedError('Failed to load your created knowledge paths');
+        setCreatedError('Error al cargar tus rutas de conocimiento creadas');
       } finally {
         setCreatedLoading(false);
       }
@@ -58,7 +58,7 @@ const KnowledgePathsUser = () => {
         setEngagedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching engaged knowledge paths:', err);
-        setEngagedError('Failed to load your engaged knowledge paths');
+        setEngagedError('Error al cargar tus rutas de conocimiento en las que participas');
       } finally {
         setEngagedLoading(false);
       }
@@ -88,12 +88,12 @@ const KnowledgePathsUser = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
-        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">My Knowledge Paths</h1>
+        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">Mis Rutas de Conocimiento</h1>
         <Link 
           to="/knowledge_path/create"
           className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
         >
-          Create New Path
+          Crear Nueva Ruta
         </Link>
       </div>
 
@@ -101,12 +101,12 @@ const KnowledgePathsUser = () => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="knowledge paths tabs">
           <Tab 
-            label={`Created (${createdPaths.length})`} 
+            label={`Creadas (${createdPaths.length})`} 
             icon={<EditIcon />} 
             iconPosition="start"
           />
           <Tab 
-            label={`Engaged (${engagedPaths.length})`} 
+            label={`En las que participo (${engagedPaths.length})`} 
             icon={<SchoolIcon />} 
             iconPosition="start"
           />
@@ -115,7 +115,7 @@ const KnowledgePathsUser = () => {
 
       {/* Loading State */}
       {isLoading && (
-        <div className="text-center py-8">Loading...</div>
+        <div className="text-center py-8">Cargando...</div>
       )}
 
       {/* Error State */}
@@ -161,7 +161,7 @@ const KnowledgePathsUser = () => {
                     <div className="mb-3">
                       <Chip
                         icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                        label={path.is_visible ? 'Public' : 'Private'}
+                        label={path.is_visible ? 'Público' : 'Privado'}
                         color={path.is_visible ? 'success' : 'default'}
                         size="small"
                         variant="outlined"
@@ -192,7 +192,7 @@ const KnowledgePathsUser = () => {
                       className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       <EditIcon className="w-4 h-4" />
-                      Edit
+                      Editar
                     </Link>
                   </div>
                 </div>
@@ -203,13 +203,13 @@ const KnowledgePathsUser = () => {
           {/* No Created Knowledge Paths Message */}
           {createdPaths.length === 0 && (
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">No knowledge paths created yet</h3>
-              <p className="text-gray-500 mb-6">Start creating your first knowledge path to organize and share your learning journey.</p>
+              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no has creado rutas de conocimiento</h3>
+              <p className="text-gray-500 mb-6">Comienza creando tu primera ruta de conocimiento para organizar y compartir tu viaje de aprendizaje.</p>
               <Link 
                 to="/knowledge_path/create"
                 className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
-                Create Your First Path
+                Crear Tu Primera Ruta
               </Link>
             </div>
           )}
@@ -226,11 +226,11 @@ const KnowledgePathsUser = () => {
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Previous
+                Anterior
               </button>
               
               <span className="text-gray-600">
-                Page {createdCurrentPage} of {createdTotalPages}
+                Página {createdCurrentPage} de {createdTotalPages}
               </span>
               
               <button
@@ -242,7 +242,7 @@ const KnowledgePathsUser = () => {
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Next
+                Siguiente
               </button>
             </div>
           )}
@@ -286,7 +286,7 @@ const KnowledgePathsUser = () => {
                     {/* Author Info */}
                     <div className="mb-3">
                       <p className="text-sm text-gray-500">
-                        By {path.author}
+                        Por {path.author}
                       </p>
                     </div>
 
@@ -306,13 +306,13 @@ const KnowledgePathsUser = () => {
           {/* No Engaged Knowledge Paths Message */}
           {engagedPaths.length === 0 && (
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold !text-gray-600 mb-4">No engaged knowledge paths yet</h3>
-              <p className="text-gray-500 mb-6">Start exploring knowledge paths created by other users to begin your learning journey.</p>
+              <h3 className="text-xl font-semibold !text-gray-600 mb-4">Aún no participas en rutas de conocimiento</h3>
+              <p className="text-gray-500 mb-6">Comienza explorando rutas de conocimiento creadas por otros usuarios para iniciar tu viaje de aprendizaje.</p>
               <Link 
                 to="/knowledge_path"
                 className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
-                Browse Knowledge Paths
+                Explorar Rutas de Conocimiento
               </Link>
             </div>
           )}
@@ -329,11 +329,11 @@ const KnowledgePathsUser = () => {
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Previous
+                Anterior
               </button>
               
               <span className="text-gray-600">
-                Page {engagedCurrentPage} of {engagedTotalPages}
+                Página {engagedCurrentPage} de {engagedTotalPages}
               </span>
               
               <button
@@ -345,7 +345,7 @@ const KnowledgePathsUser = () => {
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Next
+                Siguiente
               </button>
             </div>
           )}

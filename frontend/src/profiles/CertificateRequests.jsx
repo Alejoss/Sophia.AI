@@ -141,7 +141,7 @@ const CertificateRequests = () => {
           <CardContent>
             <div className="flex justify-between items-start">
               <div>
-                <Typography variant="h6">
+                <Typography variant="h6" color="text.primary">
                   {request.knowledge_path_title}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
@@ -256,7 +256,16 @@ const CertificateRequests = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <Typography variant="h4" gutterBottom>
+      <Typography 
+        variant="h4" 
+        gutterBottom 
+        color="text.primary"
+        sx={{
+          fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+          fontWeight: 400,
+          fontSize: "24px"
+        }}
+      >
         Certificate Requests
       </Typography>
 
@@ -269,7 +278,16 @@ const CertificateRequests = () => {
           {/* Teacher View */}
           {teacherRequests.length > 0 && (
             <div>
-              <Typography variant="h5" gutterBottom>
+              <Typography 
+                variant="h5" 
+                gutterBottom 
+                color="text.primary"
+                sx={{
+                  fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                  fontWeight: 400,
+                  fontSize: "20px"
+                }}
+              >
                 Requests to Review
               </Typography>
               {renderRequests(teacherRequests, true)}
@@ -279,7 +297,16 @@ const CertificateRequests = () => {
           {/* Student View */}
           {studentRequests.length > 0 && (
             <div>
-              <Typography variant="h5" gutterBottom>
+              <Typography 
+                variant="h5" 
+                gutterBottom 
+                color="text.primary"
+                sx={{
+                  fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                  fontWeight: 400,
+                  fontSize: "20px"
+                }}
+              >
                 My Requests
               </Typography>
               {renderRequests(studentRequests, false)}

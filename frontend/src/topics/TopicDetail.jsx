@@ -75,7 +75,7 @@ const TopicDetail = () => {
                     status: err.response?.status,
                     data: err.response?.data
                 });
-                setError('Failed to fetch topic details');
+                setError('Error al cargar los detalles del tema');
                 setLoading(false);
             }
         };
@@ -137,7 +137,16 @@ const TopicDetail = () => {
         return (
             <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ textTransform: 'capitalize' }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        textTransform: 'capitalize',
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "18px"
+                      }} 
+                      color="text.primary"
+                    >
                         {type}s
                     </Typography>
                     {hasMore && (
@@ -146,7 +155,7 @@ const TopicDetail = () => {
                             onClick={() => navigate(`/content/topics/${topicId}/${type}`)}
                             sx={{ textTransform: 'none' }}
                         >
-                            See all {contents.length} {type}s
+                            Ver todos los {contents.length} {type}s
                         </Button>
                     )}
                 </Box>
@@ -167,9 +176,9 @@ const TopicDetail = () => {
         );
     };
 
-    if (loading) return <Typography>Loading topic details...</Typography>;
+    if (loading) return <Typography>Cargando detalles del tema...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!topic) return <Typography>Topic not found</Typography>;
+    if (!topic) return <Typography>Tema no encontrado</Typography>;
 
     console.log('Auth check:', {
         isAuthenticated: isAuthenticated,
@@ -179,7 +188,7 @@ const TopicDetail = () => {
     });
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
             <TopicHeader 
                 topic={topic}
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
@@ -193,7 +202,7 @@ const TopicDetail = () => {
 
             {Object.keys(contentByType).length === 0 && (
                 <Typography variant="body1" color="text.secondary" align="center">
-                    No content has been added to this topic yet.
+                    Aún no se ha agregado contenido a este tema.
                 </Typography>
             )}
 

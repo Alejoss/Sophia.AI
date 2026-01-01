@@ -29,7 +29,7 @@ const TopicList = () => {
                 setTopics(data);
                 setLoading(false);
             } catch (err) {
-                setError('Failed to fetch topics');
+                setError('Error al cargar los temas');
                 setLoading(false);
             }
         };
@@ -38,22 +38,31 @@ const TopicList = () => {
     }, []);
 
     if (loading) return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 12 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: { xs: 2, md: 4 } }}>
             <CircularProgress />
         </Box>
     );
 
     if (error) return (
-        <Box sx={{ pt: 12, px: 3 }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: 3 }}>
             <Alert severity="error">{error}</Alert>
         </Box>
     );
 
     return (
-        <Box sx={{ pt: 12, px: 3 }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, color: "text.primary" }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4" component="h1">
-                    Topics
+                <Typography 
+                    variant="h4" 
+                    component="h1" 
+                    color="text.primary"
+                    sx={{
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "24px"
+                    }}
+                >
+                    Temas
                 </Typography>
                 {isAuthenticated() && (
                     <Button
@@ -62,7 +71,7 @@ const TopicList = () => {
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/content/create_topic')}
                     >
-                        Create Topic
+                        Crear Tema
                     </Button>
                 )}
             </Box>
@@ -80,7 +89,7 @@ const TopicList = () => {
                                     sx={{ objectFit: 'cover' }}
                                 />
                                 <CardContent>
-                                    <Typography variant="h6" gutterBottom>
+                                    <Typography variant="h6" gutterBottom color="text.primary">
                                         {topic.title}
                                     </Typography>
                                     {topic.description && (

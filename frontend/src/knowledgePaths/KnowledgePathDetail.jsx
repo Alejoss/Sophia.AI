@@ -74,9 +74,9 @@ const KnowledgePathDetail = () => {
       } catch (err) {
         if (err.response?.status === 401) {
           // The axios interceptor will handle the redirect to login
-          setError('Please log in to view this knowledge path');
+          setError('Por favor inicia sesión para ver esta ruta de conocimiento');
         } else {
-          setError('Failed to load knowledge path');
+          setError('Error al cargar la ruta de conocimiento');
         }
       } finally {
         setLoading(false);
@@ -121,7 +121,7 @@ const KnowledgePathDetail = () => {
       handleCloseModal();
     } catch (error) {
       console.error('Error requesting certificate:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to request certificate';
+      const errorMessage = error.response?.data?.error || 'Error al solicitar el certificado';
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -140,7 +140,7 @@ const KnowledgePathDetail = () => {
       setCertificateStatus(statusData);
     } catch (error) {
       console.error('Error cancelling certificate request:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to cancel certificate request';
+      const errorMessage = error.response?.data?.error || 'Error al cancelar la solicitud de certificado';
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -159,7 +159,7 @@ const KnowledgePathDetail = () => {
       setCertificateStatus(statusData);
     } catch (error) {
       console.error('Error accepting certificate request:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to accept certificate request';
+      const errorMessage = error.response?.data?.error || 'Error al aceptar la solicitud de certificado';
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -181,7 +181,7 @@ const KnowledgePathDetail = () => {
         <div className="mt-6 text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
             <CheckCircle className="mr-2" />
-            <span>You have earned a certificate for completing this knowledge path</span>
+            <span>Has obtenido un certificado por completar esta ruta de conocimiento</span>
           </div>
         </div>
       );
@@ -192,7 +192,7 @@ const KnowledgePathDetail = () => {
         <div className="mt-6 text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
             <CheckCircle className="mr-2" />
-            <span>You have earned a certificate for completing this knowledge path</span>
+            <span>Has obtenido un certificado por completar esta ruta de conocimiento</span>
           </div>
         </div>
       );
@@ -205,14 +205,14 @@ const KnowledgePathDetail = () => {
           return (
             <div className="mt-6 text-center">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-yellow-100 text-yellow-800">
-                <span>Certificate request pending review</span>
+                <span>Solicitud de certificado pendiente de revisión</span>
               </div>
               <button
                 onClick={handleCancelRequest}
                 disabled={requestingCertificate}
                 className="mt-2 px-4 py-1 text-sm text-red-600 hover:text-red-800"
               >
-                {requestingCertificate ? 'Cancelling...' : 'Cancel Request'}
+                {requestingCertificate ? 'Cancelando...' : 'Cancelar Solicitud'}
               </button>
             </div>
           );
@@ -220,10 +220,10 @@ const KnowledgePathDetail = () => {
           return (
             <div className="mt-6 text-center">
               <div className="inline-flex flex-col items-center px-4 py-2 rounded-full bg-red-100 text-red-800">
-                <span>Certificate request was rejected</span>
+                <span>La solicitud de certificado fue rechazada</span>
                 {request.rejection_reason && (
                   <div className="mt-2 text-sm font-medium">
-                    Reason: {request.rejection_reason}
+                    Razón: {request.rejection_reason}
                   </div>
                 )}
               </div>
@@ -233,7 +233,7 @@ const KnowledgePathDetail = () => {
                   disabled={requestingCertificate}
                   className="mt-2 px-4 py-1 text-sm text-green-600 hover:text-green-800"
                 >
-                  {requestingCertificate ? 'Accepting...' : 'Accept Request'}
+                  {requestingCertificate ? 'Aceptando...' : 'Aceptar Solicitud'}
                 </button>
               )}
               {!isCreator && (
@@ -242,7 +242,7 @@ const KnowledgePathDetail = () => {
                   disabled={requestingCertificate}
                   className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
                 >
-                  {requestingCertificate ? 'Requesting...' : 'Request Again'}
+                  {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
                 </button>
               )}
             </div>
@@ -251,14 +251,14 @@ const KnowledgePathDetail = () => {
           return (
             <div className="mt-6 text-center">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-800">
-                <span>Certificate request was cancelled</span>
+                <span>La solicitud de certificado fue cancelada</span>
               </div>
               <button
                 onClick={handleOpenModal}
                 disabled={requestingCertificate}
                 className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
               >
-                {requestingCertificate ? 'Requesting...' : 'Request Again'}
+                {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
               </button>
             </div>
           );
@@ -277,7 +277,7 @@ const KnowledgePathDetail = () => {
               ? 'bg-gray-400 cursor-not-allowed' 
               : 'bg-green-500 hover:bg-green-600 text-white'}`}
         >
-          {requestingCertificate ? 'Requesting...' : 'Request Certificate'}
+          {requestingCertificate ? 'Solicitando...' : 'Solicitar Certificado'}
         </button>
       </div>
     );
@@ -290,9 +290,9 @@ const KnowledgePathDetail = () => {
     requestingCertificate
   ]);
 
-  if (loading) return <div className="text-center py-8">Loading...</div>;
+  if (loading) return <div className="text-center py-8">Cargando...</div>;
   if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
-  if (!knowledgePath && !error) return <div className="text-center py-8">Knowledge path not found</div>;
+  if (!knowledgePath && !error) return <div className="text-center py-8">Ruta de conocimiento no encontrada</div>;
 
   return (
     <div className="container mx-auto md:p-4">
@@ -319,7 +319,7 @@ const KnowledgePathDetail = () => {
               <div>
                 <h1 className="md:!text-3xl !text-xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
                 <p className="text-gray-600">
-                  Created by{' '}
+                  Creado por{' '}
                   <Link 
                     to={`/profiles/user_profile/${knowledgePath.author_id}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -332,7 +332,7 @@ const KnowledgePathDetail = () => {
                     onClick={handleViewCertificateRequests}
                     className="mt-2 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
                   >
-                    <span>You have {pendingRequests} pending certificate request{pendingRequests !== 1 ? 's' : ''}</span>
+                    <span>Tienes {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} de certificado pendiente{pendingRequests !== 1 ? 's' : ''}</span>
                   </button>
                 )}
               </div>
@@ -352,7 +352,7 @@ const KnowledgePathDetail = () => {
                     to={`/knowledge_path/${pathId}/edit`}
                     className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
                   >
-                    Edit Path
+                    Editar Ruta
                   </Link>
                 )}
               </div>
@@ -369,22 +369,22 @@ const KnowledgePathDetail = () => {
               />
             </div>
             <p className="text-sm text-gray-600">
-              Completed {knowledgePath.progress.completed_nodes} of {knowledgePath.progress.total_nodes} nodes
+              Completados {knowledgePath.progress.completed_nodes} de {knowledgePath.progress.total_nodes} nodos
             </p>
           </div>
         )}
 
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900">Description</h2>
+          <h2 className="text-xl font-semibold mb-2 text-gray-900">Descripción</h2>
           <p className="text-gray-700">{knowledgePath.description}</p>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Content Nodes</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Nodos de Contenido</h2>
             {knowledgePath.progress?.is_completed && (
               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                Completed
+                Completado
               </span>
             )}
           </div>
@@ -421,7 +421,7 @@ const KnowledgePathDetail = () => {
               })}
             </div>
           ) : (
-            <p className="text-gray-500">No content nodes added yet</p>
+            <p className="text-gray-500">Aún no se han agregado nodos de contenido</p>
           )}
 
           {/* Certificate Status Section */}
@@ -435,15 +435,15 @@ const KnowledgePathDetail = () => {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Request Certificate</DialogTitle>
+          <DialogTitle>Solicitar Certificado</DialogTitle>
           <DialogContent>
             <Box sx={{ mt: 2 }}>
               <TextField
                 fullWidth
                 multiline
                 rows={4}
-                label="Optional message"
-                placeholder="Optionally add a note to the creator of the knowledge path"
+                label="Mensaje opcional"
+                placeholder="Opcionalmente agrega una nota al creador de la ruta de conocimiento"
                 value={requestNote}
                 onChange={(e) => setRequestNote(e.target.value)}
                 variant="outlined"
@@ -465,14 +465,14 @@ const KnowledgePathDetail = () => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseModal}>Cancel</Button>
+            <Button onClick={handleCloseModal}>Cancelar</Button>
             <Button 
               onClick={handleRequestCertificate}
               variant="contained"
               color="primary"
               disabled={requestingCertificate}
             >
-              {requestingCertificate ? 'Submitting...' : 'Submit Request'}
+              {requestingCertificate ? 'Enviando...' : 'Enviar Solicitud'}
             </Button>
           </DialogActions>
         </Dialog>

@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Stack,
+} from '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentSelector from '../content/ContentSelector';
 
@@ -54,7 +64,7 @@ const NodeEdit = () => {
         }
       } catch (err) {
         console.error('Failed to load data:', err);
-        setError('Failed to load data');
+        setError('Error al cargar los datos');
       } finally {
         setLoading(false);
       }
@@ -91,22 +101,39 @@ const NodeEdit = () => {
       navigate(`/knowledge_path/${pathId}/edit`);
     } catch (err) {
       console.error('Error updating node:', err);
-      setError(err.message || 'Failed to update node');
+      setError(err.message || 'Error al actualizar el nodo');
     }
   };
 
-  if (loading) return <div className="container mx-auto p-4">Loading...</div>;
-  if (error) return <div className="container mx-auto p-4 text-red-600">{error}</div>;
+  if (loading) {
+    return (
+      <Container sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container sx={{ py: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold !text-gray-900 mb-2">Edit Content Node</h1>
-        <h2 className="text-gray-600 mb-6">
-          in Knowledge Path: {knowledgePath?.title}
-        </h2>
+    <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
+      <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
+        <Typography variant="h5" component="h1" sx={{ mb: 1 }}>
+          Editar Nodo de Contenido
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          en la Ruta de Conocimiento: {knowledgePath?.title}
+        </Typography>
 
-        <div className="space-y-6">
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <ContentSelector
             selectedContent={selectedContent}
             onContentSelected={handleContentSelected}
@@ -120,57 +147,50 @@ const NodeEdit = () => {
             previewVariant="detailed"
           />
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title Input */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                Node Title
-              </label>
-              <input
-                type="text"
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
+          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <TextField
+              fullWidth
+              id="title"
+              label="Título del Nodo"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              required
+            />
 
-            {/* Description Input */}
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows="4"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            <TextField
+              fullWidth
+              id="description"
+              label="Descripción"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              multiline
+              rows={4}
+            />
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 md:flex-nowrap flex-wrap">
-              <button
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                variant="contained"
+                color="success"
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
-                Save Changes
-              </button>
-              <button
+                Guardar Cambios
+              </Button>
+              <Button
                 type="button"
                 onClick={() => navigate(`/knowledge_path/${pathId}/edit`)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg"
+                variant="outlined"
+                color="inherit"
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+                Cancelar
+              </Button>
+            </Stack>
+          </Box>
+        </Box>
+      </Box>
+    </Container>
   );
 };
 
-export default NodeEdit; 
+export default NodeEdit;

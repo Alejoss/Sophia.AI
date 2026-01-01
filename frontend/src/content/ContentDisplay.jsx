@@ -269,7 +269,7 @@ const ContentDisplay = ({
                 color: "text.secondary",
               }}
             >
-              <Typography>Failed to load image</Typography>
+              <Typography color="text.primary">Failed to load image</Typography>
             </Box>
           </Box>
         );
@@ -409,9 +409,9 @@ const ContentDisplay = ({
               onClick={handleContentClick}
               title="Click to open URL in new tab"
             >
-              <Typography variant="body1">
+              <Typography variant="body1" color="text.primary">
                 URL Content:{" "}
-                <a href={url} target="_blank" rel="noopener noreferrer">
+                <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>
                   {url}
                 </a>
               </Typography>
@@ -487,7 +487,7 @@ const ContentDisplay = ({
                     }}
                   >
                     <StorageIcon fontSize="small" color="action" />
-                    <Typography variant="body2">File:</Typography>
+                    <Typography variant="body2" color="text.primary">File:</Typography>
                     <Button
                       size="small"
                       variant="outlined"
@@ -516,7 +516,7 @@ const ContentDisplay = ({
                 {url && !fileDetails?.file && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <LinkIcon fontSize="small" color="action" />
-                    <Typography variant="body2">URL:</Typography>
+                    <Typography variant="body2" color="text.primary">URL:</Typography>
                     <Button
                       size="small"
                       variant="outlined"
@@ -538,7 +538,7 @@ const ContentDisplay = ({
                 {fileDetails?.file_size && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <StorageIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       File size:{" "}
                       {(fileDetails.file_size / (1024 * 1024)).toFixed(2)} MB
                     </Typography>
@@ -548,7 +548,7 @@ const ContentDisplay = ({
                 {fileDetails?.text_length && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <DescriptionIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Text length: {fileDetails.text_length.toLocaleString()}{" "}
                       characters
                     </Typography>
@@ -570,7 +570,7 @@ const ContentDisplay = ({
                 {contentData.created_at && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Content created: {formatDate(contentData.created_at)}
                     </Typography>
                   </Box>
@@ -579,7 +579,7 @@ const ContentDisplay = ({
                 {fileDetails?.uploaded_at && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       File uploaded: {formatDate(fileDetails.uploaded_at)}
                     </Typography>
                   </Box>
@@ -588,7 +588,7 @@ const ContentDisplay = ({
                 {profile?.created_at && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Profile created: {formatDate(profile.created_at)}
                     </Typography>
                   </Box>
@@ -597,7 +597,7 @@ const ContentDisplay = ({
                 {profile?.updated_at && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Profile updated: {formatDate(profile.updated_at)}
                     </Typography>
                   </Box>
@@ -618,7 +618,7 @@ const ContentDisplay = ({
                 {profile?.user_username && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <PersonIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Profile owner: {profile.user_username}
                     </Typography>
                   </Box>
@@ -639,7 +639,7 @@ const ContentDisplay = ({
                 {profile?.collection_name && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <FolderIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Collection: {profile.collection_name}
                     </Typography>
                   </Box>
@@ -648,7 +648,7 @@ const ContentDisplay = ({
                 {contentData.topics && contentData.topics.length > 0 && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <FolderIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Associated topics: {contentData.topics.length}
                     </Typography>
                   </Box>
@@ -672,7 +672,7 @@ const ContentDisplay = ({
                   ) : (
                     <VisibilityOffIcon fontSize="small" color="error" />
                   )}
-                  <Typography variant="body2">
+                  <Typography variant="body2" color="text.primary">
                     {profile?.is_visible ? "Visible" : "Hidden"} in search
                   </Typography>
                 </Box>
@@ -680,7 +680,7 @@ const ContentDisplay = ({
                 {profile?.is_producer && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <PersonIcon fontSize="small" color="primary" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       You are the producer
                     </Typography>
                   </Box>
@@ -701,7 +701,7 @@ const ContentDisplay = ({
                 <Stack spacing={1}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <ThumbUpIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.primary">
                       Votes: {contentData.vote_count}
                     </Typography>
                   </Box>
@@ -709,7 +709,7 @@ const ContentDisplay = ({
                   {contentData.user_vote !== undefined && (
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <ThumbUpIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
+                      <Typography variant="body2" color="text.primary">
                         Your vote:{" "}
                         {contentData.user_vote === 1
                           ? "Upvoted"
@@ -753,7 +753,7 @@ const ContentDisplay = ({
                   >
                     Type:
                   </Typography>
-                  <Typography variant="body1">{fileDetails.og_type}</Typography>
+                  <Typography variant="body1" color="text.primary">{fileDetails.og_type}</Typography>
                 </Box>
               )}
 
@@ -766,7 +766,7 @@ const ContentDisplay = ({
                   >
                     Site:
                   </Typography>
-                  <Typography variant="body1">
+                  <Typography variant="body1" color="text.primary">
                     {fileDetails.og_site_name}
                   </Typography>
                 </Box>
@@ -781,7 +781,7 @@ const ContentDisplay = ({
                   >
                     Description:
                   </Typography>
-                  <Typography variant="body1">
+                  <Typography variant="body1" color="text.primary">
                     {fileDetails.og_description}
                   </Typography>
                 </Box>
@@ -883,7 +883,7 @@ const ContentDisplay = ({
                   color: "error.contrastText",
                 }}
               >
-                <Typography variant="body2">
+                <Typography variant="body2" color="text.primary">
                   Invalid content data provided
                 </Typography>
               </Box>
@@ -926,9 +926,22 @@ const ContentDisplay = ({
               sx={{
                 cursor: "pointer",
                 display: "flex",
-                alignItems: "flex-start",
-                gap: 2,
-                p: 2,
+                flexDirection: {
+                  xs: "column", // Stack vertically on mobile
+                  sm: "row",    // Side by side on small screens and up
+                },
+                alignItems: {
+                  xs: "stretch", // Stretch to full width on mobile
+                  sm: "flex-start", // Align to start on larger screens
+                },
+                gap: {
+                  xs: 2, // Smaller gap on mobile
+                  sm: 2, // Standard gap on larger screens
+                },
+                p: {
+                  xs: 1.5, // Less padding on mobile
+                  sm: 2,   // Standard padding on larger screens
+                },
                 "&:hover": {
                   backgroundColor: "action.hover",
                   borderRadius: 1,
@@ -946,8 +959,14 @@ const ContentDisplay = ({
               {/* Media Preview Section */}
               <Box
                 sx={{
-                  width: 160,
-                  height: 160,
+                  width: {
+                    xs: "100%",     // Full width on mobile
+                    sm: 160,        // Fixed width on larger screens
+                  },
+                  height: {
+                    xs: 200,        // Taller on mobile for better proportions
+                    sm: 160,        // Standard height on larger screens
+                  },
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1034,14 +1053,25 @@ const ContentDisplay = ({
               </Box>
 
               {/* Content Information Section */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ 
+                flex: 1, 
+                minWidth: 0,
+                // Ensure content takes full width on mobile
+                width: {
+                  xs: "100%",
+                  sm: "auto",
+                }
+              }}>
                 <Typography
                   variant="subtitle1"
                   sx={{
                     fontWeight: "medium",
                     color: "text.primary",
                     mb: 0.5,
-                    fontSize: "1.1rem",
+                    fontSize: {
+                      xs: "1rem",    // Slightly smaller on mobile
+                      sm: "1.1rem",  // Standard size on larger screens
+                    },
                   }}
                 >
                   {title || "Untitled Content"}
@@ -1065,7 +1095,10 @@ const ContentDisplay = ({
                     sx={{
                       mb: 1,
                       display: "-webkit-box",
-                      WebkitLineClamp: 2,
+                      WebkitLineClamp: {
+                        xs: 3,  // Show more lines on mobile
+                        sm: 2,  // Standard 2 lines on larger screens
+                      },
                       WebkitBoxOrient: "vertical",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -1085,7 +1118,10 @@ const ContentDisplay = ({
                       mb: 1,
                       fontStyle: "italic",
                       display: "-webkit-box",
-                      WebkitLineClamp: 2,
+                      WebkitLineClamp: {
+                        xs: 3,  // Show more lines on mobile
+                        sm: 2,  // Standard 2 lines on larger screens
+                      },
                       WebkitBoxOrient: "vertical",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -1104,6 +1140,13 @@ const ContentDisplay = ({
                     gap: 1,
                     alignItems: "center",
                     mt: 1,
+                    // Ensure chips don't overflow on mobile
+                    "& .MuiChip-root": {
+                      fontSize: {
+                        xs: "0.75rem",
+                        sm: "0.875rem",
+                      },
+                    },
                   }}
                 >
                   {/* Media Type Badge */}
@@ -1152,7 +1195,18 @@ const ContentDisplay = ({
               {/* Additional Actions */}
               {additionalActions && (
                 <Box
-                  sx={{ flexShrink: 0, alignSelf: "flex-start" }}
+                  sx={{ 
+                    flexShrink: 0, 
+                    alignSelf: {
+                      xs: "stretch",    // Full width on mobile
+                      sm: "flex-start", // Auto width on larger screens
+                    },
+                    // Position actions below content on mobile
+                    order: {
+                      xs: 3,  // After content on mobile
+                      sm: 2,  // After image on larger screens
+                    },
+                  }}
                   data-action-button
                 >
                   {additionalActions}
@@ -1166,6 +1220,11 @@ const ContentDisplay = ({
                   bottom: 8,
                   right: 8,
                   zIndex: 1,
+                  // Hide on very small screens to avoid overlap
+                  display: {
+                    xs: "none",
+                    sm: "block",
+                  },
                 }}
                 data-action-button
               >
@@ -1239,7 +1298,10 @@ const ContentDisplay = ({
               <CardMedia
                 component="div"
                 sx={{
-                  height: 140,
+                  height: {
+                    xs: 180,  // Taller on mobile for better proportions
+                    sm: 140,  // Standard height on larger screens
+                  },
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1309,8 +1371,25 @@ const ContentDisplay = ({
                   return getMediaTypeIcon(contentData);
                 })()}
               </CardMedia>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Typography gutterBottom variant="h6" component="div">
+              <CardContent sx={{ 
+                flexGrow: 1,
+                p: {
+                  xs: 1.5,  // Less padding on mobile
+                  sm: 2,    // Standard padding on larger screens
+                },
+              }}>
+                <Typography 
+                  gutterBottom 
+                  variant="h6" 
+                  component="div"
+                  color="text.primary"
+                  sx={{
+                    fontSize: {
+                      xs: "1.1rem",  // Slightly smaller on mobile
+                      sm: "1.25rem",  // Standard size on larger screens
+                    },
+                  }}
+                >
                   {title}
                 </Typography>
                 {showAuthor && author && (
@@ -1338,7 +1417,18 @@ const ContentDisplay = ({
                 )}
 
                 {/* Card Metadata */}
-                <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                <Box sx={{ 
+                  mt: 2, 
+                  display: "flex", 
+                  flexWrap: "wrap", 
+                  gap: 1,
+                  "& .MuiChip-root": {
+                    fontSize: {
+                      xs: "0.75rem",
+                      sm: "0.875rem",
+                    },
+                  },
+                }}>
                   {/* Date - Priority: file upload date > content creation date */}
                   {(fileDetails?.uploaded_at || contentData.created_at) && (
                     <Chip
@@ -1361,7 +1451,12 @@ const ContentDisplay = ({
                 </Box>
               </CardContent>
               {showActions && (
-                <CardActions>
+                <CardActions sx={{
+                  p: {
+                    xs: 1.5,  // Less padding on mobile
+                    sm: 2,    // Standard padding on larger screens
+                  },
+                }}>
                   {onEdit && (
                     <Button
                       size="small"
@@ -1402,7 +1497,7 @@ const ContentDisplay = ({
               sx={{ p: 2, bgcolor: "background.default", position: "relative" }}
             >
               <Box>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" gutterBottom color="text.primary">
                   {title}
                 </Typography>
                 {showAuthor && author && (
@@ -1429,13 +1524,13 @@ const ContentDisplay = ({
                     }}
                   >
                     {contentData.original_title && (
-                      <Typography variant="body2" gutterBottom>
+                      <Typography variant="body2" gutterBottom color="text.primary">
                         <strong>original title:</strong>{" "}
                         {contentData.original_title}
                       </Typography>
                     )}
                     {contentData.original_author && (
-                      <Typography variant="body2">
+                      <Typography variant="body2" color="text.primary">
                         <strong>original author:</strong>{" "}
                         {contentData.original_author}
                       </Typography>
@@ -1453,7 +1548,7 @@ const ContentDisplay = ({
                     Personal Notes
                   </Typography>
                   <Box sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
-                    <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                    <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }} color="text.primary">
                       {profile.personal_note}
                     </Typography>
                   </Box>

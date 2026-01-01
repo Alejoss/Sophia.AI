@@ -5,12 +5,12 @@
   justify-content: center;
   text-align: center;
   padding: 40px 20px;
-  min-height: calc(100vh - 100px); /* Adjust based on header/footer */
+  min-height: calc(100vh - 80px); /* Account for Material-UI navbar height */
   box-sizing: border-box;
 }
 
 .welcome-container h2 {
-  color: #333;
+  color: var(--text-primary);
   font-size: 28px;
   margin-bottom: 15px;
 }

@@ -40,24 +40,24 @@ class EventSerializer(serializers.ModelSerializer):
         # Validate required fields
         if not data.get('title', '').strip():
             raise serializers.ValidationError({
-                'title': 'Title is required'
+                'title': 'El título es requerido'
             })
         
         if not data.get('description', '').strip():
             raise serializers.ValidationError({
-                'description': 'Description is required'
+                'description': 'La descripción es requerida'
             })
         
         # Validate other_platform when platform is 'other'
         if data.get('platform') == 'other' and not data.get('other_platform'):
             raise serializers.ValidationError({
-                'other_platform': 'Other platform name is required when platform is "Other"'
+                'other_platform': 'El nombre de otra plataforma es requerido cuando la plataforma es "Otra"'
             })
         
         # Validate end date is after start date
         if data.get('date_end') and data.get('date_start') and data['date_end'] <= data['date_start']:
             raise serializers.ValidationError({
-                'date_end': 'End date must be after start date'
+                'date_end': 'La fecha de finalización debe ser posterior a la fecha de inicio'
             })
         
         return data
@@ -127,22 +127,22 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         user = request.user if request else None
         
         if not event:
-            raise serializers.ValidationError("Event is required")
+            raise serializers.ValidationError("El evento es requerido")
         
         if not user or not user.is_authenticated:
-            raise serializers.ValidationError("User must be authenticated")
+            raise serializers.ValidationError("El usuario debe estar autenticado")
         
         # Check if user is already registered
         if EventRegistration.objects.filter(user=user, event=event).exists():
-            raise serializers.ValidationError("User is already registered for this event")
+            raise serializers.ValidationError("El usuario ya está registrado para este evento")
         
         # Check if user is the event creator
         if user == event.owner:
-            raise serializers.ValidationError("Event creators cannot register for their own events")
+            raise serializers.ValidationError("Los creadores de eventos no pueden registrarse en sus propios eventos")
         
         # Check if event has already started
         if event.date_start and event.date_start < timezone.now():
-            raise serializers.ValidationError("Cannot register for events that have already started")
+            raise serializers.ValidationError("No se puede registrar para eventos que ya han comenzado")
         
         return data
     

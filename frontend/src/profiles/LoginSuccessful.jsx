@@ -13,10 +13,10 @@ const LoginSuccessful = () => {
 
   return (
     <div>
-      <h1>Login Successful</h1>
+      <h1>Inicio de sesión exitoso</h1>
       {user && (
         <div>
-          <p>Welcome back, {user.username}!</p>
+          <p>¡Bienvenido de nuevo, {user.username}!</p>
         </div>
       )}
     </div>

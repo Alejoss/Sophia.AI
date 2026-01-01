@@ -43,7 +43,7 @@ const EventDetail = () => {
         }
 
       } catch (err) {
-        setError('Failed to load event. Please try again.');
+        setError('Error al cargar el evento. Por favor, inténtelo de nuevo.');
         console.error('Error loading event:', err);
       } finally {
         setLoading(false);
@@ -55,7 +55,7 @@ const EventDetail = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD';
-    return new Date(dateString).toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -66,9 +66,9 @@ const EventDetail = () => {
 
   const getEventTypeLabel = (eventType) => {
     const typeMap = {
-      'LIVE_COURSE': 'Live Course',
-      'LIVE_CERTIFICATION': 'Live Certification',
-      'LIVE_MASTER_CLASS': 'Live Master Class'
+      'LIVE_COURSE': 'Curso en Vivo',
+      'LIVE_CERTIFICATION': 'Certificación en Vivo',
+      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
     };
     return typeMap[eventType] || eventType;
   };
@@ -98,12 +98,12 @@ const EventDetail = () => {
 
   const handleRegister = async () => {
     if (!authState.isAuthenticated) {
-      setError('Please log in to register for events');
+      setError('Por favor, inicie sesión para registrarse en eventos');
       return;
     }
 
     if (isEventStarted()) {
-      setError('Cannot register for events that have already started');
+      setError('No se puede registrar en eventos que ya han comenzado');
       return;
     }
 
@@ -119,7 +119,7 @@ const EventDetail = () => {
       setIsRegistered(true);
       setShowRegistrationModal(false);
     } catch (err) {
-      const errorMessage = err.error || err.detail || 'Failed to register for event';
+      const errorMessage = err.error || err.detail || 'Error al registrarse en el evento';
       setError(errorMessage);
     } finally {
       setRegistrationLoading(false);
@@ -133,7 +133,7 @@ const EventDetail = () => {
   const handleCancelRegistration = async () => {
     // Check if payment has been accepted
     if (userRegistration && userRegistration.payment_status === 'PAID') {
-      setError('Cannot cancel registration after payment has been accepted');
+      setError('No se puede cancelar el registro después de que el pago haya sido aceptado');
       return;
     }
 
@@ -144,7 +144,7 @@ const EventDetail = () => {
       setIsRegistered(false);
       setUserRegistration(null);
     } catch (err) {
-      const errorMessage = err.error || err.detail || 'Failed to cancel registration';
+      const errorMessage = err.error || err.detail || 'Error al cancelar el registro';
       setError(errorMessage);
     } finally {
       setRegistrationLoading(false);
@@ -157,11 +157,11 @@ const EventDetail = () => {
       await navigator.clipboard.writeText(eventUrl);
       
       // Update button text to show success
-      setShareButtonText('URL Copied!');
+      setShareButtonText('¡URL Copiada!');
       
       // Reset button text after 2 seconds
       setTimeout(() => {
-        setShareButtonText('Share Event');
+        setShareButtonText('Compartir Evento');
       }, 2000);
     } catch (err) {
       console.error('Failed to copy URL:', err);
@@ -174,9 +174,9 @@ const EventDetail = () => {
       document.execCommand('copy');
       document.body.removeChild(textArea);
       
-      setShareButtonText('URL Copied!');
+      setShareButtonText('¡URL Copiada!');
       setTimeout(() => {
-        setShareButtonText('Share Event');
+        setShareButtonText('Compartir Evento');
       }, 2000);
     }
   };
@@ -193,8 +193,8 @@ const EventDetail = () => {
     return (
       <div className="event-detail-container">
         <div className="text-center">
-          <h2>Event Details</h2>
-          <p>Loading event...</p>
+          <h2>Detalles del Evento</h2>
+          <p>Cargando evento...</p>
         </div>
       </div>
     );
@@ -204,9 +204,9 @@ const EventDetail = () => {
     return (
       <div className="event-detail-container">
         <div className="text-center">
-          <h2>Event Details</h2>
+          <h2>Detalles del Evento</h2>
           <p style={{ color: 'red' }}>{error}</p>
-          <Link to="/events" className="btn btn-primary">Back to Events</Link>
+          <Link to="/events" className="btn btn-primary">Volver a Eventos</Link>
         </div>
       </div>
     );
@@ -216,9 +216,9 @@ const EventDetail = () => {
     return (
       <div className="event-detail-container">
         <div className="text-center">
-          <h2>Event Details</h2>
-          <p>Event not found.</p>
-          <Link to="/events" className="btn btn-primary">Back to Events</Link>
+          <h2>Detalles del Evento</h2>
+          <p>Evento no encontrado.</p>
+          <Link to="/events" className="btn btn-primary">Volver a Eventos</Link>
         </div>
       </div>
     );
@@ -228,7 +228,7 @@ const EventDetail = () => {
     <div className="event-detail-container">
       <div className="event-detail-header">
         <Link to="/events" className="btn btn-secondary">
-          ← Back to Events
+          ← Volver a Eventos
         </Link>
         <h1>{event.title}</h1>
         <span className={`event-type-badge ${event.event_type.toLowerCase()}`}>
@@ -269,7 +269,7 @@ const EventDetail = () => {
             </div>
           )}
           <div className="event-description">
-            <h3>Description</h3>
+            <h3>Descripción</h3>
             <p>{event.description}</p>
           </div>
 
@@ -285,7 +285,7 @@ const EventDetail = () => {
 
             {event.platform && (
               <div className="event-meta-item">
-                <strong>Platform:</strong>
+                <strong>Plataforma:</strong>
                 <span>
                   {getPlatformLabel(event.platform)}
                   {event.platform === 'other' && event.other_platform && (
@@ -296,7 +296,7 @@ const EventDetail = () => {
             )}
 
             <div className="event-meta-item">
-              <strong>Created:</strong>
+              <strong>Creado:</strong>
               <span>{formatDate(event.date_created)}</span>
             </div>
 
@@ -329,27 +329,27 @@ const EventDetail = () => {
             )}
 
             <div className="event-meta-item">
-              <strong>Start Date:</strong>
+              <strong>Fecha de Inicio:</strong>
               <span>{formatDate(event.date_start)}</span>
             </div>
 
             {event.date_end && (
               <div className="event-meta-item">
-                <strong>End Date:</strong>
+                <strong>Fecha de Fin:</strong>
                 <span>{formatDate(event.date_end)}</span>
               </div>
             )}
 
             {event.date_recorded && (
               <div className="event-meta-item">
-                <strong>Recorded Date:</strong>
+                <strong>Fecha Grabada:</strong>
                 <span>{formatDate(event.date_recorded)}</span>
               </div>
             )}
 
             {event.schedule_description && (
               <div className="event-meta-item">
-                <strong>Schedule:</strong>
+                <strong>Horario:</strong>
                 <span>{event.schedule_description}</span>
               </div>
             )}
@@ -360,10 +360,10 @@ const EventDetail = () => {
           {isEventCreator() && (
             <>
               <Link to={`/events/${eventId}/edit`} className="btn btn-primary">
-                Edit Event
+                Editar Evento
               </Link>
               <Link to={`/events/${eventId}/manage`} className="btn btn-secondary">
-                Manage Event
+                Gestionar Evento
               </Link>
             </>
           )}
@@ -375,19 +375,19 @@ const EventDetail = () => {
                   onClick={handleRegister}
                   disabled={registrationLoading || isEventStarted()}
                   className={`btn ${isEventStarted() ? 'btn-disabled' : 'btn-primary'}`}
-                  title={isEventStarted() ? 'Event has already started' : ''}
+                  title={isEventStarted() ? 'El evento ya ha comenzado' : ''}
                 >
-                  {registrationLoading ? 'Registering...' : isEventStarted() ? 'Event Started' : 'Join Event'}
+                  {registrationLoading ? 'Registrando...' : isEventStarted() ? 'Evento Iniciado' : 'Unirse al Evento'}
                 </button>
               ) : (
                 <button 
                   onClick={handleCancelRegistration}
                   disabled={registrationLoading || (userRegistration && userRegistration.payment_status === 'PAID')}
                   className={`btn ${userRegistration && userRegistration.payment_status === 'PAID' ? 'btn-disabled' : 'btn-danger'}`}
-                  title={userRegistration && userRegistration.payment_status === 'PAID' ? 'Cannot cancel after payment accepted' : ''}
+                  title={userRegistration && userRegistration.payment_status === 'PAID' ? 'No se puede cancelar después de que el pago sea aceptado' : ''}
                 >
-                  {registrationLoading ? 'Cancelling...' : 
-                   userRegistration && userRegistration.payment_status === 'PAID' ? 'Payment Accepted' : 'Cancel Registration'}
+                  {registrationLoading ? 'Cancelando...' : 
+                   userRegistration && userRegistration.payment_status === 'PAID' ? 'Pago Aceptado' : 'Cancelar Registro'}
                 </button>
               )}
             </>
@@ -395,7 +395,7 @@ const EventDetail = () => {
           
           {!authState.isAuthenticated && (
             <Link to="/profiles/login" className="btn btn-primary">
-              Login to Join Event
+              Iniciar Sesión para Unirse al Evento
             </Link>
           )}
           
@@ -405,7 +405,7 @@ const EventDetail = () => {
           
           {!isEventCreator() && authState.isAuthenticated && isRegistered && (
             <button className="btn btn-info" onClick={handleContactCreator}>
-              Contact Creator
+              Contactar al Creador
             </button>
           )}
         </div>
@@ -416,7 +416,7 @@ const EventDetail = () => {
         <div className="modal-overlay" onClick={cancelRegistrationModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Confirm Event Registration</h3>
+              <h3>Confirmar Registro en el Evento</h3>
               <button 
                 className="modal-close"
                 onClick={cancelRegistrationModal}
@@ -427,31 +427,31 @@ const EventDetail = () => {
             <div className="modal-body">
               <div className="registration-notification">
                 <div className="notification-icon">📧</div>
-                <h4>Registration Confirmation</h4>
+                <h4>Confirmación de Registro</h4>
                 <p>
-                  You're about to register for <strong>{event.title}</strong>.
+                  Estás a punto de registrarte en <strong>{event.title}</strong>.
                 </p>
                 <p>
-                  <strong>Important:</strong> The event creator will get in touch with you 
-                  to provide further details about joining the event.
+                  <strong>Importante:</strong> El creador del evento se pondrá en contacto contigo 
+                  para proporcionarte más detalles sobre cómo unirte al evento.
                 </p>
                 <p>
-                  <strong>Check your Academia Blockchain inbox and your email inbox</strong> for 
-                  communication from the event creator.
+                  <strong>Revisa tu bandeja de entrada de Academia Blockchain y tu correo electrónico</strong> para 
+                  recibir comunicación del creador del evento.
                 </p>
                 <div className="event-summary">
                   <div className="summary-item">
-                    <strong>Event:</strong> {event.title}
+                    <strong>Evento:</strong> {event.title}
                   </div>
                   <div className="summary-item">
-                    <strong>Host:</strong> {event.owner.username}
+                    <strong>Anfitrión:</strong> {event.owner.username}
                   </div>
                   <div className="summary-item">
-                    <strong>Date:</strong> {formatDate(event.date_start)}
+                    <strong>Fecha:</strong> {formatDate(event.date_start)}
                   </div>
                   {event.reference_price > 0 && (
                     <div className="summary-item">
-                      <strong>Price:</strong> ${event.reference_price}
+                      <strong>Precio:</strong> ${event.reference_price}
                     </div>
                   )}
                 </div>
@@ -463,14 +463,14 @@ const EventDetail = () => {
                 onClick={cancelRegistrationModal}
                 disabled={registrationLoading}
               >
-                Cancel
+                Cancelar
               </button>
               <button 
                 className="btn btn-primary"
                 onClick={confirmRegistration}
                 disabled={registrationLoading}
               >
-                {registrationLoading ? 'Registering...' : 'Confirm Registration'}
+                {registrationLoading ? 'Registrando...' : 'Confirmar Registro'}
               </button>
             </div>
           </div>

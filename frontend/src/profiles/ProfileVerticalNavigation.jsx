@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 
 import {
   Box,
@@ -24,9 +24,78 @@ import {
   Notifications as NotificationsIcon,
   LibraryBooks as LibraryIcon
 } from '@mui/icons-material';
+import { createMenuConfig } from '../utils/menuUtils';
+
+// Export menu configuration for use in header navigation
+export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCount = 0) => {
+  const baseItems = [
+    {
+      label: 'Publicaciones',
+      section: 'publications',
+      icon: ArticleIcon,
+      path: null // Will be handled by section change
+    },
+    {
+      label: 'Marcadores',
+      section: 'saved-items',
+      icon: BookmarkIcon,
+      path: null
+    },
+    {
+      label: 'Rutas de conocimiento',
+      section: 'knowledge-paths',
+      icon: KnowledgePathIcon,
+      path: null
+    },
+    {
+      label: 'Certificados',
+      section: 'certificates',
+      icon: SchoolIcon,
+      path: null
+    },
+    {
+      label: 'Eventos',
+      section: 'events',
+      icon: EventIcon,
+      path: null
+    },
+    {
+      label: 'Criptomonedas favoritas',
+      section: 'cryptos',
+      icon: CryptoIcon,
+      path: null
+    }
+  ];
+
+  // Add profile-specific items
+  if (isOwnProfile) {
+    baseItems.push(
+      {
+        label: 'Notificaciones',
+        section: 'notifications',
+        icon: NotificationsIcon,
+        path: null,
+        badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null
+      },
+      {
+        label: 'Tu biblioteca',
+        section: 'library',
+        icon: LibraryIcon,
+        path: '/content/library_user'
+      }
+    );
+  }
+
+  return baseItems;
+};
+
+// Export menu configuration for use in header navigation
+export const getProfileMenuConfig = (isOwnProfile = false, unreadNotificationsCount = 0) => {
+  const items = getProfileMenuItems(isOwnProfile, unreadNotificationsCount);
+  return createMenuConfig(items, 'Secciones del perfil', true);
+};
 
 const ProfileVerticalNavigation = ({ 
-  
   isOwnProfile = false, 
   userId = null,
   activeSection = 'publications',
@@ -37,55 +106,18 @@ const ProfileVerticalNavigation = ({
   const handleSectionClick = (section) => {
     onSectionChange(null, section);
   };
-const [isOpen, setIsOpen] = useState(false);
-  // Define menu items - Events visible to both owners and visitors
-  const getMenuItems = () => {
-    const baseItems = [
-      {
-        label: 'Publications',
-        section: 'publications',
-        icon: ArticleIcon
-      },
-      {
-        label: 'Bookmarks',
-        section: 'saved-items',
-        icon: BookmarkIcon
-      },
-      {
-        label: 'Knowledge Paths',
-        section: 'knowledge-paths',
-        icon: KnowledgePathIcon
-      },
-      {
-        label: 'Certificates',
-        section: 'certificates',
-        icon: SchoolIcon
-      },
-      {
-        label: 'Events',
-        section: 'events',
-        icon: EventIcon
-      },
-      {
-        label: 'Favorite Cryptos',
-        section: 'cryptos',
-        icon: CryptoIcon
-      }
-    ];
 
-    return baseItems;
-  };
-
-  const menuItems = getMenuItems();
+  // Get menu items using the exported function
+  const menuItems = getProfileMenuItems(isOwnProfile, unreadNotificationsCount);
 
   return (
     <Paper 
       elevation={1} 
       sx={{ 
         width: {
-      xs: "100%", // full width on mobile
-      md: 280,    // fixed 280px on md+
-    },
+          xs: "100%", // full width on mobile
+          md: 280,    // fixed 280px on md+
+        },
         minHeight: 'fit-content',
         backgroundColor: 'background.paper',
         ...sx 
@@ -101,31 +133,52 @@ const [isOpen, setIsOpen] = useState(false);
             fontWeight: 600 
           }}
         >
-          {isOwnProfile ? 'Your Profile' : 'Profile'}
+          {isOwnProfile ? 'Tu perfil' : 'Perfil'}
         </Typography>
         
         <Divider sx={{ mb: 2 }} />
         
-        {/* Hamburger */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden block"
-      >
-        <img
-          src="/images/hamburger.svg"
-          className="w-5 h-5 md:hidden block mb-5"
-          alt="Menu"
-        />
-      </button>
-         <div
-        className={`${
-          isOpen ? "block" : "hidden"
-        } md:block`}
-      >
         <List sx={{ p: 0 }}>
           {menuItems.map((item, index) => {
             const IconComponent = item.icon;
             const isItemActive = activeSection === item.section;
+            
+            // Handle library link differently (external link)
+            if (item.path && item.section === 'library') {
+              return (
+                <ListItem key={index} disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton
+                    component="a"
+                    href={item.path}
+                    sx={{
+                      borderRadius: 1,
+                      mx: 1,
+                      backgroundColor: 'transparent',
+                      color: 'text.primary',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      }
+                    }}
+                  >
+                    <ListItemIcon sx={{ 
+                      color: 'text.secondary',
+                      minWidth: 40 
+                    }}>
+                      <IconComponent />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item.label}
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          fontWeight: 400,
+                          fontSize: '0.95rem'
+                        }
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            }
             
             return (
               <ListItem key={index} disablePadding sx={{ mb: 0.5 }}>
@@ -134,10 +187,10 @@ const [isOpen, setIsOpen] = useState(false);
                   sx={{
                     borderRadius: 1,
                     mx: 1,
-                    backgroundColor: isItemActive ? 'primary.light text-white' : 'transparent',
-                    color: isItemActive ? 'text-white' : 'text-white',
+                    backgroundColor: isItemActive ? 'primary.light' : 'transparent',
+                    color: isItemActive ? 'text.white' : 'text.white',
                     '&:hover': {
-                      backgroundColor: isItemActive ? 'text-white' : 'action.hover',
+                      backgroundColor: isItemActive ? 'text.white' : 'action.hover',
                     },
                     '&.Mui-selected': {
                       backgroundColor: 'primary.light',
@@ -163,110 +216,28 @@ const [isOpen, setIsOpen] = useState(false);
                       }
                     }}
                   />
+                  {/* Badge for notifications */}
+                  {item.badge && (
+                    <Chip
+                      label={item.badge}
+                      size="small"
+                      color="error"
+                      sx={{
+                        height: 20,
+                        minWidth: 20,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        '& .MuiChip-label': {
+                          px: 0.5
+                        }
+                      }}
+                    />
+                  )}
                 </ListItemButton>
               </ListItem>
             );
           })}
-
-          {/* Notifications section - only for own profile */}
-          {isOwnProfile && (
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                onClick={() => handleSectionClick('notifications')}
-                sx={{
-                  borderRadius: 1,
-                  mx: 1,
-                  backgroundColor: activeSection === 'notifications' ? 'primary.light' : 'transparent',
-                  color: activeSection === 'notifications' ? 'primary.main' : 'text.primary',
-                  '&:hover': {
-                    backgroundColor: activeSection === 'notifications' ? 'primary.light' : 'action.hover',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: 'primary.light',
-                    '&:hover': {
-                      backgroundColor: 'primary.light',
-                    }
-                  }
-                }}
-                selected={activeSection === 'notifications'}
-              >
-                <ListItemIcon sx={{ 
-                  color: activeSection === 'notifications' ? 'primary.main' : 'text.secondary',
-                  minWidth: 40 
-                }}>
-                  <NotificationsIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Notifications"
-                  sx={{
-                    '& .MuiListItemText-primary': {
-                      fontWeight: activeSection === 'notifications' ? 600 : 400,
-                      fontSize: '0.95rem'
-                    }
-                  }}
-                />
-                {/* Unread count pill */}
-                {unreadNotificationsCount > 0 && (
-                  <Chip
-                    label={unreadNotificationsCount}
-                    size="small"
-                    color="error"
-                    sx={{
-                      height: 20,
-                      minWidth: 20,
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      '& .MuiChip-label': {
-                        px: 0.5
-                      }
-                    }}
-                  />
-                )}
-              </ListItemButton>
-            </ListItem>
-          )}
-
-          {/* Separator */}
-          {isOwnProfile && (
-            <Divider sx={{ my: 2, mx: 1 }} />
-          )}
-
-          {/* Your Library link - only for own profile */}
-          {isOwnProfile && (
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                component="a"
-                href="/content/library_user"
-                sx={{
-                  borderRadius: 1,
-                  mx: 1,
-                  backgroundColor: 'transparent',
-                  color: 'text.primary',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ 
-                  color: 'text.secondary',
-                  minWidth: 40 
-                }}>
-                  <LibraryIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Your Library"
-                  sx={{
-                    '& .MuiListItemText-primary': {
-                      fontWeight: 400,
-                      fontSize: '0.95rem'
-                    }
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          )}
         </List>
-        </div>
       </Box>
     </Paper>
   );

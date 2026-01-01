@@ -67,7 +67,7 @@ const Bookmarks = () => {
       await deleteBookmark(bookmarkId);
       fetchBookmarks();
     } catch (error) {
-      setError("Failed to delete bookmark");
+      setError("Error al eliminar el marcador");
     }
   };
 
@@ -109,12 +109,12 @@ const Bookmarks = () => {
             fontWeight: 600,
           }}
         >
-          My Bookmarks
+          Mis marcadores
         </Typography>
 
         {bookmarks.length === 0 ? (
           <Typography variant="body1" align="center" sx={{ py: 4 }}>
-            No saved items
+            No hay elementos guardados
           </Typography>
         ) : (
           <Box>
@@ -148,7 +148,7 @@ const Bookmarks = () => {
                               content={bookmark.content_profile}
                               onSuccess={fetchBookmarks}
                             />
-                            <Tooltip title="Delete bookmark">
+                            <Tooltip title="Eliminar marcador">
                               <IconButton
                                 onClick={(e) => handleDelete(bookmark.id, e)}
                                 color="error"
@@ -195,10 +195,10 @@ const Bookmarks = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                            "Untitled Knowledge Path"}
+                            "Ruta de conocimiento sin título"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Knowledge Path
+                          Ruta de conocimiento
                         </Typography>
                       </Box>
                       <Tooltip title="Delete bookmark">
@@ -245,10 +245,10 @@ const Bookmarks = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                            "Untitled Publication"}
+                            "Publicación sin título"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Publication
+                          Publicación
                         </Typography>
                       </Box>
                       <Tooltip title="Delete bookmark">

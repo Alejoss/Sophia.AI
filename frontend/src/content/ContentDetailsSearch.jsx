@@ -49,7 +49,7 @@ const ContentDetailsSearch = () => {
         setReferences(referencesData);
       } catch (err) {
         console.error("Error fetching content details:", err);
-        setError("Failed to load content");
+        setError("Error al cargar el contenido");
       } finally {
         setLoading(false);
       }
@@ -75,7 +75,7 @@ const ContentDetailsSearch = () => {
   if (!content)
     return (
       <Container sx={{ pt: 12 }}>
-        <Typography>Content not found</Typography>
+        <Typography>Contenido no encontrado</Typography>
       </Container>
     );
 
@@ -108,14 +108,14 @@ const ContentDetailsSearch = () => {
           startIcon={<SearchIcon />}
           onClick={handleBackToSearch}
         >
-          Do Another Search
+          Hacer otra búsqueda
         </Button>
       </Box>
 
       {searchQuery && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: "info.light" }}>
           <Typography variant="body1">
-            You are viewing this content as a result of searching for:{" "}
+            Estás viendo este contenido como resultado de buscar:{" "}
             <strong>"{searchQuery}"</strong>
           </Typography>
         </Paper>
@@ -181,7 +181,16 @@ const ContentDetailsSearch = () => {
       {/* Content References Section */}
       {references && (
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h5" gutterBottom>
+          <Typography 
+            variant="h5" 
+            gutterBottom 
+            color="text.primary"
+            sx={{
+              fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+              fontWeight: 400,
+              fontSize: "20px"
+            }}
+          >
             References
           </Typography>
           <ContentReferences references={references} />

@@ -33,7 +33,7 @@ const ProfileHeader = ({
             {/* Configuration Icon - Top Right Corner */}
             {isOwnProfile && (
                 <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
-                    <Tooltip title="Settings">
+                    <Tooltip title="Configuración">
                         <IconButton
                             onClick={onSecurityClick}
                             size="small"
@@ -86,7 +86,7 @@ const ProfileHeader = ({
                         {/* Action Buttons */}
                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
                             {!isOwnProfile && (
-                                <Tooltip title={isAuthenticated ? "Send a message" : "Login to send a message"}>
+                                <Tooltip title={isAuthenticated ? "Enviar un mensaje" : "Inicia sesión para enviar un mensaje"}>
                                     <Button 
                                         variant="contained"
                                         color="primary"
@@ -99,14 +99,14 @@ const ProfileHeader = ({
                                             }
                                         }}
                                     >
-                                        Send Message
+                                        Enviar mensaje
                                     </Button>
                                 </Tooltip>
                             )}
                         </Box>
                     </Box>
                     <Typography variant="body1" paragraph>
-                        {profile.profile_description || 'No description available.'}
+                        {profile.profile_description || 'No hay descripción disponible.'}
                     </Typography>
                     
                     {/* Edit Profile Button - Below Description */}
@@ -120,7 +120,7 @@ const ProfileHeader = ({
                                 startIcon={<EditIcon />}
                                 size="small"
                             >
-                                Edit Profile
+                                Editar perfil
                             </Button>
                         </Box>
                     )}

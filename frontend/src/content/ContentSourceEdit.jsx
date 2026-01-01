@@ -70,7 +70,17 @@ const ContentSourceEdit = () => {
 
     return (
         <Box sx={{ maxWidth: 1400, margin: '0 auto', padding: 2, pt: 12 }}>
-            <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+            <Typography 
+              variant="h4" 
+              gutterBottom 
+              sx={{ 
+                mb: 3,
+                fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                fontWeight: 400,
+                fontSize: "24px"
+              }} 
+              color="text.primary"
+            >
                 Edit Content Source
             </Typography>
 
@@ -99,7 +109,16 @@ const ContentSourceEdit = () => {
                 // Show message when content cannot be modified
                 <Card sx={{ padding: 3, mb: 3 }}>
                     <Alert severity="warning" sx={{ mb: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography 
+                          variant="h6" 
+                          gutterBottom 
+                          color="text.primary"
+                          sx={{
+                            fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                            fontWeight: 400,
+                            fontSize: "18px"
+                          }}
+                        >
                             Cannot Modify Content Source
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 2 }}>
@@ -120,7 +139,17 @@ const ContentSourceEdit = () => {
                     </Alert>
                     
                     {/* Show content preview */}
-                    <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                    <Typography 
+                      variant="h6" 
+                      gutterBottom 
+                      sx={{ 
+                        mt: 3,
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "18px"
+                      }} 
+                      color="text.primary"
+                    >
                         Content Preview
                     </Typography>
                     <ContentDisplay 
@@ -138,7 +167,16 @@ const ContentSourceEdit = () => {
                         <Card sx={{ padding: 3, height: 'fit-content' }}>
                             {/* Upload Content Form */}
                             <Paper elevation={2} sx={{ p: 3 }}>
-                                <Typography variant="h6" gutterBottom>
+                                <Typography 
+                                  variant="h6" 
+                                  gutterBottom 
+                                  color="text.primary"
+                                  sx={{
+                                    fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                                    fontWeight: 400,
+                                    fontSize: "18px"
+                                  }}
+                                >
                                     Change Content Source
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

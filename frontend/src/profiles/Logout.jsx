@@ -29,7 +29,7 @@ const Logout = () => {
         window.location.href = '/profiles/login/';
       } catch (error) {
         console.error('Logout failed:', error);
-        setError(error.message || 'Failed to logout');
+        setError(error.message || 'Error al cerrar sesión');
         clearAuthState();
         clearAuthenticationStatus();
         window.location.href = '/profiles/login/';
@@ -49,7 +49,7 @@ const Logout = () => {
       {error ? (
         <div style={{ color: 'red' }}>Error: {error}</div>
       ) : (
-        <div>Logging out {username}...</div>
+        <div>Cerrando sesión de {username}...</div>
       )}
     </div>
   );

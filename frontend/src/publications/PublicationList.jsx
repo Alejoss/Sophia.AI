@@ -27,7 +27,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
         setPublications(data);
         setError(null);
       } catch (err) {
-        setError('Failed to load publications');
+        setError('Error al cargar las publicaciones');
       } finally {
         setLoading(false);
       }
@@ -61,7 +61,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="body1" color="text.secondary">
-          No publications found.
+          No se encontraron publicaciones.
         </Typography>
       </Box>
     );
@@ -91,7 +91,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Published: {new Date(publication.published_at).toLocaleDateString()}
+                      Publicado: {new Date(publication.published_at).toLocaleDateString('es-ES')}
                     </Typography>
                   </Box>
                   
@@ -108,7 +108,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                         color="primary"
                         size="small"
                       >
-                        Edit
+                        Editar
                       </Button>
                     )}
                   </Box>
@@ -119,7 +119,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                 {hasContent && (
                   <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                      Referenced Content:
+                      Contenido Referenciado:
                     </Typography>
                     
                     <ContentDisplay 

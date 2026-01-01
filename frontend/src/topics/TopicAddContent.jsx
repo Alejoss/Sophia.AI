@@ -59,8 +59,8 @@ const TopicAddContent = () => {
     
     return (
         <LibrarySelectMultiple
-            title={`Add Content to Topic (ID: ${topicId})`}
-            description="Select content from your library to add to this topic"
+            title={`Agregar Contenido al Tema (ID: ${topicId})`}
+            description="Selecciona contenido de tu biblioteca para agregar a este tema"
             onCancel={handleCancel}
             onSave={handleSave}
             onSelectionChange={handleSelectionChange}

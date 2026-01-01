@@ -109,7 +109,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         """Validate that knowledge path can be made visible"""
         if value and not self.instance.can_be_visible():
             raise serializers.ValidationError(
-                "Knowledge paths need at least two nodes to be visible"
+                "Las rutas de conocimiento necesitan al menos dos nodos para ser visibles"
             )
         return value
 
@@ -135,7 +135,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
             new_visibility = validated_data['is_visible']
             if new_visibility and not instance.can_be_visible():
                 raise serializers.ValidationError({
-                    'is_visible': "Knowledge paths need at least two nodes to be visible"
+                    'is_visible': "Las rutas de conocimiento necesitan al menos dos nodos para ser visibles"
                 })
             instance.is_visible = new_visibility
         
@@ -227,6 +227,6 @@ class NodeReorderSerializer(serializers.Serializer):
         for item in value:
             if not all(k in item for k in ('id', 'order')):
                 raise serializers.ValidationError(
-                    "Each item must have 'id' and 'order' fields"
+                    "Cada elemento debe tener los campos 'id' y 'order'"
                 )
         return value

@@ -2,6 +2,8 @@
 
 This guide will help you set up the Sophia.AI Academia Blockchain project on your local machine.
 
+> **Note**: For more detailed documentation, see the [main documentation](docs/README.md) and [local development guide](docs/deployment/local-development.md).
+
 ## Prerequisites
 
 Before you begin, make sure you have the following installed:

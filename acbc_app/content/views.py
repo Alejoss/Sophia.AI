@@ -169,7 +169,7 @@ class ContentDetailView(APIView):
                 }
             )
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -182,7 +182,7 @@ class ContentDetailView(APIView):
                 exc_info=True
             )
             return Response(
-                {'error': 'Internal server error'}, 
+                {'error': 'Error interno del servidor'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -259,7 +259,7 @@ class ContentDetailView(APIView):
                 }
             )
             return Response(
-                {'error': 'You do not have permission to delete this content'},
+                {'error': 'No tiene permiso para eliminar este contenido'},
                 status=status.HTTP_403_FORBIDDEN
             )
         except Exception as e:
@@ -347,7 +347,7 @@ class ContentPreviewView(APIView):
             
         except Content.DoesNotExist:
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -385,7 +385,7 @@ class UploadContentView(APIView):
                     extra={'user_id': user_id, 'username': username}
                 )
                 return Response(
-                    {'error': 'Cannot provide both file and URL'}, 
+                    {'error': 'No se puede proporcionar tanto archivo como URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -396,7 +396,7 @@ class UploadContentView(APIView):
                     extra={'user_id': user_id, 'username': username}
                 )
                 return Response(
-                    {'error': 'No file or URL provided'}, 
+                    {'error': 'No se proporcionó archivo ni URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -410,7 +410,7 @@ class UploadContentView(APIView):
                     validator(normalized_url)
                 except ValidationError:
                     return Response(
-                        {'error': 'Invalid URL format'}, 
+                        {'error': 'Formato de URL inválido'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -421,7 +421,7 @@ class UploadContentView(APIView):
                 valid_media_types = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
                 if media_type not in valid_media_types:
                     return Response(
-                        {'error': f'Invalid media type. Must be one of: {", ".join(valid_media_types)}'}, 
+                        {'error': f'Tipo de medio inválido. Debe ser uno de: {", ".join(valid_media_types)}'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -470,14 +470,14 @@ class UploadContentView(APIView):
                 file = request.FILES.get('file')
                 if not file:
                     return Response(
-                        {'error': 'No file provided'}, 
+                        {'error': 'No se proporcionó archivo'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
                 media_type = request.data.get('media_type')
                 if not media_type:
                     return Response(
-                        {'error': 'Media type not detected'}, 
+                        {'error': 'Tipo de medio no detectado'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
@@ -551,7 +551,7 @@ class UploadContentView(APIView):
             )
             return Response(
                 {
-                    'error': 'Failed to upload content',
+                    'error': 'Error al subir contenido',
                     'details': str(e)  # Include error details in response
                 }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -634,7 +634,7 @@ class UserContentListView(APIView):
                 exc_info=True
             )
             return Response(
-                {'error': 'An error occurred while fetching content'}, 
+                {'error': 'Ocurrió un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -665,7 +665,7 @@ class UserContentWithDetailsView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {'error': 'An error occurred while fetching content'}, 
+                {'error': 'Ocurrió un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -700,12 +700,12 @@ class UserContentByIdView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response(
-                {'error': f'User with ID {user_id} not found'}, 
+                {'error': f'Usuario con ID {user_id} no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
             return Response(
-                {'error': 'An error occurred while fetching content'}, 
+                {'error': 'Ocurrió un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -786,7 +786,7 @@ class CollectionContentView(APIView):
         content_profile_ids = request.data.get('content_profile_ids')
         if not content_profile_ids or not isinstance(content_profile_ids, list):
             return Response(
-                {'error': 'content_profile_ids must be a non-empty array'}, 
+                {'error': 'content_profile_ids debe ser un array no vacío'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -823,7 +823,7 @@ class ContentProfileView(APIView):
         if 'is_visible' in request.data:
             if not request.data.get('is_producer', False):
                 return Response(
-                    {'error': 'You must claim to be the producer to change visibility'},
+                    {'error': 'Debe reclamar ser el productor para cambiar la visibilidad'},
                     status=status.HTTP_403_FORBIDDEN
                 )
         
@@ -849,7 +849,7 @@ class ContentProfileView(APIView):
         new_content_id = request.data.get('content_id')
         if not new_content_id:
             return Response(
-                {'error': 'content_id is required'}, 
+                {'error': 'content_id es requerido'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -857,7 +857,7 @@ class ContentProfileView(APIView):
             new_content = Content.objects.get(id=new_content_id)
         except Content.DoesNotExist:
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         
@@ -1057,10 +1057,10 @@ class TopicDetailView(APIView):
         
         # Check if user is author or moderator
         if not topic.is_moderator_or_creator(request.user):
-            return Response(
-                {"error": "You do not have permission to update this topic."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+                return Response(
+                    {"error": "No tiene permiso para actualizar este tema."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         # Handle image update if present
         if 'topic_image' in request.FILES:
@@ -1159,7 +1159,7 @@ class TopicEditContentView(APIView):
             )
         except Exception as e:
             return Response(
-                {'error': f'Failed to add content: {str(e)}'}, 
+                {'error': f'Error al agregar contenido: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1177,7 +1177,7 @@ class TopicEditContentView(APIView):
             )
         except Exception as e:
             return Response(
-                {'error': f'Failed to remove content: {str(e)}'}, 
+                {'error': f'Error al eliminar contenido: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1281,7 +1281,7 @@ class PublicationDetailView(APIView):
             return Response(serializer.data)
         except Publication.DoesNotExist:
             return Response(
-                {'error': 'Publication not found'},
+                {'error': 'Publicación no encontrada'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -1351,7 +1351,7 @@ class ContentReferencesView(APIView):
             return Response(data)
         except Content.DoesNotExist:
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -1376,10 +1376,10 @@ class ContentProfileDetailView(APIView):
             )
             return Response(serializer.data)
         except ContentProfile.DoesNotExist:
-            return Response(
-                {"error": "Content profile not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+                return Response(
+                    {"error": "Perfil de contenido no encontrado"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
 
 class ContentProfileCreateView(APIView):
@@ -1410,7 +1410,7 @@ class ContentProfileCreateView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'Content ID is required'}, 
+                    {'error': 'ID de contenido es requerido'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1427,7 +1427,7 @@ class ContentProfileCreateView(APIView):
                     }
                 )
                 return Response(
-                    {'error': f'Content with ID {content_id} not found'}, 
+                    {'error': f'Contenido con ID {content_id} no encontrado'}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
 
@@ -1448,7 +1448,7 @@ class ContentProfileCreateView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'You already have a profile for this content'}, 
+                    {'error': 'Ya tiene un perfil para este contenido'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1496,8 +1496,8 @@ class ContentProfileCreateView(APIView):
                 )
                 return Response(
                     {
-                        'error': 'Failed to create content profile',
-                        'details': 'Database error occurred while creating the profile'
+                        'error': 'Error al crear el perfil de contenido',
+                        'details': 'Ocurrió un error en la base de datos al crear el perfil'
                     }, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -1523,8 +1523,8 @@ class ContentProfileCreateView(APIView):
                 )
                 return Response(
                     {
-                        'error': 'Failed to serialize content profile',
-                        'details': 'Error occurred while preparing the response'
+                        'error': 'Error al serializar el perfil de contenido',
+                        'details': 'Ocurrió un error al preparar la respuesta'
                     }, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -1541,8 +1541,8 @@ class ContentProfileCreateView(APIView):
             )
             return Response(
                 {
-                    'error': 'An unexpected error occurred',
-                    'details': 'Please check the server logs for more information'
+                    'error': 'Ocurrió un error inesperado',
+                    'details': 'Por favor, revise los registros del servidor para más información'
                 }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -1633,7 +1633,7 @@ class URLPreviewView(APIView):
                 }
             )
             return Response(
-                {'error': 'URL is required'}, 
+                {'error': 'URL es requerida'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1701,7 +1701,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'Request timeout'}, 
+                    {'error': 'Tiempo de espera agotado'}, 
                     status=status.HTTP_408_REQUEST_TIMEOUT
                 )
             except requests.exceptions.RequestException as e:
@@ -1715,7 +1715,7 @@ class URLPreviewView(APIView):
                     exc_info=True
                 )
                 return Response(
-                    {'error': 'Unable to access this URL'}, 
+                    {'error': 'No se puede acceder a esta URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1730,7 +1730,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'Unable to access this URL'}, 
+                    {'error': 'No se puede acceder a esta URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1747,7 +1747,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'Unable to access this URL'}, 
+                    {'error': 'No se puede acceder a esta URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1765,7 +1765,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response({
-                    'error': 'URL must point to a webpage'
+                    'error': 'La URL debe apuntar a una página web'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Parse HTML
@@ -1828,7 +1828,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'Could not extract preview information from this URL'}, 
+                    {'error': 'No se pudo extraer información de vista previa de esta URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1857,7 +1857,7 @@ class URLPreviewView(APIView):
                 }
             )
             return Response(
-                {'error': 'Failed to fetch URL data'}, 
+                {'error': 'Error al obtener datos de la URL'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except requests.RequestException as e:
@@ -1871,7 +1871,7 @@ class URLPreviewView(APIView):
                 exc_info=True
             )
             return Response(
-                {'error': 'Failed to fetch URL data'}, 
+                {'error': 'Error al obtener datos de la URL'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
@@ -1885,7 +1885,7 @@ class URLPreviewView(APIView):
                 exc_info=True
             )
             return Response(
-                {'error': 'Failed to fetch URL data'}, 
+                {'error': 'Error al obtener datos de la URL'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1950,15 +1950,15 @@ class ContentModificationCheckView(APIView):
                 'other_users_count': other_users_count,
                 'is_original_uploader': content.uploaded_by and content.uploaded_by.id == request.user.id,
                 'message': (
-                    f"Cannot change the source of this content because {other_users_count} other user(s) have added it to their libraries"
+                    f"No se puede cambiar la fuente de este contenido porque {other_users_count} otro(s) usuario(s) lo han agregado a sus bibliotecas"
                     if not can_modify and other_users_count > 0
-                    else "Content can be modified"
+                    else "El contenido puede ser modificado"
                 )
             })
             
         except Content.DoesNotExist:
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -2002,7 +2002,7 @@ class ContentUpdateView(APIView):
                     'user_id': request.user.id,
                 })
                 return Response(
-                    {'error': 'You do not have permission to edit this content'},
+                    {'error': 'No tiene permiso para editar este contenido'},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
@@ -2036,7 +2036,7 @@ class ContentUpdateView(APIView):
                         'url': request.data['url'],
                     })
                     return Response(
-                        {'error': 'Invalid URL format'}, 
+                        {'error': 'Formato de URL inválido'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
@@ -2072,7 +2072,7 @@ class ContentUpdateView(APIView):
                 'user_id': request.user.id,
             })
             return Response(
-                {'error': 'Content not found'}, 
+                {'error': 'Contenido no encontrado'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:

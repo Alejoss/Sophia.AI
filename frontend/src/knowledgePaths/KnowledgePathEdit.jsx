@@ -123,7 +123,7 @@ const KnowledgePathEdit = () => {
         pathId,
         submitData
       );
-      setSuccessMessage("Knowledge path updated successfully");
+      setSuccessMessage("Ruta de conocimiento actualizada exitosamente");
 
       // Update the image display with the new image URL from the response
       if (updatedData.image) {
@@ -137,7 +137,7 @@ const KnowledgePathEdit = () => {
       });
     } catch (err) {
       console.error("KnowledgePathEdit - Error updating knowledge path:", err);
-      setError(err.message || "Failed to update knowledge path");
+      setError(err.message || "Error al actualizar la ruta de conocimiento");
     }
   };
 
@@ -175,7 +175,7 @@ const KnowledgePathEdit = () => {
         is_visible: updatedData.is_visible || false,
       }));
     } catch (err) {
-      const errorMessage = err.response?.data?.error || "Failed to remove node";
+      const errorMessage = err.response?.data?.error || "Error al eliminar el nodo";
       setError(errorMessage);
     } finally {
       setIsRemovingNode(false);
@@ -220,14 +220,14 @@ const KnowledgePathEdit = () => {
       setNodes(updatedNodes);
     } catch (err) {
       console.error("Reorder error:", err.response?.data || err.message);
-      setError("Failed to reorder nodes");
+      setError("Error al reordenar los nodos");
     } finally {
       setIsReordering(false);
     }
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>Cargando...</div>;
   }
 
   return (
@@ -238,7 +238,7 @@ const KnowledgePathEdit = () => {
           to={`/knowledge_path/${pathId}`}
           className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
         >
-          ← Back to Path
+          ← Volver a la Ruta
         </Link>
       </div>
 
@@ -277,7 +277,7 @@ const KnowledgePathEdit = () => {
             </div>
             <p className="text-gray-600 mb-4">{formData.description}</p>
             <div className="text-sm text-gray-500">
-              Created by {knowledgePath?.author || "Loading..."}
+              Creado por {knowledgePath?.author || "Cargando..."}
             </div>
           </div>
         </div>
@@ -290,14 +290,14 @@ const KnowledgePathEdit = () => {
               onClick={handleAddNode}
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2"
             >
-              Add Content Node
+              Agregar Nodo de Contenido
             </button>
             {nodes.length >= 2 && (
               <button
                 onClick={handleAddActivityRequirement}
                 className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
               >
-                Add Quiz
+                Agregar Cuestionario
               </button>
             )}
           </div>
@@ -309,7 +309,7 @@ const KnowledgePathEdit = () => {
                 : "bg-green-500 hover:bg-green-700 text-white"
             }`}
           >
-            {showForm ? "Hide Form" : "Edit Knowledge Path Details"}
+            {showForm ? "Ocultar Formulario" : "Editar Detalles de la Ruta de Conocimiento"}
           </button>
         </div>
         {/* Visibility Toggle - Independent of form */}
@@ -338,15 +338,15 @@ const KnowledgePathEdit = () => {
                 name="is_visible"
               />
             }
-            label="Public"
+            label="Público"
             sx={{ mb: 0, color: "text.primary" }}
           />
           <Typography variant="caption" color="text.secondary">
-            {formData.is_visible ? "Visible to others" : ""}
+            {formData.is_visible ? "Visible para otros" : ""}
           </Typography>
           {!knowledgePath?.can_be_visible && (
             <Typography variant="caption" color="#000" sx={{ ml: 1 }}>
-              Knowledge paths need at least two nodes to be visible
+              Las rutas de conocimiento necesitan al menos dos nodos para ser visibles
             </Typography>
           )}
         </div>
@@ -364,7 +364,7 @@ const KnowledgePathEdit = () => {
             {/* Image Section */}
             <div className="mb-6">
               <label className="block text-gray-700 font-bold mb-2">
-                Cover Image
+                Imagen de Portada
               </label>
               <div className="flex items-center space-x-4">
                 <Avatar
@@ -404,7 +404,7 @@ const KnowledgePathEdit = () => {
                     </IconButton>
                   </label>
                   <p className="text-sm text-gray-500 mt-1">
-                    Click to upload a cover image
+                    Haz clic para subir una imagen de portada
                   </p>
                 </div>
               </div>
@@ -415,7 +415,7 @@ const KnowledgePathEdit = () => {
                 htmlFor="title"
                 className="block text-gray-700 font-bold mb-2"
               >
-                Title
+                Título
               </label>
               <input
                 type="text"
@@ -433,7 +433,7 @@ const KnowledgePathEdit = () => {
                 htmlFor="description"
                 className="block text-gray-700 font-bold mb-2"
               >
-                Description
+                Descripción
               </label>
               <textarea
                 id="description"
@@ -450,7 +450,7 @@ const KnowledgePathEdit = () => {
               type="submit"
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              Update Knowledge Path
+              Actualizar Ruta de Conocimiento
             </button>
           </form>
 
@@ -470,22 +470,22 @@ const KnowledgePathEdit = () => {
               <thead>
                 <tr>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Order
+                    Orden
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Title
+                    Título
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Media Type
+                    Tipo de Medio
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Quiz
+                    Cuestionario
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    View
+                    Ver
                   </th>
                   <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Actions
+                    Acciones
                   </th>
                 </tr>
               </thead>
@@ -499,7 +499,7 @@ const KnowledgePathEdit = () => {
                         {index + 1}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        {node.title || "Untitled"}
+                        {node.title || "Sin título"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
                         {node.media_type}
@@ -512,7 +512,7 @@ const KnowledgePathEdit = () => {
                                 to={`/quizzes/${quiz.id}/edit`}
                                 className="text-blue-500 hover:text-blue-700"
                               >
-                                {quiz.title || `Quiz ${quizIndex + 1}`}
+                                {quiz.title || `Cuestionario ${quizIndex + 1}`}
                               </Link>
                             ))
                           : "No"}
@@ -525,7 +525,7 @@ const KnowledgePathEdit = () => {
                           className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          View
+                          Ver
                           <OpenInNewIcon className="w-4 h-4" />
                         </Link>
                       </td>
@@ -563,7 +563,7 @@ const KnowledgePathEdit = () => {
                             to={`/knowledge_path/${pathId}/nodes/${node.id}/edit`}
                             className="text-blue-500 hover:text-blue-700"
                           >
-                            Edit
+                            Editar
                           </Link>
                           <button
                             onClick={() => handleRemoveNode(node.id)}
@@ -575,7 +575,7 @@ const KnowledgePathEdit = () => {
                                   : "cursor-pointer"
                               }`}
                           >
-                            Remove
+                            Eliminar
                           </button>
                         </div>
                       </td>

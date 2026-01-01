@@ -218,7 +218,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     def validate_title(self, value):
         if len(value.strip()) == 0:
-            raise serializers.ValidationError("Title cannot be empty or contain only whitespace.")
+            raise serializers.ValidationError("El título no puede estar vacío o contener solo espacios en blanco.")
         return value.strip()
 
 

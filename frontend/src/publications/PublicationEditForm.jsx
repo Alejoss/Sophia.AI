@@ -44,7 +44,7 @@ const PublicationEditForm = () => {
         setError(null);
       } catch (err) {
         console.error('Error fetching publication details:', err);
-        setError('Failed to load publication details');
+        setError('Error al cargar los detalles de la publicación');
       } finally {
         setIsFetching(false);
       }
@@ -109,7 +109,7 @@ const PublicationEditForm = () => {
       await contentApi.updatePublication(publicationId, publicationData);
       navigate('/profiles/my_profile');
     } catch (err) {
-      setError('Failed to update publication');
+      setError('Error al actualizar la publicación');
       console.error('Error updating publication:', err);
     } finally {
       setIsLoading(false);
@@ -121,13 +121,13 @@ const PublicationEditForm = () => {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this publication? This action cannot be undone.')) {
+    if (window.confirm('¿Está seguro de que desea eliminar esta publicación? Esta acción no se puede deshacer.')) {
       try {
         setIsLoading(true);
         await contentApi.deletePublication(publicationId);
         navigate('/profiles/my_profile');
       } catch (err) {
-        setError('Failed to delete publication');
+        setError('Error al eliminar la publicación');
         console.error('Error deleting publication:', err);
       } finally {
         setIsLoading(false);
@@ -152,18 +152,18 @@ const PublicationEditForm = () => {
           onClick={() => navigate('/profiles/my_profile')}
           sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
         >
-          ← Back to Profile
+          ← Volver al Perfil
         </Link>
       </Box>
 
       <Typography variant="h4" gutterBottom>
-        Edit Publication
+        Editar Publicación
       </Typography>
       
       {showContentOptions && (
         <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
           <Typography variant="h6" gutterBottom align="center">
-            Choose Content Source (Optional)
+            Elegir Fuente de Contenido (Opcional)
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
             <Button 
@@ -172,7 +172,7 @@ const PublicationEditForm = () => {
               size="large"
               onClick={() => setShowContentModal(true)}
             >
-              Choose Content from Library
+              Elegir Contenido de la Biblioteca
             </Button>
             <Button 
               variant="contained" 
@@ -180,7 +180,7 @@ const PublicationEditForm = () => {
               size="large"
               onClick={() => setShowUploadForm(true)}
             >
-              Upload New Content
+              Subir Nuevo Contenido
             </Button>
           </Box>
         </Paper>
@@ -193,7 +193,7 @@ const PublicationEditForm = () => {
             onClick={() => setShowUploadForm(false)}
             sx={{ mb: 2 }}
           >
-            ← Back
+            ← Volver
           </Button>
           <UploadContentForm onContentUploaded={handleContentUpload} />
         </Box>
@@ -201,12 +201,12 @@ const PublicationEditForm = () => {
 
       <Paper elevation={2} sx={{ p: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Publication Details
+          Detalles de la Publicación
         </Typography>
         
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
-            Content:
+            Contenido:
           </Typography>
           
           {selectedContent ? (
@@ -229,14 +229,14 @@ const PublicationEditForm = () => {
                     setShowContentOptions(true);
                   }}
                 >
-                  Remove Content
+                  Eliminar Contenido
                 </Button>
                 <Button 
                   variant="text" 
                   color="primary" 
                   onClick={() => setShowContentOptions(true)}
                 >
-                  Change Content
+                  Cambiar Contenido
                 </Button>
               </Box>
             </>
@@ -246,7 +246,7 @@ const PublicationEditForm = () => {
                 variant="outlined" 
                 onClick={() => setShowContentOptions(true)}
               >
-                Add Content
+                Agregar Contenido
               </Button>
             </Box>
           )}
@@ -256,7 +256,7 @@ const PublicationEditForm = () => {
           fullWidth
           multiline
           rows={4}
-          label="Text Content"
+          label="Contenido de Texto"
           value={formData.text_content}
           onChange={(e) => setFormData({ ...formData, text_content: e.target.value })}
           required
@@ -272,21 +272,21 @@ const PublicationEditForm = () => {
             onClick={handleDelete}
             disabled={isLoading}
           >
-            Delete
+            Eliminar
           </Button>
           <Button
             variant="outlined"
             onClick={handleCancel}
             disabled={isLoading}
           >
-            Cancel
+            Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? 'Updating...' : 'Update Publication'}
+            {isLoading ? 'Actualizando...' : 'Actualizar Publicación'}
           </Button>
         </Box>
       </Paper>

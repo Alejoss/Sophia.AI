@@ -1,16 +1,5 @@
-.nav {
-  background-color: #fff;
-  padding: 1rem;
-  box-shadow: 0 2px 4px rgba(6, 17, 118, .08), 0 4px 12px rgba(6, 17, 118, .08);
-  width: 100%;
-  position: fixed;
-  top: 0;
-  left: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
+/* Navbar styles are now handled by Material-UI AppBar component */
+/* Keeping this file for any legacy styles that might still be needed */
 
 .nav-list {
   list-style-type: none;
@@ -39,8 +28,36 @@
 .nav-link:hover {
   color: #6d28d2;
   background-color: #6d28d21f;
+}
 
+/* Mobile menu specific styles */
+.nav-list.mobile-menu {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0;
+  padding-top: 0;
+}
 
+.nav-list.mobile-menu .nav-item:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.nav-list.mobile-menu .nav-item {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.nav-list.mobile-menu .nav-item:last-child {
+  border-bottom: none;
+}
+
+.nav-list.mobile-menu .nav-link {
+  padding: 12px 20px;
+  font-size: 14px;
+  border-radius: 0;
+}
+
+.nav-list.mobile-menu .nav-link:hover {
+  background-color: #f9fafb;
 }
 
 @media screen and (max-width: 768px) {

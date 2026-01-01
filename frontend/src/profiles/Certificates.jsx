@@ -55,7 +55,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       console.log("DEBUG: Fetched certificates:", data);
       setCertificates(data);
     } catch (err) {
-      setError("Failed to load certificates");
+      setError("Error al cargar los certificados");
       console.error(err);
     } finally {
       setCertificatesLoading(false);
@@ -74,7 +74,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         setRequests([]);
       }
     } catch (err) {
-      setError("Failed to load certificate requests");
+      setError("Error al cargar las solicitudes de certificados");
       console.error(err);
     } finally {
       setRequestsLoading(false);
@@ -94,7 +94,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
-      setError("Failed to approve request");
+      setError("Error al aprobar la solicitud");
       console.error(err);
     }
   };
@@ -112,7 +112,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
-      setError("Failed to reject request");
+      setError("Error al rechazar la solicitud");
       console.error(err);
     }
   };
@@ -122,7 +122,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       await certificatesApi.cancelCertificateRequest(requestId);
       fetchRequests();
     } catch (err) {
-      setError("Failed to cancel request");
+      setError("Error al cancelar la solicitud");
       console.error(err);
     }
   };
@@ -173,11 +173,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const getCertificateType = (certificate) => {
     if (certificate.knowledge_path_title) {
-      return "Knowledge Path";
+      return "Ruta de conocimiento";
     } else if (certificate.event_title) {
-      return "Event";
+      return "Evento";
     } else {
-      return "Certificate";
+      return "Certificado";
     }
   };
 
@@ -193,11 +193,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const getRequestType = (request) => {
     if (request.knowledge_path_title) {
-      return "Knowledge Path";
+      return "Ruta de conocimiento";
     } else if (request.event_title) {
-      return "Event";
+      return "Evento";
     } else {
-      return "Certificate";
+      return "Certificado";
     }
   };
 
@@ -211,15 +211,24 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       {isOwnProfile ? (
         <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label="My Certificates" value="certificates" />
-            <Tab label="Certificate Requests" value="requests" />
+            <Tab label="Mis certificados" value="certificates" />
+            <Tab label="Solicitudes de certificados" value="requests" />
           </Tabs>
         </Box>
       ) : (
         // For visitors, show a simple header
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" gutterBottom>
-            Certificates ({certificates.length})
+          <Typography 
+            variant="h5" 
+            gutterBottom 
+            color="text.primary"
+            sx={{
+              fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+              fontWeight: 400,
+              fontSize: "20px"
+            }}
+          >
+            Certificados ({certificates.length})
           </Typography>
         </Box>
       )}
@@ -242,8 +251,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : certificates.length === 0 ? (
               <Typography variant="body1" color="textSecondary">
                 {isOwnProfile
-                  ? "You haven't earned any certificates yet. Complete knowledge paths or attend events to earn certificates!"
-                  : "No certificates found."}
+                  ? "Aún no has obtenido ningún certificado. ¡Completa rutas de conocimiento o asiste a eventos para obtener certificados!"
+                  : "No se encontraron certificados."}
               </Typography>
             ) : (
               <div className="grid gap-4">
@@ -252,21 +261,21 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     <CardContent>
                       <div className="flex justify-between items-start">
                         <div>
-                          <Typography variant="h6">
+                          <Typography variant="h6" color="text.primary">
                             {getCertificateTitle(certificate)}
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
-                            Type: {getCertificateType(certificate)}
+                            Tipo: {getCertificateType(certificate)}
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
-                            Issued on:{" "}
+                            Emitido el:{" "}
                             {new Date(
                               certificate.issued_on
                             ).toLocaleDateString()}
                           </Typography>
                           {certificate.blockchain_hash && (
                             <Chip
-                              label="On Blockchain"
+                              label="En Blockchain"
                               color="success"
                               size="small"
                               className="mt-2"
@@ -281,7 +290,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            Download
+                            Descargar
                           </Button>
                         )}
                       </div>
@@ -308,8 +317,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : requests.length === 0 ? (
               <Box textAlign="center" py={4}>
                 <Typography variant="h6" color="textSecondary" gutterBottom>
-                  ¿Got something to teach? Create a Knowledge Path or an Event
-                  and issue certificates
+                  ¿Tienes algo que enseñar? Crea una Ruta de Conocimiento o un Evento
+                  y emite certificados
                 </Typography>
                 <Box
                   mt={3}
@@ -333,14 +342,14 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     color="primary"
                     onClick={() => navigate("/knowledge_path/create")}
                   >
-                    Create Knowledge Path
+                    Crear ruta de conocimiento
                   </Button>
                   <Button
                     variant="contained"
                     color="secondary"
                     onClick={() => navigate("/events/create")}
                   >
-                    Create an Event
+                    Crear un evento
                   </Button>
                 </Box>
               </Box>
@@ -352,8 +361,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     req.knowledge_path_author === authState.user?.username
                 ).length > 0 && (
                   <div>
-                    <Typography variant="h5" gutterBottom>
-                      Requests to Review
+                    <Typography 
+                      variant="h5" 
+                      gutterBottom 
+                      color="text.primary"
+                      sx={{
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "20px"
+                      }}
+                    >
+                      Solicitudes para revisar
                     </Typography>
                     {sortRequests(
                       requests.filter(
@@ -369,7 +387,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Requested by:{" "}
+                                Solicitado por:{" "}
                                 <Link
                                   to={`/profiles/user_profile/${request.requester_id}`}
                                   className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -408,14 +426,14 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                     color="success"
                                     onClick={() => openApproveDialog(request)}
                                   >
-                                    Approve
+                                    Aprobar
                                   </Button>
                                   <Button
                                     variant="contained"
                                     color="error"
                                     onClick={() => openRejectDialog(request)}
                                   >
-                                    Reject
+                                    Rechazar
                                   </Button>
                                 </>
                               )}
@@ -425,7 +443,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                   color="success"
                                   onClick={() => openApproveDialog(request)}
                                 >
-                                  Accept Request
+                                  Aceptar solicitud
                                 </Button>
                               )}
                             </div>
@@ -451,8 +469,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                   (req) => req.requester === authState.user?.username
                 ).length > 0 && (
                   <div>
-                    <Typography variant="h5" gutterBottom>
-                      My Requests
+                    <Typography 
+                      variant="h5" 
+                      gutterBottom 
+                      color="text.primary"
+                      sx={{
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "20px"
+                      }}
+                    >
+                      Mis solicitudes
                     </Typography>
                     {sortRequests(
                       requests.filter(
@@ -463,17 +490,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                         <CardContent>
                           <div className="flex justify-between items-start">
                             <div>
-                              <Typography variant="h6">
+                              <Typography variant="h6" color="text.primary">
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Requested on:{" "}
+                                Solicitado el:{" "}
                                 {new Date(
                                   request.request_date
                                 ).toLocaleDateString()}
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Author:{" "}
+                                Autor:{" "}
                                 <Link
                                   to={`/profiles/user_profile/${
                                     request.knowledge_path_author_id ||
@@ -486,7 +513,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 </Link>
                               </Typography>
                               <Typography variant="body2" color="textSecondary">
-                                Type: {getRequestType(request)}
+                                Tipo: {getRequestType(request)}
                               </Typography>
                               <Chip
                                 label={request.status}
@@ -500,7 +527,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                   (typeof request.notes === "string" &&
                                     request.notes.trim() !== "")) && (
                                   <Typography variant="body2" className="mt-2">
-                                    Notes:{" "}
+                                    Notas:{" "}
                                     {typeof request.notes === "object"
                                       ? JSON.stringify(request.notes)
                                       : request.notes}
@@ -513,7 +540,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 color="error"
                                 onClick={() => handleCancel(request.id)}
                               >
-                                Cancel
+                                Cancelar
                               </Button>
                             )}
                           </div>
@@ -523,7 +550,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                               color="error"
                               className="mt-2"
                             >
-                              Rejection reason: {request.rejection_reason}
+                              Motivo del rechazo: {request.rejection_reason}
                             </Typography>
                           )}
                         </CardContent>
@@ -542,12 +569,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         open={approveDialogOpen}
         onClose={() => setApproveDialogOpen(false)}
       >
-        <DialogTitle>Approve Certificate Request</DialogTitle>
+        <DialogTitle>Aprobar solicitud de certificado</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Note (optional)"
+            label="Nota (opcional)"
             type="text"
             fullWidth
             multiline
@@ -557,9 +584,9 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApproveDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
           <Button onClick={handleApprove} color="primary">
-            Approve
+            Aprobar
           </Button>
         </DialogActions>
       </Dialog>
@@ -569,12 +596,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         open={rejectDialogOpen}
         onClose={() => setRejectDialogOpen(false)}
       >
-        <DialogTitle>Reject Certificate Request</DialogTitle>
+        <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Reason for rejection"
+            label="Motivo del rechazo"
             type="text"
             fullWidth
             required
@@ -585,9 +612,9 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
           <Button onClick={handleReject} color="error">
-            Reject
+            Rechazar
           </Button>
         </DialogActions>
       </Dialog>

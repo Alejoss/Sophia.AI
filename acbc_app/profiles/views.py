@@ -80,7 +80,7 @@ class UserProfileView(APIView):
             user_profile = Profile.objects.filter(user=request.user).first()
             if not user_profile:
                 logger.warning(f"Profile not found for user {request.user.username}")
-                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Perfil no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
             serializer = ProfileSerializer(user_profile, context={'request': request})
             logger.debug(f"User profile retrieved successfully for user {request.user.username}")
@@ -88,7 +88,7 @@ class UserProfileView(APIView):
         except Exception as e:
             logger.error(f"Error retrieving user profile for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to retrieve profile'},
+                {'error': 'Error al obtener el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -101,7 +101,7 @@ class UserProfileView(APIView):
             user_profile = Profile.objects.filter(user=request.user).first()
             if not user_profile:
                 logger.warning(f"Profile not found for user {request.user.username}")
-                return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Perfil no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
             # Handle profile picture upload if present
             if 'profile_picture' in request.FILES:
@@ -128,7 +128,7 @@ class UserProfileView(APIView):
         except Exception as e:
             logger.error(f"Error updating user profile for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': f'Failed to update profile: {str(e)}'},
+                {'error': f'Error al actualizar el perfil: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -149,7 +149,7 @@ class UserProfileView(APIView):
         except Exception as e:
             logger.error(f"Error creating user profile for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to create profile'},
+                {'error': 'Error al crear el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -166,7 +166,7 @@ class ProfileList(APIView):
         except Exception as e:
             logger.error(f"Error retrieving profile list: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to retrieve profiles'},
+                {'error': 'Error al obtener los perfiles'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -186,7 +186,7 @@ class ProfileList(APIView):
         except Exception as e:
             logger.error(f"Error creating profile for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to create profile'},
+                {'error': 'Error al crear el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -206,7 +206,7 @@ class UserDetailView(APIView):
         except Exception as e:
             logger.error(f"Error retrieving user detail for user ID {pk}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to retrieve user'},
+                {'error': 'Error al obtener el usuario'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -230,7 +230,7 @@ class UserDetailView(APIView):
         except Exception as e:
             logger.error(f"Error updating user {pk} for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to update user'},
+                {'error': 'Error al actualizar el usuario'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -248,7 +248,7 @@ class ProfileDetail(APIView):
         except Exception as e:
             logger.error(f"Error retrieving profile detail for user ID {pk}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to retrieve profile'},
+                {'error': 'Error al obtener el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -270,7 +270,7 @@ class ProfileDetail(APIView):
         except Exception as e:
             logger.error(f"Error updating profile for user {pk} by user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to update profile'},
+                {'error': 'Error al actualizar el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -286,7 +286,7 @@ class ProfileDetail(APIView):
         except Exception as e:
             logger.error(f"Error deleting profile for user {pk} by user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to delete profile'},
+                {'error': 'Error al eliminar el perfil'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -306,7 +306,7 @@ def set_jwt_token(user):
 
         if not user.is_authenticated:
             logger.warning(f'JWT token generation failed - user not authenticated: {user.username}')
-            return JsonResponse({'error': 'User not authenticated'}, status=401)
+            return JsonResponse({'error': 'Usuario no autenticado'}, status=401)
 
         # Debug: Log that the tokens are being created
         logger.debug(f'Creating refresh and access tokens for user: {user.username}')
@@ -377,7 +377,7 @@ class LoginView(APIView):
         
         if attempts >= 5:
             return Response(
-                {'error': 'Too many login attempts. Please try again later.'},
+                {'error': 'Demasiados intentos de inicio de sesión. Por favor, intente nuevamente más tarde.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
 
@@ -415,7 +415,7 @@ class LoginView(APIView):
             except Exception as e:
                 logger.error(f"Error generating tokens during login for user {user.username}: {str(e)}", exc_info=True)
                 return Response(
-                    {'error': 'Failed to generate tokens'},
+                    {'error': 'Error al generar tokens'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         else:
@@ -423,7 +423,7 @@ class LoginView(APIView):
             cache.set(cache_key, attempts + 1, timeout=300)  # 5 minutes timeout
             logger.warning(f"Invalid credentials for user {username} from IP {client_ip}")
             return Response(
-                {'error': 'Invalid credentials'},
+                {'error': 'Credenciales inválidas'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -482,7 +482,7 @@ def activate_account(request, uid, token):
     else:
         # If the token is not valid, inform the user
         logger.warning(f"Activation link is invalid for user {user.username if user else 'unknown'} with token {token}")
-        return HttpResponse('Activation link is invalid!')
+        return HttpResponse('¡El enlace de activación es inválido!')
 
 
 class LogoutView(APIView):
@@ -492,7 +492,7 @@ class LogoutView(APIView):
     def post(self, request):
         try:
             logger.info(f"Processing logout request for user {request.user.username}")
-            response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+            response = Response({'message': 'Cierre de sesión exitoso'}, status=status.HTTP_200_OK)
             
             # Get the refresh token cookie name from settings
             refresh_cookie_name = settings.SIMPLE_JWT['REFRESH_COOKIE']
@@ -510,7 +510,7 @@ class LogoutView(APIView):
         except Exception as e:
             logger.error(f"Logout error for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': f'Logout failed: {str(e)}'}, 
+                {'error': f'Error al cerrar sesión: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -588,7 +588,7 @@ class RefreshTokenView(APIView):
             if not refresh_token:
                 logger.warning(f"No refresh token found in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'No refresh token found'},
+                    {'error': 'No se encontró token de actualización'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
@@ -604,7 +604,7 @@ class RefreshTokenView(APIView):
         except Exception as e:
             logger.error(f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Invalid refresh token'},
+                {'error': 'Token de actualización inválido'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -625,7 +625,7 @@ class GoogleLoginView(SocialLoginView):
         if not id_token:
             logger.error(f"No access token provided in request for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return Response(
-                {'error': 'No access token provided'},
+                {'error': 'No se proporcionó token de acceso'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -636,14 +636,14 @@ class GoogleLoginView(SocialLoginView):
             if response.status_code != 200:
                 logger.error(f"Failed to fetch Google public keys. Status code: {response.status_code} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'Failed to fetch Google public keys'},
+                    {'error': 'Error al obtener las claves públicas de Google'},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE
                 )
             public_keys = response.json()
         except requests.RequestException as e:
             logger.error(f"Request error while fetching Google public keys for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to connect to Google services'},
+                {'error': 'Error al conectar con los servicios de Google'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
@@ -663,7 +663,7 @@ class GoogleLoginView(SocialLoginView):
             if not public_key:
                 logger.error(f"No matching public key found for token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'No matching public key found for token'},
+                    {'error': 'No se encontró una clave pública coincidente para el token'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -672,7 +672,7 @@ class GoogleLoginView(SocialLoginView):
             if not client_id:
                 logger.error(f"Google OAuth client ID not configured in settings for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'Google OAuth client ID not configured'},
+                    {'error': 'ID de cliente de Google OAuth no configurado'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
@@ -694,26 +694,26 @@ class GoogleLoginView(SocialLoginView):
             except jwt.ExpiredSignatureError:
                 logger.error(f"Token has expired for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'Token has expired. Please try logging in again.'},
+                    {'error': 'El token ha expirado. Por favor, intente iniciar sesión nuevamente.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except jwt.InvalidTokenError as e:
                 logger.error(f"Invalid token error for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
                 return Response(
-                    {'error': f'Invalid ID token: {str(e)}'},
+                    {'error': f'Token de ID inválido: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except Exception as e:
                 logger.error(f"Unexpected error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
                 return Response(
-                    {'error': 'Failed to verify token'},
+                    {'error': 'Error al verificar el token'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
         except Exception as e:
             logger.error(f"Error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to verify token'},
+                {'error': 'Error al verificar el token'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -733,7 +733,7 @@ class GoogleLoginView(SocialLoginView):
             if not email:
                 logger.error(f"No email provided in Google token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
-                    {'error': 'Email not provided by Google'},
+                    {'error': 'Correo electrónico no proporcionado por Google'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -828,7 +828,7 @@ class GoogleLoginView(SocialLoginView):
         except Exception as e:
             logger.error(f"Error generating tokens or creating response for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to complete login process'},
+                {'error': 'Error al completar el proceso de inicio de sesión'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -929,7 +929,7 @@ class UserNotificationsView(APIView):
                 logger.warning(f"Notification {notification_id} not found for user {request.user.username}")
                 logger.info("=== End Marking Notification as Read ===")
                 return Response(
-                    {'error': 'Notification not found'},
+                    {'error': 'Notificación no encontrada'},
                     status=status.HTTP_404_NOT_FOUND
                 )
         else:
@@ -956,7 +956,7 @@ class UserNotificationsView(APIView):
                 logger.error(f"Error marking all notifications as read for user {request.user.username}: {str(e)}", exc_info=True)
                 logger.info("=== End Marking All Notifications as Read ===")
                 return Response(
-                    {'error': 'Failed to mark notifications as read'},
+                    {'error': 'Error al marcar las notificaciones como leídas'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
@@ -980,7 +980,7 @@ class UserNotificationsView(APIView):
                 return Response({'status': 'success'})
             except Notification.DoesNotExist:
                 return Response(
-                    {'error': 'Notification not found'},
+                    {'error': 'Notificación no encontrada'},
                     status=status.HTTP_404_NOT_FOUND
                 )
         else:
@@ -1027,7 +1027,7 @@ class UnreadNotificationsCountView(APIView):
         except Exception as e:
             logger.error(f"Error getting unread notifications count for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to get unread count'},
+                {'error': 'Error al obtener el conteo de no leídas'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1048,7 +1048,7 @@ class CryptoCurrencyListView(APIView):
         except Exception as e:
             logger.error(f"Error fetching cryptocurrencies for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to fetch cryptocurrencies'},
+                {'error': 'Error al obtener las criptomonedas'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1085,7 +1085,7 @@ class UserAcceptedCryptosView(APIView):
         except Exception as e:
             logger.error(f"Error fetching accepted cryptocurrencies for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to fetch accepted cryptocurrencies'},
+                {'error': 'Error al obtener las criptomonedas aceptadas'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1103,7 +1103,7 @@ class UserAcceptedCryptosView(APIView):
             if not crypto_id or not address:
                 logger.warning(f"Invalid data for adding accepted cryptocurrency for user {request.user.username}")
                 return Response(
-                    {'error': 'Both crypto_id and address are required'},
+                    {'error': 'Se requieren tanto crypto_id como address'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1113,7 +1113,7 @@ class UserAcceptedCryptosView(APIView):
             except CryptoCurrency.DoesNotExist:
                 logger.warning(f"Cryptocurrency not found for user {request.user.username}: crypto_id={crypto_id}")
                 return Response(
-                    {'error': 'Cryptocurrency not found'},
+                    {'error': 'Criptomoneda no encontrada'},
                     status=status.HTTP_404_NOT_FOUND
                 )
             
@@ -1137,7 +1137,7 @@ class UserAcceptedCryptosView(APIView):
         except Exception as e:
             logger.error(f"Error adding accepted cryptocurrency for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to add cryptocurrency'},
+                {'error': 'Error al agregar criptomoneda'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1157,11 +1157,11 @@ class UserAcceptedCryptosView(APIView):
             accepted_crypto.save()
             
             logger.info(f"Accepted cryptocurrency removed successfully for user {request.user.username}")
-            return Response({'message': 'Cryptocurrency removed successfully'})
+            return Response({'message': 'Criptomoneda eliminada exitosamente'})
             
         except Exception as e:
             logger.error(f"Error removing accepted cryptocurrency for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
-                {'error': 'Failed to remove cryptocurrency'},
+                {'error': 'Error al eliminar criptomoneda'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

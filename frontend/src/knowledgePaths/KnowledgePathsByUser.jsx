@@ -29,7 +29,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths by user:', err);
-        setError('Failed to load knowledge paths');
+        setError('Error al cargar las rutas de conocimiento');
       } finally {
         setLoading(false);
       }
@@ -45,7 +45,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
 
   if (loading) {
     return (
-      <div className="text-center py-8">Loading...</div>
+      <div className="text-center py-8">Cargando...</div>
     );
   }
 
@@ -59,7 +59,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
         <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">
-          Knowledge Paths by {authorName}
+          Rutas de Conocimiento por {authorName}
         </h1>
       </div>
 
@@ -98,7 +98,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
                 <div className="mb-3">
                   <Chip
                     icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                    label={path.is_visible ? 'Public' : 'Private'}
+                    label={path.is_visible ? 'Público' : 'Privado'}
                     color={path.is_visible ? 'success' : 'default'}
                     size="small"
                     variant="outlined"
@@ -131,9 +131,9 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
       {/* No Knowledge Paths Message */}
       {paths.length === 0 && (
         <div className="text-center py-12">
-          <h3 className="text-xl font-semibold text-gray-600 mb-4">No knowledge paths created yet</h3>
+          <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no se han creado rutas de conocimiento</h3>
           <p className="text-gray-500 mb-6">
-            {authorName} hasn't created any knowledge paths yet.
+            {authorName} aún no ha creado rutas de conocimiento.
           </p>
         </div>
       )}
@@ -150,11 +150,11 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            Previous
+            Anterior
           </button>
           
           <span className="text-gray-600">
-            Page {currentPage} of {totalPages}
+            Página {currentPage} de {totalPages}
           </span>
           
           <button
@@ -166,7 +166,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            Next
+            Siguiente
           </button>
         </div>
       )}

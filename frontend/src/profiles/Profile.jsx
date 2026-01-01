@@ -29,9 +29,20 @@ import SecurityIcon from '@mui/icons-material/Security';
 // Placeholder components for different sections
 const SecuritySection = () => (
   <Box>
-    <Typography variant="h5" gutterBottom>Security Settings</Typography>
+    <Typography 
+      variant="h5" 
+      gutterBottom 
+      color="text.primary"
+      sx={{
+        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+        fontWeight: 400,
+        fontSize: "20px"
+      }}
+    >
+      Configuración de seguridad
+    </Typography>
     <Typography variant="body1" color="text.secondary">
-      Password change and security settings will be implemented here.
+      El cambio de contraseña y la configuración de seguridad se implementarán aquí.
     </Typography>
   </Box>
 );
@@ -56,6 +67,28 @@ const Profile = () => {
     // Determine if this is the user's own profile
     const isOwnProfile = !profileId || (currentUser && profile && currentUser.id === profile.user?.id);
     const isAuthenticated = authState.isAuthenticated;
+
+    // Function to handle section changes from external navigation (like header menu)
+    const handleExternalSectionChange = (newSection) => {
+        setActiveSection(newSection);
+        // Update URL without reloading
+        const url = new URL(window.location);
+        url.searchParams.set('section', newSection);
+        window.history.pushState({}, '', url);
+    };
+
+    // Expose the function globally for header navigation
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.handleProfileSectionChange = handleExternalSectionChange;
+        }
+        
+        return () => {
+            if (typeof window !== 'undefined') {
+                delete window.handleProfileSectionChange;
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -140,7 +173,7 @@ const Profile = () => {
             setNotifications(Array.isArray(notifications) ? notifications : []);
             setNotificationsError(null);
         } catch (err) {
-            setNotificationsError('Failed to fetch notifications');
+            setNotificationsError('Error al obtener las notificaciones');
             console.error('Error fetching notifications:', err);
             setNotifications([]);
         } finally {
@@ -189,7 +222,7 @@ const Profile = () => {
                                     color="primary"
                                     startIcon={<EditIcon />}
                                 >
-                                    Create Publication
+                                    Crear publicación
                                 </Button>
                             </Box>
                         )}
@@ -222,7 +255,7 @@ const Profile = () => {
                 return (
                     <Box>
                         <Typography variant="body1" color="text.secondary">
-                            Recent activity will be shown here.
+                            La actividad reciente se mostrará aquí.
                         </Typography>
                     </Box>
                 );
@@ -267,7 +300,7 @@ const Profile = () => {
     if (!profile) {
         return (
             <Container maxWidth="xl" sx={{ py: 3 }}>
-                <Typography>No profile found</Typography>
+                <Typography>No se encontró el perfil</Typography>
             </Container>
         );
     }
@@ -290,10 +323,11 @@ const Profile = () => {
                 mt: 0,
                 flexDirection: { xs: 'column', md: 'row' }
             }}>
-                {/* Left Sidebar - Profile Vertical Navigation */}
+                {/* Left Sidebar - Profile Vertical Navigation - Hidden on mobile */}
                 <Box sx={{ 
                     flexShrink: 0,
-                    width: { xs: '100%', md: '280px' }
+                    width: { xs: '100%', md: '280px' },
+                    display: { xs: 'none', md: 'block' }
                 }}>
                     <Box sx={{ position: 'sticky', top: 20 }}>
                         <ProfileVerticalNavigation 

@@ -109,7 +109,7 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
                 onClick={onEdit}
                 size={size === "small" ? "small" : "medium"}
               >
-                Edit Topic
+                Editar Tema
               </Button>
             )}
           </Box>

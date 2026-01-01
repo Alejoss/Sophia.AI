@@ -84,7 +84,7 @@ const PublicationDetail = () => {
 
     if (!publication) return (
         <Box sx={{ p: 3 }}>
-            <Typography>Publication not found</Typography>
+            <Typography>Publicación no encontrada</Typography>
         </Box>
     );
 
@@ -129,7 +129,7 @@ const PublicationDetail = () => {
                             startIcon={<EditIcon />}
                             onClick={() => navigate(`/publications/${publicationId}/edit`)}
                         >
-                            Edit Publication
+                            Editar Publicación
                         </Button>
                     </Box>
                 </Box>
@@ -137,7 +137,7 @@ const PublicationDetail = () => {
                 {/* Publication Header */}
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Published on {formatDate(publication.published_at)}
+                        Publicado el {formatDate(publication.published_at)}
                     </Typography>
                 </Box>
 
@@ -147,7 +147,7 @@ const PublicationDetail = () => {
                 {publication.content && (
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                            Referenced Content:
+                            Contenido Referenciado:
                         </Typography>
                         
                         <Box sx={{ mb: 2 }}>

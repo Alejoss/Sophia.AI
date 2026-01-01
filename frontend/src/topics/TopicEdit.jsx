@@ -33,11 +33,11 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
 
     if (!allowedTypes.includes(file.type)) {
-      return "File must be an image (JPEG, PNG, or GIF)";
+      return "El archivo debe ser una imagen (JPEG, PNG o GIF)";
     }
 
     if (file.size > maxSize) {
-      return "File size must be less than 2MB";
+      return "El tamaño del archivo debe ser menor a 2MB";
     }
 
     return null;
@@ -85,8 +85,17 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
           p: 4,
         }}
       >
-        <Typography variant="h6" gutterBottom>
-          Upload Topic Image
+        <Typography 
+          variant="h6" 
+          gutterBottom 
+          color="text.primary"
+          sx={{
+            fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+            fontWeight: 400,
+            fontSize: "18px"
+          }}
+        >
+          Subir Imagen del Tema
         </Typography>
 
         <List>
@@ -99,8 +108,8 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
               )}
             </ListItemIcon>
             <ListItemText
-              primary="Select an image file"
-              secondary={selectedFile ? selectedFile.name : "No file selected"}
+              primary="Seleccionar un archivo de imagen"
+              secondary={selectedFile ? selectedFile.name : "Ningún archivo seleccionado"}
             />
           </ListItem>
           <ListItem>
@@ -113,7 +122,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
                 }
               />
             </ListItemIcon>
-            <ListItemText primary="File size less than 2MB" />
+            <ListItemText primary="Tamaño del archivo menor a 2MB" />
           </ListItem>
         </List>
 
@@ -125,7 +134,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
 
         <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
           <Button variant="contained" component="label">
-            Choose File
+            Elegir Archivo
             <input
               type="file"
               hidden
@@ -139,10 +148,10 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
             onClick={handleUpload}
             disabled={!selectedFile || error}
           >
-            Upload Image
+            Subir Imagen
           </Button>
           <Button variant="outlined" onClick={handleClose}>
-            Cancel
+            Cancelar
           </Button>
         </Box>
       </Box>
@@ -175,7 +184,7 @@ const TopicEdit = () => {
         });
         setLoading(false);
       } catch (err) {
-        setError("Failed to fetch topic details");
+        setError("Error al cargar los detalles del tema");
         setLoading(false);
       }
     };
@@ -192,7 +201,7 @@ const TopicEdit = () => {
       setTopic(updatedTopic);
       setError(null);
     } catch (err) {
-      setError("Failed to update topic image");
+      setError("Error al actualizar la imagen del tema");
     }
   };
 
@@ -213,18 +222,18 @@ const TopicEdit = () => {
       setError(null);
       navigate(`/content/topics/${topicId}`);
     } catch (err) {
-      setError("Failed to update topic details");
+      setError("Error al actualizar los detalles del tema");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <Typography>Loading topic details...</Typography>;
+  if (loading) return <Typography>Cargando detalles del tema...</Typography>;
   if (error) return <Alert severity="error">{error}</Alert>;
-  if (!topic) return <Alert severity="info">Topic not found</Alert>;
+  if (!topic) return <Alert severity="info">Tema no encontrado</Alert>;
 
   return (
-    <Box sx={{ pt: 12, px: 1.5, maxWidth: 800, mx: "auto" }}>
+    <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 1.5 }, maxWidth: 800, mx: "auto" }}>
       <Paper sx={{ p: 1.5, position: "relative" }}>
         {/* View Topic Button */}
         <Box sx={{ position: "absolute", top: -10, right: 12, zIndex: 1 }}>
@@ -235,7 +244,7 @@ const TopicEdit = () => {
             variant="outlined"
             size="small"
           >
-            View Topic
+            Ver Tema
           </Button>
         </Box>
 
@@ -291,7 +300,7 @@ const TopicEdit = () => {
                 },
               }}
             >
-              Edit Image
+              Editar Imagen
             </Button>
           </Box>
 
@@ -300,18 +309,18 @@ const TopicEdit = () => {
             <form onSubmit={handleSubmit}>
               <TextField
                 fullWidth
-                label="Title"
+                label="Título"
                 name="title"
                 value={formData.title}
                 onChange={handleInputChange}
                 margin="normal"
                 required
                 error={!formData.title}
-                helperText={!formData.title ? "Title is required" : ""}
+                helperText={!formData.title ? "El título es requerido" : ""}
               />
               <TextField
                 fullWidth
-                label="Description"
+                label="Descripción"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -327,7 +336,7 @@ const TopicEdit = () => {
                 disabled={saving || !formData.title}
                 sx={{ mt: 2 }}
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </form>
           </Box>
@@ -336,8 +345,17 @@ const TopicEdit = () => {
         <Divider sx={{ my: 3 }} />
 
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Topic Content
+          <Typography 
+            variant="h6" 
+            gutterBottom 
+            color="text.primary"
+            sx={{
+              fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+              fontWeight: 400,
+              fontSize: "18px"
+            }}
+          >
+            Contenido del Tema
           </Typography>
 
           <Button
@@ -347,17 +365,17 @@ const TopicEdit = () => {
             onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
             sx={{ mb: 2 }}
           >
-            Edit Content in Topic
+            Editar Contenido del Tema
           </Button>
 
           {topic.contents?.length > 0 ? (
             <Box sx={{ mt: 2 }}>
               {/* We'll implement content display later */}
-              <Typography>Content count: {topic.contents.length}</Typography>
+              <Typography>Cantidad de contenido: {topic.contents.length}</Typography>
             </Box>
           ) : (
             <Alert severity="info" sx={{ mt: 2 }}>
-              No content has been added to this topic yet.
+              Aún no se ha agregado contenido a este tema.
             </Alert>
           )}
         </Box>

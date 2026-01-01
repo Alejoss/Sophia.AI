@@ -19,19 +19,19 @@ const Register = () => {
   const validatePassword = (password) => {
     const errors = [];
     if (password.length < 8) {
-      errors.push('Password must be at least 8 characters long.');
+      errors.push('La contraseña debe tener al menos 8 caracteres.');
     }
     if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter.');
+      errors.push('La contraseña debe contener al menos una letra mayúscula.');
     }
     if (!/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter.');
+      errors.push('La contraseña debe contener al menos una letra minúscula.');
     }
     if (!/[0-9]/.test(password)) {
-      errors.push('Password must contain at least one number.');
+      errors.push('La contraseña debe contener al menos un número.');
     }
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) {
-      errors.push('Password must contain at least one special character.');
+      errors.push('La contraseña debe contener al menos un carácter especial.');
     }
     return errors;
   };
@@ -50,12 +50,12 @@ const Register = () => {
     const newErrors = {};
 
     if (!formData.username.trim()) {
-      newErrors.username = 'Username is required.';
+      newErrors.username = 'El nombre de usuario es requerido.';
     }
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required.';
+      newErrors.email = 'El correo electrónico es requerido.';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid.';
+      newErrors.email = 'El correo electrónico es inválido.';
     }
 
     const passwordErrors = validatePassword(formData.password);
@@ -64,7 +64,7 @@ const Register = () => {
     }
 
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match.';
+      newErrors.confirmPassword = 'Las contraseñas no coinciden.';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -100,7 +100,7 @@ const Register = () => {
              setServerError(error.response.data.toString());
         }
       } else {
-        setServerError('Registration failed. An unexpected error occurred.');
+        setServerError('Error en el registro. Ocurrió un error inesperado.');
       }
       console.error('Registration error:', error);
     } finally {
@@ -111,11 +111,11 @@ const Register = () => {
   return (
     <div className="register-container">
       <form onSubmit={handleSubmit} className="register-form">
-        <h2>Create Account</h2>
+        <h2>Crear cuenta</h2>
         {serverError && <div className="server-error-message">{serverError}</div>}
         
         <div className="form-group">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">Nombre de usuario</label>
           <input
             type="text"
             id="username"
@@ -129,7 +129,7 @@ const Register = () => {
         </div>
         
         <div className="form-group">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">Correo electrónico</label>
           <input
             type="email"
             id="email"
@@ -143,7 +143,7 @@ const Register = () => {
         </div>
         
         <div className="form-group">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">Contraseña</label>
           <input
             type="password"
             id="password"
@@ -157,7 +157,7 @@ const Register = () => {
         </div>
         
         <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
+          <label htmlFor="confirmPassword">Confirmar contraseña</label>
           <input
             type="password"
             id="confirmPassword"
@@ -171,12 +171,12 @@ const Register = () => {
         </div>
         
         <button type="submit" className="submit-button" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating Account...' : 'Create Account'}
+          {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
       </form>
 
       <div className="social-login-section">
-        <p>Or continue with</p>
+        <p>O continúa con</p>
         <SocialLogin />
       </div>
     </div>

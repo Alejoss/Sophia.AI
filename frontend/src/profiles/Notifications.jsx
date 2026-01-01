@@ -15,37 +15,37 @@ const Notifications = ({
   console.log('Notifications prop:', notifications);
 
   const getNotificationDescription = (notification) => {
-    if (notification.verb === 'commented on your knowledge path') {
-      return `${notification.actor} commented on your knowledge path ${notification.context_title}`;
-    } else if (notification.verb === 'replied to') {
-      return `${notification.actor} replied to your comment in ${notification.context_title}`;
-    } else if (notification.verb === 'completed your knowledge path') {
+    if (notification.verb === 'comentó en tu ruta de conocimiento') {
+      return `${notification.actor} comentó en tu ruta de conocimiento ${notification.context_title}`;
+    } else if (notification.verb === 'respondió a') {
+      return `${notification.actor} respondió a tu comentario en ${notification.context_title}`;
+    } else if (notification.verb === 'completó tu ruta de conocimiento') {
       return notification.description;
-    } else if (notification.verb === 'requested a certificate for your knowledge path') {
+    } else if (notification.verb === 'solicitó un certificado para tu ruta de conocimiento') {
       return notification.description;
-    } else if (notification.verb === 'approved your certificate request for') {
+    } else if (notification.verb === 'aprobó tu solicitud de certificado para') {
       return notification.description;
-    } else if (notification.verb === 'rejected your certificate request for') {
+    } else if (notification.verb === 'rechazó tu solicitud de certificado para') {
       return notification.description;
-    } else if (notification.verb === 'upvoted your content') {
+    } else if (notification.verb === 'votó positivamente tu contenido') {
       return notification.description;
-    } else if (notification.verb === 'upvoted your knowledge path') {
+    } else if (notification.verb === 'votó positivamente tu ruta de conocimiento') {
       return notification.description;
-    } else if (notification.verb === 'registered for your event') {
+    } else if (notification.verb === 'se registró en tu evento') {
       return notification.description;
-    } else if (notification.verb === 'accepted your payment for') {
+    } else if (notification.verb === 'aceptó tu pago para') {
       return notification.description;
-    } else if (notification.verb === 'sent you a certificate for') {
+    } else if (notification.verb === 'te envió un certificado para') {
       return notification.description;
     }
-    return `${notification.actor} ${notification.verb} your comment in ${notification.context_title}`;
+    return `${notification.actor} ${notification.verb} tu comentario en ${notification.context_title}`;
   };
 
   return (
     <div className="notifications-container">
       <div className="notifications-header">
         <div className="header-content">
-          <h2>Notifications</h2>          
+          <h2>Notificaciones</h2>          
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '10px 0' }}>
@@ -53,16 +53,16 @@ const Notifications = ({
           className="mark-all-read-button"
           onClick={onMarkAllAsRead}
         >
-          Mark all as read
+          Marcar todas como leídas
         </button>
       </div>
       {loading ? (
-        <div className="loading-spinner">Loading notifications...</div>
+        <div className="loading-spinner">Cargando notificaciones...</div>
       ) : error ? (
         <div className="error-message">{error}</div>
       ) : notifications.length === 0 ? (
         <div className="empty-state">
-          <p>No notifications found</p>
+          <p>No se encontraron notificaciones</p>
         </div>
       ) : (
         <div className="notifications-list">
@@ -112,7 +112,7 @@ const Notifications = ({
                       className="mark-read-button"
                       onClick={() => onMarkAsRead(notification.id)}
                     >
-                      Mark as Read
+                      Marcar como leída
                     </button>
                   )}
                 </div>
@@ -128,7 +128,7 @@ const Notifications = ({
         color: '#666',
         fontStyle: 'italic'
       }}>
-        Read notifications are deleted after 30 days
+        Las notificaciones leídas se eliminan después de 30 días
       </div>
     </div>
   );

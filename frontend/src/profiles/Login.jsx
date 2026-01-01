@@ -9,6 +9,7 @@ import {
   isAuthenticated,
 } from "../context/localStorageUtils.js";
 import SocialLogin from "../components/SocialLogin";
+import '../styles/login.css';
 
 /**
  * Regular Login Component
@@ -77,7 +78,7 @@ const Login = () => {
       const errorMessage =
         error.response?.data?.error ||
         error.response?.statusText ||
-        "Login failed: " + error.message;
+        "Error al iniciar sesión: " + error.message;
       setError(errorMessage);
     }
   };
@@ -86,8 +87,8 @@ const Login = () => {
     return (
       <div>
         <p>
-          Already logged in as {username}, want to
-          <Link to="/profiles/logout"> logout?</Link>
+          Ya has iniciado sesión como {username}, ¿deseas
+          <Link to="/profiles/logout"> cerrar sesión?</Link>
         </p>
       </div>
     );
@@ -99,11 +100,11 @@ const Login = () => {
             <img src="/images/login-img.png" className="inline-block" alt="" />
           </div>
           <div>
-            <h2 className="heading-2 text-center">Login</h2>
+            <h2 className="heading-2 text-center">Iniciar sesión</h2>
             <form onSubmit={handleSubmit}>
               <div className="mb-5">
                 <label className="form-label" htmlFor="username">
-                  Username:
+                  Nombre de usuario:
                 </label>
                 <input
                   type="text"
@@ -115,7 +116,7 @@ const Login = () => {
               </div>
               <div className="mb-5">
                 <label htmlFor="password" className="form-label">
-                  Password:
+                  Contraseña:
                 </label>
                 <input
                   type="password"
@@ -127,12 +128,12 @@ const Login = () => {
               </div>
               {error && <div style={{ color: "red" }}>{error}</div>}
               <button type="submit" className="btn-primary">
-                Login
+                Iniciar sesión
               </button>
             </form>
 
             <div className="social-login-section">
-              <p>Or continue with</p>
+              <p>O continúa con</p>
               <SocialLogin />
             </div>
           </div>

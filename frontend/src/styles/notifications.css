@@ -2,7 +2,7 @@
   max-width: 800px;
   margin: 2rem auto;
   padding: 1.5rem;
-  background-color: #ffffff;
+  background-color: var(--bg-primary);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -31,12 +31,12 @@
 .header-content h2 {
   margin: 0;
   font-size: 1.5rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .notification-count {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .cleanup-button {
@@ -65,8 +65,8 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 1rem;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   transition: all 0.2s ease;
 }
@@ -97,13 +97,13 @@
 .notification-text {
   margin: 0;
   font-size: 1rem;
-  color: #333;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .notification-description {
   margin: 0.5rem 0 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.4;
 }
@@ -154,7 +154,7 @@
 .loading-spinner {
   text-align: center;
   padding: 2rem;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 1.1rem;
 }
 
@@ -171,8 +171,8 @@
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #666;
-  background-color: #f8f9fa;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
   border-radius: 6px;
   margin: 1rem 0;
 }

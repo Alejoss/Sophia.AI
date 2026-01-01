@@ -13,13 +13,13 @@ const Home = () => {
         <div className="text-box">
           {username ? (
             <h1>
-              Are you {username}?{" "}
-              <Link to="/profiles/login">Login back again</Link>
+              ¿Eres {username}?{" "}
+              <Link to="/profiles/login">Inicia sesión nuevamente</Link>
             </h1>
           ) : (
             <h1>
-              Welcome to Academia Blockchain,{" "}
-              <Link to="/profiles/login">login</Link>
+              Bienvenido a Academia Blockchain,{" "}
+              <Link to="/profiles/login">inicia sesión</Link>
             </h1>
           )}
         </div>

@@ -29,7 +29,7 @@ const EditProfile = () => {
                 setPreviewUrl(profile.profile_picture);
                 setError(null);
             } catch (err) {
-                setError('Failed to load profile');
+                setError('Error al cargar el perfil');
             } finally {
                 setLoading(false);
             }
@@ -71,7 +71,7 @@ const EditProfile = () => {
             await updateProfile(formDataToSend);
             navigate('/profiles/my_profile');
         } catch (err) {
-            setError('Failed to update profile');
+            setError('Error al actualizar el perfil');
         } finally {
             setSaving(false);
         }
@@ -88,8 +88,17 @@ const EditProfile = () => {
     return (
         <Box sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
             <Paper elevation={3} sx={{ p: 3 }}>
-                <Typography variant="h4" gutterBottom>
-                    Edit Profile
+                <Typography 
+                    variant="h4" 
+                    gutterBottom 
+                    color="text.primary"
+                    sx={{
+                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "24px"
+                    }}
+                >
+                    Editar perfil
                 </Typography>
 
                 {error && (
@@ -108,7 +117,7 @@ const EditProfile = () => {
                             variant="outlined"
                             component="label"
                         >
-                            Change Profile Picture
+                            Cambiar foto de perfil
                             <input
                                 type="file"
                                 hidden
@@ -120,7 +129,7 @@ const EditProfile = () => {
 
                     <TextField
                         name="username"
-                        label="Username"
+                        label="Nombre de usuario"
                         value={formData.username}
                         fullWidth
                         disabled
@@ -129,7 +138,7 @@ const EditProfile = () => {
 
                     <TextField
                         name="profile_description"
-                        label="Profile Description"
+                        label="Descripción del perfil"
                         value={formData.profile_description}
                         onChange={handleInputChange}
                         multiline
@@ -143,14 +152,14 @@ const EditProfile = () => {
                             type="button"
                             onClick={() => navigate('/profiles/my_profile')}
                         >
-                            Cancel
+                            Cancelar
                         </Button>
                         <Button
                             type="submit"
                             variant="contained"
                             disabled={saving}
                         >
-                            {saving ? 'Saving...' : 'Save Changes'}
+                            {saving ? 'Guardando...' : 'Guardar cambios'}
                         </Button>
                     </Box>
                 </form>

@@ -1,21 +1,21 @@
 .feature-block {
-    border: 1px solid #ddd; /* Borde delgado */
-    border-radius: 4px; /* Bordes redondeados */
-    padding: 15px; /* Espaciado interno */
-    margin-bottom: 20px; /* Espacio abajo del bloque */
-    background-color: #f9f9f9; /* Fondo ligeramente gris */
-    max-width: 600px; /* Ancho máximo */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Sombra sutil */
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background-color: var(--bg-secondary);
+    max-width: 600px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .feature-block h4 {
-    margin: 0 0 10px; /* Margen debajo del título */
-    font-size: 18px; /* Tamaño de fuente del título */
-    color: #333; /* Color del texto del título */
+    margin: 0 0 10px;
+    font-size: 18px;
+    color: var(--text-primary);
 }
 
 .feature-block p {
-    margin: 0; /* Margen en párrafos */
-    font-size: 16px; /* Tamaño de fuente de párrafos */
-    color: #555; /* Color del texto de los párrafos */
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-secondary);
 }

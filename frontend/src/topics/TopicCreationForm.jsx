@@ -31,26 +31,29 @@ const TopicCreationForm = () => {
             // Redirect to topic edit page after successful creation
             setTimeout(() => navigate(`/content/topics/${response.id}/edit`), 2000);
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to create topic');
+            setError(err.response?.data?.error || 'Error al crear el tema');
             setSuccess(false);
         }
     };
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 600, mx: 'auto' }}>
+        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 600, mx: 'auto', color: "text.primary" }}>
             <Paper sx={{ p: 3 }}>
            <Typography
   variant="h4"
   gutterBottom
+  color="text.primary"
   sx={{
+    fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+    fontWeight: 400,
     fontSize: {
-      xs: "1.25rem", // ~20px on mobile
-      sm: "1.5rem",  // ~24px on small screens
-      md: "2rem",    // ~32px on medium+
+      xs: "20px", // ~20px on mobile
+      sm: "24px",  // ~24px on small screens
+      md: "24px",    // ~24px on medium+
     },
   }}
 >
-                    Create New Topic
+                    Crear Nuevo Tema
                 </Typography>
 
                 {error && (
@@ -61,14 +64,14 @@ const TopicCreationForm = () => {
 
                 {success && (
                     <Alert severity="success" sx={{ mb: 2 }}>
-                        Topic created successfully!
+                        ¡Tema creado exitosamente!
                     </Alert>
                 )}
 
                 <form onSubmit={handleSubmit}>
                     <TextField
                         fullWidth
-                        label="Topic Title"
+                        label="Título del Tema"
                         name="title"
                         value={formData.title}
                         onChange={handleChange}
@@ -78,7 +81,7 @@ const TopicCreationForm = () => {
 
                     <TextField
                         fullWidth
-                        label="Description"
+                        label="Descripción"
                         name="description"
                         value={formData.description}
                         onChange={handleChange}
@@ -93,7 +96,7 @@ const TopicCreationForm = () => {
                         color="primary"
                         fullWidth
                     >
-                        Create Topic
+                        Crear Tema
                     </Button>
                 </form>
             </Paper>

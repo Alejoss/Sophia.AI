@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar } from '@mui/material';
+import {
+  Container,
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  Avatar,
+  CircularProgress,
+  Alert,
+  Stack,
+} from '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
@@ -31,7 +43,7 @@ const KnowledgePathList = () => {
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths:', err);
-        setError('Failed to load knowledge paths');
+        setError('Error al cargar las rutas de conocimiento');
         // Set empty array on error to prevent map error
         setKnowledgePaths([]);
       } finally {
@@ -47,32 +59,74 @@ const KnowledgePathList = () => {
     window.scrollTo(0, 0);
   };
 
-  if (loading) return <div className="text-center py-8">Loading...</div>;
-  if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6 md:flex-nowrap flex-wrap">
-        <h1 className="md:!text-2xl !text-xl md:mb-0 mb-4 font-bold !text-gray-900">Knowledge Paths</h1>
+    <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+          flexWrap: { xs: 'wrap', md: 'nowrap' },
+        }}
+      >
+        <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
+          Rutas de Conocimiento
+        </Typography>
         {authState.isAuthenticated && (
-          <div className="flex flex-wrap gap-3">
-            <Link 
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' } }}>
+            <Button
+              component={Link}
               to="/profiles/my_profile?section=knowledge-paths"
-              className="bg-gray-500 md:w-auto w-full text-center hover:bg-gray-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              variant="contained"
+              color="inherit"
+              sx={{
+                bgcolor: 'grey.500',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'grey.700',
+                },
+                textDecoration: 'none',
+                width: { xs: '100%', md: 'auto' },
+              }}
             >
-              My Knowledge Paths
-            </Link>
-            <Link 
+              Mis Rutas de Conocimiento
+            </Button>
+            <Button
+              component={Link}
               to="/knowledge_path/create"
-              className="bg-blue-500 md:w-auto w-full text-center hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+              variant="contained"
+              color="primary"
+              sx={{
+                textDecoration: 'none',
+                width: { xs: '100%', md: 'auto' },
+              }}
             >
-              Create New Path
-            </Link>
-          </div>
+              Crear Nueva Ruta
+            </Button>
+          </Stack>
         )}
-      </div>
+      </Box>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+      <Grid container spacing={3}>
         {(knowledgePaths || []).map((path) => {
           console.log('=== KnowledgePathList: VoteComponent props ===');
           console.log('VoteComponent props:', {
@@ -88,97 +142,161 @@ const KnowledgePathList = () => {
           console.log('=== End KnowledgePathList VoteComponent props ===');
           
           return (
-            <div 
-              key={path.id}
-              className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px]"
-            >
-              {/* Image and Title Section */}
-              <div className=" mb-4">
-                <Avatar 
-                  src={path.image} 
-                  alt={path.title}
-                  sx={{ 
-                    width: 80, 
-                    height: 80, 
-                    mr: 3,
-                    bgcolor: 'grey.300',
-                    flexShrink: 0
-                  }}
-                >
-                  {path.title.charAt(0).toUpperCase()}
-                </Avatar>
-                
-                <div className="min-w-0 mt-4">
-                  {/* Title Section */}
-                  <Link 
-                    to={`/knowledge_path/${path.id}`}
-                    className="text-xl font-semibold hover:text-blue-500 transition-colors break-words block mb-3"
+            <Grid item xs={12} sm={6} lg={4} key={path.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  '&:hover': {
+                    boxShadow: 4,
+                  },
+                  minHeight: 200,
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box sx={{ mb: 2 }}>
+                    <Avatar
+                      src={path.image}
+                      alt={path.title}
+                      sx={{
+                        width: 80,
+                        height: 80,
+                        mb: 2,
+                        bgcolor: 'grey.300',
+                      }}
+                    >
+                      {path.title.charAt(0).toUpperCase()}
+                    </Avatar>
+                    
+                    <Typography
+                      component={Link}
+                      to={`/knowledge_path/${path.id}`}
+                      variant="h5"
+                      sx={{
+                        display: 'block',
+                        mb: 1.5,
+                        textDecoration: 'none',
+                        color: 'text.primary',
+                        '&:hover': {
+                          color: 'primary.main',
+                        },
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {path.title}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {path.description}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <VoteComponent
+                        type="knowledge_path"
+                        ids={{ pathId: path.id }}
+                        initialVoteCount={Number(path.vote_count) || 0}
+                        initialUserVote={Number(path.user_vote) || 0}
+                      />
+                    </Box>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      pt: 2,
+                      borderTop: 1,
+                      borderColor: 'divider',
+                    }}
                   >
-                    {path.title}
-                  </Link>
-
-                  {/* Description */}
-                  <p className="text-gray-600 mb-3 line-clamp-3">{path.description}</p>
-
-                  {/* Vote Component */}
-                  <div className="flex justify-end">
-                    <VoteComponent 
-                      type="knowledge_path"
-                      ids={{ pathId: path.id }}
-                      initialVoteCount={Number(path.vote_count) || 0}
-                      initialUserVote={Number(path.user_vote) || 0}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Author and Date */}
-              <div className="flex justify-between text-sm text-gray-500">
-                <Link 
-                  to={`/profiles/user_profile/${path.author_id}`}
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  By {path.author}
-                </Link>
-                <span>{new Date(path.created_at).toLocaleDateString()}</span>
-              </div>
-            </div>
+                    <Typography
+                      component={Link}
+                      to={`/profiles/user_profile/${path.author_id}`}
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        textDecoration: 'none',
+                        '&:hover': {
+                          color: 'primary.main',
+                        },
+                      }}
+                    >
+                      Por {path.author}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(path.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
           );
         })}
-      </div>
+      </Grid>
 
       {/* Pagination Controls */}
-      <div className="flex justify-center items-center space-x-4 mt-8">
-        <button
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 2,
+          mt: 4,
+        }}
+      >
+        <Button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={!hasPrevious}
-          className={`px-4 py-2 rounded-lg ${
-            hasPrevious
-              ? 'bg-blue-500 hover:bg-blue-600 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          variant="contained"
+          color={hasPrevious ? 'primary' : 'inherit'}
+          sx={{
+            bgcolor: hasPrevious ? 'primary.main' : 'grey.300',
+            color: hasPrevious ? 'white' : 'text.disabled',
+            '&:disabled': {
+              bgcolor: 'grey.300',
+              color: 'text.disabled',
+            },
+          }}
         >
-          Previous
-        </button>
+          Anterior
+        </Button>
         
-        <span className="text-gray-600">
-          Page {currentPage} of {totalPages}
-        </span>
+        <Typography variant="body2" color="text.secondary">
+          Página {currentPage} de {totalPages}
+        </Typography>
         
-        <button
+        <Button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={!hasNext}
-          className={`px-4 py-2 rounded-lg ${
-            hasNext
-              ? 'bg-blue-500 hover:bg-blue-600 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          variant="contained"
+          color={hasNext ? 'primary' : 'inherit'}
+          sx={{
+            bgcolor: hasNext ? 'primary.main' : 'grey.300',
+            color: hasNext ? 'white' : 'text.disabled',
+            '&:disabled': {
+              bgcolor: 'grey.300',
+              color: 'text.disabled',
+            },
+          }}
         >
-          Next
-        </button>
-      </div>
-    </div>
+          Siguiente
+        </Button>
+      </Box>
+    </Container>
   );
 };
 
-export default KnowledgePathList; 
+export default KnowledgePathList;

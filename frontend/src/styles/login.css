@@ -8,21 +8,58 @@ html, body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    max-width: 400px;
+    min-height: calc(100vh - 80px); /* Account for navbar */
+    width: 100%;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
+    box-sizing: border-box;
 }
 
-form {
-    display: flex;
-    flex-direction: column;
+.login-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
     align-items: center;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.login-wrapper > div {
     width: 100%;
 }
 
-form div {
-    margin-bottom: 10px;
+.login-wrapper > div:last-child {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+@media screen and (max-width: 768px) {
+    .login-wrapper {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .login-wrapper img {
+        height: auto !important;
+        max-height: 300px;
+    }
+    
+    .order-m-2 {
+        order: 2;
+    }
+}
+
+.login-wrapper form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+}
+
+.login-wrapper form div {
+    margin-bottom: 20px;
     width: 100%;
 }
 
@@ -34,6 +71,31 @@ form div {
 
 .social-login-section p {
     margin-bottom: 1rem;
-    color: #666;
+    color: var(--text-secondary);
     font-size: 0.9rem;
+}
+
+/* Ensure form inputs have visible text */
+.form-control {
+    color: var(--input-text) !important;
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+.form-control::placeholder {
+    color: var(--input-placeholder) !important;
+    opacity: 1;
+}
+
+.form-label {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure all input types within login container are visible */
+.login-container input,
+.login-container textarea,
+.login-container select {
+    color: var(--input-text) !important;
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
 }
