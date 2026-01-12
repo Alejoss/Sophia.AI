@@ -154,7 +154,7 @@ def notify_knowledge_path_comment(comment):
             recipient=knowledge_path.author,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='comentó en tu ruta de conocimiento',
+            verb='comentó en tu camino de conocimiento',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=knowledge_path_ct,
@@ -174,12 +174,12 @@ def notify_knowledge_path_comment(comment):
             recipient=knowledge_path.author,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
-            verb='comentó en tu ruta de conocimiento',
+            verb='comentó en tu camino de conocimiento',
             action_object_content_type=comment_ct,
             action_object_object_id=comment.id,
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id,
-            description=f'{comment.author.username} comentó en tu ruta de conocimiento "{knowledge_path.title}": {comment.body[:50]}...'
+            description=f'{comment.author.username} comentó en tu camino de conocimiento "{knowledge_path.title}": {comment.body[:50]}...'
         )
         logger.info("Knowledge path comment notification created successfully", extra={
             'notification_id': notification.id,
@@ -364,7 +364,7 @@ def notify_knowledge_path_completion(user, knowledge_path):
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completó tu ruta de conocimiento',
+        verb='completó tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id
     )
@@ -382,10 +382,10 @@ def notify_knowledge_path_completion(user, knowledge_path):
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completó tu ruta de conocimiento',
+        verb='completó tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id,
-        description=f'{user.username} completó tu ruta de conocimiento "{knowledge_path.title}"'
+        description=f'{user.username} completó tu camino de conocimiento "{knowledge_path.title}"'
     )
     logger.info("Knowledge path completion notification created successfully", extra={
         'notification_id': notification.id,
@@ -453,7 +453,7 @@ def notify_certificate_request(certificate_request):
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='solicitó un certificado para tu ruta de conocimiento',
+        verb='solicitó un certificado para tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
         timestamp__gte=recent_cutoff
@@ -472,10 +472,10 @@ def notify_certificate_request(certificate_request):
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='solicitó un certificado para tu ruta de conocimiento',
+        verb='solicitó un certificado para tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.requester.username} solicitó un certificado para tu ruta de conocimiento "{certificate_request.knowledge_path.title}"'
+        description=f'{certificate_request.requester.username} solicitó un certificado para tu camino de conocimiento "{certificate_request.knowledge_path.title}"'
     )
     logger.info("Certificate request notification created successfully", extra={
         'notification_id': notification.id,
@@ -818,7 +818,7 @@ def notify_knowledge_path_upvote(vote):
             recipient=knowledge_path.author,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='votó positivamente tu ruta de conocimiento',
+            verb='votó positivamente tu camino de conocimiento',
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id
         )
@@ -836,10 +836,10 @@ def notify_knowledge_path_upvote(vote):
             recipient=knowledge_path.author,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
-            verb='votó positivamente tu ruta de conocimiento',
+            verb='votó positivamente tu camino de conocimiento',
             target_content_type=knowledge_path_ct,
             target_object_id=knowledge_path.id,
-            description=f'{vote.user.username} votó positivamente tu ruta de conocimiento "{knowledge_path.title}"'
+            description=f'{vote.user.username} votó positivamente tu camino de conocimiento "{knowledge_path.title}"'
         )
         logger.info("Knowledge path upvote notification created successfully", extra={
             'notification_id': notification.id,

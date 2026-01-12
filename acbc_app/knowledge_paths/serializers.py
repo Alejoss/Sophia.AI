@@ -109,7 +109,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         """Validate that knowledge path can be made visible"""
         if value and not self.instance.can_be_visible():
             raise serializers.ValidationError(
-                "Las rutas de conocimiento necesitan al menos dos nodos para ser visibles"
+                "Los caminos de conocimiento necesitan al menos dos nodos para ser visibles"
             )
         return value
 
@@ -135,7 +135,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
             new_visibility = validated_data['is_visible']
             if new_visibility and not instance.can_be_visible():
                 raise serializers.ValidationError({
-                    'is_visible': "Las rutas de conocimiento necesitan al menos dos nodos para ser visibles"
+                    'is_visible': "Los caminos de conocimiento necesitan al menos dos nodos para ser visibles"
                 })
             instance.is_visible = new_visibility
         

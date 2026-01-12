@@ -14,7 +14,7 @@ const EventDetail = () => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationLoading, setRegistrationLoading] = useState(false);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
-  const [shareButtonText, setShareButtonText] = useState('Share Event');
+  const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
   const [userRegistration, setUserRegistration] = useState(null);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ const EventDetail = () => {
   }, [eventId, authState.isAuthenticated, authState.user]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'TBD';
+    if (!dateString) return 'Por determinar';
       return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
@@ -78,7 +78,7 @@ const EventDetail = () => {
       'google_meet': 'Google Meet',
       'jitsi': 'Jitsi',
       'microsoft_teams': 'Microsoft Teams',
-      'other': 'Other',
+      'other': 'Otra',
       'telegram': 'Telegram',
       'tox': 'Tox',
       'twitch': 'Twitch',
@@ -302,7 +302,7 @@ const EventDetail = () => {
 
             {event.reference_price > 0 && (
               <div className="event-meta-item">
-                <strong>Price:</strong>
+                <strong>Precio:</strong>
                 <span>${event.reference_price}</span>
                 {event.owner_accepted_cryptos && event.owner_accepted_cryptos.length > 0 && (
                   <div className="crypto-payment-methods">

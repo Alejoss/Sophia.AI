@@ -129,12 +129,12 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
             if (error.response?.status === 401) {
                 console.log('Authentication required for voting');
                 // You might want to show a message to the user or redirect to login
-                alert('Please log in to vote');
+                alert('Por favor inicia sesión para votar');
                 return;
             }
             
             // Handle other errors
-            alert('An error occurred while processing your vote. Please try again.');
+                alert('Ocurrió un error al procesar tu voto. Por favor intenta de nuevo.');
         } finally {
             setLoading(false);
         }

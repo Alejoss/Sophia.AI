@@ -33,7 +33,7 @@ const Bookmarks = () => {
       setBookmarks(bookmarksData);
     } catch (err) {
       console.error("Failed to load bookmarks:", err);
-      setError("Failed to load bookmarks");
+      setError("Error al cargar los marcadores");
     } finally {
       setLoading(false);
     }
@@ -185,7 +185,7 @@ const Bookmarks = () => {
                           width: 60,
                           height: 60,
                           backgroundColor: "background.paper",
-                          borderRadius: 1,
+                          borderRadius: 0.5,
                         }}
                       >
                         <SchoolIcon
@@ -195,10 +195,10 @@ const Bookmarks = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                            "Ruta de conocimiento sin título"}
+                            "Camino de conocimiento sin título"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Ruta de conocimiento
+                          Camino de conocimiento
                         </Typography>
                       </Box>
                       <Tooltip title="Delete bookmark">
@@ -235,7 +235,7 @@ const Bookmarks = () => {
                           width: 60,
                           height: 60,
                           backgroundColor: "background.paper",
-                          borderRadius: 1,
+                          borderRadius: 0.5,
                         }}
                       >
                         <ArticleIcon

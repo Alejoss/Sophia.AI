@@ -15,7 +15,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { getFileUrl } from "../utils/fileUtils";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
@@ -63,7 +63,7 @@ const ContentDisplay = ({
 
   // Get appropriate data from either content or content_profile
   const profile = content.selected_profile || content;
-  const title = profile.title || content.original_title || "Untitled";
+  const title = profile.title || content.original_title || "Sin título";
   const author = profile.author || content.original_author;
 
   // For preview mode, expect the PreviewContentProfileSerializer structure
@@ -208,11 +208,11 @@ const ContentDisplay = ({
                 width: "100%",
                 height: 200,
                 bgcolor: "grey.100",
-                borderRadius: 1,
+                borderRadius: 0.5,
               }}
             >
               <Typography color="text.secondary">
-                Image file not available
+                Archivo de imagen no disponible
               </Typography>
             </Box>
           );
@@ -239,7 +239,7 @@ const ContentDisplay = ({
                 : {},
             }}
             onClick={isClickable ? handleContentClick : undefined}
-            title={isClickable ? "Click to open image in new tab" : undefined}
+            title={isClickable ? "Haz clic para abrir la imagen en una nueva pestaña" : undefined}
           >
             <img
               src={fileUrl}
@@ -269,7 +269,7 @@ const ContentDisplay = ({
                 color: "text.secondary",
               }}
             >
-              <Typography color="text.primary">Failed to load image</Typography>
+              <Typography color="text.primary">Error al cargar la imagen</Typography>
             </Box>
           </Box>
         );
@@ -284,11 +284,11 @@ const ContentDisplay = ({
                 width: "100%",
                 height: 200,
                 bgcolor: "grey.100",
-                borderRadius: 1,
+                borderRadius: 0.5,
               }}
             >
               <Typography color="text.secondary">
-                Video file not available
+                Archivo de video no disponible
               </Typography>
             </Box>
           );
@@ -304,15 +304,15 @@ const ContentDisplay = ({
               "&:hover": isClickable
                 ? {
                     boxShadow: 2,
-                    borderRadius: 1,
+                    borderRadius: 0.5,
                   }
                 : {},
             }}
             onClick={isClickable ? handleContentClick : undefined}
-            title={isClickable ? "Click to open video in new tab" : undefined}
+            title={isClickable ? "Haz clic para abrir el video en una nueva pestaña" : undefined}
           >
             <video controls style={{ width: "100%" }} src={fileUrl}>
-              Your browser does not support the video tag.
+              Tu navegador no admite la etiqueta de video.
             </video>
           </Box>
         );
@@ -327,11 +327,11 @@ const ContentDisplay = ({
                 width: "100%",
                 height: 100,
                 bgcolor: "grey.100",
-                borderRadius: 1,
+                borderRadius: 0.5,
               }}
             >
               <Typography color="text.secondary">
-                Audio file not available
+                Archivo de audio no disponible
               </Typography>
             </Box>
           );
@@ -347,15 +347,15 @@ const ContentDisplay = ({
               "&:hover": isClickable
                 ? {
                     boxShadow: 2,
-                    borderRadius: 1,
+                    borderRadius: 0.5,
                   }
                 : {},
             }}
             onClick={isClickable ? handleContentClick : undefined}
-            title={isClickable ? "Click to open audio in new tab" : undefined}
+            title={isClickable ? "Haz clic para abrir el audio en una nueva pestaña" : undefined}
           >
             <audio controls style={{ width: "100%" }} src={fileUrl}>
-              Your browser does not support the audio tag.
+              Tu navegador no admite la etiqueta de audio.
             </audio>
           </Box>
         );
@@ -371,7 +371,7 @@ const ContentDisplay = ({
                 wordBreak: "break-word",
                 p: 2,
                 bgcolor: "grey.50",
-                borderRadius: 1,
+                borderRadius: 0.5,
                 border: "1px solid",
                 borderColor: "divider",
                 cursor: isClickable ? "pointer" : "default",
@@ -383,7 +383,7 @@ const ContentDisplay = ({
                   : {},
               }}
               onClick={isClickable ? handleContentClick : undefined}
-              title={isClickable ? "Click to open file in new tab" : undefined}
+              title={isClickable ? "Haz clic para abrir el archivo en una nueva pestaña" : undefined}
             >
               {contentData.file_details.extracted_text}
             </Box>
@@ -397,7 +397,7 @@ const ContentDisplay = ({
                 mx: "auto",
                 p: 2,
                 bgcolor: "info.light",
-                borderRadius: 1,
+                borderRadius: 0.5,
                 border: "1px solid",
                 borderColor: "info.main",
                 cursor: "pointer",
@@ -407,10 +407,10 @@ const ContentDisplay = ({
                 },
               }}
               onClick={handleContentClick}
-              title="Click to open URL in new tab"
+              title="Haz clic para abrir la URL en una nueva pestaña"
             >
               <Typography variant="body1" color="text.primary">
-                URL Content:{" "}
+                Contenido URL:{" "}
                 <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>
                   {url}
                 </a>
@@ -427,11 +427,11 @@ const ContentDisplay = ({
                 width: "100%",
                 height: 100,
                 bgcolor: "grey.100",
-                borderRadius: 1,
+                borderRadius: 0.5,
               }}
             >
               <Typography color="text.secondary">
-                No text content available
+                No hay contenido de texto disponible
               </Typography>
             </Box>
           );
@@ -450,7 +450,7 @@ const ContentDisplay = ({
             }}
           >
             <Typography color="text.secondary">
-              Unsupported media type: {mediaTypeUpper}
+              Tipo de medio no soportado: {mediaTypeUpper}
             </Typography>
           </Box>
         );
@@ -462,9 +462,19 @@ const ContentDisplay = ({
       return (
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6" gutterBottom color="text.secondary">
-            Content Details
+            Detalles del contenido
           </Typography>
-          <Stack spacing={2}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr", // Single column on mobile
+                md: "1fr 1fr", // Two columns on medium+ screens
+              },
+              gap: 3,
+              mt: 2,
+            }}
+          >
             {/* File Information */}
             <Box>
               <Typography
@@ -472,7 +482,7 @@ const ContentDisplay = ({
                 color="text.secondary"
                 gutterBottom
               >
-                File Information
+                Información del archivo
               </Typography>
               <Stack spacing={1}>
                 {fileDetails?.file && (
@@ -487,7 +497,7 @@ const ContentDisplay = ({
                     }}
                   >
                     <StorageIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">File:</Typography>
+                    <Typography variant="body2" color="text.primary">Archivo:</Typography>
                     <Button
                       size="small"
                       variant="outlined"
@@ -496,7 +506,7 @@ const ContentDisplay = ({
                       }
                       sx={{ ml: 1 }}
                     >
-                      Download File
+                      Descargar archivo
                     </Button>
                     <Button
                       size="small"
@@ -507,7 +517,7 @@ const ContentDisplay = ({
                         )
                       }
                     >
-                      Copy URL
+                      Copiar URL
                     </Button>
                   </Box>
                 )}
@@ -523,14 +533,14 @@ const ContentDisplay = ({
                       onClick={() => window.open(url, "_blank")}
                       sx={{ ml: 1 }}
                     >
-                      Open URL
+                      Abrir URL
                     </Button>
                     <Button
                       size="small"
                       variant="text"
                       onClick={() => navigator.clipboard.writeText(url)}
                     >
-                      Copy URL
+                      Copiar URL
                     </Button>
                   </Box>
                 )}
@@ -539,7 +549,7 @@ const ContentDisplay = ({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <StorageIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      File size:{" "}
+                      Tamaño del archivo:{" "}
                       {(fileDetails.file_size / (1024 * 1024)).toFixed(2)} MB
                     </Typography>
                   </Box>
@@ -549,144 +559,74 @@ const ContentDisplay = ({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <DescriptionIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Text length: {fileDetails.text_length.toLocaleString()}{" "}
-                      characters
+                      Longitud del texto: {fileDetails.text_length.toLocaleString()}{" "}
+                      caracteres
                     </Typography>
                   </Box>
                 )}
               </Stack>
             </Box>
 
-            {/* Timestamps */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                Timestamps
-              </Typography>
-              <Stack spacing={1}>
-                {contentData.created_at && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Content created: {formatDate(contentData.created_at)}
-                    </Typography>
-                  </Box>
-                )}
-
-                {fileDetails?.uploaded_at && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      File uploaded: {formatDate(fileDetails.uploaded_at)}
-                    </Typography>
-                  </Box>
-                )}
-
-                {profile?.created_at && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Profile created: {formatDate(profile.created_at)}
-                    </Typography>
-                  </Box>
-                )}
-
-                {profile?.updated_at && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CalendarTodayIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Profile updated: {formatDate(profile.updated_at)}
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
-
-            {/* User Information */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                User Information
-              </Typography>
-              <Stack spacing={1}>
-                {profile?.user_username && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <PersonIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Profile owner: {profile.user_username}
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
-
-            {/* Organization */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                Organization
-              </Typography>
-              <Stack spacing={1}>
-                {profile?.collection_name && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <FolderIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Collection: {profile.collection_name}
-                    </Typography>
-                  </Box>
-                )}
-
-                {contentData.topics && contentData.topics.length > 0 && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <FolderIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Associated topics: {contentData.topics.length}
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
-
-            {/* Status Flags */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="text.secondary"
-                gutterBottom
-              >
-                Status
-              </Typography>
-              <Stack spacing={1}>
+            {/* Shared By */}
+            {profile?.user_username && (
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  Compartido por
+                </Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {profile?.is_visible ? (
-                    <VisibilityIcon fontSize="small" color="success" />
+                  <PersonIcon fontSize="small" color="action" />
+                  {profile?.user ? (
+                    <Link
+                      to={`/profiles/user_profile/${profile.user}`}
+                      style={{
+                        textDecoration: "none",
+                        color: "inherit",
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        color="primary"
+                        sx={{
+                          "&:hover": {
+                            textDecoration: "underline",
+                          },
+                        }}
+                      >
+                        {profile.user_username}
+                      </Typography>
+                    </Link>
                   ) : (
-                    <VisibilityOffIcon fontSize="small" color="error" />
+                    <Typography variant="body2" color="text.primary">
+                      {profile.user_username}
+                    </Typography>
                   )}
+                </Box>
+              </Box>
+            )}
+
+            {/* Creation Date */}
+            {contentData.created_at && (
+              <Tooltip title="Creado el" arrow>
+                <Box 
+                  sx={{ 
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    gap: 1,
+                    cursor: "help",
+                    width: "fit-content"
+                  }}
+                >
+                  <CalendarTodayIcon fontSize="small" color="action" />
                   <Typography variant="body2" color="text.primary">
-                    {profile?.is_visible ? "Visible" : "Hidden"} in search
+                    {formatDate(contentData.created_at)}
                   </Typography>
                 </Box>
-
-                {profile?.is_producer && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <PersonIcon fontSize="small" color="primary" />
-                    <Typography variant="body2" color="text.primary">
-                      You are the producer
-                    </Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
+              </Tooltip>
+            )}
 
             {/* Vote Information */}
             {contentData.vote_count !== undefined && (
@@ -696,33 +636,19 @@ const ContentDisplay = ({
                   color="text.secondary"
                   gutterBottom
                 >
-                  Engagement
+                  Participación
                 </Typography>
                 <Stack spacing={1}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <ThumbUpIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Votes: {contentData.vote_count}
+                      Votos: {contentData.vote_count}
                     </Typography>
                   </Box>
-
-                  {contentData.user_vote !== undefined && (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <ThumbUpIcon fontSize="small" color="action" />
-                      <Typography variant="body2" color="text.primary">
-                        Your vote:{" "}
-                        {contentData.user_vote === 1
-                          ? "Upvoted"
-                          : contentData.user_vote === -1
-                          ? "Downvoted"
-                          : "No vote"}
-                      </Typography>
-                    </Box>
-                  )}
                 </Stack>
               </Box>
             )}
-          </Stack>
+          </Box>
         </Box>
       );
     }
@@ -741,7 +667,7 @@ const ContentDisplay = ({
         return (
           <Box sx={{ mt: 3 }}>
             <Typography variant="h6" gutterBottom color="text.secondary">
-              Website Information
+              Información del sitio web
             </Typography>
             <Stack spacing={2}>
               {fileDetails.og_type && (
@@ -751,7 +677,7 @@ const ContentDisplay = ({
                     color="text.secondary"
                     gutterBottom
                   >
-                    Type:
+                    Tipo:
                   </Typography>
                   <Typography variant="body1" color="text.primary">{fileDetails.og_type}</Typography>
                 </Box>
@@ -764,7 +690,7 @@ const ContentDisplay = ({
                     color="text.secondary"
                     gutterBottom
                   >
-                    Site:
+                    Sitio:
                   </Typography>
                   <Typography variant="body1" color="text.primary">
                     {fileDetails.og_site_name}
@@ -779,7 +705,7 @@ const ContentDisplay = ({
                     color="text.secondary"
                     gutterBottom
                   >
-                    Description:
+                    Descripción:
                   </Typography>
                   <Typography variant="body1" color="text.primary">
                     {fileDetails.og_description}
@@ -812,7 +738,7 @@ const ContentDisplay = ({
                 p: 1,
                 "&:hover": { bgcolor: "action.hover" },
                 cursor: onClick ? "pointer" : "default",
-                borderRadius: 1,
+                borderRadius: 0.5,
                 position: "relative",
               }}
               onClick={onClick}
@@ -849,7 +775,7 @@ const ContentDisplay = ({
                       noWrap
                       sx={{ fontSize: "0.8rem", mb: 0.5 }}
                     >
-                      By {author}
+                      Por {author}
                     </Typography>
                   )}
                   <Typography
@@ -878,13 +804,13 @@ const ContentDisplay = ({
                   p: 2,
                   border: "1px solid",
                   borderColor: "error.main",
-                  borderRadius: 1,
+                  borderRadius: 0.5,
                   backgroundColor: "error.light",
                   color: "error.contrastText",
                 }}
               >
                 <Typography variant="body2" color="text.primary">
-                  Invalid content data provided
+                  Datos de contenido inválidos proporcionados
                 </Typography>
               </Box>
             );
@@ -918,10 +844,10 @@ const ContentDisplay = ({
               }}
               title={
                 url
-                  ? "Click to open link in new tab"
+                  ? "Haz clic para abrir el enlace en una nueva pestaña"
                   : fileDetails?.file
-                  ? "Click to open file in new tab"
-                  : "Click to view content"
+                  ? "Haz clic para abrir el archivo en una nueva pestaña"
+                  : "Haz clic para ver el contenido"
               }
               sx={{
                 cursor: "pointer",
@@ -944,13 +870,13 @@ const ContentDisplay = ({
                 },
                 "&:hover": {
                   backgroundColor: "action.hover",
-                  borderRadius: 1,
+                  borderRadius: 0.5,
                   boxShadow: 2,
                 },
                 position: "relative",
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 1,
+                borderRadius: 0.5,
                 minHeight: 100,
                 transition: "all 0.2s ease-in-out",
                 backgroundColor: "background.paper",
@@ -971,7 +897,7 @@ const ContentDisplay = ({
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: "background.default",
-                  borderRadius: 1,
+                  borderRadius: 0.5,
                   overflow: "hidden",
                   border: "1px solid",
                   borderColor: "divider",
@@ -1074,7 +1000,7 @@ const ContentDisplay = ({
                     },
                   }}
                 >
-                  {title || "Untitled Content"}
+                  {title || "Contenido sin título"}
                 </Typography>
 
                 {showAuthor && author && (
@@ -1228,7 +1154,7 @@ const ContentDisplay = ({
                 }}
                 data-action-button
               >
-                <Tooltip title="View Details">
+                <Tooltip title="Ver detalles">
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -1289,10 +1215,10 @@ const ContentDisplay = ({
               onClick={handleCardClick}
               title={
                 url
-                  ? "Click to open link in new tab"
+                  ? "Haz clic para abrir el enlace en una nueva pestaña"
                   : fileDetails?.file
-                  ? "Click to open file in new tab"
-                  : "Click to view content"
+                  ? "Haz clic para abrir el archivo en una nueva pestaña"
+                  : "Haz clic para ver el contenido"
               }
             >
               <CardMedia
@@ -1465,7 +1391,7 @@ const ContentDisplay = ({
                         onEdit(e);
                       }}
                     >
-                      Edit
+                      Editar
                     </Button>
                   )}
                   {onRemove && (
@@ -1477,7 +1403,7 @@ const ContentDisplay = ({
                         onRemove(e);
                       }}
                     >
-                      Remove
+                      Eliminar
                     </Button>
                   )}
                   {additionalActions && (
@@ -1518,20 +1444,20 @@ const ContentDisplay = ({
                       mt: 2,
                       p: 2,
                       bgcolor: "grey.50",
-                      borderRadius: 1,
+                      borderRadius: 0.5,
                       border: "1px solid",
                       borderColor: "divider",
                     }}
                   >
                     {contentData.original_title && (
                       <Typography variant="body2" gutterBottom color="text.primary">
-                        <strong>original title:</strong>{" "}
+                        <strong>título original:</strong>{" "}
                         {contentData.original_title}
                       </Typography>
                     )}
                     {contentData.original_author && (
                       <Typography variant="body2" color="text.primary">
-                        <strong>original author:</strong>{" "}
+                        <strong>autor original:</strong>{" "}
                         {contentData.original_author}
                       </Typography>
                     )}
@@ -1545,7 +1471,7 @@ const ContentDisplay = ({
               {profile?.personal_note && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="h6" gutterBottom color="text.secondary">
-                    Personal Notes
+                    Notas personales
                   </Typography>
                   <Box sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
                     <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }} color="text.primary">
@@ -1571,7 +1497,7 @@ const ContentDisplay = ({
                         onEdit(e);
                       }}
                     >
-                      Change Content
+                      Cambiar contenido
                     </Button>
                   )}
                   {onRemove && (
@@ -1583,7 +1509,7 @@ const ContentDisplay = ({
                         onRemove(e);
                       }}
                     >
-                      Remove
+                      Eliminar
                     </Button>
                   )}
                   {additionalActions && (
@@ -1599,7 +1525,7 @@ const ContentDisplay = ({
         default:
           return (
             <Typography color="error" align="center" sx={{ p: 2 }}>
-              Unknown variant: {variant}
+              Variante desconocida: {variant}
             </Typography>
           );
       }
@@ -1607,7 +1533,7 @@ const ContentDisplay = ({
       console.error("Error in renderContent:", error);
       return (
         <Typography color="error" align="center" sx={{ p: 2 }}>
-          Error rendering content: {error.message}
+          Error al renderizar el contenido: {error.message}
         </Typography>
       );
     }
@@ -1619,7 +1545,7 @@ const ContentDisplay = ({
     console.error("Fatal error in ContentDisplay:", error);
     return (
       <Typography color="error" align="center" sx={{ p: 2 }}>
-        Error displaying content: {error.message}
+        Error al mostrar el contenido: {error.message}
       </Typography>
     );
   }

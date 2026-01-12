@@ -37,7 +37,7 @@ const ThreadList = ({ onThreadSelect }) => {
                 setError(null);
             } catch (err) {
                 console.error('Error loading threads:', err);
-                setError('Failed to load conversations.');
+                setError('Error al cargar las conversaciones.');
             } finally {
                 setLoading(false);
             }
@@ -73,14 +73,14 @@ const ThreadList = ({ onThreadSelect }) => {
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Messages</Typography>
+                <Typography variant="h6" sx={{ mb: 2 }}>Mensajes</Typography>
                 <Paper
                     component="form"
                     sx={{ p: '2px 4px', display: 'flex', alignItems: 'center' }}
                 >
                     <InputBase
                         sx={{ ml: 1, flex: 1 }}
-                        placeholder="Search conversations"
+                        placeholder="Buscar conversaciones"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -95,8 +95,8 @@ const ThreadList = ({ onThreadSelect }) => {
                 {!filteredThreads || filteredThreads.length === 0 ? (
                     <ListItem>
                         <ListItemText 
-                            primary="No conversations found" 
-                            secondary={searchQuery ? "Try a different search term" : "No conversations yet"}
+                            primary="No se encontraron conversaciones" 
+                            secondary={searchQuery ? "Intente con un término de búsqueda diferente" : "Aún no hay conversaciones"}
                         />
                     </ListItem>
                 ) : (
@@ -143,10 +143,10 @@ const ThreadList = ({ onThreadSelect }) => {
                                                         variant="caption"
                                                         color="text.secondary"
                                                     >
-                                                        {new Date(thread.last_message.timestamp).toLocaleString()}
+                                                        {new Date(thread.last_message.timestamp).toLocaleString('es-ES')}
                                                     </Typography>
                                                 </>
-                                            ) : 'No messages yet'
+                                            ) : 'Aún no hay mensajes'
                                         }
                                     />
                                 </ListItem>

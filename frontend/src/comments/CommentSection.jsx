@@ -42,7 +42,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             setComments(fetchedComments);
         } catch (err) {
             if (err.response?.status !== 404) {
-                setError('Failed to load comments');
+                setError('Error al cargar los comentarios');
             }
             setComments([]);
         } finally {
@@ -52,7 +52,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
 
     const handleAddComment = async () => {
         if (!authState.user) {
-            setError('You must be logged in to comment');
+            setError('Debe iniciar sesión para comentar');
             return;
         }
 
@@ -72,7 +72,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             setNewComment('');
             await loadComments();
         } catch (error) {
-            setError('Failed to add comment. Please try again.');
+            setError('Error al agregar el comentario. Por favor, inténtelo de nuevo.');
         }
     };
 
@@ -81,7 +81,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             await commentsApi.deleteComment(commentId);
             await loadComments();
         } catch (err) {
-            setError('Failed to delete comment');
+            setError('Error al eliminar el comentario');
         }
     };
 
@@ -90,13 +90,13 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             await commentsApi.updateComment(commentId, body);
             await loadComments();
         } catch (error) {
-            setError('Failed to update comment');
+            setError('Error al actualizar el comentario');
         }
     };
 
     const handleReplySubmit = async (parentId, body) => {
         if (!authState.user) {
-            setError('You must be logged in to reply');
+            setError('Debe iniciar sesión para responder');
             return;
         }
 
@@ -104,16 +104,16 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             await commentsApi.addCommentReply(parentId, body);
             await loadComments();
         } catch (error) {
-            setError('Failed to add reply. Please try again.');
+            setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
         }
     };
 
-    if (loading) return <Typography>Loading comments...</Typography>;
+    if (loading) return <Typography>Cargando comentarios...</Typography>;
 
     return (
         <Paper sx={{ p: 3, mt: 3 }}>
             <Typography variant="h6" gutterBottom>
-                Comments
+                Comentarios
             </Typography>
             
             {authState.isAuthenticated ? (
@@ -122,7 +122,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
                         fullWidth
                         multiline
                         rows={3}
-                        placeholder="Write a comment..."
+                        placeholder="Escriba un comentario..."
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                     />
@@ -132,12 +132,12 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
                         onClick={handleAddComment}
                         disabled={!newComment.trim()}
                     >
-                        Post Comment
+                        Publicar Comentario
                     </Button>
                 </Box>
             ) : (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    Please sign in to leave a comment.
+                    Por favor, inicie sesión para dejar un comentario.
                 </Typography>
             )}
 
@@ -160,7 +160,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
                 </Box>
             ) : (
                 <Typography color="text.secondary">
-                    No comments yet. Be the first to comment!
+                    Aún no hay comentarios. ¡Sé el primero en comentar!
                 </Typography>
             )}
 

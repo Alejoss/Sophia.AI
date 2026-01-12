@@ -35,6 +35,11 @@ const About = () => {
                 <h4>ACBC Tokens</h4>
                 <p>Distributes ACBC tokens as rewards to users, incentivizing participation and engagement.</p>
             </div>
+
+            <div className="feature-block">
+                <h4>Gamification System</h4>
+                <p>Earn badges and points by learning, contributing, and engaging with the community. Badges recognize meaningful achievements and contributions.</p>
+            </div>
         </div>
     );
 };

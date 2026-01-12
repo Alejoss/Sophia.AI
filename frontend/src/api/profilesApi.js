@@ -65,7 +65,7 @@ const apiLogout = async () => {
   } catch (error) {
     // Even if the API call fails, clear the headers
     delete axiosInstance.defaults.headers.common['Authorization'];
-    throw new Error('Logout failed');
+    throw new Error('Error al cerrar sesión');
   }
 };
 

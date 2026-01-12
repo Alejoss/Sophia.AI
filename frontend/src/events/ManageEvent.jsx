@@ -54,7 +54,7 @@ const ManageEvent = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not specified';
+    if (!dateString) return 'No especificado';
       return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',

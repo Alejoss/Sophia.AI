@@ -216,7 +216,7 @@ const QuizForm = () => {
           onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
           className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
         >
-          ← Volver a la Ruta de Conocimiento
+          ← Volver al Camino de Conocimiento
         </button>
       </div>
 

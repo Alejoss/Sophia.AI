@@ -8,7 +8,7 @@ const contentApi = {
         } catch (error) {
             console.error('Error fetching user content:', error);
             if (error.code === 'ECONNABORTED') {
-                throw new Error('Request timed out. Please try again.');
+                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
             }
             throw error;
         }
@@ -21,7 +21,7 @@ const contentApi = {
         } catch (error) {
             console.error('Error fetching user content with details:', error);
             if (error.code === 'ECONNABORTED') {
-                throw new Error('Request timed out. Please try again.');
+                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
             }
             throw error;
         }
@@ -34,10 +34,10 @@ const contentApi = {
         } catch (error) {
             console.error(`Error fetching content for user ${userId}:`, error);
             if (error.code === 'ECONNABORTED') {
-                throw new Error('Request timed out. Please try again.');
+                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
             }
             if (error.response?.status === 404) {
-                throw new Error(`User with ID ${userId} not found.`);
+                throw new Error(`Usuario con ID ${userId} no encontrado.`);
             }
             throw error;
         }
@@ -458,19 +458,19 @@ const contentApi = {
             const isAllowedDomain = allowedDomains.some(domain => urlDomain.includes(domain));
 
             if (!isAllowedDomain) {
-                throw new Error('Unable to fetch preview for this URL');
+                throw new Error('No se puede obtener la vista previa para esta URL');
             }
 
             // Fallback to direct fetch if server fails
             console.log('Making direct fetch request...');
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error('Failed to fetch URL data');
+                throw new Error('Error al obtener los datos de la URL');
             }
 
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('text/html')) {
-                throw new Error('URL must point to a webpage');
+                throw new Error('La URL debe apuntar a una página web');
             }
 
             const html = await response.text();
@@ -505,7 +505,7 @@ const contentApi = {
                         const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
                         const oembedResponse = await fetch(oembedUrl);
                         if (!oembedResponse.ok) {
-                            throw new Error('Failed to fetch YouTube data');
+                            throw new Error('Error al obtener los datos de YouTube');
                         }
                         const oembedData = await oembedResponse.json();
                         if (oembedData.title) {
@@ -520,7 +520,7 @@ const contentApi = {
 
             // Validate required fields
             if (!metadata.title && !metadata.description && !metadata.image) {
-                throw new Error('Could not extract preview information from this URL');
+                throw new Error('No se pudo extraer la información de vista previa de esta URL');
             }
 
             console.log('Final metadata:', metadata);
@@ -530,7 +530,7 @@ const contentApi = {
             console.error('Error fetching URL metadata:', error);
             
             // Return a user-friendly error message
-            throw new Error(error.message || 'Failed to fetch URL data');
+            throw new Error(error.message || 'Error al obtener los datos de la URL');
         }
     }
 };

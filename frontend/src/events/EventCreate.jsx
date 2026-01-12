@@ -11,7 +11,7 @@ const PLATFORM_CHOICES = [
   { value: 'tox', label: 'Tox' },
   { value: 'twitch', label: 'Twitch' },
   { value: 'zoom', label: 'Zoom' },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Otra' },
 ];
 
 const EVENT_TYPES = [

@@ -247,7 +247,7 @@ const NodeDetail = () => {
               to={`/knowledge_path/${pathId}`}
               className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg transition-colors"
             >
-              Volver a la Ruta
+              Volver al Camino
             </Link>
             {node.is_completed ? (
               <button

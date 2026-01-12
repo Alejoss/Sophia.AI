@@ -26,7 +26,7 @@
 
 .notification-item {
   padding: 15px;
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   transition: all 0.3s ease;
@@ -77,7 +77,7 @@
   background-color: #1976d2;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 0.9em;
   transition: background-color 0.3s ease;
@@ -104,5 +104,5 @@
   padding: 40px;
   color: var(--text-secondary);
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: 2px;
 } 

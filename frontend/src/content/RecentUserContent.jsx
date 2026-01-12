@@ -21,7 +21,7 @@ const RecentUserContent = () => {
         setLoading(false);
       } catch (err) {
         console.error('\nError fetching recent content:', err);
-        setError('Failed to load recent content');
+        setError('Error al cargar el contenido reciente');
         setLoading(false);
       }
     };
@@ -52,7 +52,7 @@ const RecentUserContent = () => {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Recently Uploaded Content
+        Contenido subido recientemente
       </Typography>
       <Grid container spacing={2}>
         {recentContent.map((profile) => {
@@ -71,7 +71,7 @@ const RecentUserContent = () => {
         {recentContent.length === 0 && (
           <Grid item xs={12}>
             <Typography color="text.secondary" align="center">
-              No recent content found
+              No se encontró contenido reciente
             </Typography>
           </Grid>
         )}

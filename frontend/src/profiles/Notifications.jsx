@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import ApiIcon from '@mui/icons-material/Api';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { Tooltip } from '@mui/material';
 import '../styles/notifications.css';
 
 const Notifications = ({
@@ -15,13 +17,13 @@ const Notifications = ({
   console.log('Notifications prop:', notifications);
 
   const getNotificationDescription = (notification) => {
-    if (notification.verb === 'comentó en tu ruta de conocimiento') {
-      return `${notification.actor} comentó en tu ruta de conocimiento ${notification.context_title}`;
+    if (notification.verb === 'comentó en tu camino de conocimiento') {
+      return `${notification.actor} comentó en tu camino de conocimiento ${notification.context_title}`;
     } else if (notification.verb === 'respondió a') {
       return `${notification.actor} respondió a tu comentario en ${notification.context_title}`;
-    } else if (notification.verb === 'completó tu ruta de conocimiento') {
+    } else if (notification.verb === 'completó tu camino de conocimiento') {
       return notification.description;
-    } else if (notification.verb === 'solicitó un certificado para tu ruta de conocimiento') {
+    } else if (notification.verb === 'solicitó un certificado para tu camino de conocimiento') {
       return notification.description;
     } else if (notification.verb === 'aprobó tu solicitud de certificado para') {
       return notification.description;
@@ -29,7 +31,7 @@ const Notifications = ({
       return notification.description;
     } else if (notification.verb === 'votó positivamente tu contenido') {
       return notification.description;
-    } else if (notification.verb === 'votó positivamente tu ruta de conocimiento') {
+    } else if (notification.verb === 'votó positivamente tu camino de conocimiento') {
       return notification.description;
     } else if (notification.verb === 'se registró en tu evento') {
       return notification.description;
@@ -108,12 +110,20 @@ const Notifications = ({
                 </div>
                 <div className="notification-actions">
                   {notification.unread && (
-                    <button 
-                      className="mark-read-button"
-                      onClick={() => onMarkAsRead(notification.id)}
-                    >
-                      Marcar como leída
-                    </button>
+                    <Tooltip title="Marcar como leída" arrow>
+                      <button 
+                        className="mark-all-read-button"
+                        onClick={() => onMarkAsRead(notification.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '8px'
+                        }}
+                      >
+                        <CheckCircleIcon style={{ fontSize: '20px', color: 'white' }} />
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
               </div>

@@ -42,7 +42,7 @@ const KnowledgePathsUser = () => {
         setCreatedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching created knowledge paths:', err);
-        setCreatedError('Error al cargar tus rutas de conocimiento creadas');
+        setCreatedError('Error al cargar tus caminos de conocimiento creados');
       } finally {
         setCreatedLoading(false);
       }
@@ -58,7 +58,7 @@ const KnowledgePathsUser = () => {
         setEngagedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching engaged knowledge paths:', err);
-        setEngagedError('Error al cargar tus rutas de conocimiento en las que participas');
+        setEngagedError('Error al cargar tus caminos de conocimiento en los que participas');
       } finally {
         setEngagedLoading(false);
       }
@@ -88,12 +88,12 @@ const KnowledgePathsUser = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
-        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">Mis Rutas de Conocimiento</h1>
+        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">Mis Caminos de Conocimiento</h1>
         <Link 
           to="/knowledge_path/create"
           className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
         >
-          Crear Nueva Ruta
+          Crear Nuevo Camino
         </Link>
       </div>
 
@@ -203,13 +203,13 @@ const KnowledgePathsUser = () => {
           {/* No Created Knowledge Paths Message */}
           {createdPaths.length === 0 && (
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no has creado rutas de conocimiento</h3>
-              <p className="text-gray-500 mb-6">Comienza creando tu primera ruta de conocimiento para organizar y compartir tu viaje de aprendizaje.</p>
+              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no has creado caminos de conocimiento</h3>
+              <p className="text-gray-500 mb-6">Comienza creando tu primer camino de conocimiento para organizar y compartir tu viaje de aprendizaje.</p>
               <Link 
                 to="/knowledge_path/create"
                 className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
-                Crear Tu Primera Ruta
+                Crear Tu Primer Camino
               </Link>
             </div>
           )}
@@ -306,13 +306,13 @@ const KnowledgePathsUser = () => {
           {/* No Engaged Knowledge Paths Message */}
           {engagedPaths.length === 0 && (
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold !text-gray-600 mb-4">Aún no participas en rutas de conocimiento</h3>
-              <p className="text-gray-500 mb-6">Comienza explorando rutas de conocimiento creadas por otros usuarios para iniciar tu viaje de aprendizaje.</p>
+              <h3 className="text-xl font-semibold !text-gray-600 mb-4">Aún no participas en caminos de conocimiento</h3>
+              <p className="text-gray-500 mb-6">Comienza explorando caminos de conocimiento creados por otros usuarios para iniciar tu viaje de aprendizaje.</p>
               <Link 
                 to="/knowledge_path"
                 className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
               >
-                Explorar Rutas de Conocimiento
+                Explorar Caminos de Conocimiento
               </Link>
             </div>
           )}

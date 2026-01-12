@@ -15,10 +15,10 @@ const LibraryUploadContent = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Upload Content
+          Subir contenido
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Upload new content and view your recent uploads
+          Sube nuevo contenido y visualiza tus subidas recientes
         </Typography>
       </Box>
       <Grid container spacing={3}>

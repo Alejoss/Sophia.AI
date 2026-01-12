@@ -33,7 +33,7 @@ const NodeCreate = () => {
         const data = await knowledgePathsApi.getKnowledgePathBasic(pathId);
         setKnowledgePath(data);
       } catch (err) {
-        setError('Error al cargar la ruta de conocimiento');
+        setError('Error al cargar el camino de conocimiento');
       } finally {
         setLoading(false);
       }
@@ -100,7 +100,7 @@ const NodeCreate = () => {
           Agregar Nodo de Contenido
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          a la Ruta de Conocimiento: {knowledgePath?.title}
+          al Camino de Conocimiento: {knowledgePath?.title}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

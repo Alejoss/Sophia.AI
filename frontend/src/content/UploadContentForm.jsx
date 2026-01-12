@@ -184,12 +184,12 @@ const URLPreview = ({ previewData, isLoading, error }) => {
 const schema = yup.object({
   file: yup.mixed().when('isUrlMode', {
     is: false,
-    then: () => yup.mixed().required('File is required'),
+    then: () => yup.mixed().required('El archivo es requerido'),
     otherwise: () => yup.mixed().nullable()
   }),
   url: yup.string().when('isUrlMode', {
     is: true,
-    then: () => yup.string().url('Must be a valid URL').required('URL is required'),
+    then: () => yup.string().url('Debe ser una URL válida').required('La URL es requerida'),
     otherwise: () => yup.string().nullable()
   }),
   media_type: yup.string().when('isUrlMode', {

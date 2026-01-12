@@ -2,7 +2,15 @@ from django.contrib import admin
 from profiles.models import Profile, UserNodeCompletion, CryptoCurrency, AcceptedCrypto
 import os
 
-admin.site.register(Profile)
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'total_points', 'featured_badge', 'is_teacher')
+    list_filter = ('is_teacher',)
+    search_fields = ('user__username', 'user__email')
+    raw_id_fields = ('featured_badge',)
+
+
 admin.site.register(UserNodeCompletion)
 
 @admin.register(CryptoCurrency)

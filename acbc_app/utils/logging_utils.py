@@ -31,6 +31,7 @@ search_logger = get_logger('search')
 user_messages_logger = get_logger('user_messages')
 bookmarks_logger = get_logger('bookmarks')
 notifications_logger = get_logger('notifications')
+gamification_logger = get_logger('gamification')
 
 
 def log_request(request: HttpRequest, response=None, duration: float = None):
@@ -169,6 +170,8 @@ def log_business_event(event_type: str, user_id: int = None, object_id: int = No
         bookmarks_logger.info(f"Business event: {event_type}", extra=extra)
     elif object_type == 'notification':
         notifications_logger.info(f"Business event: {event_type}", extra=extra)
+    elif object_type == 'badge' or object_type == 'gamification':
+        gamification_logger.info(f"Business event: {event_type}", extra=extra)
     else:
         # Default to API logger
         api_logger.info(f"Business event: {event_type}", extra=extra)

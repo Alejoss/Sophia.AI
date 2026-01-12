@@ -27,7 +27,7 @@ const MessageThread = () => {
       try {
         const threadRes = await fetchOrCreateThread(userId);
         if (!threadRes.data) {
-          throw new Error('Failed to create or fetch thread');
+          throw new Error('Error al crear o obtener el hilo');
         }
         setThread(threadRes.data);
         const threadId = threadRes.data.id;
@@ -37,7 +37,7 @@ const MessageThread = () => {
         setError(null);
       } catch (err) {
         console.error('Error loading messages:', err);
-        setError('Failed to load messages.');
+        setError('Error al cargar los mensajes.');
       } finally {
         setLoading(false);
       }
@@ -56,7 +56,7 @@ const MessageThread = () => {
       setNewMessage('');
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message.');
+      setError('Error al enviar el mensaje.');
     } finally {
       setSending(false);
     }
@@ -70,7 +70,7 @@ const MessageThread = () => {
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>;
   if (error) return <Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>;
-  if (!thread) return <Box sx={{ p: 3 }}><Typography>No thread found.</Typography></Box>;
+  if (!thread) return <Box sx={{ p: 3 }}><Typography>No se encontró el hilo.</Typography></Box>;
 
   const otherUser = getOtherUser();
 
@@ -78,7 +78,7 @@ const MessageThread = () => {
     <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <Typography variant="h5" gutterBottom>
-          Conversation with{' '}
+          Conversación con{' '}
           <Link 
             to={`/profiles/user_profile/${otherUser?.id}`}
             style={{ 
@@ -89,12 +89,12 @@ const MessageThread = () => {
               }
             }}
           >
-            {otherUser ? otherUser.username : 'User'}
+            {otherUser ? otherUser.username : 'Usuario'}
           </Link>
         </Typography>
         <List sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
           {(!messages || messages.length === 0) && (
-            <ListItem><ListItemText primary="No messages yet." /></ListItem>
+            <ListItem><ListItemText primary="Aún no hay mensajes." /></ListItem>
           )}
           {messages && messages.map(msg => (
             <ListItem 
@@ -109,7 +109,7 @@ const MessageThread = () => {
                   maxWidth: '70%',
                   backgroundColor: msg.sender.id === currentUser.id ? 'primary.main' : 'grey.200',
                   color: msg.sender.id === currentUser.id ? 'white' : 'text.primary',
-                  borderRadius: 2,
+                  borderRadius: 1,
                   p: 1.5,
                   px: 2
                 }}
@@ -123,7 +123,7 @@ const MessageThread = () => {
                     mt: 0.5
                   }}
                 >
-                  {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString()}
+                  {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString('es-ES')}
                 </Typography>
               </Box>
             </ListItem>
@@ -135,14 +135,14 @@ const MessageThread = () => {
             fullWidth
             variant="outlined"
             size="small"
-            placeholder="Type your message..."
+            placeholder="Escriba su mensaje..."
             value={newMessage}
             onChange={e => setNewMessage(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSendMessage(); }}
             disabled={sending}
           />
           <Button variant="contained" color="primary" onClick={handleSendMessage} disabled={sending || !newMessage.trim()}>
-            Send
+            Enviar
           </Button>
         </Box>
       </Paper>

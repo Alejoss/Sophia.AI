@@ -121,6 +121,28 @@ class UserProfileView(APIView):
                 user_profile.interests = interests
                 logger.debug(f"Interests updated for user {request.user.username}")
 
+            # Handle featured_badge_id update
+            featured_badge_id = request.data.get('featured_badge_id')
+            if featured_badge_id is not None:
+                # Handle empty string or null to remove featured badge
+                if featured_badge_id == '' or featured_badge_id is None:
+                    user_profile.featured_badge = None
+                    logger.debug(f"Featured badge removed for user {request.user.username}")
+                else:
+                    try:
+                        from gamification.models import UserBadge
+                        # Convert to int if it's a string
+                        badge_id = int(featured_badge_id) if isinstance(featured_badge_id, str) else featured_badge_id
+                        user_badge = UserBadge.objects.get(id=badge_id, user=request.user)
+                        user_profile.featured_badge = user_badge
+                        logger.debug(f"Featured badge updated for user {request.user.username}")
+                    except (UserBadge.DoesNotExist, ValueError):
+                        logger.warning(f"Featured badge {featured_badge_id} not found for user {request.user.username}")
+                        return Response(
+                            {'error': 'Badge no encontrado o no pertenece al usuario'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
             user_profile.save()
             serializer = ProfileSerializer(user_profile, context={'request': request})
             logger.info(f"User profile updated successfully for user {request.user.username}")
@@ -375,7 +397,7 @@ class LoginView(APIView):
         cache_key = f'login_attempts_{client_ip}'
         attempts = cache.get(cache_key, 0)
         
-        if attempts >= 5:
+        if attempts >= 10:
             return Response(
                 {'error': 'Demasiados intentos de inicio de sesión. Por favor, intente nuevamente más tarde.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS

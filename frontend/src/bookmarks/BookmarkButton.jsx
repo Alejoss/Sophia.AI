@@ -91,7 +91,7 @@ const BookmarkButton = ({
     }
 
     return (
-        <Tooltip title={isBookmarked ? "Remove bookmark" : "Add bookmark"}>
+        <Tooltip title={isBookmarked ? "Quitar marcador" : "Agregar marcador"}>
             <IconButton onClick={handleToggle} color={isBookmarked ? "primary" : "default"}>
                 {isBookmarked ? <BookmarkIcon /> : <BookmarkBorderIcon />}
             </IconButton>

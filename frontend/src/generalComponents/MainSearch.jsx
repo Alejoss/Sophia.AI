@@ -123,7 +123,7 @@ const MainSearch = () => {
           )}
           
           <div className="result-footer">
-            <button className="view-details-button">View Details</button>
+            <button className="view-details-button">Ver Detalles</button>
           </div>
         </li>
       );
@@ -132,7 +132,7 @@ const MainSearch = () => {
 
   return (
     <div className="search-container">
-      <h1>Search</h1>
+      <h1>Buscar</h1>
       
       <form onSubmit={(e) => handleSearch(e, 1)} className="search-form">
         <div className="search-input-container">
@@ -140,11 +140,11 @@ const MainSearch = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search for content, topics, knowledge paths, or people..."
+            placeholder="Buscar contenido, temas, caminos de conocimiento o personas..."
             className="search-input"
           />
           <button type="submit" className="search-button">
-            Search
+            Buscar
           </button>
         </div>
         
@@ -157,7 +157,7 @@ const MainSearch = () => {
               checked={searchType === 'all'}
               onChange={(e) => setSearchType(e.target.value)}
             />
-            All
+            Todo
           </label>
           <label>
             <input
@@ -167,7 +167,7 @@ const MainSearch = () => {
               checked={searchType === 'content'}
               onChange={(e) => setSearchType(e.target.value)}
             />
-            Content
+            Contenido
           </label>
           <label>
             <input
@@ -177,7 +177,7 @@ const MainSearch = () => {
               checked={searchType === 'topics'}
               onChange={(e) => setSearchType(e.target.value)}
             />
-            Topics
+            Temas
           </label>
           <label>
             <input
@@ -187,19 +187,19 @@ const MainSearch = () => {
               checked={searchType === 'knowledge_paths'}
               onChange={(e) => setSearchType(e.target.value)}
             />
-            Knowledge Paths
+            Caminos de Conocimiento
           </label>
         </div>
       </form>
 
       {isLoading ? (
-        <div className="loading">Loading results...</div>
+        <div className="loading">Cargando resultados...</div>
       ) : (
         <div className="search-results">
           {searchResults.length > 0 ? (
             <>
               <div className="results-summary">
-                Showing {searchResults.length} of {pagination.totalResults} results
+                Mostrando {searchResults.length} de {pagination.totalResults} resultados
               </div>
               <ul className="results-list">
                 {searchResults.map(renderResultItem)}
@@ -213,11 +213,11 @@ const MainSearch = () => {
                     disabled={pagination.currentPage === 1}
                     className="pagination-button"
                   >
-                    Previous
+                    Anterior
                   </button>
                   
                   <span className="pagination-info">
-                    Page {pagination.currentPage} of {pagination.totalPages}
+                    Página {pagination.currentPage} de {pagination.totalPages}
                   </span>
                   
                   <button 
@@ -225,13 +225,13 @@ const MainSearch = () => {
                     disabled={pagination.currentPage === pagination.totalPages}
                     className="pagination-button"
                   >
-                    Next
+                    Siguiente
                   </button>
                 </div>
               )}
             </>
           ) : (
-            searchQuery && <p className="no-results">No results found for "{searchQuery}"</p>
+            searchQuery && <p className="no-results">No se encontraron resultados para "{searchQuery}"</p>
           )}
         </div>
       )}

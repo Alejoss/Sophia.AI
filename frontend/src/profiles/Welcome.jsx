@@ -33,7 +33,7 @@ const Welcome = () => {
         } else if (backendAuthenticated && !userDataFromState && authState.isAuthenticated) {
           // This case might happen if user refreshes /welcome or navigates directly with a valid cookie
           // but without registration state. AuthContext might already be populated.
-          setMessage(`Welcome back, ${authState.user?.username || 'User'}! You are logged in.`);
+          setMessage(`¡Bienvenido de nuevo, ${authState.user?.username || 'Usuario'}! Has iniciado sesión.`);
           setIsVerified(true);
         } else {
           // Verification failed or user data is missing where it's expected
@@ -43,7 +43,7 @@ const Welcome = () => {
             isAuthenticated: false,
             user: null,
           });
-          setMessage('Session verification failed. Please try logging in.');
+          setMessage('La verificación de sesión falló. Por favor intenta iniciar sesión.');
           setIsVerified(false);
           // Optional: Redirect to login after a delay
           // setTimeout(() => navigate('/profiles/login'), 3000);
@@ -56,7 +56,7 @@ const Welcome = () => {
           isAuthenticated: false,
           user: null,
         });
-        setMessage('An error occurred during session verification. Please try logging in.');
+        setMessage('Ocurrió un error durante la verificación de sesión. Por favor intenta iniciar sesión.');
         setIsVerified(false);
       }
     };

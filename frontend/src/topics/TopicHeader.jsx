@@ -64,7 +64,7 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              borderRadius: "4px",
+              borderRadius: "2px",
             }}
           />
         </Box>

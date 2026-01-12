@@ -1,6 +1,6 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemText, useMediaQuery, useTheme } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemButton, ListItemText, useMediaQuery, useTheme } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
@@ -71,40 +71,43 @@ const HeaderComp = () => {
       return (
         <ListItem 
           key={item.key}
-          button
-          onClick={() => handleProfileSectionClick(item.section)}
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            '&:hover': {
-              bgcolor: 'action.hover',
-            },
-          }}
+          disablePadding
         >
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {item.icon && <item.icon sx={{ fontSize: 16 }} />}
-                {item.label}
-                {item.badge && (
-                  <Box
-                    component="span"
-                    sx={{
-                      bgcolor: 'error.main',
-                      color: 'white',
-                      fontSize: '0.75rem',
-                      borderRadius: '9999px',
-                      px: 1,
-                      py: 0.5,
-                      ml: 'auto'
-                    }}
-                  >
-                    {item.badge}
-                  </Box>
-                )}
-              </Box>
-            }
-          />
+          <ListItemButton
+            onClick={() => handleProfileSectionClick(item.section)}
+            sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            <ListItemText
+              primary={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {item.icon && <item.icon sx={{ fontSize: 16 }} />}
+                  {item.label}
+                  {item.badge && (
+                    <Box
+                      component="span"
+                      sx={{
+                        bgcolor: 'error.main',
+                        color: 'white',
+                        fontSize: '0.75rem',
+                        borderRadius: '9999px',
+                        px: 1,
+                        py: 0.5,
+                        ml: 'auto'
+                      }}
+                    >
+                      {item.badge}
+                    </Box>
+                  )}
+                </Box>
+              }
+            />
+          </ListItemButton>
         </ListItem>
       );
     }
@@ -114,7 +117,7 @@ const HeaderComp = () => {
 
   const navLinks = [
     { to: '/search', label: 'Buscar' },
-    { to: '/knowledge_path', label: 'Rutas de conocimiento' },
+    { to: '/knowledge_path', label: 'Caminos de conocimiento' },
     { to: '/content/topics', label: 'Temas' },
     { to: '/events', label: 'Eventos' },
   ];
@@ -207,7 +210,7 @@ const HeaderComp = () => {
                 fontWeight: 400,
                 px: 2.5,
                 py: 0.625,
-                borderRadius: '10px',
+                borderRadius: '4px',
                 '&:hover': {
                   color: '#6d28d2',
                   bgcolor: '#6d28d21f',
@@ -229,7 +232,7 @@ const HeaderComp = () => {
                 fontWeight: 400,
                 px: 2.5,
                 py: 0.625,
-                borderRadius: '10px',
+                borderRadius: '4px',
                 '&:hover': {
                   color: '#6d28d2',
                   bgcolor: '#6d28d21f',
@@ -328,36 +331,43 @@ const HeaderComp = () => {
                 }}
               >
                 <ListItemText
-                  primary={link.label}
+                  primary={
+                    <Typography
+                      component="span"
+                      sx={{
+                        fontSize: '14px',
+                        color: 'text.primary',
+                      }}
+                    >
+                      {link.label}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+            {/* Dark Mode Toggle in Mobile Menu */}
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={() => {
+                  toggleMode();
+                  setIsOpen(false);
+                }}
+                sx={{
+                  borderTop: 1,
+                  borderColor: 'divider',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <ListItemText
+                  primary={mode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
                   primaryTypographyProps={{
                     fontSize: '14px',
                     color: 'text.primary',
                   }}
                 />
-              </ListItem>
-            ))}
-            {/* Dark Mode Toggle in Mobile Menu */}
-            <ListItem
-              button
-              onClick={() => {
-                toggleMode();
-                setIsOpen(false);
-              }}
-              sx={{
-                borderTop: 1,
-                borderColor: 'divider',
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                },
-              }}
-            >
-              <ListItemText
-                primary={mode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-                primaryTypographyProps={{
-                  fontSize: '14px',
-                  color: 'text.primary',
-                }}
-              />
+              </ListItemButton>
             </ListItem>
           </List>
         </Drawer>

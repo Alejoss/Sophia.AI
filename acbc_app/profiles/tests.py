@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from django.contrib.contenttypes.models import ContentType
 from content.models import Content, Topic
+from gamification.models import Badge, UserBadge
 
 
 class ProfileModelTests(TestCase):
@@ -200,6 +201,165 @@ class ProfileAPITests(APITestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.interests, 'Updated interests')
         self.assertEqual(self.profile.profile_description, 'Updated description')
+
+    def test_set_featured_badge(self):
+        """Test setting a featured badge"""
+        # Create a badge and award it to the user
+        badge = Badge.objects.create(
+            code='test_badge',
+            name='Test Badge',
+            description='A test badge',
+            points_value=10
+        )
+        user_badge = UserBadge.objects.create(
+            user=self.user,
+            badge=badge,
+            points_earned=10
+        )
+        
+        url = reverse('profiles:user_profile')
+        data = {
+            'featured_badge_id': user_badge.id
+        }
+        response = self.client.put(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.featured_badge.id, user_badge.id)
+        self.assertIsNotNone(response.data.get('featured_badge'))
+
+    def test_remove_featured_badge(self):
+        """Test removing a featured badge"""
+        # Create a badge and set it as featured
+        badge = Badge.objects.create(
+            code='test_badge',
+            name='Test Badge',
+            description='A test badge',
+            points_value=10
+        )
+        user_badge = UserBadge.objects.create(
+            user=self.user,
+            badge=badge,
+            points_earned=10
+        )
+        self.profile.featured_badge = user_badge
+        self.profile.save()
+        
+        url = reverse('profiles:user_profile')
+        data = {
+            'featured_badge_id': ''  # Empty string removes badge
+        }
+        response = self.client.put(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.featured_badge)
+
+    def test_set_featured_badge_not_owned(self):
+        """Test that users cannot set badges they don't own as featured"""
+        # Create another user and badge
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        badge = Badge.objects.create(
+            code='other_badge',
+            name='Other Badge',
+            description='Another badge',
+            points_value=10
+        )
+        other_user_badge = UserBadge.objects.create(
+            user=other_user,
+            badge=badge,
+            points_earned=10
+        )
+        
+        url = reverse('profiles:user_profile')
+        data = {
+            'featured_badge_id': other_user_badge.id
+        }
+        response = self.client.put(url, data, format='json')
+        
+        # Should fail validation
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.featured_badge)
+
+    def test_set_featured_badge_nonexistent(self):
+        """Test setting a non-existent badge as featured"""
+        url = reverse('profiles:user_profile')
+        data = {
+            'featured_badge_id': 99999  # Non-existent badge ID
+        }
+        response = self.client.put(url, data, format='json')
+        
+        # Should fail validation
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_get_profile_with_featured_badge(self):
+        """Test retrieving profile with featured badge"""
+        # Create a badge and set it as featured
+        badge = Badge.objects.create(
+            code='test_badge',
+            name='Test Badge',
+            description='A test badge',
+            points_value=10
+        )
+        user_badge = UserBadge.objects.create(
+            user=self.user,
+            badge=badge,
+            points_earned=10
+        )
+        self.profile.featured_badge = user_badge
+        self.profile.save()
+        
+        url = reverse('profiles:user_profile')
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data.get('featured_badge'))
+        self.assertEqual(response.data['featured_badge']['badge_code'], 'test_badge')
+        self.assertEqual(response.data['featured_badge']['badge_name'], 'Test Badge')
+
+    def test_can_set_featured_badge_method(self):
+        """Test the can_set_featured_badge model method"""
+        # Create a badge and award it to the user
+        badge = Badge.objects.create(
+            code='test_badge',
+            name='Test Badge',
+            description='A test badge',
+            points_value=10
+        )
+        user_badge = UserBadge.objects.create(
+            user=self.user,
+            badge=badge,
+            points_earned=10
+        )
+        
+        # User should be able to set their own badge
+        self.assertTrue(self.profile.can_set_featured_badge(user_badge))
+        
+        # Create another user's badge
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        other_badge = Badge.objects.create(
+            code='other_badge',
+            name='Other Badge',
+            description='Another badge',
+            points_value=10
+        )
+        other_user_badge = UserBadge.objects.create(
+            user=other_user,
+            badge=other_badge,
+            points_earned=10
+        )
+        
+        # User should not be able to set another user's badge
+        self.assertFalse(self.profile.can_set_featured_badge(other_user_badge))
 
 
 class AuthenticationTests(APITestCase):

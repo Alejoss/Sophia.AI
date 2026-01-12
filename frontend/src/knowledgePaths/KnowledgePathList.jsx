@@ -43,7 +43,7 @@ const KnowledgePathList = () => {
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths:', err);
-        setError('Error al cargar las rutas de conocimiento');
+        setError('Error al cargar los caminos de conocimiento');
         // Set empty array on error to prevent map error
         setKnowledgePaths([]);
       } finally {
@@ -89,7 +89,7 @@ const KnowledgePathList = () => {
         }}
       >
         <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
-          Rutas de Conocimiento
+          Caminos de Conocimiento
         </Typography>
         {authState.isAuthenticated && (
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' } }}>
@@ -108,7 +108,7 @@ const KnowledgePathList = () => {
                 width: { xs: '100%', md: 'auto' },
               }}
             >
-              Mis Rutas de Conocimiento
+              Mis Caminos de Conocimiento
             </Button>
             <Button
               component={Link}
@@ -120,7 +120,7 @@ const KnowledgePathList = () => {
                 width: { xs: '100%', md: 'auto' },
               }}
             >
-              Crear Nueva Ruta
+              Crear Nuevo Camino
             </Button>
           </Stack>
         )}

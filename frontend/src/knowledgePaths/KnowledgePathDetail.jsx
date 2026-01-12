@@ -74,9 +74,9 @@ const KnowledgePathDetail = () => {
       } catch (err) {
         if (err.response?.status === 401) {
           // The axios interceptor will handle the redirect to login
-          setError('Por favor inicia sesión para ver esta ruta de conocimiento');
+          setError('Por favor inicia sesión para ver este camino de conocimiento');
         } else {
-          setError('Error al cargar la ruta de conocimiento');
+          setError('Error al cargar el camino de conocimiento');
         }
       } finally {
         setLoading(false);
@@ -181,7 +181,7 @@ const KnowledgePathDetail = () => {
         <div className="mt-6 text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
             <CheckCircle className="mr-2" />
-            <span>Has obtenido un certificado por completar esta ruta de conocimiento</span>
+            <span>Has obtenido un certificado por completar este camino de conocimiento</span>
           </div>
         </div>
       );
@@ -192,7 +192,7 @@ const KnowledgePathDetail = () => {
         <div className="mt-6 text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
             <CheckCircle className="mr-2" />
-            <span>Has obtenido un certificado por completar esta ruta de conocimiento</span>
+            <span>Has obtenido un certificado por completar este camino de conocimiento</span>
           </div>
         </div>
       );
@@ -292,7 +292,7 @@ const KnowledgePathDetail = () => {
 
   if (loading) return <div className="text-center py-8">Cargando...</div>;
   if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
-  if (!knowledgePath && !error) return <div className="text-center py-8">Ruta de conocimiento no encontrada</div>;
+  if (!knowledgePath && !error) return <div className="text-center py-8">Camino de conocimiento no encontrado</div>;
 
   return (
     <div className="container mx-auto md:p-4">
@@ -352,7 +352,7 @@ const KnowledgePathDetail = () => {
                     to={`/knowledge_path/${pathId}/edit`}
                     className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
                   >
-                    Editar Ruta
+                    Editar Camino
                   </Link>
                 )}
               </div>
@@ -443,7 +443,7 @@ const KnowledgePathDetail = () => {
                 multiline
                 rows={4}
                 label="Mensaje opcional"
-                placeholder="Opcionalmente agrega una nota al creador de la ruta de conocimiento"
+                placeholder="Opcionalmente agrega una nota al creador del camino de conocimiento"
                 value={requestNote}
                 onChange={(e) => setRequestNote(e.target.value)}
                 variant="outlined"

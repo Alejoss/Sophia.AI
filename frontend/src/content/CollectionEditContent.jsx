@@ -62,7 +62,7 @@ const CollectionEditContent = () => {
                     response: err.response,
                     stack: err.stack
                 });
-                setError('Failed to fetch collection data');
+                setError('Error al obtener los datos de la colección');
                 setLoading(false);
             }
         };
@@ -80,7 +80,7 @@ const CollectionEditContent = () => {
             setSaving(false);
         } catch (err) {
             console.error('Error removing content:', err);
-            setError('Failed to remove content from collection');
+            setError('Error al eliminar contenido de la colección');
             setSaving(false);
         }
     };
@@ -105,7 +105,7 @@ const CollectionEditContent = () => {
             setSaving(false);
         } catch (error) {
             console.error('Error adding content:', error);
-            setError('Failed to add content to collection');
+            setError('Error al agregar contenido a la colección');
             setSaving(false);
         }
     };
@@ -126,7 +126,7 @@ const CollectionEditContent = () => {
 
     if (loading) {
         console.log('Component is loading...');
-        return <Typography>Loading collection content...</Typography>;
+        return <Typography>Cargando contenido de la colección...</Typography>;
     }
     if (error) {
         console.log('Component has error:', error);
@@ -134,15 +134,15 @@ const CollectionEditContent = () => {
     }
     if (!collectionData) {
         console.log('No collection data available');
-        return <Alert severity="error">Collection not found</Alert>;
+        return <Alert severity="error">Colección no encontrada</Alert>;
     }
 
     if (showAddContent) {
         console.log('Showing add content view');
         return (
             <LibrarySelectMultiple
-                title="Add Content to Collection"
-                description="Select content from your library to add to this collection"
+                title="Agregar contenido a la colección"
+                description="Selecciona contenido de tu biblioteca para agregar a esta colección"
                 onCancel={handleCancelAdd}
                 onSave={handleSaveAdd}
                 filterFunction={filterContent}
@@ -176,25 +176,25 @@ const CollectionEditContent = () => {
                         startIcon={<AddIcon />}
                         onClick={() => setShowAddContent(true)}
                     >
-                        Add content from your library
+                        Agregar contenido de tu biblioteca
                     </Button>
                 </Box>
 
                 <Divider sx={{ my: 3 }} />
 
                 <Typography variant="h6" sx={{ mb: 2 }}>
-                    Content in Collection ({collectionData.length})
+                    Contenido en la colección ({collectionData.length})
                 </Typography>
 
                 <TableContainer>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Title</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Author</TableCell>
-                                <TableCell>View</TableCell>
-                                <TableCell>Actions</TableCell>
+                                <TableCell>Título</TableCell>
+                                <TableCell>Tipo</TableCell>
+                                <TableCell>Autor</TableCell>
+                                <TableCell>Ver</TableCell>
+                                <TableCell>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -204,7 +204,7 @@ const CollectionEditContent = () => {
                                     hover
                                     sx={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{content.title || 'Untitled'}</TableCell>
+                                    <TableCell>{content.title || 'Sin título'}</TableCell>
                                     <TableCell>
                                         <Chip 
                                             label={content.content.media_type} 
@@ -212,7 +212,7 @@ const CollectionEditContent = () => {
                                             color="primary"
                                         />
                                     </TableCell>
-                                    <TableCell>{content.author || 'Unknown'}</TableCell>
+                                    <TableCell>{content.author || 'Desconocido'}</TableCell>
                                     <TableCell>
                                         <MuiLink
                                             href={`/content/${content.content.id}`}
@@ -229,7 +229,7 @@ const CollectionEditContent = () => {
                                                 }
                                             }}
                                         >
-                                            View
+                                            Ver
                                             <OpenInNewIcon fontSize="small" />
                                         </MuiLink>
                                     </TableCell>
@@ -241,7 +241,7 @@ const CollectionEditContent = () => {
                                             onClick={() => handleContentRemove(content.id)}
                                             disabled={saving}
                                         >
-                                            Remove
+                                            Eliminar
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -249,7 +249,7 @@ const CollectionEditContent = () => {
                             {collectionData.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={5} align="center">
-                                        No content in this collection
+                                        No hay contenido en esta colección
                                     </TableCell>
                                 </TableRow>
                             )}

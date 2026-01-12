@@ -8,6 +8,7 @@ class CommentSerializer(serializers.ModelSerializer):
     reply_count = serializers.SerializerMethodField()
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
+    featured_badge = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -24,7 +25,8 @@ class CommentSerializer(serializers.ModelSerializer):
             'is_active',
             'vote_count',
             'user_vote',
-            'parent'  # Added parent field
+            'parent',  # Added parent field
+            'featured_badge'  # Author's featured badge
         ]
         read_only_fields = ['created_at', 'updated_at', 'is_edited', 'is_active']
 
@@ -52,6 +54,26 @@ class CommentSerializer(serializers.ModelSerializer):
             return 0
         vote = obj.get_user_vote(request.user)
         return vote
+
+    def get_featured_badge(self, obj):
+        """Get the author's featured badge if available."""
+        try:
+            from profiles.models import Profile
+            from gamification.serializers import UserBadgeSummarySerializer
+            
+            # Get the author's profile
+            try:
+                profile = Profile.objects.get(user=obj.author)
+            except Profile.DoesNotExist:
+                return None
+            
+            # Return featured badge if it exists
+            if profile.featured_badge:
+                return UserBadgeSummarySerializer(profile.featured_badge, context=self.context).data
+            return None
+        except Exception:
+            # If there's any error (e.g., gamification app not installed), return None
+            return None
 
 
 class KnowledgePathCommentSerializer(CommentSerializer):

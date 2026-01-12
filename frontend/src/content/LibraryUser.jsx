@@ -105,7 +105,7 @@ const LibraryUser = () => {
                 setError(
                   err.response?.data?.error ||
                     err.message ||
-                    "Failed to fetch content"
+                    "Error al obtener el contenido"
                 );
                 setLoading(false);
               }
@@ -193,7 +193,7 @@ const LibraryUser = () => {
               navigate("/profiles/my_profile?section=knowledge-paths")
             }
           >
-            Mis rutas de conocimiento
+            Mis caminos de conocimiento
           </Button>
 
           <Button

@@ -130,7 +130,7 @@ const NodeEdit = () => {
           Editar Nodo de Contenido
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          en la Ruta de Conocimiento: {knowledgePath?.title}
+          en el Camino de Conocimiento: {knowledgePath?.title}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

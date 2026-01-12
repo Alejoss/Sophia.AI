@@ -31,7 +31,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
         setFilteredContent(content);
       } catch (err) {
         console.error('Error fetching content:', err);
-        setError('Failed to load content');
+        setError('Error al cargar el contenido');
       } finally {
         setLoading(false);
       }
@@ -69,7 +69,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
     >
       <DialogTitle>
         <Typography variant="h6">
-          Select Content in your Library
+          Seleccionar contenido de tu biblioteca
         </Typography>
       </DialogTitle>
 
@@ -78,7 +78,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
         <Box sx={{ mb: 3 }}>
           <TextField
             fullWidth
-            placeholder="Search content..."
+            placeholder="Buscar contenido..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             variant="outlined"
@@ -98,7 +98,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
             </Alert>
           ) : filteredContent.length === 0 ? (
             <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
-              No content found
+              No se encontró contenido
             </Typography>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -116,7 +116,7 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
                     sx={{
                       border: 1,
                       borderColor: 'divider',
-                      borderRadius: 1,
+                      borderRadius: 0.5,
                       '&:hover': {
                         borderColor: 'primary.main',
                         boxShadow: 1
@@ -146,12 +146,12 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={20} />
             <Typography variant="body2" color="text.secondary">
-              Adding content...
+              Agregando contenido...
             </Typography>
           </Box>
         ) : (
           <Button onClick={onClose} color="inherit">
-            Cancel
+            Cancelar
           </Button>
         )}
       </DialogActions>

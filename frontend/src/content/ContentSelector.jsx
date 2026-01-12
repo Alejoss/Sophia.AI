@@ -55,7 +55,7 @@ const ContentSelector = ({
               },
             }}
           >
-            Choose Content Source (Optional)
+            Elegir fuente de contenido (Opcional)
           </Typography>
           <Box
             sx={{
@@ -83,7 +83,7 @@ const ContentSelector = ({
               onClick={() => setShowContentModal(true)}
               disabled={isUploading}
             >
-              Choose from Library
+              Elegir de la biblioteca
             </Button>
             <Button
               variant="contained"
@@ -94,7 +94,7 @@ const ContentSelector = ({
               }}
               disabled={isUploading}
             >
-              Upload New Content
+              Subir nuevo contenido
             </Button>
           </Box>
         </Paper>
@@ -110,7 +110,7 @@ const ContentSelector = ({
             }}
             sx={{ mb: 2 }}
           >
-            ← Back
+            ← Volver
           </Button>
           <UploadContentForm onContentUploaded={handleContentUpload} />
         </Box>

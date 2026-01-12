@@ -1,5 +1,6 @@
 import { useState, useContext } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AuthContext } from '../context/AuthContext';
 import {
     Box,
@@ -16,6 +17,7 @@ import {
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import commentsApi from '../api/commentsApi';
 import VoteComponent from '../votes/VoteComponent';
+import BadgeDisplay from '../gamification/BadgeDisplay';
 
 const MAX_DEPTH = 3;
 
@@ -127,7 +129,7 @@ export const Comment = ({
                 }))
             );
         } catch (error) {
-            setError('Failed to add reply. Please try again.');
+            setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
             // Revert the optimistic update
             setAllComments(prevComments => 
                 updateCommentInTree(prevComments, comment.id, comment => ({
@@ -157,7 +159,7 @@ export const Comment = ({
         try {
             await commentsApi.updateComment(comment.id, editedBody);
         } catch (error) {
-            setError('Failed to edit comment. Please try again.');
+            setError('Error al editar el comentario. Por favor, inténtelo de nuevo.');
             // Revert the optimistic update
             setAllComments(prevComments => 
                 updateCommentInTree(prevComments, comment.id, comment => ({
@@ -170,7 +172,7 @@ export const Comment = ({
     };
 
     const handleDeleteComment = async () => {
-        if (!window.confirm('Are you sure you want to delete this comment?')) {
+        if (!window.confirm('¿Está seguro de que desea eliminar este comentario?')) {
             return;
         }
 
@@ -185,7 +187,7 @@ export const Comment = ({
         try {
             await commentsApi.deleteComment(comment.id);
         } catch (error) {
-            setError('Failed to delete comment. Please try again.');
+            setError('Error al eliminar el comentario. Por favor, inténtelo de nuevo.');
             // Revert the optimistic update
             setAllComments(prevComments => 
                 updateCommentInTree(prevComments, comment.id, comment => ({
@@ -206,7 +208,16 @@ export const Comment = ({
                 <Avatar>{comment.author_name?.[0]?.toUpperCase() || '?'}</Avatar>
                 <Box sx={{ flex: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="subtitle2">{comment.author_name}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2">{comment.author_name}</Typography>
+                            {comment.featured_badge && (
+                                <BadgeDisplay 
+                                    badge={comment.featured_badge} 
+                                    showName={false} 
+                                    context="comment"
+                                />
+                            )}
+                        </Box>
                         {isAuthor && (
                             <>
                                 <IconButton size="small" onClick={handleMenuOpen}>
@@ -221,13 +232,13 @@ export const Comment = ({
                                         setIsEditing(true);
                                         handleMenuClose();
                                     }}>
-                                        Edit
+                                        Editar
                                     </MenuItem>
                                     <MenuItem onClick={() => {
                                         handleDeleteComment();
                                         handleMenuClose();
                                     }}>
-                                        Delete
+                                        Eliminar
                                     </MenuItem>
                                 </Menu>
                             </>
@@ -243,7 +254,7 @@ export const Comment = ({
                                 onChange={(e) => setEditedBody(e.target.value)}
                                 size="small"
                                 error={editedBody.trim() === ''}
-                                helperText={editedBody.trim() === '' ? 'Comment cannot be empty' : ''}
+                                helperText={editedBody.trim() === '' ? 'El comentario no puede estar vacío' : ''}
                             />
                             <Box sx={{ mt: 1 }}>
                                 <Button 
@@ -251,7 +262,7 @@ export const Comment = ({
                                     onClick={handleEditComment}
                                     disabled={!editedBody.trim() || editedBody === comment.body}
                                 >
-                                    Save
+                                    Guardar
                                 </Button>
                                 <Button 
                                     size="small" 
@@ -260,7 +271,7 @@ export const Comment = ({
                                         setEditedBody(comment.body);
                                     }}
                                 >
-                                    Cancel
+                                    Cancelar
                                 </Button>
                             </Box>
                         </Box>
@@ -270,12 +281,12 @@ export const Comment = ({
 
                     <Box sx={{ mt: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                         <Typography variant="caption" color="text.secondary">
-                            {formatDistanceToNow(new Date(comment.created_at))} ago
-                            {comment.is_edited && ' (edited)'}
+                            hace {formatDistanceToNow(new Date(comment.created_at), { locale: es })}
+                            {comment.is_edited && ' (editado)'}
                         </Typography>
                         {canReply && authState?.isAuthenticated && (
                             <Button size="small" onClick={() => setIsReplying(!isReplying)}>
-                                Reply
+                                Responder
                             </Button>
                         )}
                         {hasReplies && (
@@ -284,7 +295,7 @@ export const Comment = ({
                                 onClick={() => setShowReplies(!showReplies)}
                                 sx={{ ml: 'auto' }}
                             >
-                                {showReplies ? 'Hide Replies' : `Show ${comment.replies.length} ${comment.replies.length === 1 ? 'Reply' : 'Replies'}`}
+                                {showReplies ? 'Ocultar Respuestas' : `Mostrar ${comment.replies.length} ${comment.replies.length === 1 ? 'Respuesta' : 'Respuestas'}`}
                             </Button>
                         )}
                     </Box>
@@ -294,7 +305,7 @@ export const Comment = ({
                             <TextField
                                 fullWidth
                                 multiline
-                                placeholder="Write a reply..."
+                                placeholder="Escriba una respuesta..."
                                 value={replyBody}
                                 onChange={(e) => setReplyBody(e.target.value)}
                                 size="small"
@@ -305,13 +316,13 @@ export const Comment = ({
                                     onClick={handleReply}
                                     disabled={!replyBody.trim()}
                                 >
-                                    Submit
+                                    Enviar
                                 </Button>
                                 <Button size="small" onClick={() => {
                                     setIsReplying(false);
                                     setReplyBody('');
                                 }}>
-                                    Cancel
+                                    Cancelar
                                 </Button>
                             </Box>
                         </Box>

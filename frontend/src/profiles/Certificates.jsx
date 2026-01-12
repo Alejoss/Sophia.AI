@@ -173,7 +173,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const getCertificateType = (certificate) => {
     if (certificate.knowledge_path_title) {
-      return "Ruta de conocimiento";
+      return "Camino de conocimiento";
     } else if (certificate.event_title) {
       return "Evento";
     } else {
@@ -193,7 +193,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const getRequestType = (request) => {
     if (request.knowledge_path_title) {
-      return "Ruta de conocimiento";
+      return "Camino de conocimiento";
     } else if (request.event_title) {
       return "Evento";
     } else {
@@ -251,7 +251,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : certificates.length === 0 ? (
               <Typography variant="body1" color="textSecondary">
                 {isOwnProfile
-                  ? "Aún no has obtenido ningún certificado. ¡Completa rutas de conocimiento o asiste a eventos para obtener certificados!"
+                  ? "Aún no has obtenido ningún certificado. ¡Completa caminos de conocimiento o asiste a eventos para obtener certificados!"
                   : "No se encontraron certificados."}
               </Typography>
             ) : (
@@ -317,7 +317,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : requests.length === 0 ? (
               <Box textAlign="center" py={4}>
                 <Typography variant="h6" color="textSecondary" gutterBottom>
-                  ¿Tienes algo que enseñar? Crea una Ruta de Conocimiento o un Evento
+                  ¿Tienes algo que enseñar? Crea un Camino de Conocimiento o un Evento
                   y emite certificados
                 </Typography>
                 <Box
@@ -342,7 +342,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     color="primary"
                     onClick={() => navigate("/knowledge_path/create")}
                   >
-                    Crear ruta de conocimiento
+                    Crear camino de conocimiento
                   </Button>
                   <Button
                     variant="contained"

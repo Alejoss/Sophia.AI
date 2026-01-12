@@ -48,7 +48,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         setCreatedEvents(createdEventsData);
       } catch (err) {
         console.error('Error loading user events:', err);
-        setError('Failed to load events');
+        setError('Error al cargar los eventos');
       } finally {
         setLoading(false);
       }
@@ -58,8 +58,8 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
   }, [isOwnProfile, userId]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'TBD';
-    return new Date(dateString).toLocaleDateString('en-US', {
+    if (!dateString) return 'Por determinar';
+    return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -70,26 +70,26 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
 
   const getEventTypeLabel = (eventType) => {
     const typeMap = {
-      'LIVE_COURSE': 'Live Course',
-      'LIVE_CERTIFICATION': 'Live Certification',
-      'LIVE_MASTER_CLASS': 'Live Master Class'
+      'LIVE_COURSE': 'Curso en Vivo',
+      'LIVE_CERTIFICATION': 'Certificación en Vivo',
+      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
     };
     return typeMap[eventType] || eventType;
   };
 
   const getPaymentStatusLabel = (paymentStatus) => {
     const paymentMap = {
-      'PENDING': 'Pending',
-      'PAID': 'Paid',
-      'REFUNDED': 'Refunded'
+      'PENDING': 'Pendiente',
+      'PAID': 'Pagado',
+      'REFUNDED': 'Reembolsado'
     };
     return paymentMap[paymentStatus] || paymentStatus;
   };
 
   const getRegistrationStatusLabel = (registrationStatus) => {
     const statusMap = {
-      'REGISTERED': 'Registered',
-      'CANCELLED': 'Cancelled'
+      'REGISTERED': 'Registrado',
+      'CANCELLED': 'Cancelado'
     };
     return statusMap[registrationStatus] || registrationStatus;
   };
@@ -98,8 +98,8 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>{isOwnProfile ? 'My Events' : 'Events'}</h2>
-          <div className="loading-spinner">Loading events...</div>
+          <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
+          <div className="loading-spinner">Cargando eventos...</div>
         </div>
       </div>
     );
@@ -109,10 +109,10 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>{isOwnProfile ? 'My Events' : 'Events'}</h2>
+          <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
           <div className="error-message">{error}</div>
           <button onClick={() => window.location.reload()} className="btn btn-primary">
-            Try Again
+            Intentar de nuevo
           </button>
         </div>
       </div>
@@ -122,9 +122,9 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
   return (
     <div className="events-list-container">
       <div className="events-header">
-        <h2>{isOwnProfile ? 'My Events' : 'Events'}</h2>
+        <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
         <Link to="/events" className="btn btn-secondary">
-          Browse All Events
+          Explorar todos los eventos
         </Link>
       </div>
 
@@ -135,19 +135,19 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
             className={`tab-button ${activeTab === 'registrations' ? 'active' : ''}`}
             onClick={() => setActiveTab('registrations')}
           >
-            Events I'm Registered For ({registrations.length})
+            Eventos en los que estoy registrado ({registrations.length})
           </button>
           <button 
             className={`tab-button ${activeTab === 'created' ? 'active' : ''}`}
             onClick={() => setActiveTab('created')}
           >
-            Events I've Created ({createdEvents.length})
+            Eventos que he creado ({createdEvents.length})
           </button>
         </div>
       ) : (
         // For visitors, show created events directly without tabs
         <div style={{ marginBottom: '20px' }}>
-          <h3>Created Events ({createdEvents.length})</h3>
+          <h3>Eventos creados ({createdEvents.length})</h3>
         </div>
       )}
 
@@ -156,9 +156,9 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         <div className="tab-content">
           {registrations.length === 0 ? (
             <div className="text-center">
-              <p className='mb-5'>You're not registered for any events yet.</p>
+              <p className='mb-5'>Aún no estás registrado en ningún evento.</p>
               <Link to="/events" className="btn btn-primary">
-                Browse Events
+                Explorar eventos
               </Link>
             </div>
           ) : (
@@ -166,7 +166,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
               {registrations.map((registration) => (
                 <div key={registration.id} className="event-card">
                   <div className="event-header">
-                    <h3>{registration.event_title || 'Untitled Event'}</h3>
+                    <h3>{registration.event_title || 'Evento sin título'}</h3>
                     <div className="registration-status">
                       <span className={`registration-badge ${registration.registration_status.toLowerCase()}`}>
                         {getRegistrationStatusLabel(registration.registration_status)}
@@ -180,17 +180,17 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                   <div className="event-details">
                     <div className="event-meta">
                       <div className="event-info">
-                        <strong>Event Date:</strong> {formatDate(registration.event_date)}
+                        <strong>Fecha del evento:</strong> {formatDate(registration.event_date)}
                       </div>
                       <div className="event-info">
-                        <strong>Registered:</strong> {formatDate(registration.registered_at)}
+                        <strong>Registrado:</strong> {formatDate(registration.registered_at)}
                       </div>
                     </div>
                   </div>
                   
                   <div className="event-actions">
                     <Link to={`/events/${registration.event}`} className="btn btn-secondary">
-                      View Event
+                      Ver evento
                     </Link>
                   </div>
                 </div>
@@ -205,10 +205,10 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         <div className="tab-content">
           {createdEvents.length === 0 ? (
             <div className="text-center">
-              <p>{isOwnProfile ? 'You haven\'t created any events yet.' : 'No created events found.'}</p>
+              <p>{isOwnProfile ? 'Aún no has creado ningún evento.' : 'No se encontraron eventos creados.'}</p>
               {isOwnProfile && (
                 <Link to="/events/create" className="btn btn-primary">
-                  Create Your First Event
+                  Crear tu primer evento
                 </Link>
               )}
             </div>
@@ -236,7 +236,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                     </div>
                   )}
                   <div className="event-header">
-                    <h3>{event.title || 'Untitled Event'}</h3>
+                    <h3>{event.title || 'Evento sin título'}</h3>
                     <span className={`event-type ${event.event_type?.toLowerCase() || 'unknown'}`}>
                       {getEventTypeLabel(event.event_type)}
                     </span>
@@ -248,23 +248,23 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                         ? (event.description.length > 150 
                             ? `${event.description.substring(0, 150)}...` 
                             : event.description)
-                        : 'No description available'}
+                        : 'No hay descripción disponible'}
                     </p>
                     
                     <div className="event-meta">
                       <div className="event-info">
-                        <strong>Start:</strong> {formatDate(event.date_start)}
+                        <strong>Inicio:</strong> {formatDate(event.date_start)}
                       </div>
                       
                       {event.date_end && (
                         <div className="event-info">
-                          <strong>End:</strong> {formatDate(event.date_end)}
+                          <strong>Fin:</strong> {formatDate(event.date_end)}
                         </div>
                       )}
                       
                       {event.reference_price > 0 && (
                         <div className="event-info">
-                          <strong>Price:</strong> ${event.reference_price}
+                          <strong>Precio:</strong> ${event.reference_price}
                         </div>
                       )}
                     </div>
@@ -272,15 +272,15 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                   
                   <div className="event-actions">
                     <Link to={`/events/${event.id}`} className="btn btn-secondary">
-                      View Details
+                      Ver detalles
                     </Link>
                     {isOwnProfile && (
                       <>
                         <Link to={`/events/${event.id}/edit`} className="btn btn-primary">
-                          Edit
+                          Editar
                         </Link>
                         <Link to={`/events/${event.id}/manage`} className="btn btn-outline">
-                          Manage
+                          Gestionar
                         </Link>
                       </>
                     )}

@@ -189,7 +189,7 @@ const PublicationCreationForm = () => {
                       alignItems: "center",
                       width: "100%",
                       overflow: "hidden",
-                      borderRadius: "4px",
+                      borderRadius: "2px",
                       boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                     }}
                   >
@@ -204,7 +204,7 @@ const PublicationCreationForm = () => {
                         maxWidth: "100%",
                         maxHeight: "300px",
                         objectFit: "contain",
-                        borderRadius: "4px 4px 0 0",
+                        borderRadius: "2px 2px 0 0",
                         transition: "transform 0.3s ease",
                         cursor: "pointer",
                       }}

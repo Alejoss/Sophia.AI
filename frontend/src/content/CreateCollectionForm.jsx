@@ -9,9 +9,9 @@ import contentApi from '../api/contentApi';
 const schema = yup.object().shape({
     name: yup
         .string()
-        .required('Collection name is required')
-        .min(3, 'Collection name must be at least 3 characters')
-        .max(100, 'Collection name must not exceed 100 characters'),
+        .required('El nombre de la colección es requerido')
+        .min(3, 'El nombre de la colección debe tener al menos 3 caracteres')
+        .max(100, 'El nombre de la colección no debe exceder 100 caracteres'),
 });
 
 const CreateCollectionForm = () => {
@@ -28,7 +28,7 @@ const CreateCollectionForm = () => {
             navigate('/content/collections');
         } catch (error) {
             console.error('Failed to create collection:', error);
-            alert('Failed to create collection. Please try again.');
+            alert('Error al crear la colección. Por favor intenta de nuevo.');
         } finally {
             setIsSubmitting(false);
         }
@@ -38,13 +38,13 @@ const CreateCollectionForm = () => {
         <Box sx={{ pt: 12, px: 3, maxWidth: 600, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
                 <Typography variant="h4" gutterBottom>
-                    Create New Collection
+                    Crear nueva colección
                 </Typography>
 
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <TextField
                         fullWidth
-                        label="Collection Name"
+                        label="Nombre de la colección"
                         {...register('name')}
                         error={!!errors.name}
                         helperText={errors.name?.message}
@@ -57,14 +57,14 @@ const CreateCollectionForm = () => {
                             variant="outlined"
                             onClick={() => navigate('/content/collections')}
                         >
-                            Cancel
+                            Cancelar
                         </Button>
                         <Button
                             type="submit"
                             variant="contained"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Creating...' : 'Create Collection'}
+                            {isSubmitting ? 'Creando...' : 'Crear colección'}
                         </Button>
                     </Box>
                 </form>

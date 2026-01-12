@@ -191,7 +191,7 @@ const Quiz = () => {
                 onClick={() => navigate(`/knowledge_path/${quiz.knowledge_path}`)}
                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
               >
-                Ir a la Ruta de Conocimiento
+                Ir al Camino de Conocimiento
               </button>
               {quiz.next_node && (
                 <button

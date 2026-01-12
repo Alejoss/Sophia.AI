@@ -78,7 +78,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
   const handleAddCrypto = async () => {
     if (!selectedCrypto || !address.trim()) {
-      setSubmitError('Please select a cryptocurrency and enter an address');
+      setSubmitError('Por favor selecciona una criptomoneda e ingresa una dirección');
       return;
     }
 
@@ -97,14 +97,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       await fetchData();
     } catch (err) {
       console.error('Error adding cryptocurrency:', err);
-      setSubmitError(err.response?.data?.error || 'Failed to add cryptocurrency');
+      setSubmitError(err.response?.data?.error || 'Error al agregar la criptomoneda');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteCrypto = async (cryptoId) => {
-    if (!window.confirm('Are you sure you want to remove this cryptocurrency?')) {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta criptomoneda?')) {
       return;
     }
 
@@ -113,7 +113,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       await fetchData(); // Refresh the list
     } catch (err) {
       console.error('Error deleting cryptocurrency:', err);
-      setError('Failed to remove cryptocurrency');
+      setError('Error al eliminar la criptomoneda');
     }
   };
 
@@ -150,7 +150,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
     <Box>
       <Box sx={{ display: 'flex', flexWrap:'wrap',  justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5" gutterBottom>
-          Favorite Cryptocurrencies
+          Criptomonedas favoritas
         </Typography>
         {isOwnProfile && (
           <Button
@@ -158,14 +158,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
             startIcon={<AddIcon />}
             onClick={() => setModalOpen(true)}
           >
-            Add Cryptocurrency
+            Agregar criptomoneda
           </Button>
         )}
       </Box>
 
       {isOwnProfile && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          You will receive payments in these cryptocurrencies
+          Recibirás pagos en estas criptomonedas
         </Alert>
       )}
 
@@ -175,12 +175,12 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CryptoIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                No cryptocurrencies added yet
+                Aún no se han agregado criptomonedas
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {isOwnProfile 
-                  ? 'Add your favorite cryptocurrencies to receive payments'
-                  : 'This user hasn\'t added any cryptocurrencies yet'
+                  ? 'Agrega tus criptomonedas favoritas para recibir pagos'
+                  : 'Este usuario aún no ha agregado ninguna criptomoneda'
                 }
               </Typography>
             </Box>
@@ -242,7 +242,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
                           color="text.secondary" 
                           sx={{ wordBreak: 'break-all', mt: 1 }}
                         >
-                          <strong>Address:</strong> {acceptedCrypto.address}
+                          <strong>Dirección:</strong> {acceptedCrypto.address}
                         </Typography>
                       )
                     }
@@ -253,7 +253,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
                         edge="end"
                         color="error"
                         onClick={() => handleDeleteCrypto(acceptedCrypto.crypto.id)}
-                        title="Remove cryptocurrency"
+                        title="Eliminar criptomoneda"
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -269,15 +269,15 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
       {/* Add Cryptocurrency Modal */}
       <Dialog open={modalOpen} onClose={handleModalClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Cryptocurrency</DialogTitle>
+        <DialogTitle>Agregar criptomoneda</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Select Cryptocurrency</InputLabel>
+              <InputLabel>Seleccionar criptomoneda</InputLabel>
               <Select
                 value={selectedCrypto}
                 onChange={(e) => setSelectedCrypto(e.target.value)}
-                label="Select Cryptocurrency"
+                label="Seleccionar criptomoneda"
               >
                 {availableCryptos.map((crypto) => (
                   <MenuItem key={crypto.id} value={crypto.id}>
@@ -296,10 +296,10 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
             <TextField
               fullWidth
-              label="Wallet Address"
+              label="Dirección de billetera"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter your wallet address"
+              placeholder="Ingresa tu dirección de billetera"
               multiline
               rows={3}
               sx={{ mb: 2 }}
@@ -314,14 +314,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleModalClose} disabled={submitting}>
-            Cancel
+            Cancelar
           </Button>
           <Button 
             onClick={handleAddCrypto} 
             variant="contained" 
             disabled={submitting || !selectedCrypto || !address.trim()}
           >
-            {submitting ? <CircularProgress size={20} /> : 'Add'}
+            {submitting ? <CircularProgress size={20} /> : 'Agregar'}
           </Button>
         </DialogActions>
       </Dialog>

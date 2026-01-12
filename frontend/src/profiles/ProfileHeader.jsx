@@ -13,6 +13,7 @@ import {
 import MessageIcon from '@mui/icons-material/Message';
 import SettingsIcon from '@mui/icons-material/Settings';
 import EditIcon from '@mui/icons-material/Edit';
+import BadgeDisplay from '../gamification/BadgeDisplay';
 
 const ProfileHeader = ({ 
     profile, 
@@ -70,18 +71,29 @@ const ProfileHeader = ({
                 </Grid>
                 <Grid item xs={12} md={9}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                        <Typography 
-                            variant="h4" 
-                            onClick={handleProfileClick}
-                            sx={{ 
-                                cursor: 'pointer',
-                                '&:hover': {
-                                    color: 'primary.main'
-                                }
-                            }}
-                        >
-                            {profile.user.username}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box>
+                                <Typography 
+                                    variant="h4" 
+                                    onClick={handleProfileClick}
+                                    sx={{ 
+                                        cursor: 'pointer',
+                                        '&:hover': {
+                                            color: 'primary.main'
+                                        }
+                                    }}
+                                >
+                                    {profile.user.username}
+                                </Typography>
+                            </Box>
+                            {profile.featured_badge && (
+                                <BadgeDisplay 
+                                    badge={profile.featured_badge} 
+                                    showName={false} 
+                                    context="profile"
+                                />
+                            )}
+                        </Box>
                         
                         {/* Action Buttons */}
                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>

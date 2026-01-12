@@ -23,12 +23,12 @@ const Collection = () => {
                 setContent(data);
                 
                 if (data.length > 0) {
-                    setCollectionName(data[0].collection_name || 'Untitled Collection');
+                    setCollectionName(data[0].collection_name || 'Colección sin título');
                 }
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching collection content:', err);
-                setError(err.response?.data?.error || 'Failed to fetch collection content');
+                setError(err.response?.data?.error || 'Error al obtener el contenido de la colección');
                 setLoading(false);
             }
         };
@@ -36,7 +36,7 @@ const Collection = () => {
         fetchCollectionContent();
     }, [collectionId]);
 
-    if (loading) return <Typography>Loading collection content...</Typography>;
+    if (loading) return <Typography>Cargando contenido de la colección...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
 
     return (
@@ -53,7 +53,7 @@ const Collection = () => {
                     color="primary"
                     onClick={() => navigate(`/content/collections/${collectionId}/edit`)}
                 >
-                    Edit Content
+                    Editar contenido
                 </Button>
             </Box>
 
@@ -87,7 +87,7 @@ const Collection = () => {
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                     <Typography variant="h6">
-                                        {contentProfile.title || 'Untitled'}
+                                        {contentProfile.title || 'Sin título'}
                                     </Typography>
                                     {contentProfile.personal_note && (
                                         <IconButton size="small" title={contentProfile.personal_note}>
@@ -104,7 +104,7 @@ const Collection = () => {
                                     />
                                     {contentProfile.author && (
                                         <Chip 
-                                            label={`Author: ${contentProfile.author}`}
+                                            label={`Autor: ${contentProfile.author}`}
                                             size="small"
                                             variant="outlined"
                                         />
@@ -112,9 +112,9 @@ const Collection = () => {
                                 </Box>
                                 
                                 <Typography variant="caption" color="text.secondary">
-                                    Added: {contentProfile.content.file_details?.uploaded_at 
+                                    Agregado: {contentProfile.content.file_details?.uploaded_at 
                                         ? new Date(contentProfile.content.file_details.uploaded_at).toLocaleDateString()
-                                        : 'Date not available'}
+                                        : 'Fecha no disponible'}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -124,7 +124,7 @@ const Collection = () => {
                 {content.length === 0 && (
                     <Box gridColumn="span 12">
                         <Typography variant="body1" color="text.secondary" align="center">
-                            No content in this collection yet.
+                            Aún no hay contenido en esta colección.
                         </Typography>
                     </Box>
                 )}

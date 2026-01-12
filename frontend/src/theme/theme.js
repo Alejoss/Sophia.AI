@@ -90,7 +90,7 @@ const createThemeConfig = (mode) => ({
   },
   spacing: 8,
   shape: {
-    borderRadius: 8,
+    borderRadius: 4,
   },
   components: {
     MuiTypography: {

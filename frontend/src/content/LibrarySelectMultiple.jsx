@@ -23,7 +23,7 @@ const LibrarySelectMultiple = ({
     onCancel, 
     onSave, 
     onSelectionChange,
-    title = "Select Content from Library",
+    title = "Seleccionar contenido de la biblioteca",
     description,
     filterFunction,
     maxSelections,
@@ -84,7 +84,7 @@ const LibrarySelectMultiple = ({
                 setLoading(false);
             } catch (err) {
                 console.error('LibrarySelectMultiple: Error fetching content:', err);
-                setError('Failed to fetch your content');
+                setError('Error al obtener tu contenido');
                 setLoading(false);
             }
         };
@@ -172,12 +172,12 @@ const LibrarySelectMultiple = ({
             console.log('LibrarySelectMultiple.handleSubmit - Save successful');
         } catch (err) {
             console.error('LibrarySelectMultiple.handleSubmit - Error:', err);
-            setError('Failed to save selections');
+            setError('Error al guardar las selecciones');
             setSaving(false);
         }
     };
 
-    if (loading) return <Typography>Loading your content...</Typography>;
+    if (loading) return <Typography>Cargando tu contenido...</Typography>;
     if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
@@ -194,7 +194,7 @@ const LibrarySelectMultiple = ({
                     )}
                     {maxSelections && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Maximum {maxSelections} items can be selected
+                            Se pueden seleccionar máximo {maxSelections} elementos
                         </Typography>
                     )}
                 </Box>
@@ -203,7 +203,7 @@ const LibrarySelectMultiple = ({
 
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6">
-                        Available Content ({userContent.length})
+                        Contenido disponible ({userContent.length})
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <Button
@@ -211,7 +211,7 @@ const LibrarySelectMultiple = ({
                             onClick={onCancel}
                             disabled={saving}
                         >
-                            Cancel
+                            Cancelar
                         </Button>
                         <Button
                             variant="contained"
@@ -219,7 +219,7 @@ const LibrarySelectMultiple = ({
                             onClick={handleSubmit}
                             disabled={selectedContentProfiles.length === 0 || saving}
                         >
-                            {saving ? 'Saving...' : `Save Selected (${selectedContentProfiles.length})`}
+                            {saving ? 'Guardando...' : `Guardar seleccionados (${selectedContentProfiles.length})`}
                         </Button>
                     </Box>
                 </Box>
@@ -236,10 +236,10 @@ const LibrarySelectMultiple = ({
                                         disabled={maxSelections && selectedContentProfiles.length >= maxSelections}
                                     />
                                 </TableCell>
-                                <TableCell>Title</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Author</TableCell>
-                                <TableCell>View</TableCell>
+                                <TableCell>Título</TableCell>
+                                <TableCell>Tipo</TableCell>
+                                <TableCell>Autor</TableCell>
+                                <TableCell>Ver</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -256,7 +256,7 @@ const LibrarySelectMultiple = ({
                                             disabled={maxSelections && selectedContentProfiles.length >= maxSelections && !selectedContentProfiles.some(p => p.id === content.id)}
                                         />
                                     </TableCell>
-                                    <TableCell>{content.title || 'Untitled'}</TableCell>
+                                    <TableCell>{content.title || 'Sin título'}</TableCell>
                                     <TableCell>
                                         <Chip 
                                             label={content.content.media_type} 
@@ -264,7 +264,7 @@ const LibrarySelectMultiple = ({
                                             color="primary"
                                         />
                                     </TableCell>
-                                    <TableCell>{content.author || 'Unknown'}</TableCell>
+                                    <TableCell>{content.author || 'Desconocido'}</TableCell>
                                     <TableCell 
                                         onClick={(e) => e.stopPropagation()} // Prevent row click from triggering
                                     >
@@ -283,7 +283,7 @@ const LibrarySelectMultiple = ({
                                                 }
                                             }}
                                         >
-                                            View
+                                            Ver
                                             <OpenInNewIcon fontSize="small" />
                                         </MuiLink>
                                     </TableCell>
@@ -292,7 +292,7 @@ const LibrarySelectMultiple = ({
                             {userContent.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={5} align="center">
-                                        No content available
+                                        No hay contenido disponible
                                     </TableCell>
                                 </TableRow>
                             )}

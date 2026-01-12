@@ -40,7 +40,7 @@ const CertificateRequests = () => {
       const data = await certificatesApi.getCertificateRequests();
       setRequests(data);
     } catch (err) {
-      setError('Failed to load certificate requests');
+      setError('Error al cargar las solicitudes de certificados');
       console.error(err);
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ const CertificateRequests = () => {
       setSelectedRequest(null);
       fetchRequests(); // Refresh the list
     } catch (err) {
-      setError('Failed to approve request');
+      setError('Error al aprobar la solicitud');
       console.error(err);
     }
   };
@@ -72,7 +72,7 @@ const CertificateRequests = () => {
       setSelectedRequest(null);
       fetchRequests(); // Refresh the list
     } catch (err) {
-      setError('Failed to reject request');
+      setError('Error al rechazar la solicitud');
       console.error(err);
     }
   };
@@ -82,7 +82,7 @@ const CertificateRequests = () => {
       await certificatesApi.cancelCertificateRequest(requestId);
       fetchRequests(); // Refresh the list
     } catch (err) {
-      setError('Failed to cancel request');
+      setError('Error al cancelar la solicitud');
       console.error(err);
     }
   };
@@ -147,7 +147,7 @@ const CertificateRequests = () => {
                 <Typography variant="body2" color="textSecondary">
                   {isTeacherView ? (
                     <>
-                      Requested by:{' '}
+                      Solicitado por:{' '}
                       <Link 
                         to={`/profiles/user_profile/${request.requester_id}`}
                         className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -156,12 +156,12 @@ const CertificateRequests = () => {
                       </Link>
                     </>
                   ) : (
-                    `Requested on: ${new Date(request.request_date).toLocaleDateString()}`
+                    `Solicitado el: ${new Date(request.request_date).toLocaleDateString()}`
                   )}
                 </Typography>
                 {!isTeacherView && (
                   <Typography variant="body2" color="textSecondary">
-                    Author: {request.knowledge_path_author}
+                    Autor: {request.knowledge_path_author}
                   </Typography>
                 )}
                 <Chip
@@ -174,7 +174,7 @@ const CertificateRequests = () => {
                  ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
                   (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
                   <Typography variant="body2" className="mt-2">
-                    Notes: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
+                    Notas: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
                   </Typography>
                 )}
               </div>
@@ -187,14 +187,14 @@ const CertificateRequests = () => {
                       color="success"
                       onClick={() => openApproveDialog(request)}
                     >
-                      Approve
+                      Aprobar
                     </Button>
                     <Button
                       variant="contained"
                       color="error"
                       onClick={() => openRejectDialog(request)}
                     >
-                      Reject
+                      Rechazar
                     </Button>
                   </>
                 )}
@@ -204,7 +204,7 @@ const CertificateRequests = () => {
                     color="success"
                     onClick={() => openApproveDialog(request)}
                   >
-                    Accept Request
+                    Aceptar solicitud
                   </Button>
                 )}
                 {request.status === 'PENDING' && request.requester === authState.user?.username && (
@@ -213,7 +213,7 @@ const CertificateRequests = () => {
                     color="error"
                     onClick={() => handleCancel(request.id)}
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                 )}
               </div>
@@ -221,7 +221,7 @@ const CertificateRequests = () => {
 
             {request.rejection_reason && (
               <Typography variant="body2" color="error" className="mt-2">
-                Rejection reason: {request.rejection_reason}
+                Motivo del rechazo: {request.rejection_reason}
               </Typography>
             )}
           </CardContent>
@@ -266,12 +266,12 @@ const CertificateRequests = () => {
           fontSize: "24px"
         }}
       >
-        Certificate Requests
+        Solicitudes de certificados
       </Typography>
 
       {requests.length === 0 ? (
         <Typography variant="body1" color="textSecondary">
-          No certificate requests found.
+          No se encontraron solicitudes de certificados.
         </Typography>
       ) : (
         <div className="space-y-8">
@@ -288,7 +288,7 @@ const CertificateRequests = () => {
                   fontSize: "20px"
                 }}
               >
-                Requests to Review
+                Solicitudes para revisar
               </Typography>
               {renderRequests(teacherRequests, true)}
             </div>
@@ -307,7 +307,7 @@ const CertificateRequests = () => {
                   fontSize: "20px"
                 }}
               >
-                My Requests
+                Mis solicitudes
               </Typography>
               {renderRequests(studentRequests, false)}
             </div>
@@ -322,15 +322,15 @@ const CertificateRequests = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Approve Certificate Request</DialogTitle>
+        <DialogTitle>Aprobar solicitud de certificado</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
               fullWidth
               multiline
               rows={4}
-              label="Optional note"
-              placeholder="Optionally add a note to the student"
+              label="Nota opcional"
+              placeholder="Opcionalmente agrega una nota al estudiante"
               value={approveNote}
               onChange={(e) => setApproveNote(e.target.value)}
               variant="outlined"
@@ -338,13 +338,13 @@ const CertificateRequests = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApproveDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
           <Button 
             onClick={handleApprove}
             variant="contained"
             color="success"
           >
-            Approve
+            Aprobar
           </Button>
         </DialogActions>
       </Dialog>
@@ -356,13 +356,13 @@ const CertificateRequests = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Reject Certificate Request</DialogTitle>
+        <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
               fullWidth
               margin="dense"
-              label="Rejection Reason"
+              label="Motivo del rechazo"
               multiline
               rows={2}
               value={rejectReason}
@@ -372,14 +372,14 @@ const CertificateRequests = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
           <Button 
             onClick={handleReject}
             variant="contained"
             color="error"
             disabled={!rejectReason.trim()}
           >
-            Reject
+            Rechazar
           </Button>
         </DialogActions>
       </Dialog>

@@ -42,7 +42,7 @@ const ContentSourceEdit = () => {
                 setContent(contentData);
                 setModificationCheck(modificationData);
             } catch (err) {
-                setError('Failed to load content');
+                setError('Error al cargar el contenido');
                 console.error(err);
             }
         };
@@ -52,18 +52,18 @@ const ContentSourceEdit = () => {
     const handleContentUploaded = async (contentProfile) => {
         try {
             // Content was updated successfully
-            setSuccess('Content source updated successfully!');
+            setSuccess('¡Fuente de contenido actualizada exitosamente!');
             
             // Refresh the current content data
             const updatedData = await contentApi.getContentDetails(contentId, 'library', authState?.user?.id);
             setContent(updatedData);
         } catch (err) {
-            setError('Failed to refresh content data');
+            setError('Error al actualizar los datos del contenido');
             console.error(err);
         }
     };
 
-    if (!content || !modificationCheck) return <div>Loading...</div>;
+    if (!content || !modificationCheck) return <div>Cargando...</div>;
 
     // Check if content can be modified
     const canModify = modificationCheck.can_modify;
@@ -81,7 +81,7 @@ const ContentSourceEdit = () => {
               }} 
               color="text.primary"
             >
-                Edit Content Source
+                Editar fuente del contenido
             </Typography>
 
             {error && (
@@ -101,7 +101,7 @@ const ContentSourceEdit = () => {
                     variant="outlined"
                     onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
                 >
-                    Cancel
+                    Cancelar
                 </Button>
             </Box>
 
@@ -119,13 +119,13 @@ const ContentSourceEdit = () => {
                             fontSize: "18px"
                           }}
                         >
-                            Cannot Modify Content Source
+                            No se puede modificar la fuente del contenido
                         </Typography>
                         <Typography variant="body1" sx={{ mb: 2 }}>
                             {modificationCheck.message}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Since other users have added this content to their libraries, changing the source would affect their content as well.
+                            Como otros usuarios han agregado este contenido a sus bibliotecas, cambiar la fuente afectaría su contenido también.
                         </Typography>
                         <Button
                             component={Link}
@@ -134,7 +134,7 @@ const ContentSourceEdit = () => {
                             startIcon={<AddIcon />}
                             sx={{ mt: 1 }}
                         >
-                            Upload New Content
+                            Subir nuevo contenido
                         </Button>
                     </Alert>
                     
@@ -150,7 +150,7 @@ const ContentSourceEdit = () => {
                       }} 
                       color="text.primary"
                     >
-                        Content Preview
+                        Vista previa del contenido
                     </Typography>
                     <ContentDisplay 
                         content={content}
@@ -177,10 +177,10 @@ const ContentSourceEdit = () => {
                                     fontSize: "18px"
                                   }}
                                 >
-                                    Change Content Source
+                                    Cambiar fuente del contenido
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Upload a new file or change the URL to replace the current content source.
+                                    Sube un nuevo archivo o cambia la URL para reemplazar la fuente de contenido actual.
                                 </Typography>
                                 <UploadContentForm 
                                     onContentUploaded={handleContentUploaded}
@@ -202,7 +202,7 @@ const ContentSourceEdit = () => {
                     <Grid item xs={12} md={6}>
                         <Card sx={{ padding: 3 }}>
                             <Typography variant="h6" gutterBottom>
-                                Content Preview
+                                Vista previa del contenido
                             </Typography>
                             <ContentDisplay 
                                 content={content}

@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/messages/', include('user_messages.urls')),
     path('api/certificates/', include('certificates.urls')),
     path('api/bookmarks/', include('bookmarks.urls')),
+    path('api/gamification/', include('gamification.urls')),
     
     # dj-rest-auth URLs
     path('api/rest-auth/', include('dj_rest_auth.urls')),

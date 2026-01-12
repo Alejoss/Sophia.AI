@@ -10,15 +10,11 @@ const ContentReferences = ({ references }) => {
 
     return (
         <Box>
-            <Typography variant="h6" gutterBottom color="text.secondary">
-                Content References
-            </Typography>
-
             {/* Knowledge Paths */}
             {references.knowledge_paths?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Knowledge Paths
+                        Rutas de conocimiento
                     </Typography>
                     <List>
                         {references.knowledge_paths.map((path) => (
@@ -26,7 +22,14 @@ const ContentReferences = ({ references }) => {
                                 key={path.id}
                                 component="button"
                                 onClick={() => navigate(`/knowledge_path/${path.id}`)}
-                                sx={{ width: '100%', textAlign: 'left' }}
+                                sx={{ 
+                                    width: '100%', 
+                                    textAlign: 'left',
+                                    bgcolor: 'transparent',
+                                    '&:hover': {
+                                        bgcolor: 'action.hover'
+                                    }
+                                }}
                             >
                                 <Avatar 
                                     src={path.image} 
@@ -51,7 +54,7 @@ const ContentReferences = ({ references }) => {
             {references.topics?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Topics
+                        Temas
                     </Typography>
                     <List>
                         {references.topics.map((topic) => (
@@ -59,7 +62,14 @@ const ContentReferences = ({ references }) => {
                                 key={topic.id}
                                 component="button"
                                 onClick={() => navigate(`/content/topics/${topic.id}`)}
-                                sx={{ width: '100%', textAlign: 'left' }}
+                                sx={{ 
+                                    width: '100%', 
+                                    textAlign: 'left',
+                                    bgcolor: 'transparent',
+                                    '&:hover': {
+                                        bgcolor: 'action.hover'
+                                    }
+                                }}
                             >
                                 <Avatar 
                                     src={topic.topic_image} 
@@ -84,7 +94,7 @@ const ContentReferences = ({ references }) => {
             {references.publications?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Publications
+                        Publicaciones
                     </Typography>
                     <List>
                         {references.publications.map((pub) => (
@@ -92,7 +102,14 @@ const ContentReferences = ({ references }) => {
                                 key={pub.id}
                                 component="button"
                                 onClick={() => navigate(`/publications/${pub.id}`)}
-                                sx={{ width: '100%', textAlign: 'left' }}
+                                sx={{ 
+                                    width: '100%', 
+                                    textAlign: 'left',
+                                    bgcolor: 'transparent',
+                                    '&:hover': {
+                                        bgcolor: 'action.hover'
+                                    }
+                                }}
                             >
                                 <Avatar 
                                     src={pub.profile_picture || '/default-avatar.png'} 
@@ -107,7 +124,7 @@ const ContentReferences = ({ references }) => {
                                     {pub.username.charAt(0).toUpperCase()}
                                 </Avatar>
                                 <ListItemText 
-                                    primary={`Publication by ${pub.username}`}
+                                    primary={`Publicación por ${pub.username}`}
                                     secondary={formatDate(pub.published_at)}
                                 />
                             </ListItem>
@@ -121,7 +138,7 @@ const ContentReferences = ({ references }) => {
              !references.topics?.length && 
              !references.publications?.length && (
                 <Typography color="text.secondary">
-                    This content is not referenced in any knowledge paths, topics, or publications.
+                    Este contenido no está referenciado en ninguna ruta de conocimiento, tema o publicación.
                 </Typography>
             )}
         </Box>

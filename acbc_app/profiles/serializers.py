@@ -81,12 +81,19 @@ class ContactMethodSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     profile_picture = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
+    total_points = serializers.IntegerField(read_only=True)
+    featured_badge = serializers.SerializerMethodField()
+    featured_badge_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     # cryptos_list = serializers.SerializerMethodField()  # TODO manejar en otro endpoint
 
     class Meta:
         model = Profile
-        fields = ['user', 'interests', 'profile_description', 'timezone', 'is_teacher', 'profile_picture']
+        fields = [
+            'user', 'interests', 'profile_description', 'timezone', 'is_teacher', 
+            'profile_picture', 'badges', 'total_points', 'featured_badge', 'featured_badge_id'
+        ]
 
     def get_profile_picture(self, obj):
         if obj.profile_picture:
@@ -95,6 +102,51 @@ class ProfileSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.profile_picture.url)
             return obj.profile_picture.url
         return None
+
+    def get_badges(self, obj):
+        """Get user badges."""
+        try:
+            from gamification.serializers import UserBadgeSummarySerializer
+            badges = obj.user.user_badges.all().select_related('badge')
+            return UserBadgeSummarySerializer(badges, many=True, context=self.context).data
+        except Exception as e:
+            logger.error("Error getting badges", extra={'error': str(e)}, exc_info=True)
+            return []
+
+    def get_featured_badge(self, obj):
+        """Get featured badge details if set."""
+        if obj.featured_badge:
+            try:
+                from gamification.serializers import UserBadgeSummarySerializer
+                return UserBadgeSummarySerializer(obj.featured_badge, context=self.context).data
+            except Exception as e:
+                logger.error("Error getting featured badge", extra={'error': str(e)}, exc_info=True)
+                return None
+        return None
+
+    def update(self, instance, validated_data):
+        """Update profile, handling featured_badge separately."""
+        featured_badge_id = validated_data.pop('featured_badge_id', None)
+        
+        # Update other fields
+        instance = super().update(instance, validated_data)
+        
+        # Handle featured_badge update
+        if featured_badge_id is not None:
+            if featured_badge_id:
+                try:
+                    from gamification.models import UserBadge
+                    user_badge = UserBadge.objects.get(id=featured_badge_id, user=instance.user)
+                    instance.featured_badge = user_badge
+                except UserBadge.DoesNotExist:
+                    raise serializers.ValidationError({
+                        'featured_badge_id': 'Badge not found or does not belong to user'
+                    })
+            else:
+                instance.featured_badge = None
+            instance.save()
+        
+        return instance
 
     def get_cryptos_list(self, obj):
         # Fetch all non-deleted AcceptedCrypto instances related to this profile's user
@@ -140,7 +192,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_context_title(self, obj):
         try:
             # For knowledge path comments
-            if obj.verb == 'comentó en tu ruta de conocimiento' and obj.target:
+            if obj.verb == 'comentó en tu camino de conocimiento' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
             
             # For comment replies
@@ -176,11 +228,11 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_target_url(self, obj):
         try:
             # For knowledge path comments
-            if obj.verb == 'comentó en tu ruta de conocimiento' and obj.target:
+            if obj.verb == 'comentó en tu camino de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For knowledge path completion
-            if obj.verb == 'completó tu ruta de conocimiento' and obj.target:
+            if obj.verb == 'completó tu camino de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For comment replies
@@ -195,7 +247,7 @@ class NotificationSerializer(serializers.ModelSerializer):
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
             
             # For knowledge path upvotes
-            if obj.verb == 'votó positivamente tu ruta de conocimiento' and obj.target:
+            if obj.verb == 'votó positivamente tu camino de conocimiento' and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
             
             # For event registrations
@@ -220,13 +272,13 @@ class NotificationSerializer(serializers.ModelSerializer):
             return None
 
     def getNotificationDescription(self, notification):
-        if notification.verb == 'comentó en tu ruta de conocimiento':
-            return f"{notification.actor} comentó en tu ruta de conocimiento {notification.context_title}"
+        if notification.verb == 'comentó en tu camino de conocimiento':
+            return f"{notification.actor} comentó en tu camino de conocimiento {notification.context_title}"
         elif notification.verb == 'respondió a':
             return f"{notification.actor} respondió a tu comentario en {notification.context_title}"
-        elif notification.verb == 'completó tu ruta de conocimiento':
+        elif notification.verb == 'completó tu camino de conocimiento':
             return notification.description
-        elif notification.verb == 'solicitó un certificado para tu ruta de conocimiento':
+        elif notification.verb == 'solicitó un certificado para tu camino de conocimiento':
             return notification.description
         elif notification.verb == 'aprobó tu solicitud de certificado para':
             return notification.description
@@ -234,7 +286,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             return notification.description
         elif notification.verb == 'votó positivamente tu contenido':
             return notification.description
-        elif notification.verb == 'votó positivamente tu ruta de conocimiento':
+        elif notification.verb == 'votó positivamente tu camino de conocimiento':
             return notification.description
         elif notification.verb == 'se registró en tu evento':
             return notification.description

@@ -153,7 +153,7 @@ const ContentDetailsSearch = () => {
             >
               {content.selected_profile?.title ||
                 content.original_title ||
-                "Untitled Content"}
+                "Contenido sin título"}
             </Typography>
 
             {content.selected_profile?.author && (
@@ -162,7 +162,7 @@ const ContentDetailsSearch = () => {
                 color="text.secondary"
                 gutterBottom
               >
-                By {content.selected_profile.author}
+                Por {content.selected_profile.author}
               </Typography>
             )}
           </Box>
@@ -180,7 +180,7 @@ const ContentDetailsSearch = () => {
 
       {/* Content References Section */}
       {references && (
-        <Paper sx={{ p: 3, mb: 3 }}>
+        <Paper sx={{ p: 3, mb: 3, bgcolor: "background.paper" }}>
           <Typography 
             variant="h5" 
             gutterBottom 
@@ -191,7 +191,7 @@ const ContentDetailsSearch = () => {
               fontSize: "20px"
             }}
           >
-            References
+            Referencias
           </Typography>
           <ContentReferences references={references} />
         </Paper>

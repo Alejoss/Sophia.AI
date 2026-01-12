@@ -123,7 +123,7 @@ const KnowledgePathEdit = () => {
         pathId,
         submitData
       );
-      setSuccessMessage("Ruta de conocimiento actualizada exitosamente");
+      setSuccessMessage("Camino de conocimiento actualizado exitosamente");
 
       // Update the image display with the new image URL from the response
       if (updatedData.image) {
@@ -137,7 +137,7 @@ const KnowledgePathEdit = () => {
       });
     } catch (err) {
       console.error("KnowledgePathEdit - Error updating knowledge path:", err);
-      setError(err.message || "Error al actualizar la ruta de conocimiento");
+      setError(err.message || "Error al actualizar el camino de conocimiento");
     }
   };
 
@@ -238,7 +238,7 @@ const KnowledgePathEdit = () => {
           to={`/knowledge_path/${pathId}`}
           className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
         >
-          ← Volver a la Ruta
+          ← Volver al Camino
         </Link>
       </div>
 
@@ -309,7 +309,7 @@ const KnowledgePathEdit = () => {
                 : "bg-green-500 hover:bg-green-700 text-white"
             }`}
           >
-            {showForm ? "Ocultar Formulario" : "Editar Detalles de la Ruta de Conocimiento"}
+            {showForm ? "Ocultar Formulario" : "Editar Detalles del Camino de Conocimiento"}
           </button>
         </div>
         {/* Visibility Toggle - Independent of form */}
@@ -346,7 +346,7 @@ const KnowledgePathEdit = () => {
           </Typography>
           {!knowledgePath?.can_be_visible && (
             <Typography variant="caption" color="#000" sx={{ ml: 1 }}>
-              Las rutas de conocimiento necesitan al menos dos nodos para ser visibles
+              Los caminos de conocimiento necesitan al menos dos nodos para ser visibles
             </Typography>
           )}
         </div>
@@ -396,7 +396,7 @@ const KnowledgePathEdit = () => {
                       component="span"
                       sx={{
                         border: "2px dashed #ccc",
-                        borderRadius: "8px",
+                        borderRadius: "2px",
                         padding: "12px",
                       }}
                     >
@@ -450,7 +450,7 @@ const KnowledgePathEdit = () => {
               type="submit"
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
-              Actualizar Ruta de Conocimiento
+              Actualizar Camino de Conocimiento
             </button>
           </form>
 

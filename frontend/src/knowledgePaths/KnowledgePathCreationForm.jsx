@@ -56,7 +56,7 @@ const KnowledgePathCreationForm = () => {
       const data = await knowledgePathsApi.createKnowledgePath(submitData);
       navigate(`/knowledge_path/${data.id}/edit`);
     } catch (err) {
-      setError(err.message || 'Error al crear la ruta de conocimiento');
+      setError(err.message || 'Error al crear el camino de conocimiento');
     }
   };
 
@@ -64,7 +64,7 @@ const KnowledgePathCreationForm = () => {
     <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
       <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
         <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
-          Crear Ruta de Conocimiento
+          Crear Camino de Conocimiento
         </Typography>
         
         {error && (
@@ -109,7 +109,7 @@ const KnowledgePathCreationForm = () => {
                       sx={{
                         border: '2px dashed',
                         borderColor: 'divider',
-                        borderRadius: 1,
+                        borderRadius: 0.5,
                         p: 1.5,
                       }}
                     >
@@ -131,7 +131,7 @@ const KnowledgePathCreationForm = () => {
               value={formData.title}
               onChange={handleChange}
               required
-              placeholder="Ingresa el título de la ruta de conocimiento"
+              placeholder="Ingresa el título del camino de conocimiento"
               sx={{ mb: 2 }}
             />
 
@@ -145,7 +145,7 @@ const KnowledgePathCreationForm = () => {
               required
               multiline
               rows={4}
-              placeholder="Describe tu ruta de conocimiento"
+              placeholder="Describe tu camino de conocimiento"
               sx={{ mb: 3 }}
             />
 
@@ -156,7 +156,7 @@ const KnowledgePathCreationForm = () => {
                 color="primary"
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
-                Crear Ruta de Conocimiento
+                Crear Camino de Conocimiento
               </Button>
               <Button
                 type="button"

@@ -80,7 +80,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
           transform: "translate(-50%, -50%)",
           width: 400,
           bgcolor: "background.paper",
-          borderRadius: 1,
+          borderRadius: 0.5,
           boxShadow: 24,
           p: 4,
         }}
@@ -282,7 +282,7 @@ const TopicEdit = () => {
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                borderRadius: "4px",
+                borderRadius: "2px",
               }}
             />
             <Button

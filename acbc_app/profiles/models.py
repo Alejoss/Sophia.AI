@@ -54,9 +54,28 @@ class Profile(models.Model):
     timezone = models.CharField(max_length=30, blank=True)
     is_teacher = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to=upload_profile_picture, null=True, blank=True)
+    total_points = models.IntegerField(default=0, help_text="Total gamification points earned by the user")
+    featured_badge = models.ForeignKey(
+        'gamification.UserBadge',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='featured_profiles',
+        help_text="Badge destacado que se muestra junto al nombre de usuario"
+    )
 
     def __str__(self):
         return self.user.username
+
+    def add_points(self, points):
+        """Safely add points to the user's total."""
+        from django.db.models import F
+        Profile.objects.filter(id=self.id).update(total_points=F('total_points') + points)
+        self.refresh_from_db()
+    
+    def can_set_featured_badge(self, user_badge):
+        """Check if user can set this badge as featured."""
+        return user_badge.user == self.user
 
 
 class CryptoCurrency(models.Model):

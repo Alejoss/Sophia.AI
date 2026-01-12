@@ -12,6 +12,9 @@ import Bookmarks from './Bookmarks';
 import KnowledgePathsUser from '../knowledgePaths/KnowledgePathsUser';
 import KnowledgePathsByUser from '../knowledgePaths/KnowledgePathsByUser';
 import FavoriteCryptos from './FavoriteCryptos';
+import FeaturedBadgeSelector from '../gamification/FeaturedBadgeSelector';
+import BadgeList from '../gamification/BadgeList';
+import { useBadges } from '../gamification/useBadges';
 import { 
     Box, 
     Typography, 
@@ -67,6 +70,10 @@ const Profile = () => {
     // Determine if this is the user's own profile
     const isOwnProfile = !profileId || (currentUser && profile && currentUser.id === profile.user?.id);
     const isAuthenticated = authState.isAuthenticated;
+    
+    // Use badges hook - fetch own badges if own profile, otherwise fetch by userId
+    const badgesUserId = isOwnProfile ? null : (profileId || profile?.user?.id);
+    const { badges: userBadges, loading: badgesLoading, error: badgesError } = useBadges(badgesUserId);
 
     // Function to handle section changes from external navigation (like header menu)
     const handleExternalSectionChange = (newSection) => {
@@ -136,6 +143,7 @@ const Profile = () => {
                 'certificates': 'certificates',
                 'saved-items': 'saved-items',
                 'cryptos': 'cryptos',
+                'badges': 'badges',
                 'notifications': 'notifications',
                 'security': 'security'
             };
@@ -276,6 +284,47 @@ const Profile = () => {
                 );
             case 'events':
                 return <UserEvents isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
+            case 'badges':
+                // Use hook data for own profile, fallback to profile data for others
+                const badgesToShow = isOwnProfile ? userBadges : (profile?.badges || []);
+                
+                return (
+                    <Box>
+                        <Typography 
+                            variant="body1" 
+                            color="text.secondary" 
+                            sx={{ mb: 3, lineHeight: 1.6, fontStyle: 'italic' }}
+                        >
+                            Las insignias reflejan tu recorrido dentro de la red de conocimiento compartido de Academia Blockchain. Se obtienen al aprender, aportar y generar valor real para la comunidad.
+                        </Typography>
+                        {isOwnProfile && (
+                            <Box sx={{ mb: 4 }}>
+                                <FeaturedBadgeSelector
+                                    badges={badgesToShow}
+                                    currentFeaturedBadgeId={profile?.featured_badge?.id}
+                                    onUpdate={async () => {
+                                        // Refetch profile to get updated featured_badge
+                                        try {
+                                            const profileData = await getUserProfile();
+                                            setProfile(profileData);
+                                            // Also refresh badges
+                                            // The hook will automatically refetch when component re-renders
+                                        } catch (err) {
+                                            console.error('Error refreshing profile:', err);
+                                        }
+                                    }}
+                                />
+                            </Box>
+                        )}
+                        <BadgeList 
+                            badges={badgesToShow}
+                            title={isOwnProfile ? "Mis Insignias" : "Insignias"}
+                            emptyMessage={isOwnProfile ? "Aún no has obtenido insignias. ¡Sigue aprendiendo y contribuyendo!" : "Este usuario aún no tiene insignias."}
+                            loading={badgesLoading}
+                            error={badgesError}
+                        />
+                    </Box>
+                );
             default:
                 return null;
         }

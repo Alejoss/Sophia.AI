@@ -22,7 +22,8 @@ import {
   CurrencyBitcoin as CryptoIcon,
   AccountTree as KnowledgePathIcon,
   Notifications as NotificationsIcon,
-  LibraryBooks as LibraryIcon
+  LibraryBooks as LibraryIcon,
+  EmojiEvents as BadgeIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 
@@ -42,7 +43,7 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       path: null
     },
     {
-      label: 'Rutas de conocimiento',
+      label: 'Caminos de conocimiento',
       section: 'knowledge-paths',
       icon: KnowledgePathIcon,
       path: null
@@ -63,6 +64,12 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       label: 'Criptomonedas favoritas',
       section: 'cryptos',
       icon: CryptoIcon,
+      path: null
+    },
+    {
+      label: 'Insignias',
+      section: 'badges',
+      icon: BadgeIcon,
       path: null
     }
   ];
@@ -151,7 +158,7 @@ const ProfileVerticalNavigation = ({
                     component="a"
                     href={item.path}
                     sx={{
-                      borderRadius: 1,
+                      borderRadius: 0.5,
                       mx: 1,
                       backgroundColor: 'transparent',
                       color: 'text.primary',
@@ -185,7 +192,7 @@ const ProfileVerticalNavigation = ({
                 <ListItemButton
                   onClick={() => handleSectionClick(item.section)}
                   sx={{
-                    borderRadius: 1,
+                    borderRadius: 0.5,
                     mx: 1,
                     backgroundColor: isItemActive ? 'primary.light' : 'transparent',
                     color: isItemActive ? 'text.white' : 'text.white',

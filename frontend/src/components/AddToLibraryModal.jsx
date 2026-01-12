@@ -85,7 +85,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
 
     return (
         <>
-            <Tooltip title="Add to library">
+            <Tooltip title="Agregar a la biblioteca">
                 {buttonProps?.variant ? (
                     // Show as a button with text when buttonProps are provided
                     <Button
@@ -93,7 +93,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                         startIcon={<AddIcon />}
                         {...buttonProps}
                     >
-                        Add To Library
+                        Agregar a la biblioteca
                     </Button>
                 ) : (
                     // Show as an icon button (default behavior)
@@ -117,12 +117,12 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                 disablePortal={false}
                 aria-labelledby="add-to-library-dialog-title"
             >
-                <DialogTitle id="add-to-library-dialog-title">Add to Library</DialogTitle>
+                <DialogTitle id="add-to-library-dialog-title">Agregar a la biblioteca</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField
                             name="title"
-                            label="Title"
+                            label="Título"
                             value={formData.title}
                             onChange={handleFormChange}
                             fullWidth
@@ -130,27 +130,27 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                         />
                         <TextField
                             name="author"
-                            label="Author"
+                            label="Autor"
                             value={formData.author}
                             onChange={handleFormChange}
                             fullWidth
                         />
                         <TextField
                             name="personalNote"
-                            label="Personal Note"
+                            label="Nota personal"
                             value={formData.personalNote}
                             onChange={handleFormChange}
                             multiline
                             rows={4}
                             fullWidth
-                            placeholder="Add your thoughts or notes about this content..."
+                            placeholder="Agrega tus pensamientos o notas sobre este contenido..."
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
+                    <Button onClick={handleClose}>Cancelar</Button>
                     <Button onClick={handleSubmit} variant="contained" color="primary">
-                        Add to Library
+                        Agregar a la biblioteca
                     </Button>
                 </DialogActions>
             </Dialog>

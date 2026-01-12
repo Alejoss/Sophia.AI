@@ -131,8 +131,8 @@ const MessagesLayout = () => {
                                     p: 3
                                 }}
                             >
-                                <h2>Select a conversation</h2>
-                                <p>Choose a conversation from the list or start a new one</p>
+                                <h2>Seleccione una conversación</h2>
+                                <p>Elija una conversación de la lista o inicie una nueva</p>
                             </Box>
                         </Box>
                     )}
