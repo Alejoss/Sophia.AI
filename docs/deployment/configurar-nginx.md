@@ -21,10 +21,21 @@ Esta guía explica cómo configurar Nginx como reverse proxy para la aplicación
 
 ```bash
 cd /opt/acbc-app
+
+# Si hay cambios locales (solo permisos), descartarlos
+git restore acbc_app/entrypoint.sh scripts/setup-nginx.sh
+
+# Hacer pull
 git pull origin main
+
+# Restaurar permisos de ejecución si es necesario
+chmod +x scripts/setup-nginx.sh
+chmod +x acbc_app/entrypoint.sh
 ```
 
 **Nota:** NO necesitas parar los contenedores. Los contenedores seguirán corriendo normalmente porque Nginx se configura en el sistema operativo, no dentro de Docker.
+
+**Importante:** Si Git muestra conflictos por cambios locales (generalmente solo permisos de ejecución), usa `git restore` para descartarlos antes de hacer pull.
 
 ### 2. Ejecutar el Script de Configuración
 

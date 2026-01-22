@@ -57,6 +57,10 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls', namespace='notifications')),
 ]
 
-if settings.DEBUG:
+# Serve static and media files
+# In production with Docker, Django serves them since Nginx proxies to Django
+# Only skip if using S3 storage (which is commented out, so we always serve)
+use_s3_storage = hasattr(settings, 'AWS_STORAGE_BUCKET_NAME') and getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+if not use_s3_storage:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
