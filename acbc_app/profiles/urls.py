@@ -33,4 +33,10 @@ urlpatterns = [
     path('accepted-cryptos/', views.UserAcceptedCryptosView.as_view(), name='accepted_cryptos'),
     path('accepted-cryptos/<int:user_id>/', views.UserAcceptedCryptosView.as_view(), name='user_accepted_cryptos'),
     path('accepted-cryptos/delete/<int:crypto_id>/', views.UserAcceptedCryptosView.as_view(), name='delete_accepted_crypto'),
+    
+    # Suggestions endpoint
+    path('suggestions/', views.SuggestionCreateView.as_view(), name='suggestions'),
+    
+    # Password change endpoint
+    path('change-password/', views.ChangePasswordView.as_view(), name='change_password'),
 ]

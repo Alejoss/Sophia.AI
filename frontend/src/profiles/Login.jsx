@@ -7,6 +7,7 @@ import {
   setUserInLocalStorage,
   setAuthenticationStatus,
   isAuthenticated,
+  getAccessTokenFromLocalStorage,
 } from "../context/localStorageUtils.js";
 import SocialLogin from "../components/SocialLogin";
 import '../styles/login.css';
@@ -22,8 +23,13 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
+  const [loginImage, setLoginImage] = useState("");
 
   useEffect(() => {
+    // Select a random login cover image (1-10)
+    const randomImageNumber = Math.floor(Math.random() * 10) + 1;
+    setLoginImage(`/images/login_cover/login_cover${randomImageNumber}.jpg`);
+
     // Log environment variables to verify they're accessible
     console.log(
       "Google Client ID:",
@@ -64,11 +70,21 @@ const Login = () => {
     e.preventDefault();
     console.log("Submitting login form with:", { username, password });
     try {
+      // Check if user had previous session data before login using utilities
+      const storedUser = getUserFromLocalStorage();
+      const wasAuthenticated = isAuthenticated();
+      const hadAccessToken = getAccessTokenFromLocalStorage() !== null;
+      const hadPreviousSession = (storedUser !== null) || wasAuthenticated || hadAccessToken;
+      
       const response = await apiLogin({ username, password });
       console.log("Login API response:", response);
 
       if (response.data) {
         const { access_token, ...userData } = response.data;
+        // Mark if this is a returning user
+        if (hadPreviousSession) {
+          sessionStorage.setItem('had_previous_session', 'true');
+        }
         // Use centralized auth state update
         updateAuthState(userData, access_token);
         navigate("/profiles/login_successful");
@@ -96,45 +112,56 @@ const Login = () => {
     return (
       <div className="login-container">
         <div className="login-wrapper">
-          <div className="order-m-2 text-center">
-            <img src="/images/login-img.png" className="inline-block" alt="" />
+          <div className="login-image-section">
+            <img src={loginImage} className="login-image" alt="Login illustration" />
           </div>
-          <div>
-            <h2 className="heading-2 text-center">Iniciar sesión</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-5">
-                <label className="form-label" htmlFor="username">
-                  Nombre de usuario:
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  className="form-control"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-              <div className="mb-5">
-                <label htmlFor="password" className="form-label">
-                  Contraseña:
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  className="form-control"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <div style={{ color: "red" }}>{error}</div>}
-              <button type="submit" className="btn-primary">
-                Iniciar sesión
-              </button>
-            </form>
+          <div className="login-form-section">
+            <div className="login-form-card">
+              <h2 className="heading-2 text-center">Iniciar sesión</h2>
+              <form onSubmit={handleSubmit}>
+                <div className="mb-5">
+                  <label className="form-label" htmlFor="username">
+                    Nombre de usuario:
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    className="form-control"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                <div className="mb-5">
+                  <label htmlFor="password" className="form-label">
+                    Contraseña:
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    className="form-control"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                {error && <div className="error-message">{error}</div>}
+                <button type="submit" className="btn-primary">
+                  Iniciar sesión
+                </button>
+              </form>
 
-            <div className="social-login-section">
-              <p>O continúa con</p>
-              <SocialLogin />
+              <div className="social-login-section">
+                <div className="divider">
+                  <span>O continúa con</span>
+                </div>
+                <SocialLogin />
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                <span>¿No tienes cuenta? </span>
+                <Link to="/profiles/register" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  Regístrate
+                </Link>
+              </div>
             </div>
           </div>
         </div>

@@ -108,7 +108,7 @@ const KnowledgePathList = () => {
                 width: { xs: '100%', md: 'auto' },
               }}
             >
-              Mis Caminos de Conocimiento
+              Caminos de Conocimiento
             </Button>
             <Button
               component={Link}

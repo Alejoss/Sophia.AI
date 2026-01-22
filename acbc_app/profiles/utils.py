@@ -1,6 +1,5 @@
 import pytz
 import logging
-import requests
 
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.sites.shortcuts import get_current_site
@@ -8,22 +7,46 @@ from django.utils.http import urlsafe_base64_encode
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 
-from django.conf import settings
-
+from profiles.email_service import EmailService, EmailServiceError
 
 logger = logging.getLogger('app_logger')
 
 
 def send_email_message(receiver_email, subject, message):
-    domain_name = settings.MAILGUN_DOMAIN
-
-    return requests.post(
-        "https://api.mailgun.net/v3/" + domain_name + "/messages",
-        auth=("api", settings.MAILGUN_API_KEY),
-        data={"from": "academiablockchain@no-reply.com",
-              "to": [receiver_email],
-              "subject": subject,
-              "text": message})
+    """
+    Legacy function for sending plain text emails.
+    
+    This function is maintained for backward compatibility.
+    For new code, use EmailService directly.
+    
+    Args:
+        receiver_email: Recipient email address
+        subject: Email subject
+        message: Plain text message content
+        
+    Returns:
+        Response object from Mailgun API (for backward compatibility)
+        
+    Note:
+        This function now uses EmailService internally.
+        Returns None if email sending is disabled or fails.
+    """
+    try:
+        success = EmailService.send_email(
+            receiver_email=receiver_email,
+            subject=subject,
+            text_message=message
+        )
+        # Return a mock response object for backward compatibility
+        if success:
+            class MockResponse:
+                status_code = 200
+            return MockResponse()
+        return None
+    except EmailServiceError as e:
+        logger.error(f"Error in send_email_message: {str(e)}")
+        # Return None on error for backward compatibility
+        return None
 
 
 def academia_blockchain_timezones():
@@ -66,12 +89,23 @@ def send_confirmation_email(request, user, user_email):
         'domain': current_site
     })
 
-    # Send the email using the custom email sending function
-    send_email_message(
-        subject="Activate your account",  # Translated from "Activa tu cuenta"
-        message=message,
-        receiver_email=user_email
-    )
+    # Send the email using EmailService
+    try:
+        EmailService.send_email(
+            receiver_email=user_email,
+            subject="Activate your account",  # Translated from "Activa tu cuenta"
+            html_message=message,  # The template already renders HTML
+            text_message=None  # Will be auto-generated from HTML if needed
+        )
+    except EmailServiceError as e:
+        logger.error(f"Error sending confirmation email to {user_email}: {str(e)}", exc_info=True)
+        # Fallback to legacy method for backward compatibility
+        from profiles.utils import send_email_message
+        send_email_message(
+            subject="Activate your account",
+            message=message,
+            receiver_email=user_email
+        )
 
     # Log information for debugging purposes
     logger.warning(f"current_site: {current_site}")

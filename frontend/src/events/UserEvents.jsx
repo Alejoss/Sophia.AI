@@ -98,7 +98,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
+          <h2>Eventos</h2>
           <div className="loading-spinner">Cargando eventos...</div>
         </div>
       </div>
@@ -109,7 +109,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     return (
       <div className="events-list-container">
         <div className="text-center">
-          <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
+          <h2>Eventos</h2>
           <div className="error-message">{error}</div>
           <button onClick={() => window.location.reload()} className="btn btn-primary">
             Intentar de nuevo

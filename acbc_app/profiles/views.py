@@ -28,8 +28,8 @@ from datetime import datetime
 import jwt
 import json
 
-from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto
+from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
@@ -120,7 +120,12 @@ class UserProfileView(APIView):
             if interests is not None:
                 user_profile.interests = interests
                 logger.debug(f"Interests updated for user {request.user.username}")
-
+            
+            external_url = request.data.get('external_url')
+            if external_url is not None:
+                user_profile.external_url = external_url
+                logger.debug(f"External URL updated for user {request.user.username}")
+            
             # Handle featured_badge_id update
             featured_badge_id = request.data.get('featured_badge_id')
             if featured_badge_id is not None:
@@ -914,7 +919,7 @@ class UserNotificationsView(APIView):
             logger.debug(f"{nt['verb']}: {nt['count']}")
         
         # Serialize the notifications
-        notification_data = NotificationSerializer(notifications, many=True).data
+        notification_data = NotificationSerializer(notifications, many=True, context={'request': request}).data
         
         logger.debug("\nSerialized data being sent for user {request.user.username}:")
         logger.debug(notification_data)
@@ -1185,5 +1190,172 @@ class UserAcceptedCryptosView(APIView):
             logger.error(f"Error removing accepted cryptocurrency for user {request.user.username}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Error al eliminar criptomoneda'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SuggestionCreateView(APIView):
+    """
+    Create a new suggestion/feedback from the authenticated user.
+    Saves the suggestion to the database and sends an email to administrators.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logger.info(f"Suggestion submission requested by user {request.user.username}")
+        
+        try:
+            serializer = SuggestionSerializer(data=request.data)
+            
+            if not serializer.is_valid():
+                logger.warning(f"Invalid suggestion data from user {request.user.username}: {serializer.errors}")
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create suggestion with the authenticated user
+            suggestion = serializer.save(user=request.user)
+            logger.info(f"Suggestion created successfully by user {request.user.username} (ID: {suggestion.id})")
+            
+            # Send email to administrators
+            try:
+                self._send_email_to_admins(suggestion, request.user, request)
+            except Exception as e:
+                # Log error but don't fail the request if email fails
+                logger.error(f"Error sending email for suggestion {suggestion.id}: {str(e)}", exc_info=True)
+            
+            return Response(
+                {
+                    'message': 'Sugerencia enviada exitosamente',
+                    'suggestion': serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+            
+        except Exception as e:
+            logger.error(f"Error creating suggestion for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Error al enviar la sugerencia'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _send_email_to_admins(self, suggestion, user, request=None):
+        """
+        Send email notification to administrators about the new suggestion.
+        Uses EmailService with HTML templates for professional email delivery.
+        
+        Args:
+            suggestion: Suggestion model instance
+            user: User model instance who created the suggestion
+            request: HttpRequest object (optional, for getting site URL)
+        """
+        from profiles.email_service import EmailService, EmailServiceError
+        from django.contrib.sites.shortcuts import get_current_site
+        
+        try:
+            # Get site URL for template context
+            try:
+                if request:
+                    current_site = get_current_site(request)
+                else:
+                    # Fallback: try to get site without request
+                    from django.contrib.sites.models import Site
+                    current_site = Site.objects.get_current()
+                site_url = f"https://{current_site.domain}" if current_site else "https://sophia-ai.algobeat.com"
+            except Exception:
+                site_url = "https://sophia-ai.algobeat.com"
+            
+            # Prepare email subject
+            subject = f"Nueva sugerencia de {user.username}"
+            
+            # Prepare template context
+            context = {
+                'user': user,
+                'suggestion': suggestion,
+                'site_url': site_url,
+            }
+            
+            # Send email using template
+            results = EmailService.send_to_admins(
+                subject=subject,
+                template_name='suggestion_notification',
+                context=context,
+                tags=['suggestion', 'notification', 'admin']
+            )
+            
+            # Log results
+            if results['sent']:
+                logger.info(
+                    f"Suggestion notification email sent successfully to {len(results['sent'])} admin(s): "
+                    f"{', '.join(results['sent'])}"
+                )
+            if results['failed']:
+                logger.warning(
+                    f"Failed to send suggestion notification email to {len(results['failed'])} admin(s): "
+                    f"{', '.join(results['failed'])}"
+                )
+                
+        except EmailServiceError as e:
+            # Log error but don't fail the request
+            logger.error(
+                f"Error sending suggestion notification email: {str(e)}",
+                exc_info=True
+            )
+        except Exception as e:
+            # Catch any other unexpected errors
+            logger.error(
+                f"Unexpected error sending suggestion notification email: {str(e)}",
+                exc_info=True
+            )
+
+
+class ChangePasswordView(APIView):
+    """
+    API endpoint for authenticated users to change their password.
+    Requires the old password for security verification.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        logger.info(f"Password change requested by user {request.user.username}")
+        
+        try:
+            serializer = ChangePasswordSerializer(data=request.data)
+            
+            if not serializer.is_valid():
+                logger.warning(f"Invalid password change data from user {request.user.username}: {serializer.errors}")
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user = request.user
+            old_password = serializer.validated_data['old_password']
+            new_password = serializer.validated_data['new_password']
+            
+            # Verify old password
+            if not user.check_password(old_password):
+                logger.warning(f"Invalid old password provided by user {request.user.username}")
+                return Response(
+                    {'old_password': ['La contraseña actual es incorrecta.']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            logger.info(f"Password changed successfully for user {request.user.username}")
+            
+            return Response(
+                {'message': 'Contraseña cambiada exitosamente'},
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error changing password for user {request.user.username}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Error al cambiar la contraseña'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

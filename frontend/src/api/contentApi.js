@@ -126,6 +126,26 @@ const contentApi = {
         }
     },
 
+    getCollection: async (collectionId) => {
+        try {
+            const response = await axiosInstance.get(`/content/collections/${collectionId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching collection:', error.response || error);
+            throw error;
+        }
+    },
+
+    updateCollection: async (collectionId, collectionData) => {
+        try {
+            const response = await axiosInstance.patch(`/content/collections/${collectionId}/`, collectionData);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating collection:', error.response || error);
+            throw error;
+        }
+    },
+
     getCollectionContent: async (collectionId) => {
         try {
             const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`);
@@ -412,6 +432,174 @@ const contentApi = {
             return response.data;
         } catch (error) {
             console.error('Error updating topic:', error);
+            throw error;
+        }
+    },
+
+    addTopicModerators: async (topicId, usernames) => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/`, {
+                usernames: usernames
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error adding topic moderators:', error);
+            throw error;
+        }
+    },
+
+    removeTopicModerators: async (topicId, usernames) => {
+        try {
+            const response = await axiosInstance.delete(`/content/topics/${topicId}/moderators/`, {
+                data: { usernames: usernames }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error removing topic moderators:', error);
+            throw error;
+        }
+    },
+
+    inviteTopicModerator: async (topicId, username, message = '') => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invite/`, {
+                username: username,
+                message: message
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error inviting topic moderator:', error.response || error);
+            throw error;
+        }
+    },
+
+    getTopicModeratorInvitations: async (topicId) => {
+        try {
+            const response = await axiosInstance.get(`/content/topics/${topicId}/moderators/invitations/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching topic moderator invitations:', error.response || error);
+            throw error;
+        }
+    },
+
+    acceptTopicModeratorInvitation: async (topicId, invitationId) => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/accept/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error accepting topic moderator invitation:', error.response || error);
+            throw error;
+        }
+    },
+
+    declineTopicModeratorInvitation: async (topicId, invitationId) => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/decline/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error declining topic moderator invitation:', error.response || error);
+            throw error;
+        }
+    },
+
+    getUserTopics: async (type = null) => {
+        try {
+            const url = type ? `/content/user/topics/?type=${type}` : '/content/user/topics/';
+            const response = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user topics:', error.response || error);
+            throw error;
+        }
+    },
+
+    getUserTopicInvitations: async (status = 'PENDING') => {
+        try {
+            const response = await axiosInstance.get(`/content/user/topics/invitations/?status=${status}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user topic invitations:', error.response || error);
+            throw error;
+        }
+    },
+
+    // Content Suggestions API methods
+    createContentSuggestion: async (topicId, contentId, message = '') => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/topics/${topicId}/content-suggestions/create/`,
+                { content_id: contentId, message: message }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error creating content suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    getTopicContentSuggestions: async (topicId, filters = {}) => {
+        try {
+            const params = new URLSearchParams();
+            if (filters.status) params.append('status', filters.status);
+            if (filters.is_duplicate !== undefined) params.append('is_duplicate', filters.is_duplicate);
+            
+            const url = `/content/topics/${topicId}/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+            const response = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching topic content suggestions:', error.response || error);
+            throw error;
+        }
+    },
+
+    acceptContentSuggestion: async (topicId, suggestionId) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/topics/${topicId}/content-suggestions/${suggestionId}/accept/`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error accepting content suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    rejectContentSuggestion: async (topicId, suggestionId, rejectionReason) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/topics/${topicId}/content-suggestions/${suggestionId}/reject/`,
+                { rejection_reason: rejectionReason }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error rejecting content suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    getUserContentSuggestions: async (filters = {}) => {
+        try {
+            const params = new URLSearchParams();
+            if (filters.status) params.append('status', filters.status);
+            if (filters.topic_id) params.append('topic_id', filters.topic_id);
+            
+            const url = `/content/user/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+            const response = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user content suggestions:', error.response || error);
+            throw error;
+        }
+    },
+    deleteContentSuggestion: async (topicId, suggestionId) => {
+        try {
+            const response = await axiosInstance.delete(
+                `/content/topics/${topicId}/content-suggestions/${suggestionId}/`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error deleting content suggestion:', error.response || error);
             throw error;
         }
     },

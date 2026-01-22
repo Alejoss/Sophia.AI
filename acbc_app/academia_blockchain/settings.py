@@ -24,9 +24,28 @@ except Exception:
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY", 'django-insecure-development-key-123')  # Default key for development
-ALLOWED_HOSTS = ["*"]
-DEBUG = True
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
+
+# Security settings based on environment
+if ENVIRONMENT == "PRODUCTION":
+    DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    # Parse ALLOWED_HOSTS from environment variable (comma-separated)
+    allowed_hosts_str = os.getenv("ALLOWED_HOSTS", "")
+    if allowed_hosts_str:
+        ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(",") if host.strip()]
+    else:
+        raise ValueError("ALLOWED_HOSTS must be set in production environment!")
+    
+    # Security validation
+    if DEBUG:
+        raise ValueError("DEBUG must be False in production environment!")
+    if SECRET_KEY == 'django-insecure-development-key-123':
+        raise ValueError("Please set a proper SECRET_KEY in production!")
+else:
+    # Development defaults
+    DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+    allowed_hosts_str = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0")
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(",") if host.strip()] if allowed_hosts_str else ["*"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -531,6 +550,22 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 
+# Email configuration
+MAILGUN_DOMAIN = os.getenv('MAILGUN_DOMAIN', '')
+MAILGUN_API_KEY = os.getenv('MAILGUN_API_KEY', '')
+EMAIL_FROM = os.getenv('EMAIL_FROM', 'academiablockchain@no-reply.com')
+EMAIL_FROM_NAME = os.getenv('EMAIL_FROM_NAME', 'Academia Blockchain')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', '')
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))  # Timeout in seconds
+EMAIL_MAX_RETRIES = int(os.getenv('EMAIL_MAX_RETRIES', '3'))
+
+# Validate email configuration in production
+if ENVIRONMENT == "PRODUCTION" and SEND_EMAILS:
+    if not MAILGUN_DOMAIN or not MAILGUN_API_KEY:
+        raise ValueError(
+            "MAILGUN_DOMAIN and MAILGUN_API_KEY must be set in production when SEND_EMAILS=True"
+        )
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -569,9 +604,6 @@ if ENVIRONMENT == "PRODUCTION":
     STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
     STATIC_URL = "/static/"
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-
-    if SECRET_KEY == 'django-insecure-development-key-123':
-        raise ValueError("Please set a proper SECRET_KEY in production!")
 
 else:
 

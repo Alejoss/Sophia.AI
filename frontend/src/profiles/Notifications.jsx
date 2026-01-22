@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ApiIcon from '@mui/icons-material/Api';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { Tooltip } from '@mui/material';
+import { Tooltip, Typography, Box } from '@mui/material';
 import '../styles/notifications.css';
 
 const Notifications = ({
@@ -39,17 +39,82 @@ const Notifications = ({
       return notification.description;
     } else if (notification.verb === 'te envió un certificado para') {
       return notification.description;
+    } else if (notification.verb === 'te invitó a moderar') {
+      if (notification.description) {
+        // Si hay un mensaje opcional después de los dos puntos, dividirlo
+        // Formato esperado: "usuario te invitó a moderar el tema "título": mensaje opcional"
+        // Buscamos el patrón: " después de las comillas del título, hay un : seguido de espacio
+        const match = notification.description.match(/^(.+?":\s)(.+)$/);
+        if (match && match.length === 3) {
+          // match[1] = "usuario te invitó a moderar el tema "título": "
+          // match[2] = mensaje opcional
+          return (
+            <>
+              {match[1].trim()}
+              <br />
+              <br />
+              {match[2]}
+            </>
+          );
+        }
+        // Fallback: intentar dividir por el primer ": " después de las comillas de cierre
+        const quoteIndex = notification.description.lastIndexOf('"');
+        if (quoteIndex !== -1) {
+          const colonIndex = notification.description.indexOf(': ', quoteIndex);
+          if (colonIndex !== -1) {
+            const mainMessage = notification.description.substring(0, colonIndex + 1).trim();
+            const optionalMessage = notification.description.substring(colonIndex + 2).trim();
+            return (
+              <>
+                {mainMessage}
+                <br />
+                <br />
+                {optionalMessage}
+              </>
+            );
+          }
+        }
+        return notification.description;
+      }
+      return `${notification.actor} te invitó a moderar`;
+    } else if (notification.verb === 'aceptó tu invitación para moderar') {
+      return notification.description || `${notification.actor} aceptó tu invitación para moderar`;
+    } else if (notification.verb === 'rechazó tu invitación para moderar') {
+      return notification.description || `${notification.actor} rechazó tu invitación para moderar`;
+    } else if (notification.verb === 'te removió como moderador de') {
+      return notification.description || `${notification.actor} te removió como moderador`;
+    } else if (notification.verb === 'sugirió contenido para') {
+      return notification.description || `${notification.actor} sugirió contenido`;
+    } else if (notification.verb === 'aceptó tu sugerencia de contenido para') {
+      return notification.description || `${notification.actor} aceptó tu sugerencia de contenido`;
+    } else if (notification.verb === 'rechazó tu sugerencia de contenido para') {
+      return notification.description || `${notification.actor} rechazó tu sugerencia de contenido`;
     }
-    return `${notification.actor} ${notification.verb} tu comentario en ${notification.context_title}`;
+    // Fallback: use description if available, otherwise construct a message
+    if (notification.description) {
+      return notification.description;
+    }
+    return `${notification.actor} ${notification.verb}${notification.context_title ? ` en ${notification.context_title}` : ''}`;
   };
 
   return (
     <div className="notifications-container">
-      <div className="notifications-header">
-        <div className="header-content">
-          <h2>Notificaciones</h2>          
-        </div>
-      </div>
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
+          Notificaciones
+        </Typography>
+      </Box>
       <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '10px 0' }}>
         <button 
           className="mark-all-read-button"
@@ -87,10 +152,11 @@ const Notifications = ({
                       {new Date(notification.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p className="notification-description">
+                  <br />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div className="notification-description">
                       {getNotificationDescription(notification)}
-                    </p>
+                    </div>
                     {notification.target_url && (
                       <Link 
                         to={notification.target_url} 
@@ -100,7 +166,8 @@ const Notifications = ({
                           alignItems: 'center',
                           color: '#666',
                           textDecoration: 'none',
-                          marginLeft: '16px'
+                          marginLeft: '16px',
+                          marginTop: '0'
                         }}
                       >
                         <ApiIcon style={{ fontSize: '20px' }} />

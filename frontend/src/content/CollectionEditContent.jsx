@@ -15,11 +15,15 @@ import {
     Alert,
     Chip,
     Link as MuiLink,
-    Divider
+    Divider,
+    TextField
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 
@@ -28,32 +32,28 @@ const CollectionEditContent = () => {
     const navigate = useNavigate();
     const [collectionData, setCollectionData] = useState(null);
     const [collectionName, setCollectionName] = useState('');
+    const [editingName, setEditingName] = useState(false);
+    const [tempCollectionName, setTempCollectionName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [savingName, setSavingName] = useState(false);
     const [showAddContent, setShowAddContent] = useState(false);
 
     useEffect(() => {
         const fetchCollectionData = async () => {
             console.log('Fetching collection data for ID:', collectionId);
             try {
-                console.log('Fetching collection content...');
-                const contentData = await contentApi.getCollectionContent(collectionId);
+                // Fetch collection info and content in parallel
+                const [collectionInfo, contentData] = await Promise.all([
+                    contentApi.getCollection(collectionId),
+                    contentApi.getCollectionContent(collectionId)
+                ]);
+                console.log('Collection info fetched:', collectionInfo);
                 console.log('Collection content fetched:', contentData);
 
-                // Get the collection name from the first content item's collection_name
-                if (contentData.length > 0 && contentData[0].collection_name) {
-                    setCollectionName(contentData[0].collection_name);
-                } else {
-                    // If no content, try to get it from user collections
-                    const collections = await contentApi.getUserCollections();
-                    const collection = collections.find(c => c.id === parseInt(collectionId));
-                    if (collection) {
-                        setCollectionName(collection.name);
-                    }
-                }
-
-                setCollectionData(contentData);
+                setCollectionName(collectionInfo.name || '');
+                setCollectionData(contentData || []);
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching collection data:', err);
@@ -110,6 +110,37 @@ const CollectionEditContent = () => {
         }
     };
 
+    const handleStartEditName = () => {
+        setTempCollectionName(collectionName);
+        setEditingName(true);
+    };
+
+    const handleCancelEditName = () => {
+        setEditingName(false);
+        setTempCollectionName('');
+    };
+
+    const handleSaveName = async () => {
+        if (!tempCollectionName.trim()) {
+            setError('El nombre de la colección no puede estar vacío');
+            return;
+        }
+
+        try {
+            setSavingName(true);
+            const updatedCollection = await contentApi.updateCollection(collectionId, {
+                name: tempCollectionName.trim()
+            });
+            setCollectionName(updatedCollection.name);
+            setEditingName(false);
+            setSavingName(false);
+        } catch (err) {
+            console.error('Error updating collection name:', err);
+            setError('Error al actualizar el nombre de la colección');
+            setSavingName(false);
+        }
+    };
+
     const filterContent = (content) => {
         // Filter out content that's already in this collection
         const isInCollection = content.collection === parseInt(collectionId);
@@ -160,21 +191,60 @@ const CollectionEditContent = () => {
     return (
         <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
                     <IconButton 
                         onClick={() => navigate(`/content/collections/${collectionId}`)}
-                        sx={{ mr: 2 }}
+                        sx={{ mr: 1 }}
                     >
                         <ArrowBackIcon />
                     </IconButton>
-                    <Typography variant="h4" sx={{ flexGrow: 1 }}>
-                        {collectionName}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 1, minWidth: 300 }}>
+                        {editingName ? (
+                            <>
+                                <TextField
+                                    value={tempCollectionName}
+                                    onChange={(e) => setTempCollectionName(e.target.value)}
+                                    variant="outlined"
+                                    size="small"
+                                    sx={{ flexGrow: 1 }}
+                                    disabled={savingName}
+                                    autoFocus
+                                />
+                                <IconButton
+                                    onClick={handleSaveName}
+                                    disabled={savingName}
+                                    color="primary"
+                                >
+                                    <SaveIcon />
+                                </IconButton>
+                                <IconButton
+                                    onClick={handleCancelEditName}
+                                    disabled={savingName}
+                                >
+                                    <CancelIcon />
+                                </IconButton>
+                            </>
+                        ) : (
+                            <>
+                                <Typography variant="h4" sx={{ flexGrow: 1 }}>
+                                    {collectionName}
+                                </Typography>
+                                <IconButton
+                                    onClick={handleStartEditName}
+                                    size="small"
+                                    sx={{ ml: 1 }}
+                                >
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            </>
+                        )}
+                    </Box>
                     <Button
                         variant="contained"
                         color="primary"
                         startIcon={<AddIcon />}
                         onClick={() => setShowAddContent(true)}
+                        sx={{ ml: 'auto' }}
                     >
                         Agregar contenido de tu biblioteca
                     </Button>

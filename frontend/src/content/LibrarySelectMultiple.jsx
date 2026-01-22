@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Box, 
     Typography, 
@@ -14,9 +14,18 @@ import {
     Checkbox,
     Chip,
     Link as MuiLink,
-    Divider
+    Divider,
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    IconButton
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import SearchIcon from '@mui/icons-material/Search';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import contentApi from '../api/contentApi';
 
 const LibrarySelectMultiple = ({ 
@@ -43,6 +52,13 @@ const LibrarySelectMultiple = ({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
+    
+    // New states for search, collection, and sorting
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCollectionId, setSelectedCollectionId] = useState(null);
+    const [sortField, setSortField] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc');
+    const [collections, setCollections] = useState([]);
 
     useEffect(() => {
         console.log('LibrarySelectMultiple useEffect triggered');
@@ -96,6 +112,93 @@ const LibrarySelectMultiple = ({
         };
     }, [filterFunction]);
 
+    // Fetch user collections
+    useEffect(() => {
+        const fetchCollections = async () => {
+            try {
+                const data = await contentApi.getUserCollections();
+                setCollections(data || []);
+            } catch (err) {
+                console.error('LibrarySelectMultiple: Error fetching collections:', err);
+                // Don't set error state, just log it - collections are optional
+            }
+        };
+
+        fetchCollections();
+    }, []);
+
+    // Initialize selectedContentProfiles from selectedIds prop
+    useEffect(() => {
+        if (selectedIds && selectedIds.length > 0 && userContent.length > 0) {
+            const initialSelected = userContent.filter(item => 
+                selectedIds.includes(item.id)
+            );
+            if (initialSelected.length > 0) {
+                setSelectedContentProfiles(initialSelected);
+            }
+        }
+    }, [selectedIds, userContent]);
+
+    // Filtered and sorted content using useMemo for optimization
+    const filteredContent = useMemo(() => {
+        let filtered = [...userContent];
+
+        // Apply collection filter
+        if (selectedCollectionId !== null) {
+            const collectionIdNum = typeof selectedCollectionId === 'string' 
+                ? parseInt(selectedCollectionId) 
+                : selectedCollectionId;
+            
+            filtered = filtered.filter(item => {
+                // Check if content is in the selected collection
+                // Content has a collection field that is the collection ID
+                return item.collection === collectionIdNum || 
+                       item.collection === selectedCollectionId;
+            });
+        }
+
+        // Apply search filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(item => {
+                const title = (item.title || '').toLowerCase();
+                const author = (item.author || '').toLowerCase();
+                const mediaType = (item.content?.media_type || '').toLowerCase();
+                
+                return title.includes(query) || 
+                       author.includes(query) || 
+                       mediaType.includes(query);
+            });
+        }
+
+        // Apply sorting
+        if (sortField) {
+            filtered = [...filtered].sort((a, b) => {
+                let aValue, bValue;
+                
+                if (sortField === 'title') {
+                    aValue = (a.title || 'Sin título').toLowerCase();
+                    bValue = (b.title || 'Sin título').toLowerCase();
+                } else if (sortField === 'author') {
+                    aValue = (a.author || 'Desconocido').toLowerCase();
+                    bValue = (b.author || 'Desconocido').toLowerCase();
+                } else {
+                    return 0;
+                }
+
+                if (aValue < bValue) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [userContent, selectedCollectionId, searchQuery, sortField, sortDirection]);
+
     const handleContentToggle = (contentProfile) => {
         console.log('LibrarySelectMultiple.handleContentToggle:', {
             contentProfileId: contentProfile.id,
@@ -135,19 +238,32 @@ const LibrarySelectMultiple = ({
         console.log('LibrarySelectMultiple.handleSelectAll:', {
             checked: event.target.checked,
             maxSelections,
-            totalItems: userContent.length
+            totalItems: filteredContent.length
         });
         
         let newSelection;
         if (event.target.checked) {
-            newSelection = maxSelections ? userContent.slice(0, maxSelections) : userContent;
+            // Get currently selected items that are NOT in filteredContent
+            const selectedNotInFiltered = selectedContentProfiles.filter(
+                selected => !filteredContent.some(filtered => filtered.id === selected.id)
+            );
+            
+            // Add all filtered items (up to maxSelections if applicable)
+            const itemsToAdd = maxSelections 
+                ? filteredContent.slice(0, maxSelections - selectedNotInFiltered.length)
+                : filteredContent;
+            
+            newSelection = [...selectedNotInFiltered, ...itemsToAdd];
             console.log('Selecting all:', {
                 selectedIds: newSelection.map(p => p.id),
                 limited: maxSelections ? 'yes' : 'no'
             });
         } else {
-            console.log('Clearing all selections');
-            newSelection = [];
+            // Only deselect items that are in filteredContent
+            newSelection = selectedContentProfiles.filter(
+                selected => !filteredContent.some(filtered => filtered.id === selected.id)
+            );
+            console.log('Clearing filtered selections');
         }
         
         setSelectedContentProfiles(newSelection);
@@ -156,6 +272,10 @@ const LibrarySelectMultiple = ({
         if (onSelectionChange) {
             onSelectionChange(newSelection);
         }
+    };
+
+    const handleSortDirectionToggle = () => {
+        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     };
 
     const handleSubmit = async () => {
@@ -201,9 +321,71 @@ const LibrarySelectMultiple = ({
 
                 <Divider sx={{ my: 3 }} />
 
+                {/* Toolbar with search, collection selector, and sorting */}
+                <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                    {/* Search field */}
+                    <TextField
+                        placeholder="Buscar contenido..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        size="small"
+                        InputProps={{
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                        }}
+                        sx={{ flexGrow: 1, minWidth: 200 }}
+                    />
+
+                    {/* Collection selector */}
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Colección</InputLabel>
+                        <Select
+                            value={selectedCollectionId || ''}
+                            label="Colección"
+                            onChange={(e) => setSelectedCollectionId(e.target.value || null)}
+                        >
+                            <MenuItem value="">
+                                <em>Todas las colecciones</em>
+                            </MenuItem>
+                            {collections.map((collection) => (
+                                <MenuItem key={collection.id} value={collection.id}>
+                                    {collection.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    {/* Sort field selector */}
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel>Ordenar por</InputLabel>
+                        <Select
+                            value={sortField || ''}
+                            label="Ordenar por"
+                            onChange={(e) => setSortField(e.target.value || null)}
+                        >
+                            <MenuItem value="">
+                                <em>Sin ordenar</em>
+                            </MenuItem>
+                            <MenuItem value="title">Título</MenuItem>
+                            <MenuItem value="author">Autor</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    {/* Sort direction toggle */}
+                    {sortField && (
+                        <IconButton
+                            onClick={handleSortDirectionToggle}
+                            size="small"
+                            sx={{ border: 1, borderColor: 'divider' }}
+                            title={sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}
+                        >
+                            {sortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
+                        </IconButton>
+                    )}
+                </Box>
+
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6">
-                        Contenido disponible ({userContent.length})
+                        Contenido disponible ({filteredContent.length})
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <Button
@@ -219,7 +401,7 @@ const LibrarySelectMultiple = ({
                             onClick={handleSubmit}
                             disabled={selectedContentProfiles.length === 0 || saving}
                         >
-                            {saving ? 'Guardando...' : `Guardar seleccionados (${selectedContentProfiles.length})`}
+                            {saving ? 'Guardando...' : `Elegir (${selectedContentProfiles.length})`}
                         </Button>
                     </Box>
                 </Box>
@@ -230,8 +412,15 @@ const LibrarySelectMultiple = ({
                             <TableRow>
                                 <TableCell padding="checkbox">
                                     <Checkbox
-                                        indeterminate={selectedContentProfiles.length > 0 && selectedContentProfiles.length < userContent.length}
-                                        checked={userContent.length > 0 && selectedContentProfiles.length === userContent.length}
+                                        indeterminate={
+                                            filteredContent.length > 0 && 
+                                            filteredContent.some(item => selectedContentProfiles.some(p => p.id === item.id)) &&
+                                            !filteredContent.every(item => selectedContentProfiles.some(p => p.id === item.id))
+                                        }
+                                        checked={
+                                            filteredContent.length > 0 && 
+                                            filteredContent.every(item => selectedContentProfiles.some(p => p.id === item.id))
+                                        }
                                         onChange={handleSelectAll}
                                         disabled={maxSelections && selectedContentProfiles.length >= maxSelections}
                                     />
@@ -243,7 +432,7 @@ const LibrarySelectMultiple = ({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {userContent.map((content) => (
+                            {filteredContent.map((content) => (
                                 <TableRow 
                                     key={content.id}
                                     hover
@@ -289,10 +478,12 @@ const LibrarySelectMultiple = ({
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {userContent.length === 0 && (
+                            {filteredContent.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={5} align="center">
-                                        No hay contenido disponible
+                                        {searchQuery || selectedCollectionId !== null 
+                                            ? 'No se encontró contenido con los filtros aplicados' 
+                                            : 'No hay contenido disponible'}
                                     </TableCell>
                                 </TableRow>
                             )}

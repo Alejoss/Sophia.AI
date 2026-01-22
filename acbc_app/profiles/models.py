@@ -51,6 +51,7 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     interests = models.CharField(max_length=250, blank=True)
     profile_description = models.TextField(max_length=2500, blank=True)
+    external_url = models.URLField(max_length=500, blank=True)
     timezone = models.CharField(max_length=30, blank=True)
     is_teacher = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to=upload_profile_picture, null=True, blank=True)
@@ -143,3 +144,17 @@ class UserNodeCompletion(models.Model):
     def __str__(self):
         status = 'Completed' if self.is_completed else 'Pending'
         return f"{self.user.username} - {self.node.title} ({status})"
+
+
+class Suggestion(models.Model):
+    # Stores user suggestions/feedback about the platform.
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='suggestions')
+    message = models.TextField(help_text="Sugerencia o feedback del usuario")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Sugerencia de {self.user.username} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, ContactMethod, UserNodeCompletion
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, ContactMethod, UserNodeCompletion, Suggestion
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath, Node
 from certificates.models import CertificateRequest, Certificate, CertificateTemplate
@@ -13,7 +13,7 @@ from django.conf import settings
 import jwt
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from django.contrib.contenttypes.models import ContentType
 from content.models import Content, Topic
 from gamification.models import Badge, UserBadge
@@ -1129,8 +1129,8 @@ class NotificationTests(APITestCase):
         
         # Verify notification content
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'upvoted your content')
-        self.assertIn('testuser upvoted your content', notification['description'])
+        self.assertEqual(notification['verb'], 'votó positivamente tu contenido')
+        self.assertIn('testuser votó positivamente tu contenido', notification['description'])
         self.assertIn('Test Content', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -1170,8 +1170,8 @@ class NotificationTests(APITestCase):
         
         # Verify notification content
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'upvoted your knowledge path')
-        self.assertIn('testuser upvoted your knowledge path', notification['description'])
+        self.assertEqual(notification['verb'], 'votó positivamente tu camino de conocimiento')
+        self.assertIn('testuser votó positivamente tu camino de conocimiento', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -1206,7 +1206,7 @@ class NotificationTests(APITestCase):
         
         # Should have no upvote notifications (no self-notification)
         # But may have other notifications from setUp
-        upvote_notifications = [n for n in notifications if n['verb'] == 'upvoted your content']
+        upvote_notifications = [n for n in notifications if n['verb'] == 'votó positivamente tu contenido']
         self.assertEqual(len(upvote_notifications), 0)
 
     def test_upvote_notification_duplicate_prevention(self):
@@ -1256,5 +1256,428 @@ class NotificationTests(APITestCase):
         notifications = notifications_response.data['notifications']
         
         # Should have only one notification due to duplicate prevention
-        upvote_notifications = [n for n in notifications if n['verb'] == 'upvoted your content']
+        upvote_notifications = [n for n in notifications if n['verb'] == 'votó positivamente tu contenido']
         self.assertEqual(len(upvote_notifications), 1)
+
+
+class SuggestionModelTests(TestCase):
+    """Tests for the Suggestion model"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+    
+    def test_suggestion_creation(self):
+        """Test suggestion creation and string representation"""
+        suggestion = Suggestion.objects.create(
+            user=self.user,
+            message='Esta es una sugerencia de prueba para mejorar la plataforma.'
+        )
+        self.assertEqual(str(suggestion), f"Sugerencia de {self.user.username} - {suggestion.created_at.strftime('%Y-%m-%d %H:%M')}")
+        self.assertEqual(suggestion.message, 'Esta es una sugerencia de prueba para mejorar la plataforma.')
+        self.assertEqual(suggestion.user, self.user)
+        self.assertIsNotNone(suggestion.created_at)
+    
+    def test_suggestion_ordering(self):
+        """Test that suggestions are ordered by created_at descending"""
+        suggestion1 = Suggestion.objects.create(
+            user=self.user,
+            message='Primera sugerencia'
+        )
+        suggestion2 = Suggestion.objects.create(
+            user=self.user,
+            message='Segunda sugerencia'
+        )
+        
+        suggestions = list(Suggestion.objects.all())
+        # Most recent should be first
+        self.assertEqual(suggestions[0], suggestion2)
+        self.assertEqual(suggestions[1], suggestion1)
+    
+    def test_suggestion_user_relationship(self):
+        """Test that suggestion is properly linked to user"""
+        suggestion = Suggestion.objects.create(
+            user=self.user,
+            message='Test suggestion'
+        )
+        self.assertEqual(suggestion.user.id, self.user.id)
+        # Test reverse relationship
+        self.assertIn(suggestion, self.user.suggestions.all())
+
+
+class SuggestionSerializerTests(TestCase):
+    """Tests for the SuggestionSerializer"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        from profiles.serializers import SuggestionSerializer
+        self.serializer_class = SuggestionSerializer
+    
+    def test_valid_suggestion_data(self):
+        """Test serializer with valid data"""
+        data = {
+            'message': 'Esta es una sugerencia válida con más de 10 caracteres.'
+        }
+        serializer = self.serializer_class(data=data)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_empty_message_validation(self):
+        """Test that empty message is rejected"""
+        data = {'message': ''}
+        serializer = self.serializer_class(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('message', serializer.errors)
+    
+    def test_whitespace_only_message_validation(self):
+        """Test that whitespace-only message is rejected"""
+        data = {'message': '   '}
+        serializer = self.serializer_class(data=data)
+        self.assertFalse(serializer.is_valid())
+    
+    def test_short_message_validation(self):
+        """Test that message shorter than 10 characters is rejected"""
+        data = {'message': 'Corto'}
+        serializer = self.serializer_class(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('message', serializer.errors)
+    
+    def test_minimum_length_message_validation(self):
+        """Test that message with exactly 10 characters is accepted"""
+        data = {'message': '1234567890'}
+        serializer = self.serializer_class(data=data)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_message_trimming(self):
+        """Test that message is trimmed of whitespace"""
+        data = {'message': '   Mensaje con espacios   '}
+        serializer = self.serializer_class(data=data)
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['message'], 'Mensaje con espacios')
+
+
+class SuggestionAPITests(APITestCase):
+    """Tests for the Suggestion API endpoint"""
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.admin_user = User.objects.create_user(
+            username='admin',
+            email='admin@example.com',
+            password='adminpass123',
+            is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+    
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_create_suggestion_success(self, mock_send_to_admins):
+        """Test successful suggestion creation"""
+        mock_send_to_admins.return_value = {'sent': [self.admin_user.email], 'failed': []}
+        
+        url = reverse('profiles:suggestions')
+        data = {
+            'message': 'Esta es una sugerencia de prueba para mejorar la plataforma.'
+        }
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('message', response.data)
+        self.assertIn('suggestion', response.data)
+        self.assertEqual(response.data['message'], 'Sugerencia enviada exitosamente')
+        
+        # Verify suggestion was saved
+        suggestion = Suggestion.objects.get(user=self.user)
+        self.assertEqual(suggestion.message, 'Esta es una sugerencia de prueba para mejorar la plataforma.')
+        
+        # Verify email was sent to admin
+        self.assertTrue(mock_send_to_admins.called)
+    
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_create_suggestion_sends_email_to_admins(self, mock_send_to_admins):
+        """Test that email is sent to admin users"""
+        mock_send_to_admins.return_value = {'sent': [self.admin_user.email], 'failed': []}
+        
+        url = reverse('profiles:suggestions')
+        data = {
+            'message': 'Sugerencia que debería enviar email a administradores.'
+        }
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify email was called
+        self.assertTrue(mock_send_to_admins.called)
+        # Check that it was called with correct template name
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertEqual(call_kwargs['template_name'], 'suggestion_notification')
+    
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_create_suggestion_email_failure_does_not_fail_request(self, mock_send_to_admins):
+        """Test that email failure doesn't cause the request to fail"""
+        from profiles.email_service import EmailServiceError
+        mock_send_to_admins.side_effect = EmailServiceError("Email service unavailable")
+        
+        url = reverse('profiles:suggestions')
+        data = {
+            'message': 'Sugerencia que debería guardarse aunque falle el email.'
+        }
+        response = self.client.post(url, data, format='json')
+        
+        # Request should still succeed
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify suggestion was saved despite email failure
+        suggestion = Suggestion.objects.get(user=self.user)
+        self.assertEqual(suggestion.message, 'Sugerencia que debería guardarse aunque falle el email.')
+    
+    def test_create_suggestion_requires_authentication(self):
+        """Test that unauthenticated users cannot create suggestions"""
+        self.client.force_authenticate(user=None)
+        
+        url = reverse('profiles:suggestions')
+        data = {
+            'message': 'Esta sugerencia no debería ser aceptada.'
+        }
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(Suggestion.objects.count(), 0)
+    
+    def test_create_suggestion_empty_message(self):
+        """Test that empty message is rejected"""
+        url = reverse('profiles:suggestions')
+        data = {'message': ''}
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('message', response.data)
+    
+    def test_create_suggestion_short_message(self):
+        """Test that message shorter than 10 characters is rejected"""
+        url = reverse('profiles:suggestions')
+        data = {'message': 'Corto'}
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('message', response.data)
+    
+    def test_create_suggestion_whitespace_only(self):
+        """Test that whitespace-only message is rejected"""
+        url = reverse('profiles:suggestions')
+        data = {'message': '   '}
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_create_suggestion_with_valid_minimum_length(self):
+        """Test that message with exactly 10 characters is accepted"""
+        url = reverse('profiles:suggestions')
+        data = {'message': '1234567890'}
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    
+    def test_create_suggestion_multiple_users(self):
+        """Test that multiple users can create suggestions"""
+        user2 = User.objects.create_user(
+            username='testuser2',
+            email='test2@example.com',
+            password='testpass123'
+        )
+        
+        # First user's suggestion
+        url = reverse('profiles:suggestions')
+        data1 = {'message': 'Sugerencia del primer usuario'}
+        response1 = self.client.post(url, data1, format='json')
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+        
+        # Second user's suggestion
+        self.client.force_authenticate(user=user2)
+        data2 = {'message': 'Sugerencia del segundo usuario'}
+        response2 = self.client.post(url, data2, format='json')
+        self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
+        
+        # Verify both suggestions exist
+        self.assertEqual(Suggestion.objects.count(), 2)
+        self.assertEqual(Suggestion.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Suggestion.objects.filter(user=user2).count(), 1)
+    
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_create_suggestion_email_content(self, mock_send_to_admins):
+        """Test that email contains correct information"""
+        mock_send_to_admins.return_value = {'sent': [self.admin_user.email], 'failed': []}
+        
+        url = reverse('profiles:suggestions')
+        data = {'message': 'Mensaje de prueba para verificar contenido del email'}
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify email was called
+        self.assertTrue(mock_send_to_admins.called)
+        
+        # Check email content - EmailService.send_to_admins uses template_name and context
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertIn(self.user.username, call_kwargs['subject'])
+        self.assertEqual(call_kwargs['template_name'], 'suggestion_notification')
+        # Verify context contains user and suggestion
+        context = call_kwargs['context']
+        self.assertEqual(context['user'], self.user)
+        self.assertIn('suggestion', context)
+        self.assertIn(data['message'], context['suggestion'].message)
+
+
+class EmailServiceTests(TestCase):
+    """Tests for the EmailService class"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.admin_user = User.objects.create_user(
+            username='admin',
+            email='admin@example.com',
+            password='adminpass123',
+            is_staff=True
+        )
+    
+    def test_validate_email_valid(self):
+        """Test email validation with valid email"""
+        try:
+            EmailService._validate_email('test@example.com')
+        except EmailValidationError:
+            self.fail("Valid email should not raise EmailValidationError")
+    
+    def test_validate_email_invalid(self):
+        """Test email validation with invalid email"""
+        with self.assertRaises(EmailValidationError):
+            EmailService._validate_email('invalid-email')
+    
+    def test_validate_email_empty(self):
+        """Test email validation with empty string"""
+        with self.assertRaises(EmailValidationError):
+            EmailService._validate_email('')
+    
+    @patch('profiles.email_service.settings')
+    def test_validate_configuration_missing_domain(self, mock_settings):
+        """Test configuration validation with missing domain"""
+        mock_settings.MAILGUN_DOMAIN = ''
+        mock_settings.MAILGUN_API_KEY = 'test-key'
+        
+        with self.assertRaises(EmailConfigurationError):
+            EmailService._validate_configuration()
+    
+    @patch('profiles.email_service.settings')
+    def test_validate_configuration_missing_api_key(self, mock_settings):
+        """Test configuration validation with missing API key"""
+        mock_settings.MAILGUN_DOMAIN = 'test-domain'
+        mock_settings.MAILGUN_API_KEY = ''
+        
+        with self.assertRaises(EmailConfigurationError):
+            EmailService._validate_configuration()
+    
+    @patch('profiles.email_service.settings')
+    def test_is_email_enabled(self, mock_settings):
+        """Test email enabled check"""
+        mock_settings.SEND_EMAILS = True
+        self.assertTrue(EmailService._is_email_enabled())
+        
+        mock_settings.SEND_EMAILS = False
+        self.assertFalse(EmailService._is_email_enabled())
+    
+    def test_get_admin_emails(self):
+        """Test getting admin emails"""
+        admin_emails = EmailService.get_admin_emails()
+        
+        # Should include staff user email
+        self.assertIn(self.admin_user.email, admin_emails)
+        # Should not include regular user email
+        self.assertNotIn(self.user.email, admin_emails)
+    
+    @patch('profiles.email_service.settings')
+    def test_get_admin_emails_with_setting(self, mock_settings):
+        """Test getting admin emails includes ADMIN_EMAIL setting"""
+        mock_settings.ADMIN_EMAIL = 'admin-setting@example.com'
+        
+        admin_emails = EmailService.get_admin_emails()
+        
+        # Should include both setting and staff user
+        self.assertIn('admin-setting@example.com', admin_emails)
+        self.assertIn(self.admin_user.email, admin_emails)
+    
+    @patch('profiles.email_service.EmailService._is_email_enabled')
+    @patch('profiles.email_service.EmailService._validate_configuration')
+    @patch('profiles.email_service.EmailService._validate_email')
+    @patch('profiles.email_service.requests.post')
+    def test_send_email_success(self, mock_post, mock_validate_email, mock_validate_config, mock_is_enabled):
+        """Test successful email sending"""
+        mock_is_enabled.return_value = True
+        mock_post.return_value.status_code = 200
+        
+        result = EmailService.send_email(
+            receiver_email='test@example.com',
+            subject='Test Subject',
+            text_message='Test message'
+        )
+        
+        self.assertTrue(result)
+        mock_post.assert_called_once()
+    
+    @patch('profiles.email_service.EmailService._is_email_enabled')
+    def test_send_email_disabled(self, mock_is_enabled):
+        """Test email sending when disabled"""
+        mock_is_enabled.return_value = False
+        
+        result = EmailService.send_email(
+            receiver_email='test@example.com',
+            subject='Test Subject',
+            text_message='Test message'
+        )
+        
+        self.assertFalse(result)
+    
+    @patch('profiles.email_service.EmailService._is_email_enabled')
+    @patch('profiles.email_service.EmailService._validate_configuration')
+    @patch('profiles.email_service.EmailService._validate_email')
+    @patch('profiles.email_service.requests.post')
+    def test_send_email_timeout(self, mock_post, mock_validate_email, mock_validate_config, mock_is_enabled):
+        """Test email sending with timeout"""
+        import requests
+        mock_is_enabled.return_value = True
+        mock_post.side_effect = requests.exceptions.Timeout("Request timeout")
+        
+        with self.assertRaises(EmailServiceError):
+            EmailService.send_email(
+                receiver_email='test@example.com',
+                subject='Test Subject',
+                text_message='Test message'
+            )
+    
+    @patch('profiles.email_service.EmailService.send_email')
+    def test_send_to_admins(self, mock_send_email):
+        """Test sending email to all admins"""
+        mock_send_email.return_value = True
+        
+        results = EmailService.send_to_admins(
+            subject='Test Subject',
+            text_message='Test message'
+        )
+        
+        # Should have sent to admin user
+        self.assertIn(self.admin_user.email, results['sent'])
+        self.assertEqual(len(results['failed']), 0)
+        # Should have called send_email for each admin
+        self.assertEqual(mock_send_email.call_count, len(EmailService.get_admin_emails()))

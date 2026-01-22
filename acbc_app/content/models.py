@@ -241,6 +241,82 @@ class ModerationLog(models.Model):
         return f"{self.action} by {self.moderator.username} on {self.content.title} at {self.created_at}"
 
 
+class TopicModeratorInvitation(models.Model):
+    # Tracks moderator invitations for topics, allowing users to accept or decline.
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('DECLINED', 'Declined'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='moderator_invitations')
+    invited_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='topic_moderator_invitations')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_topic_moderator_invitations')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    message = models.TextField(blank=True, null=True, help_text="Optional message from creator")
+    
+    class Meta:
+        unique_together = [['topic', 'invited_user']]
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Invitation to {self.invited_user.username} for topic {self.topic.title} - {self.status}"
+    
+    def accept(self):
+        """Accept the invitation and add user as moderator"""
+        if self.status != 'PENDING':
+            raise ValueError("Can only accept pending invitations")
+        self.topic.moderators.add(self.invited_user)
+        self.status = 'ACCEPTED'
+        self.save()
+    
+    def decline(self):
+        """Decline the invitation"""
+        if self.status != 'PENDING':
+            raise ValueError("Can only decline pending invitations")
+        self.status = 'DECLINED'
+        self.save()
+
+
+class ContentSuggestion(models.Model):
+    """Tracks content suggestions made by users for topics. Moderators can accept or reject them."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='content_suggestions')
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='topic_suggestions')
+    suggested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='content_suggestions')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_suggestions')
+    
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    message = models.TextField(blank=True, null=True, help_text="Justificación o mensaje del sugeridor")
+    rejection_reason = models.TextField(blank=True, null=True, help_text="Razón de rechazo del moderador")
+    
+    is_duplicate = models.BooleanField(default=False, help_text="Si el contenido ya está en el tema")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = [['topic', 'content', 'suggested_by']]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['topic', 'status']),
+            models.Index(fields=['suggested_by', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.suggested_by.username} suggested {self.content.original_title} for {self.topic.title} - {self.status}"
+
+
 class Publication(models.Model):    
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='publications')
     content_profile = models.ForeignKey(ContentProfile, on_delete=models.CASCADE, related_name='publications', null=True, blank=True)

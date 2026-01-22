@@ -66,6 +66,10 @@ class Command(BaseCommand):
                 'name': 'Filecoin',
                 'code': 'FIL',
             },
+            {
+                'name': 'Monero',
+                'code': 'XMR',
+            },
         ]
 
         created_count = 0

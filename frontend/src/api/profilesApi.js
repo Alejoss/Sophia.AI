@@ -94,7 +94,20 @@ const apiLogin = async ({ username, password }) => {
 const apiRegister = async (userData) => {
   try {
     const response = await axiosInstance.post('/profiles/register/', userData);
-    return response.data;
+    
+    // Make sure we have an access token
+    if (response.data.access_token) {
+      // Set the token in the axios instance
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+      
+      // Set the token in AuthContext using the new approach
+      if (window.authContext) {
+        const { access_token, ...userData } = response.data;
+        window.authContext.updateAuthState(userData, access_token);
+      }
+    }
+    
+    return response;
   } catch (error) {
     throw error;
   }
@@ -254,6 +267,32 @@ const deleteAcceptedCrypto = async (cryptoId) => {
   }
 };
 
+const submitSuggestion = async (message) => {
+  try {
+    const response = await axiosInstance.post('/profiles/suggestions/', {
+      message: message
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting suggestion:', error);
+    throw error;
+  }
+};
+
+const changePassword = async (oldPassword, newPassword, confirmPassword) => {
+  try {
+    const response = await axiosInstance.post('/profiles/change-password/', {
+      old_password: oldPassword,
+      new_password: newPassword,
+      confirm_password: confirmPassword
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error changing password:', error);
+    throw error;
+  }
+};
+
 export { 
   getUserProfile, 
   apiLogout, 
@@ -274,5 +313,7 @@ export {
   getCryptocurrencies,
   getUserAcceptedCryptos,
   addAcceptedCrypto,
-  deleteAcceptedCrypto
+  deleteAcceptedCrypto,
+  submitSuggestion,
+  changePassword
 };

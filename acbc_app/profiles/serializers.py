@@ -3,7 +3,7 @@ import logging
 
 from django.contrib.auth.models import User
 
-from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile
+from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile, Suggestion
 from notifications.models import Notification
 
 # Get logger for profiles serializers
@@ -91,7 +91,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
-            'user', 'interests', 'profile_description', 'timezone', 'is_teacher', 
+            'user', 'interests', 'profile_description', 'external_url', 'timezone', 'is_teacher', 
             'profile_picture', 'badges', 'total_points', 'featured_badge', 'featured_badge_id'
         ]
 
@@ -215,6 +215,16 @@ class NotificationSerializer(serializers.ModelSerializer):
             # For certificate sent
             if obj.verb == 'te envió un certificado para' and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
+            
+            # For topic moderator invitations and related actions
+            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar', 
+                           'rechazó tu invitación para moderar', 'te removió como moderador de'] and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+            
+            # For content suggestions
+            if obj.verb in ['sugirió contenido para', 'aceptó tu sugerencia de contenido para', 
+                           'rechazó tu sugerencia de contenido para'] and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
                 
             return None
         except Exception as e:
@@ -261,6 +271,27 @@ class NotificationSerializer(serializers.ModelSerializer):
             # For certificate sent
             if obj.verb == 'te envió un certificado para' and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
+            
+            # For topic moderator invitations and related actions
+            # Link should go to the recipient's profile "Temas" section
+            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar', 
+                           'rechazó tu invitación para moderar', 'te removió como moderador de']:
+                # Get the request from context to check if recipient is the current user
+                request = self.context.get('request')
+                recipient = obj.recipient
+                
+                if request and request.user.is_authenticated and request.user.id == recipient.id:
+                    # Current user is viewing their own notifications
+                    return '/profiles/my_profile?section=topics'
+                else:
+                    # Link to recipient's profile topics section
+                    return f'/profiles/user_profile/{recipient.id}?section=topics' if recipient else None
+            
+            # For content suggestions
+            if obj.verb in ['sugirió contenido para', 'aceptó tu sugerencia de contenido para', 
+                           'rechazó tu sugerencia de contenido para'] and obj.target:
+                # Link to topic detail page or topic edit page for moderators
+                return f'/content/topics/{obj.target.id}' if hasattr(obj.target, 'id') else None
                 
             return None
         except Exception as e:
@@ -296,3 +327,37 @@ class NotificationSerializer(serializers.ModelSerializer):
             return notification.description
         else:
             return f"{notification.actor} {notification.verb} tu comentario en {notification.context_title}"
+
+
+class SuggestionSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Suggestion
+        fields = ['id', 'user', 'message', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
+    
+    def validate_message(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("El mensaje no puede estar vacío.")
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError("El mensaje debe tener al menos 10 caracteres.")
+        return value.strip()
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
+    new_password = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
+    confirm_password = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
+    
+    def validate_new_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("La nueva contraseña debe tener al menos 8 caracteres.")
+        return value
+    
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({
+                'confirm_password': "Las contraseñas no coinciden."
+            })
+        return attrs

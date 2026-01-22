@@ -1,0 +1,80 @@
+/* Home Page Specific Styles */
+
+.home-container {
+  width: 100%;
+}
+
+/* Hero Section - Full Width */
+/* Compensates for .main-content padding-top but leaves space for header */
+.home-hero-section {
+  position: relative;
+  width: 100vw;
+  left: 50%;
+  right: 50%;
+  margin-left: calc(-50vw + 1rem);
+  margin-right: calc(-50vw + 1rem);
+  margin-top: -60px; /* Partially compensate for .main-content padding-top, leaving space for header */
+  min-height: 60vh;
+  margin-bottom: 2rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .home-hero-section {
+    min-height: 70vh;
+    margin-bottom: 3rem;
+    margin-top: -65px; /* Slightly more compensation on larger screens */
+  }
+}
+
+/* Mobile adjustment for .main-content padding-top: 72px */
+@media screen and (max-width: 768px) {
+  .home-hero-section {
+    margin-top: -55px; /* Partially compensate for .main-content padding-top: 72px on mobile */
+  }
+}
+
+/* Hero Background Image */
+.home-hero-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/images/home_hero.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+/* Hero Overlay */
+.home-hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.6);
+  z-index: 1;
+}
+
+/* Hero Content */
+.home-hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 2rem 1rem;
+  padding-top: 6rem; /* Add extra top padding to account for header and spacing */
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .home-hero-content {
+    padding: 3rem 2rem;
+    padding-top: 7rem; /* More padding on larger screens */
+  }
+}

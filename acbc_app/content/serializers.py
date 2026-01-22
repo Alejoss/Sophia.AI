@@ -2,7 +2,7 @@ from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication
+from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
 
@@ -224,9 +224,10 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
 class TopicDetailSerializer(TopicBasicSerializer):
     contents = ContentWithSelectedProfileSerializer(many=True, read_only=True)
+    moderators = UserSerializer(many=True, read_only=True)
     
     class Meta(TopicBasicSerializer.Meta):
-        fields = TopicBasicSerializer.Meta.fields + ['contents']
+        fields = TopicBasicSerializer.Meta.fields + ['contents', 'moderators']
 
     def to_representation(self, instance):
         # Pass user context to the content serializer
@@ -246,6 +247,17 @@ class TopicContentSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         self.context['topic'] = instance
         return super().to_representation(instance)
+
+
+class TopicModeratorInvitationSerializer(serializers.ModelSerializer):
+    invited_user = UserSerializer(read_only=True)
+    invited_by = UserSerializer(read_only=True)
+    topic = TopicBasicSerializer(read_only=True)
+    
+    class Meta:
+        model = TopicModeratorInvitation
+        fields = ['id', 'topic', 'invited_user', 'invited_by', 'status', 
+                  'created_at', 'updated_at', 'message']
 
 
 class PublicationSerializer(serializers.ModelSerializer):
@@ -518,3 +530,46 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
                     'favicon': None  # Will be populated by PreviewContentSerializer if available
                 }
             }
+
+
+class ContentSuggestionSerializer(serializers.ModelSerializer):
+    suggested_by = UserSerializer(read_only=True)
+    reviewed_by = UserSerializer(read_only=True)
+    topic = TopicBasicSerializer(read_only=True)
+    content = ContentSerializer(read_only=True)
+    content_profile = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ContentSuggestion
+        fields = ['id', 'topic', 'content', 'content_profile', 'suggested_by', 
+                  'reviewed_by', 'status', 'message', 'rejection_reason', 
+                  'is_duplicate', 'created_at', 'updated_at', 'reviewed_at']
+    
+    def get_content_profile(self, obj):
+        """Get the content profile for the suggested_by user. If not found, fallback to topic creator's profile."""
+        try:
+            request = self.context.get('request')
+            
+            # First, try to get the suggested_by user's profile for this content
+            if obj.suggested_by:
+                try:
+                    return SimpleContentProfileSerializer(
+                        ContentProfile.objects.get(content=obj.content, user=obj.suggested_by),
+                        context=self.context
+                    ).data
+                except ContentProfile.DoesNotExist:
+                    pass
+            
+            # Fallback to topic creator's profile
+            if obj.topic.creator:
+                try:
+                    return SimpleContentProfileSerializer(
+                        ContentProfile.objects.get(content=obj.content, user=obj.topic.creator),
+                        context=self.context
+                    ).data
+                except ContentProfile.DoesNotExist:
+                    pass
+            
+            return None
+        except Exception as e:
+            return None

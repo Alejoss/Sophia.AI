@@ -161,6 +161,16 @@ const HeaderComp = () => {
             gap: 1,
             textDecoration: 'none',
             color: 'inherit',
+            position: 'relative',
+          }}
+          ref={(el) => {
+            if (el) {
+              // #region agent log
+              const logoImg = el.querySelector('img');
+              const computedStyle = window.getComputedStyle(el);
+              fetch('http://127.0.0.1:7243/ingest/dedadcf2-b73e-481e-9590-d75e385009f3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HeaderComp.jsx:logo-box-ref',message:'Header logo box check',data:{hasElement:!!el,hasLogoImg:!!logoImg,logoSrc:logoImg?.src,computedBackgroundImage:computedStyle.backgroundImage,computedBackground:computedStyle.background,allImages:Array.from(el.querySelectorAll('img')).map(img=>({src:img.src,alt:img.alt}))},timestamp:Date.now(),sessionId:'debug-session',runId:'header-check',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+            }
           }}
         >
           {mode === 'light' && (

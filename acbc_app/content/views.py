@@ -14,10 +14,17 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 import logging
 
 from utils.permissions import IsAuthor
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication
+from utils.notification_utils import (
+    notify_topic_moderator_invitation,
+    notify_topic_moderator_invitation_accepted,
+    notify_topic_moderator_invitation_declined
+)
+from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
 from content.serializers import (
@@ -32,7 +39,9 @@ from content.serializers import (
     PreviewContentProfileSerializer,
     PreviewContentSerializer,
     TopicIdTitleSerializer,
-    PublicationBasicSerializer
+    PublicationBasicSerializer,
+    TopicModeratorInvitationSerializer,
+    ContentSuggestionSerializer
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
@@ -757,6 +766,32 @@ class UserCollectionsView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class CollectionDetailView(APIView):
+    """Get or update a specific collection"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, collection_id):
+        collection = get_object_or_404(
+            Collection, 
+            id=collection_id, 
+            library__user=request.user
+        )
+        serializer = CollectionSerializer(collection)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, collection_id):
+        collection = get_object_or_404(
+            Collection, 
+            id=collection_id, 
+            library__user=request.user
+        )
+        serializer = CollectionSerializer(collection, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class CollectionContentView(APIView):
     """Get all content profiles for a specific collection"""
     permission_classes = [IsAuthenticated]
@@ -1139,6 +1174,13 @@ class TopicEditContentView(APIView):
     def post(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
         
+        # Check if user is creator or moderator
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {"error": "No tiene permiso para agregar contenido a este tema."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         content_profile_ids = request.data.get('content_profile_ids', [])
         
         try:
@@ -1166,6 +1208,13 @@ class TopicEditContentView(APIView):
     def patch(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
         
+        # Check if user is creator or moderator
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {"error": "No tiene permiso para eliminar contenido de este tema."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         content_ids = request.data.get('content_ids', [])
         
         try:
@@ -1180,6 +1229,369 @@ class TopicEditContentView(APIView):
                 {'error': f'Error al eliminar contenido: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class TopicModeratorsView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        """Add moderators to a topic. Only the creator can add moderators."""
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        # Check if user is the creator
+        if topic.creator != request.user:
+            return Response(
+                {"error": "Solo el creador del tema puede agregar moderadores."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        usernames = request.data.get('usernames', [])
+        if not usernames:
+            return Response(
+                {"error": "Debe proporcionar al menos un nombre de usuario."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get users to add as moderators by username
+            users_to_add = User.objects.filter(username__in=usernames)
+            
+            # Check if all users exist
+            found_usernames = set(users_to_add.values_list('username', flat=True))
+            missing_usernames = set(usernames) - found_usernames
+            if missing_usernames:
+                return Response(
+                    {"error": f"Los siguientes usuarios no existen: {list(missing_usernames)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Add users as moderators (ManyToMany add is idempotent)
+            topic.moderators.add(*users_to_add)
+            
+            # Return updated topic with moderators
+            serializer = TopicDetailSerializer(topic, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al agregar moderadores: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def delete(self, request, pk):
+        """Remove moderators from a topic. Only the creator can remove moderators."""
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        # Check if user is the creator
+        if topic.creator != request.user:
+            return Response(
+                {"error": "Solo el creador del tema puede eliminar moderadores."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        usernames = request.data.get('usernames', [])
+        if not usernames:
+            return Response(
+                {"error": "Debe proporcionar al menos un nombre de usuario."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get users to remove as moderators by username
+            users_to_remove = User.objects.filter(username__in=usernames)
+            
+            # Verify all users exist
+            found_usernames = set(users_to_remove.values_list('username', flat=True))
+            missing_usernames = set(usernames) - found_usernames
+            if missing_usernames:
+                return Response(
+                    {"error": f"Los siguientes usuarios no existen: {list(missing_usernames)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Store users before removal for notifications
+            removed_users_list = list(users_to_remove)
+            
+            # Remove users from moderators
+            topic.moderators.remove(*users_to_remove)
+            
+            # Send notifications to removed moderators
+            for removed_user in removed_users_list:
+                try:
+                    notify_topic_moderator_removed(topic, removed_user, request.user)
+                except Exception as e:
+                    # Log error but don't fail the request
+                    logger.error(f"Error sending moderator removed notification: {str(e)}", extra={
+                        'topic_id': topic.id,
+                        'removed_user_id': removed_user.id,
+                        'removed_by_id': request.user.id,
+                    }, exc_info=True)
+            
+            # Return updated topic with moderators
+            serializer = TopicDetailSerializer(topic, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al eliminar moderadores: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class TopicModeratorInviteView(APIView):
+    """Create a moderator invitation for a topic. Only the creator can send invitations."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        # Check if user is the creator
+        if topic.creator != request.user:
+            return Response(
+                {"error": "Solo el creador del tema puede enviar invitaciones."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        username = request.data.get('username')
+        message = request.data.get('message', '')
+        
+        if not username:
+            return Response(
+                {"error": "Debe proporcionar un nombre de usuario."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get user to invite
+            invited_user = User.objects.get(username=username)
+            
+            # Check if user is already a moderator
+            if invited_user in topic.moderators.all():
+                return Response(
+                    {"error": f"El usuario {username} ya es moderador de este tema."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if there's already a pending invitation
+            existing_invitation = TopicModeratorInvitation.objects.filter(
+                topic=topic,
+                invited_user=invited_user,
+                status='PENDING'
+            ).first()
+            
+            if existing_invitation:
+                return Response(
+                    {"error": f"Ya existe una invitación pendiente para {username}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if there's an existing invitation (regardless of status) - update it to PENDING
+            existing_invitation = TopicModeratorInvitation.objects.filter(
+                topic=topic,
+                invited_user=invited_user
+            ).first()
+            
+            if existing_invitation:
+                # Update existing invitation to PENDING
+                existing_invitation.status = 'PENDING'
+                existing_invitation.invited_by = request.user
+                existing_invitation.message = message
+                existing_invitation.save()
+                invitation = existing_invitation
+            else:
+                # Create new invitation
+                invitation = TopicModeratorInvitation.objects.create(
+                    topic=topic,
+                    invited_user=invited_user,
+                    invited_by=request.user,
+                    message=message,
+                    status='PENDING'
+                )
+            
+            # Send notification to invited user
+            try:
+                notify_topic_moderator_invitation(invitation)
+            except Exception as e:
+                # Log error but don't fail the request
+                logger.error(f"Error sending moderator invitation notification: {str(e)}", extra={
+                    'invitation_id': invitation.id,
+                    'topic_id': topic.id,
+                })
+            
+            serializer = TopicModeratorInvitationSerializer(invitation, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": f"El usuario {username} no existe."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error al crear la invitación: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class TopicModeratorInvitationsView(APIView):
+    """List invitations for a topic. Creator can see all, invited users can see their own."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        # Creator can see all invitations, invited users can see their own
+        if topic.creator == request.user:
+            invitations = TopicModeratorInvitation.objects.filter(topic=topic).order_by('-created_at')
+        else:
+            invitations = TopicModeratorInvitation.objects.filter(
+                topic=topic,
+                invited_user=request.user
+            ).order_by('-created_at')
+        
+        serializer = TopicModeratorInvitationSerializer(invitations, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicModeratorAcceptView(APIView):
+    """Accept a moderator invitation. Only the invited user can accept."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, pk, invitation_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        invitation = get_object_or_404(TopicModeratorInvitation, pk=invitation_id, topic=topic)
+        
+        # Check if user is the invited user
+        if invitation.invited_user != request.user:
+            return Response(
+                {"error": "Solo el usuario invitado puede aceptar la invitación."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if invitation is pending
+        if invitation.status != 'PENDING':
+            return Response(
+                {"error": "Esta invitación ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Accept the invitation
+            invitation.accept()
+            
+            # Send notification to topic creator
+            try:
+                notify_topic_moderator_invitation_accepted(invitation)
+            except Exception as e:
+                # Log error but don't fail the request
+                logger.error(f"Error sending moderator invitation accepted notification: {str(e)}", extra={
+                    'invitation_id': invitation.id,
+                    'topic_id': topic.id,
+                })
+            
+            serializer = TopicModeratorInvitationSerializer(invitation, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error al aceptar la invitación: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class TopicModeratorDeclineView(APIView):
+    """Decline a moderator invitation. Only the invited user can decline."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, pk, invitation_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        invitation = get_object_or_404(TopicModeratorInvitation, pk=invitation_id, topic=topic)
+        
+        # Check if user is the invited user
+        if invitation.invited_user != request.user:
+            return Response(
+                {"error": "Solo el usuario invitado puede rechazar la invitación."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if invitation is pending
+        if invitation.status != 'PENDING':
+            return Response(
+                {"error": "Esta invitación ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Decline the invitation
+            invitation.decline()
+            
+            # Send notification to topic creator
+            try:
+                notify_topic_moderator_invitation_declined(invitation)
+            except Exception as e:
+                # Log error but don't fail the request
+                logger.error(f"Error sending moderator invitation declined notification: {str(e)}", extra={
+                    'invitation_id': invitation.id,
+                    'topic_id': topic.id,
+                })
+            
+            serializer = TopicModeratorInvitationSerializer(invitation, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error al rechazar la invitación: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class UserTopicsView(APIView):
+    """Get topics where user is creator or moderator."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        topic_type = request.query_params.get('type', None)  # 'created' or 'moderated'
+        
+        if topic_type == 'created':
+            topics = Topic.objects.filter(creator=request.user).order_by('-created_at')
+        elif topic_type == 'moderated':
+            topics = request.user.moderated_topics.all().order_by('-created_at')
+        else:
+            # Return both created and moderated (combined, distinct)
+            topics = Topic.objects.filter(
+                Q(creator=request.user) | Q(moderators=request.user)
+            ).distinct().order_by('-created_at')
+        
+        serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserTopicInvitationsView(APIView):
+    """Get all pending moderator invitations for the authenticated user."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        status_filter = request.query_params.get('status', 'PENDING')
+        
+        invitations = TopicModeratorInvitation.objects.filter(
+            invited_user=request.user,
+            status=status_filter
+        ).order_by('-created_at')
+        
+        serializer = TopicModeratorInvitationSerializer(invitations, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TopicContentMediaTypeView(APIView):
@@ -2086,3 +2498,274 @@ class ContentUpdateView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class TopicContentSuggestionCreateView(APIView):
+    """Create a content suggestion for a topic."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        content_id = request.data.get('content_id')
+        message = request.data.get('message', '')
+        
+        if not content_id:
+            return Response(
+                {"error": "Debe proporcionar un ID de contenido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            content = Content.objects.get(pk=content_id)
+        except Content.DoesNotExist:
+            return Response(
+                {"error": "El contenido especificado no existe."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if suggestion already exists
+        existing_suggestion = ContentSuggestion.objects.filter(
+            topic=topic,
+            content=content,
+            suggested_by=request.user
+        ).first()
+        
+        if existing_suggestion:
+            return Response(
+                {"error": "Ya has sugerido este contenido para este tema."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if content is already in the topic
+        is_duplicate = content in topic.contents.all()
+        
+        # Create the suggestion
+        suggestion = ContentSuggestion.objects.create(
+            topic=topic,
+            content=content,
+            suggested_by=request.user,
+            message=message,
+            is_duplicate=is_duplicate,
+            status='PENDING'
+        )
+        
+        # Send notifications to moderators
+        try:
+            from utils.notification_utils import notify_content_suggestion_created
+            notify_content_suggestion_created(suggestion)
+        except Exception as e:
+            logger.error(f"Error sending content suggestion notification: {str(e)}", extra={
+                'suggestion_id': suggestion.id,
+                'topic_id': topic.id,
+            }, exc_info=True)
+        
+        serializer = ContentSuggestionSerializer(suggestion, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TopicContentSuggestionsView(APIView):
+    """List content suggestions for a topic. Moderators see all, users see only their own."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        
+        # Check if user is moderator or creator
+        is_moderator = topic.is_moderator_or_creator(request.user)
+        
+        # Get filter parameters
+        status_filter = request.query_params.get('status', None)
+        is_duplicate_filter = request.query_params.get('is_duplicate', None)
+        
+        # Build query
+        if is_moderator:
+            # Moderators see all suggestions
+            suggestions = ContentSuggestion.objects.filter(topic=topic)
+        else:
+            # Regular users see only their own suggestions
+            suggestions = ContentSuggestion.objects.filter(topic=topic, suggested_by=request.user)
+        
+        # Apply filters
+        if status_filter:
+            suggestions = suggestions.filter(status=status_filter)
+        
+        if is_duplicate_filter is not None:
+            is_duplicate_bool = is_duplicate_filter.lower() == 'true'
+            suggestions = suggestions.filter(is_duplicate=is_duplicate_bool)
+        
+        # Order by created_at (most recent first)
+        suggestions = suggestions.order_by('-created_at')
+        
+        serializer = ContentSuggestionSerializer(suggestions, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicContentSuggestionAcceptView(APIView):
+    """Accept a content suggestion. Only moderators/creators can accept."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
+        
+        # Check if user is moderator or creator
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {"error": "Solo los moderadores y el creador del tema pueden aceptar sugerencias."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if suggestion is pending
+        if suggestion.status != 'PENDING':
+            return Response(
+                {"error": "Esta sugerencia ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Update suggestion
+            suggestion.status = 'ACCEPTED'
+            suggestion.reviewed_by = request.user
+            suggestion.reviewed_at = timezone.now()
+            suggestion.save()
+            
+            # Add content to topic if not duplicate
+            if not suggestion.is_duplicate:
+                topic.contents.add(suggestion.content)
+            
+            # Send notification to suggester
+            try:
+                from utils.notification_utils import notify_content_suggestion_accepted
+                notify_content_suggestion_accepted(suggestion)
+            except Exception as e:
+                logger.error(f"Error sending content suggestion accepted notification: {str(e)}", extra={
+                    'suggestion_id': suggestion.id,
+                    'topic_id': topic.id,
+                }, exc_info=True)
+            
+            serializer = ContentSuggestionSerializer(suggestion, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error accepting content suggestion: {str(e)}", extra={
+                'suggestion_id': suggestion.id,
+                'topic_id': topic.id,
+            }, exc_info=True)
+            return Response(
+                {"error": f"Error al aceptar la sugerencia: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class TopicContentSuggestionRejectView(APIView):
+    """Reject a content suggestion. Only moderators/creators can reject."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
+        
+        # Check if user is moderator or creator
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {"error": "Solo los moderadores y el creador del tema pueden rechazar sugerencias."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if suggestion is pending
+        if suggestion.status != 'PENDING':
+            return Response(
+                {"error": "Esta sugerencia ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Require rejection reason
+        rejection_reason = request.data.get('rejection_reason', '')
+        if not rejection_reason or not rejection_reason.strip():
+            return Response(
+                {"error": "Debe proporcionar una razón para rechazar la sugerencia."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Update suggestion
+            suggestion.status = 'REJECTED'
+            suggestion.reviewed_by = request.user
+            suggestion.reviewed_at = timezone.now()
+            suggestion.rejection_reason = rejection_reason
+            suggestion.save()
+            
+            # Send notification to suggester
+            try:
+                from utils.notification_utils import notify_content_suggestion_rejected
+                notify_content_suggestion_rejected(suggestion)
+            except Exception as e:
+                logger.error(f"Error sending content suggestion rejected notification: {str(e)}", extra={
+                    'suggestion_id': suggestion.id,
+                    'topic_id': topic.id,
+                }, exc_info=True)
+            
+            serializer = ContentSuggestionSerializer(suggestion, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error rejecting content suggestion: {str(e)}", extra={
+                'suggestion_id': suggestion.id,
+                'topic_id': topic.id,
+            }, exc_info=True)
+            return Response(
+                {"error": f"Error al rechazar la sugerencia: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class UserContentSuggestionsView(APIView):
+    """Get all content suggestions made by the authenticated user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get filter parameters
+        status_filter = request.query_params.get('status', None)
+        topic_id = request.query_params.get('topic_id', None)
+        
+        # Build query
+        suggestions = ContentSuggestion.objects.filter(suggested_by=request.user)
+        
+        # Apply filters
+        if status_filter:
+            suggestions = suggestions.filter(status=status_filter)
+        
+        if topic_id:
+            try:
+                suggestions = suggestions.filter(topic_id=topic_id)
+            except ValueError:
+                pass  # Invalid topic_id, ignore filter
+        
+        # Order by created_at (most recent first)
+        suggestions = suggestions.order_by('-created_at')
+        
+        serializer = ContentSuggestionSerializer(suggestions, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicContentSuggestionDeleteView(APIView):
+    """Delete a content suggestion. Only the user who created it can delete it."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
+        
+        # Only the user who created the suggestion can delete it
+        if suggestion.suggested_by != request.user:
+            return Response(
+                {"error": "No tienes permiso para eliminar esta sugerencia."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        suggestion.delete()
+        return Response(
+            {"message": "Sugerencia eliminada exitosamente."},
+            status=status.HTTP_200_OK
+        )

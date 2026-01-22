@@ -63,8 +63,7 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
         Insignia Destacada
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Selecciona una insignia para mostrarla junto a tu nombre de usuario en toda la aplicación.
-        Esta insignia aparecerá en el header y en tu perfil público.
+        Selecciona una insignia para mostrarla junto a tu nombre de usuario.
       </Typography>
 
       {error && (

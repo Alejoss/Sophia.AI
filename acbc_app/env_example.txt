@@ -1,0 +1,281 @@
+================================================================================
+BACKEND .ENV FILE - EXAMPLE REQUIRED VARIABLES
+================================================================================
+This file contains all environment variables that can be used in the backend .env file.
+Copy this file to .env and fill in the actual values for your environment.
+
+================================================================================
+REQUIRED VARIABLES (MUST BE SET)
+================================================================================
+
+# ============================================================================
+# DJANGO CORE SETTINGS
+# ============================================================================
+
+# Django Secret Key - REQUIRED
+# Generate a secure key using:
+#   python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+# NEVER use the default development key in production!
+ACADEMIA_BLOCKCHAIN_SKEY=django-insecure-development-key-123
+
+# Environment - REQUIRED
+# Options: DEVELOPMENT, PRODUCTION
+# In production, this MUST be set to PRODUCTION
+ENVIRONMENT=DEVELOPMENT
+
+# Debug Mode - REQUIRED
+# In production, this MUST be False
+# In development, can be True for debugging
+DEBUG=True
+
+# Allowed Hosts - REQUIRED in PRODUCTION
+# Comma-separated list of domain names that can access the application
+# In production, MUST include your actual domain(s)
+# Example: yourdomain.com,www.yourdomain.com,api.yourdomain.com
+# In development, defaults to: localhost,127.0.0.1,0.0.0.0
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+
+
+# ============================================================================
+# DATABASE CONFIGURATION - REQUIRED
+# ============================================================================
+
+# Database Name
+# The name of your PostgreSQL database
+DB_NAME=acbc_db
+
+# Database User
+# PostgreSQL username
+DB_USER=postgres
+
+# Database Password - REQUIRED
+# PostgreSQL password - use a strong password in production
+DB_PASSWORD=postgres
+
+# Database Host
+# For Docker Compose, use: postgres
+# For external database, use the hostname or IP
+DB_HOST=postgres
+
+# Database Port
+# Default PostgreSQL port is 5432
+DB_PORT=5432
+
+# PostgreSQL Database Name (for Docker Compose)
+# Should match DB_NAME
+POSTGRES_DB=acbc_db
+
+# PostgreSQL User (for Docker Compose)
+# Should match DB_USER
+POSTGRES_USER=postgres
+
+# PostgreSQL Password (for Docker Compose)
+# Should match DB_PASSWORD
+POSTGRES_PASSWORD=postgres
+
+
+================================================================================
+OPTIONAL VARIABLES (CONFIGURE AS NEEDED)
+================================================================================
+
+# ============================================================================
+# GOOGLE OAUTH CONFIGURATION (Optional - Required if using Google Login)
+# ============================================================================
+
+# Google OAuth Client ID
+# Get from: https://console.cloud.google.com/
+# Create OAuth 2.0 credentials in Google Cloud Console
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+
+# Google OAuth Secret Key
+# Get from: https://console.cloud.google.com/
+# This is the client secret from your OAuth 2.0 credentials
+GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-google-oauth-secret-key
+
+
+# ============================================================================
+# EMAIL CONFIGURATION (Optional - Required if SEND_EMAILS=True)
+# ============================================================================
+
+# Mailgun Domain
+# Your Mailgun domain (e.g., mg.yourdomain.com)
+# Required if using Mailgun for email sending
+MAILGUN_DOMAIN=
+
+# Mailgun API Key
+# Your Mailgun API key
+# Required if using Mailgun for email sending
+MAILGUN_API_KEY=
+
+# Email From Address
+# Default sender email address
+# Default: academiablockchain@no-reply.com
+EMAIL_FROM=academiablockchain@no-reply.com
+
+# Email From Name
+# Display name for sender
+# Default: Academia Blockchain
+EMAIL_FROM_NAME=Academia Blockchain
+
+# Admin Email
+# Email address for admin notifications
+ADMIN_EMAIL=
+
+# Email Timeout (seconds)
+# How long to wait for email server response
+# Default: 10
+EMAIL_TIMEOUT=10
+
+# Email Max Retries
+# Number of retry attempts for failed emails
+# Default: 3
+EMAIL_MAX_RETRIES=3
+
+# Send Emails
+# Enable/disable email sending
+# Set to True to enable email functionality
+# Note: If True in PRODUCTION, MAILGUN_DOMAIN and MAILGUN_API_KEY are required
+SEND_EMAILS=False
+
+
+# ============================================================================
+# AWS S3 CONFIGURATION (Optional - For Media/Static File Storage)
+# ============================================================================
+
+# AWS Access Key ID
+# Your AWS access key for S3 access
+# Required if using S3 for media/static file storage
+AWS_ACCESS_KEY_ID=
+
+# AWS Secret Access Key
+# Your AWS secret key for S3 access
+# Required if using S3 for media/static file storage
+AWS_SECRET_ACCESS_KEY=
+
+# AWS Storage Bucket Name
+# Your S3 bucket name
+# Default: academiablockchain
+AWS_STORAGE_BUCKET_NAME=academiablockchain
+
+# AWS S3 Region Name
+# AWS region where your S3 bucket is located
+# Default: us-west-2
+# Examples: us-east-1, us-west-2, eu-west-1, ap-southeast-1
+AWS_S3_REGION_NAME=us-west-2
+
+
+# ============================================================================
+# MONITORING & ERROR TRACKING (Optional)
+# ============================================================================
+
+# Sentry DSN
+# Your Sentry DSN for error tracking
+# Get from: https://sentry.io/
+# Format: https://abc123@o123456.ingest.sentry.io/123456
+SENTRY_DSN=
+
+
+================================================================================
+PRODUCTION EXAMPLE
+================================================================================
+
+# For production deployment, use these values as a template:
+
+ACADEMIA_BLOCKCHAIN_SKEY=<generate-secure-random-key-here>
+ENVIRONMENT=PRODUCTION
+DEBUG=False
+ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com,api.yourdomain.com
+
+DB_NAME=academiablockchain_prod
+DB_USER=postgres
+DB_PASSWORD=<strong-secure-password>
+DB_HOST=postgres
+DB_PORT=5432
+
+POSTGRES_DB=academiablockchain_prod
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=<strong-secure-password>
+
+GOOGLE_OAUTH_CLIENT_ID=your-production-client-id.apps.googleusercontent.com
+GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-production-secret-key
+
+MAILGUN_DOMAIN=mg.yourdomain.com
+MAILGUN_API_KEY=your-mailgun-api-key
+EMAIL_FROM=noreply@yourdomain.com
+EMAIL_FROM_NAME=Academia Blockchain
+ADMIN_EMAIL=admin@yourdomain.com
+SEND_EMAILS=True
+
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_STORAGE_BUCKET_NAME=academiablockchain-prod
+AWS_S3_REGION_NAME=us-west-2
+
+SENTRY_DSN=https://abc123@o123456.ingest.sentry.io/123456
+
+
+================================================================================
+DEVELOPMENT EXAMPLE
+================================================================================
+
+# For local development, you can use these minimal values:
+
+ACADEMIA_BLOCKCHAIN_SKEY=django-insecure-development-key-123
+ENVIRONMENT=DEVELOPMENT
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+
+DB_NAME=acbc_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=postgres
+DB_PORT=5432
+
+POSTGRES_DB=acbc_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+# Optional - only if testing OAuth locally
+# GOOGLE_OAUTH_CLIENT_ID=your-dev-client-id
+# GOOGLE_OAUTH_SECRET_KEY=your-dev-secret-key
+
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. SECURITY:
+   - NEVER commit the .env file to version control
+   - Always use strong, unique passwords in production
+   - Generate a secure SECRET_KEY for production
+   - Keep your .env file permissions restricted (chmod 600)
+
+2. PRODUCTION REQUIREMENTS:
+   - ENVIRONMENT must be set to PRODUCTION
+   - DEBUG must be False
+   - ALLOWED_HOSTS must include your actual domain(s)
+   - ACADEMIA_BLOCKCHAIN_SKEY must NOT be the default development key
+   - Database credentials must be secure
+
+3. VALIDATION:
+   - The application will raise errors if required production variables are missing
+   - DEBUG=True will cause an error in PRODUCTION environment
+   - ALLOWED_HOSTS is required in PRODUCTION environment
+   - If SEND_EMAILS=True in PRODUCTION, MAILGUN_DOMAIN and MAILGUN_API_KEY are required
+
+4. GENERATING SECRET KEY:
+   Run this command to generate a secure secret key:
+   python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+5. DOCKER COMPOSE:
+   - When using docker-compose, DB_HOST should be "postgres" (the service name)
+   - POSTGRES_* variables are used by the postgres container
+   - DB_* variables are used by the Django application
+
+6. VARIABLE NAMING:
+   - All variable names are case-sensitive
+   - No spaces around the = sign
+   - No quotes needed for values (unless the value itself contains special characters)
+   - Comments start with # and must be on their own line
+
+================================================================================

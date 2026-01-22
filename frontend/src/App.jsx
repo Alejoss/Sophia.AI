@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
+import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/Home.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
@@ -98,13 +99,13 @@ const AppContent = () => {
               <Route path="collections/create" element={<CreateCollectionForm />} />
               <Route path="collections/:collectionId" element={<Collection />} />
               <Route path="collections/:collectionId/edit" element={<CollectionEditContent />} />
-              <Route path="create_topic" element={<TopicCreationForm />} />
-              <Route path="topics/:topicId/edit" element={<TopicEdit />} />
-              <Route path="topics" element={<TopicList />} />
-              <Route path="topics/:topicId/add-content" element={<TopicAddContent />} />
-              <Route path="topics/:topicId/edit-content" element={<TopicEditContent />} />
-              <Route path="topics/:topicId" element={<TopicDetail />} />
-              <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
+              <Route path="create_topic" element={<ProtectedRoute><TopicCreationForm /></ProtectedRoute>} />
+              <Route path="topics/:topicId/edit" element={<ProtectedRoute><TopicEdit /></ProtectedRoute>} />
+              <Route path="topics" element={<ProtectedRoute><TopicList /></ProtectedRoute>} />
+              <Route path="topics/:topicId/add-content" element={<ProtectedRoute><TopicAddContent /></ProtectedRoute>} />
+              <Route path="topics/:topicId/edit-content" element={<ProtectedRoute><TopicEditContent /></ProtectedRoute>} />
+              <Route path="topics/:topicId" element={<ProtectedRoute><TopicDetail /></ProtectedRoute>} />
+              <Route path="topics/:topicId/:mediaType" element={<ProtectedRoute><TopicContentMediaType /></ProtectedRoute>} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />
@@ -113,13 +114,13 @@ const AppContent = () => {
               <Route path="library_upload_content" element={<LibraryUploadContent />} />
             </Route>
             <Route path="knowledge_path">
-              <Route path="" element={<KnowledgePathList />} />
-              <Route path=":pathId" element={<KnowledgePathDetail />} />
-              <Route path="create" element={<KnowledgePathCreationForm />} />
-              <Route path=":pathId/edit" element={<KnowledgePathEdit />} />
-              <Route path=":pathId/add-node" element={<NodeCreate />} />
-              <Route path=":pathId/nodes/:nodeId/edit" element={<NodeEdit />} />
-              <Route path=":pathId/nodes/:nodeId" element={<NodeDetail />} />
+              <Route path="" element={<ProtectedRoute><KnowledgePathList /></ProtectedRoute>} />
+              <Route path=":pathId" element={<ProtectedRoute><KnowledgePathDetail /></ProtectedRoute>} />
+              <Route path="create" element={<ProtectedRoute><KnowledgePathCreationForm /></ProtectedRoute>} />
+              <Route path=":pathId/edit" element={<ProtectedRoute><KnowledgePathEdit /></ProtectedRoute>} />
+              <Route path=":pathId/add-node" element={<ProtectedRoute><NodeCreate /></ProtectedRoute>} />
+              <Route path=":pathId/nodes/:nodeId/edit" element={<ProtectedRoute><NodeEdit /></ProtectedRoute>} />
+              <Route path=":pathId/nodes/:nodeId" element={<ProtectedRoute><NodeDetail /></ProtectedRoute>} />
             </Route>
 
             <Route path="quizzes">

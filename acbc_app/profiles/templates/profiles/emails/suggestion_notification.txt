@@ -1,0 +1,23 @@
+Nueva Sugerencia - Academia Blockchain
+
+Se ha recibido una nueva sugerencia
+
+Un usuario ha enviado una sugerencia o comentario sobre la plataforma Academia Blockchain.
+
+Información:
+-----------
+Usuario: {{ user.username }}
+Email: {{ user.email }}
+Fecha: {{ suggestion.created_at|date:"d/m/Y H:i" }}
+
+Mensaje:
+--------
+{{ suggestion.message }}
+
+---
+Ver en el panel de administración: {{ site_url }}/admin/profiles/suggestion/{{ suggestion.id }}/
+
+---
+Academia Blockchain
+Este es un mensaje automático del sistema de notificaciones.
+Por favor, no respondas directamente a este correo.

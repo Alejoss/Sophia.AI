@@ -12,7 +12,6 @@ import {
 } from "@mui/material";
 import NoteIcon from "@mui/icons-material/Note";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
-import { isAuthenticated } from "../context/localStorageUtils";
 import contentApi from "../api/contentApi";
 import { useNavigate } from "react-router-dom";
 import { getFileUrl } from "../utils/fileUtils";
@@ -28,6 +27,7 @@ const LibraryUser = () => {
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const currentUser = authState.user;
+  const isAuthenticated = authState.isAuthenticated;
 
   useEffect(() => {
     const fetchUserContent = async () => {
@@ -57,12 +57,12 @@ const LibraryUser = () => {
       }
     };
 
-    if (isAuthenticated()) {
+    if (isAuthenticated) {
       fetchUserContent();
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const handleFilterChange = (event, newFilter) => {
     setMediaFilter(newFilter || "ALL");
@@ -110,14 +110,18 @@ const LibraryUser = () => {
                 setLoading(false);
               }
             };
-            fetchUserContent();
+            if (isAuthenticated) {
+              fetchUserContent();
+            } else {
+              setLoading(false);
+            }
           }}
         >
           Reintentar
         </Button>
       </Box>
     );
-  if (!isAuthenticated())
+  if (!isAuthenticated)
     return <Typography color="text.primary">Por favor inicia sesión para ver el contenido</Typography>;
 
   return (
@@ -134,17 +138,19 @@ const LibraryUser = () => {
         color: "text.primary",
       }}
     >
-      <Typography 
-        variant="h4" 
-        color="text.primary" 
+      <Typography
+        variant="h4"
         gutterBottom
         sx={{
-          fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-          fontWeight: 400,
-          fontSize: "24px"
+          fontSize: {
+            xs: "1.5rem", // ~24px on mobile
+            sm: "1.75rem", // ~28px on small screens
+            md: "2.125rem", // ~34px on desktop (default h4)
+          },
+          fontWeight: 600,
         }}
       >
-        Mi biblioteca de contenido
+        Biblioteca de Contenido
       </Typography>
 
       <Box sx={{ mb: 3 }}>

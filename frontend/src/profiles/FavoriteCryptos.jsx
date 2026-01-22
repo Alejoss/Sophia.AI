@@ -149,7 +149,18 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
   return (
     <Box>
       <Box sx={{ display: 'flex', flexWrap:'wrap',  justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5" gutterBottom>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
           Criptomonedas favoritas
         </Typography>
         {isOwnProfile && (
@@ -165,7 +176,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
       {isOwnProfile && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Recibirás pagos en estas criptomonedas
+          Por razones legales, todavía no podemos activar los pagos en cripto.
         </Alert>
       )}
 
@@ -300,8 +311,6 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Ingresa tu dirección de billetera"
-              multiline
-              rows={3}
               sx={{ mb: 2 }}
             />
 

@@ -3,7 +3,7 @@
 }
 
 .main-content {
-  padding-top: 80px; /* Adjusted for Material-UI AppBar height */
+  padding-top: 80px; /* 64px header + 16px margin */
   flex: 1;
   width: 100%;
   max-width: 1200px;
@@ -14,6 +14,6 @@
 
 @media screen and (max-width: 768px) {
   .main-content {
-    padding-top: 72px; /* Adjusted for Material-UI AppBar height on mobile */
+    padding-top: 72px; /* 56px header + 16px margin */
   }
 }

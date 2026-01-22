@@ -14,6 +14,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
 import { MEDIA_BASE_URL } from '../api/config';
@@ -21,6 +22,8 @@ import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import TopicHeader from './TopicHeader';
 import ContentDisplay from '../content/ContentDisplay';
+import ContentSuggestionModal from './ContentSuggestionModal';
+import { Badge } from '@mui/material';
 
 const TopicDetail = () => {
     const { topicId } = useParams();
@@ -30,6 +33,9 @@ const TopicDetail = () => {
     const [contentByType, setContentByType] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
+    const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
+    const [isModerator, setIsModerator] = useState(false);
 
     useEffect(() => {
         const fetchTopic = async () => {
@@ -67,6 +73,19 @@ const TopicDetail = () => {
 
                 console.log('Grouped content by type:', grouped);
                 setContentByType(grouped);
+                
+                // Check if user is moderator or creator
+                const userIsModerator = isAuthenticated && (
+                    data.creator === user?.id || 
+                    (data.moderators || []).some(mod => mod.id === user?.id)
+                );
+                setIsModerator(userIsModerator);
+                
+                // Fetch pending suggestions count if moderator
+                if (userIsModerator) {
+                    fetchPendingSuggestionsCount();
+                }
+                
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching topic:', err);
@@ -81,7 +100,49 @@ const TopicDetail = () => {
         };
 
         fetchTopic();
-    }, [topicId]);
+    }, [topicId, isAuthenticated, user?.id]);
+
+    const fetchPendingSuggestionsCount = async () => {
+        try {
+            const suggestions = await contentApi.getTopicContentSuggestions(topicId, { status: 'PENDING' });
+            setPendingSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
+        } catch (err) {
+            console.error('Error fetching pending suggestions count:', err);
+        }
+    };
+
+    const handleSuggestionSuccess = () => {
+        fetchPendingSuggestionsCount();
+        // Refresh topic to show newly accepted content if any
+        const fetchTopic = async () => {
+            try {
+                const data = await contentApi.getTopicDetails(topicId);
+                setTopic(data);
+                
+                if (data.contents) {
+                    const grouped = data.contents.reduce((acc, content) => {
+                        const type = content.media_type.toLowerCase();
+                        if (!acc[type]) {
+                            acc[type] = [];
+                        }
+                        acc[type].push(content);
+                        return acc;
+                    }, {});
+                    
+                    Object.keys(grouped).forEach(type => {
+                        grouped[type].sort((a, b) => 
+                            new Date(b.created_at) - new Date(a.created_at)
+                        );
+                    });
+                    
+                    setContentByType(grouped);
+                }
+            } catch (err) {
+                console.error('Error refreshing topic:', err);
+            }
+        };
+        fetchTopic();
+    };
 
     const renderContentPreview = (content, type) => {
         if (!content.file_details && type !== 'image') return null;
@@ -194,6 +255,29 @@ const TopicDetail = () => {
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
             />
 
+            {/* Action buttons */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                {isAuthenticated && (
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setSuggestionModalOpen(true)}
+                    >
+                        Sugerir Contenido
+                    </Button>
+                )}
+                {isModerator && pendingSuggestionsCount > 0 && (
+                    <Badge badgeContent={pendingSuggestionsCount} color="error">
+                        <Button
+                            variant="outlined"
+                            onClick={() => navigate(`/content/topics/${topicId}/edit?tab=suggestions`)}
+                        >
+                            Gestionar Sugerencias
+                        </Button>
+                    </Badge>
+                )}
+            </Box>
+
             {/* Content sections by type */}
             {renderContentSection('image', contentByType.image)}
             {renderContentSection('text', contentByType.text)}
@@ -208,6 +292,14 @@ const TopicDetail = () => {
 
             {/* Add CommentSection */}
             <CommentSection topicId={topicId} />
+
+            {/* Content Suggestion Modal */}
+            <ContentSuggestionModal
+                open={suggestionModalOpen}
+                onClose={() => setSuggestionModalOpen(false)}
+                topicId={topicId}
+                onSuccess={handleSuggestionSuccess}
+            />
         </Box>
     );
 };

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from profiles.models import Profile, UserNodeCompletion, CryptoCurrency, AcceptedCrypto
+from profiles.models import Profile, UserNodeCompletion, CryptoCurrency, AcceptedCrypto, Suggestion
 import os
 
 
@@ -38,3 +38,18 @@ class AcceptedCryptoAdmin(admin.ModelAdmin):
     list_filter = ('deleted', 'crypto')
     search_fields = ('user__username', 'crypto__name', 'address')
     ordering = ('user__username', 'crypto__name')
+
+@admin.register(Suggestion)
+class SuggestionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'created_at', 'message_preview')
+    list_filter = ('created_at',)
+    search_fields = ('user__username', 'user__email', 'message')
+    ordering = ('-created_at',)
+    readonly_fields = ('user', 'created_at', 'message')
+    
+    def message_preview(self, obj):
+        """Show first 100 characters of the message"""
+        if len(obj.message) > 100:
+            return obj.message[:100] + '...'
+        return obj.message
+    message_preview.short_description = 'Mensaje'

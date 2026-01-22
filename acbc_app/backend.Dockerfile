@@ -32,5 +32,6 @@ EXPOSE 8000
 # Environment settings
 ENV PYTHONUNBUFFERED=1
 
-# This CMD is just a placeholder; actual command will be provided by docker-compose
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Default to Gunicorn for production, can be overridden in docker-compose
+# For development, docker-compose will override this with runserver
+CMD ["gunicorn", "academia_blockchain.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]

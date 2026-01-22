@@ -23,7 +23,10 @@ import {
   AccountTree as KnowledgePathIcon,
   Notifications as NotificationsIcon,
   LibraryBooks as LibraryIcon,
-  EmojiEvents as BadgeIcon
+  EmojiEvents as BadgeIcon,
+  Lightbulb as LightbulbIcon,
+  Security as SecurityIcon,
+  AcUnit as TopicIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 
@@ -46,6 +49,12 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       label: 'Caminos de conocimiento',
       section: 'knowledge-paths',
       icon: KnowledgePathIcon,
+      path: null
+    },
+    {
+      label: 'Temas',
+      section: 'topics',
+      icon: TopicIcon,
       path: null
     },
     {
@@ -85,10 +94,24 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
         badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null
       },
       {
+        label: 'Seguridad',
+        section: 'security',
+        icon: SecurityIcon,
+        path: null
+      },
+      {
         label: 'Tu biblioteca',
         section: 'library',
         icon: LibraryIcon,
-        path: '/content/library_user'
+        path: '/content/library_user',
+        showDividerBefore: true // Flag to show divider before this item
+      },
+      {
+        label: 'Sugerencias',
+        section: 'suggestions',
+        icon: LightbulbIcon,
+        path: null,
+        isAction: true // Special flag to indicate this is an action button, not a section
       }
     );
   }
@@ -107,6 +130,7 @@ const ProfileVerticalNavigation = ({
   userId = null,
   activeSection = 'publications',
   onSectionChange = () => {},
+  onSuggestionClick = () => {},
   unreadNotificationsCount = 0,
   sx = {} 
 }) => {
@@ -150,13 +174,55 @@ const ProfileVerticalNavigation = ({
             const IconComponent = item.icon;
             const isItemActive = activeSection === item.section;
             
+            // Show divider before library item if flag is set
+            const showDivider = item.showDividerBefore;
+            
             // Handle library link differently (external link)
             if (item.path && item.section === 'library') {
               return (
+                <React.Fragment key={index}>
+                  {showDivider && <Divider sx={{ my: 1, mx: 2 }} />}
+                  <ListItem disablePadding sx={{ mb: 0.5 }}>
+                    <ListItemButton
+                      component="a"
+                      href={item.path}
+                      sx={{
+                        borderRadius: 0.5,
+                        mx: 1,
+                        backgroundColor: 'transparent',
+                        color: 'text.primary',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ 
+                        color: 'text.secondary',
+                        minWidth: 40 
+                      }}>
+                        <IconComponent />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={item.label}
+                        sx={{
+                          '& .MuiListItemText-primary': {
+                            fontWeight: 400,
+                            fontSize: '0.95rem'
+                          }
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                </React.Fragment>
+              );
+            }
+            
+            // Handle suggestions action button (opens modal)
+            if (item.isAction && item.section === 'suggestions') {
+              return (
                 <ListItem key={index} disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton
-                    component="a"
-                    href={item.path}
+                    onClick={() => onSuggestionClick()}
                     sx={{
                       borderRadius: 0.5,
                       mx: 1,

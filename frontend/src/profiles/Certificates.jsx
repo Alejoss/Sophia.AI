@@ -211,21 +211,23 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       {isOwnProfile ? (
         <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label="Mis certificados" value="certificates" />
+            <Tab label="Certificados" value="certificates" />
             <Tab label="Solicitudes de certificados" value="requests" />
           </Tabs>
         </Box>
       ) : (
         // For visitors, show a simple header
         <Box sx={{ mb: 3 }}>
-          <Typography 
-            variant="h5" 
-            gutterBottom 
-            color="text.primary"
+          <Typography
+            variant="h4"
+            gutterBottom
             sx={{
-              fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-              fontWeight: 400,
-              fontSize: "20px"
+              fontSize: {
+                xs: "1.5rem", // ~24px on mobile
+                sm: "1.75rem", // ~28px on small screens
+                md: "2.125rem", // ~34px on desktop (default h4)
+              },
+              fontWeight: 600,
             }}
           >
             Certificados ({certificates.length})

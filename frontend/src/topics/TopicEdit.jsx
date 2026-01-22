@@ -23,6 +23,9 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import SaveIcon from "@mui/icons-material/Save";
 import contentApi from "../api/contentApi";
+import { useAuth } from "../context/AuthContext";
+import TopicModerators from "./TopicModerators";
+import ContentSuggestionsManager from "./ContentSuggestionsManager";
 
 const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -162,6 +165,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
 const TopicEdit = () => {
   const { topicId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [topic, setTopic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -172,6 +176,8 @@ const TopicEdit = () => {
     description: "",
   });
   const [saving, setSaving] = useState(false);
+  
+  const isCreator = user && topic && topic.creator === user.id;
 
   useEffect(() => {
     const fetchTopic = async () => {
@@ -235,8 +241,17 @@ const TopicEdit = () => {
   return (
     <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 1.5 }, maxWidth: 800, mx: "auto" }}>
       <Paper sx={{ p: 1.5, position: "relative" }}>
-        {/* View Topic Button */}
-        <Box sx={{ position: "absolute", top: -10, right: 12, zIndex: 1 }}>
+        {/* View Topic and Edit Content Buttons */}
+        <Box sx={{ position: "absolute", top: -10, right: 12, zIndex: 1, display: "flex", gap: 1 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<EditIcon />}
+            onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
+            size="small"
+          >
+            Editar Contenido
+          </Button>
           <Button
             component={Link}
             to={`/content/topics/${topicId}`}
@@ -344,6 +359,41 @@ const TopicEdit = () => {
 
         <Divider sx={{ my: 3 }} />
 
+        {/* Moderators Section - Only visible to creator */}
+        {isCreator && (
+          <Box sx={{ mb: 3 }}>
+            <TopicModerators
+              topicId={topicId}
+              onModeratorsUpdate={(updatedTopic) => {
+                setTopic(updatedTopic);
+              }}
+            />
+          </Box>
+        )}
+
+        {isCreator && <Divider sx={{ my: 3 }} />}
+
+        {/* Content Suggestions Section - Only visible to creator/moderators */}
+        {(isCreator || (topic.moderators && topic.moderators.some(mod => mod.id === user?.id))) && (
+          <>
+            <Box sx={{ mb: 3 }}>
+              <ContentSuggestionsManager
+                topicId={topicId}
+                onSuggestionProcessed={async () => {
+                  // Refresh topic data after suggestion is processed
+                  try {
+                    const updatedTopic = await contentApi.getTopicDetails(topicId);
+                    setTopic(updatedTopic);
+                  } catch (err) {
+                    console.error('Error refreshing topic:', err);
+                  }
+                }}
+              />
+            </Box>
+            <Divider sx={{ my: 3 }} />
+          </>
+        )}
+
         <Box sx={{ mb: 3 }}>
           <Typography 
             variant="h6" 
@@ -358,20 +408,52 @@ const TopicEdit = () => {
             Contenido del Tema
           </Typography>
 
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
-            sx={{ mb: 2 }}
-          >
-            Editar Contenido del Tema
-          </Button>
-
           {topic.contents?.length > 0 ? (
             <Box sx={{ mt: 2 }}>
-              {/* We'll implement content display later */}
-              <Typography>Cantidad de contenido: {topic.contents.length}</Typography>
+              {(() => {
+                // Contar contenido por tipo
+                const counts = {
+                  VIDEO: 0,
+                  AUDIO: 0,
+                  TEXT: 0,
+                  IMAGE: 0
+                };
+                
+                topic.contents.forEach(content => {
+                  const mediaType = content.media_type;
+                  if (mediaType && counts.hasOwnProperty(mediaType)) {
+                    counts[mediaType]++;
+                  }
+                });
+
+                const typeLabels = {
+                  VIDEO: 'Videos',
+                  AUDIO: 'Audios',
+                  TEXT: 'Textos',
+                  IMAGE: 'Imágenes'
+                };
+
+                const typesWithContent = Object.keys(counts).filter(type => counts[type] > 0);
+
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                    {typesWithContent.map(type => (
+                      <Chip
+                        key={type}
+                        label={`${typeLabels[type]}: ${counts[type]}`}
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontSize: '0.875rem' }}
+                      />
+                    ))}
+                    {typesWithContent.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Sin contenido clasificado
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })()}
             </Box>
           ) : (
             <Alert severity="info" sx={{ mt: 2 }}>

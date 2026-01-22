@@ -109,7 +109,7 @@ const Bookmarks = () => {
             fontWeight: 600,
           }}
         >
-          Mis marcadores
+          Marcadores
         </Typography>
 
         {bookmarks.length === 0 ? (
@@ -126,7 +126,7 @@ const Bookmarks = () => {
 
               return (
                 <Box key={bookmark.id}>
-                  {bookmark.content_type_name === "content" && (
+                  {bookmark.content_type_name === "content" && bookmark.content_profile && (
                     <Box
                       onClick={() => handleBookmarkClick(bookmark)}
                       sx={{
@@ -138,10 +138,11 @@ const Bookmarks = () => {
                       }}
                     >
                       <ContentDisplay
-                        content={bookmark.content_profile.content}
+                        content={bookmark.content_profile}
                         variant="simple"
                         showAuthor={true}
                         showActions={true}
+                        onClick={() => handleBookmarkClick(bookmark)}
                         additionalActions={
                           <Box sx={{ display: "flex", gap: 1 }}>
                             <AddToLibraryModal

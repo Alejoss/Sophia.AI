@@ -4,7 +4,7 @@ Utility functions for handling notifications across the application.
 from django.contrib.contenttypes.models import ContentType
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath
-from content.models import ContentProfile
+from content.models import ContentProfile, TopicModeratorInvitation, Topic, ContentSuggestion
 import traceback
 import logging
 
@@ -1177,4 +1177,656 @@ def notify_certificate_sent(registration):
             'registration_id': registration.id,
             'event_id': registration.event.id,
             'student_id': registration.user.id,
+        }, exc_info=True)
+
+def notify_topic_moderator_invitation(invitation):
+    """
+    Create a notification when a topic creator invites a user to be a moderator.
+    Notifies the invited user.
+    
+    Args:
+        invitation: The TopicModeratorInvitation instance that was created/updated
+    """
+    logger.info("Creating topic moderator invitation notification", extra={
+        'invitation_id': invitation.id,
+        'topic_id': invitation.topic.id,
+        'topic_title': invitation.topic.title,
+        'invited_user_id': invitation.invited_user.id,
+        'invited_user_username': invitation.invited_user.username,
+        'invited_by_id': invitation.invited_by.id,
+        'invited_by_username': invitation.invited_by.username,
+    })
+    
+    # Don't notify if user invites themselves
+    if invitation.invited_user == invitation.invited_by:
+        logger.info("User is inviting themselves - skipping notification", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+        })
+        return
+    
+    try:
+        # Get content types
+        invited_by_ct = ContentType.objects.get_for_model(invitation.invited_by)
+        topic_ct = ContentType.objects.get_for_model(invitation.topic)
+        logger.debug(f"Content types - Invited By: {invited_by_ct}, Topic: {topic_ct}")
+        
+        # Check if notification already exists for this invitation
+        existing_notifications = Notification.objects.filter(
+            recipient=invitation.invited_user,
+            actor_content_type=invited_by_ct,
+            actor_object_id=invitation.invited_by.id,
+            verb='te invitó a moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id
+        )
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
+        
+        if existing_notifications.exists():
+            logger.info("Notification already exists - skipping creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            return
+        
+        # Build description with optional message
+        description = f'{invitation.invited_by.username} te invitó a moderar el tema "{invitation.topic.title}"'
+        if invitation.message:
+            description += f': {invitation.message}'
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=invitation.invited_user,
+            actor_content_type=invited_by_ct,
+            actor_object_id=invitation.invited_by.id,
+            verb='te invitó a moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id,
+            description=description
+        )
+        logger.info("Topic moderator invitation notification created successfully", extra={
+            'notification_id': notification.id,
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+        
+        # Verify the notification was created
+        if notification:
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
+        else:
+            logger.warning("Notification not found in database after creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            
+    except Exception as e:
+        logger.error(f"Error creating topic moderator invitation notification: {str(e)}", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id if invitation else None,
+            'invited_user_id': invitation.invited_user.id if invitation else None,
+        }, exc_info=True)
+
+def notify_topic_moderator_invitation_accepted(invitation):
+    """
+    Create a notification when a user accepts a moderator invitation.
+    Notifies the topic creator.
+    
+    Args:
+        invitation: The TopicModeratorInvitation instance that was accepted
+    """
+    logger.info("Creating topic moderator invitation accepted notification", extra={
+        'invitation_id': invitation.id,
+        'topic_id': invitation.topic.id,
+        'topic_title': invitation.topic.title,
+        'invited_user_id': invitation.invited_user.id,
+        'invited_user_username': invitation.invited_user.username,
+        'topic_creator_id': invitation.topic.creator.id if invitation.topic.creator else None,
+        'topic_creator_username': invitation.topic.creator.username if invitation.topic.creator else None,
+    })
+    
+    # Don't notify if topic has no creator
+    if not invitation.topic.creator:
+        logger.info("Topic has no creator - skipping notification", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+        })
+        return
+    
+    # Don't notify if user accepts their own invitation (shouldn't happen, but check anyway)
+    if invitation.invited_user == invitation.topic.creator:
+        logger.info("User is accepting invitation for their own topic - skipping notification", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+        })
+        return
+    
+    try:
+        # Get content types
+        invited_user_ct = ContentType.objects.get_for_model(invitation.invited_user)
+        topic_ct = ContentType.objects.get_for_model(invitation.topic)
+        logger.debug(f"Content types - Invited User: {invited_user_ct}, Topic: {topic_ct}")
+        
+        # Check if notification already exists for this acceptance
+        existing_notifications = Notification.objects.filter(
+            recipient=invitation.topic.creator,
+            actor_content_type=invited_user_ct,
+            actor_object_id=invitation.invited_user.id,
+            verb='aceptó tu invitación para moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id
+        )
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
+        
+        if existing_notifications.exists():
+            logger.info("Notification already exists - skipping creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            return
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=invitation.topic.creator,
+            actor_content_type=invited_user_ct,
+            actor_object_id=invitation.invited_user.id,
+            verb='aceptó tu invitación para moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id,
+            description=f'{invitation.invited_user.username} aceptó tu invitación para moderar el tema "{invitation.topic.title}"'
+        )
+        logger.info("Topic moderator invitation accepted notification created successfully", extra={
+            'notification_id': notification.id,
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+        
+        # Verify the notification was created
+        if notification:
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
+        else:
+            logger.warning("Notification not found in database after creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            
+    except Exception as e:
+        logger.error(f"Error creating topic moderator invitation accepted notification: {str(e)}", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id if invitation else None,
+            'invited_user_id': invitation.invited_user.id if invitation else None,
+        }, exc_info=True)
+
+def notify_topic_moderator_invitation_declined(invitation):
+    """
+    Create a notification when a user declines a moderator invitation.
+    Notifies the topic creator.
+    
+    Args:
+        invitation: The TopicModeratorInvitation instance that was declined
+    """
+    logger.info("Creating topic moderator invitation declined notification", extra={
+        'invitation_id': invitation.id,
+        'topic_id': invitation.topic.id,
+        'topic_title': invitation.topic.title,
+        'invited_user_id': invitation.invited_user.id,
+        'invited_user_username': invitation.invited_user.username,
+        'topic_creator_id': invitation.topic.creator.id if invitation.topic.creator else None,
+        'topic_creator_username': invitation.topic.creator.username if invitation.topic.creator else None,
+    })
+    
+    # Don't notify if topic has no creator
+    if not invitation.topic.creator:
+        logger.info("Topic has no creator - skipping notification", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+        })
+        return
+    
+    # Don't notify if user declines their own invitation (shouldn't happen, but check anyway)
+    if invitation.invited_user == invitation.topic.creator:
+        logger.info("User is declining invitation for their own topic - skipping notification", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+        })
+        return
+    
+    try:
+        # Get content types
+        invited_user_ct = ContentType.objects.get_for_model(invitation.invited_user)
+        topic_ct = ContentType.objects.get_for_model(invitation.topic)
+        logger.debug(f"Content types - Invited User: {invited_user_ct}, Topic: {topic_ct}")
+        
+        # Check if notification already exists for this decline
+        existing_notifications = Notification.objects.filter(
+            recipient=invitation.topic.creator,
+            actor_content_type=invited_user_ct,
+            actor_object_id=invitation.invited_user.id,
+            verb='rechazó tu invitación para moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id
+        )
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
+        
+        if existing_notifications.exists():
+            logger.info("Notification already exists - skipping creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            return
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=invitation.topic.creator,
+            actor_content_type=invited_user_ct,
+            actor_object_id=invitation.invited_user.id,
+            verb='rechazó tu invitación para moderar',
+            target_content_type=topic_ct,
+            target_object_id=invitation.topic.id,
+            description=f'{invitation.invited_user.username} rechazó tu invitación para moderar el tema "{invitation.topic.title}"'
+        )
+        logger.info("Topic moderator invitation declined notification created successfully", extra={
+            'notification_id': notification.id,
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+        
+        # Verify the notification was created
+        if notification:
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
+        else:
+            logger.warning("Notification not found in database after creation", extra={
+                'invitation_id': invitation.id,
+                'topic_id': invitation.topic.id,
+            })
+            
+    except Exception as e:
+        logger.error(f"Error creating topic moderator invitation declined notification: {str(e)}", extra={
+            'invitation_id': invitation.id,
+            'topic_id': invitation.topic.id if invitation else None,
+            'invited_user_id': invitation.invited_user.id if invitation else None,
+        }, exc_info=True)
+
+def notify_topic_moderator_removed(topic, removed_user, removed_by):
+    """
+    Create a notification when a topic creator removes a moderator from a topic.
+    Notifies the removed moderator.
+    
+    Args:
+        topic: The Topic instance
+        removed_user: The User instance who was removed as moderator
+        removed_by: The User instance who removed the moderator (should be the topic creator)
+    """
+    logger.info("Creating topic moderator removed notification", extra={
+        'topic_id': topic.id,
+        'topic_title': topic.title,
+        'removed_user_id': removed_user.id,
+        'removed_user_username': removed_user.username,
+        'removed_by_id': removed_by.id,
+        'removed_by_username': removed_by.username,
+        'topic_creator_id': topic.creator.id if topic.creator else None,
+        'topic_creator_username': topic.creator.username if topic.creator else None,
+    })
+    
+    # Don't notify if user removes themselves (shouldn't happen, but check anyway)
+    if removed_user == removed_by:
+        logger.info("User is removing themselves - skipping notification", extra={
+            'topic_id': topic.id,
+            'removed_user_id': removed_user.id,
+        })
+        return
+    
+    # Don't notify if topic has no creator
+    if not topic.creator:
+        logger.info("Topic has no creator - skipping notification", extra={
+            'topic_id': topic.id,
+        })
+        return
+    
+    # Verify that removed_by is the creator
+    if removed_by != topic.creator:
+        logger.warning("User removing moderator is not the creator - still sending notification", extra={
+            'topic_id': topic.id,
+            'removed_by_id': removed_by.id,
+            'creator_id': topic.creator.id,
+        })
+    
+    try:
+        # Get content types
+        removed_by_ct = ContentType.objects.get_for_model(removed_by)
+        topic_ct = ContentType.objects.get_for_model(topic)
+        logger.debug(f"Content types - Removed By: {removed_by_ct}, Topic: {topic_ct}")
+        
+        # Check if notification already exists (within the last hour to avoid spam)
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        recent_cutoff = timezone.now() - timedelta(hours=1)
+        existing_notifications = Notification.objects.filter(
+            recipient=removed_user,
+            actor_content_type=removed_by_ct,
+            actor_object_id=removed_by.id,
+            verb='te removió como moderador de',
+            target_content_type=topic_ct,
+            target_object_id=topic.id,
+            timestamp__gte=recent_cutoff
+        )
+        logger.debug(f"Existing notifications count: {existing_notifications.count()}")
+        
+        if existing_notifications.exists():
+            logger.info("Recent notification already exists - skipping creation", extra={
+                'topic_id': topic.id,
+                'removed_user_id': removed_user.id,
+            })
+            return
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=removed_user,
+            actor_content_type=removed_by_ct,
+            actor_object_id=removed_by.id,
+            verb='te removió como moderador de',
+            target_content_type=topic_ct,
+            target_object_id=topic.id,
+            description=f'{removed_by.username} te removió como moderador del tema "{topic.title}"'
+        )
+        logger.info("Topic moderator removed notification created successfully", extra={
+            'notification_id': notification.id,
+            'topic_id': topic.id,
+            'removed_user_id': removed_user.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+        
+        # Verify the notification was created
+        if notification:
+            logger.debug("Notification verification successful", extra={
+                'notification_id': notification.id,
+                'recipient': notification.recipient.username,
+                'actor': notification.actor.username,
+                'verb': notification.verb,
+                'timestamp': notification.timestamp.isoformat(),
+                'unread': notification.unread,
+                'target_content_type': str(notification.target_content_type),
+                'target_object_id': notification.target_object_id,
+            })
+        else:
+            logger.warning("Notification not found in database after creation", extra={
+                'topic_id': topic.id,
+                'removed_user_id': removed_user.id,
+            })
+            
+    except Exception as e:
+        logger.error(f"Error creating topic moderator removed notification: {str(e)}", extra={
+            'topic_id': topic.id if topic else None,
+            'removed_user_id': removed_user.id if removed_user else None,
+            'removed_by_id': removed_by.id if removed_by else None,
+        }, exc_info=True)
+
+def notify_content_suggestion_created(suggestion):
+    """
+    Create notifications when a user suggests content for a topic.
+    Notifies all moderators of the topic.
+    
+    Args:
+        suggestion: The ContentSuggestion instance that was created
+    """
+    logger.info("Creating content suggestion notification", extra={
+        'suggestion_id': suggestion.id,
+        'topic_id': suggestion.topic.id,
+        'topic_title': suggestion.topic.title,
+        'content_id': suggestion.content.id,
+        'suggested_by_id': suggestion.suggested_by.id,
+        'suggested_by_username': suggestion.suggested_by.username,
+    })
+    
+    try:
+        # Get all moderators of the topic (including creator)
+        moderators = list(suggestion.topic.moderators.all())
+        if suggestion.topic.creator and suggestion.topic.creator not in moderators:
+            moderators.append(suggestion.topic.creator)
+        
+        # Get content types
+        suggested_by_ct = ContentType.objects.get_for_model(suggestion.suggested_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        
+        notifications_created = 0
+        
+        for moderator in moderators:
+            # Don't notify the user who made the suggestion
+            if moderator.id == suggestion.suggested_by.id:
+                continue
+            
+            # Check if notification already exists
+            existing_notifications = Notification.objects.filter(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirió contenido para',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id
+            )
+            
+            if existing_notifications.exists():
+                logger.info("Notification already exists - skipping creation", extra={
+                    'suggestion_id': suggestion.id,
+                    'moderator_id': moderator.id,
+                })
+                continue
+            
+            # Build description
+            description = f'{suggestion.suggested_by.username} sugirió contenido para el tema "{suggestion.topic.title}"'
+            if suggestion.message:
+                description += f': {suggestion.message[:100]}'
+            
+            # Create the notification
+            notification = Notification.objects.create(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirió contenido para',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id,
+                description=description
+            )
+            notifications_created += 1
+            logger.info("Content suggestion notification created successfully", extra={
+                'notification_id': notification.id,
+                'suggestion_id': suggestion.id,
+                'moderator_id': moderator.id,
+            })
+        
+        logger.info(f"Created {notifications_created} notifications for content suggestion", extra={
+            'suggestion_id': suggestion.id,
+            'total_moderators': len(moderators),
+            'notifications_created': notifications_created,
+        })
+            
+    except Exception as e:
+        logger.error(f"Error creating content suggestion notification: {str(e)}", extra={
+            'suggestion_id': suggestion.id if suggestion else None,
+            'topic_id': suggestion.topic.id if suggestion else None,
+        }, exc_info=True)
+
+def notify_content_suggestion_accepted(suggestion):
+    """
+    Create a notification when a content suggestion is accepted.
+    Notifies the user who suggested the content.
+    
+    Args:
+        suggestion: The ContentSuggestion instance that was accepted
+    """
+    logger.info("Creating content suggestion accepted notification", extra={
+        'suggestion_id': suggestion.id,
+        'topic_id': suggestion.topic.id,
+        'topic_title': suggestion.topic.title,
+        'suggested_by_id': suggestion.suggested_by.id,
+        'reviewed_by_id': suggestion.reviewed_by.id if suggestion.reviewed_by else None,
+    })
+    
+    # Don't notify if reviewer is the suggester
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        logger.info("Reviewer is the suggester - skipping notification", extra={
+            'suggestion_id': suggestion.id,
+        })
+        return
+    
+    try:
+        # Get content types
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by) if suggestion.reviewed_by else None
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        
+        if not reviewed_by_ct:
+            logger.warning("No reviewer found - skipping notification", extra={
+                'suggestion_id': suggestion.id,
+            })
+            return
+        
+        # Check if notification already exists
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='aceptó tu sugerencia de contenido para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id
+        )
+        
+        if existing_notifications.exists():
+            logger.info("Notification already exists - skipping creation", extra={
+                'suggestion_id': suggestion.id,
+            })
+            return
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='aceptó tu sugerencia de contenido para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=f'{suggestion.reviewed_by.username} aceptó tu sugerencia de contenido para el tema "{suggestion.topic.title}"'
+        )
+        logger.info("Content suggestion accepted notification created successfully", extra={
+            'notification_id': notification.id,
+            'suggestion_id': suggestion.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+            
+    except Exception as e:
+        logger.error(f"Error creating content suggestion accepted notification: {str(e)}", extra={
+            'suggestion_id': suggestion.id if suggestion else None,
+            'topic_id': suggestion.topic.id if suggestion else None,
+        }, exc_info=True)
+
+def notify_content_suggestion_rejected(suggestion):
+    """
+    Create a notification when a content suggestion is rejected.
+    Notifies the user who suggested the content.
+    
+    Args:
+        suggestion: The ContentSuggestion instance that was rejected
+    """
+    logger.info("Creating content suggestion rejected notification", extra={
+        'suggestion_id': suggestion.id,
+        'topic_id': suggestion.topic.id,
+        'topic_title': suggestion.topic.title,
+        'suggested_by_id': suggestion.suggested_by.id,
+        'reviewed_by_id': suggestion.reviewed_by.id if suggestion.reviewed_by else None,
+    })
+    
+    # Don't notify if reviewer is the suggester
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        logger.info("Reviewer is the suggester - skipping notification", extra={
+            'suggestion_id': suggestion.id,
+        })
+        return
+    
+    try:
+        # Get content types
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by) if suggestion.reviewed_by else None
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        
+        if not reviewed_by_ct:
+            logger.warning("No reviewer found - skipping notification", extra={
+                'suggestion_id': suggestion.id,
+            })
+            return
+        
+        # Check if notification already exists
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazó tu sugerencia de contenido para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id
+        )
+        
+        if existing_notifications.exists():
+            logger.info("Notification already exists - skipping creation", extra={
+                'suggestion_id': suggestion.id,
+            })
+            return
+        
+        # Build description with rejection reason if available
+        description = f'{suggestion.reviewed_by.username} rechazó tu sugerencia de contenido para el tema "{suggestion.topic.title}"'
+        if suggestion.rejection_reason:
+            description += f': {suggestion.rejection_reason[:100]}'
+        
+        # Create the notification
+        notification = Notification.objects.create(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazó tu sugerencia de contenido para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=description
+        )
+        logger.info("Content suggestion rejected notification created successfully", extra={
+            'notification_id': notification.id,
+            'suggestion_id': suggestion.id,
+            'recipient_id': notification.recipient.id,
+            'actor_id': notification.actor.id,
+        })
+            
+    except Exception as e:
+        logger.error(f"Error creating content suggestion rejected notification: {str(e)}", extra={
+            'suggestion_id': suggestion.id if suggestion else None,
+            'topic_id': suggestion.topic.id if suggestion else None,
         }, exc_info=True) 

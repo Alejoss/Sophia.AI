@@ -100,9 +100,6 @@ const EventsList = () => {
       <div className="events-header">
         <h2>Eventos</h2>
         <div className="events-header-actions">
-          <Link to="/profiles/my_events" className="btn btn-secondary">
-            Mis Eventos
-          </Link>
           <Link to="/events/create" className="btn btn-primary">
             Crear Evento
           </Link>

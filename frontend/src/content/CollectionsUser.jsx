@@ -1,21 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Box, Typography, Card, CardContent, Button, IconButton } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import contentApi from '../api/contentApi';
-import { isAuthenticated } from '../context/localStorageUtils';
+import { AuthContext } from '../context/AuthContext';
 
 const CollectionsUser = () => {
     const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { authState } = useContext(AuthContext);
+    const isAuthenticated = authState.isAuthenticated;
 
     useEffect(() => {
         const fetchCollections = async () => {
             try {
                 const data = await contentApi.getUserCollections();
-                setCollections(data);
+                setCollections(data || []);
                 setLoading(false);
             } catch (err) {
                 setError('Error al obtener tus colecciones');
@@ -23,14 +25,16 @@ const CollectionsUser = () => {
             }
         };
 
-        if (isAuthenticated()) {
+        if (isAuthenticated) {
             fetchCollections();
+        } else {
+            setLoading(false);
         }
-    }, []);
+    }, [isAuthenticated]);
 
     if (loading) return <Typography>Cargando tus colecciones...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!isAuthenticated()) return <Typography>Por favor inicia sesión para ver tus colecciones</Typography>;
+    if (!isAuthenticated) return <Typography>Por favor inicia sesión para ver tus colecciones</Typography>;
 
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, color: "text.primary" }}>

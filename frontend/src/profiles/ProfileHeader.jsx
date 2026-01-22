@@ -7,12 +7,11 @@ import {
     Paper, 
     Grid, 
     Tooltip,
-    CircularProgress,
-    IconButton
+    CircularProgress
 } from '@mui/material';
 import MessageIcon from '@mui/icons-material/Message';
-import SettingsIcon from '@mui/icons-material/Settings';
 import EditIcon from '@mui/icons-material/Edit';
+import PostAddIcon from '@mui/icons-material/PostAdd';
 import BadgeDisplay from '../gamification/BadgeDisplay';
 
 const ProfileHeader = ({ 
@@ -20,8 +19,7 @@ const ProfileHeader = ({
     isOwnProfile, 
     isAuthenticated, 
     onSendMessage, 
-    isNavigating,
-    onSecurityClick
+    isNavigating
 }) => {
     const navigate = useNavigate();
 
@@ -31,27 +29,6 @@ const ProfileHeader = ({
 
     return (
         <Paper elevation={2} sx={{ p: 3, mb: 3, position: 'relative' }}>
-            {/* Configuration Icon - Top Right Corner */}
-            {isOwnProfile && (
-                <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
-                    <Tooltip title="Configuración">
-                        <IconButton
-                            onClick={onSecurityClick}
-                            size="small"
-                            sx={{
-                                color: 'text.secondary',
-                                '&:hover': {
-                                    color: 'primary.main',
-                                    backgroundColor: 'action.hover'
-                                }
-                            }}
-                        >
-                            <SettingsIcon />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            )}
-
             <Grid container spacing={3}>
                 <Grid item xs={12} md={3}>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -97,6 +74,30 @@ const ProfileHeader = ({
                         
                         {/* Action Buttons */}
                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                            {isOwnProfile && (
+                                <>
+                                    <Button
+                                        component={Link}
+                                        to="/publications/create"
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<PostAddIcon />}
+                                        size="small"
+                                    >
+                                        Crear publicación
+                                    </Button>
+                                    <Button
+                                        component={Link}
+                                        to="/profiles/my_profile/edit"
+                                        variant="outlined"
+                                        color="primary"
+                                        startIcon={<EditIcon />}
+                                        size="small"
+                                    >
+                                        Editar perfil
+                                    </Button>
+                                </>
+                            )}
                             {!isOwnProfile && (
                                 <Tooltip title={isAuthenticated ? "Enviar un mensaje" : "Inicia sesión para enviar un mensaje"}>
                                     <Button 
@@ -117,24 +118,10 @@ const ProfileHeader = ({
                             )}
                         </Box>
                     </Box>
-                    <Typography variant="body1" paragraph>
-                        {profile.profile_description || 'No hay descripción disponible.'}
-                    </Typography>
-                    
-                    {/* Edit Profile Button - Below Description */}
-                    {isOwnProfile && (
-                        <Box sx={{ mt: 2 }}>
-                            <Button
-                                component={Link}
-                                to="/profiles/my_profile/edit"
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<EditIcon />}
-                                size="small"
-                            >
-                                Editar perfil
-                            </Button>
-                        </Box>
+                    {profile.profile_description && (
+                        <Typography variant="body1" paragraph>
+                            {profile.profile_description}
+                        </Typography>
                     )}
                 </Grid>
             </Grid>

@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from content.models import (
     Library, Collection, Content, ContentProfile, 
-    FileDetails, Topic, Publication
+    FileDetails, Topic, Publication, TopicModeratorInvitation
 )
 from django.utils import timezone
 import json
@@ -1005,3 +1005,410 @@ class ContentSourceEditTests(APITestCase):
         response = self.client.get(check_url)
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TopicModeratorInvitationModelTests(TestCase):
+    """Test suite for TopicModeratorInvitation model"""
+    
+    def setUp(self):
+        """Set up test data"""
+        self.creator = User.objects.create_user(
+            username='creator',
+            email='creator@example.com',
+            password='testpass123'
+        )
+        self.invited_user = User.objects.create_user(
+            username='inviteduser',
+            email='invited@example.com',
+            password='testpass123'
+        )
+        self.topic = Topic.objects.create(
+            title='Test Topic',
+            description='Test Description',
+            creator=self.creator
+        )
+    
+    def test_invitation_creation(self):
+        """Test creating a moderator invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator,
+            message='Please moderate this topic'
+        )
+        self.assertEqual(invitation.topic, self.topic)
+        self.assertEqual(invitation.invited_user, self.invited_user)
+        self.assertEqual(invitation.invited_by, self.creator)
+        self.assertEqual(invitation.status, 'PENDING')
+        self.assertEqual(invitation.message, 'Please moderate this topic')
+    
+    def test_invitation_accept(self):
+        """Test accepting an invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator
+        )
+        invitation.accept()
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.status, 'ACCEPTED')
+        self.assertIn(self.invited_user, self.topic.moderators.all())
+    
+    def test_invitation_decline(self):
+        """Test declining an invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator
+        )
+        invitation.decline()
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.status, 'DECLINED')
+        self.assertNotIn(self.invited_user, self.topic.moderators.all())
+    
+    def test_invitation_accept_non_pending(self):
+        """Test that accepting a non-pending invitation raises error"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator,
+            status='DECLINED'
+        )
+        with self.assertRaises(ValueError):
+            invitation.accept()
+    
+    def test_invitation_decline_non_pending(self):
+        """Test that declining a non-pending invitation raises error"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator,
+            status='ACCEPTED'
+        )
+        with self.assertRaises(ValueError):
+            invitation.decline()
+    
+    def test_invitation_str(self):
+        """Test string representation of invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.invited_user,
+            invited_by=self.creator
+        )
+        expected_str = f"Invitation to {self.invited_user.username} for topic {self.topic.title} - PENDING"
+        self.assertEqual(str(invitation), expected_str)
+
+
+class TopicModeratorAPITests(APITestCase):
+    """Test suite for Topic Moderator API endpoints"""
+    
+    def setUp(self):
+        """Set up test data"""
+        self.creator = User.objects.create_user(
+            username='creator',
+            email='creator@example.com',
+            password='testpass123'
+        )
+        self.moderator_user = User.objects.create_user(
+            username='moderator',
+            email='moderator@example.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.creator)
+        self.topic = Topic.objects.create(
+            title='Test Topic',
+            description='Test Description',
+            creator=self.creator
+        )
+    
+    def test_invite_moderator(self):
+        """Test inviting a user as moderator"""
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {
+            'username': self.moderator_user.username,
+            'message': 'Please moderate this topic'
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'PENDING')
+        self.assertEqual(response.data['message'], 'Please moderate this topic')
+        
+        # Verify invitation was created
+        invitation = TopicModeratorInvitation.objects.get(
+            topic=self.topic,
+            invited_user=self.moderator_user
+        )
+        self.assertEqual(invitation.status, 'PENDING')
+    
+    def test_invite_moderator_no_username(self):
+        """Test inviting without username"""
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+    
+    def test_invite_moderator_user_not_exists(self):
+        """Test inviting a non-existent user"""
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {'username': 'nonexistent'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+    
+    def test_invite_moderator_already_moderator(self):
+        """Test inviting a user who is already a moderator"""
+        self.topic.moderators.add(self.moderator_user)
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {'username': self.moderator_user.username}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ya es moderador', response.data['error'])
+    
+    def test_invite_moderator_pending_invitation(self):
+        """Test inviting a user with pending invitation"""
+        TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator,
+            status='PENDING'
+        )
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {'username': self.moderator_user.username}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Ya existe una invitación pendiente', response.data['error'])
+    
+    def test_invite_moderator_not_creator(self):
+        """Test that non-creators cannot invite moderators"""
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('content:topic-moderator-invite', args=[self.topic.id])
+        data = {'username': self.moderator_user.username}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    
+    def test_list_invitations_as_creator(self):
+        """Test listing invitations as topic creator"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        url = reverse('content:topic-moderator-invitations', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], invitation.id)
+    
+    def test_list_invitations_as_invited_user(self):
+        """Test listing invitations as invited user"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.moderator_user)
+        url = reverse('content:topic-moderator-invitations', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], invitation.id)
+    
+    def test_list_invitations_as_other_user(self):
+        """Test that other users cannot list invitations"""
+        TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('content:topic-moderator-invitations', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    
+    def test_accept_invitation(self):
+        """Test accepting an invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.moderator_user)
+        url = reverse('content:topic-moderator-accept', args=[self.topic.id, invitation.id])
+        response = self.client.post(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'ACCEPTED')
+        
+        # Verify user was added as moderator
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.status, 'ACCEPTED')
+        self.assertIn(self.moderator_user, self.topic.moderators.all())
+    
+    def test_accept_invitation_not_invited_user(self):
+        """Test that only invited user can accept"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('content:topic-moderator-accept', args=[self.topic.id, invitation.id])
+        response = self.client.post(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    
+    def test_accept_invitation_non_pending(self):
+        """Test that non-pending invitations cannot be accepted"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator,
+            status='DECLINED'
+        )
+        self.client.force_authenticate(user=self.moderator_user)
+        url = reverse('content:topic-moderator-accept', args=[self.topic.id, invitation.id])
+        response = self.client.post(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    
+    def test_decline_invitation(self):
+        """Test declining an invitation"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.moderator_user)
+        url = reverse('content:topic-moderator-decline', args=[self.topic.id, invitation.id])
+        response = self.client.post(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'DECLINED')
+        
+        # Verify invitation was declined
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.status, 'DECLINED')
+        self.assertNotIn(self.moderator_user, self.topic.moderators.all())
+    
+    def test_decline_invitation_not_invited_user(self):
+        """Test that only invited user can decline"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.topic,
+            invited_user=self.moderator_user,
+            invited_by=self.creator
+        )
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('content:topic-moderator-decline', args=[self.topic.id, invitation.id])
+        response = self.client.post(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    
+    def test_add_moderators_directly(self):
+        """Test adding moderators directly (deprecated method)"""
+        url = reverse('content:topic-moderators', args=[self.topic.id])
+        data = {'usernames': [self.moderator_user.username]}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(self.moderator_user, self.topic.moderators.all())
+    
+    def test_remove_moderators_directly(self):
+        """Test removing moderators directly (deprecated method)"""
+        self.topic.moderators.add(self.moderator_user)
+        url = reverse('content:topic-moderators', args=[self.topic.id])
+        data = {'usernames': [self.moderator_user.username]}
+        response = self.client.delete(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn(self.moderator_user, self.topic.moderators.all())
+
+
+class UserTopicsAPITests(APITestCase):
+    """Test suite for User Topics API endpoints"""
+    
+    def setUp(self):
+        """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.moderator_user = User.objects.create_user(
+            username='moderator',
+            email='moderator@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.user)
+        
+        # Topic created by user
+        self.created_topic = Topic.objects.create(
+            title='Created Topic',
+            description='Created Description',
+            creator=self.user
+        )
+        
+        # Topic moderated by user
+        self.moderated_topic = Topic.objects.create(
+            title='Moderated Topic',
+            description='Moderated Description',
+            creator=self.moderator_user
+        )
+        self.moderated_topic.moderators.add(self.user)
+    
+    def test_get_user_topics_all(self):
+        """Test getting all user topics (created and moderated)"""
+        url = reverse('content:user-topics')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        topic_titles = [topic['title'] for topic in response.data]
+        self.assertIn('Created Topic', topic_titles)
+        self.assertIn('Moderated Topic', topic_titles)
+    
+    def test_get_user_topics_created(self):
+        """Test getting only created topics"""
+        url = reverse('content:user-topics')
+        response = self.client.get(url, {'type': 'created'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], 'Created Topic')
+    
+    def test_get_user_topics_moderated(self):
+        """Test getting only moderated topics"""
+        url = reverse('content:user-topics')
+        response = self.client.get(url, {'type': 'moderated'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], 'Moderated Topic')
+    
+    def test_get_user_topic_invitations(self):
+        """Test getting user's pending invitations"""
+        invitation = TopicModeratorInvitation.objects.create(
+            topic=self.created_topic,
+            invited_user=self.user,
+            invited_by=self.moderator_user
+        )
+        url = reverse('content:user-topic-invitations')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], invitation.id)
+    
+    def test_get_user_topic_invitations_filtered_status(self):
+        """Test getting invitations filtered by status"""
+        pending_invitation = TopicModeratorInvitation.objects.create(
+            topic=self.created_topic,
+            invited_user=self.user,
+            invited_by=self.moderator_user,
+            status='PENDING'
+        )
+        declined_invitation = TopicModeratorInvitation.objects.create(
+            topic=self.moderated_topic,
+            invited_user=self.user,
+            invited_by=self.moderator_user,
+            status='DECLINED'
+        )
+        url = reverse('content:user-topic-invitations')
+        response = self.client.get(url, {'status': 'PENDING'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], pending_invitation.id)

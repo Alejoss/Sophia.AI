@@ -2,10 +2,15 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, re_path
+from django.http import JsonResponse
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from profiles.views import GoogleLoginView
+
+def health_check(request):
+    """Health check endpoint for monitoring"""
+    return JsonResponse({"status": "healthy", "service": "academia_blockchain"})
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -21,6 +26,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
     path('api/profiles/', include('profiles.urls')),
     path('api/events/', include('events.urls')),

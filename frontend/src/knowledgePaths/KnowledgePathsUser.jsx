@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Chip, Tabs, Tab, Box } from '@mui/material';
+import { Avatar, Chip, Tabs, Tab, Box, Typography } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EditIcon from '@mui/icons-material/Edit';
@@ -87,15 +87,28 @@ const KnowledgePathsUser = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
-        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">Mis Caminos de Conocimiento</h1>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
+          Caminos de Conocimiento
+        </Typography>
         <Link 
           to="/knowledge_path/create"
           className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
         >
           Crear Nuevo Camino
         </Link>
-      </div>
+      </Box>
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
@@ -106,7 +119,7 @@ const KnowledgePathsUser = () => {
             iconPosition="start"
           />
           <Tab 
-            label={`En las que participo (${engagedPaths.length})`} 
+            label={`En los que participo (${engagedPaths.length})`} 
             icon={<SchoolIcon />} 
             iconPosition="start"
           />

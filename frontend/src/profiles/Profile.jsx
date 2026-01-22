@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationsCount } from '../api/profilesApi';
+import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationsCount, changePassword } from '../api/profilesApi';
 import ProfileHeader from './ProfileHeader';
 import ProfileVerticalNavigation from './ProfileVerticalNavigation';
 import PublicationList from '../publications/PublicationList';
@@ -11,9 +11,12 @@ import Certificates from './Certificates';
 import Bookmarks from './Bookmarks';
 import KnowledgePathsUser from '../knowledgePaths/KnowledgePathsUser';
 import KnowledgePathsByUser from '../knowledgePaths/KnowledgePathsByUser';
+import TopicsUser from '../topics/TopicsUser';
+import TopicsByUser from '../topics/TopicsByUser';
 import FavoriteCryptos from './FavoriteCryptos';
 import FeaturedBadgeSelector from '../gamification/FeaturedBadgeSelector';
 import BadgeList from '../gamification/BadgeList';
+import SuggestionModal from './SuggestionModal';
 import { useBadges } from '../gamification/useBadges';
 import { 
     Box, 
@@ -24,31 +27,161 @@ import {
     Button,
     Grid,
     Container,
-    Paper
+    Paper,
+    TextField,
+    Alert
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SecurityIcon from '@mui/icons-material/Security';
 
-// Placeholder components for different sections
-const SecuritySection = () => (
-  <Box>
-    <Typography 
-      variant="h5" 
-      gutterBottom 
-      color="text.primary"
-      sx={{
-        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-        fontWeight: 400,
-        fontSize: "20px"
-      }}
-    >
-      Configuración de seguridad
-    </Typography>
-    <Typography variant="body1" color="text.secondary">
-      El cambio de contraseña y la configuración de seguridad se implementarán aquí.
-    </Typography>
-  </Box>
-);
+// Security Section Component
+const SecuritySection = () => {
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    // Validation
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError('Por favor, completa todos los campos.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError('La nueva contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    if (oldPassword === newPassword) {
+      setError('La nueva contraseña debe ser diferente a la actual.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await changePassword(oldPassword, newPassword, confirmPassword);
+      setSuccess(true);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setSuccess(false);
+      }, 5000);
+    } catch (err) {
+      const errorMessage = err.response?.data?.old_password?.[0] ||
+                          err.response?.data?.new_password?.[0] ||
+                          err.response?.data?.confirm_password?.[0] ||
+                          err.response?.data?.error ||
+                          err.response?.data?.message ||
+                          err.message ||
+                          'Error al cambiar la contraseña. Por favor, intenta nuevamente.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{
+          fontSize: {
+            xs: "1.5rem", // ~24px on mobile
+            sm: "1.75rem", // ~28px on small screens
+            md: "2.125rem", // ~34px on desktop (default h4)
+          },
+          fontWeight: 600,
+        }}
+      >
+        Configuración de seguridad
+      </Typography>
+      
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Cambia tu contraseña para mantener tu cuenta segura.
+      </Typography>
+
+      <Paper elevation={1} sx={{ p: 3, maxWidth: 600 }}>
+        <form onSubmit={handleSubmit}>
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              ¡Contraseña cambiada exitosamente!
+            </Alert>
+          )}
+          
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            label="Contraseña actual"
+            type="password"
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            margin="normal"
+            required
+            disabled={loading || success}
+            autoComplete="current-password"
+          />
+
+          <TextField
+            fullWidth
+            label="Nueva contraseña"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            margin="normal"
+            required
+            disabled={loading || success}
+            autoComplete="new-password"
+            helperText="Mínimo 8 caracteres"
+          />
+
+          <TextField
+            fullWidth
+            label="Confirmar nueva contraseña"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            margin="normal"
+            required
+            disabled={loading || success}
+            autoComplete="new-password"
+          />
+
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={loading || success}
+              startIcon={loading ? <CircularProgress size={20} /> : null}
+            >
+              {loading ? 'Cambiando...' : success ? 'Cambiada' : 'Cambiar contraseña'}
+            </Button>
+          </Box>
+        </form>
+      </Paper>
+    </Box>
+  );
+};
 
 const Profile = () => {
     const { profileId } = useParams();
@@ -66,6 +199,7 @@ const Profile = () => {
     const [notificationsError, setNotificationsError] = useState(null);
     const [isNavigating, setIsNavigating] = useState(false);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+    const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     
     // Determine if this is the user's own profile
     const isOwnProfile = !profileId || (currentUser && profile && currentUser.id === profile.user?.id);
@@ -138,6 +272,7 @@ const Profile = () => {
             // Map URL parameter to section name
             const sectionMap = {
                 'knowledge-paths': 'knowledge-paths',
+                'topics': 'topics',
                 'publications': 'publications',
                 'events': 'events',
                 'certificates': 'certificates',
@@ -208,12 +343,13 @@ const Profile = () => {
         navigate(`/messages/thread/${profile.user.id}`);
     };
 
-    const handleSecurityClick = () => {
-        setActiveSection('security');
-    };
 
     const handleSectionChange = (event, newSection) => {
         setActiveSection(newSection);
+    };
+
+    const handleSuggestionClick = () => {
+        setSuggestionModalOpen(true);
     };
 
     const renderSectionContent = () => {
@@ -221,19 +357,6 @@ const Profile = () => {
             case 'publications':
                 return (
                     <Box>
-                        {isOwnProfile && (
-                            <Box sx={{ mb: 3, display: 'flex', flexwrap:'wrap', justifyContent: 'flex-end' }}>
-                                <Button
-                                    component={Link}
-                                    to="/publications/create"
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<EditIcon />}
-                                >
-                                    Crear publicación
-                                </Button>
-                            </Box>
-                        )}
                         <PublicationList isOwnProfile={isOwnProfile} userId={profile?.user?.id} />
                     </Box>
                 );
@@ -280,6 +403,13 @@ const Profile = () => {
                     <KnowledgePathsByUser 
                         userId={profile?.user?.id} 
                         authorName={profile?.user?.username || 'User'}
+                    />
+                );
+            case 'topics':
+                return isOwnProfile ? <TopicsUser /> : (
+                    <TopicsByUser 
+                        userId={profile?.user?.id} 
+                        userName={profile?.user?.username || 'User'}
                     />
                 );
             case 'events':
@@ -355,14 +485,13 @@ const Profile = () => {
     }
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Container maxWidth="xl" sx={{ pb: 3 }}>
             <ProfileHeader 
                 profile={profile}
                 isOwnProfile={isOwnProfile}
                 isAuthenticated={isAuthenticated}
                 onSendMessage={handleSendMessage}
                 isNavigating={isNavigating}
-                onSecurityClick={handleSecurityClick}
             />
             
             {/* Use flexbox instead of Grid for better control with fixed-width navigation */}
@@ -384,6 +513,7 @@ const Profile = () => {
                             userId={profile?.user?.id}
                             activeSection={activeSection}
                             onSectionChange={handleSectionChange}
+                            onSuggestionClick={handleSuggestionClick}
                             unreadNotificationsCount={unreadNotificationsCount}
                         />
                     </Box>
@@ -400,6 +530,14 @@ const Profile = () => {
                     </Paper>
                 </Box>
             </Box>
+            
+            {/* Suggestion Modal */}
+            {isOwnProfile && (
+                <SuggestionModal 
+                    open={suggestionModalOpen} 
+                    onClose={() => setSuggestionModalOpen(false)} 
+                />
+            )}
         </Container>
     );
 };

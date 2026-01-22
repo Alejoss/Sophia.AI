@@ -111,7 +111,7 @@ const TopicEditContent = () => {
                 onCancel={handleCancelAdd}
                 onSave={handleSaveAdd}
                 filterFunction={filterContent}
-                contextName={topicData.title}
+                contextName={topicData?.topic?.title}
             />
         );
     }
@@ -135,24 +135,25 @@ const TopicEditContent = () => {
     },
   }}
 >
-                    <IconButton 
-                        onClick={() => navigate(`/content/topics/${topicId}/edit`)}
-                        sx={{ mr: 2 }}
-                    >
-                        <ArrowBackIcon />
-                    </IconButton>
-                    <Typography 
-                      variant="h4" 
-                      sx={{ 
-                        flexGrow: 1,
-                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-                        fontWeight: 400,
-                        fontSize: "24px"
-                      }} 
-                      color="text.primary"
-                    >
-                        {topicData.title}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+                        <IconButton 
+                            onClick={() => navigate(`/content/topics/${topicId}/edit`)}
+                            sx={{ mr: 2 }}
+                        >
+                            <ArrowBackIcon />
+                        </IconButton>
+                        <Typography 
+                          variant="h4" 
+                          sx={{ 
+                            fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                            fontWeight: 400,
+                            fontSize: "24px"
+                          }} 
+                          color="text.primary"
+                        >
+                            {topicData?.topic?.title}
+                        </Typography>
+                    </Box>
                     <Button
                         variant="contained"
                         color="primary"

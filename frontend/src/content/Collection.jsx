@@ -14,26 +14,28 @@ const Collection = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const fetchCollectionContent = async () => {
+        const fetchCollectionData = async () => {
             try {
-                console.log('Fetching collection content for ID:', collectionId);
-                const data = await contentApi.getCollectionContent(collectionId);
-                console.log('Received collection data:', data);
+                console.log('Fetching collection data for ID:', collectionId);
+                // Fetch collection info and content in parallel
+                const [collectionInfo, contentData] = await Promise.all([
+                    contentApi.getCollection(collectionId),
+                    contentApi.getCollectionContent(collectionId)
+                ]);
+                console.log('Received collection info:', collectionInfo);
+                console.log('Received collection content:', contentData);
                 
-                setContent(data);
-                
-                if (data.length > 0) {
-                    setCollectionName(data[0].collection_name || 'Colección sin título');
-                }
+                setCollectionName(collectionInfo.name || 'Colección sin título');
+                setContent(contentData || []);
                 setLoading(false);
             } catch (err) {
-                console.error('Error fetching collection content:', err);
+                console.error('Error fetching collection data:', err);
                 setError(err.response?.data?.error || 'Error al obtener el contenido de la colección');
                 setLoading(false);
             }
         };
 
-        fetchCollectionContent();
+        fetchCollectionData();
     }, [collectionId]);
 
     if (loading) return <Typography>Cargando contenido de la colección...</Typography>;
