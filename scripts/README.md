@@ -64,6 +64,24 @@ chmod +x scripts/restore-db.sh
 - Restores database from backup file
 - Prompts for confirmation before proceeding
 
+### `setup-nginx.sh`
+Sets up Nginx as a reverse proxy for the application.
+
+**Usage:**
+```bash
+chmod +x scripts/setup-nginx.sh
+sudo ./scripts/setup-nginx.sh
+```
+
+**What it does:**
+- Installs Nginx if not already installed
+- Copies nginx configuration from `nginx/nginx-server.conf`
+- Enables the site configuration
+- Tests and reloads Nginx
+- Provides next steps for updating environment variables
+
+**Note:** This script must be run as root (use sudo).
+
 ## Prerequisites
 
 - Docker and Docker Compose installed

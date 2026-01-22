@@ -37,4 +37,5 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 
 # Use entrypoint script that chooses command based on ENVIRONMENT
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Use bash explicitly to ensure it works even if permissions are wrong
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
