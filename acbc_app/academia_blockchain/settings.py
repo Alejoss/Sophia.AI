@@ -626,5 +626,6 @@ else:
 # WhiteNoise allows Django to serve static files even when DEBUG=False
 # This is configured via middleware, but we can add storage settings for optimization
 if ENVIRONMENT == "PRODUCTION":
-    # Use WhiteNoise's compressed storage for better performance
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    # Use WhiteNoise's compressed storage (without manifest to avoid missing file errors)
+    # CompressedStaticFilesStorage compresses files but doesn't require manifest
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'

@@ -18,6 +18,7 @@ run the docker containers and build the image from the root directory of acbc_ap
 docker-compose up --build
 docker-compose up --build backend
 docker-compose up --build frontend
+docker compose logs backend --tail=50
 
 **DATABASE CONFIGURATION**
 
