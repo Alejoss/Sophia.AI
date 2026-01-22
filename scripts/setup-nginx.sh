@@ -14,6 +14,15 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Check if port 80 is in use by Docker container
+if command -v docker &> /dev/null; then
+    if docker ps --format '{{.Ports}}' | grep -q ':80->'; then
+        echo "⚠️  Warning: Port 80 is in use by a Docker container"
+        echo "   The frontend container needs to be restarted to use port 8080"
+        echo "   After this script completes, run: docker compose up -d frontend"
+    fi
+fi
+
 # Check if Nginx is installed
 if ! command -v nginx &> /dev/null; then
     echo "Installing Nginx..."
@@ -62,10 +71,16 @@ else
     exit 1
 fi
 
-# Reload Nginx
-echo "Reloading Nginx..."
-systemctl reload nginx
-echo "✅ Nginx reloaded"
+# Start or reload Nginx
+echo "Starting/Reloading Nginx..."
+if systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+    echo "✅ Nginx reloaded"
+else
+    systemctl start nginx
+    systemctl enable nginx
+    echo "✅ Nginx started and enabled"
+fi
 
 # Check Nginx status
 if systemctl is-active --quiet nginx; then
@@ -80,9 +95,11 @@ echo "✅ Nginx setup complete!"
 echo "=========================================="
 echo ""
 echo "Next steps:"
-echo "1. Update VITE_API_URL in .env to: http://$(hostname -I | awk '{print $1}')/api"
-echo "2. Rebuild frontend: docker compose build frontend"
-echo "3. Restart services: docker compose up -d"
+echo "1. Stop frontend if running on port 80: docker compose stop frontend"
+echo "2. Update docker-compose.yml (frontend port changed to 8080)"
+echo "3. Restart frontend: docker compose up -d frontend"
+echo "4. Update VITE_API_URL in .env to: http://$(hostname -I | awk '{print $1}')/api"
+echo "5. Rebuild frontend: docker compose build frontend && docker compose up -d frontend"
 echo ""
 echo "To verify:"
 echo "  curl http://$(hostname -I | awk '{print $1}')/api/health/"

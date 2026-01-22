@@ -24,6 +24,8 @@ cd /opt/acbc-app
 git pull origin main
 ```
 
+**Nota:** NO necesitas parar los contenedores. Los contenedores seguirán corriendo normalmente porque Nginx se configura en el sistema operativo, no dentro de Docker.
+
 ### 2. Ejecutar el Script de Configuración
 
 ```bash
@@ -59,11 +61,15 @@ VITE_API_URL=http://159.65.69.165/api
 
 ### 4. Reconstruir Frontend
 
+**Importante:** Solo necesitas reconstruir el frontend porque cambiaste `VITE_API_URL`. El backend NO necesita reiniciarse.
+
 ```bash
 cd /opt/acbc-app
 docker compose build frontend
 docker compose up -d frontend
 ```
+
+**¿Por qué reconstruir el frontend?** Porque `VITE_API_URL` se inyecta en tiempo de build. Al cambiar la URL, necesitas reconstruir la imagen para que el cambio se refleje.
 
 ### 5. Verificar
 

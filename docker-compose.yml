@@ -53,7 +53,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      # Frontend en puerto 8080 (Nginx usará el 80 y redirigirá aquí)
+      - "${FRONTEND_PORT:-8080}:80"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
     networks:
