@@ -566,9 +566,6 @@ if ENVIRONMENT == "PRODUCTION" and SEND_EMAILS:
             "MAILGUN_DOMAIN and MAILGUN_API_KEY must be set in production when SEND_EMAILS=True"
         )
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
 if ENVIRONMENT == "PRODUCTION":
 
     DATABASES = {

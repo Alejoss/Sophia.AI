@@ -59,8 +59,8 @@ urlpatterns = [
 
 # Serve static and media files
 # In production with Docker, Django serves them since Nginx proxies to Django
-# Only skip if using S3 storage (which is commented out, so we always serve)
-use_s3_storage = hasattr(settings, 'AWS_STORAGE_BUCKET_NAME') and getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+# Only skip if actually using S3 storage (check if STATICFILES_STORAGE is set to S3)
+use_s3_storage = hasattr(settings, 'STATICFILES_STORAGE') and 's3' in str(getattr(settings, 'STATICFILES_STORAGE', '')).lower()
 if not use_s3_storage:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
