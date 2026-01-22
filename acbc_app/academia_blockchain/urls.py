@@ -3,6 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, re_path
 from django.http import JsonResponse
+from django.views.static import serve
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -61,7 +62,18 @@ urlpatterns = [
 # Static files are served by WhiteNoise middleware in production (no need for static() helper)
 # Only skip if actually using S3 storage (check if STATICFILES_STORAGE is set to S3)
 use_s3_storage = hasattr(settings, 'STATICFILES_STORAGE') and 's3' in str(getattr(settings, 'STATICFILES_STORAGE', '')).lower()
+
 if not use_s3_storage:
     # WhiteNoise handles static files automatically via middleware
-    # Only need to serve media files manually
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # For media files: Django serves them when Nginx proxies requests
+    # In development (DEBUG=True), static() works automatically
+    # In production (DEBUG=False), we need to explicitly serve media files
+    if settings.DEBUG:
+        # Development: use Django's static() helper
+        urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    else:
+        # Production: serve media files explicitly (Nginx proxies to Django)
+        # This allows Django to serve media files even when DEBUG=False
+        urlpatterns += [
+            re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+        ]
