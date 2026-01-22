@@ -23,6 +23,10 @@ COPY . /app
 # Create logs directory
 RUN mkdir -p /app/logs
 
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Set Python path
 ENV PYTHONPATH=/app
 
@@ -32,6 +36,5 @@ EXPOSE 8000
 # Environment settings
 ENV PYTHONUNBUFFERED=1
 
-# Default to Gunicorn for production, can be overridden in docker-compose
-# For development, docker-compose will override this with runserver
-CMD ["gunicorn", "academia_blockchain.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+# Use entrypoint script that chooses command based on ENVIRONMENT
+ENTRYPOINT ["/app/entrypoint.sh"]

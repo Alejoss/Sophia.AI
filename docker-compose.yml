@@ -6,27 +6,27 @@ services:
       context: ./acbc_app
       dockerfile: backend.Dockerfile
     container_name: acbc_backend
+    # Volumes: 
+    # - Código montado para desarrollo (hot-reload), en producción el código ya está en la imagen
+    # - static_volume y media_volume para persistir archivos estáticos y media
     volumes:
       - ./acbc_app:/app
-      - static_volume:/app/static
-      - /var/www/sophia-ai/staticfiles:/app/staticfiles
-      - /var/www/sophia-ai/media:/app/media
-    command: python manage.py runserver 0.0.0.0:8000
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    # No command - entrypoint.sh elige según ENVIRONMENT del .env
     env_file:
       - ./acbc_app/.env
+    # Variables de entorno vienen principalmente del .env
+    # Estos son defaults que se sobrescriben con .env
     environment:
-      - DB_NAME=acbc_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DEBUG=True
-      - SECRET_KEY=django-insecure-development-key-123
-      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
-      - ENVIRONMENT=DEVELOPMENT
-      - POSTGRES_DB=acbc_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - DB_NAME=${DB_NAME:-acbc_db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-acbc_db}}
+      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
     ports:
       - "8000:8000"
     depends_on:
@@ -39,33 +39,41 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: frontend.Dockerfile
+      # Por defecto: frontend.prod.Dockerfile (producción con nginx)
+      # Para desarrollo local: usar docker-compose.override.yml con FRONTEND_DOCKERFILE=frontend.Dockerfile
+      dockerfile: ${FRONTEND_DOCKERFILE:-frontend.prod.Dockerfile}
+      args:
+        # Vite environment variables (needed at build time)
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+        VITE_GOOGLE_OAUTH_CLIENT_ID: ${VITE_GOOGLE_OAUTH_CLIENT_ID:-}
     container_name: acbc_frontend
+    # Volumes: en producción (frontend.prod.Dockerfile) estos no afectan (nginx sirve desde /usr/share/nginx/html)
+    # En desarrollo (frontend.Dockerfile) estos permiten hot-reload
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-80}:80"
     environment:
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true   # 👈 force file watching inside Docker
-    command: npm run dev -- --host 0.0.0.0   # 👈 run vite dev on 0.0.0.0
+      - NODE_ENV=${NODE_ENV:-production}
     networks:
       - app_network
+    restart: unless-stopped
 
   postgres:
     image: postgres:15
+    container_name: acbc_postgres
     environment:
-      - POSTGRES_DB=acbc_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-acbc_db}}
+      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       - POSTGRES_INITDB_ARGS=--locale=C
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -78,3 +86,4 @@ networks:
 volumes:
   postgres_data:
   static_volume:
+  media_volume:
