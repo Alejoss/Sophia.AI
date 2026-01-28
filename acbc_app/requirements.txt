@@ -38,7 +38,7 @@ webencodings==0.5.1
 whitenoise==6.7.0
 pymupdf==1.24.2
 bleach==6.1.0
-drf-yasg==1.2.1.8
+drf-yasg==1.21.14
 inflection==0.5.1
 uritemplate==4.1.1
 beautifulsoup4>=4.9.3
