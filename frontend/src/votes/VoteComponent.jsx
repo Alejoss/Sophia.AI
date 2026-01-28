@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import PropTypes from 'prop-types';
-import { IconButton, Typography, Box } from '@mui/material';
+import { IconButton, Typography, Box, Tooltip } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import votesApi from '../api/votesApi';
@@ -103,6 +103,9 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
                 case 'publication':
                     response = await votesApi.votePublication(ids.publicationId, action);
                     break;
+                case 'content_suggestion':
+                    response = await votesApi.voteContentSuggestion(ids.suggestionId, action);
+                    break;
                 default:
                     throw new Error('Invalid vote type');
             }
@@ -144,25 +147,34 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
     const downvoteColor = userVote < 0 ? 'primary' : 'default';
     const isDisabled = loading || !authState.isAuthenticated;
 
+    // Tooltip text for upvote button - special message for content suggestions
+    const upvoteTooltip = type === 'content_suggestion' 
+        ? 'Es una buena referencia de contenido para este tema'
+        : 'Votar a favor';
+
     return (
         <Box display="flex" alignItems="center">
-            <IconButton 
-                onClick={() => handleVote('upvote')}
-                color={upvoteColor}
-                disabled={isDisabled}
-                className={upvoteColor === 'primary' ? 'MuiIconButton-colorPrimary' : ''}
-                sx={{
-                    color: upvoteColor === 'primary' ? '#1976d2 !important' : '#757575 !important',
-                    '&.MuiIconButton-colorPrimary': {
-                        color: '#1976d2 !important'
-                    },
-                    '&:hover': {
-                        backgroundColor: upvoteColor === 'primary' ? 'primary.light' : 'action.hover'
-                    }
-                }}
-            >
-                <ThumbUpIcon />
-            </IconButton>
+            <Tooltip title={upvoteTooltip}>
+                <span>
+                    <IconButton 
+                        onClick={() => handleVote('upvote')}
+                        color={upvoteColor}
+                        disabled={isDisabled}
+                        className={upvoteColor === 'primary' ? 'MuiIconButton-colorPrimary' : ''}
+                        sx={{
+                            color: upvoteColor === 'primary' ? '#1976d2 !important' : '#757575 !important',
+                            '&.MuiIconButton-colorPrimary': {
+                                color: '#1976d2 !important'
+                            },
+                            '&:hover': {
+                                backgroundColor: upvoteColor === 'primary' ? 'primary.light' : 'action.hover'
+                            }
+                        }}
+                    >
+                        <ThumbUpIcon />
+                    </IconButton>
+                </span>
+            </Tooltip>
             <Typography variant="body1" sx={{ mx: 1, minWidth: '20px', textAlign: 'center', color: 'text.primary' }}>
                 {voteCount}
             </Typography>
@@ -188,7 +200,7 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
 };
 
 VoteComponent.propTypes = {
-    type: PropTypes.oneOf(['content', 'comment', 'knowledge_path', 'publication']).isRequired,
+    type: PropTypes.oneOf(['content', 'comment', 'knowledge_path', 'publication', 'content_suggestion']).isRequired,
     ids: PropTypes.object.isRequired,
     initialVoteCount: PropTypes.number,
     initialUserVote: PropTypes.number

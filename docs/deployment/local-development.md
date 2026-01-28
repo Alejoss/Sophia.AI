@@ -72,7 +72,7 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 From the root directory of the project:
 
 ```bash
-# Build and start all services
+# Build and start all services (local development)
 docker-compose up --build
 
 # Or build and start services individually
@@ -91,6 +91,14 @@ This will:
 - Start PostgreSQL database
 - Start the Django backend server on port 8000
 - Start the React frontend on port 5173
+
+### Media files persistence in development
+
+- In development, the file `docker-compose.override.yml` (git-ignored) is used to:
+  - Mount `./acbc_app` into `/app` (código del backend).
+  - Montar `./acbc_app/media` en `/app/media`, de modo que los **archivos subidos se guarden en tu máquina local** y no solo en un volumen anónimo de Docker.
+- **Comando local**: sigue siendo el mismo (`docker-compose up --build`); Docker Compose aplica automáticamente el override si el archivo existe.
+- **Importante**: no copies `docker-compose.override.yml` al servidor de producción; allí solo debe usarse `docker-compose.yml` o el compose específico de producción.
 
 ## Step 5: Database Setup
 

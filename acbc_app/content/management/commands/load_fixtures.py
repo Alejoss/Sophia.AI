@@ -6,6 +6,9 @@ class Command(BaseCommand):
     help = 'Loads all fixtures in the correct order'
 
     def handle(self, *args, **options):
+        import os
+        if os.getenv('ENVIRONMENT') == 'PRODUCTION':
+            raise SystemExit('load_fixtures must not be run in PRODUCTION.')
         # List of fixtures to load, in the correct order
         fixtures = [
             'users_fixture.json',

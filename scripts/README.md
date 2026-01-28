@@ -38,30 +38,31 @@ chmod +x scripts/setup-ssl.sh
 - Sets up automatic certificate renewal
 
 ### `backup-db.sh`
-Creates a backup of the PostgreSQL database.
+Creates a backup of the PostgreSQL database. Use the same project root and `docker-compose.prod.yml` as deployment.
 
 **Usage:**
 ```bash
+cd /path/to/project
 chmod +x scripts/backup-db.sh
 BACKUP_DIR=/path/to/backups ./scripts/backup-db.sh
 ```
 
 **What it does:**
-- Creates compressed database backup
-- Stores in backup directory
-- Automatically cleans up backups older than 7 days
+- Creates compressed database backup via `docker-compose -f docker-compose.prod.yml exec postgres pg_dump`
+- Uses `DB_NAME`, `DB_USER` from env (same as prod)
+- Stores in backup directory; cleans up backups older than 7 days
 
 ### `restore-db.sh`
-Restores the database from a backup file.
+Restores the database from a backup file. Run from project root; uses `docker-compose.prod.yml` and `DB_NAME`/`DB_USER`.
 
 **Usage:**
 ```bash
-chmod +x scripts/restore-db.sh
+cd /path/to/project
 ./scripts/restore-db.sh backups/backup_20240101_120000.sql.gz
 ```
 
 **What it does:**
-- Restores database from backup file
+- Restores via `docker-compose -f docker-compose.prod.yml exec postgres psql`
 - Prompts for confirmation before proceeding
 
 ### `setup-nginx.sh`

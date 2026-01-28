@@ -111,15 +111,14 @@ const NodeDetail = () => {
     try {
       response = await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
       console.log('Response from marking node completed:', response);
+      
+      // Backend returns {"message": "Node completed successfully"}
+      // If we get a successful response, mark the node as completed
+      setNode(prev => ({ ...prev, is_completed: true }));
     } catch (error) {
       console.error('Error marking node as completed:', error);
       setError('Error al marcar el nodo como completado');
       return;
-    }
-
-    // Check if the response indicates completion
-    if (response.status === 'completed') {
-      setNode(prev => ({ ...prev, is_completed: true }));
     }
         
     // Check if there's a quiz for this node

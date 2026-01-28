@@ -55,12 +55,23 @@ const TopicsByUser = ({ userId, userName }) => {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
-        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">
+    <Box sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
           Temas por {userName}
-        </h1>
-      </div>
+        </Typography>
+      </Box>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {topics.map((topic) => {
@@ -123,14 +134,24 @@ const TopicsByUser = ({ userId, userName }) => {
 
       {/* No Topics Message */}
       {topics.length === 0 && (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no se han creado temas</h3>
-          <p className="text-gray-500 mb-6">
+        <Box sx={{ textAlign: 'center', py: 6 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              color: 'text.secondary',
+              mb: 2
+            }}
+          >
+            Aún no se han creado temas
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             {userName} aún no ha creado temas.
-          </p>
-        </div>
+          </Typography>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 

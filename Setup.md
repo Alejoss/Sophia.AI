@@ -81,7 +81,7 @@ GOOGLE_OAUTH_SECRET_KEY=your-google-oauth-secret-key
 From the root directory of the project, run:
 
 ```bash
-# Build and start all services
+# Build and start all services (local development)
 docker-compose up --build
 
 # Or build and start services individually
@@ -95,6 +95,11 @@ This will:
 - Start PostgreSQL database
 - Start the Django backend server on port 8000
 - Start the React frontend on port 5173
+
+On your local machine, Docker Compose will also read `docker-compose.override.yml` (if present and **not** deployed to the server).  
+That override is used only for development to:
+- Mount the backend code from `./acbc_app` into `/app`.
+- Mount `./acbc_app/media` into `/app/media` so that **uploaded media files persist on your host machine** even if Docker volumes are recreated.
 
 ## Step 5: Run Database Migrations
 

@@ -13,8 +13,10 @@ const knowledgePathsApi = {
             if (hasImage) {
                 // Use FormData for file upload
                 const formData = new FormData();
-                formData.append('title', knowledgePathData.title);
-                formData.append('description', knowledgePathData.description);
+                if (knowledgePathData.title !== undefined) formData.append('title', knowledgePathData.title);
+                if (knowledgePathData.description !== undefined) formData.append('description', knowledgePathData.description);
+                // Ensure visibility updates work even when uploading an image
+                if (knowledgePathData.is_visible !== undefined) formData.append('is_visible', String(knowledgePathData.is_visible));
                 formData.append('image', knowledgePathData.image);
                 
                 console.log('knowledgePathsApi.createKnowledgePath - Using FormData');

@@ -59,10 +59,12 @@ axiosInstance.interceptors.response.use(
     // 2. The request has already been retried
     // 3. The request is for the refresh token endpoint
     // 4. The request is for the logout endpoint
+    // 5. The request is for the check_auth endpoint (to avoid infinite loops)
     if (error.response?.status !== 401 || 
         originalRequest._retry || 
         originalRequest.url === '/profiles/refresh_token/' ||
-        originalRequest.url === '/profiles/logout/') {
+        originalRequest.url === '/profiles/logout/' ||
+        originalRequest.url === '/profiles/check_auth/') {
       return Promise.reject(error);
     }
 
@@ -81,13 +83,24 @@ axiosInstance.interceptors.response.use(
       originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      // If refresh fails, clear auth and redirect to login
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      localStorage.setItem('is_authenticated', 'false');
+      // If refresh fails, don't automatically clear auth state or redirect
+      // This prevents hard page refresh that breaks React Router state
+      // Components will receive the 401 error and can handle it appropriately
       
-      window.location.href = '/profiles/login';
-      return Promise.reject(refreshError);
+      // Dispatch a custom event that components can listen to if needed
+      // This allows for graceful handling without hard page refresh
+      window.dispatchEvent(new CustomEvent('auth:token_refresh_failed', { 
+        detail: { 
+          reason: 'token_refresh_failed',
+          originalError: error,
+          refreshError: refreshError
+        } 
+      }));
+      
+      // Return the original 401 error so components can handle it
+      // Components can check error.response?.status === 401 and decide what to do
+      // They might want to verify auth status with checkAuth() or show appropriate UI
+      return Promise.reject(error);
     }
   }
 );

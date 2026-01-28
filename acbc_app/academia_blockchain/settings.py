@@ -97,22 +97,26 @@ MIDDLEWARE = [
     'utils.logging_middleware.RequestLoggingMiddleware',
 ]
 
-# CORS settings
-# TODO CORS settings are repetitive
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS settings: use explicit origins; never Allow All in production.
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
+_CORS_ORIGINS = [
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://sophia-ai.algobeat.com",
     "https://sophia-ai-api.algobeat.com",
 ]
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://localhost:[0-9]+$",
-    r"^http://127.0.0.1:[0-9]+$",
-    "https://sophia-ai.algobeat.com",
-    "https://sophia-ai-api.algobeat.com",
-]
+if ENVIRONMENT == "PRODUCTION":
+    CORS_ALLOW_ALL_ORIGINS = False
+    extra = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    CORS_ALLOWED_ORIGINS = _CORS_ORIGINS + [x.strip() for x in extra.split(",") if x.strip()]
+    CORS_ALLOWED_ORIGIN_REGEXES = []  # No regex in production; use CORS_ALLOWED_ORIGINS only.
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = _CORS_ORIGINS
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://localhost:[0-9]+$",
+        r"^http://127.0.0.1:[0-9]+$",
+    ]
 
 # CSRF settings
 CSRF_TRUSTED_ORIGINS = [
@@ -131,7 +135,9 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
 
 # Security settings
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # This will fix the Cross-Origin-Opener-Policy error
+# SECURE_CROSS_ORIGIN_OPENER_POLICY = None avoids strict COOP headers that break
+# OAuth popups / cross-origin flows (e.g. Google login). Revisit if COOP is required.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 ROOT_URLCONF = 'academia_blockchain.urls'
 
@@ -153,8 +159,9 @@ TEMPLATES = [
     },
 ]
 
+# Only non-sensitive config is exported to templates (e.g. frontend CSRF token).
 SETTINGS_EXPORT = [
-    'CSRF_COOKIE_NAME'
+    'CSRF_COOKIE_NAME',
 ]
 
 WSGI_APPLICATION = 'academia_blockchain.wsgi.application'
@@ -467,9 +474,13 @@ else:
     }
 
 # REST Framework configuration
+# Default deny: views must explicitly use AllowAny for public endpoints (login, register, search, health).
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
@@ -481,6 +492,9 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
+# Secure cookies in production when using HTTPS (recommended).
+_USE_SECURE_COOKIES = ENVIRONMENT == "PRODUCTION" and os.getenv("USE_HTTPS", "true").lower() == "true"
+
 # dj-rest-auth settings
 REST_AUTH = {
     'USE_JWT': True,
@@ -488,7 +502,7 @@ REST_AUTH = {
     'JWT_AUTH_REFRESH_COOKIE': 'acbc_refresh_token',
     'JWT_AUTH_HTTPONLY': True,
     'JWT_AUTH_SAMESITE': 'Lax',
-    'JWT_AUTH_SECURE': False,  # Set to True in production with HTTPS
+    'JWT_AUTH_SECURE': _USE_SECURE_COOKIES,
     'TOKEN_MODEL': None,  # We're using JWT, not token authentication
 }
 
@@ -512,7 +526,7 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'AUTH_COOKIE': 'acbc_jwt',
     'REFRESH_COOKIE': 'acbc_refresh_token',
-    'AUTH_COOKIE_SECURE': False,
+    'AUTH_COOKIE_SECURE': _USE_SECURE_COOKIES,
     'AUTH_COOKIE_HTTP_ONLY': True,
     'AUTH_COOKIE_PATH': '/',
     'AUTH_COOKIE_SAMESITE': 'Lax',

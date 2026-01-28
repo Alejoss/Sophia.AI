@@ -73,56 +73,74 @@ GOOGLE_OAUTH_SECRET_KEY=<tu-secret>
 
 ## 🚀 Comandos de Deployment
 
-### Primera vez
+### Local (desarrollo en tu máquina)
 
 ```bash
-# 1. Clonar y configurar
+# Desde la raíz del proyecto
+docker-compose up --build
+```
+
+- Usa `docker-compose.yml` + `docker-compose.override.yml` (si existe) para:
+  - Montar el código fuente.
+  - Montar `./acbc_app/media` en `/app/media` y **persistir archivos subidos** en tu máquina local.
+
+### Producción (en el servidor remoto)
+
+**Ruta del proyecto**: Usa `/opt/acbc-app` o `~/Sophia.AI` según tu setup. CI deploy usa `secrets.DEPLOY_PATH` o `~/Sophia.AI` por defecto.
+
+```bash
+# 1. Clonar y configurar (en el servidor)
 cd /opt
-git clone <repo> acbc-app
+sudo git clone <repo> acbc-app
 cd acbc-app
 git config --global core.fileMode false
 
-# 2. Configurar .env files
-nano acbc_app/.env  # Backend
-nano .env  # Frontend
+# 2. Configurar .env
+nano acbc_app/.env   # Backend (ver environment-variables.md)
+nano .env            # Frontend: VITE_API_URL, VITE_GOOGLE_OAUTH_CLIENT_ID
 
-# 3. Construir y levantar
-docker compose build
-docker compose up -d
+# 3. Construir y levantar (producción)
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
 
 # 4. Migraciones y setup
-docker compose exec backend python manage.py migrate
-docker compose exec backend python manage.py collectstatic --noinput
-docker compose exec backend python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 
-# 5. Configurar Nginx
+# 5. Nginx: si usas Nginx en host (no el contenedor)
 sudo bash scripts/setup-nginx.sh
 ```
 
-### Actualizaciones
+**Nota**: En producción se usa **`docker-compose.prod.yml`** (incl. Nginx contenedor). No uses `docker-compose.override.yml` en el servidor.
+
+### Actualizaciones (en el servidor)
 
 ```bash
-cd /opt/acbc-app
+cd /opt/acbc-app   # o tu DEPLOY_PATH
 git pull origin main
-docker compose restart backend frontend
-docker compose exec backend python manage.py migrate
-docker compose exec backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
 
 ## 🔍 Verificaciones
 
 ```bash
 # Estado de contenedores
-docker compose ps
+docker compose -f docker-compose.prod.yml ps
 
-# Health check
-curl http://localhost/health/
+# Backend health (proxied by Nginx; JSON)
+curl -s http://localhost/health/
+
+# Nginx-only health (plain text, no backend)
+curl -s http://localhost/health
 
 # Static files
 curl -I http://localhost/static/admin/css/base.css
 
 # API
-curl http://localhost/api/health/
+curl -s http://localhost/api/profiles/   # requiere auth según endpoint
 
 # Frontend
 curl -I http://localhost/
@@ -131,21 +149,19 @@ curl -I http://localhost/
 ## ⚠️ Pendiente (Opcional pero Recomendado)
 
 1. **SSL/HTTPS**
-   - Script disponible: `scripts/setup-ssl.sh`
-   - Requiere dominio configurado
-   - Let's Encrypt con Certbot
+   - Script: `scripts/setup-ssl.sh` (ver [README](../../scripts/README.md))
+   - Requiere dominio; Let's Encrypt con Certbot. Actualizar `nginx/nginx.conf` con el dominio real.
 
-2. **Backups Automáticos**
-   - Script disponible: `scripts/backup-db.sh`
-   - Configurar cron job
+2. **Backups automáticos**
+   - Script: `scripts/backup-db.sh`. Ejecutar desde la raíz del proyecto; usa `docker-compose.prod.yml`.
+   - Cron: `0 2 * * * cd /opt/acbc-app && ./scripts/backup-db.sh` (ver [scripts/README](../../scripts/README.md)).
 
 3. **Monitoreo**
-   - Configurar alertas básicas
-   - Monitoreo de recursos (CPU, RAM, disco)
+   - Alertas básicas y monitoreo de recursos (CPU, RAM, disco). Health: `GET /health/` (backend), `GET /health` (nginx).
 
 4. **Logs**
-   - Rotación de logs
-   - Centralización de logs (opcional)
+   - Rotación: `LOGGING` en `settings.py` usa `RotatingFileHandler` (tamaño y backup count). Ver [logging-and-observability](../../docs/backend/logging-and-observability.md).
+   - Centralización opcional (e.g. Sentry, agregador de logs).
 
 ## ✅ Estado Final
 

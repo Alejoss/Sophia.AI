@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -9,8 +9,12 @@ import {
   Alert,
   CircularProgress,
   Stack,
+  Paper,
+  Divider,
 } from '@mui/material';
+import QuizIcon from '@mui/icons-material/Quiz';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import quizzesApi from '../api/quizzesApi';
 import ContentSelector from '../content/ContentSelector';
 
 const NodeEdit = () => {
@@ -23,6 +27,7 @@ const NodeEdit = () => {
     description: '',
     content_profile_id: null
   });
+  const [nodeQuiz, setNodeQuiz] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,6 +66,18 @@ const NodeEdit = () => {
             console.error('Error fetching content profile:', contentErr);
             setSelectedContent(null);
           }
+        }
+
+        // Fetch quiz associated with this node
+        try {
+          const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
+          const quizForNode = Array.isArray(quizzesData) 
+            ? quizzesData.find(quiz => quiz.node === parseInt(nodeId))
+            : null;
+          setNodeQuiz(quizForNode || null);
+        } catch (quizErr) {
+          console.error('Error fetching quiz:', quizErr);
+          setNodeQuiz(null);
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -146,6 +163,29 @@ const NodeEdit = () => {
             }}
             previewVariant="detailed"
           />
+
+          {/* Quiz Section */}
+          {nodeQuiz && (
+            <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <QuizIcon color="secondary" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    {nodeQuiz.title || 'Cuestionario'}
+                  </Typography>
+                </Stack>
+                <Button
+                  component={Link}
+                  to={`/quizzes/${nodeQuiz.id}/edit`}
+                  variant="outlined"
+                  color="secondary"
+                  sx={{ textTransform: 'none' }}
+                >
+                  Editar cuestionario
+                </Button>
+              </Stack>
+            </Paper>
+          )}
 
           <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <TextField

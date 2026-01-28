@@ -5,7 +5,6 @@ import {
   Typography,
   Paper,
   Button,
-  Divider,
   CircularProgress,
   Container,
 } from "@mui/material";
@@ -131,45 +130,6 @@ const ContentDetailsSearch = () => {
           mb: 3,
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            mb: 2,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                fontSize: {
-                  xs: "1.25rem", // ~20px on mobile
-                  sm: "1.5rem", // ~24px on small screens
-                  md: "2rem", // ~32px on medium+
-                },
-              }}
-              gutterBottom
-            >
-              {content.selected_profile?.title ||
-                content.original_title ||
-                "Contenido sin título"}
-            </Typography>
-
-            {content.selected_profile?.author && (
-              <Typography
-                variant="subtitle1"
-                color="text.secondary"
-                gutterBottom
-              >
-                Por {content.selected_profile.author}
-              </Typography>
-            )}
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
         {/* Content Display */}
         <ContentDisplay
           content={content}

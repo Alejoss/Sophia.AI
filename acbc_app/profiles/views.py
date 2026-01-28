@@ -384,9 +384,10 @@ class LoginView(APIView):
     def post(self, request):
         """
         Authenticates user and generates JWT tokens.
+        Supports both username and email login.
         
         Args:
-            request: Contains username and password in request.data
+            request: Contains username/email and password in request.data
             
         Returns:
             Response with:
@@ -394,7 +395,7 @@ class LoginView(APIView):
             - Access token in response body
             - Refresh token in HTTP-only cookie
         """
-        username = request.data.get('username')
+        username_or_email = request.data.get('username')
         password = request.data.get('password')
         client_ip = self.get_client_ip(request)
 
@@ -402,17 +403,47 @@ class LoginView(APIView):
         cache_key = f'login_attempts_{client_ip}'
         attempts = cache.get(cache_key, 0)
         
-        if attempts >= 10:
+        # Log attempt count for debugging
+        login_identifier = username_or_email
+        logger.info(f"[LOGIN RATE LIMIT] IP: {client_ip}, Username/Email: {login_identifier}, Current failed attempts: {attempts}, Cache key: {cache_key}")
+        
+        if attempts >= 20:
+            logger.warning(f"[LOGIN RATE LIMIT] BLOCKED - IP {client_ip} has exceeded 20 failed attempts. Current count: {attempts}")
             return Response(
                 {'error': 'Demasiados intentos de inicio de sesión. Por favor, intente nuevamente más tarde.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
 
-        user = authenticate(request, username=username, password=password)
+        # Try to authenticate with username or email
+        user = None
+        
+        # Check if input looks like an email (contains @)
+        if '@' in username_or_email:
+            try:
+                # Try to find user by email first
+                user_by_email = User.objects.filter(email=username_or_email).first()
+                if user_by_email:
+                    # Authenticate using the username (Django's authenticate uses username)
+                    user = authenticate(request, username=user_by_email.username, password=password)
+                    if user:
+                        logger.info(f"[LOGIN] Email login successful: {username_or_email} -> username: {user_by_email.username}")
+                    else:
+                        logger.info(f"[LOGIN] Email found but authentication failed: {username_or_email} -> username: {user_by_email.username}")
+                else:
+                    logger.info(f"[LOGIN] Email not found in database: {username_or_email}")
+            except Exception as e:
+                logger.error(f"[LOGIN] Error during email-based authentication: {str(e)}", exc_info=True)
+        
+        # If email authentication failed or input doesn't look like email, try username
+        if not user:
+            user = authenticate(request, username=username_or_email, password=password)
+            if user:
+                logger.info(f"[LOGIN] Username login successful: {username_or_email}")
 
         if user:
             login(request, user)
             cache.delete(cache_key)  # Reset rate limiting on success
+            logger.info(f"[LOGIN RATE LIMIT] SUCCESS - Reset attempt counter for IP {client_ip}, Username/Email: {login_identifier}, Username: {user.username}. Previous attempts: {attempts}")
 
             try:
                 # Generate JWT tokens
@@ -447,8 +478,9 @@ class LoginView(APIView):
                 )
         else:
             # Increment failed attempts
-            cache.set(cache_key, attempts + 1, timeout=300)  # 5 minutes timeout
-            logger.warning(f"Invalid credentials for user {username} from IP {client_ip}")
+            new_attempt_count = attempts + 1
+            cache.set(cache_key, new_attempt_count, timeout=300)  # 5 minutes timeout
+            logger.warning(f"[LOGIN RATE LIMIT] FAILED ATTEMPT - IP: {client_ip}, Username/Email: {login_identifier}, Failed attempts incremented: {attempts} -> {new_attempt_count} (will reset in 300 seconds)")
             return Response(
                 {'error': 'Credenciales inválidas'},
                 status=status.HTTP_403_FORBIDDEN

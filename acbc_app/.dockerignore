@@ -1,0 +1,26 @@
+# Exclude from Docker build context
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.env.*
+!.env.example
+*.log
+logs/*
+.git
+.gitignore
+*.md
+.pytest_cache
+.coverage
+htmlcov
+.venv
+venv
+*.egg-info
+dist
+build
+*.sqlite3
+media
+staticfiles
+*.1

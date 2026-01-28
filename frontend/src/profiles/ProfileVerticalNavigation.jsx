@@ -40,12 +40,6 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       path: null // Will be handled by section change
     },
     {
-      label: 'Marcadores',
-      section: 'saved-items',
-      icon: BookmarkIcon,
-      path: null
-    },
-    {
       label: 'Caminos de conocimiento',
       section: 'knowledge-paths',
       icon: KnowledgePathIcon,
@@ -86,6 +80,12 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
   // Add profile-specific items
   if (isOwnProfile) {
     baseItems.push(
+      {
+        label: 'Marcadores',
+        section: 'saved-items',
+        icon: BookmarkIcon,
+        path: null
+      },
       {
         label: 'Notificaciones',
         section: 'notifications',

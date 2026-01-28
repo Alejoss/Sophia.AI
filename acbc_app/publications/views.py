@@ -29,8 +29,14 @@ class PublicationDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Error retrieving publication {publication_id} for user {request.user.username}: {str(e)}", exc_info=True)
+            logger.error(
+                "Error retrieving publication %s for user %s: %s",
+                publication_id,
+                request.user.username,
+                str(e),
+                exc_info=True,
+            )
             return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'error': 'An unexpected error occurred.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) 

@@ -85,10 +85,10 @@ All services are connected to `app_network` (bridge driver).
 
 ## Usage
 
-### Start Services
+### Start Services (local development)
 
 ```bash
-# Start all services
+# Start all services (local, with override)
 docker-compose up
 
 # Start in background
@@ -97,6 +97,13 @@ docker-compose up -d
 # Build and start
 docker-compose up --build
 ```
+
+In local development, Docker Compose automatically reads `docker-compose.override.yml` (if present) in addition to `docker-compose.yml`.  
+This project uses that override to:
+- Mount `./acbc_app` into `/app`.
+- Mount `./acbc_app/media` into `/app/media`, so uploaded files are stored on the host and survive `docker-compose down -v`.
+
+On production servers, you should **not** copy `docker-compose.override.yml`; only the base compose file (and any explicit prod compose files) should be used.
 
 ### Stop Services
 

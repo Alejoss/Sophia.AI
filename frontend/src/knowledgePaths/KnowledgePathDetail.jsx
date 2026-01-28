@@ -1,24 +1,46 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Avatar } from '@mui/material';
-import knowledgePathsApi from '../api/knowledgePathsApi';
-import certificatesApi from '../api/certificatesApi';
-import commentsApi from '../api/commentsApi';
-import { AuthContext } from '../context/AuthContext';
-import { Lock, LockOpen, CheckCircle } from '@mui/icons-material';
-import CommentSection from '../comments/CommentSection';
-import VoteComponent from '../votes/VoteComponent';
-import BookmarkButton from '../bookmarks/BookmarkButton';
 import {
+  Avatar,
+  Container,
+  Paper,
+  Box,
+  Typography,
+  Button,
+  Chip,
+  LinearProgress,
+  Card,
+  CardContent,
+  Alert,
+  AlertTitle,
+  Stack,
+  Divider,
+  IconButton,
+  Tooltip,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  Button,
-  Box,
-  Typography
 } from '@mui/material';
+import {
+  Lock,
+  LockOpen,
+  CheckCircle,
+  Edit,
+  School,
+  Description,
+  ArrowForward,
+  NotificationsActive,
+} from '@mui/icons-material';
+import knowledgePathsApi from '../api/knowledgePathsApi';
+import certificatesApi from '../api/certificatesApi';
+import commentsApi from '../api/commentsApi';
+import { AuthContext } from '../context/AuthContext';
+import CommentSection from '../comments/CommentSection';
+import VoteComponent from '../votes/VoteComponent';
+import BookmarkButton from '../bookmarks/BookmarkButton';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
@@ -176,25 +198,18 @@ const KnowledgePathDetail = () => {
     if (!hasCompleted) return null;
 
     // If there's an approved request, treat it as having a certificate
-    if (certificateStatus?.certificate_request?.status === 'APPROVED') {
+    if (certificateStatus?.certificate_request?.status === 'APPROVED' || certificateStatus?.has_certificate) {
       return (
-        <div className="mt-6 text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
-            <CheckCircle className="mr-2" />
-            <span>Has obtenido un certificado por completar este camino de conocimiento</span>
-          </div>
-        </div>
-      );
-    }
-
-    if (certificateStatus?.has_certificate) {
-      return (
-        <div className="mt-6 text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
-            <CheckCircle className="mr-2" />
-            <span>Has obtenido un certificado por completar este camino de conocimiento</span>
-          </div>
-        </div>
+        <Box sx={{ mt: 4 }}>
+          <Alert 
+            severity="success" 
+            icon={<CheckCircle />}
+            sx={{ borderRadius: 2 }}
+          >
+            <AlertTitle sx={{ fontWeight: 600 }}>Certificado Obtenido</AlertTitle>
+            Has obtenido un certificado por completar este camino de conocimiento
+          </Alert>
+        </Box>
       );
     }
 
@@ -203,64 +218,85 @@ const KnowledgePathDetail = () => {
       switch (request.status) {
         case 'PENDING':
           return (
-            <div className="mt-6 text-center">
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-yellow-100 text-yellow-800">
-                <span>Solicitud de certificado pendiente de revisión</span>
-              </div>
-              <button
-                onClick={handleCancelRequest}
-                disabled={requestingCertificate}
-                className="mt-2 px-4 py-1 text-sm text-red-600 hover:text-red-800"
+            <Box sx={{ mt: 4 }}>
+              <Alert 
+                severity="warning" 
+                sx={{ borderRadius: 2 }}
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={handleCancelRequest}
+                    disabled={requestingCertificate}
+                  >
+                    {requestingCertificate ? 'Cancelando...' : 'Cancelar'}
+                  </Button>
+                }
               >
-                {requestingCertificate ? 'Cancelando...' : 'Cancelar Solicitud'}
-              </button>
-            </div>
+                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Pendiente</AlertTitle>
+                Tu solicitud de certificado está pendiente de revisión
+              </Alert>
+            </Box>
           );
         case 'REJECTED':
           return (
-            <div className="mt-6 text-center">
-              <div className="inline-flex flex-col items-center px-4 py-2 rounded-full bg-red-100 text-red-800">
-                <span>La solicitud de certificado fue rechazada</span>
+            <Box sx={{ mt: 4 }}>
+              <Alert 
+                severity="error" 
+                sx={{ borderRadius: 2 }}
+              >
+                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Rechazada</AlertTitle>
                 {request.rejection_reason && (
-                  <div className="mt-2 text-sm font-medium">
-                    Razón: {request.rejection_reason}
-                  </div>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    <strong>Razón:</strong> {request.rejection_reason}
+                  </Typography>
                 )}
-              </div>
-              {isCreator && (
-                <button
-                  onClick={handleAcceptRejectedRequest}
-                  disabled={requestingCertificate}
-                  className="mt-2 px-4 py-1 text-sm text-green-600 hover:text-green-800"
-                >
-                  {requestingCertificate ? 'Aceptando...' : 'Aceptar Solicitud'}
-                </button>
-              )}
-              {!isCreator && (
-                <button
-                  onClick={handleOpenModal}
-                  disabled={requestingCertificate}
-                  className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
-                </button>
-              )}
-            </div>
+                <Box sx={{ mt: 2 }}>
+                  {isCreator ? (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      onClick={handleAcceptRejectedRequest}
+                      disabled={requestingCertificate}
+                      startIcon={<CheckCircle />}
+                    >
+                      {requestingCertificate ? 'Aceptando...' : 'Aceptar Solicitud'}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      onClick={handleOpenModal}
+                      disabled={requestingCertificate}
+                    >
+                      {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
+                    </Button>
+                  )}
+                </Box>
+              </Alert>
+            </Box>
           );
         case 'CANCELLED':
           return (
-            <div className="mt-6 text-center">
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-800">
-                <span>La solicitud de certificado fue cancelada</span>
-              </div>
-              <button
-                onClick={handleOpenModal}
-                disabled={requestingCertificate}
-                className="mt-2 px-4 py-1 text-sm text-blue-600 hover:text-blue-800"
-              >
-                {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
-              </button>
-            </div>
+            <Box sx={{ mt: 4 }}>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Cancelada</AlertTitle>
+                Tu solicitud de certificado fue cancelada
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    onClick={handleOpenModal}
+                    disabled={requestingCertificate}
+                  >
+                    {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
+                  </Button>
+                </Box>
+              </Alert>
+            </Box>
           );
         default:
           return null;
@@ -268,18 +304,26 @@ const KnowledgePathDetail = () => {
     }
 
     return (
-      <div className="mt-6 flex justify-center">
-        <button
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <Button
+          variant="contained"
+          color="success"
+          size="large"
           onClick={handleOpenModal}
           disabled={requestingCertificate}
-          className={`px-6 py-2 rounded-lg font-medium transition-colors
-            ${requestingCertificate 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-green-500 hover:bg-green-600 text-white'}`}
+          startIcon={<School />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            textTransform: 'none',
+            fontSize: '1rem',
+            fontWeight: 600
+          }}
         >
           {requestingCertificate ? 'Solicitando...' : 'Solicitar Certificado'}
-        </button>
-      </div>
+        </Button>
+      </Box>
     );
   };
 
@@ -290,143 +334,393 @@ const KnowledgePathDetail = () => {
     requestingCertificate
   ]);
 
-  if (loading) return <div className="text-center py-8">Cargando...</div>;
-  if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
-  if (!knowledgePath && !error) return <div className="text-center py-8">Camino de conocimiento no encontrado</div>;
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+          <CircularProgress size={60} />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          <AlertTitle>Error</AlertTitle>
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
+
+  if (!knowledgePath && !error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="info" sx={{ borderRadius: 2 }}>
+          <AlertTitle>No encontrado</AlertTitle>
+          Camino de conocimiento no encontrado
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
-    <div className="container mx-auto md:p-4">
-      <div className="bg-white rounded-lg shadow-lg md:p-6 px-2 py-4">
-        {/* Header with Image */}
-        <div className="md:flex items-start mb-6">
-          <Avatar 
-            src={knowledgePath.image} 
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+      {/* Hero Header Section */}
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          mb: 4,
+          borderRadius: 3,
+          overflow: 'hidden',
+          position: 'relative',
+          minHeight: { xs: 200, md: 300 },
+        }}
+      >
+        {/* Cover Image */}
+        {knowledgePath.image ? (
+          <Box
+            component="img"
+            src={knowledgePath.image}
             alt={knowledgePath.title}
-            sx={{ 
-              width: 120, 
-              height: 120, 
-              mr: 4,
-              bgcolor: 'grey.300',
-              fontSize: '3rem',
-              flexShrink: 0
+            sx={{
+              width: '100%',
+              height: { xs: 200, md: 300 },
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: '100%',
+              height: { xs: 200, md: 300 },
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: { xs: '4rem', md: '6rem' },
+              color: 'white',
+              fontWeight: 700,
             }}
           >
             {knowledgePath.title.charAt(0).toUpperCase()}
-          </Avatar>
-          
-          <div className="md:flex-1 md:mt-0 mt-4 min-w-0">
-            <div className="md:flex justify-between items-start">
-              <div>
-                <h1 className="md:!text-3xl !text-xl font-bold mb-2 text-gray-900">{knowledgePath.title}</h1>
-                <p className="text-gray-600">
-                  Creado por{' '}
-                  <Link 
-                    to={`/profiles/user_profile/${knowledgePath.author_id}`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    {knowledgePath.author}
-                  </Link>
-                </p>
-                {isCreator && pendingRequests > 0 && (
-                  <button
-                    onClick={handleViewCertificateRequests}
-                    className="mt-2 inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
-                  >
-                    <span>Tienes {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} de certificado pendiente{pendingRequests !== 1 ? 's' : ''}</span>
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
+          </Box>
+        )}
+        
+        {/* Content Overlay */}
+        <Box 
+          sx={{ 
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            p: { xs: 3, md: 4 },
+            background: knowledgePath.image 
+              ? 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)'
+              : 'transparent',
+            color: 'white',
+          }}
+        >
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography 
+                variant="h3" 
+                component="h1" 
+                sx={{ 
+                  fontWeight: 700,
+                  mb: 1.5,
+                  fontSize: { xs: '1.75rem', md: '2.5rem' },
+                  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                  color: 'white',
+                }}
+              >
+                {knowledgePath.title}
+              </Typography>
+              <Typography variant="body1" sx={{ mb: 2, opacity: 0.95, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                Creado por{' '}
+                <Link 
+                  to={`/profiles/user_profile/${knowledgePath.author_id}`}
+                  style={{ 
+                    color: 'white', 
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    textDecorationColor: 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  {knowledgePath.author}
+                </Link>
+              </Typography>
+              {isCreator && pendingRequests > 0 && (
+                <Button
+                  variant="contained"
+                  color="warning"
+                  size="small"
+                  startIcon={<NotificationsActive />}
+                  onClick={handleViewCertificateRequests}
+                  sx={{ 
+                    mt: 1,
+                    bgcolor: 'warning.main',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    '&:hover': {
+                      bgcolor: 'warning.dark',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                    }
+                  }}
+                >
+                  {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} pendiente{pendingRequests !== 1 ? 's' : ''}
+                </Button>
+              )}
+            </Box>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap', gap: 1.5 }}>
+              <Box
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: 2,
+                  p: 0.5,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                }}
+              >
                 <BookmarkButton 
                   contentId={pathId}
                   contentType="knowledgepath"
                 />
+              </Box>
+              <Box
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: 2,
+                  p: 0.5,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
                 <VoteComponent 
                   type="knowledge_path"
                   ids={{ pathId }}
                   initialVoteCount={Number(knowledgePath.vote_count) || 0}
                   initialUserVote={Number(knowledgePath.user_vote) || 0}
                 />
-                {isCreator && (
-                  <Link
-                    to={`/knowledge_path/${pathId}/edit`}
-                    className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
-                  >
-                    Editar Camino
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+              </Box>
+              {isCreator && (
+                <Button
+                  component={Link}
+                  to={`/knowledge_path/${pathId}/edit`}
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<Edit />}
+                  sx={{ 
+                    bgcolor: 'secondary.main',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    '&:hover': {
+                      bgcolor: 'secondary.dark',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                    }
+                  }}
+                >
+                  Editar
+                </Button>
+              )}
+            </Stack>
+          </Stack>
+        </Box>
+      </Paper>
 
-        {!isCreator && knowledgePath.progress && (
-          <div className="mb-6">
-            <div className="bg-gray-200 rounded-full h-4 mb-2">
-              <div 
-                className="bg-blue-500 rounded-full h-4 transition-all duration-500"
-                style={{ width: `${knowledgePath.progress.percentage}%` }}
-              />
-            </div>
-            <p className="text-sm text-gray-600">
-              Completados {knowledgePath.progress.completed_nodes} de {knowledgePath.progress.total_nodes} nodos
-            </p>
-          </div>
+      {/* Progress Section */}
+      {!isCreator && knowledgePath.progress && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+          <Box sx={{ mb: 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
+                Progreso
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {knowledgePath.progress.completed_nodes} de {knowledgePath.progress.total_nodes} nodos completados
+              </Typography>
+            </Stack>
+            <LinearProgress 
+              variant="determinate" 
+              value={knowledgePath.progress.percentage || 0} 
+              sx={{ 
+                height: 10, 
+                borderRadius: 5,
+                bgcolor: 'grey.200',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 5,
+                  background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)'
+                }
+              }} 
+            />
+          </Box>
+        </Paper>
+      )}
+
+      {/* Description Section */}
+      <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Description color="primary" />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Descripción
+          </Typography>
+        </Stack>
+        <Typography
+          variant="body1"
+          sx={{ color: 'text.secondary', lineHeight: 1.8, whiteSpace: 'pre-line', wordBreak: 'break-word' }}
+        >
+          {knowledgePath.description}
+        </Typography>
+      </Paper>
+
+      {/* Nodes Section */}
+      <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <School color="primary" />
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              Nodos de Contenido
+            </Typography>
+          </Stack>
+          {knowledgePath.progress?.is_completed && (
+            <Chip 
+              icon={<CheckCircle />}
+              label="Completado" 
+              color="success" 
+              sx={{ fontWeight: 600 }}
+            />
+          )}
+        </Stack>
+
+        {knowledgePath.nodes?.length > 0 ? (
+          <Stack spacing={2}>
+            {knowledgePath.nodes.map((node, index) => {
+              const isLocked = !node.is_available && !isCreator;
+              const isCompleted = node.is_completed;
+              
+              return (
+                <Card
+                  key={node.id}
+                  elevation={isLocked ? 1 : 2}
+                  sx={{
+                    borderRadius: 2,
+                    transition: 'all 0.3s ease',
+                    opacity: isLocked ? 0.7 : 1,
+                    '&:hover': {
+                      elevation: isLocked ? 1 : 4,
+                      transform: isLocked ? 'none' : 'translateY(-2px)',
+                    }
+                  }}
+                >
+                  <CardContent>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box
+                        sx={{
+                          minWidth: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          bgcolor: isCompleted ? 'success.main' : isLocked ? 'grey.300' : 'primary.main',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '1.1rem'
+                        }}
+                      >
+                        {index + 1}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        {node.is_available ? (
+                          <Link 
+                            to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                            style={{ 
+                              textDecoration: 'none',
+                              color: 'inherit'
+                            }}
+                          >
+                            <Typography 
+                              variant="subtitle1" 
+                              component="div"
+                              sx={{ 
+                                fontWeight: 600,
+                                mb: 0.5,
+                                color: 'primary.main',
+                                fontSize: '1.25rem',
+                                '&:hover': {
+                                  textDecoration: 'underline'
+                                }
+                              }}
+                            >
+                              {node.title}
+                            </Typography>
+                          </Link>
+                        ) : (
+                          <Typography 
+                            variant="subtitle1" 
+                            component="div"
+                            sx={{ 
+                              fontWeight: 600,
+                              mb: 0.5,
+                              fontSize: '1.25rem',
+                              color: 'text.disabled'
+                            }}
+                          >
+                            {node.title}
+                          </Typography>
+                        )}
+                        <Chip 
+                          label={node.media_type} 
+                          size="small" 
+                          variant="outlined"
+                          sx={{ mt: 0.5 }}
+                        />
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {isCompleted && (
+                          <Tooltip title="Completado">
+                            <CheckCircle color="success" sx={{ fontSize: 28 }} />
+                          </Tooltip>
+                        )}
+                        {isLocked && (
+                          <Tooltip title="Bloqueado">
+                            <Lock color="disabled" sx={{ fontSize: 28 }} />
+                          </Tooltip>
+                        )}
+                        {node.is_available && !isCompleted && (
+                          <Tooltip title="Disponible">
+                            <LockOpen color="primary" sx={{ fontSize: 28 }} />
+                          </Tooltip>
+                        )}
+                        {node.is_available && (
+                          <IconButton
+                            component={Link}
+                            to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                            color="primary"
+                            size="small"
+                          >
+                            <ArrowForward />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </Stack>
+        ) : (
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Aún no se han agregado nodos de contenido
+          </Alert>
         )}
 
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900">Descripción</h2>
-          <p className="text-gray-700">{knowledgePath.description}</p>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Nodos de Contenido</h2>
-            {knowledgePath.progress?.is_completed && (
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                Completado
-              </span>
-            )}
-          </div>
-          {knowledgePath.nodes?.length > 0 ? (
-            <div className="space-y-4">
-              {knowledgePath.nodes.map((node, index) => {
-                return (
-                  <div 
-                    key={node.id}
-                    className={`flex items-center p-4 rounded-lg border 
-                      ${node.is_available ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-gray-300'}`}
-                  >
-                    <span className="font-bold text-gray-500 mr-4">{index + 1}</span>
-                    <div className="flex-grow">
-                      {node.is_available ? (
-                        <Link 
-                          to={`/knowledge_path/${pathId}/nodes/${node.id}`}
-                          className="font-medium text-gray-900 hover:text-blue-500"
-                        >
-                          {node.title}
-                        </Link>
-                      ) : (
-                        <span className="text-gray-500">{node.title}</span>
-                      )}
-                      <span className="text-sm text-gray-500 ml-2">{node.media_type}</span>
-                    </div>
-                    <div className="flex items-center">
-                      {node.is_completed && <CheckCircle className="text-green-500 mr-2" />}
-                      {!node.is_available && !isCreator && <Lock className="text-gray-500" />}
-                      {node.is_available && !node.is_completed && <LockOpen className="text-blue-500" />}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-gray-500">Aún no se han agregado nodos de contenido</p>
-          )}
-
-          {/* Certificate Status Section */}
-          {certificateStatusSection}
-        </div>
+        {/* Certificate Status Section */}
+        {certificateStatusSection}
+      </Paper>
 
         {/* Certificate Request Modal */}
         <Dialog 
@@ -477,16 +771,15 @@ const KnowledgePathDetail = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Comments Section */}
-        {(hasCompleted || isCreator) && (
-          <div className="mt-8 border-t pt-6">
-            <CommentSection 
-              knowledgePathId={pathId}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Comments Section */}
+      {(hasCompleted || isCreator) && (
+        <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+          <CommentSection 
+            knowledgePathId={pathId}
+          />
+        </Paper>
+      )}
+    </Container>
   );
 };
 

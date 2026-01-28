@@ -6,8 +6,6 @@ import {
   Typography,
   TextField,
   Button,
-  Avatar,
-  IconButton,
   Paper,
   Alert,
   Stack,
@@ -80,19 +78,46 @@ const KnowledgePathCreationForm = () => {
               <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
                 Imagen de Portada (Opcional)
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar
-                  src={imagePreview}
-                  alt="Knowledge Path Cover"
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { xs: 'stretch', sm: 'flex-start' } }}>
+                <Box
                   sx={{
-                    width: 100,
-                    height: 100,
+                    width: { xs: '100%', sm: 240 },
+                    height: 135,
+                    borderRadius: 2,
                     bgcolor: 'grey.300',
-                    fontSize: '2rem'
+                    overflow: 'hidden',
+                    position: 'relative',
+                    flexShrink: 0,
                   }}
                 >
-                  {formData.title ? formData.title.charAt(0).toUpperCase() : 'K'}
-                </Avatar>
+                  {imagePreview ? (
+                    <Box
+                      component="img"
+                      src={imagePreview}
+                      alt="Knowledge Path Cover"
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '3rem',
+                        color: 'text.secondary',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {formData.title ? formData.title.charAt(0).toUpperCase() : 'K'}
+                    </Box>
+                  )}
+                </Box>
                 <Box>
                   <input
                     accept="image/*"
@@ -102,22 +127,20 @@ const KnowledgePathCreationForm = () => {
                     onChange={handleImageUpload}
                   />
                   <label htmlFor="image-upload">
-                    <IconButton
-                      color="primary"
-                      aria-label="upload picture"
+                    <Button
                       component="span"
+                      variant="outlined"
+                      startIcon={<PhotoCameraIcon />}
                       sx={{
-                        border: '2px dashed',
-                        borderColor: 'divider',
-                        borderRadius: 0.5,
-                        p: 1.5,
+                        textTransform: 'none',
+                        borderRadius: 2,
                       }}
                     >
-                      <PhotoCameraIcon />
-                    </IconButton>
+                      Subir portada
+                    </Button>
                   </label>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                    Haz clic para subir una imagen de portada
+                    Recomendado: imagen 16:9 para mejor visualización.
                   </Typography>
                 </Box>
               </Box>

@@ -15,6 +15,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
 
@@ -2565,26 +2566,18 @@ class TopicContentSuggestionCreateView(APIView):
 
 
 class TopicContentSuggestionsView(APIView):
-    """List content suggestions for a topic. Moderators see all, users see only their own."""
+    """List content suggestions for a topic. All authenticated users can see all suggestions."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         topic = get_object_or_404(Topic, pk=pk)
         
-        # Check if user is moderator or creator
-        is_moderator = topic.is_moderator_or_creator(request.user)
-        
         # Get filter parameters
         status_filter = request.query_params.get('status', None)
         is_duplicate_filter = request.query_params.get('is_duplicate', None)
         
-        # Build query
-        if is_moderator:
-            # Moderators see all suggestions
-            suggestions = ContentSuggestion.objects.filter(topic=topic)
-        else:
-            # Regular users see only their own suggestions
-            suggestions = ContentSuggestion.objects.filter(topic=topic, suggested_by=request.user)
+        # All authenticated users can see all suggestions
+        suggestions = ContentSuggestion.objects.filter(topic=topic)
         
         # Apply filters
         if status_filter:
@@ -2594,8 +2587,22 @@ class TopicContentSuggestionsView(APIView):
             is_duplicate_bool = is_duplicate_filter.lower() == 'true'
             suggestions = suggestions.filter(is_duplicate=is_duplicate_bool)
         
-        # Order by created_at (most recent first)
-        suggestions = suggestions.order_by('-created_at')
+        # Annotate with vote counts for ordering
+        # Votes for suggestions are not topic-specific (topic=None)
+        content_type = ContentType.objects.get_for_model(ContentSuggestion)
+        vote_count_subquery = models.Subquery(
+            VoteCount.objects.filter(
+                content_type=content_type,
+                object_id=models.OuterRef('id'),
+                topic__isnull=True
+            ).values('vote_count')[:1]
+        )
+        suggestions = suggestions.annotate(
+            vote_count_value=Coalesce(vote_count_subquery, 0)
+        )
+        
+        # Order by vote count descending, then by created_at descending
+        suggestions = suggestions.order_by('-vote_count_value', '-created_at')
         
         serializer = ContentSuggestionSerializer(suggestions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

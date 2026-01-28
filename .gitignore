@@ -146,3 +146,6 @@ node_modules
 
 # Visual Studio Code configuration
 .vscode/
+
+# Docker Compose override (development only)
+docker-compose.override.yml

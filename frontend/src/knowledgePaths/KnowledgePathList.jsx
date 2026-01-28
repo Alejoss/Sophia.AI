@@ -7,8 +7,8 @@ import {
   Grid,
   Card,
   CardContent,
+  CardMedia,
   Button,
-  Avatar,
   CircularProgress,
   Alert,
   Stack,
@@ -151,24 +151,37 @@ const KnowledgePathList = () => {
                   '&:hover': {
                     boxShadow: 4,
                   },
-                  minHeight: 200,
                 }}
               >
+                {/* Cover Image */}
+                {path.image ? (
+                  <CardMedia
+                    component="img"
+                    height="140"
+                    image={path.image}
+                    alt={path.title}
+                    sx={{ objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: 140,
+                      bgcolor: 'grey.300',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '3rem',
+                      color: 'text.secondary',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {path.title.charAt(0).toUpperCase()}
+                  </Box>
+                )}
+                
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ mb: 2 }}>
-                    <Avatar
-                      src={path.image}
-                      alt={path.title}
-                      sx={{
-                        width: 80,
-                        height: 80,
-                        mb: 2,
-                        bgcolor: 'grey.300',
-                      }}
-                    >
-                      {path.title.charAt(0).toUpperCase()}
-                    </Avatar>
-                    
                     <Typography
                       component={Link}
                       to={`/knowledge_path/${path.id}`}
@@ -248,53 +261,57 @@ const KnowledgePathList = () => {
       </Grid>
 
       {/* Pagination Controls */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 2,
-          mt: 4,
-        }}
-      >
-        <Button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={!hasPrevious}
-          variant="contained"
-          color={hasPrevious ? 'primary' : 'inherit'}
+      {totalPages > 1 && (
+        <Box
           sx={{
-            bgcolor: hasPrevious ? 'primary.main' : 'grey.300',
-            color: hasPrevious ? 'white' : 'text.disabled',
-            '&:disabled': {
-              bgcolor: 'grey.300',
-              color: 'text.disabled',
-            },
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            mt: 4,
           }}
         >
-          Anterior
-        </Button>
-        
-        <Typography variant="body2" color="text.secondary">
-          Página {currentPage} de {totalPages}
-        </Typography>
-        
-        <Button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={!hasNext}
-          variant="contained"
-          color={hasNext ? 'primary' : 'inherit'}
-          sx={{
-            bgcolor: hasNext ? 'primary.main' : 'grey.300',
-            color: hasNext ? 'white' : 'text.disabled',
-            '&:disabled': {
-              bgcolor: 'grey.300',
-              color: 'text.disabled',
-            },
-          }}
-        >
-          Siguiente
-        </Button>
-      </Box>
+          <Button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={!hasPrevious}
+            variant="contained"
+            color={hasPrevious ? 'primary' : 'inherit'}
+            sx={{
+              bgcolor: hasPrevious ? 'primary.main' : 'grey.300',
+              color: hasPrevious ? 'white' : 'text.disabled',
+              textTransform: 'none',
+              '&:disabled': {
+                bgcolor: 'grey.300',
+                color: 'text.disabled',
+              },
+            }}
+          >
+            Anterior
+          </Button>
+          
+          <Typography variant="body2" color="text.secondary">
+            Página {currentPage} de {totalPages}
+          </Typography>
+          
+          <Button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={!hasNext}
+            variant="contained"
+            color={hasNext ? 'primary' : 'inherit'}
+            sx={{
+              bgcolor: hasNext ? 'primary.main' : 'grey.300',
+              color: hasNext ? 'white' : 'text.disabled',
+              textTransform: 'none',
+              '&:disabled': {
+                bgcolor: 'grey.300',
+                color: 'text.disabled',
+              },
+            }}
+          >
+            Siguiente
+          </Button>
+        </Box>
+      )}
     </Container>
   );
 };

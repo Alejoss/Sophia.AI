@@ -103,10 +103,6 @@ const ContentSearchModal = ({ isOpen, onClose, onSelectContent, isLoading }) => 
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {filteredContent.map((contentProfile) => {
-                console.log('Rendering content profile:', contentProfile);
-                console.log('Content:', contentProfile.content);
-                console.log('Media type:', contentProfile.content?.media_type);
-                
                 const content = contentProfile.content;
                 if (!content) return null;
 

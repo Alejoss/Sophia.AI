@@ -37,7 +37,8 @@ const LibrarySelectMultiple = ({
     filterFunction,
     maxSelections,
     selectedIds = [],
-    contextName = ""
+    contextName = "",
+    compact = false
 }) => {
     console.log('LibrarySelectMultiple rendering with props:', {
         title,
@@ -301,10 +302,10 @@ const LibrarySelectMultiple = ({
     if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
-            <Paper sx={{ p: 3 }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" sx={{ mb: 1 }}>
+        <Box sx={{ pt: compact ? 0 : 12, px: compact ? 0 : 3, maxWidth: compact ? '100%' : 1200, mx: compact ? 0 : 'auto' }}>
+            <Paper sx={{ p: compact ? 2 : 3 }}>
+                <Box sx={{ mb: compact ? 1 : 3 }}>
+                    <Typography variant={compact ? "h6" : "h4"} sx={{ mb: 1 }}>
                         {title} {contextName && `: ${contextName}`}
                     </Typography>
                     {description && (
@@ -319,7 +320,7 @@ const LibrarySelectMultiple = ({
                     )}
                 </Box>
 
-                <Divider sx={{ my: 3 }} />
+                <Divider sx={{ my: compact ? 1.5 : 3 }} />
 
                 {/* Toolbar with search, collection selector, and sorting */}
                 <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>

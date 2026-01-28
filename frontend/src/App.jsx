@@ -38,6 +38,7 @@ import TopicAddContent from './topics/TopicAddContent';
 import TopicEditContent from './topics/TopicEditContent';
 import TopicDetail from './topics/TopicDetail';
 import TopicContentMediaType from './topics/TopicContentMediaType';
+import TopicContentSuggestionsPage from './topics/TopicContentSuggestionsPage';
 import ContentProfileEdit from './content/ContentProfileEdit.jsx';
 import ContentSourceEdit from './content/ContentSourceEdit.jsx';
 import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
@@ -105,6 +106,7 @@ const AppContent = () => {
               <Route path="topics/:topicId/add-content" element={<ProtectedRoute><TopicAddContent /></ProtectedRoute>} />
               <Route path="topics/:topicId/edit-content" element={<ProtectedRoute><TopicEditContent /></ProtectedRoute>} />
               <Route path="topics/:topicId" element={<ProtectedRoute><TopicDetail /></ProtectedRoute>} />
+              <Route path="topics/:topicId/suggestions" element={<ProtectedRoute><TopicContentSuggestionsPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/:mediaType" element={<ProtectedRoute><TopicContentMediaType /></ProtectedRoute>} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />

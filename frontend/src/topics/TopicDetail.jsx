@@ -15,6 +15,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AddIcon from '@mui/icons-material/Add';
+import ListIcon from '@mui/icons-material/List';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
 import { MEDIA_BASE_URL } from '../api/config';
@@ -258,13 +259,22 @@ const TopicDetail = () => {
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                 {isAuthenticated && (
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setSuggestionModalOpen(true)}
-                    >
-                        Sugerir Contenido
-                    </Button>
+                    <>
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={() => setSuggestionModalOpen(true)}
+                        >
+                            Sugerir Contenido
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            startIcon={<ListIcon />}
+                            onClick={() => navigate(`/content/topics/${topicId}/suggestions`)}
+                        >
+                            Ver Todas las Sugerencias de Contenido
+                        </Button>
+                    </>
                 )}
                 {isModerator && pendingSuggestionsCount > 0 && (
                     <Badge badgeContent={pendingSuggestionsCount} color="error">

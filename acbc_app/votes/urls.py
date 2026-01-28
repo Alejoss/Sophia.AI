@@ -28,4 +28,10 @@ urlpatterns = [
         views.PublicationVoteView.as_view(),
         name='publication-vote'
     ),
+    # Content suggestion votes
+    path(
+        'content-suggestions/<int:pk>/vote/',
+        views.ContentSuggestionVoteView.as_view(),
+        name='content-suggestion-vote'
+    ),
 ]

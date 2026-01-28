@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Box, Button, Typography } from '@mui/material';
 import generalApi from '../api/generalApi';
 import ContentDisplay from '../content/ContentDisplay';
 import '/src/styles/search.css';
@@ -207,27 +208,55 @@ const MainSearch = () => {
               
               {/* Pagination controls */}
               {pagination.totalPages > 1 && (
-                <div className="pagination-controls">
-                  <button 
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 2,
+                    mt: 4,
+                  }}
+                >
+                  <Button
                     onClick={() => handlePageChange(pagination.currentPage - 1)}
                     disabled={pagination.currentPage === 1}
-                    className="pagination-button"
+                    variant="contained"
+                    color={pagination.currentPage > 1 ? 'primary' : 'inherit'}
+                    sx={{
+                      bgcolor: pagination.currentPage > 1 ? 'primary.main' : 'grey.300',
+                      color: pagination.currentPage > 1 ? 'white' : 'text.disabled',
+                      textTransform: 'none',
+                      '&:disabled': {
+                        bgcolor: 'grey.300',
+                        color: 'text.disabled',
+                      },
+                    }}
                   >
                     Anterior
-                  </button>
+                  </Button>
                   
-                  <span className="pagination-info">
+                  <Typography variant="body2" color="text.secondary">
                     Página {pagination.currentPage} de {pagination.totalPages}
-                  </span>
+                  </Typography>
                   
-                  <button 
+                  <Button
                     onClick={() => handlePageChange(pagination.currentPage + 1)}
                     disabled={pagination.currentPage === pagination.totalPages}
-                    className="pagination-button"
+                    variant="contained"
+                    color={pagination.currentPage < pagination.totalPages ? 'primary' : 'inherit'}
+                    sx={{
+                      bgcolor: pagination.currentPage < pagination.totalPages ? 'primary.main' : 'grey.300',
+                      color: pagination.currentPage < pagination.totalPages ? 'white' : 'text.disabled',
+                      textTransform: 'none',
+                      '&:disabled': {
+                        bgcolor: 'grey.300',
+                        color: 'text.disabled',
+                      },
+                    }}
                   >
                     Siguiente
-                  </button>
-                </div>
+                  </Button>
+                </Box>
               )}
             </>
           ) : (

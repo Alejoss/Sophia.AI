@@ -538,12 +538,15 @@ class ContentSuggestionSerializer(serializers.ModelSerializer):
     topic = TopicBasicSerializer(read_only=True)
     content = ContentSerializer(read_only=True)
     content_profile = serializers.SerializerMethodField()
+    vote_count = serializers.SerializerMethodField()
+    user_vote = serializers.SerializerMethodField()
     
     class Meta:
         model = ContentSuggestion
         fields = ['id', 'topic', 'content', 'content_profile', 'suggested_by', 
                   'reviewed_by', 'status', 'message', 'rejection_reason', 
-                  'is_duplicate', 'created_at', 'updated_at', 'reviewed_at']
+                  'is_duplicate', 'created_at', 'updated_at', 'reviewed_at',
+                  'vote_count', 'user_vote']
     
     def get_content_profile(self, obj):
         """Get the content profile for the suggested_by user. If not found, fallback to topic creator's profile."""
@@ -573,3 +576,36 @@ class ContentSuggestionSerializer(serializers.ModelSerializer):
             return None
         except Exception as e:
             return None
+    
+    def get_vote_count(self, obj):
+        """Get the vote count for this content suggestion. Votes are not topic-specific."""
+        from django.contrib.contenttypes.models import ContentType
+        from votes.models import VoteCount
+        
+        content_type = ContentType.objects.get_for_model(ContentSuggestion)
+        vote_count_obj = VoteCount.objects.filter(
+            content_type=content_type,
+            object_id=obj.id,
+            topic__isnull=True  # Suggestions votes are not topic-specific
+        ).first()
+        
+        return vote_count_obj.vote_count if vote_count_obj else 0
+    
+    def get_user_vote(self, obj):
+        """Get the user's vote for this content suggestion. Votes are not topic-specific."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        
+        from django.contrib.contenttypes.models import ContentType
+        from votes.models import Vote
+        
+        content_type = ContentType.objects.get_for_model(ContentSuggestion)
+        vote = Vote.objects.filter(
+            user=request.user,
+            content_type=content_type,
+            object_id=obj.id,
+            topic__isnull=True  # Suggestions votes are not topic-specific
+        ).first()
+        
+        return vote.value if vote else 0

@@ -86,6 +86,17 @@ Location: `acbc_app/.env`
 - **Default**: `localhost,127.0.0.1,0.0.0.0`
 - **Example**: `ALLOWED_HOSTS=example.com,www.example.com`
 
+#### `USE_HTTPS`
+- **Description**: When `true` in production, JWT/cookie secure flags are enabled. Set for HTTPS.
+- **Required**: No
+- **Default**: `true` when `ENVIRONMENT=PRODUCTION`
+- **Example**: `USE_HTTPS=true`
+
+#### `CORS_ALLOWED_ORIGINS`
+- **Description**: Extra CORS origins in production (comma-separated). Base list is in settings.
+- **Required**: No
+- **Example**: `CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com`
+
 ### Google OAuth (Optional)
 
 #### `GOOGLE_OAUTH_CLIENT_ID`

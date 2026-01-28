@@ -7,8 +7,13 @@ This section contains guides for deploying the Sophia.AI Academia Blockchain pla
 - **[Local Development](local-development.md)** - Setting up a local development environment
 - **[Production](production.md)** - Production deployment guide
 - **[Docker](docker.md)** - Docker configuration and usage
-- **[AWS S3](aws-s3.md)** - Deploying static sites to AWS S3
+- **[Docker Checklist](docker-checklist.md)** - Backend image, entrypoint, env, volumes
+- **[Nginx Routes](nginx-routes.md)** - Which config to use, route diagram, `/health/` vs `/health`, SSL
+- **[CI/CD Flow](cicd-flow.md)** - GitHub Actions, deploy steps, scripts
+- **[Deployment Summary](deployment-summary.md)** - Resumen y comandos
+- **[Deployment Checklist](deployment-checklist.md)** - Checklist producción y mantenimiento
 - **[Environment Variables](environment-variables.md)** - Environment configuration reference
+- **[AWS S3](aws-s3.md)** - Deploying static sites to AWS S3
 
 ## Quick Start
 

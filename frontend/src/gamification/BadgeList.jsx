@@ -93,13 +93,15 @@ const getBadgeEarningDescription = (badge) => {
  * @param {string} emptyMessage - Message to show when no badges
  * @param {boolean} loading - Loading state
  * @param {string} error - Error message if any
+ * @param {boolean} showEarningTooltip - Whether to show "how you earned it" tooltip
  */
 const BadgeList = ({ 
   badges, 
   title = 'Insignias', 
   emptyMessage = 'Aún no hay insignias',
   loading = false,
-  error = null
+  error = null,
+  showEarningTooltip = true
 }) => {
   // Loading state
   if (loading) {
@@ -142,132 +144,140 @@ const BadgeList = ({
     const description = badge.badge_description || badge.description || '';
     const earningDescription = getBadgeEarningDescription(badge);
 
-    return (
-      <Grid item xs={12} sm={6} md={4}>
-        <Tooltip
-          title={
-            <Box sx={{ color: 'white' }}>
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  fontWeight: 'bold', 
-                  mb: 0.5,
-                  color: 'white',
-                }}
-              >
-                Cómo la obtuviste:
-              </Typography>
-              <Typography 
-                variant="body2"
-                sx={{ color: 'white' }}
-              >
-                {earningDescription}
-              </Typography>
-              {badge.earned_at && (
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    display: 'block', 
-                    mt: 1, 
-                    opacity: 0.9,
-                    color: 'rgba(255, 255, 255, 0.9)',
-                  }}
-                >
-                  Obtenida el {new Date(badge.earned_at).toLocaleDateString('es-ES', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </Typography>
-              )}
-            </Box>
-          }
-          arrow
-          placement="top"
-          slotProps={{
-            tooltip: {
-              sx: {
-                bgcolor: '#212121',
-                color: 'white',
-                fontSize: '0.875rem',
-                maxWidth: 350,
-                zIndex: 1500,
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
-                padding: '12px 16px',
-                '& .MuiTooltip-arrow': {
-                  color: '#212121',
-                },
-              },
-            },
-          }}
-        >
+    const cardContent = (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          p: 2,
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease-in-out',
+          minHeight: 180, // Uniform minimum height
+          height: '100%',
+          '&:hover': {
+            boxShadow: 2,
+            transform: 'translateY(-2px)',
+          },
+        }}
+      >
+        {/* Badge Image and Name Row */}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+          {/* Badge Image */}
           <Box
             sx={{
+              flexShrink: 0,
+              width: 80,
+              height: 80,
               display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              p: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease-in-out',
-              minHeight: 180, // Uniform minimum height
-              height: '100%',
-              '&:hover': {
-                boxShadow: 2,
-                transform: 'translateY(-2px)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BadgeDisplay badge={badge} showName={false} context="badgeList" />
+          </Box>
+          
+          {/* Badge Name */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                fontSize: '1.1rem',
+                lineHeight: 1.2,
+              }}
+            >
+              {badge.badge_name || badge.name}
+            </Typography>
+          </Box>
+        </Box>
+        
+        {/* Badge Description */}
+        {description && (
+          <Box sx={{ flex: 1 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                lineHeight: 1.6,
+              }}
+            >
+              {description}
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    );
+
+    return (
+      <Grid item xs={12} sm={6} md={4}>
+        {showEarningTooltip ? (
+          <Tooltip
+            title={
+              <Box sx={{ color: 'white' }}>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    fontWeight: 'bold', 
+                    mb: 0.5,
+                    color: 'white',
+                  }}
+                >
+                  Cómo la obtuviste:
+                </Typography>
+                <Typography 
+                  variant="body2"
+                  sx={{ color: 'white' }}
+                >
+                  {earningDescription}
+                </Typography>
+                {badge.earned_at && (
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      display: 'block', 
+                      mt: 1, 
+                      opacity: 0.9,
+                      color: 'rgba(255, 255, 255, 0.9)',
+                    }}
+                  >
+                    Obtenida el {new Date(badge.earned_at).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Typography>
+                )}
+              </Box>
+            }
+            arrow
+            placement="top"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#212121',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  maxWidth: 350,
+                  zIndex: 1500,
+                  boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
+                  padding: '12px 16px',
+                  '& .MuiTooltip-arrow': {
+                    color: '#212121',
+                  },
+                },
               },
             }}
           >
-            {/* Badge Image and Name Row */}
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-              {/* Badge Image */}
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  width: 80,
-                  height: 80,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BadgeDisplay badge={badge} showName={false} context="badgeList" />
-              </Box>
-              
-              {/* Badge Name */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: '1.1rem',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {badge.badge_name || badge.name}
-                </Typography>
-              </Box>
-            </Box>
-            
-            {/* Badge Description */}
-            {description && (
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {description}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Tooltip>
+            {cardContent}
+          </Tooltip>
+        ) : (
+          cardContent
+        )}
       </Grid>
     );
   };

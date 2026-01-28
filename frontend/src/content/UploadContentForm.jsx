@@ -25,7 +25,11 @@ import {
   Avatar,
   Skeleton,
   Select,
-  MenuItem
+  MenuItem,
+  Stack,
+  ToggleButtonGroup,
+  ToggleButton,
+  Snackbar
 } from '@mui/material';
 
 const getMediaType = (file) => {
@@ -77,7 +81,7 @@ const URLPreview = ({ previewData, isLoading, error }) => {
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mt: 2, mb: 3, position: 'relative', zIndex: 1 }}>
+      <Alert severity="warning" sx={{ mt: 2, mb: 3, position: 'relative', zIndex: 1 }}>
         {error}
       </Alert>
     );
@@ -181,7 +185,8 @@ const URLPreview = ({ previewData, isLoading, error }) => {
   );
 };
 
-const schema = yup.object({
+// Create schema function that can access current form values
+const createSchema = () => yup.object({
   file: yup.mixed().when('isUrlMode', {
     is: false,
     then: () => yup.mixed().required('El archivo es requerido'),
@@ -189,7 +194,15 @@ const schema = yup.object({
   }),
   url: yup.string().when('isUrlMode', {
     is: true,
-    then: () => yup.string().url('Debe ser una URL válida').required('La URL es requerida'),
+    then: () => yup.string()
+      .required('La URL es requerida')
+      .test('is-url', 'Debe ser una URL válida', function(value) {
+        if (!value) return true; // required check handles empty
+        // Normalize URL by adding https:// if missing
+        const normalized = value.match(/^https?:\/\//i) ? value : `https://${value}`;
+        // Use yup's url validation on normalized URL
+        return yup.string().url().isValidSync(normalized);
+      }),
     otherwise: () => yup.string().nullable()
   }),
   media_type: yup.string().when('isUrlMode', {
@@ -204,12 +217,26 @@ const schema = yup.object({
   isUrlMode: yup.boolean()
 }).required();
 
-const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null }) => {
+const schema = createSchema();
+
+const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [isUrlMode, setIsUrlMode] = useState(!!initialData?.url);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  
+  // Notify parent when uploading state changes
+  useEffect(() => {
+    if (onUploadingChange) {
+      onUploadingChange(isUploading);
+    }
+  }, [isUploading, onUploadingChange]);
+  const [isUrlMode, setIsUrlMode] = useState(initialUrlMode !== null ? initialUrlMode : !!initialData?.url);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
+  const fileInputRef = React.useRef(null);
+  
+  // Determine initial isUrlMode value
+  const initialIsUrlMode = initialUrlMode !== null ? initialUrlMode : !!initialData?.url;
   
   const {
     register,
@@ -226,11 +253,24 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       author: initialData?.author || '',
       is_producer: false,
       is_visible: true,
-      isUrlMode: !!initialData?.url,
+      isUrlMode: initialIsUrlMode,
       media_type: initialData?.media_type || '',
       url: initialData?.url || ''
     }
   });
+
+  // Sync isUrlMode state with form value when initialUrlMode changes
+  useEffect(() => {
+    if (initialUrlMode !== null && initialUrlMode !== isUrlMode) {
+      setIsUrlMode(initialUrlMode);
+      setValue('isUrlMode', initialUrlMode, { shouldValidate: false });
+    }
+  }, [initialUrlMode]); // Only depend on initialUrlMode to avoid unnecessary runs
+
+  // Always keep form isUrlMode in sync with state (only when state changes)
+  useEffect(() => {
+    setValue('isUrlMode', isUrlMode, { shouldValidate: false });
+  }, [isUrlMode, setValue]);
 
   // Watch the URL field for changes
   const url = watch('url');
@@ -277,55 +317,82 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     if (!isUrlMode || !url) {
       console.log('URL preview disabled or no URL provided');
       setPreviewData(null);
+      setPreviewError(null); // Clear error when URL is cleared
       return;
     }
 
     console.log('\n=== URL Preview Effect ===');
     console.log('URL changed:', url);
 
-    // Clear any previous timeout
+    // Clear any previous timeout and error immediately when URL changes
     if (urlDebounceTimeout.current) {
       console.log('Clearing previous debounce timeout');
       clearTimeout(urlDebounceTimeout.current);
     }
+    setPreviewError(null); // Clear error when URL changes
 
-    // Validate URL before fetching preview
-    trigger('url').then(isValid => {
-      console.log('URL validation result:', isValid);
-      if (!isValid) {
-        console.log('URL validation failed, skipping preview');
+    // Helper function to normalize URL (add protocol if missing)
+    const normalizeUrl = (urlString) => {
+      if (!urlString || urlString.trim() === '') return null;
+      const trimmed = urlString.trim();
+      // If URL doesn't start with http:// or https://, add https://
+      if (!trimmed.match(/^https?:\/\//i)) {
+        return `https://${trimmed}`;
+      }
+      return trimmed;
+    };
+
+    // Basic URL check - just check if it looks like a URL (has a dot or is a valid format)
+    const looksLikeUrl = (urlString) => {
+      if (!urlString || urlString.trim() === '') return false;
+      const trimmed = urlString.trim();
+      // Check if it has at least a dot and some characters (basic URL pattern)
+      return trimmed.includes('.') && trimmed.length > 4;
+    };
+
+    // Set a new timeout to fetch preview - increased debounce for better UX
+    console.log('Setting debounce timeout for preview fetch');
+    urlDebounceTimeout.current = setTimeout(async () => {
+      console.log('Debounce timeout triggered, fetching preview...');
+      
+      // Check if URL looks valid before attempting fetch
+      if (!looksLikeUrl(url)) {
+        console.log('URL does not look valid, skipping preview');
+        setPreviewError(null);
         return;
       }
 
-      // Set a new timeout to fetch preview
-      console.log('Setting debounce timeout for preview fetch');
-      urlDebounceTimeout.current = setTimeout(async () => {
-        console.log('Debounce timeout triggered, fetching preview...');
-        setIsLoadingPreview(true);
-        setPreviewError(null);
+      setIsLoadingPreview(true);
+      setPreviewError(null);
 
-                  try {
-            console.log('Fetching metadata for URL:', url);
-            const metadata = await contentApi.fetchUrlMetadata(url);
-            console.log('Received metadata:', metadata);
-            setPreviewData(metadata);
-            setPreviewError(null);  // Clear any previous errors
+      try {
+        // Normalize URL before fetching
+        const normalizedUrl = normalizeUrl(url);
+        console.log('Fetching metadata for URL:', normalizedUrl);
+        const metadata = await contentApi.fetchUrlMetadata(normalizedUrl);
+        console.log('Received metadata:', metadata);
+        setPreviewData(metadata);
+        setPreviewError(null);  // Clear any previous errors
 
-            // Auto-fill form fields if empty
-            const currentTitle = watch('title');
-            if (!currentTitle && metadata.title) {
-              console.log('Auto-filling title:', metadata.title);
-              setValue('title', metadata.title);
-            }
-          } catch (error) {
-            console.error('Preview fetch error:', error);
-            setPreviewData(null);  // Clear any previous preview data
-            setPreviewError(error.message || 'No se pudo cargar la vista previa para esta URL');
-          } finally {
-            setIsLoadingPreview(false);
-          }
-      }, 500); // Debounce for 500ms
-    });
+        // Auto-fill form fields if empty
+        const currentTitle = watch('title');
+        if (!currentTitle && metadata.title) {
+          console.log('Auto-filling title:', metadata.title);
+          setValue('title', metadata.title);
+        }
+      } catch (error) {
+        console.error('Preview fetch error:', error);
+        setPreviewData(null);  // Clear any previous preview data
+        // Only show error if URL is still the same (url is captured in closure)
+        // Check current URL value to ensure it hasn't changed
+        const currentUrl = watch('url');
+        if (currentUrl === url) {
+          setPreviewError(error.message || 'No se pudo cargar la vista previa para esta URL');
+        }
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }, 4000); // Increased debounce to 4000ms to give user more time
 
     // Cleanup timeout on unmount
     return () => {
@@ -334,22 +401,28 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         clearTimeout(urlDebounceTimeout.current);
       }
     };
-  }, [url, isUrlMode, setValue, trigger, watch]);
+  }, [url, isUrlMode]); // Removed setValue, trigger, watch from dependencies to avoid unnecessary re-runs
 
   const onSubmit = async (data) => {
+    console.log('\n=== Form Submit ===');
+    console.log('Form data:', data);
+    console.log('data.isUrlMode:', data.isUrlMode);
+    console.log('isUrlMode state:', isUrlMode);
+    console.log('isEditMode:', isEditMode);
+    console.log('contentId:', contentId);
+    
+    // Use form data's isUrlMode if available, otherwise fall back to state
+    const currentIsUrlMode = data.isUrlMode !== undefined ? data.isUrlMode : isUrlMode;
+    console.log('Using isUrlMode:', currentIsUrlMode);
+    
     setIsUploading(true);
     try {
-      console.log('\n=== Form Submit ===');
-      console.log('Form data:', data);
-      console.log('isUrlMode:', isUrlMode);
-      console.log('isEditMode:', isEditMode);
-      console.log('contentId:', contentId);
       
       if (isEditMode && contentId) {
         // Edit mode - update existing content
         console.log('Edit mode - updating existing content');
         
-        if (!isUrlMode) {
+        if (!currentIsUrlMode) {
           // File upload in edit mode - create new content and update profile
           console.log('File upload in edit mode - creating new content');
           
@@ -360,8 +433,9 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           }
           
           formData.append('file', file);
-          formData.append('is_producer', false);
-          formData.append('is_visible', true);
+          // Send booleans as strings for consistent backend parsing
+          formData.append('is_producer', 'false');
+          formData.append('is_visible', 'true');
           
           const mediaType = getMediaType(file);
           if (!mediaType) {
@@ -385,7 +459,11 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response.content_profile);
           }
           
-          alert('¡Nuevo contenido creado exitosamente! El perfil de contenido ha sido actualizado para referenciar el nuevo archivo.');
+          setSnackbar({
+            open: true,
+            message: '¡Nuevo contenido creado exitosamente! El perfil de contenido ha sido actualizado para referenciar el nuevo archivo.',
+            severity: 'success'
+          });
         } else {
           // URL update - update existing content
           console.log('URL update mode - updating existing content');
@@ -409,19 +487,28 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response);
           }
           
-          alert('¡Contenido actualizado exitosamente!');
+          setSnackbar({
+            open: true,
+            message: '¡Contenido actualizado exitosamente!',
+            severity: 'success'
+          });
         }
       } else {
         // Create new content
         const formData = new FormData();
         
-        if (isUrlMode) {
+        if (currentIsUrlMode) {
           console.log('URL mode submission');
           // URL mode - send URL and preview data
-          formData.append('url', data.url);
+          // Normalize URL by adding https:// if missing
+          const normalizedUrl = data.url && !data.url.match(/^https?:\/\//i) 
+            ? `https://${data.url}` 
+            : data.url;
+          formData.append('url', normalizedUrl);
           formData.append('media_type', data.media_type);
-          formData.append('is_producer', false);
-          formData.append('is_visible', true);
+          // URLs are always visible and not produced content
+          formData.append('is_producer', 'false');
+          formData.append('is_visible', 'true');
           
           // Add preview metadata if available
           if (previewData) {
@@ -440,8 +527,9 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           console.log('Selected file:', file);
           
           formData.append('file', file);
-          formData.append('is_producer', data.is_producer || false);
-          formData.append('is_visible', data.is_visible || true);
+          // Use nullish coalescing so `false` is preserved, and send as strings
+          formData.append('is_producer', String(data.is_producer ?? false));
+          formData.append('is_visible', String(data.is_visible ?? true));
           
           const mediaType = getMediaType(file);
           console.log('Detected media type:', mediaType);
@@ -465,11 +553,19 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
         reset();
         setPreviewData(null);
-        alert('¡Contenido subido exitosamente!');
+        setSnackbar({
+          open: true,
+          message: '¡Contenido subido exitosamente!',
+          severity: 'success'
+        });
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      alert(error.response?.data?.error || error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.');
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.',
+        severity: 'error'
+      });
     } finally {
       setIsUploading(false);
     }
@@ -517,41 +613,108 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     console.log('Form reset completed');
   };
 
+  // Register file input with ref callback
+  const fileInputRegistration = register('file');
+  const { ref: fileInputRegisterRef, onChange: fileInputOnChange, ...fileInputRest } = fileInputRegistration;
+
   return (
-    <Box sx={{ width: '100%', '& .MuiFormControl-root': { marginBottom: 2 } }}>
-      <Typography variant="h6" gutterBottom>
-        {isEditMode ? 'Cambiar fuente del contenido' : 'Subir contenido'}
-      </Typography>
+    <Paper elevation={2} sx={{ p: 3, width: '100%' }}>
+      {showModeToggle && (
+        <>
+          <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
+            {isEditMode ? 'Cambiar fuente del contenido' : 'Selecciona cómo agregar contenido'}
+          </Typography>
 
-      {/* Toggle Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
-        <Button
-          variant={!isUrlMode ? "contained" : "outlined"}
-          onClick={() => handleModeToggle(false)}
-          size="large"
-        >
-          Subir archivo
-        </Button>
-        <Button
-          variant={isUrlMode ? "contained" : "outlined"}
-          onClick={() => handleModeToggle(true)}
-          size="large"
-        >
-          Agregar desde URL
-        </Button>
-      </Box>
+          {/* Toggle Buttons - Styled as option cards */}
+          <Box sx={{ mb: 4 }}>
+            <ToggleButtonGroup
+              value={isUrlMode ? 'url' : 'file'}
+              exclusive
+              onChange={(e, newMode) => {
+                if (newMode !== null) {
+                  handleModeToggle(newMode === 'url');
+                }
+              }}
+              fullWidth
+              sx={{
+                '& .MuiToggleButton-root': {
+                  py: 2.5,
+                  px: 3,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  border: '2px solid',
+                  borderColor: 'divider',
+                  '&.Mui-selected': {
+                    backgroundColor: 'primary.main',
+                    color: 'primary.contrastText',
+                    borderColor: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                    }
+                  },
+                  '&:not(.Mui-selected)': {
+                    backgroundColor: 'background.paper',
+                    color: 'text.primary',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    }
+                  }
+                }
+              }}
+            >
+              <ToggleButton value="url" aria-label="subir contenido desde url">
+                Desde URL
+              </ToggleButton>
+              <ToggleButton value="file" aria-label="subir archivo">
+                Subir Archivo
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        </>
+      )}
 
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit, (errors) => {
+        console.error('Form validation errors:', errors);
+        console.error('Current isUrlMode state:', isUrlMode);
+        console.error('Current isUrlMode form value:', watch('isUrlMode'));
+        setSnackbar({
+          open: true,
+          message: 'Por favor completa todos los campos requeridos correctamente.',
+          severity: 'error'
+        });
+      })}>
         {/* File or URL Input */}
         {!isUrlMode ? (
-          <FormControl fullWidth error={!!errors.file}>
-            <Typography variant="subtitle2" gutterBottom>
+          <FormControl fullWidth error={!!errors.file} sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500 }}>
               Archivo:
             </Typography>
-            <input
-              type="file"
-              {...register('file')}
-            />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+              <Button
+                variant="outlined"
+                sx={{ textTransform: 'none' }}
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Seleccionar archivo
+              </Button>
+              <input
+                type="file"
+                {...fileInputRest}
+                ref={(e) => {
+                  fileInputRef.current = e;
+                  fileInputRegisterRef(e);
+                }}
+                onChange={(e) => {
+                  fileInputOnChange(e);
+                }}
+                style={{ display: 'none' }}
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                {watch('file')?.[0]?.name ? watch('file')[0].name : 'Ningún archivo seleccionado'}
+              </Typography>
+            </Stack>
             {errors.file && (
               <FormHelperText error>
                 {errors.file.message}
@@ -560,7 +723,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           </FormControl>
         ) : (
           <>
-            <FormControl fullWidth>
+            <FormControl fullWidth sx={{ mb: 3 }}>
               <TextField
                 label="URL"
                 variant="outlined"
@@ -572,8 +735,15 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
               />
             </FormControl>
             
+            {/* URL Preview/Error - Show immediately below URL field */}
+            <URLPreview 
+              previewData={previewData}
+              isLoading={isLoadingPreview}
+              error={previewError}
+            />
+            
             {/* Media Type Selector for URL Content */}
-            <FormControl fullWidth error={!!errors.media_type}>
+            <FormControl fullWidth error={!!errors.media_type} sx={{ mb: 3 }}>
               <InputLabel id="media-type-label">Tipo de contenido</InputLabel>
               <Select
                 labelId="media-type-label"
@@ -593,33 +763,31 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 </FormHelperText>
               )}
             </FormControl>
-            
-            <URLPreview 
-              previewData={previewData}
-              isLoading={isLoadingPreview}
-              error={previewError}
-            />
           </>
         )}
 
         {/* Common Fields */}
-        <FormControl fullWidth>
+        <FormControl fullWidth sx={{ mb: 3 }}>
           <TextField
-            label="Título original"
+            label="Autor"
             variant="outlined"
-            {...register('title')}
-            error={!!errors.title}
-            helperText={errors.title?.message}
+            {...register('author')}
+            value={watch('author') || ''}
+            onChange={(e) => setValue('author', e.target.value)}
+            error={!!errors.author}
+            helperText={errors.author?.message}
           />
         </FormControl>
 
-        <FormControl fullWidth>
+        <FormControl fullWidth sx={{ mb: 3 }}>
           <TextField
-            label="Autor original"
+            label="Título"
             variant="outlined"
-            {...register('author')}
-            error={!!errors.author}
-            helperText={errors.author?.message}
+            {...register('title')}
+            value={watch('title') || ''}
+            onChange={(e) => setValue('title', e.target.value)}
+            error={!!errors.title}
+            helperText={errors.title?.message}
           />
         </FormControl>
 
@@ -656,18 +824,35 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           </Box>
         )}
 
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          fullWidth
-          disabled={isUploading || isLoadingPreview}
-          sx={{ mt: 3 }}
-        >
-          {isUploading ? 'Subiendo...' : (isEditMode ? 'Actualizar contenido' : 'Subir contenido')}
-        </Button>
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            fullWidth
+            disabled={isUploading || isLoadingPreview}
+            startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isUploading ? 'Subiendo...' : (isEditMode ? 'Actualizar contenido' : 'Guardar Contenido')}
+          </Button>
+        </Stack>
       </form>
-    </Box>
+      
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
   );
 };
 

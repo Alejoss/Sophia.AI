@@ -122,6 +122,41 @@ const votesApi = {
 
     downvotePublication: async (publicationId) => {
         return votesApi.votePublication(publicationId, 'downvote');
+    },
+
+    // Content Suggestion voting
+    getContentSuggestionVoteStatus: async (suggestionId) => {
+        try {
+            const response = await axiosInstance.get(
+                `/votes/content-suggestions/${suggestionId}/vote/`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching content suggestion vote status:', error);
+            throw error;
+        }
+    },
+
+    voteContentSuggestion: async (suggestionId, action) => {
+        try {
+            const response = await axiosInstance.post(
+                `/votes/content-suggestions/${suggestionId}/vote/`,
+                { action }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error voting on content suggestion:', error);
+            throw error;
+        }
+    },
+
+    // Helper methods for content suggestion voting
+    upvoteContentSuggestion: async (suggestionId) => {
+        return votesApi.voteContentSuggestion(suggestionId, 'upvote');
+    },
+
+    downvoteContentSuggestion: async (suggestionId) => {
+        return votesApi.voteContentSuggestion(suggestionId, 'downvote');
     }
 };
 

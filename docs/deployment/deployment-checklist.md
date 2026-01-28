@@ -122,30 +122,30 @@ sudo nano .env
 
 ### 3. Construir y Levantar Contenedores
 
+**Producción**: Usa `docker-compose.prod.yml`. **Local**: Usa `docker-compose.yml` (opcionalmente `docker-compose.override.yml`).
+
 ```bash
-cd /opt/acbc-app
+cd /opt/acbc-app   # o ~/Sophia.AI, según tu DEPLOY_PATH
 
-# Construir contenedores
-docker compose build
-
-# Levantar servicios
-docker compose up -d
+# Producción: construir y levantar
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
 
 # Verificar que están corriendo
-docker compose ps
+docker compose -f docker-compose.prod.yml ps
 ```
 
 ### 4. Configurar Base de Datos
 
 ```bash
-# Ejecutar migraciones
-docker compose exec backend python manage.py migrate
+# Ejecutar migraciones (producción)
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
 
 # Crear superusuario (opcional)
-docker compose exec backend python manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 
 # Colectar static files
-docker compose exec backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
 
 ### 5. Configurar Nginx
@@ -174,27 +174,23 @@ sudo systemctl reload nginx
 
 ```bash
 # 1. Verificar contenedores
-docker compose ps
+docker compose -f docker-compose.prod.yml ps
 # Todos deben estar "Up"
 
-# 2. Verificar health check
-curl http://localhost/health/
+# 2. Backend health (Nginx proxy a Django /health/)
+curl -s http://localhost/health/
 # Debe devolver {"status": "healthy", "service": "academia_blockchain"}
 
 # 3. Verificar static files
 curl -I http://localhost/static/admin/css/base.css
 # Debe devolver HTTP 200
 
-# 4. Verificar API
-curl http://localhost/api/health/
-# Debe devolver JSON con status
-
-# 5. Verificar frontend
+# 4. Verificar frontend
 curl -I http://localhost/
 # Debe devolver HTTP 200
 
-# 6. Verificar logs
-docker compose logs backend --tail=20
+# 5. Verificar logs
+docker compose -f docker-compose.prod.yml logs backend --tail=20
 # No debe haber errores críticos
 ```
 
@@ -202,36 +198,28 @@ docker compose logs backend --tail=20
 
 ### Pendiente (Recomendado para producción)
 
-- [ ] **SSL/HTTPS**: Configurar Let's Encrypt con Certbot
-- [ ] **Firewall**: Verificar que solo puertos necesarios están abiertos
-- [ ] **Backups**: Configurar backups automáticos de base de datos
-- [ ] **Monitoreo**: Configurar alertas y monitoreo básico
-- [ ] **Logs**: Configurar rotación de logs
-- [ ] **Actualizaciones**: Configurar actualizaciones automáticas de seguridad
+- [ ] **SSL/HTTPS**: `scripts/setup-ssl.sh`; Let's Encrypt. Ver [setup-ssl](../../scripts/README.md#setup-sslsh).
+- [ ] **Firewall**: Verificar que solo puertos necesarios están abiertos (22, 80, 443).
+- [ ] **Backups**: `scripts/backup-db.sh`; cron. Ver [scripts/README](../../scripts/README.md#backup-dbsh).
+- [ ] **Monitoreo**: Alertas y monitoreo básico; health `GET /health/`, `GET /health`.
+- [ ] **Logs**: Rotación vía `LOGGING` (RotatingFileHandler). Ver [logging-and-observability](../../docs/backend/logging-and-observability.md).
+- [ ] **Actualizaciones**: Actualizaciones de seguridad del SO y de imágenes Docker.
 
 ### SSL/HTTPS (Opcional pero Recomendado)
 
-```bash
-# Instalar Certbot
-sudo apt install certbot python3-certbot-nginx -y
-
-# Obtener certificado (reemplaza con tu dominio)
-sudo certbot --nginx -d tu-dominio.com -d www.tu-dominio.com
-
-# Renovación automática
-sudo certbot renew --dry-run
-```
+- Script: `scripts/setup-ssl.sh`. Ver [scripts/README](../../scripts/README.md).
+- Actualizar `nginx/nginx.conf` (o `nginx-server.conf` si Nginx en host): reemplazar `yourdomain.com` por tu dominio. Certbot: `certbot certonly --webroot -w /var/www/certbot -d tu-dominio.com`.
 
 ## 📊 Monitoreo Básico
 
 ### Comandos Útiles
 
 ```bash
-# Ver estado de contenedores
-docker compose ps
+# Ver estado de contenedores (producción)
+docker compose -f docker-compose.prod.yml ps
 
 # Ver logs en tiempo real
-docker compose logs -f backend
+docker compose -f docker-compose.prod.yml logs -f backend
 
 # Ver uso de recursos
 docker stats
@@ -241,7 +229,7 @@ df -h
 docker system df
 
 # Verificar salud de servicios
-curl http://localhost/health/
+curl -s http://localhost/health/
 ```
 
 ## 🔄 Mantenimiento
@@ -249,75 +237,69 @@ curl http://localhost/health/
 ### Actualizar Aplicación
 
 ```bash
-cd /opt/acbc-app
+cd /opt/acbc-app   # o tu DEPLOY_PATH
 
-# Pull de cambios
 git pull origin main
 
 # Reconstruir si hay cambios en Dockerfiles o requirements
-docker compose build backend  # Solo si cambió backend.Dockerfile o requirements.txt
-docker compose build frontend  # Solo si cambió frontend.prod.Dockerfile
+docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml up -d --force-recreate
 
-# Reiniciar servicios
-docker compose restart backend frontend
-
-# Si hay migraciones
-docker compose exec backend python manage.py migrate
-
-# Si hay cambios en static files
-docker compose exec backend python manage.py collectstatic --noinput
+# Migraciones y static
+docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
 
 ### Backups
 
-```bash
-# Backup de base de datos
-docker compose exec postgres pg_dump -U postgres acbc_db > backup_$(date +%Y%m%d).sql
+Usa `scripts/backup-db.sh` y `scripts/restore-db.sh` (desde la raíz del proyecto; usan `docker-compose.prod.yml`). Ver [scripts/README](../../scripts/README.md).
 
-# Restaurar backup
-docker compose exec -T postgres psql -U postgres acbc_db < backup_20260122.sql
+```bash
+cd /opt/acbc-app
+./scripts/backup-db.sh
+# Restaurar: ./scripts/restore-db.sh backups/backup_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 ## ❌ Problemas Comunes
 
 ### Contenedor no inicia
 ```bash
-# Ver logs
-docker compose logs backend
+# Ver logs (producción)
+docker compose -f docker-compose.prod.yml logs backend
 
 # Verificar variables de entorno
-docker compose exec backend env | grep ENVIRONMENT
+docker compose -f docker-compose.prod.yml exec backend env | grep ENVIRONMENT
 ```
 
 ### Static files no cargan
 ```bash
-# Ejecutar collectstatic
-docker compose exec backend python manage.py collectstatic --noinput
-docker compose restart backend
+# Ejecutar collectstatic (producción)
+docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml restart backend
 ```
 
 ### Base de datos no conecta
 ```bash
 # Verificar que postgres está corriendo
-docker compose ps postgres
+docker compose -f docker-compose.prod.yml ps postgres
 
 # Ver logs de postgres
-docker compose logs postgres
+docker compose -f docker-compose.prod.yml logs postgres
 
 # Verificar variables de entorno
-docker compose exec backend python -c "from django.conf import settings; print(settings.DATABASES)"
+docker compose -f docker-compose.prod.yml exec backend python -c "from django.conf import settings; print(settings.DATABASES)"
 ```
 
 ### Nginx 502 Bad Gateway
 ```bash
 # Verificar que backend está corriendo
-docker compose ps backend
+docker compose -f docker-compose.prod.yml ps backend
 
 # Ver logs del backend
-docker compose logs backend --tail=50
+docker compose -f docker-compose.prod.yml logs backend --tail=50
 
-# Verificar que backend responde
-docker compose exec backend curl http://localhost:8000/health/
+# Verificar que backend responde (dentro del contenedor)
+docker compose -f docker-compose.prod.yml exec backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')"
 ```
 
 ## 📝 Notas Finales

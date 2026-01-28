@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Database connection debugging script
-Run this inside the backend container to debug database connection issues
+Database connection debugging script.
+Run only inside the backend container for local/staging debug. Do NOT run in production.
 """
 
 import os
+
+if os.getenv("ENVIRONMENT") == "PRODUCTION":
+    raise SystemExit("debug_db.py must not be run in PRODUCTION.")
+
 import psycopg2
 from psycopg2 import OperationalError
 

@@ -10,6 +10,7 @@ from .logging_utils import log_request
 class RequestLoggingMiddleware(MiddlewareMixin):
     """
     Middleware to automatically log HTTP requests and responses.
+    Does not log body, Authorization, or cookies. See docs/backend/logging-and-observability.md.
     """
     
     def process_request(self, request):
@@ -35,7 +36,6 @@ class RequestLoggingMiddleware(MiddlewareMixin):
         
         if not should_skip:
             log_request(request, response, duration)
-        
         return response
     
     def process_exception(self, request, exception):

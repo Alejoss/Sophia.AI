@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Chip, Box } from '@mui/material';
+import { Avatar, Chip, Box, CardMedia, Button, Typography } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import SchoolIcon from '@mui/icons-material/School';
@@ -57,45 +57,84 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center md:flex-nowrap flex-wrap md:gap-0 gap-4 mb-6">
-        <h1 className="md:!text-2xl !text-xl font-bold !text-gray-900">
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
           Caminos de Conocimiento por {authorName}
-        </h1>
-      </div>
+        </Typography>
+      </Box>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {paths.map((path) => (
           <div 
             key={path.id}
-            className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px]"
+            className="block bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow overflow-hidden"
           >
-            {/* Image and Title Section */}
-            <div className="flex items-start mb-4">
-              <Avatar 
-                src={path.image} 
+            {/* Cover Image */}
+            {path.image ? (
+              <CardMedia
+                component="img"
+                height="140"
+                image={path.image}
                 alt={path.title}
-                sx={{ 
-                  width: 80, 
-                  height: 80, 
-                  mr: 3,
+                sx={{ objectFit: 'cover' }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: 140,
                   bgcolor: 'grey.300',
-                  flexShrink: 0
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '3rem',
+                  color: 'text.secondary',
+                  fontWeight: 700,
                 }}
               >
                 {path.title.charAt(0).toUpperCase()}
-              </Avatar>
-              
+              </Box>
+            )}
+            
+            {/* Content Section */}
+            <div className="p-6">
               <div className="flex-1 min-w-0">
                 {/* Title Section */}
-                <Link 
-                  to={`/knowledge_path/${path.id}`}
-                  className="text-xl font-semibold hover:text-blue-500 transition-colors break-words block mb-3"
-                >
-                  {path.title}
-                </Link>
+                <Box sx={{ mb: 2, textAlign: 'center' }}>
+                  <Typography
+                    component={Link}
+                    to={`/knowledge_path/${path.id}`}
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: 'text.primary',
+                      textDecoration: 'none',
+                      display: 'block',
+                      wordBreak: 'break-word',
+                      '&:hover': {
+                        color: 'primary.main',
+                        textDecoration: 'none',
+                      },
+                    }}
+                  >
+                    <br />
+                    {path.title}
+                  </Typography>
+                </Box>
 
                 {/* Visibility Status */}
-                <div className="mb-3">
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'left' }}>
                   <Chip
                     icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
                     label={path.is_visible ? 'Público' : 'Privado'}
@@ -103,26 +142,41 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
                     size="small"
                     variant="outlined"
                   />
-                </div>
+                </Box>
 
-                {/* Description */}
-                <p className="text-gray-600 mb-3 line-clamp-3">{path.description}</p>
+                    {/* Description */}
+                    <p className="text-gray-600 mb-3 line-clamp-7">{path.description}</p>
+                  </div>
 
-                {/* Vote Component */}
-                <div className="flex justify-end">
-                  <VoteComponent 
-                    type="knowledge_path"
-                    ids={{ pathId: path.id }}
-                    initialVoteCount={Number(path.vote_count) || 0}
-                    initialUserVote={Number(path.user_vote) || 0}
-                  />
-                </div>
-              </div>
-            </div>
+                  {/* Footer: Vote and Date */}
+                  <Box 
+                    sx={{ 
+                      mt: 3,
+                      pt: 2,
+                      borderTop: 1,
+                      borderColor: 'divider',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 2
+                    }}
+                  >
+                    {/* Vote Component */}
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <VoteComponent 
+                        type="knowledge_path"
+                        ids={{ pathId: path.id }}
+                        initialVoteCount={Number(path.vote_count) || 0}
+                        initialUserVote={Number(path.user_vote) || 0}
+                      />
+                    </Box>
 
-            {/* Date */}
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <span>{new Date(path.created_at).toLocaleDateString()}</span>
+                    {/* Date */}
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(path.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
             </div>
           </div>
         ))}
@@ -130,45 +184,75 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
 
       {/* No Knowledge Paths Message */}
       {paths.length === 0 && (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no se han creado caminos de conocimiento</h3>
-          <p className="text-gray-500 mb-6">
+        <Box sx={{ textAlign: 'center', py: 6 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              color: 'text.secondary',
+              mb: 2
+            }}
+          >
+            Aún no se han creado caminos de conocimiento
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             {authorName} aún no ha creado caminos de conocimiento.
-          </p>
-        </div>
+          </Typography>
+        </Box>
       )}
 
       {/* Pagination Controls */}
-      {paths.length > 0 && (
-        <div className="flex justify-center items-center space-x-4 mt-8">
-          <button
+      {totalPages > 1 && (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            mt: 4,
+          }}
+        >
+          <Button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={!hasPrevious}
-            className={`px-4 py-2 rounded-lg ${
-              hasPrevious
-                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            variant="contained"
+            color={hasPrevious ? 'primary' : 'inherit'}
+            sx={{
+              bgcolor: hasPrevious ? 'primary.main' : 'grey.300',
+              color: hasPrevious ? 'white' : 'text.disabled',
+              textTransform: 'none',
+              '&:disabled': {
+                bgcolor: 'grey.300',
+                color: 'text.disabled',
+              },
+            }}
           >
             Anterior
-          </button>
+          </Button>
           
-          <span className="text-gray-600">
+          <Typography variant="body2" color="text.secondary">
             Página {currentPage} de {totalPages}
-          </span>
+          </Typography>
           
-          <button
+          <Button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={!hasNext}
-            className={`px-4 py-2 rounded-lg ${
-              hasNext
-                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            variant="contained"
+            color={hasNext ? 'primary' : 'inherit'}
+            sx={{
+              bgcolor: hasNext ? 'primary.main' : 'grey.300',
+              color: hasNext ? 'white' : 'text.disabled',
+              textTransform: 'none',
+              '&:disabled': {
+                bgcolor: 'grey.300',
+                color: 'text.disabled',
+              },
+            }}
           >
             Siguiente
-          </button>
-        </div>
+          </Button>
+        </Box>
       )}
     </div>
   );

@@ -1,8 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  Card,
+  CardContent,
+  Divider,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  Checkbox,
+  IconButton,
+  Chip,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import QuizIcon from '@mui/icons-material/Quiz';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizApi from '../api/quizzesApi';
-
 
 const QuizForm = () => {
   const navigate = useNavigate();
@@ -13,6 +41,7 @@ const QuizForm = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPathId, setCurrentPathId] = useState(initialPathId);
+  const [submitting, setSubmitting] = useState(false);
   
   const [quizData, setQuizData] = useState({
     title: '',
@@ -85,6 +114,8 @@ const QuizForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
+    setSubmitting(true);
     console.log('Submitting quiz data:', quizData);
     console.log('Current path ID:', currentPathId);
     console.log('Initial path ID:', initialPathId);
@@ -141,6 +172,8 @@ const QuizForm = () => {
       }
       
       setError(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -207,202 +240,298 @@ const QuizForm = () => {
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
   };
 
-  if (loading) return <div>Cargando...</div>;
+  const handleRemoveOption = (questionIndex, optionIndex) => {
+    const updatedQuestions = [...quizData.questions];
+    updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options.filter((_, i) => i !== optionIndex);
+    setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
+  };
+
+  const handleAddOption = (questionIndex) => {
+    const updatedQuestions = [...quizData.questions];
+    updatedQuestions[questionIndex].options.push({ text: '', isCorrect: false });
+    setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
+  };
+
+  const handleRemoveQuestion = (questionIndex) => {
+    const updatedQuestions = quizData.questions.filter((_, i) => i !== questionIndex);
+    setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-4 bg-white">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
-          className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
-        >
-          ← Volver al Camino de Conocimiento
-        </button>
-      </div>
-
-      <h1 className="text-2xl font-bold mb-4 text-gray-900">
-        {mode === 'create' ? 'Crear Cuestionario' : 'Editar Cuestionario'}
-      </h1>
-      
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 whitespace-pre-line">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
-        <div>
-          <label className="block text-gray-900 font-bold mb-2">
-            Seleccionar Nodo Precedente
-          </label>
-          <select
-            value={quizData.precedingNodeId}
-            onChange={(e) => setQuizData(prev => ({ ...prev, precedingNodeId: e.target.value }))}
-            required
-            className="w-full p-2 border rounded text-gray-900"
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Stack spacing={3}>
+        {/* Header with Back Button */}
+        <Box>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
+            sx={{ textTransform: 'none', mb: 2 }}
           >
-            <option value="">Seleccionar un nodo...</option>
-            {nodes.map(node => (
-              <option key={node.id} value={node.id}>
-                {node.title}
-              </option>
-            ))}
-          </select>
-        </div>
+            Volver al Camino de Conocimiento
+          </Button>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            {mode === 'create' ? 'Crear Cuestionario' : 'Editar Cuestionario'}
+          </Typography>
+        </Box>
 
-        <div>
-          <label className="block text-gray-900 font-bold mb-2">
-            Título del Cuestionario
-          </label>
-          <input
-            type="text"
-            value={quizData.title}
-            onChange={(e) => setQuizData(prev => ({ ...prev, title: e.target.value }))}
-            required
-            className="w-full p-2 border rounded text-gray-900"
-          />
-        </div>
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>
+            {error}
+          </Alert>
+        )}
 
-        <div>
-          <label className="block text-gray-900 font-bold mb-2">
-            Descripción del Cuestionario
-          </label>
-          <textarea
-            value={quizData.description}
-            onChange={(e) => setQuizData(prev => ({ ...prev, description: e.target.value }))}
-            className="w-full p-2 border rounded text-gray-900"
-            rows="3"
-          />
-        </div>
-
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold text-gray-900">Preguntas</h2>
-          
-          {quizData.questions.map((question, qIndex) => (
-            <div key={qIndex} className="p-4 border rounded space-y-4">
-              <div>
-                <label className="block text-gray-900 font-bold mb-2">
-                  Texto de la Pregunta
-                </label>
-                <textarea
-                  value={question.text}
-                  onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
-                  className="w-full p-2 border rounded text-gray-900"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-900 font-bold mb-2">
-                  Tipo de Pregunta
-                </label>
-                <select
-                  value={question.questionType}
-                  onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
-                  className="w-full p-2 border rounded text-gray-900"
+        {/* Form */}
+        <Paper elevation={1} sx={{ p: { xs: 3, md: 4 }, borderRadius: 3 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={4}>
+              {/* Preceding Node Selection */}
+              <FormControl fullWidth required>
+                <InputLabel id="preceding-node-label">Seleccionar Nodo Precedente</InputLabel>
+                <Select
+                  labelId="preceding-node-label"
+                  id="preceding-node"
+                  value={quizData.precedingNodeId}
+                  label="Seleccionar Nodo Precedente"
+                  onChange={(e) => setQuizData(prev => ({ ...prev, precedingNodeId: e.target.value }))}
                 >
-                  <option value="SINGLE">Opción Única</option>
-                  <option value="MULTIPLE">Opción Múltiple</option>
-                </select>
-              </div>
+                  <MenuItem value="">
+                    <em>Seleccionar un nodo...</em>
+                  </MenuItem>
+                  {nodes.map(node => (
+                    <MenuItem key={node.id} value={node.id}>
+                      {node.title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-              <div className="space-y-2">
-                <label className="block text-gray-900 font-bold mb-2">
-                  Opciones
-                </label>
-                {question.options.map((option, oIndex) => (
-                  <div key={oIndex} className="flex items-center space-x-2">
-                    <input
-                      type={question.questionType === 'SINGLE' ? 'radio' : 'checkbox'}
-                      checked={option.isCorrect}
-                      onChange={(e) => handleOptionChange(qIndex, oIndex, 'isCorrect', e.target.checked)}
-                      name={`question-${qIndex}-correct`}
-                      className="text-blue-600"
-                    />
-                    <input
-                      type="text"
-                      value={option.text}
-                      onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
-                      className="flex-1 p-2 border rounded text-gray-900"
-                      placeholder="Texto de la opción"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedQuestions = [...quizData.questions];
-                        updatedQuestions[qIndex].options = updatedQuestions[qIndex].options.filter((_, i) => i !== oIndex);
-                        setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
-                      }}
-                      className="text-red-600"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const updatedQuestions = [...quizData.questions];
-                    updatedQuestions[qIndex].options.push({ text: '', isCorrect: false });
-                    setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
+              {/* Quiz Title */}
+              <TextField
+                fullWidth
+                required
+                label="Título del Cuestionario"
+                value={quizData.title}
+                onChange={(e) => setQuizData(prev => ({ ...prev, title: e.target.value }))}
+                variant="outlined"
+              />
+
+              {/* Quiz Description */}
+              <TextField
+                fullWidth
+                label="Descripción del Cuestionario"
+                value={quizData.description}
+                onChange={(e) => setQuizData(prev => ({ ...prev, description: e.target.value }))}
+                variant="outlined"
+                multiline
+                rows={3}
+              />
+
+              <Divider />
+
+              {/* Questions Section */}
+              <Box>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+                  <QuizIcon color="primary" />
+                  <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                    Preguntas
+                  </Typography>
+                  {quizData.questions.length > 0 && (
+                    <Chip label={`${quizData.questions.length} pregunta(s)`} size="small" color="primary" variant="outlined" />
+                  )}
+                </Stack>
+
+                <Stack spacing={3}>
+                  {quizData.questions.map((question, qIndex) => (
+                    <Card key={qIndex} variant="outlined" sx={{ borderRadius: 2 }}>
+                      <CardContent>
+                        <Stack spacing={3}>
+                          {/* Question Header */}
+                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              Pregunta {qIndex + 1}
+                            </Typography>
+                            {quizData.questions.length > 1 && (
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveQuestion(qIndex)}
+                                aria-label="Eliminar pregunta"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Stack>
+
+                          {/* Question Text */}
+                          <TextField
+                            fullWidth
+                            required
+                            label="Texto de la Pregunta"
+                            value={question.text}
+                            onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
+                            variant="outlined"
+                            multiline
+                            rows={2}
+                          />
+
+                          {/* Question Type */}
+                          <FormControl fullWidth>
+                            <InputLabel id={`question-type-${qIndex}-label`}>Tipo de Pregunta</InputLabel>
+                            <Select
+                              labelId={`question-type-${qIndex}-label`}
+                              id={`question-type-${qIndex}`}
+                              value={question.questionType}
+                              label="Tipo de Pregunta"
+                              onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
+                            >
+                              <MenuItem value="SINGLE">Opción Única</MenuItem>
+                              <MenuItem value="MULTIPLE">Opción Múltiple</MenuItem>
+                            </Select>
+                          </FormControl>
+
+                          <Divider />
+
+                          {/* Options */}
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                              Opciones
+                            </Typography>
+                            <Stack spacing={2}>
+                              {question.options.map((option, oIndex) => (
+                                <Stack key={oIndex} direction="row" spacing={2} alignItems="flex-start">
+                                  {question.questionType === 'SINGLE' ? (
+                                    <Radio
+                                      checked={option.isCorrect}
+                                      onChange={(e) => handleOptionChange(qIndex, oIndex, 'isCorrect', e.target.checked)}
+                                      name={`question-${qIndex}-correct`}
+                                      sx={{ mt: 0.5 }}
+                                    />
+                                  ) : (
+                                    <Checkbox
+                                      checked={option.isCorrect}
+                                      onChange={(e) => handleOptionChange(qIndex, oIndex, 'isCorrect', e.target.checked)}
+                                      sx={{ mt: 0.5 }}
+                                    />
+                                  )}
+                                  <TextField
+                                    fullWidth
+                                    required
+                                    size="small"
+                                    placeholder="Texto de la opción"
+                                    value={option.text}
+                                    onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
+                                    variant="outlined"
+                                  />
+                                  {question.options.length > 2 && (
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleRemoveOption(qIndex, oIndex)}
+                                      aria-label="Eliminar opción"
+                                      sx={{ mt: 0.5 }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </Stack>
+                              ))}
+                              <Button
+                                startIcon={<AddIcon />}
+                                onClick={() => handleAddOption(qIndex)}
+                                variant="outlined"
+                                size="small"
+                                sx={{ textTransform: 'none', alignSelf: 'flex-start' }}
+                              >
+                                Agregar Opción
+                              </Button>
+                            </Stack>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {/* Add Question Button */}
+                  <Button
+                    startIcon={<AddIcon />}
+                    onClick={handleAddQuestion}
+                    variant="outlined"
+                    color="success"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Agregar Pregunta
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Divider />
+
+              {/* Max Attempts per Day */}
+              <FormControl fullWidth required>
+                <InputLabel id="max-attempts-label">Intentos Máximos por Día</InputLabel>
+                <Select
+                  labelId="max-attempts-label"
+                  id="max-attempts"
+                  value={quizData.max_attempts_per_day}
+                  label="Intentos Máximos por Día"
+                  onChange={(e) => {
+                    const value = Math.max(2, parseInt(e.target.value) || 2);
+                    setQuizData(prev => ({ ...prev, max_attempts_per_day: value }));
                   }}
-                  className="text-blue-600"
                 >
-                  Agregar Opción
-                </button>
-              </div>
-            </div>
-          ))}
+                  {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                    <MenuItem key={num} value={num}>
+                      {num} intentos
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>
+                  Establezca cuántas veces un estudiante puede intentar este cuestionario por día
+                </FormHelperText>
+              </FormControl>
 
-          <button
-            type="button"
-            onClick={handleAddQuestion}
-            className="bg-green-500 text-white px-4 py-2 rounded"
-          >
-            Agregar Pregunta
-          </button>
-        </div>
-
-        <div>
-          <label className="block text-gray-900 font-bold mb-2">
-            Intentos Máximos por Día
-          </label>
-          <select
-            value={quizData.max_attempts_per_day}
-            onChange={(e) => {
-              const value = Math.max(2, parseInt(e.target.value) || 2);
-              console.log('Selected max attempts:', value);
-              setQuizData(prev => {
-                const updated = { ...prev, max_attempts_per_day: value };
-                console.log('Updated quiz data:', updated);
-                return updated;
-              });
-            }}
-            required
-            className="w-full p-2 border rounded text-gray-900"
-          >
-            {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-              <option key={num} value={num}>
-                {num} intentos
-              </option>
-            ))}
-          </select>
-          <p className="text-sm text-gray-600 mt-1">
-            Establezca cuántas veces un estudiante puede intentar este cuestionario por día
-          </p>
-        </div>
-
-        <div>
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-6 py-2 rounded"
-          >
-            {mode === 'create' ? 'Crear Cuestionario' : 'Actualizar Cuestionario'}
-          </button>
-        </div>
-      </form>
-    </div>
+              {/* Submit Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 2 }}>
+                <Button
+                  onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
+                  variant="outlined"
+                  sx={{ textTransform: 'none' }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={submitting}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {submitting ? (
+                    <>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      {mode === 'create' ? 'Creando...' : 'Actualizando...'}
+                    </>
+                  ) : (
+                    mode === 'create' ? 'Crear Cuestionario' : 'Actualizar Cuestionario'
+                  )}
+                </Button>
+              </Box>
+            </Stack>
+          </form>
+        </Paper>
+      </Stack>
+    </Container>
   );
 };
 

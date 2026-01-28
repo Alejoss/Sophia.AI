@@ -1,72 +1,149 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  Alert,
+  AlertTitle,
   Avatar,
-  IconButton,
+  Box,
+  Button,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
   FormControlLabel,
+  IconButton,
+  Paper,
+  Snackbar,
+  Stack,
   Switch,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import EditIcon from "@mui/icons-material/Edit";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import QuizIcon from "@mui/icons-material/Quiz";
+import SchoolIcon from "@mui/icons-material/School";
+import SettingsIcon from "@mui/icons-material/Settings";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import EditIcon from "@mui/icons-material/Edit";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    is_visible: false,
-  });
-  const [knowledgePathImage, setKnowledgePathImage] = useState(null);
-  const [nodes, setNodes] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isRemovingNode, setIsRemovingNode] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [isReordering, setIsReordering] = useState(false);
-  const [quizzes, setQuizzes] = useState({});
-  const [showForm, setShowForm] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [knowledgePath, setKnowledgePath] = useState(null);
+  const [nodes, setNodes] = useState([]);
+  const [quizzesByNodeId, setQuizzesByNodeId] = useState({});
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [quizWarning, setQuizWarning] = useState(null);
+
+  // Details editable state
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [isVisible, setIsVisible] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+
+  // Autosave state
+  const [saveState, setSaveState] = useState({ status: "idle", message: null, updatedAt: null });
+  const lastSavedRef = useRef({ title: "", description: "", isVisible: false, imageUrl: null });
+  const autosaveTimerRef = useRef(null);
+  const isHydratingRef = useRef(true);
+
+  // Curriculum state
+  const [reorderState, setReorderState] = useState({ status: "idle", message: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, node: null });
+  const [isDeletingNode, setIsDeletingNode] = useState(false);
+
+  const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
+  const initialTab = tabFromQuery === "details" ? 0 : 1; // Default to Curriculum (tab 1)
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const canBePublic = useMemo(() => {
+    // Prefer backend signal if present; also enforce at least 2 nodes client-side.
+    const backendCan = Boolean(knowledgePath?.can_be_visible);
+    return backendCan && (nodes?.length || 0) >= 2;
+  }, [knowledgePath?.can_be_visible, nodes?.length]);
+
+  const statusChips = useMemo(() => {
+    const chips = [];
+    chips.push(
+      isVisible ? { label: "Público", color: "success", icon: <VisibilityIcon fontSize="small" /> } : { label: "Privado", color: "default", icon: <VisibilityOffIcon fontSize="small" /> }
+    );
+    return chips;
+  }, [isVisible, canBePublic]);
+
+  const headerDescription = description || knowledgePath?.description || "";
+  // Support stored `<br>` tags while staying safe (no HTML execution):
+  // convert <br>, <br/>, <br /> to newline and render with `whiteSpace: pre-line`.
+  const headerDescriptionForDisplay = useMemo(() => {
+    return String(headerDescription || "")
+      .replace(/<br\s*\/?>/gi, "\n");
+  }, [headerDescription]);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
       try {
+        setLoading(true);
+        setLoadError(null);
+        setQuizWarning(null);
+        setSaveState({ status: "idle", message: null, updatedAt: null });
+
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
         setKnowledgePath(data);
-        setFormData({
-          title: data.title,
-          description: data.description,
-          is_visible: data.is_visible || false,
-        });
-        setKnowledgePathImage(data.image);
-        setNodes(data.nodes || []);
+        setNodes(Array.isArray(data.nodes) ? data.nodes : []);
 
-        console.log("KnowledgePathEdit - Loaded knowledge path data:", data);
-        console.log("KnowledgePathEdit - Image URL:", data.image);
-        console.log("KnowledgePathEdit - Can be visible:", data.can_be_visible);
+        // Hydrate details fields
+        setTitle(data.title || "");
+        setDescription(data.description || "");
+        setIsVisible(Boolean(data.is_visible));
+        setImageFile(null);
+        setImagePreviewUrl(data.image || null);
 
-        // Fetch quizzes and map them to nodes using the correct attribute
-        const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
-        console.log("Fetched quizzes data:", quizzesData); // Log the quizzes data
+        lastSavedRef.current = {
+          title: data.title || "",
+          description: data.description || "",
+          isVisible: Boolean(data.is_visible),
+          imageUrl: data.image || null,
+        };
+        isHydratingRef.current = false;
 
-        // Map quizzes to nodes using the 'node' attribute
-        const quizzesMap = quizzesData.reduce((acc, quiz) => {
-          if (!acc[quiz.node]) {
-            acc[quiz.node] = [];
-          }
-          acc[quiz.node].push(quiz);
-          return acc;
-        }, {});
-        console.log("Mapped quizzes:", quizzesMap); // Log the mapped quizzes
-        setQuizzes(quizzesMap);
+        // Quizzes (non-blocking)
+        try {
+          const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
+          const map = Array.isArray(quizzesData)
+            ? quizzesData.reduce((acc, quiz) => {
+                const nodeId = quiz.node;
+                if (!acc[nodeId]) acc[nodeId] = [];
+                acc[nodeId].push(quiz);
+                return acc;
+              }, {})
+            : {};
+          setQuizzesByNodeId(map);
+        } catch (quizErr) {
+          setQuizWarning("No pudimos cargar la información de cuestionarios. Puedes seguir editando nodos.");
+        }
       } catch (err) {
-        console.error("Failed to load knowledge path or quizzes", err);
+        setLoadError(err.response?.data?.error || err.message || "Error al cargar el camino de conocimiento");
       } finally {
         setLoading(false);
       }
@@ -75,519 +152,638 @@ const KnowledgePathEdit = () => {
     fetchKnowledgePath();
   }, [pathId]);
 
-  // Refresh data when component becomes visible (e.g., returning from add node)
+  // Keep tab selection in URL
   useEffect(() => {
-    const handleFocus = () => {
-      refreshKnowledgePathData();
+    const tab = activeTab === 1 ? "curriculum" : "details";
+    const current = (searchParams.get("tab") || "").toLowerCase();
+    if (current !== tab) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Cleanup object URL for image preview
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
+  }, []);
 
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [pathId]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+  const handlePickImage = (file) => {
+    if (!file) return;
+    setImageFile(file);
+    const nextUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(nextUrl);
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setKnowledgePathImage(URL.createObjectURL(file));
-      // Store the file for upload
-      setFormData((prevState) => ({
-        ...prevState,
-        image: file,
-      }));
-    }
-  };
+  const isDirty = useMemo(() => {
+    const last = lastSavedRef.current;
+    const fieldsDirty = title !== last.title || description !== last.description || isVisible !== last.isVisible;
+    return fieldsDirty || Boolean(imageFile);
+  }, [title, description, isVisible, imageFile]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setSuccessMessage("");
+  const runAutosave = async () => {
+    if (isHydratingRef.current) return;
+    if (!isDirty) return;
 
-    console.log("KnowledgePathEdit - Submitting form data:", formData);
-    console.log(
-      "KnowledgePathEdit - Form data has image:",
-      formData.image instanceof File
-    );
-
+    setSaveState({ status: "saving", message: null, updatedAt: null });
     try {
-      // Remove is_visible from formData since it's handled separately
-      const { is_visible, ...submitData } = formData;
-      const updatedData = await knowledgePathsApi.updateKnowledgePath(
-        pathId,
-        submitData
-      );
-      setSuccessMessage("Camino de conocimiento actualizado exitosamente");
+      const payload = {
+        title,
+        description,
+        is_visible: isVisible,
+      };
+      if (imageFile) payload.image = imageFile;
 
-      // Update the image display with the new image URL from the response
-      if (updatedData.image) {
-        setKnowledgePathImage(updatedData.image);
+      const updated = await knowledgePathsApi.updateKnowledgePath(pathId, payload);
+
+      // Update local state with canonical server response
+      setKnowledgePath((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+      if (updated?.nodes) setNodes(Array.isArray(updated.nodes) ? updated.nodes : nodes);
+
+      if (updated?.image) {
+        setImagePreviewUrl(updated.image);
       }
+      setImageFile(null);
 
-      // Clear the image file from formData after successful upload
-      setFormData((prevState) => {
-        const { image, ...rest } = prevState;
-        return rest;
+      lastSavedRef.current = {
+        title: updated?.title ?? title,
+        description: updated?.description ?? description,
+        isVisible: typeof updated?.is_visible === "boolean" ? updated.is_visible : isVisible,
+        imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
+      };
+
+      setSaveState({ status: "saved", message: "Guardado", updatedAt: Date.now() });
+    } catch (err) {
+      setSaveState({
+        status: "error",
+        message: err.response?.data?.error || err.message || "No se pudo guardar",
+        updatedAt: null,
       });
-    } catch (err) {
-      console.error("KnowledgePathEdit - Error updating knowledge path:", err);
-      setError(err.message || "Error al actualizar el camino de conocimiento");
     }
   };
 
-  const handleAddNode = () => {
-    navigate(`/knowledge_path/${pathId}/add-node`);
-  };
+  // Debounced autosave
+  useEffect(() => {
+    if (isHydratingRef.current) return;
+    if (!isDirty) return;
 
-  const refreshKnowledgePathData = async () => {
+    if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = window.setTimeout(() => {
+      runAutosave();
+    }, 900);
+
+    return () => {
+      if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, isVisible, imageFile]);
+
+  const refreshPath = async () => {
     try {
-      const updatedData = await knowledgePathsApi.getKnowledgePath(pathId);
-      setKnowledgePath(updatedData);
-      setFormData((prevState) => ({
-        ...prevState,
-        is_visible: updatedData.is_visible || false,
-      }));
-      setNodes(updatedData.nodes || []);
-    } catch (err) {
-      console.error("Error refreshing knowledge path data:", err);
+      const updated = await knowledgePathsApi.getKnowledgePath(pathId);
+      setKnowledgePath(updated);
+      setNodes(Array.isArray(updated.nodes) ? updated.nodes : []);
+    } catch (_) {
+      // Ignore refresh errors
     }
-  };
-
-  const handleRemoveNode = async (nodeId) => {
-    setIsRemovingNode(true);
-    setError(null);
-
-    try {
-      await knowledgePathsApi.removeNode(pathId, nodeId);
-      setNodes(nodes.filter((node) => node.id !== nodeId));
-
-      // Refresh knowledge path data to get updated visibility status
-      const updatedData = await knowledgePathsApi.getKnowledgePath(pathId);
-      setKnowledgePath(updatedData);
-      setFormData((prevState) => ({
-        ...prevState,
-        is_visible: updatedData.is_visible || false,
-      }));
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || "Error al eliminar el nodo";
-      setError(errorMessage);
-    } finally {
-      setIsRemovingNode(false);
-    }
-  };
-
-  const handleAddActivityRequirement = () => {
-    navigate(`/quizzes/${pathId}/create`);
-  };
-
-  const toggleForm = () => {
-    setShowForm(!showForm);
   };
 
   const handleMoveNode = async (nodeId, direction) => {
-    setIsReordering(true);
+    const currentIndex = nodes.findIndex((n) => n.id === nodeId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= nodes.length) return;
+
+    setReorderState({ status: "saving", message: null });
+    const newNodes = [...nodes];
+    [newNodes[currentIndex], newNodes[targetIndex]] = [newNodes[targetIndex], newNodes[currentIndex]];
+    setNodes(newNodes);
+
     try {
-      const currentIndex = nodes.findIndex((node) => node.id === nodeId);
-      if (currentIndex === -1) return;
-
-      const newNodes = [...nodes];
-      const targetIndex =
-        direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-      // Swap nodes
-      [newNodes[currentIndex], newNodes[targetIndex]] = [
-        newNodes[targetIndex],
-        newNodes[currentIndex],
-      ];
-
-      // Prepare order data
-      const nodeOrders = newNodes.map((node, index) => ({
-        id: node.id,
-        order: index + 1,
-      }));
-
-      // Update backend
-      const updatedNodes = await knowledgePathsApi.reorderNodes(
-        pathId,
-        nodeOrders
-      );
-      setNodes(updatedNodes);
+      const nodeOrders = newNodes.map((node, index) => ({ id: node.id, order: index + 1 }));
+      const updatedNodes = await knowledgePathsApi.reorderNodes(pathId, nodeOrders);
+      setNodes(Array.isArray(updatedNodes) ? updatedNodes : newNodes);
+      setReorderState({ status: "saved", message: "Orden actualizado" });
     } catch (err) {
-      console.error("Reorder error:", err.response?.data || err.message);
-      setError("Error al reordenar los nodos");
-    } finally {
-      setIsReordering(false);
+      setReorderState({ status: "error", message: "Error al reordenar los nodos" });
+      // Re-sync with server state
+      await refreshPath();
     }
   };
 
+  const openDeleteNode = (node) => setDeleteDialog({ open: true, node });
+  const closeDeleteNode = () => setDeleteDialog({ open: false, node: null });
+
+  const confirmDeleteNode = async () => {
+    const node = deleteDialog.node;
+    if (!node) return;
+    setIsDeletingNode(true);
+    try {
+      await knowledgePathsApi.removeNode(pathId, node.id);
+      setNodes((prev) => prev.filter((n) => n.id !== node.id));
+      closeDeleteNode();
+      await refreshPath();
+    } catch (err) {
+      setReorderState({ status: "error", message: err.response?.data?.error || "Error al eliminar el nodo" });
+    } finally {
+      setIsDeletingNode(false);
+    }
+  };
+
+  const handleAddNode = () => navigate(`/knowledge_path/${pathId}/add-node`);
+  const handleAddQuiz = () => navigate(`/quizzes/${pathId}/create`);
+
   if (loading) {
-    return <div>Cargando...</div>;
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+          <CircularProgress size={60} />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (loadError && !knowledgePath) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          <AlertTitle>Error</AlertTitle>
+          {loadError}
+        </Alert>
+        <Box sx={{ mt: 2 }}>
+          <Button component={Link} to={`/knowledge_path/${pathId}`} variant="outlined">
+            Volver al Camino de Conocimiento
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (!knowledgePath) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="info" sx={{ borderRadius: 2 }}>
+          <AlertTitle>No encontrado</AlertTitle>
+          Camino de conocimiento no encontrado
+        </Alert>
+        <Box sx={{ mt: 2 }}>
+          <Button component={Link} to="/knowledge_path" variant="outlined">
+            Volver a la lista
+          </Button>
+        </Box>
+      </Container>
+    );
   }
 
   return (
-    <div className="container mx-auto p-4">
-      {/* Header with Back Link */}
-      <div className="max-w-4xl mx-auto mb-6">
-        <Link
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+      {/* Back Button */}
+      <Box sx={{ mb: 2 }}>
+        <Button
+          component={Link}
           to={`/knowledge_path/${pathId}`}
-          className="text-blue-500 hover:text-blue-700 mb-4 inline-block"
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          sx={{ textTransform: "none", borderRadius: 2 }}
         >
-          ← Volver al Camino
-        </Link>
-      </div>
+          Volver
+        </Button>
+      </Box>
 
-      {/* Knowledge Path Header with Image and Title */}
-      <div className="max-w-4xl mx-auto mb-6">
-        <div className="flex items-start md:flex-nowrap flex-wrap bg-white p-6 rounded-lg shadow">
-          <Avatar
-            src={knowledgePathImage}
-            alt={formData.title}
+      {/* Header */}
+      <Paper 
+        elevation={2} 
+        sx={{ 
+          borderRadius: 3, 
+          mb: 3,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Cover Image */}
+        {imagePreviewUrl || knowledgePath?.image ? (
+          <Box
+            component="img"
+            src={imagePreviewUrl || knowledgePath?.image || null}
+            alt={title || knowledgePath?.title || "Knowledge path"}
             sx={{
-              width: 100,
-              height: 100,
-              mr: 4,
+              width: "100%",
+              height: { xs: 180, md: 240 },
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: "100%",
+              height: { xs: 180, md: 240 },
               bgcolor: "grey.300",
-              fontSize: "2.5rem",
-              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: { xs: "4rem", md: "6rem" },
+              color: "text.secondary",
+              fontWeight: 700,
             }}
           >
-            {formData.title ? formData.title.charAt(0).toUpperCase() : "K"}
-          </Avatar>
-
-          <div className="md:flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-gray-900">
-                {formData.title}
-              </h1>
-              <Link
-                to={`/knowledge_path/${pathId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700 transition-colors"
-                title="View Knowledge Path"
-              >
-                <OpenInNewIcon />
-              </Link>
-            </div>
-            <p className="text-gray-600 mb-4">{formData.description}</p>
-            <div className="text-sm text-gray-500">
-              Creado por {knowledgePath?.author || "Cargando..."}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 flex md:flex-nowrap md:gap-0 gap-4 justify-between flex-wrap items-center">
-        <div className="md:flex  items-center gap-4">
-          <div className="md:mb-0 mb-4">
-            <button
-              onClick={handleAddNode}
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2"
-            >
-              Agregar Nodo de Contenido
-            </button>
-            {nodes.length >= 2 && (
-              <button
-                onClick={handleAddActivityRequirement}
-                className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-              >
-                Agregar Cuestionario
-              </button>
-            )}
-          </div>
-          <button
-            onClick={toggleForm}
-            className={`font-bold py-2 px-4 rounded transition-colors ${
-              showForm
-                ? "bg-gray-500 hover:bg-gray-700 text-white"
-                : "bg-green-500 hover:bg-green-700 text-white"
-            }`}
-          >
-            {showForm ? "Ocultar Formulario" : "Editar Detalles del Camino de Conocimiento"}
-          </button>
-        </div>
-        {/* Visibility Toggle - Independent of form */}
-        <div className="flex md:order-2 order-1 items-center gap-2 ml-auto">
-          <FormControlLabel
-            control={
-              <Switch
-                checked={formData.is_visible}
-                disabled={!knowledgePath?.can_be_visible}
-                onChange={async (e) => {
-                  const newVisibility = e.target.checked;
-                  try {
-                    await knowledgePathsApi.updateKnowledgePath(pathId, {
-                      is_visible: newVisibility,
-                    });
-                    setFormData((prevState) => ({
-                      ...prevState,
-                      is_visible: newVisibility,
-                    }));
-                  } catch (err) {
-                    console.error("Error updating visibility:", err);
-                    // Revert the switch if the update failed
-                    e.target.checked = !newVisibility;
-                  }
-                }}
-                name="is_visible"
-              />
-            }
-            label="Público"
-            sx={{ mb: 0, color: "text.primary" }}
-          />
-          <Typography variant="caption" color="text.secondary">
-            {formData.is_visible ? "Visible para otros" : ""}
-          </Typography>
-          {!knowledgePath?.can_be_visible && (
-            <Typography variant="caption" color="#000" sx={{ ml: 1 }}>
-              Los caminos de conocimiento necesitan al menos dos nodos para ser visibles
+            {(title || knowledgePath?.title || "K").charAt(0).toUpperCase()}
+          </Box>
+        )}
+        
+        {/* Content Overlay */}
+        <Box sx={{ p: { xs: 2, md: 3 } }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }} noWrap>
+              {title || knowledgePath?.title || "Camino de conocimiento"}
             </Typography>
+            {!!headerDescriptionForDisplay.trim() && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mb: 1,
+                  whiteSpace: "pre-line",
+                  wordBreak: "break-word",
+                }}
+              >
+                {headerDescriptionForDisplay}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+              {statusChips.map((c) => (
+                <Chip key={c.label} icon={c.icon} label={c.label} color={c.color} size="small" variant={c.color === "default" ? "outlined" : "filled"} />
+              ))}
+              <Typography variant="caption" color="text.secondary">
+                {knowledgePath?.author ? `Autor: ${knowledgePath.author}` : ""}
+              </Typography>
+            </Stack>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mx: { xs: 2, md: 3 }, my: 2 }} />
+
+        <Box sx={{ px: { xs: 2, md: 3 }, pb: { xs: 2, md: 3 } }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
+            <Box sx={{ flex: 1 }}>
+              <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label="knowledge path edit tabs">
+                <Tab icon={<SettingsIcon />} iconPosition="start" label="Detalles" />
+                <Tab icon={<SchoolIcon />} iconPosition="start" label={`Currículum (${nodes.length})`} />
+              </Tabs>
+            </Box>
+
+            {/* Autosave indicator */}
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: "flex-start", md: "flex-end" }}>
+              {saveState.status === "saving" && (
+                <Chip size="small" color="info" label="Guardando…" />
+              )}
+              {saveState.status === "saved" && (
+                <Chip size="small" color="success" label="Guardado" />
+              )}
+              {saveState.status === "error" && (
+                <Chip size="small" color="error" label="Error al guardar" />
+              )}
+              {saveState.status === "error" && (
+                <Button size="small" variant="text" onClick={runAutosave} sx={{ textTransform: "none" }}>
+                  Reintentar
+                </Button>
+              )}
+              {isDirty && saveState.status !== "saving" && (
+                <Typography variant="caption" color="text.secondary">
+                  Cambios sin guardar
+                </Typography>
+              )}
+            </Stack>
+          </Stack>
+        </Box>
+      </Paper>
+
+      {/* Details Tab */}
+      {activeTab === 0 && (
+        <Stack spacing={3}>
+          {/* Publish readiness */}
+          {!canBePublic && (
+            <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ borderRadius: 2 }}>
+              <AlertTitle sx={{ fontWeight: 700 }}>Aún no puedes publicarlo</AlertTitle>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Para que sea público necesitas <strong>al menos 2 nodos</strong>.
+              </Typography>
+              <Button size="small" variant="outlined" onClick={() => setActiveTab(1)} sx={{ textTransform: "none", borderRadius: 2 }}>
+                Ir a Currículum
+              </Button>
+            </Alert>
           )}
-        </div>
-      </div>
 
-      {/* Form Section */}
-      {showForm && (
-        <div className="max-w-4xl mx-auto mt-6">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-6 bg-white p-6 rounded-lg shadow"
-          >
-            {error && <div className="text-red-600 mb-4">{error}</div>}
+          <Paper elevation={1} sx={{ p: { xs: 3, md: 4 }, borderRadius: 3 }}>
+            <Stack spacing={3}>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems={{ xs: "stretch", md: "flex-start" }}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={3} sx={{ flex: 1 }}>
+                  <Box
+                    sx={{
+                      width: { xs: "100%", sm: 280 },
+                      height: { xs: 158, sm: 158 },
+                      borderRadius: 2,
+                      bgcolor: "grey.300",
+                      overflow: "hidden",
+                      position: "relative",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {imagePreviewUrl || knowledgePath?.image ? (
+                      <Box
+                        component="img"
+                        src={imagePreviewUrl || knowledgePath?.image || null}
+                        alt={title || "Portada"}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "3rem",
+                          color: "text.secondary",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {(title || "K").charAt(0).toUpperCase()}
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+                    <input
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      id="knowledge-path-cover-upload"
+                      type="file"
+                      onChange={(e) => handlePickImage(e.target.files?.[0])}
+                    />
+                    <label htmlFor="knowledge-path-cover-upload">
+                      <Button component="span" variant="outlined" startIcon={<PhotoCameraIcon />} sx={{ textTransform: "none", borderRadius: 2, mb: 1 }}>
+                        Cambiar portada
+                      </Button>
+                    </label>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                      Recomendado: imagen 16:9 para mejor visualización.
+                    </Typography>
+                  </Box>
+                </Stack>
 
-            {/* Image Section */}
-            <div className="mb-6">
-              <label className="block text-gray-700 font-bold mb-2">
-                Imagen de Portada
-              </label>
-              <div className="flex items-center space-x-4">
-                <Avatar
-                  src={knowledgePathImage}
-                  alt={formData.title}
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    bgcolor: "grey.300",
-                    fontSize: "2rem",
-                  }}
+                {/* Visibility */}
+                <Tooltip
+                  title={!canBePublic && !isVisible ? "Necesitas al menos 2 nodos para hacerlo público." : ""}
+                  disableHoverListener={canBePublic || isVisible}
                 >
-                  {formData.title
-                    ? formData.title.charAt(0).toUpperCase()
-                    : "K"}
-                </Avatar>
-                <div>
-                  <input
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    id="image-upload"
-                    type="file"
-                    onChange={handleImageUpload}
-                  />
-                  <label htmlFor="image-upload">
-                    <IconButton
-                      color="primary"
-                      aria-label="upload picture"
-                      component="span"
-                      sx={{
-                        border: "2px dashed #ccc",
-                        borderRadius: "2px",
-                        padding: "12px",
-                      }}
-                    >
-                      <PhotoCameraIcon />
-                    </IconButton>
-                  </label>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Haz clic para subir una imagen de portada
-                  </p>
-                </div>
-              </div>
-            </div>
+                  <span>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={isVisible}
+                          disabled={!canBePublic && !isVisible}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setIsVisible(next);
+                          }}
+                        />
+                      }
+                      label={
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            Público
+                          </Typography>
+                        </Stack>
+                      }
+                    />
+                  </span>
+                </Tooltip>
+              </Stack>
 
-            <div className="mb-4">
-              <label
-                htmlFor="title"
-                className="block text-gray-700 font-bold mb-2"
-              >
-                Título
-              </label>
-              <input
-                type="text"
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              <TextField
+                label="Título"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                fullWidth
+                placeholder="Ej. Introducción a Blockchain"
+                sx={{ mt: 1 }}
               />
-            </div>
-
-            <div className="mb-4">
-              <label
-                htmlFor="description"
-                className="block text-gray-700 font-bold mb-2"
-              >
-                Descripción
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-                rows="4"
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              <TextField
+                label="Descripción"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                fullWidth
+                multiline
+                minRows={4}
+                placeholder="Explica qué aprenderá el alumno y cómo está organizado el camino."
+                sx={{ mt: 1 }}
               />
-            </div>
-
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            >
-              Actualizar Camino de Conocimiento
-            </button>
-          </form>
-
-          {successMessage && (
-            <div className="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-              {successMessage}
-            </div>
-          )}
-        </div>
+            </Stack>
+          </Paper>
+        </Stack>
       )}
 
-      {/* Node Management Section */}
-      <div className="max-w-4xl mx-auto mt-6">
-        {nodes.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Orden
-                  </th>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Título
-                  </th>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Tipo de Medio
-                  </th>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Cuestionario
-                  </th>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Ver
-                  </th>
-                  <th className="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+      {/* Curriculum Tab */}
+      {activeTab === 1 && (
+        <Stack spacing={3}>
+          {quizWarning && (
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              {quizWarning}
+            </Alert>
+          )}
+
+          <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle1" component="div" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+                  Currículum
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Organiza los nodos, agrega contenido y configura cuestionarios.
+                </Typography>
+              </Box>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <Button variant="contained" color="success" startIcon={<AddIcon />} onClick={handleAddNode} sx={{ textTransform: "none", borderRadius: 2 }}>
+                  Agregar nodo
+                </Button>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<QuizIcon />}
+                  onClick={handleAddQuiz}
+                  disabled={nodes.length < 2}
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Agregar cuestionario
+                </Button>
+              </Stack>
+            </Stack>
+
+            <Divider sx={{ my: 2 }} />
+
+            {nodes.length === 0 ? (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                <AlertTitle sx={{ fontWeight: 700 }}>Tu currículum está vacío</AlertTitle>
+                Agrega tu primer nodo para comenzar a construir el camino.
+              </Alert>
+            ) : (
+              <Stack spacing={1.5}>
                 {nodes.map((node, index) => {
-                  console.log("Node ID:", node.id); // Log each node's ID
-                  console.log("Node quizzes:", quizzes[node.id]); // Log quizzes for each node
+                  const nodeQuizzes = quizzesByNodeId?.[node.id] || [];
                   return (
-                    <tr key={node.id}>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        {node.title || "Sin título"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        {node.media_type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        {quizzes[node.id] && quizzes[node.id].length > 0
-                          ? quizzes[node.id].map((quiz, quizIndex) => (
-                              <Link
-                                key={quiz.id}
-                                to={`/quizzes/${quiz.id}/edit`}
-                                className="text-blue-500 hover:text-blue-700"
-                              >
-                                {quiz.title || `Cuestionario ${quizIndex + 1}`}
-                              </Link>
-                            ))
-                          : "No"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        <Link
-                          to={`/knowledge_path/${pathId}/nodes/${node.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          Ver
-                          <OpenInNewIcon className="w-4 h-4" />
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-300 text-gray-700">
-                        <div className="flex gap-2">
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => handleMoveNode(node.id, "up")}
-                              disabled={isReordering || index === 0}
-                              className={`p-1 rounded hover:bg-gray-100 transition-colors text-gray-700
-                                ${
-                                  isReordering || index === 0
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "cursor-pointer"
-                                }`}
-                            >
-                              <ArrowUpwardIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleMoveNode(node.id, "down")}
-                              disabled={
-                                isReordering || index === nodes.length - 1
-                              }
-                              className={`p-1 rounded hover:bg-gray-100 transition-colors text-gray-700
-                                ${
-                                  isReordering || index === nodes.length - 1
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "cursor-pointer"
-                                }`}
-                            >
-                              <ArrowDownwardIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <Link
+                    <Paper key={node.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                      <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
+                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: "50%",
+                              bgcolor: "primary.main",
+                              color: "primary.contrastText",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 800,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {index + 1}
+                          </Box>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>
+                              {node.title || "Sin título"}
+                            </Typography>
+                            <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                              {node.media_type && <Chip size="small" label={node.media_type} variant="outlined" />}
+                              {nodeQuizzes.length > 0 ? (
+                                <Chip 
+                                  size="small" 
+                                  label={nodeQuizzes.length === 1 ? "quiz" : `${nodeQuizzes.length} quiz`} 
+                                  variant="filled"
+                                  color="secondary"
+                                  component={Link}
+                                  to={`/quizzes/${nodeQuizzes[0].id}/edit`}
+                                  clickable
+                                  sx={{ 
+                                    textDecoration: 'none',
+                                    '&:hover': {
+                                      bgcolor: 'secondary.dark'
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <Chip 
+                                  size="small" 
+                                  label="0 quiz" 
+                                  variant="outlined" 
+                                  color="default" 
+                                />
+                              )}
+                            </Stack>
+                          </Box>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
+                          <Tooltip title="Mover arriba">
+                            <span>
+                              <IconButton size="small" onClick={() => handleMoveNode(node.id, "up")} disabled={index === 0 || reorderState.status === "saving"}>
+                                <ArrowUpwardIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Mover abajo">
+                            <span>
+                              <IconButton size="small" onClick={() => handleMoveNode(node.id, "down")} disabled={index === nodes.length - 1 || reorderState.status === "saving"}>
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          <Button
+                            component={Link}
+                            to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                            size="small"
+                            variant="outlined"
+                            startIcon={<OpenInNewIcon />}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                          >
+                            Ver
+                          </Button>
+                          <Button
+                            component={Link}
                             to={`/knowledge_path/${pathId}/nodes/${node.id}/edit`}
-                            className="text-blue-500 hover:text-blue-700"
+                            size="small"
+                            variant="contained"
+                            startIcon={<EditIcon />}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
                           >
                             Editar
-                          </Link>
-                          <button
-                            onClick={() => handleRemoveNode(node.id)}
-                            disabled={isRemovingNode}
-                            className={`text-red-600 hover:text-red-900 transition-colors
-                              ${
-                                isRemovingNode
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : "cursor-pointer"
-                              }`}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => openDeleteNode(node)}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
                           >
                             Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Paper>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+              </Stack>
+            )}
+          </Paper>
+        </Stack>
+      )}
+
+      {/* Delete node dialog */}
+      <Dialog open={deleteDialog.open} onClose={closeDeleteNode} maxWidth="xs" fullWidth>
+        <DialogTitle>Eliminar nodo</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            ¿Seguro que deseas eliminar <strong>{deleteDialog.node?.title || "este nodo"}</strong>? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteNode} disabled={isDeletingNode} sx={{ textTransform: "none" }}>
+            Cancelar
+          </Button>
+          <Button onClick={confirmDeleteNode} disabled={isDeletingNode} color="error" variant="contained" sx={{ textTransform: "none" }}>
+            {isDeletingNode ? "Eliminando…" : "Eliminar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Toasts */}
+      <Snackbar
+        open={Boolean(reorderState.message)}
+        autoHideDuration={3500}
+        onClose={() => setReorderState({ status: "idle", message: null })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={reorderState.status === "error" ? "error" : "success"}
+          onClose={() => setReorderState({ status: "idle", message: null })}
+          sx={{ borderRadius: 2 }}
+        >
+          {reorderState.message}
+        </Alert>
+      </Snackbar>
+    </Container>
   );
 };
 

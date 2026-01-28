@@ -10,7 +10,7 @@ from django.apps import apps
 import logging
 
 from comments.models import Comment
-from content.models import Topic, Content, Publication
+from content.models import Topic, Content, Publication, ContentSuggestion
 from knowledge_paths.models import KnowledgePath
 from votes.models import Vote, VoteCount
 from utils.notification_utils import notify_content_upvote, notify_knowledge_path_upvote
@@ -644,4 +644,118 @@ class PublicationVoteView(BaseGetVoteView):
                 return Response(
                     {'error': 'An error occurred while processing your vote'}, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                ) 
+                )
+
+
+class ContentSuggestionVoteView(BaseGetVoteView):
+    model = ContentSuggestion
+
+    def post(self, request, pk):
+        """Handle vote actions for a content suggestion. Votes are not topic-specific."""
+        try:
+            suggestion = get_object_or_404(ContentSuggestion, pk=pk)
+            action = request.data.get('action')
+            
+            logger.info(f"Content suggestion vote request: {action}", extra={
+                'user_id': request.user.id,
+                'suggestion_id': pk,
+                'action': action,
+            })
+            
+            if action not in ['upvote', 'downvote', 'remove']:
+                logger.warning("Invalid vote action for content suggestion", extra={
+                    'user_id': request.user.id,
+                    'suggestion_id': pk,
+                    'action': action,
+                })
+                return Response(
+                    {'error': 'Invalid action'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Votes for suggestions are not topic-specific (topic=None)
+            vote_count = self.perform_vote_action(request, suggestion, action, topic=None)
+            
+            # Get the user's current vote after the action
+            user_vote = self.get_vote(request.user, suggestion, topic=None)
+            
+            response_data = {
+                'vote_count': vote_count,
+                'user_vote': user_vote.value if user_vote else 0
+            }
+            
+            logger.info("Content suggestion vote completed successfully", extra={
+                'user_id': request.user.id,
+                'suggestion_id': pk,
+                'action': action,
+                'final_vote_count': vote_count,
+                'user_vote': user_vote.value if user_vote else 0,
+            })
+            
+            return Response(response_data)
+        except Exception as e:
+            if "User must be authenticated" in str(e):
+                logger.warning("Unauthenticated vote attempt on content suggestion", extra={
+                    'suggestion_id': pk,
+                    'action': request.data.get('action'),
+                })
+                return Response(
+                    {'error': 'Authentication required to vote'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            else:
+                logger.error("Error processing content suggestion vote", extra={
+                    'user_id': request.user.id,
+                    'suggestion_id': pk,
+                    'action': request.data.get('action'),
+                }, exc_info=True)
+                return Response(
+                    {'error': 'An error occurred while processing your vote'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+    def get(self, request, pk):
+        """Get vote information for a content suggestion. Votes are not topic-specific."""
+        try:
+            suggestion = get_object_or_404(ContentSuggestion, pk=pk)
+            
+            logger.debug("Retrieving vote info for content suggestion", extra={
+                'user_id': request.user.id if request.user.is_authenticated else None,
+                'suggestion_id': pk,
+            })
+            
+            # For anonymous users, only return vote count, not user vote
+            if not request.user.is_authenticated:
+                vote_count = self.get_vote_count(suggestion, topic=None)
+                logger.debug("Vote info retrieved for anonymous user", extra={
+                    'suggestion_id': pk,
+                    'vote_count': vote_count,
+                })
+                return Response({
+                    'user_vote': 0,
+                    'vote_count': vote_count
+                })
+            
+            user_vote = self.get_vote(request.user, suggestion, topic=None)
+            vote_count = self.get_vote_count(suggestion, topic=None)
+            
+            logger.debug("Vote info retrieved successfully", extra={
+                'user_id': request.user.id,
+                'suggestion_id': pk,
+                'user_vote': user_vote.value if user_vote else 0,
+                'vote_count': vote_count,
+            })
+            
+            return Response({
+                'user_vote': user_vote.value if user_vote else 0,
+                'vote_count': vote_count
+            })
+        except Exception as e:
+            logger.error("Error retrieving vote information for content suggestion", extra={
+                'user_id': request.user.id if request.user.is_authenticated else None,
+                'suggestion_id': pk,
+            }, exc_info=True)
+            return Response(
+                {'error': 'An error occurred while retrieving vote information'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

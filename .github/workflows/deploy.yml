@@ -34,7 +34,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Cache pip dependencies
       uses: actions/cache@v3
@@ -86,16 +86,14 @@ jobs:
         cd acbc_app
         python -c "
         import os
-        print('Environment variables:')
-        for key in ['DB_HOST', 'POSTGRES_PORT', 'DB_NAME', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'ENVIRONMENT']:
-            print(f'{key}: {os.environ.get(key)}')
-
-        # Test if we can import Django settings
+        for key in ['DB_HOST', 'POSTGRES_PORT', 'DB_NAME', 'POSTGRES_USER', 'ENVIRONMENT']:
+            v = os.environ.get(key)
+            print(f'{key}: {v}')
         import django
         from django.conf import settings
         django.setup()
-        print('Django database config:')
-        print(settings.DATABASES)
+        assert settings.DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql'
+        print('Django DB config OK')
         "
 
     - name: Run Django migrations
@@ -133,26 +131,32 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: ${{ secrets.PORT || 22 }}
         script: |
-          # Exit on any error
           set -e
+          # Project dir: use DEPLOY_PATH secret or default ~/Sophia.AI
+          cd ${{ secrets.DEPLOY_PATH || '~/Sophia.AI' }}
 
-          # Navigate to your project directory
-          cd ~/Sophia.AI
-
-          # Pull latest changes
           echo "Pulling latest changes..."
           git pull
 
-          # Restart Docker Compose services
-          echo "Restarting Docker Compose services..."
-          docker compose up -d --force-recreate
+          echo "Building and starting Docker Compose (production)..."
+          docker compose -f docker-compose.prod.yml build --no-cache
+          docker compose -f docker-compose.prod.yml up -d --force-recreate
 
-          # Test nginx configuration before reload
-          echo "Testing nginx configuration..."
-          sudo nginx -t
+          echo "Running migrations..."
+          docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
 
-          # Reload nginx
-          echo "Reloading nginx..."
-          sudo nginx -s reload
+          echo "Collecting static files..."
+          docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
+
+          echo "Verifying health..."
+          curl -sf http://localhost/health/ > /dev/null || { docker compose -f docker-compose.prod.yml logs backend; exit 1; }
+          curl -sf http://localhost/health > /dev/null || true
+
+          if command -v nginx > /dev/null 2>&1; then
+            echo "Testing nginx configuration..."
+            sudo nginx -t
+            echo "Reloading nginx..."
+            sudo nginx -s reload
+          fi
 
           echo "Deployment completed successfully!"

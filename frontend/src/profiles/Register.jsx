@@ -84,6 +84,10 @@ const Register = () => {
     if (username.trim().length < 3) {
       return 'El nombre de usuario debe tener al menos 3 caracteres.';
     }
+    // Explicitly check for @ symbol
+    if (username.includes('@')) {
+      return 'El nombre de usuario no puede contener el símbolo @. Usa solo letras, números y guiones bajos (_).';
+    }
     // Check for invalid characters
     if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
       return 'El nombre de usuario solo puede contener letras, números y guiones bajos (_).';
@@ -93,6 +97,12 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Prevent @ symbol in username field
+    if (name === 'username' && value.includes('@')) {
+      return; // Don't update the value if it contains @
+    }
+    
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -273,6 +283,12 @@ const Register = () => {
             value={formData.username}
             onChange={handleChange}
             onBlur={handleBlur}
+            onKeyDown={(e) => {
+              // Prevent @ symbol from being typed in username field
+              if (e.key === '@') {
+                e.preventDefault();
+              }
+            }}
             className={errors.username ? 'input-error' : ''}
             aria-invalid={errors.username ? "true" : "false"}
             aria-describedby={errors.username ? "username-error" : null}

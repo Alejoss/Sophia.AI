@@ -10,11 +10,13 @@ import {
   getAccessTokenFromLocalStorage,
 } from "../context/localStorageUtils.js";
 import SocialLogin from "../components/SocialLogin";
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import '../styles/login.css';
 
 /**
  * Regular Login Component
- * Handles traditional username/password login
+ * Handles traditional username/email and password login
  */
 const Login = () => {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
   const [loginImage, setLoginImage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     // Select a random login cover image (1-10)
@@ -121,12 +124,13 @@ const Login = () => {
               <form onSubmit={handleSubmit}>
                 <div className="mb-5">
                   <label className="form-label" htmlFor="username">
-                    Nombre de usuario:
+                    Usuario o correo electrónico:
                   </label>
                   <input
                     type="text"
                     id="username"
                     className="form-control"
+                    placeholder="Ingresa tu usuario o correo electrónico"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                   />
@@ -135,13 +139,27 @@ const Login = () => {
                   <label htmlFor="password" className="form-label">
                     Contraseña:
                   </label>
-                  <input
-                    type="password"
-                    id="password"
-                    className="form-control"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
+                  <div className="password-input-wrapper">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      id="password"
+                      className="form-control"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPassword ? (
+                        <VisibilityOffIcon fontSize="small" />
+                      ) : (
+                        <VisibilityIcon fontSize="small" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 {error && <div className="error-message">{error}</div>}
                 <button type="submit" className="btn-primary">

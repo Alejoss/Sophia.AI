@@ -34,6 +34,7 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import StorageIcon from "@mui/icons-material/Storage";
 import FolderIcon from "@mui/icons-material/Folder";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import { formatFileSize } from "../utils/fileUtils";
 
 const ContentDisplay = ({
@@ -126,21 +127,9 @@ const ContentDisplay = ({
       fontSize: "large",
       sx: { opacity: 0.7, color: "text.secondary" },
     };
-    const [showFallbackIcon, setShowFallbackIcon] = useState(false);
 
-    // Handle non-URL content or non-TEXT URL content
+    // Use media_type from serializer
     const mediaType = content.media_type?.toUpperCase();
-
-    // Debug logging for PDF detection
-    if (mediaType === "TEXT") {
-      console.log("PDF Detection Debug:", {
-        mediaType,
-        hasUrl: !!content.url,
-        fileDetails: content.file_details,
-        filePath: content.file_details?.file,
-        isPdf: content.file_details?.file?.toLowerCase().includes(".pdf"),
-      });
-    }
 
     switch (mediaType) {
       case "VIDEO":
@@ -148,17 +137,9 @@ const ContentDisplay = ({
       case "AUDIO":
         return <AudiotrackIcon {...iconProps} />;
       case "TEXT":
-        if (content.url) {
-          return <LinkIcon {...iconProps} />;
-        }
-        // Improved PDF detection - check if file path contains .pdf
-        if (
-          content.file_details?.file &&
-          content.file_details.file.toLowerCase().includes(".pdf")
-        ) {
-          return <PictureAsPdfIcon {...iconProps} />;
-        }
-        return <ArticleIcon {...iconProps} />;
+        // If content has URL, show link icon; otherwise show article icon
+        // PDF detection should come from serializer if needed
+        return content.url ? <LinkIcon {...iconProps} /> : <ArticleIcon {...iconProps} />;
       case "IMAGE":
         return <ImageIcon {...iconProps} />;
       default:
@@ -396,14 +377,15 @@ const ContentDisplay = ({
                 maxWidth: "800px",
                 mx: "auto",
                 p: 2,
-                bgcolor: "info.light",
+                bgcolor: "grey.50",
                 borderRadius: 0.5,
                 border: "1px solid",
-                borderColor: "info.main",
+                borderColor: "divider",
                 cursor: "pointer",
                 "&:hover": {
                   boxShadow: 2,
                   borderColor: "primary.main",
+                  bgcolor: "grey.100",
                 },
               }}
               onClick={handleContentClick}
@@ -411,7 +393,16 @@ const ContentDisplay = ({
             >
               <Typography variant="body1" color="text.primary">
                 Contenido URL:{" "}
-                <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>
+                <a 
+                  href={url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  style={{ 
+                    color: "primary.main",
+                    textDecoration: "none"
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {url}
                 </a>
               </Typography>
@@ -743,6 +734,34 @@ const ContentDisplay = ({
               }}
               onClick={onClick}
             >
+              {/* Remove button in top-left corner */}
+              {onRemove && (
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                  sx={{
+                    position: "absolute",
+                    top: 4,
+                    left: 4,
+                    zIndex: 10,
+                    bgcolor: "background.paper",
+                    color: "text.primary",
+                    boxShadow: 1,
+                    "&:hover": {
+                      bgcolor: "error.main",
+                      color: "error.contrastText",
+                    },
+                    width: 24,
+                    height: 24,
+                  }}
+                  aria-label="Quitar contenido"
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              )}
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Box
                   sx={{

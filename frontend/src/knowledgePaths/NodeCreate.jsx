@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -26,6 +26,7 @@ const NodeCreate = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isUploadingContent, setIsUploadingContent] = useState(false);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -42,11 +43,10 @@ const NodeCreate = () => {
     fetchKnowledgePath();
   }, [pathId]);
 
-  const handleContentSelected = (content_profile) => {
+  const handleContentSelected = useCallback((content_profile) => {
     console.log('Selected content profile:', content_profile);
     console.log('Content profile title:', content_profile.title);
     console.log('Content profile original title:', content_profile.content?.original_title);
-    console.log('Current form data:', formData);
     
     setSelectedContent(content_profile);
     setFormData(prev => {
@@ -58,7 +58,19 @@ const NodeCreate = () => {
       console.log('New form data being set:', newFormData);
       return newFormData;
     });
-  };
+  }, []);
+
+  const handleContentRemoved = useCallback(() => {
+    setSelectedContent(null);
+    setFormData(prev => ({
+      ...prev,
+      content_profile_id: null
+    }));
+  }, []);
+
+  const handleUploadingChange = useCallback((uploading) => {
+    setIsUploadingContent(uploading);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,7 +78,8 @@ const NodeCreate = () => {
     setSubmitting(true);
 
     try {
-      await knowledgePathsApi.addNode(pathId, formData);
+      const response = await knowledgePathsApi.addNode(pathId, formData);
+      // Redirect to knowledge path edit page
       navigate(`/knowledge_path/${pathId}/edit`);
     } catch (err) {
       setError(err.message || 'Error al agregar el nodo');
@@ -107,17 +120,22 @@ const NodeCreate = () => {
           <ContentSelector
             selectedContent={selectedContent}
             onContentSelected={handleContentSelected}
-            onContentRemoved={() => {
-              setSelectedContent(null);
-              setFormData(prev => ({
-                ...prev,
-                content_profile_id: null
-              }));
-            }}
+            onContentRemoved={handleContentRemoved}
             previewVariant="detailed"
+            onUploadingChange={handleUploadingChange}
           />
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Box 
+            component="form" 
+            onSubmit={handleSubmit} 
+            sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 3,
+              opacity: isUploadingContent ? 0.7 : 1,
+              transition: 'opacity 0.3s ease'
+            }}
+          >
             <TextField
               fullWidth
               id="title"
@@ -125,6 +143,7 @@ const NodeCreate = () => {
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               required
+              disabled={isUploadingContent}
             />
 
             <TextField
@@ -135,14 +154,21 @@ const NodeCreate = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               multiline
               rows={4}
+              disabled={isUploadingContent}
             />
+
+            {isUploadingContent && (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Subiendo contenido... Puedes completar el formulario mientras tanto.
+              </Alert>
+            )}
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <Button
                 type="submit"
                 variant="contained"
-                color="success"
-                disabled={!formData.content_profile_id || submitting}
+                color="primary"
+                disabled={!formData.content_profile_id || submitting || isUploadingContent}
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
                 {submitting ? 'Agregando...' : 'Agregar Nodo'}
@@ -152,6 +178,7 @@ const NodeCreate = () => {
                 onClick={() => navigate(`/knowledge_path/${pathId}/edit`)}
                 variant="outlined"
                 color="inherit"
+                disabled={isUploadingContent}
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
                 Cancelar

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Box, Typography } from '@mui/material';
 import { 
   getUserEventRegistrations, 
   getUserCreatedEvents,
@@ -121,12 +122,25 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
 
   return (
     <div className="events-list-container">
-      <div className="events-header">
-        <h2>{isOwnProfile ? 'Mis eventos' : 'Eventos'}</h2>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem", // ~34px on desktop (default h4)
+            },
+            fontWeight: 600,
+          }}
+        >
+          {isOwnProfile ? 'Mis eventos' : 'Eventos'}
+        </Typography>
         <Link to="/events" className="btn btn-secondary">
           Explorar todos los eventos
         </Link>
-      </div>
+      </Box>
 
       {/* Tab Navigation - Show registrations tab only for owners */}
       {isOwnProfile ? (
@@ -146,9 +160,18 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         </div>
       ) : (
         // For visitors, show created events directly without tabs
-        <div style={{ marginBottom: '20px' }}>
-          <h3>Eventos creados ({createdEvents.length})</h3>
-        </div>
+        <Box sx={{ mb: 3 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              color: 'text.primary',
+            }}
+          >
+            Eventos creados ({createdEvents.length})
+          </Typography>
+        </Box>
       )}
 
       {/* Registrations Tab - Only for owners */}

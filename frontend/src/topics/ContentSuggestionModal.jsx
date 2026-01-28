@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import {
     Dialog,
-    DialogTitle,
     DialogContent,
     DialogActions,
     Button,
@@ -10,21 +8,17 @@ import {
     Box,
     Typography,
     Alert,
-    CircularProgress,
-    Link
+    CircularProgress
 } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 import contentApi from '../api/contentApi';
 
 const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
-    const navigate = useNavigate();
     const [selectedContentProfiles, setSelectedContentProfiles] = useState([]);
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const [showContentSelect, setShowContentSelect] = useState(true);
-    const [activeSuggestionsCount, setActiveSuggestionsCount] = useState(0);
 
     const handleContentSelection = (selectedProfiles) => {
         setSelectedContentProfiles(selectedProfiles);
@@ -84,24 +78,6 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
         }
     };
 
-    // Fetch active suggestions count for this topic
-    useEffect(() => {
-        if (open && topicId) {
-            const fetchActiveSuggestions = async () => {
-                try {
-                    const suggestions = await contentApi.getUserContentSuggestions({ topic_id: topicId });
-                    const activeCount = Array.isArray(suggestions) 
-                        ? suggestions.filter(s => s.status === 'PENDING').length 
-                        : 0;
-                    setActiveSuggestionsCount(activeCount);
-                } catch (err) {
-                    console.error('Error fetching active suggestions:', err);
-                }
-            };
-            fetchActiveSuggestions();
-        }
-    }, [open, topicId]);
-
     const handleClose = () => {
         if (!submitting) {
             setSelectedContentProfiles([]);
@@ -120,38 +96,12 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
             fullWidth
             disableEscapeKeyDown={submitting}
         >
-            <DialogTitle>
-                Sugerir Contenido para el Tema
-            </DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ pt: 3 }}>
                 {showContentSelect ? (
                     <Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Selecciona el contenido que deseas sugerir para este tema.
-                            </Typography>
-                            <Link
-                                component="button"
-                                variant="body2"
-                                onClick={() => {
-                                    handleClose();
-                                    navigate('/profiles/my_profile?section=topics&tab=suggestions');
-                                }}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.5,
-                                    textDecoration: 'none',
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        textDecoration: 'underline'
-                                    }
-                                }}
-                            >
-                                <VisibilityIcon fontSize="small" />
-                                Ver sugerencias de contenido activas{activeSuggestionsCount > 0 && ` (${activeSuggestionsCount})`}
-                            </Link>
-                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Selecciona el contenido que deseas sugerir para este tema.
+                        </Typography>
                         <LibrarySelectMultiple
                             onCancel={handleCancelContentSelect}
                             onSave={handleSaveContentSelect}
@@ -159,6 +109,7 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
                             title="Seleccionar contenido"
                             maxSelections={null}
                             selectedIds={selectedContentProfiles.map(p => p.id)}
+                            compact={true}
                         />
                     </Box>
                 ) : (

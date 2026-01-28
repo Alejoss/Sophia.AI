@@ -395,7 +395,7 @@ const Profile = () => {
             case 'certificates':
                 return <Certificates isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
             case 'saved-items':
-                return <Bookmarks />;
+                return isOwnProfile ? <Bookmarks /> : null;
             case 'cryptos':
                 return <FavoriteCryptos isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
             case 'knowledge-paths':
@@ -452,6 +452,7 @@ const Profile = () => {
                             emptyMessage={isOwnProfile ? "Aún no has obtenido insignias. ¡Sigue aprendiendo y contribuyendo!" : "Este usuario aún no tiene insignias."}
                             loading={badgesLoading}
                             error={badgesError}
+                            showEarningTooltip={isOwnProfile}
                         />
                     </Box>
                 );

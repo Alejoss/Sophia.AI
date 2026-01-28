@@ -61,11 +61,14 @@ const contentApi = {
                 console.log('Content data:', contentData);
             }
 
-            const response = await axiosInstance.post('/content/upload-content/', contentData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
+            // IMPORTANT:
+            // Do NOT force Content-Type for FormData. Axios will set the correct
+            // multipart boundary automatically. Forcing it can break uploads.
+            const config = contentData instanceof FormData
+                ? undefined
+                : { headers: { 'Content-Type': 'multipart/form-data' } };
+
+            const response = await axiosInstance.post('/content/upload-content/', contentData, config);
             
             console.log('Upload response:', response.data);
             return response.data;
