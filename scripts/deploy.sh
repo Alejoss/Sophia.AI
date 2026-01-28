@@ -43,15 +43,15 @@ fi
 
 # Stop existing containers
 echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-docker-compose -f docker-compose.prod.yml down || true
+docker compose -f docker-compose.prod.yml down || true
 
 # Build images
 echo -e "${YELLOW}🔨 Building Docker images...${NC}"
-docker-compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml build --no-cache
 
 # Start services
 echo -e "${YELLOW}🚀 Starting services...${NC}"
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Wait for services to be healthy
 echo -e "${YELLOW}⏳ Waiting for services to be healthy...${NC}"
@@ -59,11 +59,11 @@ sleep 10
 
 # Run database migrations
 echo -e "${YELLOW}📊 Running database migrations...${NC}"
-docker-compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
 
 # Collect static files
 echo -e "${YELLOW}📁 Collecting static files...${NC}"
-docker-compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
 
 # Check service health
 echo -e "${YELLOW}🏥 Checking service health...${NC}"
@@ -74,7 +74,7 @@ if curl -f http://localhost/health/ > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Backend health check passed${NC}"
 else
     echo -e "${RED}❌ Backend health check failed${NC}"
-    docker-compose -f docker-compose.prod.yml logs backend
+    docker compose -f docker-compose.prod.yml logs backend
     exit 1
 fi
 
@@ -83,7 +83,7 @@ if curl -f http://localhost/health > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Frontend health check passed${NC}"
 else
     echo -e "${RED}❌ Frontend health check failed${NC}"
-    docker-compose -f docker-compose.prod.yml logs frontend
+    docker compose -f docker-compose.prod.yml logs frontend
     exit 1
 fi
 
@@ -94,5 +94,5 @@ echo "  - Frontend: http://localhost"
 echo "  - Backend API: http://localhost/api"
 echo "  - Admin: http://localhost/admin"
 echo ""
-echo "To view logs: docker-compose -f docker-compose.prod.yml logs -f"
-echo "To stop services: docker-compose -f docker-compose.prod.yml down"
+echo "To view logs: docker compose -f docker-compose.prod.yml logs -f"
+echo "To stop services: docker compose -f docker-compose.prod.yml down"
