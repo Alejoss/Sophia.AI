@@ -50,18 +50,20 @@ if ! grep -qE "^POSTGRES_DB=|^DB_NAME=" acbc_app/.env && ! grep -qE "^POSTGRES_U
 fi
 
 # Build env file for Docker Compose variable substitution from acbc_app/.env
-# (so user only maintains acbc_app/.env; passwords with $ are written safely)
+# (so user only maintains acbc_app/.env; passwords with $ must not be expanded by shell)
+# Use awk so the password never goes through shell variables and $ is not interpreted
 COMPOSE_ENV_FILE=".env.compose"
 echo -e "${YELLOW}📄 Preparing Docker Compose env from acbc_app/.env...${NC}"
-DB_NAME=$(grep -E "^DB_NAME=|^POSTGRES_DB=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
-DB_USER=$(grep -E "^DB_USER=|^POSTGRES_USER=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
-DB_PASSWORD_RAW=$(grep -E "^DB_PASSWORD=|^POSTGRES_PASSWORD=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
-DB_PASSWORD_ESCAPED=$(echo "$DB_PASSWORD_RAW" | sed "s/'/'\\\\''/g")
-{
-  echo "DB_NAME=${DB_NAME:-academiablockchain_prod}"
-  echo "DB_USER=${DB_USER:-postgres}"
-  echo "DB_PASSWORD='${DB_PASSWORD_ESCAPED}'"
-} > "$COMPOSE_ENV_FILE"
+awk -v q="'" '
+  /^DB_NAME=|^POSTGRES_DB=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); dbname=$0; next }
+  /^DB_USER=|^POSTGRES_USER=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); dbuser=$0; next }
+  /^DB_PASSWORD=|^POSTGRES_PASSWORD=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); gsub(q, q "\\" q q); dbpass=$0; next }
+  END {
+    print "DB_NAME=" (length(dbname) ? dbname : "academiablockchain_prod")
+    print "DB_USER=" (length(dbuser) ? dbuser : "postgres")
+    print "DB_PASSWORD=" q dbpass q
+  }
+' acbc_app/.env > "$COMPOSE_ENV_FILE"
 
 # Free port 80 if host nginx/apache is using it (so container nginx can bind)
 if command -v ss >/dev/null 2>&1; then
