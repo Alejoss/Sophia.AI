@@ -64,7 +64,12 @@ awk -v q="'" '
   }
 ' acbc_app/.env > "$COMPOSE_ENV_FILE"
 
-# Free port 80 if host nginx/apache is using it (so container nginx can bind)
+# Stop existing containers first (frees port 80 if our nginx container was using it)
+echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml down || true
+sleep 2
+
+# If port 80 is still in use (e.g. host nginx/apache), stop it so our container can bind
 if command -v ss >/dev/null 2>&1; then
   if ss -tlnp 2>/dev/null | grep -q ':80 '; then
     echo -e "${YELLOW}🔓 Port 80 in use; stopping host nginx/apache so container can bind...${NC}"
@@ -88,10 +93,6 @@ elif command -v lsof >/dev/null 2>&1; then
     fi
   fi
 fi
-
-# Stop existing containers
-echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml down || true
 
 # Build images
 echo -e "${YELLOW}🔨 Building Docker images...${NC}"
