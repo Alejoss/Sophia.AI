@@ -2,6 +2,26 @@
 
 This directory contains scripts for deploying and managing the production environment.
 
+## Fix permissions permanently (in the repo)
+
+Git tracks file modes. If scripts are committed as non-executable (100644), every `git pull` on the server will overwrite them and you'll get "Permission denied" until you run `chmod +x` again.
+
+**One-time fix (run locally, then push):** Mark scripts as executable in Git so every clone/pull gets them executable:
+
+```bash
+git update-index --chmod=+x scripts/deploy.sh scripts/setup-nginx.sh scripts/backup-db.sh scripts/restore-db.sh scripts/setup-ssl.sh scripts/diagnose-static-files.sh
+git add scripts/
+git commit -m "chore: track deployment scripts as executable"
+git push origin main
+```
+
+After that, `git pull` on the server will keep the scripts executable.
+
+**On the server after a pull (until the repo is fixed):** Run once per pull:
+```bash
+chmod +x scripts/deploy.sh scripts/setup-nginx.sh scripts/backup-db.sh scripts/restore-db.sh scripts/setup-ssl.sh acbc_app/entrypoint.sh
+```
+
 ## Scripts
 
 ### `deploy.sh`

@@ -28,6 +28,8 @@
    ```
    (The server should not have local commits; this makes Git ignore executable-bit changes from `chmod +x`.)
 
+   **If `./scripts/deploy.sh` says "Permission denied" after a pull:** Git stores scripts as non-executable (100644), so each pull resets permissions. Either run `chmod +x scripts/deploy.sh scripts/setup-nginx.sh acbc_app/entrypoint.sh` after each pull, or fix it once in the repo (see [Scripts README](scripts/README.md#fix-permissions-permanently-in-the-repo)).
+
 1. **Build and deploy (recommended):**
    ```bash
    ./scripts/deploy.sh
