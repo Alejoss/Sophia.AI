@@ -86,6 +86,12 @@ git pull && ./scripts/deploy.sh
 
 ### Health Checks
 
+**Script (on server):**
+```bash
+./scripts/health-check.sh
+```
+
+**Manual:**
 - Backend: `http://yourdomain.com/health/` (or `http://YOUR_IP/health/`)
 - Frontend: `http://yourdomain.com/health` (or `http://YOUR_IP/health`)
 
