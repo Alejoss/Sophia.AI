@@ -41,6 +41,7 @@ Location: `acbc_app/.env`
 - **Required**: Yes (when ENVIRONMENT=PRODUCTION)
 - **Default**: `postgres` (from docker-compose)
 - **Example**: `DB_PASSWORD=secure_password_123`
+- **Note**: Avoid special characters that cause issues with Docker Compose variable expansion (`$`, `!`, `%`, `` ` ``). Recommended: use letters, numbers, and safe special characters like `-`, `_`, `.`, `@`, `#`
 
 #### `DB_HOST`
 - **Description**: PostgreSQL database host

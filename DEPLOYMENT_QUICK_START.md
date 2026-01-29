@@ -10,6 +10,7 @@
 - [ ] Generate and set secure `ACADEMIA_BLOCKCHAIN_SKEY`
 - [ ] Configure database credentials in `acbc_app/.env`:
   - Set `POSTGRES_DB` (or `DB_NAME`), `POSTGRES_USER` (or `DB_USER`), `POSTGRES_PASSWORD` (or `DB_PASSWORD`)
+  - **Recommended**: Use passwords without special characters that cause issues (`$`, `!`, `%`, `` ` ``). Safe characters: letters, numbers, `-`, `_`, `.`, `@`, `#`
 - [ ] Set up Google OAuth credentials (if using)
 - [ ] Configure frontend `.env` with production API URL
 

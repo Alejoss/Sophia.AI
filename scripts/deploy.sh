@@ -50,14 +50,13 @@ if ! grep -qE "^POSTGRES_DB=|^DB_NAME=" acbc_app/.env && ! grep -qE "^POSTGRES_U
 fi
 
 # Build env file for Docker Compose variable substitution from acbc_app/.env
-# (so user only maintains acbc_app/.env; passwords with $ must not be expanded by shell)
-# Use awk so the password never goes through shell variables and $ is not interpreted
+# Docker Compose expands $ in .env files, so escape $ as $$ so it's treated literally
 COMPOSE_ENV_FILE=".env.compose"
 echo -e "${YELLOW}📄 Preparing Docker Compose env from acbc_app/.env...${NC}"
 awk -v q="'" '
-  /^DB_NAME=|^POSTGRES_DB=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); dbname=$0; next }
-  /^DB_USER=|^POSTGRES_USER=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); dbuser=$0; next }
-  /^DB_PASSWORD=|^POSTGRES_PASSWORD=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); gsub(q, q "\\" q q); dbpass=$0; next }
+  /^DB_NAME=|^POSTGRES_DB=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); gsub(/\$/, "$$"); dbname=$0; next }
+  /^DB_USER=|^POSTGRES_USER=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); gsub(/\$/, "$$"); dbuser=$0; next }
+  /^DB_PASSWORD=|^POSTGRES_PASSWORD=/ { sub(/^[^=]*=/, ""); gsub(/^[ \t"'\'']+|[ \t"'\'']+$/, ""); gsub(/\$/, "$$"); gsub(q, q "\\" q q); dbpass=$0; next }
   END {
     print "DB_NAME=" (length(dbname) ? dbname : "academiablockchain_prod")
     print "DB_USER=" (length(dbuser) ? dbuser : "postgres")
