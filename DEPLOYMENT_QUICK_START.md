@@ -10,7 +10,6 @@
 - [ ] Generate and set secure `ACADEMIA_BLOCKCHAIN_SKEY`
 - [ ] Configure database credentials in `acbc_app/.env`:
   - Set `POSTGRES_DB` (or `DB_NAME`), `POSTGRES_USER` (or `DB_USER`), `POSTGRES_PASSWORD` (or `DB_PASSWORD`)
-- [ ] **Optional but recommended**: Create `.env` in project root (see `.env.example`) with `DB_NAME`, `DB_USER`, `DB_PASSWORD` for Docker Compose variable substitution
 - [ ] Set up Google OAuth credentials (if using)
 - [ ] Configure frontend `.env` with production API URL
 
@@ -23,28 +22,28 @@
    ```
    Then go to the app directory, e.g. `cd /opt/acbc-app`.
 
+   **First-time on this server?** Run once so `git pull` is not blocked by script permissions:
+   ```bash
+   git config core.fileMode false
+   ```
+   (The server should not have local commits; this makes Git ignore executable-bit changes from `chmod +x`.)
+
 1. **Build and deploy (recommended):**
    ```bash
    ./scripts/deploy.sh
    ```
+   The script reads DB credentials from `acbc_app/.env`, frees port 80 if host nginx/apache is using it, then builds and starts the stack.
 
    **Or build and run manually** (from project root, e.g. `/opt/acbc-app`):
    ```bash
-   # Option 1: Export variables for Docker Compose substitution
-   export DB_NAME=$(grep "^DB_NAME=" acbc_app/.env | cut -d= -f2)
-   export DB_USER=$(grep "^DB_USER=" acbc_app/.env | cut -d= -f2)
-   export DB_PASSWORD=$(grep "^DB_PASSWORD=" acbc_app/.env | cut -d= -f2)
-   
-   # Option 2: Create root .env file (copy from .env.example and fill values)
-   # cp .env.example .env
-   # nano .env  # Edit with your values
-   
-   docker compose -f docker-compose.prod.yml down
-   docker compose -f docker-compose.prod.yml build --no-cache
-   docker compose -f docker-compose.prod.yml up -d
+   # Deploy creates .env.compose from acbc_app/.env; use it for compose
+   docker compose --env-file .env.compose -f docker-compose.prod.yml down
+   docker compose --env-file .env.compose -f docker-compose.prod.yml build --no-cache
+   # Free port 80 first if needed: sudo systemctl stop nginx
+   docker compose --env-file .env.compose -f docker-compose.prod.yml up -d
    sleep 10
-   docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
-   docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+   docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
+   docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
    ```
 
 2. **Set up SSL (after DNS is configured):**
@@ -91,13 +90,21 @@ git pull && ./scripts/deploy.sh
 
 - Production compose: `docker-compose.prod.yml`
 - Backend env: `acbc_app/.env` (main configuration)
-- Root `.env`: Optional, for Docker Compose variable substitution (see `.env.example`)
+- Root `.env`: Optional (e.g. for `VITE_*`); deploy script uses `acbc_app/.env` and creates `.env.compose` for Docker Compose substitution
 - Frontend env: `frontend/.env`
 - Nginx config: `nginx/nginx.conf`
 
-**Note**: Docker Compose reads variables from `acbc_app/.env` via `env_file` for containers, but variable substitution in `docker-compose.prod.yml` (like `${DB_NAME}`) requires variables in shell environment or root `.env`. Best practice: ensure `acbc_app/.env` has `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` set, or create root `.env` with `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+**Note**: `./scripts/deploy.sh` builds `.env.compose` from `acbc_app/.env` (DB_NAME, DB_USER, DB_PASSWORD) so you only maintain `acbc_app/.env`. It also stops host nginx/apache if port 80 is in use so the container nginx can bind.
 
 ### Troubleshooting
+
+**`git pull` says "Your local changes would be overwritten" (only file mode changes):**
+```bash
+git config core.fileMode false
+git status   # scripts should no longer appear as modified
+git pull origin main
+chmod +x scripts/deploy.sh scripts/setup-nginx.sh acbc_app/entrypoint.sh  # if needed
+```
 
 **Services won't start:**
 ```bash

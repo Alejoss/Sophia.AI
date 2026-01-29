@@ -49,35 +49,56 @@ if ! grep -qE "^POSTGRES_DB=|^DB_NAME=" acbc_app/.env && ! grep -qE "^POSTGRES_U
     exit 1
 fi
 
-# Docker Compose variable substitution (${VAR}) requires variables in shell environment
-# or a .env file in the project root. Check if root .env exists, if not, warn user.
-# We don't auto-create it to avoid overwriting user configurations.
-if [ ! -f ".env" ]; then
-    echo -e "${YELLOW}⚠️  Warning: Root .env file not found${NC}"
-    echo "Docker Compose needs DB_* or POSTGRES_* variables for variable substitution."
-    echo "Options:"
-    echo "  1. Create .env in project root with DB_NAME, DB_USER, DB_PASSWORD (see .env.example)"
-    echo "  2. Export variables in shell: export DB_NAME=... DB_USER=... DB_PASSWORD=..."
-    echo "  3. Ensure acbc_app/.env has POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD set"
-    echo ""
-    read -p "Continue anyway? Docker Compose will use defaults if variables are missing. (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
+# Build env file for Docker Compose variable substitution from acbc_app/.env
+# (so user only maintains acbc_app/.env; passwords with $ are written safely)
+COMPOSE_ENV_FILE=".env.compose"
+echo -e "${YELLOW}📄 Preparing Docker Compose env from acbc_app/.env...${NC}"
+DB_NAME=$(grep -E "^DB_NAME=|^POSTGRES_DB=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+DB_USER=$(grep -E "^DB_USER=|^POSTGRES_USER=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+DB_PASSWORD_RAW=$(grep -E "^DB_PASSWORD=|^POSTGRES_PASSWORD=" acbc_app/.env | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
+DB_PASSWORD_ESCAPED=$(echo "$DB_PASSWORD_RAW" | sed "s/'/'\\\\''/g")
+{
+  echo "DB_NAME=${DB_NAME:-academiablockchain_prod}"
+  echo "DB_USER=${DB_USER:-postgres}"
+  echo "DB_PASSWORD='${DB_PASSWORD_ESCAPED}'"
+} > "$COMPOSE_ENV_FILE"
+
+# Free port 80 if host nginx/apache is using it (so container nginx can bind)
+if command -v ss >/dev/null 2>&1; then
+  if ss -tlnp 2>/dev/null | grep -q ':80 '; then
+    echo -e "${YELLOW}🔓 Port 80 in use; stopping host nginx/apache so container can bind...${NC}"
+    (sudo systemctl stop nginx 2>/dev/null || systemctl stop nginx 2>/dev/null || true)
+    (sudo systemctl stop apache2 2>/dev/null || systemctl stop apache2 2>/dev/null || true)
+    sleep 2
+    if ss -tlnp 2>/dev/null | grep -q ':80 '; then
+      echo -e "${RED}❌ Port 80 still in use. Stop the process using it (e.g. sudo systemctl stop nginx) and re-run.${NC}"
+      exit 1
     fi
+  fi
+elif command -v lsof >/dev/null 2>&1; then
+  if lsof -i :80 -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}🔓 Port 80 in use; stopping host nginx/apache so container can bind...${NC}"
+    (sudo systemctl stop nginx 2>/dev/null || systemctl stop nginx 2>/dev/null || true)
+    (sudo systemctl stop apache2 2>/dev/null || systemctl stop apache2 2>/dev/null || true)
+    sleep 2
+    if lsof -i :80 -t >/dev/null 2>&1; then
+      echo -e "${RED}❌ Port 80 still in use. Stop the process using it and re-run.${NC}"
+      exit 1
+    fi
+  fi
 fi
 
 # Stop existing containers
 echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-docker compose -f docker-compose.prod.yml down || true
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml down || true
 
 # Build images
 echo -e "${YELLOW}🔨 Building Docker images...${NC}"
-docker compose -f docker-compose.prod.yml build --no-cache
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml build --no-cache
 
 # Start services
 echo -e "${YELLOW}🚀 Starting services...${NC}"
-docker compose -f docker-compose.prod.yml up -d
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml up -d
 
 # Wait for services to be healthy
 echo -e "${YELLOW}⏳ Waiting for services to be healthy...${NC}"
@@ -85,11 +106,11 @@ sleep 10
 
 # Run database migrations
 echo -e "${YELLOW}📊 Running database migrations...${NC}"
-docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
 
 # Collect static files
 echo -e "${YELLOW}📁 Collecting static files...${NC}"
-docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
+docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
 
 # Check service health
 echo -e "${YELLOW}🏥 Checking service health...${NC}"
@@ -100,7 +121,7 @@ if curl -f http://localhost/health/ > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Backend health check passed${NC}"
 else
     echo -e "${RED}❌ Backend health check failed${NC}"
-    docker compose -f docker-compose.prod.yml logs backend
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml logs backend
     exit 1
 fi
 
@@ -109,7 +130,7 @@ if curl -f http://localhost/health > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Frontend health check passed${NC}"
 else
     echo -e "${RED}❌ Frontend health check failed${NC}"
-    docker compose -f docker-compose.prod.yml logs frontend
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml logs frontend
     exit 1
 fi
 
@@ -120,5 +141,5 @@ echo "  - Frontend: http://localhost"
 echo "  - Backend API: http://localhost/api"
 echo "  - Admin: http://localhost/admin"
 echo ""
-echo "To view logs: docker compose -f docker-compose.prod.yml logs -f"
-echo "To stop services: docker compose -f docker-compose.prod.yml down"
+echo "To view logs: docker compose --env-file $COMPOSE_ENV_FILE -f docker-compose.prod.yml logs -f"
+echo "To stop services: docker compose --env-file $COMPOSE_ENV_FILE -f docker-compose.prod.yml down"
