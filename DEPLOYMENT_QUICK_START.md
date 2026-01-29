@@ -86,8 +86,10 @@ git pull && ./scripts/deploy.sh
 
 ### Health Checks
 
-- Backend: `http://yourdomain.com/health/`
-- Frontend: `http://yourdomain.com/health`
+- Backend: `http://yourdomain.com/health/` (or `http://YOUR_IP/health/`)
+- Frontend: `http://yourdomain.com/health` (or `http://YOUR_IP/health`)
+
+**Note:** The default `nginx/nginx.conf` serves over HTTP (port 80) so the app works by IP without SSL. For HTTPS, run `./scripts/setup-ssl.sh yourdomain.com` and update nginx config with your SSL paths.
 
 ### Important Files
 
