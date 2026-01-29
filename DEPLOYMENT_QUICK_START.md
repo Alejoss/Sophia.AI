@@ -14,6 +14,13 @@
 
 ### Deployment Steps
 
+0. **Connect to the server (Digital Ocean droplet):**
+   ```bash
+   ssh root@YOUR_DROPLET_IP
+   # Example: ssh root@159.65.69.165
+   ```
+   Then go to the app directory, e.g. `cd /opt/acbc-app`.
+
 1. **Build and deploy:**
    ```bash
    ./scripts/deploy.sh

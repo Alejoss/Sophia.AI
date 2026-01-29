@@ -7,7 +7,6 @@ This guide covers deploying the Sophia.AI Academia Blockchain platform to a prod
 - Server with Docker and Docker Compose installed
 - Domain name configured
 - SSL certificate (Let's Encrypt recommended)
-- AWS account (if using S3 for media storage)
 - Google OAuth credentials configured
 
 ## Pre-Deployment Checklist
@@ -17,7 +16,6 @@ This guide covers deploying the Sophia.AI Academia Blockchain platform to a prod
 - [ ] SSL certificates obtained
 - [ ] Domain DNS configured
 - [ ] Google OAuth redirect URIs updated
-- [ ] AWS credentials configured (if using S3)
 - [ ] Monitoring and logging set up
 - [ ] Security settings reviewed
 
@@ -82,12 +80,6 @@ DB_PORT=5432
 GOOGLE_OAUTH_CLIENT_ID=your-client-id
 GOOGLE_OAUTH_SECRET_KEY=your-secret-key
 
-# AWS S3 (if using)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_STORAGE_BUCKET_NAME=academiablockchain
-AWS_S3_REGION_NAME=us-west-2
-
 # Monitoring
 SENTRY_DSN=your-sentry-dsn
 ```
@@ -139,11 +131,6 @@ docker-compose exec backend python manage.py collectstatic --noinput
 **Option 1: Local Storage** (default)
 - Files stored in `acbc_app/media/`
 - Ensure directory has proper permissions
-
-**Option 2: AWS S3** (recommended for production)
-- Configure AWS credentials in `.env`
-- Update `settings.py` to use S3 storage
-- See [AWS S3 Configuration](aws-s3.md)
 
 ## Step 5: Reverse Proxy Setup (Nginx)
 

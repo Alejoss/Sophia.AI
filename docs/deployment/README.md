@@ -13,7 +13,6 @@ This section contains guides for deploying the Sophia.AI Academia Blockchain pla
 - **[Deployment Summary](deployment-summary.md)** - Resumen y comandos
 - **[Deployment Checklist](deployment-checklist.md)** - Checklist producción y mantenimiento
 - **[Environment Variables](environment-variables.md)** - Environment configuration reference
-- **[AWS S3](aws-s3.md)** - Deploying static sites to AWS S3
 
 ## Quick Start
 
@@ -52,7 +51,7 @@ See [Production Guide](production.md) for detailed instructions.
 - [ ] Environment variables configured
 - [ ] Database migrations applied
 - [ ] Static files collected
-- [ ] Media files configured (S3 or local)
+- [ ] Media files configured (local storage)
 - [ ] SSL certificates installed
 - [ ] CORS configured for production domains
 - [ ] Google OAuth redirect URIs updated

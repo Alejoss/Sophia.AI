@@ -25,7 +25,6 @@ Deployment guides for different environments:
 - [Local Development](deployment/local-development.md) - Local setup and development
 - [Production](deployment/production.md) - Production deployment guide
 - [Docker](deployment/docker.md) - Docker configuration and usage
-- [AWS S3](deployment/aws-s3.md) - S3 static site deployment
 - [Environment Variables](deployment/environment-variables.md) - Environment configuration reference
 
 ### [Development](development/)
