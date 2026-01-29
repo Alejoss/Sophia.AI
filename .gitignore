@@ -105,6 +105,7 @@ celerybeat.pid
 
 # Environments
 acbc_app/.env
+.env
 .venv
 env/
 venv/

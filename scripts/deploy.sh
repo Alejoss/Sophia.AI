@@ -41,6 +41,32 @@ if [ "$ENVIRONMENT" != "PRODUCTION" ]; then
     fi
 fi
 
+# Verify that required database variables exist in acbc_app/.env
+echo -e "${YELLOW}📋 Verifying database configuration...${NC}"
+if ! grep -qE "^POSTGRES_DB=|^DB_NAME=" acbc_app/.env && ! grep -qE "^POSTGRES_USER=|^DB_USER=" acbc_app/.env && ! grep -qE "^POSTGRES_PASSWORD=|^DB_PASSWORD=" acbc_app/.env; then
+    echo -e "${RED}❌ Error: Database credentials not found in acbc_app/.env${NC}"
+    echo "Please ensure acbc_app/.env contains POSTGRES_DB (or DB_NAME), POSTGRES_USER (or DB_USER), and POSTGRES_PASSWORD (or DB_PASSWORD)"
+    exit 1
+fi
+
+# Docker Compose variable substitution (${VAR}) requires variables in shell environment
+# or a .env file in the project root. Check if root .env exists, if not, warn user.
+# We don't auto-create it to avoid overwriting user configurations.
+if [ ! -f ".env" ]; then
+    echo -e "${YELLOW}⚠️  Warning: Root .env file not found${NC}"
+    echo "Docker Compose needs DB_* or POSTGRES_* variables for variable substitution."
+    echo "Options:"
+    echo "  1. Create .env in project root with DB_NAME, DB_USER, DB_PASSWORD (see .env.example)"
+    echo "  2. Export variables in shell: export DB_NAME=... DB_USER=... DB_PASSWORD=..."
+    echo "  3. Ensure acbc_app/.env has POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD set"
+    echo ""
+    read -p "Continue anyway? Docker Compose will use defaults if variables are missing. (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
 # Stop existing containers
 echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
 docker compose -f docker-compose.prod.yml down || true
