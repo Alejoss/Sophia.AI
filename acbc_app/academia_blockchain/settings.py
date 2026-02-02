@@ -118,13 +118,9 @@ else:
         r"^http://127.0.0.1:[0-9]+$",
     ]
 
-# CSRF settings
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://sophia-ai.algobeat.com",
-    "https://sophia-ai-api.algobeat.com",
-]
+# CSRF settings (set in .env: CSRF_TRUSTED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com)
+_csrf_str = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf_str.split(",") if x.strip()] if _csrf_str else []
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read the CSRF cookie
 CSRF_USE_SESSIONS = False
