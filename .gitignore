@@ -107,6 +107,9 @@ celerybeat.pid
 acbc_app/.env
 .env
 .env.compose
+
+# Generated on server by setup-ssl.sh (never commit)
+nginx/nginx-ssl.conf
 .venv
 env/
 venv/

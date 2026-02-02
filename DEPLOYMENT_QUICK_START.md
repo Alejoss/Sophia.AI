@@ -49,21 +49,90 @@
    docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
    ```
 
-2. **Set up SSL (after DNS is configured):**
-   ```bash
-   ./scripts/setup-ssl.sh yourdomain.com
-   ```
+2. **Point a custom domain (Namecheap + app config):**  
+   See [Custom domain (Namecheap + Digital Ocean)](#custom-domain-namecheap--digital-ocean) below.
 
-3. **Create admin user:**
+3. **Set up SSL (after DNS is configured):**
+   Certificates come from **Let's Encrypt** (free, via certbot). The script writes only to **nginx/nginx-ssl.conf** (gitignored), so **the repo is not modified**. To avoid rebuilding twice (once for ALLOWED_HOSTS, once for SSL), set `ALLOWED_HOSTS` in `acbc_app/.env` first, then run setup-ssl, then deploy once:
+   ```bash
+   # 1) Set ALLOWED_HOSTS in acbc_app/.env (yourdomain.com,www.yourdomain.com,...)
+   # 2) Get certificate and generate SSL config (gitignored)
+   ./scripts/setup-ssl.sh yourdomain.com
+   # 3) One rebuild
+   ./scripts/deploy.sh
+   ```
+   Certs live on the host at `/etc/letsencrypt`; nginx uses them via bind mount. Renewal is via crontab (certbot renew).
+
+4. **Create admin user:**
    ```bash
    docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
    ```
 
-4. **Set up automated backups:**
+5. **Set up automated backups:**
    ```bash
    # Add to crontab
    (crontab -l 2>/dev/null; echo "0 2 * * * cd $(pwd) && ./scripts/backup-db.sh") | crontab -
    ```
+
+### Custom domain (Namecheap + Digital Ocean)
+
+To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
+
+**1. Namecheap – DNS**
+
+- Log in to [Namecheap](https://www.namecheap.com) → Domain List → Manage for your domain.
+- Go to **Advanced DNS**.
+- Add or edit records so the hostname points to your droplet’s **public IP** (e.g. `159.65.69.165`):
+
+  | Type | Host | Value | TTL |
+  |------|------|--------|-----|
+  | **A** | `@` | `YOUR_DROPLET_IP` | Automatic (or 300) |
+  | **A** | `www` | `YOUR_DROPLET_IP` | Automatic (or 300) |
+
+  For a subdomain (e.g. `academia.yourdomain.com`):
+
+  | Type | Host | Value | TTL |
+  |------|------|--------|-----|
+  | **A** | `academia` | `YOUR_DROPLET_IP` | Automatic (or 300) |
+
+- Remove any conflicting **URL Redirect** or **CNAME** for the same host if you want the droplet to serve the site.
+- Save. DNS can take from a few minutes up to 24–48 hours to propagate.
+
+**2. Digital Ocean**
+
+- No extra configuration is required for the droplet to accept the domain: it listens on ports 80/443 and your nginx uses `server_name _`, so it accepts any hostname.
+- Optional: in the DO dashboard you can add the domain under the droplet or in **Networking → Domains** for documentation only; it does not change how traffic is routed (DNS at Namecheap does).
+
+**3. App configuration (on the server)**
+
+- In `acbc_app/.env` on the droplet, set **ALLOWED_HOSTS** to your domain(s) (comma-separated, no spaces). Example for `academia.yourdomain.com` and `www.academia.yourdomain.com`:
+
+  ```env
+  ALLOWED_HOSTS=academia.yourdomain.com,www.academia.yourdomain.com,159.65.69.165
+  ```
+
+  Keep the droplet IP if you still want to open the app by IP. Then restart the backend so the change is applied:
+
+  ```bash
+  docker compose -f docker-compose.prod.yml restart backend
+  ```
+
+**4. HTTPS (recommended)**
+
+- Certificates are from **Let's Encrypt** (free; https://letsencrypt.org). The script **does not change any tracked file**: it generates **nginx/nginx-ssl.conf** (gitignored) on the server.
+- After DNS points to the droplet, set **ALLOWED_HOSTS** in `acbc_app/.env`, then run setup-ssl, then deploy once (one rebuild):
+
+  ```bash
+  ./scripts/setup-ssl.sh academia.yourdomain.com
+  ./scripts/deploy.sh
+  ```
+
+  Use the exact hostname you use in the browser. Renewal is automatic (crontab runs certbot renew).
+
+**Quick check**
+
+- From your machine: `ping academia.yourdomain.com` (or your host) — should resolve to the droplet IP.
+- Then open `http://academia.yourdomain.com` (or your host); after SSL, `https://academia.yourdomain.com`.
 
 ### Common Commands
 
@@ -95,7 +164,7 @@ git pull && ./scripts/deploy.sh
 - Backend: `http://yourdomain.com/health/` (or `http://YOUR_IP/health/`)
 - Frontend: `http://yourdomain.com/health` (or `http://YOUR_IP/health`)
 
-**Note:** The default `nginx/nginx.conf` serves over HTTP (port 80) so the app works by IP without SSL. For HTTPS, run `./scripts/setup-ssl.sh yourdomain.com` and update nginx config with your SSL paths.
+**Note:** The default `nginx/nginx.conf` serves over HTTP (port 80). For HTTPS, run `./scripts/setup-ssl.sh yourdomain.com`; it generates `nginx/nginx-ssl.conf` (gitignored) and uses Let's Encrypt certs from the host.
 
 ### Important Files
 
@@ -103,7 +172,7 @@ git pull && ./scripts/deploy.sh
 - Backend env: `acbc_app/.env` (main configuration)
 - Root `.env`: Optional (e.g. for `VITE_*`); deploy script uses `acbc_app/.env` and creates `.env.compose` for Docker Compose substitution
 - Frontend env: `frontend/.env`
-- Nginx config: `nginx/nginx.conf`
+- Nginx config: `nginx/nginx.conf` (HTTP); after SSL, deploy uses `nginx/nginx-ssl.conf` (generated, gitignored)
 
 **Note**: `./scripts/deploy.sh` builds `.env.compose` from `acbc_app/.env` (DB_NAME, DB_USER, DB_PASSWORD) so you only maintain `acbc_app/.env`. It also stops host nginx/apache if port 80 is in use so the container nginx can bind.
 

@@ -1,16 +1,20 @@
 #!/bin/bash
 
-# SSL Certificate Setup Script for Let's Encrypt
-# This script sets up SSL certificates using Certbot
+# SSL setup with Let's Encrypt (free certificates from https://letsencrypt.org).
+# Uses certbot standalone (nginx is stopped briefly). Writes only to nginx/nginx-ssl.conf
+# (gitignored) so the repo is not modified. After this, set ALLOWED_HOSTS and rebuild once.
 
 set -e
 
-echo "🔒 Setting up SSL certificates with Let's Encrypt..."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
-# Check if domain is provided
+echo "🔒 Setting up SSL with Let's Encrypt..."
+
 if [ -z "$1" ]; then
-    echo "Usage: ./setup-ssl.sh <your-domain.com>"
-    echo "Example: ./setup-ssl.sh sophia-ai.algobeat.com"
+    echo "Usage: ./scripts/setup-ssl.sh <your-domain.com> [email]"
+    echo "Example: ./scripts/setup-ssl.sh academia.example.com admin@example.com"
     exit 1
 fi
 
@@ -19,51 +23,46 @@ EMAIL=${2:-"admin@${DOMAIN}"}
 
 echo "Domain: $DOMAIN"
 echo "Email: $EMAIL"
+echo "Certificate: Let's Encrypt (free, from https://letsencrypt.org)"
 
-# Install certbot if not already installed
 if ! command -v certbot &> /dev/null; then
     echo "Installing certbot..."
     sudo apt-get update
-    sudo apt-get install -y certbot python3-certbot-nginx
+    sudo apt-get install -y certbot
 fi
 
-# Stop nginx temporarily for initial certificate generation
-echo "Temporarily stopping nginx..."
-docker-compose -f docker-compose.prod.yml stop nginx || true
+echo "Stopping nginx briefly for certificate issuance..."
+docker compose -f docker-compose.prod.yml stop nginx 2>/dev/null || true
 
-# Generate certificate
-echo "Generating SSL certificate..."
+echo "Obtaining certificate (certbot standalone)..."
 sudo certbot certonly --standalone \
     -d "$DOMAIN" \
     --email "$EMAIL" \
     --agree-tos \
     --non-interactive
 
-# Update nginx configuration with domain
-sed -i "s/yourdomain.com/$DOMAIN/g" nginx/nginx.conf
+# Generate nginx SSL config into a gitignored file (never overwrite nginx.conf)
+TEMPLATE="$PROJECT_ROOT/nginx/nginx-ssl.conf.template"
+OUTPUT="$PROJECT_ROOT/nginx/nginx-ssl.conf"
+if [ ! -f "$TEMPLATE" ]; then
+    echo "Error: template not found: $TEMPLATE"
+    exit 1
+fi
+echo "Writing $OUTPUT (gitignored – repo unchanged)..."
+sed "s/SSL_DOMAIN_PLACEHOLDER/$DOMAIN/g" "$TEMPLATE" > "$OUTPUT"
 
-# Copy certificates to docker volume location
-echo "Setting up certificate volumes..."
-sudo mkdir -p /var/lib/docker/volumes/sophia-ai-academia-blockchain_certbot_certs/_data/live/$DOMAIN
-sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /var/lib/docker/volumes/sophia-ai-academia-blockchain_certbot_certs/_data/live/$DOMAIN/ 2>/dev/null || true
-sudo cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /var/lib/docker/volumes/sophia-ai-academia-blockchain_certbot_certs/_data/live/$DOMAIN/ 2>/dev/null || true
+echo "Starting nginx with SSL config..."
+export NGINX_CONF=./nginx/nginx-ssl.conf
+docker compose -f docker-compose.prod.yml up -d nginx
 
-# Update nginx config path in docker-compose
-echo "Updating nginx configuration..."
-sed -i "s|/etc/letsencrypt/live/yourdomain.com|/etc/letsencrypt/live/$DOMAIN|g" nginx/nginx.conf
+echo "Setting up certificate auto-renewal (crontab)..."
+CRON_CMD="0 3 * * * (docker compose -f $PROJECT_ROOT/docker-compose.prod.yml stop nginx 2>/dev/null; sudo certbot renew --quiet --standalone; cd $PROJECT_ROOT && NGINX_CONF=./nginx/nginx-ssl.conf docker compose -f docker-compose.prod.yml up -d nginx)"
+if ! (crontab -l 2>/dev/null | grep -q "certbot renew"); then
+    (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
+    echo "Added certbot renewal to crontab."
+fi
 
-# Restart nginx
-echo "Starting nginx..."
-docker-compose -f docker-compose.prod.yml up -d nginx
-
-# Set up auto-renewal
-echo "Setting up certificate auto-renewal..."
-(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker-compose -f $(pwd)/docker-compose.prod.yml restart nginx'") | crontab -
-
-echo "✅ SSL certificate setup complete!"
-echo ""
-echo "Certificate will auto-renew. To manually renew:"
-echo "  sudo certbot renew"
-echo ""
-echo "To test renewal:"
-echo "  sudo certbot renew --dry-run"
+echo "✅ SSL setup complete."
+echo "   Certificates: /etc/letsencrypt/live/$DOMAIN/ (on host)"
+echo "   Nginx config: $OUTPUT (gitignored – not in repo)"
+echo "   Next: set ALLOWED_HOSTS in acbc_app/.env, then run ./scripts/deploy.sh once."
