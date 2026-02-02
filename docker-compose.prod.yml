@@ -66,6 +66,9 @@ services:
     build:
       context: ./frontend
       dockerfile: frontend.prod.Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_GOOGLE_OAUTH_CLIENT_ID: ${VITE_GOOGLE_OAUTH_CLIENT_ID:-}
     container_name: acbc_frontend_prod
     # No volume mounts in production - static files are baked into image
     # Don't expose port directly - accessed via nginx
