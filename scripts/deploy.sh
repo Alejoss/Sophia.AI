@@ -99,9 +99,13 @@ elif command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-# Build images
+# Build images (use root .env as well so VITE_* are available for frontend build)
 echo -e "${YELLOW}🔨 Building Docker images...${NC}"
-docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml build --no-cache
+if [ -f ".env" ]; then
+  docker compose --env-file "$COMPOSE_ENV_FILE" --env-file .env -f docker-compose.prod.yml build --no-cache
+else
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml build --no-cache
+fi
 
 # Start services
 echo -e "${YELLOW}🚀 Starting services...${NC}"
