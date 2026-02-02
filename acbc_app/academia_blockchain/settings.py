@@ -135,6 +135,10 @@ SESSION_COOKIE_HTTPONLY = True
 # OAuth popups / cross-origin flows (e.g. Google login). Revisit if COOP is required.
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
+# Behind HTTPS-terminating proxy (nginx): trust X-Forwarded-Proto so request.is_secure() is correct
+if ENVIRONMENT == "PRODUCTION":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 ROOT_URLCONF = 'academia_blockchain.urls'
 
 # To customize django-allauth templates: https://docs.allauth.org/en/latest/common/templates.html
