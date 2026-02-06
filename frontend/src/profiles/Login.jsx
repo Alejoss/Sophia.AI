@@ -1,13 +1,13 @@
 import { useState, useEffect, useContext } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext.jsx";
-import { apiLogin, checkAuth } from "../api/profilesApi.js";
+import { apiLogin, checkAuth, refreshToken, getUserProfile } from "../api/profilesApi.js";
 import {
   getUserFromLocalStorage,
-  setUserInLocalStorage,
   setAuthenticationStatus,
   isAuthenticated,
   getAccessTokenFromLocalStorage,
+  setAccessTokenInLocalStorage,
 } from "../context/localStorageUtils.js";
 import SocialLogin from "../components/SocialLogin";
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -20,11 +20,13 @@ import '../styles/login.css';
  */
 const Login = () => {
   const navigate = useNavigate();
-  const { setAuthState, updateAuthState } = useContext(AuthContext);
+  const location = useLocation();
+  const { authState, setAuthState, updateAuthState } = useContext(AuthContext);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(false);
   const [loginImage, setLoginImage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -43,18 +45,44 @@ const Login = () => {
     const storedUser = getUserFromLocalStorage();
     const localStorageAuth = isAuthenticated();
 
-    // check if the user is authenticated with the backend and sync with localStorage
-    checkAuth().then((backendAuthStatus) => {
-      setBackendAuthStatus(backendAuthStatus);
-      if (localStorageAuth && backendAuthStatus) {
+    // Check if the user is authenticated with the backend and sync with localStorage
+    checkAuth().then((isBackendAuthenticated) => {
+      setBackendAuthStatus(isBackendAuthenticated);
+      if (localStorageAuth && isBackendAuthenticated) {
         console.log("User is already authenticated");
-      } else if (backendAuthStatus && !localStorageAuth) {
+      } else if (isBackendAuthenticated && !authState.isAuthenticated) {
+        // Backend says authenticated but context was cleared (e.g. after wrong redirect on refresh)
+        // Restore session: get new token and user, then redirect away from login
+        setIsRestoringSession(true);
+        refreshToken()
+          .then((data) => {
+            const access_token = data?.access_token;
+            if (!access_token) {
+              setIsRestoringSession(false);
+              return;
+            }
+            setAccessTokenInLocalStorage(access_token);
+            return getUserProfile().then((profile) => {
+              if (!profile?.user) {
+                setIsRestoringSession(false);
+                return;
+              }
+              updateAuthState(profile.user, access_token);
+              const from = location.state?.from?.pathname || "/profiles/my_profile";
+              navigate(from, { replace: true });
+            });
+          })
+          .catch(() => {
+            setIsRestoringSession(false);
+            // Restore failed (e.g. no refresh cookie); backendAuthStatus is still true so we show "Ya has iniciado sesión"
+          });
+      } else if (isBackendAuthenticated && !localStorageAuth && storedUser) {
         setAuthenticationStatus(true);
         setAuthState({
           isAuthenticated: true,
           user: storedUser,
         });
-      } else if (!backendAuthStatus && localStorageAuth) {
+      } else if (!isBackendAuthenticated && localStorageAuth) {
         console.log("User is authenticated but backend is not");
         setAuthenticationStatus(false);
         setAuthState({
@@ -67,7 +95,7 @@ const Login = () => {
     if (storedUser) {
       setUsername(storedUser.username);
     }
-  }, [setAuthState]);
+  }, [setAuthState, authState.isAuthenticated, updateAuthState, location.state?.from?.pathname, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -102,6 +130,18 @@ const Login = () => {
     }
   };
 
+  // Restoring session after wrong redirect (e.g. refresh on protected route)
+  if (isRestoringSession) {
+    return (
+      <div className="login-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="login-form-card" style={{ textAlign: 'center' }}>
+          <p>Restaurando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Already authenticated (backend says so); show message only when not restoring
   if (backendAuthStatus) {
     return (
       <div>
@@ -111,8 +151,10 @@ const Login = () => {
         </p>
       </div>
     );
-  } else {
-    return (
+  }
+
+  // Not authenticated: show login form
+  return (
       <div className="login-container">
         <div className="login-wrapper">
           <div className="login-image-section">
@@ -185,7 +227,6 @@ const Login = () => {
         </div>
       </div>
     );
-  }
 };
 
 export default Login;

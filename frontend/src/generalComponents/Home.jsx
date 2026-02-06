@@ -24,14 +24,15 @@ import { getUserFromLocalStorage } from "../context/localStorageUtils.js";
 
 const Home = () => {
   const navigate = useNavigate();
-  const { authState } = React.useContext(AuthContext);
+  const { authState, authInitialized } = React.useContext(AuthContext);
   const storedUser = getUserFromLocalStorage();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
 
-
   useEffect(() => {
+    if (!authInitialized) return;
+
     // If user is already authenticated, redirect to profile page
     if (authState.isAuthenticated) {
       navigate("/profiles/my_profile");
@@ -43,7 +44,7 @@ const Home = () => {
       navigate("/profiles/login");
       return;
     }
-  }, [authState.isAuthenticated, storedUser, navigate]);
+  }, [authInitialized, authState.isAuthenticated, storedUser, navigate]);
 
 
   // Show home page only for new users (no authentication, no stored user)

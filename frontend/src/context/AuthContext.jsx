@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: false,
     user: null,
   });
+  const [authInitialized, setAuthInitialized] = useState(false);
   
   const refreshTimeoutRef = useRef(null);
 
@@ -112,7 +113,6 @@ export const AuthProvider = ({ children }) => {
       try {
         const backendAuthStatus = await checkAuth();
         const storedUser = getUserFromLocalStorage();
-        const localStorageAuth = isAuthenticated();
         const storedAccessToken = getAccessTokenFromLocalStorage();
 
         if (backendAuthStatus && storedUser && storedAccessToken) {
@@ -127,6 +127,8 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         clearAuthState();
+      } finally {
+        setAuthInitialized(true);
       }
     };
 
@@ -154,7 +156,8 @@ export const AuthProvider = ({ children }) => {
       updateAuthState,
       clearAuthState,
       user: authState.user,
-      isAuthenticated: authState.isAuthenticated
+      isAuthenticated: authState.isAuthenticated,
+      authInitialized
     }}>
       {children}
     </AuthContext.Provider>

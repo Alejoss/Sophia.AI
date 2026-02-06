@@ -1,13 +1,22 @@
 import React, { useContext } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children }) => {
-  const { authState } = useContext(AuthContext);
+  const location = useLocation();
+  const { authState, authInitialized } = useContext(AuthContext);
+
+  if (!authInitialized) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (!authState.isAuthenticated) {
-    // Redirect to login page if not authenticated
-    return <Navigate to="/profiles/login" replace />;
+    return <Navigate to="/profiles/login" replace state={{ from: location }} />;
   }
 
   return children;
