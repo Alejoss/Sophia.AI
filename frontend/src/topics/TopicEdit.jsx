@@ -20,7 +20,6 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
 import SaveIcon from "@mui/icons-material/Save";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
@@ -28,7 +27,6 @@ import TopicModerators from "./TopicModerators";
 import ContentSuggestionsManager from "./ContentSuggestionsManager";
 
 const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
-  const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState(null);
 
   const validateFile = (file) => {
@@ -44,29 +42,6 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
     }
 
     return null;
-  };
-
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const validationError = validateFile(file);
-      if (validationError) {
-        setError(validationError);
-        setSelectedFile(null);
-      } else {
-        setError(null);
-        setSelectedFile(file);
-      }
-    }
-  };
-
-  const handleUpload = () => {
-    if (selectedFile) {
-      handleImageUpload(selectedFile);
-      handleClose();
-      setSelectedFile(null);
-      setError(null);
-    }
   };
 
   return (
@@ -104,28 +79,15 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
         <List>
           <ListItem>
             <ListItemIcon>
-              {selectedFile ? (
-                <CheckCircleIcon color="success" />
-              ) : (
-                <ErrorIcon color="disabled" />
-              )}
+              <CheckCircleIcon color="disabled" />
             </ListItemIcon>
-            <ListItemText
-              primary="Seleccionar un archivo de imagen"
-              secondary={selectedFile ? selectedFile.name : "Ningún archivo seleccionado"}
-            />
+            <ListItemText primary="Formatos: JPEG, PNG o GIF" />
           </ListItem>
           <ListItem>
             <ListItemIcon>
-              <CheckCircleIcon
-                color={
-                  selectedFile && selectedFile.size <= 2 * 1024 * 1024
-                    ? "success"
-                    : "disabled"
-                }
-              />
+              <CheckCircleIcon color="disabled" />
             </ListItemIcon>
-            <ListItemText primary="Tamaño del archivo menor a 2MB" />
+            <ListItemText primary="Tamaño máximo: 2MB" />
           </ListItem>
         </List>
 
@@ -136,22 +98,27 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
         )}
 
         <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
-          <Button variant="contained" component="label">
-            Elegir Archivo
+          <Button variant="contained" color="primary" component="label">
+            Subir Imagen
             <input
               type="file"
               hidden
               accept="image/*"
-              onChange={handleFileSelect}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const validationError = validateFile(file);
+                  if (validationError) {
+                    setError(validationError);
+                  } else {
+                    setError(null);
+                    handleImageUpload(file);
+                    handleClose();
+                  }
+                }
+                e.target.value = "";
+              }}
             />
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUpload}
-            disabled={!selectedFile || error}
-          >
-            Subir Imagen
           </Button>
           <Button variant="outlined" onClick={handleClose}>
             Cancelar
@@ -169,8 +136,8 @@ const TopicEdit = () => {
   const [topic, setTopic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imageCacheBuster, setImageCacheBuster] = useState(0);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -204,7 +171,8 @@ const TopicEdit = () => {
 
     try {
       const updatedTopic = await contentApi.updateTopicImage(topicId, formData);
-      setTopic(updatedTopic);
+      setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
+      setImageCacheBuster(Date.now());
       setError(null);
     } catch (err) {
       setError("Error al actualizar la imagen del tema");
@@ -291,7 +259,11 @@ const TopicEdit = () => {
   }}
 >
             <img
-              src={topic.topic_image || "/default-topic-image.png"}
+              src={
+                topic.topic_image
+                  ? `${topic.topic_image}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`
+                  : "/default-topic-image.png"
+              }
               alt={topic.title}
               style={{
                 width: "100%",
@@ -341,7 +313,9 @@ const TopicEdit = () => {
                 onChange={handleInputChange}
                 margin="normal"
                 multiline
-                rows={4}
+                minRows={8}
+                maxRows={24}
+                placeholder="Describe el tema"
               />
               <Button
                 type="submit"

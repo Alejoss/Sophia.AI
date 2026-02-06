@@ -19,6 +19,7 @@ import {
   InputLabel,
   FormHelperText,
   CircularProgress,
+  LinearProgress,
   Card,
   CardMedia,
   CardContent,
@@ -221,6 +222,7 @@ const schema = createSchema();
 
 const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   
   // Notify parent when uploading state changes
@@ -416,6 +418,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     console.log('Using isUrlMode:', currentIsUrlMode);
     
     setIsUploading(true);
+    setUploadProgress(0);
     try {
       
       if (isEditMode && contentId) {
@@ -445,8 +448,11 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           formData.append('title', data.title || '');
           formData.append('author', data.author || '');
           
-          // Create new content
-          const response = await contentApi.uploadContent(formData);
+          const response = await contentApi.uploadContent(formData, {
+            onUploadProgress: (e) => {
+              if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          });
           console.log('New content created:', response);
           
           // Update the existing content profile to reference the new content
@@ -544,7 +550,14 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         formData.append('author', data.author || '');
 
         console.log('Submitting to API...');
-        const response = await contentApi.uploadContent(formData);
+        const uploadOptions = currentIsUrlMode
+          ? {}
+          : {
+              onUploadProgress: (e) => {
+                if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+              }
+            };
+        const response = await contentApi.uploadContent(formData, uploadOptions);
         console.log('API Response:', response);
         
         if (onContentUploaded) {
@@ -568,6 +581,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -821,6 +835,28 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 </Typography>
               </Box>
             )}
+          </Box>
+        )        }
+
+        {isUploading && (
+          <Box sx={{ mt: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <LinearProgress
+                variant={uploadProgress !== null ? 'determinate' : 'indeterminate'}
+                value={uploadProgress ?? 0}
+                sx={{ flex: 1, height: 8, borderRadius: 1 }}
+              />
+              {uploadProgress !== null && (
+                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                  {uploadProgress}%
+                </Typography>
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {uploadProgress !== null
+                ? 'Subiendo archivo… Puedes completar el formulario del nodo mientras tanto.'
+                : 'Subiendo…'}
+            </Typography>
           </Box>
         )}
 

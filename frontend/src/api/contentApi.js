@@ -44,7 +44,8 @@ const contentApi = {
     },
 
     // Add other content-related API calls here
-    uploadContent: async (contentData) => {
+    // options: { onUploadProgress?: (progressEvent) => void, timeout?: number }
+    uploadContent: async (contentData, options = {}) => {
         try {
             // Debug logging
             console.log('\n=== Content Upload Request ===');
@@ -65,7 +66,10 @@ const contentApi = {
             // Do NOT force Content-Type for FormData. Axios will set the correct
             // multipart boundary automatically. Forcing it can break uploads.
             const config = contentData instanceof FormData
-                ? undefined
+                ? {
+                    timeout: options.timeout ?? 300000, // 5 minutes for large files (e.g. video)
+                    onUploadProgress: options.onUploadProgress
+                }
                 : { headers: { 'Content-Type': 'multipart/form-data' } };
 
             const response = await axiosInstance.post('/content/upload-content/', contentData, config);

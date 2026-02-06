@@ -4,7 +4,7 @@ import knowledgePathsApi from '../api/knowledgePathsApi';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
-import { Box, Typography, Alert, Chip, CircularProgress } from '@mui/material';
+import { Box, Typography, Alert, Chip, CircularProgress, Button, Stack, Paper, Container } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
@@ -158,26 +158,29 @@ const NodeDetail = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="max-w-2xl mx-auto">
+    <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
+      <Box sx={{ maxWidth: 672, mx: 'auto' }}>
         {/* Breadcrumb Navigation */}
-        <div className="mb-6">
-          <Link 
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          <Link
             to={`/knowledge_path/${pathId}`}
+            style={{ color: 'inherit', textDecoration: 'none' }}
             className="text-blue-500 hover:text-blue-700"
           >
             {knowledgePath?.title}
           </Link>
-          <span className="mx-2">›</span>
-          <span className="text-gray-600">{node.title}</span>
-        </div>
+          <Typography component="span" sx={{ mx: 1 }}>›</Typography>
+          <Typography component="span" color="text.secondary">{node.title}</Typography>
+        </Typography>
 
         {/* Node Content */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h1 className="text-2xl font-bold !text-gray-900 mb-4">{node.title}</h1>
+        <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 3 }}>
+            {node.title}
+          </Typography>
           
           {/* Content Display */}
-          <div className="mb-6">
+          <Box sx={{ mb: 3 }}>
             {nodeContent ? (
               <>
                 {console.log('🖼️ Rendering ContentDisplay with:', nodeContent.content)}
@@ -204,77 +207,91 @@ const NodeDetail = () => {
                 </div>
               </Alert>
             )}
-          </div>          
+          </Box>
 
           {/* Description */}
           {node.description && (
-            <div className="mt-4">
+            <Box sx={{ mt: 3 }}>
               <Typography variant="h6" sx={{ mb: 1 }}>Descripción del Nodo</Typography>
-              <Typography>{node.description}</Typography>
-            </div>
+              <Typography variant="body1">{node.description}</Typography>
+            </Box>
           )}
 
           {/* Quiz Information */}
           {node.quizzes && node.quizzes.length > 0 && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <h2 className="text-lg font-semibold text-blue-700">
-                Cuestionario: {node.quizzes[0].title || "El nodo incluye un cuestionario"}                
-              </h2>
-              <p>Marca el nodo como completado para realizar el cuestionario</p>
-            </div>
+            <Alert severity="info" sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Cuestionario: {node.quizzes[0].title || 'El nodo incluye un cuestionario'}
+              </Typography>
+              <Typography variant="body2">Marca el nodo como completado para realizar el cuestionario.</Typography>
+            </Alert>
           )}
 
           {/* Action Buttons */}
-          <div className="mt-6 md:flex-nowrap flex-wrap flex gap-4">
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            flexWrap="wrap"
+            gap={2}
+            sx={{ mt: 4 }}
+          >
             {prevNode && (
-              <button
+              <Button
+                variant="outlined"
                 onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}`)}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}
               >
                 ← Anterior
-              </button>
+              </Button>
             )}
             {user && user.username === knowledgePath?.author && (
-              <Link
+              <Button
+                component={Link}
                 to={`/knowledge_path/${pathId}/nodes/${nodeId}/edit`}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                variant="outlined"
+                sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}
               >
                 Editar Nodo
-              </Link>
+              </Button>
             )}
-            <Link
+            <Button
+              component={Link}
               to={`/knowledge_path/${pathId}`}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg transition-colors"
+              variant="outlined"
+              color="inherit"
+              sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}
             >
               Volver al Camino
-            </Link>
+            </Button>
             {node.is_completed ? (
-              <button
+              <Button
+                variant="contained"
+                color="primary"
                 onClick={() => {
-                  // Check for quiz first
                   if (node.quizzes && node.quizzes.length > 0) {
                     navigate(`/quizzes/${node.quizzes[0].id}`);
                   } else if (nextNode) {
                     navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}`);
                   }
                 }}
-                className={`${nextNode ? 'bg-green-500 hover:bg-green-700' : 'bg-gray-500'} text-white font-bold py-2 px-4 rounded`}
                 disabled={!nextNode && !node.quizzes?.length}
+                sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}
               >
-                Ya Completado {nextNode ? ': Siguiente →' : ''}
-              </button>
+                Ya Completado {nextNode ? '— Siguiente →' : ''}
+              </Button>
             ) : (
-              <button
+              <Button
+                variant="contained"
+                color="primary"
                 onClick={handleComplete}
-                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}
               >
                 Marcar como Completado
-              </button>
+              </Button>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </Stack>
+        </Paper>
+      </Box>
+    </Container>
   );
 };
 

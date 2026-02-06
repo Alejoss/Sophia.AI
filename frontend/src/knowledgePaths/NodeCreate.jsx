@@ -128,13 +128,7 @@ const NodeCreate = () => {
           <Box 
             component="form" 
             onSubmit={handleSubmit} 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 3,
-              opacity: isUploadingContent ? 0.7 : 1,
-              transition: 'opacity 0.3s ease'
-            }}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
           >
             <TextField
               fullWidth
@@ -143,7 +137,6 @@ const NodeCreate = () => {
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               required
-              disabled={isUploadingContent}
             />
 
             <TextField
@@ -154,12 +147,11 @@ const NodeCreate = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               multiline
               rows={4}
-              disabled={isUploadingContent}
             />
 
             {isUploadingContent && (
               <Alert severity="info" sx={{ mb: 1 }}>
-                Subiendo contenido... Puedes completar el formulario mientras tanto.
+                Subiendo contenido… Completa el título y la descripción del nodo mientras tanto.
               </Alert>
             )}
 
@@ -178,7 +170,6 @@ const NodeCreate = () => {
                 onClick={() => navigate(`/knowledge_path/${pathId}/edit`)}
                 variant="outlined"
                 color="inherit"
-                disabled={isUploadingContent}
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
                 Cancelar

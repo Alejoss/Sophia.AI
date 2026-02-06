@@ -92,24 +92,21 @@ const KnowledgePathList = () => {
           Caminos de Conocimiento
         </Typography>
         {authState.isAuthenticated && (
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' } }}>
-            <Button
-              component={Link}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+            <Link
               to="/profiles/my_profile?section=knowledge-paths"
-              variant="contained"
-              color="inherit"
-              sx={{
-                bgcolor: 'grey.500',
-                color: 'white',
-                '&:hover': {
-                  bgcolor: 'grey.700',
-                },
-                textDecoration: 'none',
-                width: { xs: '100%', md: 'auto' },
-              }}
+              style={{ textDecoration: 'none' }}
             >
-              Caminos de Conocimiento
-            </Button>
+              <Typography
+                component="span"
+                sx={{
+                  color: 'primary.main',
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                Mis caminos del Conocimiento
+              </Typography>
+            </Link>
             <Button
               component={Link}
               to="/knowledge_path/create"

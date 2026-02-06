@@ -167,7 +167,8 @@ const KnowledgePathCreationForm = () => {
               onChange={handleChange}
               required
               multiline
-              rows={4}
+              minRows={8}
+              maxRows={24}
               placeholder="Describe tu camino de conocimiento"
               sx={{ mb: 3 }}
             />
