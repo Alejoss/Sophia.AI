@@ -74,6 +74,8 @@
    (crontab -l 2>/dev/null; echo "0 2 * * * cd $(pwd) && ./scripts/backup-db.sh") | crontab -
    ```
 
+6. **Large file uploads (videos, etc.):** The stack allows uploads up to 5 GB (nginx `client_max_body_size`, Django limits, and longer timeouts). If you use **HTTPS with a generated `nginx-ssl.conf`**, re-run `./scripts/setup-ssl.sh yourdomain.com` after pulling config changes so the generated file includes the larger body size; then restart: `docker compose -f docker-compose.prod.yml restart nginx`.
+
 ### Custom domain (Namecheap + Digital Ocean)
 
 To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
@@ -136,10 +138,21 @@ To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
 
 ### Common Commands
 
+**View logs (all services, follow mode; press Ctrl+C to exit):**
 ```bash
-# View logs
 docker compose -f docker-compose.prod.yml logs -f
+```
 
+**View logs for a single service:**
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml logs -f frontend
+docker compose -f docker-compose.prod.yml logs -f nginx
+docker compose -f docker-compose.prod.yml logs -f postgres
+```
+
+**Other commands:**
+```bash
 # Restart services
 docker compose -f docker-compose.prod.yml restart
 
@@ -188,8 +201,8 @@ chmod +x scripts/deploy.sh scripts/setup-nginx.sh acbc_app/entrypoint.sh  # if n
 
 **Services won't start:**
 ```bash
-docker compose -f docker-compose.prod.yml logs
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f   # see logs (Ctrl+C to exit)
+docker compose -f docker-compose.prod.yml ps       # see container status
 ```
 
 **Database issues:**

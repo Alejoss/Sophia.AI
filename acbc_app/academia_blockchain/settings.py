@@ -139,6 +139,11 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 if ENVIRONMENT == "PRODUCTION":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Large file uploads (e.g. videos, documentaries) for content upload API; must be >= nginx client_max_body_size
+# Files larger than FILE_UPLOAD_MAX_MEMORY_SIZE are streamed to disk (default 2.5MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5368709120  # 5 GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880     # 5 MB (stream to disk above this)
+
 ROOT_URLCONF = 'academia_blockchain.urls'
 
 # To customize django-allauth templates: https://docs.allauth.org/en/latest/common/templates.html
