@@ -293,9 +293,9 @@ const LibraryUser = () => {
                     )}
                   </td>
                   <td style={{ padding: "12px", color: "inherit" }}>
-                    {contentProfile.content.file_details?.file && (
+                    {(contentProfile.content.file_details?.url || contentProfile.content.file_details?.file) && (
                       <a
-                        href={getFileUrl(
+                        href={contentProfile.content.file_details.url || getFileUrl(
                           contentProfile.content.file_details.file
                         )}
                         target="_blank"

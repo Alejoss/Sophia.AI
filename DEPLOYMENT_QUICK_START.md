@@ -79,6 +79,24 @@
 
 6. **Large file uploads (videos, etc.):** The stack allows uploads up to 5 GB (nginx `client_max_body_size`, Django limits, and longer timeouts). If you use **HTTPS with a generated `nginx-ssl.conf`**, re-run `./scripts/setup-ssl.sh yourdomain.com` after pulling config changes so the generated file includes the larger body size; then restart: `docker compose -f docker-compose.prod.yml restart nginx`.
 
+7. **S3 media (profile pictures, uploads) and 404s:** In production, media is served from **AWS S3**. Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optionally `AWS_STORAGE_BUCKET_NAME` in `acbc_app/.env`.  
+   - **Bucket permissions:** The bucket must allow public read for images to load in the browser. In AWS S3 → your bucket → **Permissions**: either turn off **Block Public Access** for “Block public access to buckets and objects granted through new access control lists (ACLs)” so that `public-read` ACL works, or add a **bucket policy** (S3 → bucket → Permissions → Bucket policy → Edit). Example — replace `academiablockchain` with your bucket name:
+
+     ```json
+     {
+         "Version": "2012-10-17",
+         "Statement": [{
+             "Sid": "PublicReadGetObject",
+             "Effect": "Allow",
+             "Principal": "*",
+             "Action": "s3:GetObject",
+             "Resource": "arn:aws:s3:::academiablockchain/*"
+         }]
+     }
+     ```
+     This allows public read for all objects. To limit to media only, use `"Resource": "arn:aws:s3:::academiablockchain/profile_pictures/*"` and add a second statement for `files/*`.  
+   - **Existing media 404:** Profile pictures and other files uploaded **before** S3 was enabled were stored on the server’s media volume only; they were never uploaded to S3. The app now generates S3 URLs for those paths, so the browser gets 404 until the files exist in S3. Fix by either: (a) re-uploading profile pictures in the app (edit profile → change picture), or (b) copying existing files from the server’s media directory into S3 with the same keys (e.g. `profile_pictures/Username_Feb-09-26.jpeg`). New uploads go to S3 and will work once the bucket allows public read.
+
 ### Custom domain (Namecheap + Digital Ocean)
 
 To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):

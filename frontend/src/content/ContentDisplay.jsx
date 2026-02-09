@@ -106,10 +106,12 @@ const ContentDisplay = ({
         return url;
       }
 
-      // For file-based content, get the file URL from file_details
+      // For file-based content: prefer file_details.url (absolute, e.g. S3) when present
       if (fileDetails) {
+        if (fileDetails.url) {
+          return fileDetails.url;
+        }
         if (fileDetails.file) {
-          // Always use getFileUrl to convert relative paths to absolute URLs
           return getFileUrl(fileDetails.file);
         }
       }
@@ -493,7 +495,7 @@ const ContentDisplay = ({
                       size="small"
                       variant="outlined"
                       onClick={() =>
-                        window.open(getFileUrl(fileDetails.file), "_blank")
+                        window.open(fileDetails.url || getFileUrl(fileDetails.file), "_blank")
                       }
                       sx={{ ml: 1 }}
                     >
@@ -504,7 +506,7 @@ const ContentDisplay = ({
                       variant="text"
                       onClick={() =>
                         navigator.clipboard.writeText(
-                          getFileUrl(fileDetails.file)
+                          fileDetails.url || getFileUrl(fileDetails.file)
                         )
                       }
                     >
@@ -855,7 +857,7 @@ const ContentDisplay = ({
                   window.open(url, "_blank");
                 } else if (fileDetails?.file) {
                   // File-based content - open the file
-                  const fileUrl = getFileUrl(fileDetails.file);
+                  const fileUrl = fileDetails.url || getFileUrl(fileDetails.file);
                   if (fileUrl) {
                     window.open(fileUrl, "_blank");
                   }
@@ -940,7 +942,7 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   if (hasImageFile) {
-                    const imageSrc = getFileUrl(fileDetails.file);
+                    const imageSrc = fileDetails.url || getFileUrl(fileDetails.file);
                     return (
                       <img
                         src={imageSrc}
@@ -1209,8 +1211,8 @@ const ContentDisplay = ({
             // Fallback: open file or URL in new tab
             if (url) {
               window.open(url, "_blank");
-            } else if (fileDetails?.file) {
-              const fileUrl = getFileUrl(fileDetails.file);
+            } else if (fileDetails?.file || fileDetails?.url) {
+              const fileUrl = fileDetails.url || getFileUrl(fileDetails.file);
               if (fileUrl) {
                 window.open(fileUrl, "_blank");
               }
@@ -1262,7 +1264,7 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   if (hasImageFile) {
-                    const imageSrc = getFileUrl(fileDetails.file);
+                    const imageSrc = fileDetails.url || getFileUrl(fileDetails.file);
                     return (
                       <img
                         src={imageSrc}

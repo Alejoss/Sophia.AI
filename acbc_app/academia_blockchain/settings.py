@@ -609,6 +609,8 @@ if ENVIRONMENT == "PRODUCTION":
     AWS_S3_URL_PROTOCOL = 'https'
     AWS_S3_USE_SSL = True
     AWS_S3_VERIFY = True
+    # So profile pictures and other media are readable in the browser (no signed URL needed)
+    AWS_DEFAULT_ACL = 'public-read'
 
     # Media files in S3 (uploads); static stay on server
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

@@ -640,7 +640,12 @@ class UploadContentPresignView(APIView):
             )
             upload_url = s3_client.generate_presigned_url(
                 'put_object',
-                Params={'Bucket': bucket, 'Key': key, 'ContentType': content_type},
+                Params={
+                    'Bucket': bucket,
+                    'Key': key,
+                    'ContentType': content_type,
+                    'ACL': 'public-read',
+                },
                 ExpiresIn=expires_in
             )
         except Exception as e:

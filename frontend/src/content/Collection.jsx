@@ -4,6 +4,7 @@ import { Box, Typography, Card, CardContent, Chip, IconButton, Button } from '@m
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
+import { getFileUrl } from '../utils/fileUtils';
 
 const Collection = () => {
     const { collectionId } = useParams();
@@ -76,7 +77,7 @@ const Collection = () => {
                                     justifyContent: 'center'
                                 }}>
                                     <img 
-                                        src={`http://localhost:8000${contentProfile.content.file_details.file}`}
+                                        src={contentProfile.content.file_details.url || getFileUrl(contentProfile.content.file_details.file)}
                                         alt={contentProfile.title || 'Content image'}
                                         style={{
                                             width: '100%',
