@@ -45,20 +45,24 @@ const contentApi = {
 
     // Presign: get URL to upload file directly to S3
     uploadContentPresign: async (metadata) => {
+        console.log('[S3 upload] Presign request:', { filename: metadata?.filename, file_size: metadata?.file_size, media_type: metadata?.media_type });
         try {
             const response = await axiosInstance.post('/content/upload-content/presign/', metadata, {
                 timeout: 15000,
                 headers: { 'Content-Type': 'application/json' }
             });
+            console.log('[S3 upload] Presign OK, key:', response.data?.key);
             return response.data;
         } catch (err) {
-            console.error('Presign failed:', err.response?.data || err.message);
+            console.error('[S3 upload] Presign failed:', err.response?.status, err.response?.data || err.message);
             throw err;
         }
     },
 
     // Upload file directly to S3 with optional progress (XHR for progress)
     uploadFileToS3: async (file, uploadUrl, onProgress) => {
+        const urlHost = uploadUrl ? new URL(uploadUrl).host : '(no URL)';
+        console.log('[S3 upload] PUT to S3 starting, host:', urlHost, 'size:', file?.size);
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl);
@@ -70,30 +74,41 @@ const contentApi = {
                 };
             }
             xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) resolve();
-                else reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    console.log('[S3 upload] PUT to S3 success, status:', xhr.status);
+                    resolve();
+                } else {
+                    console.error('[S3 upload] PUT to S3 failed:', xhr.status, xhr.statusText);
+                    reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+                }
             };
-            xhr.onerror = () => reject(new Error('S3 upload failed'));
+            xhr.onerror = () => {
+                console.error('[S3 upload] PUT to S3 network error');
+                reject(new Error('S3 upload failed'));
+            };
             xhr.send(file);
         });
     },
 
     // Confirm: after S3 upload, create Content/ContentProfile/FileDetails
     uploadContentConfirm: async (key, metadata) => {
+        console.log('[S3 upload] Confirm request, key:', key);
         try {
             const response = await axiosInstance.post('/content/upload-content/confirm/', { key, ...metadata }, {
                 timeout: 15000,
                 headers: { 'Content-Type': 'application/json' }
             });
+            console.log('[S3 upload] Confirm OK, content_id:', response.data?.content_id);
             return response.data;
         } catch (err) {
-            console.error('Confirm failed:', err.response?.data || err.message);
+            console.error('[S3 upload] Confirm failed:', err.response?.status, err.response?.data || err.message);
             throw err;
         }
     },
 
     // Full S3 flow: presign -> upload to S3 -> confirm. Falls back to FormData upload if S3 not configured (e.g. dev).
     uploadContentViaS3: async (file, metadata, onProgress) => {
+        console.log('[S3 upload] Starting flow for file:', file?.name, 'size:', file?.size);
         try {
             const presignData = await contentApi.uploadContentPresign({
                 filename: file.name,
@@ -107,7 +122,7 @@ const contentApi = {
                 is_producer: metadata.is_producer
             });
             await contentApi.uploadFileToS3(file, presignData.upload_url, onProgress);
-            return await contentApi.uploadContentConfirm(presignData.key, {
+            const result = await contentApi.uploadContentConfirm(presignData.key, {
                 media_type: metadata.media_type,
                 title: metadata.title,
                 author: metadata.author,
@@ -116,8 +131,11 @@ const contentApi = {
                 is_producer: metadata.is_producer,
                 file_size: file.size
             });
+            console.log('[S3 upload] Flow complete, content_id:', result?.content_id);
+            return result;
         } catch (err) {
             if (err.response?.status === 503) {
+                console.warn('[S3 upload] 503 received, falling back to FormData upload');
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('media_type', metadata.media_type);
@@ -126,8 +144,11 @@ const contentApi = {
                 formData.append('personalNote', metadata.personalNote || '');
                 formData.append('is_visible', String(metadata.is_visible ?? true));
                 formData.append('is_producer', String(metadata.is_producer ?? false));
-                return contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
+                const fallbackResult = await contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
+                console.log('[S3 upload] FormData fallback OK, content_id:', fallbackResult?.content_id);
+                return fallbackResult;
             }
+            console.error('[S3 upload] Flow failed:', err.response?.status, err.message);
             throw err;
         }
     },

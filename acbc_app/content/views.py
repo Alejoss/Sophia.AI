@@ -581,7 +581,12 @@ class UploadContentPresignView(APIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        logger.info(
+            "S3 presign: request started",
+            extra={'user_id': request.user.id, 'username': request.user.username}
+        )
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
+            logger.warning("S3 presign: S3 not configured (missing credentials), returning 503")
             return Response(
                 {'error': 'S3 no está configurado para subida directa'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
@@ -615,6 +620,17 @@ class UploadContentPresignView(APIView):
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
         expires_in = 3600
+        logger.info(
+            "S3 presign: generating URL",
+            extra={
+                'user_id': request.user.id,
+                'filename': filename,
+                'file_size': file_size,
+                'key': key,
+                'bucket': bucket,
+                'region': region,
+            }
+        )
         try:
             s3_client = boto3.client(
                 's3',
@@ -628,11 +644,15 @@ class UploadContentPresignView(APIView):
                 ExpiresIn=expires_in
             )
         except Exception as e:
-            logger.exception("Presign failed")
+            logger.exception("S3 presign: boto3 failed: %s", e)
             return Response(
                 {'error': 'No se pudo generar la URL de subida', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        logger.info(
+            "S3 presign: success",
+            extra={'user_id': request.user.id, 'key': key, 'bucket': bucket}
+        )
         return Response({
             'upload_url': upload_url,
             'key': key,
@@ -646,7 +666,12 @@ class UploadContentConfirmView(APIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        logger.info(
+            "S3 confirm: request started",
+            extra={'user_id': request.user.id, 'username': request.user.username}
+        )
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None):
+            logger.warning("S3 confirm: S3 not configured, returning 503")
             return Response(
                 {'error': 'S3 no está configurado'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
@@ -658,6 +683,11 @@ class UploadContentConfirmView(APIView):
         # Prevent path traversal
         if '..' in key or key.startswith('/'):
             return Response({'error': 'key inválido'}, status=status.HTTP_400_BAD_REQUEST)
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        logger.info(
+            "S3 confirm: checking object in S3",
+            extra={'user_id': request.user.id, 'key': key, 'bucket': bucket}
+        )
         media_type = request.data.get('media_type')
         if not media_type or media_type not in VALID_MEDIA_TYPES:
             return Response(
@@ -682,7 +712,6 @@ class UploadContentConfirmView(APIView):
             file_size = int(file_size) if file_size is not None else None
         except (TypeError, ValueError):
             file_size = None
-        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         try:
             s3_client = boto3.client(
                 's3',
@@ -692,11 +721,15 @@ class UploadContentConfirmView(APIView):
             )
             s3_client.head_object(Bucket=bucket, Key=key)
         except Exception as e:
-            logger.warning("Confirm: S3 head_object failed for key=%s: %s", key, e)
+            logger.warning(
+                "S3 confirm: head_object failed (file not in S3)",
+                extra={'key': key, 'bucket': bucket, 'error': str(e)}
+            )
             return Response(
                 {'error': 'El archivo no se encontró en el almacenamiento. Sube primero con la URL de subida.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        logger.info("S3 confirm: head_object OK, creating Content/FileDetails", extra={'key': key})
         content = Content.objects.create(
             uploaded_by=request.user,
             media_type=media_type,
@@ -718,6 +751,15 @@ class UploadContentConfirmView(APIView):
         )
         # Set S3 key in DB without triggering storage upload (file already in S3)
         FileDetails.objects.filter(pk=file_details.pk).update(file=key)
+        logger.info(
+            "S3 confirm: success",
+            extra={
+                'user_id': request.user.id,
+                'content_id': content.id,
+                'key': key,
+                'bucket': bucket,
+            }
+        )
         content_profile_serializer = ContentProfileSerializer(
             content_profile,
             context={'request': request}

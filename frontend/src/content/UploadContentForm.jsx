@@ -837,7 +837,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               {uploadProgress !== null
-                ? 'Subiendo archivo… Puedes completar el formulario del nodo mientras tanto.'
+                ? 'Subiendo archivo… no cierres esta pestaña.'
                 : 'Subiendo…'}
             </Typography>
           </Box>
