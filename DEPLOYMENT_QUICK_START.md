@@ -18,10 +18,13 @@
 
 0. **Connect to the server (Digital Ocean droplet):**
    ```bash
-   ssh root@YOUR_DROPLET_IP
-   # Example: ssh root@159.65.69.165
+   ssh root@159.65.69.165
    ```
-   Then go to the app directory, e.g. `cd /opt/acbc-app`.
+   Then go to the app directory:
+   ```bash
+   cd /opt/acbc-app
+   ```
+   (If your droplet has a different IP, use `ssh root@YOUR_DROPLET_IP` and the path where the app is installed.)
 
    **First-time on this server?** Run once so `git pull` is not blocked by script permissions:
    ```bash
@@ -138,26 +141,28 @@ To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
 
 ### Common Commands
 
+Run these from the project root (e.g. `cd /opt/acbc-app`). After a deploy, the script prints the exact commands with full paths so you can run them from any directory.
+
 **View logs (all services, follow mode; press Ctrl+C to exit):**
 ```bash
-docker compose -f docker-compose.prod.yml logs -f
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f
 ```
 
 **View logs for a single service:**
 ```bash
-docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml logs -f frontend
-docker compose -f docker-compose.prod.yml logs -f nginx
-docker compose -f docker-compose.prod.yml logs -f postgres
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f backend
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f frontend
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f nginx
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f postgres
 ```
 
 **Other commands:**
 ```bash
 # Restart services
-docker compose -f docker-compose.prod.yml restart
+docker compose --env-file .env.compose -f docker-compose.prod.yml restart
 
 # Stop services
-docker compose -f docker-compose.prod.yml down
+docker compose --env-file .env.compose -f docker-compose.prod.yml down
 
 # Backup database
 ./scripts/backup-db.sh
@@ -201,18 +206,19 @@ chmod +x scripts/deploy.sh scripts/setup-nginx.sh acbc_app/entrypoint.sh  # if n
 
 **Services won't start:**
 ```bash
-docker compose -f docker-compose.prod.yml logs -f   # see logs (Ctrl+C to exit)
-docker compose -f docker-compose.prod.yml ps       # see container status
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f   # see logs (Ctrl+C to exit)
+docker compose --env-file .env.compose -f docker-compose.prod.yml ps       # see container status
 ```
+(From project root. Or use the exact command printed at the end of `./scripts/deploy.sh`, which uses full paths.)
 
 **Database issues:**
 ```bash
-docker compose -f docker-compose.prod.yml exec postgres psql -U postgres -d academiablockchain_prod
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres psql -U postgres -d academiablockchain_prod
 ```
 
 **Static files not loading:**
 ```bash
-docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
 
 For detailed instructions, see [Digital Ocean Deployment Guide](docs/deployment/digital-ocean.md).

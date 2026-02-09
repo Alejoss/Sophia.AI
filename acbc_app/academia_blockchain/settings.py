@@ -599,25 +599,21 @@ if ENVIRONMENT == "PRODUCTION":
         }
     }
 
-    # AWS config
+    # AWS config (US West Oregon)
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = 'academiablockchain'
-    AWS_S3_REGION_NAME = 'us-west-2'  # example region
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+    AWS_S3_REGION_NAME = 'us-west-2'
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
 
     AWS_S3_URL_PROTOCOL = 'https'
     AWS_S3_USE_SSL = True
     AWS_S3_VERIFY = True
 
-    # STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
-    # STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-    # MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-    # DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR + "/media/"
+    # Media files in S3 (uploads); static stay on server
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+    MEDIA_ROOT = BASE_DIR + "/media/"  # fallback path for legacy/local refs
     STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
     STATIC_URL = "/static/"
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]

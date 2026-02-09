@@ -43,44 +43,109 @@ const contentApi = {
         }
     },
 
-    // Add other content-related API calls here
-    // options: { onUploadProgress?: (progressEvent) => void, timeout?: number }
+    // Presign: get URL to upload file directly to S3
+    uploadContentPresign: async (metadata) => {
+        try {
+            const response = await axiosInstance.post('/content/upload-content/presign/', metadata, {
+                timeout: 15000,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return response.data;
+        } catch (err) {
+            console.error('Presign failed:', err.response?.data || err.message);
+            throw err;
+        }
+    },
+
+    // Upload file directly to S3 with optional progress (XHR for progress)
+    uploadFileToS3: async (file, uploadUrl, onProgress) => {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', uploadUrl);
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+            xhr.withCredentials = false;
+            if (onProgress && xhr.upload) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) onProgress({ loaded: e.loaded, total: e.total });
+                };
+            }
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                else reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+            };
+            xhr.onerror = () => reject(new Error('S3 upload failed'));
+            xhr.send(file);
+        });
+    },
+
+    // Confirm: after S3 upload, create Content/ContentProfile/FileDetails
+    uploadContentConfirm: async (key, metadata) => {
+        try {
+            const response = await axiosInstance.post('/content/upload-content/confirm/', { key, ...metadata }, {
+                timeout: 15000,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return response.data;
+        } catch (err) {
+            console.error('Confirm failed:', err.response?.data || err.message);
+            throw err;
+        }
+    },
+
+    // Full S3 flow: presign -> upload to S3 -> confirm. Falls back to FormData upload if S3 not configured (e.g. dev).
+    uploadContentViaS3: async (file, metadata, onProgress) => {
+        try {
+            const presignData = await contentApi.uploadContentPresign({
+                filename: file.name,
+                file_size: file.size,
+                content_type: file.type || 'application/octet-stream',
+                media_type: metadata.media_type,
+                title: metadata.title,
+                author: metadata.author,
+                personalNote: metadata.personalNote,
+                is_visible: metadata.is_visible,
+                is_producer: metadata.is_producer
+            });
+            await contentApi.uploadFileToS3(file, presignData.upload_url, onProgress);
+            return await contentApi.uploadContentConfirm(presignData.key, {
+                media_type: metadata.media_type,
+                title: metadata.title,
+                author: metadata.author,
+                personalNote: metadata.personalNote,
+                is_visible: metadata.is_visible,
+                is_producer: metadata.is_producer,
+                file_size: file.size
+            });
+        } catch (err) {
+            if (err.response?.status === 503) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('media_type', metadata.media_type);
+                formData.append('title', metadata.title || '');
+                formData.append('author', metadata.author || '');
+                formData.append('personalNote', metadata.personalNote || '');
+                formData.append('is_visible', String(metadata.is_visible ?? true));
+                formData.append('is_producer', String(metadata.is_producer ?? false));
+                return contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
+            }
+            throw err;
+        }
+    },
+
+    // Legacy: single POST with FormData (used for URL-only or fallback)
     uploadContent: async (contentData, options = {}) => {
         try {
-            // Debug logging
-            console.log('\n=== Content Upload Request ===');
-            if (contentData instanceof FormData) {
-                console.log('FormData contents:');
-                for (let [key, value] of contentData.entries()) {
-                    if (value instanceof File) {
-                        console.log(`${key}: File(name=${value.name}, type=${value.type}, size=${value.size})`);
-                    } else {
-                        console.log(`${key}: ${value}`);
-                    }
-                }
-            } else {
-                console.log('Content data:', contentData);
-            }
-
-            // IMPORTANT:
-            // Do NOT force Content-Type for FormData. Axios will set the correct
-            // multipart boundary automatically. Forcing it can break uploads.
             const config = contentData instanceof FormData
                 ? {
-                    timeout: options.timeout ?? 300000, // 5 minutes for large files (e.g. video)
+                    timeout: options.timeout ?? 60000,
                     onUploadProgress: options.onUploadProgress
                 }
                 : { headers: { 'Content-Type': 'multipart/form-data' } };
-
             const response = await axiosInstance.post('/content/upload-content/', contentData, config);
-            
-            console.log('Upload response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error uploading content:', error);
-            if (error.response) {
-                console.error('Error response:', error.response.data);
-            }
+            if (error.response) console.error('Error response:', error.response.data);
             throw error;
         }
     },

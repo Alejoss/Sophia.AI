@@ -57,6 +57,8 @@ from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 import time
+import uuid
+import boto3
 
 # Django-standard logger
 logger = logging.getLogger('content')
@@ -566,6 +568,165 @@ class UploadContentView(APIView):
                 }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# Max size for direct presigned PUT (5 GB)
+UPLOAD_CONTENT_MAX_SIZE = 5 * 1024 * 1024 * 1024
+VALID_MEDIA_TYPES = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
+
+
+class UploadContentPresignView(APIView):
+    """Return a presigned URL for direct upload to S3. Client uploads file to that URL, then calls confirm."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
+            return Response(
+                {'error': 'S3 no está configurado para subida directa'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        filename = request.data.get('filename')
+        file_size = request.data.get('file_size')
+        content_type = request.data.get('content_type') or 'application/octet-stream'
+        media_type = request.data.get('media_type')
+        if not filename or file_size is None:
+            return Response(
+                {'error': 'Se requieren filename y file_size'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not media_type or media_type not in VALID_MEDIA_TYPES:
+            return Response(
+                {'error': f'media_type inválido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            file_size = int(file_size)
+        except (TypeError, ValueError):
+            return Response({'error': 'file_size debe ser un número'}, status=status.HTTP_400_BAD_REQUEST)
+        if file_size <= 0 or file_size > UPLOAD_CONTENT_MAX_SIZE:
+            return Response(
+                {'error': 'El tamaño del archivo debe estar entre 1 byte y 5 GB'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Sanitize filename for key (keep extension)
+        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        key = f"files/{request.user.id}/{uuid.uuid4().hex}_{safe_name}"
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
+        expires_in = 3600
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=region,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+            upload_url = s3_client.generate_presigned_url(
+                'put_object',
+                Params={'Bucket': bucket, 'Key': key, 'ContentType': content_type},
+                ExpiresIn=expires_in
+            )
+        except Exception as e:
+            logger.exception("Presign failed")
+            return Response(
+                {'error': 'No se pudo generar la URL de subida', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        return Response({
+            'upload_url': upload_url,
+            'key': key,
+            'expires_in': expires_in
+        }, status=status.HTTP_200_OK)
+
+
+class UploadContentConfirmView(APIView):
+    """After client uploaded file to S3, create Content/ContentProfile/FileDetails with the given key."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None):
+            return Response(
+                {'error': 'S3 no está configurado'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        key = request.data.get('key')
+        if not key or not isinstance(key, str) or not key.strip():
+            return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
+        key = key.strip()
+        # Prevent path traversal
+        if '..' in key or key.startswith('/'):
+            return Response({'error': 'key inválido'}, status=status.HTTP_400_BAD_REQUEST)
+        media_type = request.data.get('media_type')
+        if not media_type or media_type not in VALID_MEDIA_TYPES:
+            return Response(
+                {'error': f'media_type inválido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        title = request.data.get('title') or key.split('/')[-1].split('_', 1)[-1]
+        author = request.data.get('author')
+        personal_note = request.data.get('personalNote')
+        is_visible = request.data.get('is_visible')
+        if isinstance(is_visible, str):
+            is_visible = is_visible.lower() == 'true'
+        else:
+            is_visible = bool(is_visible) if is_visible is not None else True
+        is_producer = request.data.get('is_producer')
+        if isinstance(is_producer, str):
+            is_producer = is_producer.lower() == 'true'
+        else:
+            is_producer = bool(is_producer) if is_producer is not None else False
+        file_size = request.data.get('file_size')
+        try:
+            file_size = int(file_size) if file_size is not None else None
+        except (TypeError, ValueError):
+            file_size = None
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2'),
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+            s3_client.head_object(Bucket=bucket, Key=key)
+        except Exception as e:
+            logger.warning("Confirm: S3 head_object failed for key=%s: %s", key, e)
+            return Response(
+                {'error': 'El archivo no se encontró en el almacenamiento. Sube primero con la URL de subida.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        content = Content.objects.create(
+            uploaded_by=request.user,
+            media_type=media_type,
+            original_title=title,
+            original_author=author
+        )
+        content_profile = ContentProfile.objects.create(
+            content=content,
+            title=title,
+            author=author,
+            personal_note=personal_note,
+            user=request.user,
+            is_visible=is_visible,
+            is_producer=is_producer
+        )
+        file_details = FileDetails.objects.create(
+            content=content,
+            file_size=file_size
+        )
+        # Set S3 key in DB without triggering storage upload (file already in S3)
+        FileDetails.objects.filter(pk=file_details.pk).update(file=key)
+        content_profile_serializer = ContentProfileSerializer(
+            content_profile,
+            context={'request': request}
+        )
+        return Response({
+            'message': 'Content uploaded successfully',
+            'content_id': content.id,
+            'content_profile': content_profile_serializer.data
+        }, status=status.HTTP_201_CREATED)
 
 
 class UserContentListView(APIView):

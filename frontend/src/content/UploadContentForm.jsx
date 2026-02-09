@@ -426,33 +426,30 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         console.log('Edit mode - updating existing content');
         
         if (!currentIsUrlMode) {
-          // File upload in edit mode - create new content and update profile
+          // File upload in edit mode - create new content via S3 and update profile
           console.log('File upload in edit mode - creating new content');
-          
-          const formData = new FormData();
           const file = data.file[0];
           if (!file) {
             throw new Error('No se seleccionó ningún archivo');
           }
-          
-          formData.append('file', file);
-          // Send booleans as strings for consistent backend parsing
-          formData.append('is_producer', 'false');
-          formData.append('is_visible', 'true');
-          
           const mediaType = getMediaType(file);
           if (!mediaType) {
             throw new Error('Tipo de archivo no soportado');
           }
-          formData.append('media_type', mediaType);
-          formData.append('title', data.title || '');
-          formData.append('author', data.author || '');
-          
-          const response = await contentApi.uploadContent(formData, {
-            onUploadProgress: (e) => {
+          const response = await contentApi.uploadContentViaS3(
+            file,
+            {
+              media_type: mediaType,
+              title: data.title || '',
+              author: data.author || '',
+              personalNote: '',
+              is_visible: true,
+              is_producer: false
+            },
+            (e) => {
               if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
             }
-          });
+          );
           console.log('New content created:', response);
           
           // Update the existing content profile to reference the new content
@@ -501,67 +498,48 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         }
       } else {
         // Create new content
-        const formData = new FormData();
-        
         if (currentIsUrlMode) {
           console.log('URL mode submission');
-          // URL mode - send URL and preview data
-          // Normalize URL by adding https:// if missing
-          const normalizedUrl = data.url && !data.url.match(/^https?:\/\//i) 
-            ? `https://${data.url}` 
-            : data.url;
+          const formData = new FormData();
+          const normalizedUrl = data.url && !data.url.match(/^https?:\/\//i)
+            ? `https://${data.url}` : data.url;
           formData.append('url', normalizedUrl);
           formData.append('media_type', data.media_type);
-          // URLs are always visible and not produced content
           formData.append('is_producer', 'false');
           formData.append('is_visible', 'true');
-          
-          // Add preview metadata if available
+          formData.append('title', data.title || '');
+          formData.append('author', data.author || '');
           if (previewData) {
             formData.append('og_description', previewData.description || '');
             formData.append('og_image', previewData.image || '');
             formData.append('og_type', previewData.type || '');
             formData.append('og_site_name', previewData.siteName || '');
           }
+          const response = await contentApi.uploadContent(formData);
+          console.log('API Response:', response);
+          if (onContentUploaded) onContentUploaded(response.content_profile);
         } else {
-          console.log('File mode submission');
-          // File mode - send file data
+          console.log('File mode submission - S3');
           const file = data.file[0];
-          if (!file) {
-            throw new Error('No se seleccionó ningún archivo');
-          }
-          console.log('Selected file:', file);
-          
-          formData.append('file', file);
-          // Use nullish coalescing so `false` is preserved, and send as strings
-          formData.append('is_producer', String(data.is_producer ?? false));
-          formData.append('is_visible', String(data.is_visible ?? true));
-          
+          if (!file) throw new Error('No se seleccionó ningún archivo');
           const mediaType = getMediaType(file);
-          console.log('Detected media type:', mediaType);
-          if (!mediaType) {
-            throw new Error('Tipo de archivo no soportado');
-          }
-          formData.append('media_type', mediaType);
-        }
-
-        // Common fields
-        formData.append('title', data.title || '');
-        formData.append('author', data.author || '');
-
-        console.log('Submitting to API...');
-        const uploadOptions = currentIsUrlMode
-          ? {}
-          : {
-              onUploadProgress: (e) => {
-                if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-              }
-            };
-        const response = await contentApi.uploadContent(formData, uploadOptions);
-        console.log('API Response:', response);
-        
-        if (onContentUploaded) {
-          onContentUploaded(response.content_profile);
+          if (!mediaType) throw new Error('Tipo de archivo no soportado');
+          const response = await contentApi.uploadContentViaS3(
+            file,
+            {
+              media_type: mediaType,
+              title: data.title || '',
+              author: data.author || '',
+              personalNote: data.personalNote,
+              is_visible: data.is_visible ?? true,
+              is_producer: data.is_producer ?? false
+            },
+            (e) => {
+              if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          );
+          console.log('API Response:', response);
+          if (onContentUploaded) onContentUploaded(response.content_profile);
         }
 
         reset();
@@ -574,9 +552,14 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       }
     } catch (error) {
       console.error('Upload failed:', error);
+      const backendError = error.response?.data?.error;
+      const backendDetails = error.response?.data?.details;
+      const message = backendError
+        ? (backendDetails ? `${backendError}: ${backendDetails}` : backendError)
+        : (error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.');
       setSnackbar({
         open: true,
-        message: error.response?.data?.error || error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.',
+        message,
         severity: 'error'
       });
     } finally {

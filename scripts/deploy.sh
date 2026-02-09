@@ -5,6 +5,10 @@
 
 set -e  # Exit on any error
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "🚀 Starting production deployment..."
 
 # Colors for output
@@ -152,5 +156,5 @@ echo "  - Frontend: http://localhost"
 echo "  - Backend API: http://localhost/api"
 echo "  - Admin: http://localhost/admin"
 echo ""
-echo "To view logs: docker compose --env-file $COMPOSE_ENV_FILE -f docker-compose.prod.yml logs -f"
-echo "To stop services: docker compose --env-file $COMPOSE_ENV_FILE -f docker-compose.prod.yml down"
+echo "To view logs: docker compose --env-file $PROJECT_ROOT/.env.compose -f $PROJECT_ROOT/docker-compose.prod.yml logs -f"
+echo "To stop services: docker compose --env-file $PROJECT_ROOT/.env.compose -f $PROJECT_ROOT/docker-compose.prod.yml down"
