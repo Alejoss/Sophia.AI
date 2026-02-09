@@ -624,9 +624,9 @@ class UploadContentPresignView(APIView):
             "S3 presign: generating URL",
             extra={
                 'user_id': request.user.id,
-                'filename': filename,
+                'upload_filename': filename,
                 'file_size': file_size,
-                'key': key,
+                's3_key': key,
                 'bucket': bucket,
                 'region': region,
             }
@@ -651,7 +651,7 @@ class UploadContentPresignView(APIView):
             )
         logger.info(
             "S3 presign: success",
-            extra={'user_id': request.user.id, 'key': key, 'bucket': bucket}
+            extra={'user_id': request.user.id, 's3_key': key, 'bucket': bucket}
         )
         return Response({
             'upload_url': upload_url,
@@ -686,7 +686,7 @@ class UploadContentConfirmView(APIView):
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         logger.info(
             "S3 confirm: checking object in S3",
-            extra={'user_id': request.user.id, 'key': key, 'bucket': bucket}
+            extra={'user_id': request.user.id, 's3_key': key, 'bucket': bucket}
         )
         media_type = request.data.get('media_type')
         if not media_type or media_type not in VALID_MEDIA_TYPES:
@@ -723,13 +723,13 @@ class UploadContentConfirmView(APIView):
         except Exception as e:
             logger.warning(
                 "S3 confirm: head_object failed (file not in S3)",
-                extra={'key': key, 'bucket': bucket, 'error': str(e)}
+                extra={'s3_key': key, 'bucket': bucket, 'error': str(e)}
             )
             return Response(
                 {'error': 'El archivo no se encontró en el almacenamiento. Sube primero con la URL de subida.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        logger.info("S3 confirm: head_object OK, creating Content/FileDetails", extra={'key': key})
+        logger.info("S3 confirm: head_object OK, creating Content/FileDetails", extra={'s3_key': key})
         content = Content.objects.create(
             uploaded_by=request.user,
             media_type=media_type,
@@ -756,7 +756,7 @@ class UploadContentConfirmView(APIView):
             extra={
                 'user_id': request.user.id,
                 'content_id': content.id,
-                'key': key,
+                's3_key': key,
                 'bucket': bucket,
             }
         )
