@@ -9,9 +9,16 @@ from quizzes.serializers import QuizSerializer
 
 
 class FileDetailsSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
+
     class Meta:
         model = FileDetails
         fields = ['file', 'file_size', 'uploaded_at']
+
+    def get_file(self, obj):
+        if obj.file:
+            return build_media_url(obj.file, self.context.get('request'))
+        return None
 
 
 class NodeSerializer(serializers.ModelSerializer):

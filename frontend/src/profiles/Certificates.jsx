@@ -284,11 +284,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             />
                           )}
                         </div>
-                        {certificate.download_url && (
+                        {(certificate.download_url || certificate.certificate_file_url) && (
                           <Button
                             variant="contained"
                             color="primary"
-                            href={certificate.download_url}
+                            href={certificate.download_url || certificate.certificate_file_url}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

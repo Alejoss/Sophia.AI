@@ -222,6 +222,12 @@ class TopicBasicSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'creator', 'topic_image']
         read_only_fields = ['creator']
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.topic_image:
+            ret['topic_image'] = build_media_url(instance.topic_image, self.context.get('request'))
+        return ret
+
     def validate_title(self, value):
         if len(value.strip()) == 0:
             raise serializers.ValidationError("El título no puede estar vacío o contener solo espacios en blanco.")
@@ -252,7 +258,10 @@ class TopicContentSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         self.context['topic'] = instance
-        return super().to_representation(instance)
+        ret = super().to_representation(instance)
+        if instance.topic_image:
+            ret['topic_image'] = build_media_url(instance.topic_image, self.context.get('request'))
+        return ret
 
 
 class TopicModeratorInvitationSerializer(serializers.ModelSerializer):

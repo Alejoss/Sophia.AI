@@ -89,14 +89,19 @@ class CertificateSerializer(serializers.ModelSerializer):
         ]
 
     def get_download_url(self, obj):
-        # If you have a method to generate download URLs, implement it here
-        # For now, returning None
-        return None
+        # Same as certificate_file_url for download button
+        return self.get_certificate_file_url(obj)
 
     def get_certificate_file_url(self, obj):
         if obj.certificate_file:
             return build_media_url(obj.certificate_file, self.context.get('request'))
         return None
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.certificate_file:
+            ret['certificate_file'] = build_media_url(instance.certificate_file, self.context.get('request'))
+        return ret
 
 
 class CertificateTemplateSerializer(serializers.ModelSerializer):
