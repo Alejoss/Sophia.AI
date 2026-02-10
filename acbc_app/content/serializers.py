@@ -1,31 +1,9 @@
-from django.conf import settings
 from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
 from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
-
-
-def _build_media_url(file_field_or_key, request=None):
-    """Return absolute media URL. For S3: build explicitly (avoids build_absolute_uri mangling)."""
-    if not file_field_or_key:
-        return None
-    key = file_field_or_key.name if hasattr(file_field_or_key, 'name') else str(file_field_or_key)
-    if not key or not key.strip():
-        return None
-    key = key.strip()
-    if key.startswith('http://') or key.startswith('https://'):
-        return key if 'content_details' not in key else None
-    use_s3 = getattr(settings, 'DEFAULT_FILE_STORAGE', '') and 's3' in str(getattr(settings, 'DEFAULT_FILE_STORAGE', '')).lower()
-    if use_s3:
-        domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
-        if domain:
-            return f"https://{domain.rstrip('/')}/{key.lstrip('/')}"
-    if request:
-        return request.build_absolute_uri(key)
-    return None
-
-
+from content.utils import build_media_url
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
 
@@ -51,7 +29,7 @@ class FileDetailsSerializer(serializers.ModelSerializer):
         """Return absolute media URL. Build S3 URL explicitly to avoid build_absolute_uri mangling."""
         if not obj.file:
             return None
-        return _build_media_url(obj.file, self.context.get('request'))
+        return build_media_url(obj.file, self.context.get('request'))
 
     def get_file(self, obj):
         return self._get_file_url(obj)
@@ -350,10 +328,7 @@ class TopicIdTitleSerializer(serializers.ModelSerializer):
     
     def get_topic_image(self, obj):
         if obj.topic_image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.topic_image.url)
-            return obj.topic_image.url
+            return build_media_url(obj.topic_image, self.context.get('request'))
         return None
 
 
@@ -367,13 +342,9 @@ class PublicationBasicSerializer(serializers.ModelSerializer):
     
     def get_profile_picture(self, obj):
         try:
-            # Get the user's profile picture
             profile = obj.user.profile
             if profile.profile_picture:
-                request = self.context.get('request')
-                if request:
-                    return request.build_absolute_uri(profile.profile_picture.url)
-                return profile.profile_picture.url
+                return build_media_url(profile.profile_picture, self.context.get('request'))
         except Exception:
             pass
         return None
@@ -463,7 +434,7 @@ class PreviewContentSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, 'file_details') and obj.file_details:
                 fd = obj.file_details
-                url = _build_media_url(fd.file, self.context.get('request')) if fd.file else None
+                url = build_media_url(fd.file, self.context.get('request')) if fd.file else None
                 return {
                     'file': url,
                     'url': url,

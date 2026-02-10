@@ -1,14 +1,21 @@
 from rest_framework import serializers
 from .models import Badge, UserBadge
+from content.utils import build_media_url
 
 
 class BadgeSerializer(serializers.ModelSerializer):
     """Serializer for Badge model."""
+    icon = serializers.SerializerMethodField()
     
     class Meta:
         model = Badge
         fields = ['id', 'code', 'name', 'description', 'icon', 'category', 'points_value', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def get_icon(self, obj):
+        if obj.icon:
+            return build_media_url(obj.icon, self.context.get('request'))
+        return None
 
 
 class UserBadgeSerializer(serializers.ModelSerializer):
@@ -30,7 +37,7 @@ class UserBadgeSummarySerializer(serializers.ModelSerializer):
     badge_name = serializers.CharField(source='badge.name', read_only=True)
     badge_description = serializers.CharField(source='badge.description', read_only=True)
     badge_category = serializers.CharField(source='badge.category', read_only=True)
-    badge_icon = serializers.ImageField(source='badge.icon', read_only=True)
+    badge_icon = serializers.SerializerMethodField()
     
     class Meta:
         model = UserBadge
@@ -39,3 +46,8 @@ class UserBadgeSummarySerializer(serializers.ModelSerializer):
             'badge_category', 'badge_icon', 'earned_at', 'points_earned', 'context_data'
         ]
         read_only_fields = ['id', 'earned_at', 'points_earned']
+    
+    def get_badge_icon(self, obj):
+        if obj.badge and obj.badge.icon:
+            return build_media_url(obj.badge.icon, self.context.get('request'))
+        return None

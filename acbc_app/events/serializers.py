@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from comments.models import Comment
 from certificates.models import Certificate, CertificateRequest
+from content.utils import build_media_url
 from events.models import Event, EventRegistration
 from profiles.serializers import UserSerializer, AcceptedCryptoSerializer
 from profiles.models import AcceptedCrypto
@@ -29,11 +30,7 @@ class EventSerializer(serializers.ModelSerializer):
         """Custom representation to provide full URLs for images"""
         data = super().to_representation(instance)
         if instance.image:
-            request = self.context.get('request')
-            if request:
-                data['image'] = request.build_absolute_uri(instance.image.url)
-            else:
-                data['image'] = instance.image.url
+            data['image'] = build_media_url(instance.image, self.context.get('request'))
         return data
 
     def validate(self, data):

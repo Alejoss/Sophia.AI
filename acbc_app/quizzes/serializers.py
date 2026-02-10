@@ -1,6 +1,7 @@
 from rest_framework import serializers
 import logging
 from .models import Quiz, Question, Option, UserQuizAttempt, Answer
+from content.utils import build_media_url
 from knowledge_paths.services.node_user_activity_service import has_completed_quiz
 
 # Get logger for quizzes serializers
@@ -16,6 +17,7 @@ class OptionSerializer(serializers.ModelSerializer):
 class QuestionSerializer(serializers.ModelSerializer):
     options = OptionSerializer(many=True)
     correct_answers = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
@@ -24,6 +26,11 @@ class QuestionSerializer(serializers.ModelSerializer):
     def get_correct_answers(self, obj):
         # Get the IDs of all correct options for this question
         return [opt.id for opt in obj.options.filter(is_correct=True)]
+
+    def get_image(self, obj):
+        if obj.image:
+            return build_media_url(obj.image, self.context.get('request'))
+        return None
 
 
 class AnswerSerializer(serializers.ModelSerializer):

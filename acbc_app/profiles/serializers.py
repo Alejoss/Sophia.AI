@@ -3,6 +3,7 @@ import logging
 
 from django.contrib.auth.models import User
 
+from content.utils import build_media_url
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile, Suggestion
 from notifications.models import Notification
 
@@ -52,10 +53,7 @@ class CryptoCurrencySerializer(serializers.ModelSerializer):
     
     def get_thumbnail(self, obj):
         if obj.thumbnail:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.thumbnail.url)
-            return obj.thumbnail.url
+            return build_media_url(obj.thumbnail, self.context.get('request'))
         return None
 
 
@@ -97,10 +95,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_profile_picture(self, obj):
         if obj.profile_picture:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url
+            return build_media_url(obj.profile_picture, self.context.get('request'))
         return None
 
     def get_badges(self, obj):

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import KnowledgePath, Node
 from django.contrib.auth.models import User
 from content.models import FileDetails, ContentProfile
+from content.utils import build_media_url
 from profiles.models import UserNodeCompletion
 from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
 from quizzes.serializers import QuizSerializer
@@ -85,10 +86,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     
     def get_image(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            return build_media_url(obj.image, self.context.get('request'))
         return None
 
 
@@ -153,10 +151,7 @@ class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     
     def get_image(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            return build_media_url(obj.image, self.context.get('request'))
         return None
 
 
@@ -171,10 +166,7 @@ class KnowledgePathEngagedSerializer(serializers.ModelSerializer):
 
     def get_image(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            return build_media_url(obj.image, self.context.get('request'))
         return None
 
 
@@ -205,10 +197,7 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
     
     def get_image(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            return build_media_url(obj.image, self.context.get('request'))
         return None
 
 

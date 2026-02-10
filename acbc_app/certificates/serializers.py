@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from content.utils import build_media_url
 from .models import CertificateRequest, Certificate, CertificateTemplate
 from knowledge_paths.serializers import KnowledgePathSerializer
 from knowledge_paths.models import KnowledgePath
@@ -93,14 +95,18 @@ class CertificateSerializer(serializers.ModelSerializer):
 
     def get_certificate_file_url(self, obj):
         if obj.certificate_file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.certificate_file.url)
-            return obj.certificate_file.url
+            return build_media_url(obj.certificate_file, self.context.get('request'))
         return None
 
 
 class CertificateTemplateSerializer(serializers.ModelSerializer):
+    template_file = serializers.SerializerMethodField()
+
     class Meta:
         model = CertificateTemplate
-        fields = '__all__' 
+        fields = '__all__'
+
+    def get_template_file(self, obj):
+        if obj.template_file:
+            return build_media_url(obj.template_file, self.context.get('request'))
+        return None 

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 import logging
 from content.models import Content
@@ -5,6 +6,29 @@ from votes.models import VoteCount
 
 # Get logger for content utils
 logger = logging.getLogger('academia_blockchain.content.utils')
+
+
+def build_media_url(file_field_or_key, request=None):
+    """
+    Return absolute media URL for S3 or local storage.
+    For S3: build explicitly to avoid build_absolute_uri mangling (content_details bug).
+    """
+    if not file_field_or_key:
+        return None
+    key = file_field_or_key.name if hasattr(file_field_or_key, 'name') else str(file_field_or_key)
+    if not key or not key.strip():
+        return None
+    key = key.strip()
+    if key.startswith('http://') or key.startswith('https://'):
+        return key if 'content_details' not in key else None
+    use_s3 = getattr(settings, 'DEFAULT_FILE_STORAGE', '') and 's3' in str(getattr(settings, 'DEFAULT_FILE_STORAGE', '')).lower()
+    if use_s3:
+        domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
+        if domain:
+            return f"https://{domain.rstrip('/')}/{key.lstrip('/')}"
+    if request:
+        return request.build_absolute_uri(key)
+    return None
 
 def get_top_voted_contents(topic, media_type, limit=None):
     """
