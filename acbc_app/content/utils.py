@@ -10,8 +10,7 @@ logger = logging.getLogger('academia_blockchain.content.utils')
 
 def build_media_url(file_field_or_key, request=None):
     """
-    Return absolute media URL for S3 or local storage.
-    For S3: build explicitly to avoid build_absolute_uri mangling (content_details bug).
+    Return absolute media URL. S3: https://{domain}/{key}. Local: request.build_absolute_uri(key).
     """
     if not file_field_or_key:
         return None
@@ -20,7 +19,7 @@ def build_media_url(file_field_or_key, request=None):
         return None
     key = key.strip()
     if key.startswith('http://') or key.startswith('https://'):
-        return key if 'content_details' not in key else None
+        return key
     use_s3 = getattr(settings, 'DEFAULT_FILE_STORAGE', '') and 's3' in str(getattr(settings, 'DEFAULT_FILE_STORAGE', '')).lower()
     if use_s3:
         domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)

@@ -103,6 +103,12 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
     def get_can_be_visible(self, obj):
         return obj.can_be_visible()
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.image:
+            data['image'] = build_media_url(instance.image, self.context.get('request'))
+        return data
+
     def validate_is_visible(self, value):
         """Validate that knowledge path can be made visible"""
         if value and not self.instance.can_be_visible():
