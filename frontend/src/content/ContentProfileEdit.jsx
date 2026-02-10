@@ -156,19 +156,22 @@ const ContentProfileEdit = () => {
                                 <Typography variant="body2">
                                     Tamaño: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
                                 </Typography>
-                                {content.file_details.file && (
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<DownloadIcon />}
-                                        href={resolveMediaUrl(content.url ?? content.file_details?.url ?? content.file_details?.file)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        download
-                                        sx={{ mt: 1 }}
-                                    >
-                                        Descargar archivo
-                                    </Button>
-                                )}
+                                {(() => {
+                                    const downloadUrl = resolveMediaUrl(content.url ?? content.file_details?.url ?? content.file_details?.file);
+                                    return downloadUrl && content.file_details.file ? (
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<DownloadIcon />}
+                                            href={downloadUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download
+                                            sx={{ mt: 1 }}
+                                        >
+                                            Descargar archivo
+                                        </Button>
+                                    ) : null;
+                                })()}
                             </Box>
                         )}
 

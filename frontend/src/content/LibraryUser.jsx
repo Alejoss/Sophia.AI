@@ -293,16 +293,19 @@ const LibraryUser = () => {
                     )}
                   </td>
                   <td style={{ padding: "12px", color: "inherit" }}>
-                    {(contentProfile.content.file_details?.url || contentProfile.content.file_details?.file) && (
-                      <a
-                        href={resolveMediaUrl(contentProfile.content.file_details.url ?? contentProfile.content.file_details.file)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "inherit", textDecoration: "underline" }}
-                      >
-                        Descargar
-                      </a>
-                    )}
+                    {(() => {
+                      const dlUrl = resolveMediaUrl(contentProfile.content.file_details?.url ?? contentProfile.content.file_details?.file);
+                      return dlUrl ? (
+                        <a
+                          href={dlUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "inherit", textDecoration: "underline" }}
+                        >
+                          Descargar
+                        </a>
+                      ) : null;
+                    })()}
                   </td>
                 </tr>
               ))}

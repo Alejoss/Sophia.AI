@@ -10,13 +10,18 @@ import { MEDIA_BASE_URL } from '../api/config';
  * Returns a valid media URL. Absolute URLs (S3, etc.) are returned as-is.
  * Relative paths are prefixed with origin only. Never uses API paths.
  * Rejects URLs that incorrectly contain content_details (API path, not media).
+ * Fixes malformed backend URLs: .../https/academiablockchain.s3... -> https://academiablockchain.s3...
  */
 export function resolveMediaUrl(value) {
   if (value == null || typeof value !== 'string') return null;
   const s = value.trim();
   if (!s) return null;
   if (s.startsWith('http://') || s.startsWith('https://')) {
-    if (s.includes('content_details')) return null;
+    if (s.includes('content_details')) {
+      const s3Match = s.match(/\/https\/([^/]+\.s3\.[^/]+\.amazonaws\.com\/.+)$/);
+      if (s3Match) return `https://${s3Match[1]}`;
+      return null;
+    }
     return s;
   }
   if (s.includes('content_details')) return null;

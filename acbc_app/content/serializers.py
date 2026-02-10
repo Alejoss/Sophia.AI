@@ -1,8 +1,31 @@
+from django.conf import settings
 from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
 from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
+
+
+def _build_media_url(file_field_or_key, request=None):
+    """Return absolute media URL. For S3: build explicitly (avoids build_absolute_uri mangling)."""
+    if not file_field_or_key:
+        return None
+    key = file_field_or_key.name if hasattr(file_field_or_key, 'name') else str(file_field_or_key)
+    if not key or not key.strip():
+        return None
+    key = key.strip()
+    if key.startswith('http://') or key.startswith('https://'):
+        return key if 'content_details' not in key else None
+    use_s3 = getattr(settings, 'DEFAULT_FILE_STORAGE', '') and 's3' in str(getattr(settings, 'DEFAULT_FILE_STORAGE', '')).lower()
+    if use_s3:
+        domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
+        if domain:
+            return f"https://{domain.rstrip('/')}/{key.lstrip('/')}"
+    if request:
+        return request.build_absolute_uri(key)
+    return None
+
+
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
 
@@ -25,17 +48,10 @@ class FileDetailsSerializer(serializers.ModelSerializer):
         ]
 
     def _get_file_url(self, obj):
-        """Return absolute media URL. S3 returns full URL; local uses build_absolute_uri."""
+        """Return absolute media URL. Build S3 URL explicitly to avoid build_absolute_uri mangling."""
         if not obj.file:
             return None
-        url = obj.file.url
-        if not url:
-            return None
-        if url.startswith('http://') or url.startswith('https://'):
-            return url
-        if 'request' in self.context and self.context.get('request'):
-            return self.context['request'].build_absolute_uri(url)
-        return url
+        return _build_media_url(obj.file, self.context.get('request'))
 
     def get_file(self, obj):
         return self._get_file_url(obj)
@@ -447,12 +463,7 @@ class PreviewContentSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, 'file_details') and obj.file_details:
                 fd = obj.file_details
-                url = None
-                if fd.file:
-                    u = fd.file.url
-                    url = u if (u and (u.startswith('http://') or u.startswith('https://'))) else (
-                        self.context['request'].build_absolute_uri(u) if self.context.get('request') else u
-                    )
+                url = _build_media_url(fd.file, self.context.get('request')) if fd.file else None
                 return {
                     'file': url,
                     'url': url,
