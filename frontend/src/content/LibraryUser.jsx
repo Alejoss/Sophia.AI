@@ -14,7 +14,7 @@ import NoteIcon from "@mui/icons-material/Note";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import contentApi from "../api/contentApi";
 import { useNavigate } from "react-router-dom";
-import { getFileUrl } from "../utils/fileUtils";
+import { resolveMediaUrl } from "../utils/fileUtils";
 import { AuthContext } from "../context/AuthContext";
 import ContentDisplay from "./ContentDisplay";
 
@@ -295,9 +295,7 @@ const LibraryUser = () => {
                   <td style={{ padding: "12px", color: "inherit" }}>
                     {(contentProfile.content.file_details?.url || contentProfile.content.file_details?.file) && (
                       <a
-                        href={contentProfile.content.file_details.url || getFileUrl(
-                          contentProfile.content.file_details.file
-                        )}
+                        href={resolveMediaUrl(contentProfile.content.file_details.url ?? contentProfile.content.file_details.file)}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "inherit", textDecoration: "underline" }}

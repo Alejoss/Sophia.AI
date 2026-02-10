@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, Button, Grid, CircularProgress, Card, CardMedia, CardContent, IconButton, Menu, MenuItem } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import contentApi from '../api/contentApi';
-import { getFileUrl } from '../utils/fileUtils';
+import { resolveMediaUrl } from '../utils/fileUtils';
 import { createContentDetailUrl, CONTEXT_TYPES } from '../utils/urlUtils';
 
 const LibraryContentList = () => {
@@ -14,7 +14,7 @@ const LibraryContentList = () => {
       <CardMedia
         component="img"
         height="140"
-        image={getFileUrl(content.thumbnail_url)}
+        image={resolveMediaUrl(content.thumbnail_url)}
         alt={content.display_title || "Untitled"}
       />
       <CardContent>

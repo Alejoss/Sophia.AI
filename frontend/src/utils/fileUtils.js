@@ -1,25 +1,32 @@
 /**
  * Utility functions for handling file URLs
+ * Media files (images, video, audio) are served from S3 or local storage.
+ * NEVER construct URLs with content_details – that path is for API only.
  */
 
 import { MEDIA_BASE_URL } from '../api/config';
 
 /**
- * Constructs a proper URL for a file
- * @param {string} filePath - The file path from the backend
- * @returns {string} - The complete URL to access the file
+ * Returns a valid media URL. Absolute URLs (S3, etc.) are returned as-is.
+ * Relative paths are prefixed with origin only. Never uses API paths.
+ * Rejects URLs that incorrectly contain content_details (API path, not media).
  */
-export const getFileUrl = (filePath) => {
-  if (!filePath) return null;
-  
-  // If the path already starts with http, return it as is
-  if (filePath.startsWith('http')) {
-    return filePath;
+export function resolveMediaUrl(value) {
+  if (value == null || typeof value !== 'string') return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    if (s.includes('content_details')) return null;
+    return s;
   }
-  
-  // Otherwise, prepend the backend URL from config
-  return `${MEDIA_BASE_URL}${filePath}`;
-};
+  if (s.includes('content_details')) return null;
+  const base = (MEDIA_BASE_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
+  const path = s.startsWith('/') ? s : `/${s}`;
+  return `${base}${path}`;
+}
+
+/** @deprecated Use resolveMediaUrl */
+export const getFileUrl = resolveMediaUrl;
 
 /**
  * Formats file size in bytes to human readable format

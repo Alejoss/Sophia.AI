@@ -614,9 +614,10 @@ class UploadContentPresignView(APIView):
                 {'error': 'El tamaño del archivo debe estar entre 1 byte y 5 GB'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # Sanitize filename for key (keep extension)
+        # Sanitize filename for key (keep extension). Structure: content/{media_type}/{user_id}/{uuid}_{name}
         safe_name = os.path.basename(filename).replace(' ', '_')[:200]
-        key = f"files/{request.user.id}/{uuid.uuid4().hex}_{safe_name}"
+        media_slug = 'document' if media_type == 'TEXT' else media_type.lower()
+        key = f"content/{media_slug}/{request.user.id}/{uuid.uuid4().hex}_{safe_name}"
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
         expires_in = 3600

@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useNavigate, Link } from "react-router-dom";
-import { getFileUrl } from "../utils/fileUtils";
+import { resolveMediaUrl } from "../utils/fileUtils";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ArticleIcon from "@mui/icons-material/Article";
@@ -98,24 +98,13 @@ const ContentDisplay = ({
     }
   };
 
-  // Standardized way to get file URL from different possible structures
   const getFileUrlFromContent = () => {
     try {
-      // For URL-based content, use the content URL directly
-      if (url) {
-        return url;
-      }
-
-      // For file-based content: prefer file_details.url (absolute, e.g. S3) when present
+      if (url) return resolveMediaUrl(url);
       if (fileDetails) {
-        if (fileDetails.url) {
-          return fileDetails.url;
-        }
-        if (fileDetails.file) {
-          return getFileUrl(fileDetails.file);
-        }
+        const v = fileDetails.url ?? fileDetails.file;
+        return resolveMediaUrl(v);
       }
-
       return null;
     } catch (error) {
       console.error("Error getting file URL:", error);
@@ -495,7 +484,7 @@ const ContentDisplay = ({
                       size="small"
                       variant="outlined"
                       onClick={() =>
-                        window.open(fileDetails.url || getFileUrl(fileDetails.file), "_blank")
+                        window.open(resolveMediaUrl(fileDetails.url ?? fileDetails.file), "_blank")
                       }
                       sx={{ ml: 1 }}
                     >
@@ -506,7 +495,7 @@ const ContentDisplay = ({
                       variant="text"
                       onClick={() =>
                         navigator.clipboard.writeText(
-                          fileDetails.url || getFileUrl(fileDetails.file)
+                          resolveMediaUrl(fileDetails.url ?? fileDetails.file)
                         )
                       }
                     >
@@ -857,7 +846,7 @@ const ContentDisplay = ({
                   window.open(url, "_blank");
                 } else if (fileDetails?.file) {
                   // File-based content - open the file
-                  const fileUrl = fileDetails.url || getFileUrl(fileDetails.file);
+                  const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
                   if (fileUrl) {
                     window.open(fileUrl, "_blank");
                   }
@@ -942,7 +931,7 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   if (hasImageFile) {
-                    const imageSrc = fileDetails.url || getFileUrl(fileDetails.file);
+                    const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
                     return (
                       <img
                         src={imageSrc}
@@ -1212,7 +1201,7 @@ const ContentDisplay = ({
             if (url) {
               window.open(url, "_blank");
             } else if (fileDetails?.file || fileDetails?.url) {
-              const fileUrl = fileDetails.url || getFileUrl(fileDetails.file);
+              const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
               if (fileUrl) {
                 window.open(fileUrl, "_blank");
               }
@@ -1264,7 +1253,7 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   if (hasImageFile) {
-                    const imageSrc = fileDetails.url || getFileUrl(fileDetails.file);
+                    const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
                     return (
                       <img
                         src={imageSrc}

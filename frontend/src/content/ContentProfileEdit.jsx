@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { formatDate } from '../utils/dateUtils';
+import { resolveMediaUrl } from '../utils/fileUtils';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from './ContentDisplay';
@@ -159,7 +160,7 @@ const ContentProfileEdit = () => {
                                     <Button
                                         variant="outlined"
                                         startIcon={<DownloadIcon />}
-                                        href={content.url || content.file_details.url || content.file_details.file}
+                                        href={resolveMediaUrl(content.url ?? content.file_details?.url ?? content.file_details?.file)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         download

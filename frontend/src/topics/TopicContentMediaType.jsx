@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
-import { MEDIA_BASE_URL } from '../api/config';
+import { resolveMediaUrl } from '../utils/fileUtils';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import TopicHeader from './TopicHeader';
@@ -67,7 +67,7 @@ const TopicContentMediaType = () => {
                             width: '100%',
                             objectFit: 'cover'
                         }}
-                        image={content.file_details?.url || `https://picsum.photos/800/600?random=${content.id}`}
+                        image={resolveMediaUrl(content.file_details?.url) || `https://picsum.photos/800/600?random=${content.id}`}
                         alt={content.selected_profile?.title || 'Content image'}
                     />
                 );
@@ -89,7 +89,7 @@ const TopicContentMediaType = () => {
                                 width: '100%',
                                 objectFit: 'cover'
                             }}
-                            image={content.file_details?.url}
+                            image={resolveMediaUrl(content.file_details?.url)}
                         />
                         <Box
                             sx={{
@@ -117,7 +117,7 @@ const TopicContentMediaType = () => {
                             controls
                             style={{ width: '100%' }}
                         >
-                            <source src={content.file_details?.url} type="audio/mpeg" />
+                            <source src={resolveMediaUrl(content.file_details?.url)} type="audio/mpeg" />
                             Tu navegador no soporta el elemento de audio.
                         </audio>
                     </Box>

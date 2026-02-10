@@ -1,3 +1,5 @@
+import os
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.apps import apps
@@ -147,10 +149,19 @@ class ContentProfile(models.Model):
         return self.author or self.content.original_author
 
 
+def content_file_upload_path(instance, filename):
+    """S3 path: content/{media_type}/{user_id}/{uuid}_{filename}. Same structure as presign flow."""
+    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    media_type = getattr(instance.content, 'media_type', 'TEXT')
+    media_slug = 'document' if media_type == 'TEXT' else media_type.lower()
+    user_id = instance.content.uploaded_by_id or 0
+    return f"content/{media_slug}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
+
+
 class FileDetails(models.Model):
     """Handles file storage and content analysis"""
     content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='file_details')
-    file = models.FileField(upload_to='files/', blank=True, null=True)  # Optional for URL content
+    file = models.FileField(upload_to=content_file_upload_path, blank=True, null=True)  # Optional for URL content
     file_size = models.PositiveIntegerField(blank=True, null=True)
     
     # Text analysis (for text-based content)

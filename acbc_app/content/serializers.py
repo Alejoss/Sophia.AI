@@ -14,6 +14,7 @@ class LibrarySerializer(serializers.ModelSerializer):
 
 
 class FileDetailsSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
 
     class Meta:
@@ -22,14 +23,25 @@ class FileDetailsSerializer(serializers.ModelSerializer):
             'file', 'file_size', 'uploaded_at', 'url',
             'og_description', 'og_image', 'og_type', 'og_site_name'
         ]
-    
-    def get_url(self, obj):
-        if obj.file:
-            url = obj.file.url
-            if 'request' in self.context and self.context['request'] is not None:
-                return self.context['request'].build_absolute_uri(url)
+
+    def _get_file_url(self, obj):
+        """Return absolute media URL. S3 returns full URL; local uses build_absolute_uri."""
+        if not obj.file:
+            return None
+        url = obj.file.url
+        if not url:
+            return None
+        if url.startswith('http://') or url.startswith('https://'):
             return url
-        return None
+        if 'request' in self.context and self.context.get('request'):
+            return self.context['request'].build_absolute_uri(url)
+        return url
+
+    def get_file(self, obj):
+        return self._get_file_url(obj)
+
+    def get_url(self, obj):
+        return self._get_file_url(obj)
 
 
 class ContentSerializer(serializers.ModelSerializer):
@@ -434,17 +446,22 @@ class PreviewContentSerializer(serializers.ModelSerializer):
     def get_file_details(self, obj):
         try:
             if hasattr(obj, 'file_details') and obj.file_details:
-                # Only include essential file details for preview
-                file_details = obj.file_details
+                fd = obj.file_details
+                url = None
+                if fd.file:
+                    u = fd.file.url
+                    url = u if (u and (u.startswith('http://') or u.startswith('https://'))) else (
+                        self.context['request'].build_absolute_uri(u) if self.context.get('request') else u
+                    )
                 return {
-                    'file': file_details.file.url if file_details.file else None,
-                    'file_size': file_details.file_size,
-                    'uploaded_at': file_details.uploaded_at,
-                    # Open Graph metadata for preview
-                    'og_description': file_details.og_description,
-                    'og_image': file_details.og_image,
-                    'og_type': file_details.og_type,
-                    'og_site_name': file_details.og_site_name
+                    'file': url,
+                    'url': url,
+                    'file_size': fd.file_size,
+                    'uploaded_at': fd.uploaded_at,
+                    'og_description': fd.og_description,
+                    'og_image': fd.og_image,
+                    'og_type': fd.og_type,
+                    'og_site_name': fd.og_site_name
                 }
             return None
         except Exception as e:
