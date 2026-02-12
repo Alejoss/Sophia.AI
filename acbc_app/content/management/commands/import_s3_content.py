@@ -15,6 +15,8 @@ USER_ID = 2
 S3_PREFIX = "Ucronia Subtitlos Español/"
 COLLECTION_NAME = "Ucronia Subtitlos Español"
 VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v'}
+# PositiveIntegerField max (PostgreSQL); larger files store None
+MAX_FILE_SIZE = 2147483647
 
 
 def is_video_key(key):
@@ -23,9 +25,18 @@ def is_video_key(key):
 
 
 def title_from_key(key):
-    """Same as UploadContentConfirmView: key.split('/')[-1].split('_', 1)[-1]"""
+    """
+    Derive display title from S3 key. E.g. "01 - Datos_ES.mp4" -> "Ucronía 01 - Datos (subtítulos español)"
+    """
     filename = key.split('/')[-1]
-    return filename.split('_', 1)[-1] if '_' in filename else filename
+    name_no_ext = os.path.splitext(filename)[0]  # "01 - Datos_ES" or "01 - Datos"
+    if name_no_ext.endswith('_ES'):
+        base = name_no_ext[:-3].strip()  # "01 - Datos"
+        suffix = " (subtítulos español)"
+    else:
+        base = name_no_ext
+        suffix = ""
+    return f"Ucronía {base}{suffix}"
 
 
 class Command(BaseCommand):
@@ -37,8 +48,22 @@ class Command(BaseCommand):
             action='store_true',
             help='Only list keys that would be imported, do not create anything.',
         )
+        parser.add_argument(
+            '--fix-existing',
+            action='store_true',
+            help='Fix titles of already-imported content with wrong "ES.mp4" names (run before re-import).',
+        )
 
     def handle(self, *args, **options):
+        user = User.objects.filter(pk=USER_ID).first()
+        if not user:
+            self.stderr.write(self.style.ERROR(f'User id={USER_ID} not found.'))
+            return
+
+        if options.get('fix_existing'):
+            self._fix_existing_titles(user)
+            return
+
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
             self.stderr.write(self.style.ERROR('AWS credentials not configured.'))
             return
@@ -47,11 +72,6 @@ class Command(BaseCommand):
             import boto3
         except ImportError:
             self.stderr.write(self.style.ERROR('boto3 required: pip install boto3'))
-            return
-
-        user = User.objects.filter(pk=USER_ID).first()
-        if not user:
-            self.stderr.write(self.style.ERROR(f'User id={USER_ID} not found.'))
             return
 
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
@@ -116,6 +136,11 @@ class Command(BaseCommand):
 
         # Create content exactly as UploadContentConfirmView (S3 confirm)
         for key, file_size in validated:
+            if FileDetails.objects.filter(file=key).exists():
+                self.stdout.write(self.style.WARNING(f'  Skip (already imported): {key}'))
+                continue
+            if file_size is not None and file_size > MAX_FILE_SIZE:
+                file_size = None  # PositiveIntegerField overflow for files > ~2GB
             title = title_from_key(key)
             # Same defaults as view: is_visible=True, is_producer=False, author=None, personal_note=None
             content = Content.objects.create(
@@ -142,3 +167,35 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'  Created: "{title}" (Content #{content.id})'))
 
         self.stdout.write(self.style.SUCCESS(f'Done. Imported {len(validated)} videos into library "{library.name}" for user id={USER_ID}.'))
+
+    def _fix_existing_titles(self, user):
+        """Fix Content/ContentProfile titles that were wrongly set to ES.mp4."""
+        library = Library.objects.filter(user=user).first()
+        if not library:
+            self.stdout.write(self.style.WARNING('No library found for user.'))
+            return
+        collection = Collection.objects.filter(library=library, name=COLLECTION_NAME).first()
+        if not collection:
+            self.stdout.write(self.style.WARNING(f'Collection "{COLLECTION_NAME}" not found.'))
+            return
+        profiles = ContentProfile.objects.filter(
+            collection=collection,
+            title='ES.mp4',
+        ).select_related('content')
+        count = 0
+        for profile in profiles:
+            try:
+                fd = profile.content.file_details
+            except FileDetails.DoesNotExist:
+                continue
+            key = fd.file.name if fd.file else None
+            if not key:
+                continue
+            new_title = title_from_key(key)
+            profile.content.original_title = new_title
+            profile.content.save(update_fields=['original_title'])
+            profile.title = new_title
+            profile.save(update_fields=['title'])
+            count += 1
+            self.stdout.write(self.style.SUCCESS(f'  Fixed: "{key}" -> "{new_title}"'))
+        self.stdout.write(self.style.SUCCESS(f'Done. Fixed {count} titles.'))
