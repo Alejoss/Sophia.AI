@@ -213,26 +213,45 @@ class ContentDetailView(APIView):
         
         try:
             content = get_object_or_404(Content, pk=pk)
-            # Check if the user has permission to delete this content
-            content_profile = ContentProfile.objects.get(content=content, user=request.user)
-            
-            logger.info(
-                "Deleting content profile",
-                extra={
-                    'user_id': user_id,
-                    'username': username,
-                    'content_id': pk,
-                    'content_title': content.original_title,
-                    'media_type': content.media_type,
-                }
-            )
-            
-            # Delete the content profile first
-            content_profile.delete()
-            
-            # Only delete the content and file if this was the last profile
+            content_profile = ContentProfile.objects.filter(
+                content=content, user=request.user
+            ).first()
+
+            # Allow: user has a profile, OR user is the original uploader, OR staff/superuser
+            if not content_profile and content.uploaded_by_id != request.user.id and not request.user.is_staff:
+                logger.warning(
+                    "Content deletion failed: permission denied",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': pk,
+                    }
+                )
+                return Response(
+                    {'error': 'No tiene permiso para eliminar este contenido'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if content_profile:
+                logger.info(
+                    "Deleting content profile",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'content_id': pk,
+                        'content_title': content.original_title,
+                        'media_type': content.media_type,
+                    }
+                )
+                content_profile.delete()
+
+            # Delete the content and file if no profiles remain (or uploader/staff doing full delete)
             remaining_profiles = ContentProfile.objects.filter(content=content).count()
-            if remaining_profiles == 0:
+            delete_content = (
+                remaining_profiles == 0
+                or (not content_profile and (content.uploaded_by_id == request.user.id or request.user.is_staff))
+            )
+            if delete_content:
                 logger.info(
                     "Deleting content and file (last profile removed)",
                     extra={
@@ -261,19 +280,6 @@ class ContentDetailView(APIView):
                 )
             
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except ContentProfile.DoesNotExist:
-            logger.warning(
-                "Content deletion failed: permission denied",
-                extra={
-                    'user_id': user_id,
-                    'username': username,
-                    'content_id': pk,
-                }
-            )
-            return Response(
-                {'error': 'No tiene permiso para eliminar este contenido'},
-                status=status.HTTP_403_FORBIDDEN
-            )
         except Exception as e:
             logger.error(
                 f"Content deletion failed: {str(e)}",
