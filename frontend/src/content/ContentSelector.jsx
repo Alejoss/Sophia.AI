@@ -1,6 +1,6 @@
 import React, { useState, useCallback, memo } from "react";
 import { Box, Button, Typography, Paper, ToggleButtonGroup, ToggleButton } from "@mui/material";
-import ContentSearchModal from "./ContentSearchModal";
+import LibrarySelectSingle from "./LibrarySelectSingle";
 import UploadContentForm from "./UploadContentForm";
 import ContentDisplay from "./ContentDisplay";
 
@@ -200,11 +200,12 @@ const ContentSelector = ({
         />
       )}
 
-      <ContentSearchModal
+      <LibrarySelectSingle
         isOpen={showContentModal}
         onClose={() => setShowContentModal(false)}
-        onSelectContent={handleContentSelect}
+        onSelect={handleContentSelect}
         isLoading={isUploading}
+        compact={true}
       />
     </Box>
   );
