@@ -156,7 +156,7 @@ class Command(BaseCommand):
                 personal_note=None,
                 user=user,
                 is_visible=True,
-                is_producer=False,
+                is_producer=True,  # importer is the producer
                 collection=collection,
             )
             file_details = FileDetails.objects.create(
@@ -195,7 +195,8 @@ class Command(BaseCommand):
             profile.content.original_title = new_title
             profile.content.save(update_fields=['original_title'])
             profile.title = new_title
-            profile.save(update_fields=['title'])
+            profile.is_producer = True  # importer is the producer
+            profile.save(update_fields=['title', 'is_producer'])
             count += 1
             self.stdout.write(self.style.SUCCESS(f'  Fixed: "{key}" -> "{new_title}"'))
         self.stdout.write(self.style.SUCCESS(f'Done. Fixed {count} titles.'))

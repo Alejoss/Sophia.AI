@@ -1064,9 +1064,11 @@ class ContentProfileView(APIView):
             user=request.user
         )
         
-        # If trying to change visibility, check if user has claimed to be the producer
+        # If trying to change visibility, check permission: must be producer or profile owner
         if 'is_visible' in request.data:
-            if not request.data.get('is_producer', False):
+            is_producer = request.data.get('is_producer', False)
+            is_owner = content_profile.user_id == request.user.id
+            if not is_producer and not is_owner:
                 return Response(
                     {'error': 'Debe reclamar ser el productor para cambiar la visibilidad'},
                     status=status.HTTP_403_FORBIDDEN
