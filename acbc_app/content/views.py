@@ -252,21 +252,23 @@ class ContentDetailView(APIView):
                 or (not content_profile and (content.uploaded_by_id == request.user.id or request.user.is_staff))
             )
             if delete_content:
+                has_file_details = hasattr(content, 'file_details')
+                fd = content.file_details if has_file_details else None
                 logger.info(
                     "Deleting content and file (last profile removed)",
                     extra={
                         'user_id': user_id,
                         'username': username,
                         'content_id': pk,
-                        'has_file_details': bool(content.file_details),
-                        'has_file': bool(content.file_details.file) if content.file_details else False,
+                        'has_file_details': has_file_details,
+                        'has_file': bool(fd.file) if fd and fd.file else False,
                     }
                 )
                 # No more profiles exist, safe to delete the content and file
-                if content.file_details:
-                    if content.file_details.file:
-                        content.file_details.file.delete()
-                    content.file_details.delete()
+                if fd:
+                    if fd.file:
+                        fd.file.delete()
+                    fd.delete()
                 content.delete()
             else:
                 logger.info(
