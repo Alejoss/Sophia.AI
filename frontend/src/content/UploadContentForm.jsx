@@ -32,6 +32,7 @@ import {
   ToggleButton,
   Snackbar
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const getMediaType = (file) => {
   if (!file || !file.type) return null;
@@ -224,6 +225,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(false);
   
   // Notify parent when uploading state changes
   useEffect(() => {
@@ -462,6 +464,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response.content_profile);
           }
           
+          setHasSavedSuccessfully(true);
           setSnackbar({
             open: true,
             message: '¡Nuevo contenido creado exitosamente! El perfil de contenido ha sido actualizado para referenciar el nuevo archivo.',
@@ -490,6 +493,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             onContentUploaded(response);
           }
           
+          setHasSavedSuccessfully(true);
           setSnackbar({
             open: true,
             message: '¡Contenido actualizado exitosamente!',
@@ -542,6 +546,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           if (onContentUploaded) onContentUploaded(response.content_profile);
         }
 
+        setHasSavedSuccessfully(true);
         reset();
         setPreviewData(null);
         setSnackbar({
@@ -570,6 +575,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
   // Update the mode toggle handlers
   const handleModeToggle = (newMode) => {
+    setHasSavedSuccessfully(false);
     console.log('handleModeToggle called with newMode:', newMode);
     console.log('Current form values before reset:', {
       title: watch('title'),
@@ -705,6 +711,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 }}
                 onChange={(e) => {
                   fileInputOnChange(e);
+                  setHasSavedSuccessfully(false);
                 }}
                 style={{ display: 'none' }}
               />
@@ -729,6 +736,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 error={!!errors.url}
                 helperText={errors.url?.message}
                 disabled={isLoadingPreview}
+                inputProps={{ onInput: () => setHasSavedSuccessfully(false) }}
               />
             </FormControl>
             
@@ -747,7 +755,10 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 label="Tipo de contenido"
                 {...register('media_type')}
                 value={watch('media_type')}
-                onChange={(e) => setValue('media_type', e.target.value)}
+                onChange={(e) => {
+                  setValue('media_type', e.target.value);
+                  setHasSavedSuccessfully(false);
+                }}
               >
                 <MenuItem value="VIDEO">Video</MenuItem>
                 <MenuItem value="AUDIO">Audio</MenuItem>
@@ -770,7 +781,10 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             variant="outlined"
             {...register('author')}
             value={watch('author') || ''}
-            onChange={(e) => setValue('author', e.target.value)}
+            onChange={(e) => {
+              setValue('author', e.target.value);
+              setHasSavedSuccessfully(false);
+            }}
             error={!!errors.author}
             helperText={errors.author?.message}
           />
@@ -782,7 +796,10 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             variant="outlined"
             {...register('title')}
             value={watch('title') || ''}
-            onChange={(e) => setValue('title', e.target.value)}
+            onChange={(e) => {
+              setValue('title', e.target.value);
+              setHasSavedSuccessfully(false);
+            }}
             error={!!errors.title}
             helperText={errors.title?.message}
           />
@@ -843,16 +860,30 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           </Box>
         )}
 
+        {hasSavedSuccessfully && (
+          <Alert
+            icon={<CheckCircleIcon />}
+            severity="success"
+            sx={{ mt: 2 }}
+          >
+            Guardado en tu biblioteca
+          </Alert>
+        )}
+
         <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
           <Button
             type="submit"
             variant="contained"
             color="primary"
             fullWidth
-            disabled={isUploading || isLoadingPreview}
+            disabled={isUploading || isLoadingPreview || hasSavedSuccessfully}
             startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : null}
           >
-            {isUploading ? 'Subiendo...' : (isEditMode ? 'Actualizar contenido' : 'Guardar Contenido')}
+            {isUploading
+              ? 'Subiendo...'
+              : hasSavedSuccessfully
+                ? (isEditMode ? 'Contenido actualizado' : 'Contenido guardado')
+                : (isEditMode ? 'Actualizar contenido' : 'Guardar Contenido')}
           </Button>
         </Stack>
       </form>

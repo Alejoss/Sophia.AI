@@ -765,6 +765,8 @@ class UploadContentConfirmView(APIView):
         )
         # Set S3 key in DB without triggering storage upload (file already in S3)
         FileDetails.objects.filter(pk=file_details.pk).update(file=key)
+        # Refresh in-memory object so serialization sees the file key (Django caches reverse OneToOne)
+        file_details.refresh_from_db()
         logger.info(
             "S3 confirm: success",
             extra={
