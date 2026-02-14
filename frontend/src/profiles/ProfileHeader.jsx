@@ -40,9 +40,9 @@ const ProfileHeader = ({
                                 height: '150px', 
                                 borderRadius: '50%', 
                                 objectFit: 'cover',
-                                cursor: 'pointer'
+                                ...(!isOwnProfile && { cursor: 'pointer' })
                             }}
-                            onClick={handleProfileClick}
+                            {...(!isOwnProfile && { onClick: handleProfileClick })}
                         />
                     </Box>
                 </Grid>
@@ -52,13 +52,11 @@ const ProfileHeader = ({
                             <Box>
                                 <Typography 
                                     variant="h4" 
-                                    onClick={handleProfileClick}
-                                    sx={{ 
+                                    onClick={!isOwnProfile ? handleProfileClick : undefined}
+                                    sx={!isOwnProfile ? { 
                                         cursor: 'pointer',
-                                        '&:hover': {
-                                            color: 'primary.main'
-                                        }
-                                    }}
+                                        '&:hover': { color: 'primary.main' }
+                                    } : undefined}
                                 >
                                     {profile.user.username}
                                 </Typography>

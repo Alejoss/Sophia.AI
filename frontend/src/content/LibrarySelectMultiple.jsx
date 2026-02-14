@@ -40,14 +40,6 @@ const LibrarySelectMultiple = ({
     contextName = "",
     compact = false
 }) => {
-    console.log('LibrarySelectMultiple rendering with props:', {
-        title,
-        hasFilterFunction: !!filterFunction,
-        maxSelections,
-        selectedIdsCount: selectedIds.length,
-        contextName
-    });
-    
     const [userContent, setUserContent] = useState([]);
     const [selectedContentProfiles, setSelectedContentProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -62,42 +54,11 @@ const LibrarySelectMultiple = ({
     const [collections, setCollections] = useState([]);
 
     useEffect(() => {
-        console.log('LibrarySelectMultiple useEffect triggered');
-        
         const fetchUserContent = async () => {
-            console.log('LibrarySelectMultiple: Fetching user content');
             try {
                 const data = await contentApi.getUserContent();
-                console.log('LibrarySelectMultiple: User content fetched:', {
-                    totalItems: data.length,
-                    sampleItem: data.length > 0 ? {
-                        id: data[0].id,
-                        title: data[0].title,
-                        content: data[0].content
-                    } : null
-                });
-                
-                // Apply filter if provided
-                if (filterFunction) {
-                    console.log('LibrarySelectMultiple: Applying filter function');
-                    const filteredData = data.filter(item => {
-                        const result = filterFunction(item);
-                        console.log('Filter result for item:', {
-                            id: item.id,
-                            title: item.title,
-                            result
-                        });
-                        return result;
-                    });
-                    console.log('LibrarySelectMultiple: After filtering:', {
-                        totalItems: data.length,
-                        filteredItems: filteredData.length
-                    });
-                    setUserContent(filteredData);
-                } else {
-                    console.log('LibrarySelectMultiple: No filter function provided, using all items');
-                    setUserContent(data);
-                }
+                const filteredData = filterFunction ? data.filter(filterFunction) : data;
+                setUserContent(filteredData);
                 setLoading(false);
             } catch (err) {
                 console.error('LibrarySelectMultiple: Error fetching content:', err);
@@ -107,10 +68,6 @@ const LibrarySelectMultiple = ({
         };
 
         fetchUserContent();
-        
-        return () => {
-            console.log('LibrarySelectMultiple useEffect cleanup');
-        };
     }, [filterFunction]);
 
     // Fetch user collections
@@ -201,27 +158,12 @@ const LibrarySelectMultiple = ({
     }, [userContent, selectedCollectionId, searchQuery, sortField, sortDirection]);
 
     const handleContentToggle = (contentProfile) => {
-        console.log('LibrarySelectMultiple.handleContentToggle:', {
-            contentProfileId: contentProfile.id,
-            contentId: contentProfile.content.id,
-            currentlySelected: selectedContentProfiles.map(p => p.id),
-            willBeSelected: !selectedContentProfiles.some(p => p.id === contentProfile.id)
-        });
-        
         setSelectedContentProfiles(prev => {
             let newSelection;
             if (prev.some(p => p.id === contentProfile.id)) {
                 newSelection = prev.filter(p => p.id !== contentProfile.id);
-                console.log('Removing from selection:', {
-                    contentProfileId: contentProfile.id,
-                    newSelection: newSelection.map(p => p.id)
-                });
             } else if (!maxSelections || prev.length < maxSelections) {
                 newSelection = [...prev, contentProfile];
-                console.log('Adding to selection:', {
-                    contentProfileId: contentProfile.id,
-                    newSelection: newSelection.map(p => p.id)
-                });
             } else {
                 return prev;
             }
@@ -236,12 +178,6 @@ const LibrarySelectMultiple = ({
     };
 
     const handleSelectAll = (event) => {
-        console.log('LibrarySelectMultiple.handleSelectAll:', {
-            checked: event.target.checked,
-            maxSelections,
-            totalItems: filteredContent.length
-        });
-        
         let newSelection;
         if (event.target.checked) {
             // Get currently selected items that are NOT in filteredContent
@@ -255,16 +191,10 @@ const LibrarySelectMultiple = ({
                 : filteredContent;
             
             newSelection = [...selectedNotInFiltered, ...itemsToAdd];
-            console.log('Selecting all:', {
-                selectedIds: newSelection.map(p => p.id),
-                limited: maxSelections ? 'yes' : 'no'
-            });
         } else {
-            // Only deselect items that are in filteredContent
             newSelection = selectedContentProfiles.filter(
                 selected => !filteredContent.some(filtered => filtered.id === selected.id)
             );
-            console.log('Clearing filtered selections');
         }
         
         setSelectedContentProfiles(newSelection);
@@ -281,16 +211,9 @@ const LibrarySelectMultiple = ({
 
     const handleSubmit = async () => {
         const selectedIds = selectedContentProfiles.map(p => p.id);
-        console.log('LibrarySelectMultiple.handleSubmit - Starting submission with:', {
-            selectedIds,
-            count: selectedIds.length
-        });
-        
         setSaving(true);
         try {
-            console.log('LibrarySelectMultiple.handleSubmit - Calling onSave with selected IDs');
             await onSave(selectedIds);
-            console.log('LibrarySelectMultiple.handleSubmit - Save successful');
         } catch (err) {
             console.error('LibrarySelectMultiple.handleSubmit - Error:', err);
             setError('Error al guardar las selecciones');
@@ -449,9 +372,10 @@ const LibrarySelectMultiple = ({
                                     <TableCell>{content.title || 'Sin título'}</TableCell>
                                     <TableCell>
                                         <Chip 
-                                            label={content.content.media_type} 
+                                            label={content.content?.media_type || '-'} 
                                             size="small"
                                             color="primary"
+                                            variant="outlined"
                                         />
                                     </TableCell>
                                     <TableCell>{content.author || 'Desconocido'}</TableCell>
@@ -459,7 +383,7 @@ const LibrarySelectMultiple = ({
                                         onClick={(e) => e.stopPropagation()} // Prevent row click from triggering
                                     >
                                         <MuiLink
-                                            href={`/content/${content.content.id}`}
+                                            href={`/content/${content.content?.id}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             sx={{ 

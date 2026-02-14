@@ -117,6 +117,7 @@ const HeaderComp = () => {
 
   const navLinks = [
     { to: '/search', label: 'Buscar' },
+    ...(isAuthenticated ? [{ to: '/content/library_user', label: 'Biblioteca' }] : []),
     { to: '/knowledge_path', label: 'Caminos de conocimiento' },
     { to: '/content/topics', label: 'Temas' },
     { to: '/events', label: 'Eventos' },

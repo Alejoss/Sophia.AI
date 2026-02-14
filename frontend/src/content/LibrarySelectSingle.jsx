@@ -211,10 +211,10 @@ const LibrarySelectSingle = ({
           sx={{ flexGrow: 1, minWidth: 180 }}
         />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Tipo / Colección</InputLabel>
+          <InputLabel>Colección</InputLabel>
           <Select
             value={selectedCollectionId || ''}
-            label="Tipo / Colección"
+            label="Colección"
             onChange={(e) =>
               setSelectedCollectionId(e.target.value || null)
             }

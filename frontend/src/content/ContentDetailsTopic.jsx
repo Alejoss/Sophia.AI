@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     Box, 
@@ -16,10 +16,12 @@ import BookmarkButton from '../bookmarks/BookmarkButton';
 import ContentDisplay from './ContentDisplay';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import TopicHeader from '../topics/TopicHeader';
+import { AuthContext } from '../context/AuthContext';
 
 // ContentDisplay Mode: "preview" - Basic preview for topic content detail
 const ContentDetailsTopic = () => {
     const { contentId, topicId } = useParams();
+    const { authState } = useContext(AuthContext);
     const navigate = useNavigate();
     const [content, setContent] = useState(null);
     const [topic, setTopic] = useState(null);
@@ -67,6 +69,10 @@ const ContentDetailsTopic = () => {
     if (loading) return <Typography>Cargando contenido...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
     if (!content || !topic) return <Typography>Contenido o tema no encontrado</Typography>;
+
+    const profileUserId = content?.selected_profile?.user;
+    const currentUserId = authState.user?.id;
+    const isOwnContent = profileUserId && currentUserId && parseInt(profileUserId) === parseInt(currentUserId);
 
     return (
         <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -118,10 +124,12 @@ const ContentDetailsTopic = () => {
                         }
                     }
                 }}>
-                    <AddToLibraryModal
-                        content={content}
-                        onSuccess={handleAddToLibrarySuccess}
-                    />
+                    {!isOwnContent && (
+                        <AddToLibraryModal
+                            content={content}
+                            onSuccess={handleAddToLibrarySuccess}
+                        />
+                    )}
                     <BookmarkButton
                         type="content"
                         ids={{

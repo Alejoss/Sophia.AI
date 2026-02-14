@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
-  Chip,
   ToggleButton,
   ToggleButtonGroup,
   IconButton,
   Button,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
 import NoteIcon from "@mui/icons-material/Note";
+import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import contentApi from "../api/contentApi";
 import { useNavigate } from "react-router-dom";
@@ -18,62 +18,76 @@ import { resolveMediaUrl } from "../utils/fileUtils";
 import { AuthContext } from "../context/AuthContext";
 import ContentDisplay from "./ContentDisplay";
 
+const fetchUserContentWithDetails = async () => {
+  const data = await contentApi.getUserContentWithDetails();
+  return Array.isArray(data) ? data.filter((item) => item && item.content) : [];
+};
+
 const LibraryUser = () => {
-  // TODO order by most recent by default
   const [userContent, setUserContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mediaFilter, setMediaFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const currentUser = authState.user;
   const isAuthenticated = authState.isAuthenticated;
 
   useEffect(() => {
-    const fetchUserContent = async () => {
+    const loadContent = async () => {
+      if (!isAuthenticated) {
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         setError(null);
-
-        console.log("Fetching user content for current user");
-
-        const data = await contentApi.getUserContentWithDetails();
-
-        console.log("Received data:", data);
-
-        // Filter out any content items that might be null or undefined
-        const validContent = Array.isArray(data)
-          ? data.filter((item) => item && item.content)
-          : [];
-        console.log("Valid content count:", validContent.length);
+        const validContent = await fetchUserContentWithDetails();
         setUserContent(validContent);
-        setLoading(false);
       } catch (err) {
-        console.error("Error fetching user content:", err);
         setError(
           err.response?.data?.error || err.message || "Error al obtener el contenido"
         );
+      } finally {
         setLoading(false);
       }
     };
-
-    if (isAuthenticated) {
-      fetchUserContent();
-    } else {
-      setLoading(false);
-    }
+    loadContent();
   }, [isAuthenticated]);
 
   const handleFilterChange = (event, newFilter) => {
     setMediaFilter(newFilter || "ALL");
   };
 
-  const filteredContent = userContent.filter((contentProfile) => {
-    if (!contentProfile || !contentProfile.content) return false;
-    return (
-      mediaFilter === "ALL" || contentProfile.content.media_type === mediaFilter
-    );
-  });
+  const filteredContent = useMemo(() => {
+    let result = userContent.filter((contentProfile) => {
+      if (!contentProfile || !contentProfile.content) return false;
+      return (
+        mediaFilter === "ALL" || contentProfile.content.media_type === mediaFilter
+      );
+    });
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter((contentProfile) => {
+        const title = (contentProfile.title || "").toLowerCase();
+        const author = (contentProfile.author || "").toLowerCase();
+        const note = (contentProfile.personal_note || "").toLowerCase();
+        const originalTitle = (contentProfile.content?.original_title || "").toLowerCase();
+        const mediaType = (contentProfile.content?.media_type || "").toLowerCase();
+        return (
+          title.includes(query) ||
+          author.includes(query) ||
+          note.includes(query) ||
+          originalTitle.includes(query) ||
+          mediaType.includes(query)
+        );
+      });
+    }
+
+    return result;
+  }, [userContent, mediaFilter, searchQuery]);
 
   if (loading) return <Typography color="text.primary">Cargando contenido...</Typography>;
   if (error)
@@ -84,35 +98,18 @@ const LibraryUser = () => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => {
+          onClick={async () => {
+            if (!isAuthenticated) return;
             setError(null);
             setLoading(true);
-            // Trigger the useEffect again
-            const fetchUserContent = async () => {
-              try {
-                setLoading(true);
-                setError(null);
-
-                const data = await contentApi.getUserContentWithDetails();
-
-                const validContent = Array.isArray(data)
-                  ? data.filter((item) => item && item.content)
-                  : [];
-                setUserContent(validContent);
-                setLoading(false);
-              } catch (err) {
-                console.error("Error fetching user content:", err);
-                setError(
-                  err.response?.data?.error ||
-                    err.message ||
-                    "Error al obtener el contenido"
-                );
-                setLoading(false);
-              }
-            };
-            if (isAuthenticated) {
-              fetchUserContent();
-            } else {
+            try {
+              const validContent = await fetchUserContentWithDetails();
+              setUserContent(validContent);
+            } catch (err) {
+              setError(
+                err.response?.data?.error || err.message || "Error al obtener el contenido"
+              );
+            } finally {
               setLoading(false);
             }
           }}
@@ -222,6 +219,27 @@ const LibraryUser = () => {
           </Button>
         </Box>
 
+        <TextField
+          placeholder="Buscar en tu biblioteca..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 2,
+            width: { xs: "100%", sm: 400 },
+            "& .MuiOutlinedInput-root": {
+              backgroundColor: "background.paper",
+            },
+          }}
+        />
+
         <ToggleButtonGroup
           value={mediaFilter}
           exclusive
@@ -257,6 +275,13 @@ const LibraryUser = () => {
       {mediaFilter === "TEXT" ? (
         // Table view for text files
         <Box sx={{ overflowX: "auto" }}>
+          {filteredContent.length === 0 ? (
+            <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 4 }}>
+              {searchQuery.trim()
+                ? "No se encontró contenido con la búsqueda realizada."
+                : "No se encontró contenido para el filtro seleccionado."}
+            </Typography>
+          ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -311,6 +336,7 @@ const LibraryUser = () => {
               ))}
             </tbody>
           </table>
+          )}
         </Box>
       ) : (
         // Grid view using ContentDisplay in card mode
@@ -336,7 +362,9 @@ const LibraryUser = () => {
           {filteredContent.length === 0 && (
             <Box gridColumn={{ xs: "span 12" }}>
               <Typography variant="body1" color="text.secondary" align="center">
-                No se encontró contenido para el filtro seleccionado.
+                {searchQuery.trim()
+                  ? "No se encontró contenido con la búsqueda realizada."
+                  : "No se encontró contenido para el filtro seleccionado."}
               </Typography>
             </Box>
           )}

@@ -186,7 +186,6 @@ const ContentProfileEdit = () => {
                                 value={formData.title}
                                 onChange={handleChange}
                                 margin="normal"
-                                helperText={content.original_title && `Título original: ${content.original_title}`}
                             />
                             <TextField
                                 fullWidth

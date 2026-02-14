@@ -680,6 +680,19 @@ class UploadContentConfirmView(APIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        try:
+            return self._post_impl(request)
+        except Exception as e:
+            logger.exception(
+                "S3 confirm: unhandled error",
+                extra={'user_id': getattr(request.user, 'id', None), 'error': str(e)}
+            )
+            return Response(
+                {'error': 'Error al confirmar la subida', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _post_impl(self, request):
         logger.info(
             "S3 confirm: request started",
             extra={'user_id': request.user.id, 'username': request.user.username}
@@ -876,7 +889,7 @@ class UserContentWithDetailsView(APIView):
         try:
             content_profiles = ContentProfile.objects.filter(user=request.user)\
                 .select_related('content', 'content__file_details')\
-                .order_by('title')
+                .order_by('-created_at')
             
             # Serialize each profile individually to handle errors gracefully
             response_data = []

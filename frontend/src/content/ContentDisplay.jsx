@@ -1459,12 +1459,6 @@ const ContentDisplay = ({
                       borderColor: "divider",
                     }}
                   >
-                    {contentData.original_title && (
-                      <Typography variant="body2" gutterBottom color="text.primary">
-                        <strong>título original:</strong>{" "}
-                        {contentData.original_title}
-                      </Typography>
-                    )}
                     {contentData.original_author && (
                       <Typography variant="body2" color="text.primary">
                         <strong>autor original:</strong>{" "}

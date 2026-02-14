@@ -75,4 +75,4 @@ El backend devuelve **URLs absolutas** para todos los archivos de media (S3 o lo
 
 ## Nota sobre LibraryContentList.jsx
 
-`LibraryContentList.jsx` usa `content.thumbnail_url`, que no existe en la API. El componente no está importado en ningún sitio (código muerto). Si se reactiva, usar: `content.file_details?.url ?? content.file_details?.file` para IMAGE, o la estructura equivalente según el tipo de contenido.
+Eliminado: el componente estaba incompleto (código muerto, no importado). La funcionalidad equivalente se cubre con LibraryUser y ContentDisplay.

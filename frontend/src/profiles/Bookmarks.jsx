@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -18,8 +18,10 @@ import ArticleIcon from "@mui/icons-material/Article";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddToLibraryModal from "../components/AddToLibraryModal";
 import ContentDisplay from "../content/ContentDisplay";
+import { AuthContext } from "../context/AuthContext";
 
 const Bookmarks = () => {
+  const { authState } = useContext(AuthContext);
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -145,10 +147,17 @@ const Bookmarks = () => {
                         onClick={() => handleBookmarkClick(bookmark)}
                         additionalActions={
                           <Box sx={{ display: "flex", gap: 1 }}>
-                            <AddToLibraryModal
-                              content={bookmark.content_profile}
-                              onSuccess={fetchBookmarks}
-                            />
+                            {(() => {
+                              const profileUserId = bookmark.content_profile?.user;
+                              const currentUserId = authState.user?.id;
+                              const isOwnContent = profileUserId && currentUserId && parseInt(profileUserId) === parseInt(currentUserId);
+                              return !isOwnContent ? (
+                                <AddToLibraryModal
+                                  content={bookmark.content_profile}
+                                  onSuccess={fetchBookmarks}
+                                />
+                              ) : null;
+                            })()}
                             <Tooltip title="Eliminar marcador">
                               <IconButton
                                 onClick={(e) => handleDelete(bookmark.id, e)}

@@ -113,8 +113,8 @@ const PublicationDetail = () => {
                     />
                     
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                        {/* Add to Library Button - Only show if there's referenced content */}
-                        {publication.content && (
+                        {/* Add to Library - Only show when viewing another user's publication */}
+                        {!isOwnProfile && publication.content && (
                             <AddToLibraryModal
                                 content={publication.content}
                                 onSuccess={handleAddToLibrarySuccess}

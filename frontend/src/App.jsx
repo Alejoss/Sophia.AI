@@ -53,7 +53,6 @@ import NodeDetail from './knowledgePaths/NodeDetail';
 import Quiz from './quizzes/Quiz';
 import PublicationCreationForm from './publications/PublicationCreationForm';
 import PublicationEditForm from './publications/PublicationEditForm';
-import UploadContentLibrary from './content/UploadContentLibrary';
 import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import MessageThread from './messages/MessageThread.jsx';
@@ -94,7 +93,6 @@ const AppContent = () => {
               <Route path="notifications" element={<Notifications />} />
             </Route>
             <Route path="content">
-              <Route path="upload_content_library" element={<UploadContentLibrary />} />
               <Route path="library_user" element={<LibraryUser />} />
               <Route path="collections" element={<CollectionsUser />} />
               <Route path="collections/create" element={<CreateCollectionForm />} />

@@ -85,7 +85,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
 
     return (
         <>
-            <Tooltip title="Agregar a la biblioteca">
+            <Tooltip title="Agregar a mi Biblioteca">
                 {buttonProps?.variant ? (
                     // Show as a button with text when buttonProps are provided
                     <Button
@@ -93,7 +93,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                         startIcon={<AddIcon />}
                         {...buttonProps}
                     >
-                        Agregar a la biblioteca
+                        Agregar a mi Biblioteca
                     </Button>
                 ) : (
                     // Show as an icon button (default behavior)
@@ -117,7 +117,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                 disablePortal={false}
                 aria-labelledby="add-to-library-dialog-title"
             >
-                <DialogTitle id="add-to-library-dialog-title">Agregar a la biblioteca</DialogTitle>
+                <DialogTitle id="add-to-library-dialog-title">Agregar a mi Biblioteca</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField
@@ -150,7 +150,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                 <DialogActions>
                     <Button onClick={handleClose}>Cancelar</Button>
                     <Button onClick={handleSubmit} variant="contained" color="primary">
-                        Agregar a la biblioteca
+                        Agregar a mi Biblioteca
                     </Button>
                 </DialogActions>
             </Dialog>

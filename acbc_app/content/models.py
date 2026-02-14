@@ -162,7 +162,7 @@ class FileDetails(models.Model):
     """Handles file storage and content analysis"""
     content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='file_details')
     file = models.FileField(upload_to=content_file_upload_path, blank=True, null=True)  # Optional for URL content
-    file_size = models.PositiveIntegerField(blank=True, null=True)
+    file_size = models.PositiveBigIntegerField(blank=True, null=True)  # BigInteger for files > 2GB
     
     # Text analysis (for text-based content)
     extracted_text = models.TextField(blank=True, null=True)
