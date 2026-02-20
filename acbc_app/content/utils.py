@@ -10,7 +10,7 @@ logger = logging.getLogger('academia_blockchain.content.utils')
 
 def build_media_url(file_field_or_key, request=None):
     """
-    Return absolute media URL. S3: https://{domain}/{key}. Local: request.build_absolute_uri(key).
+    Return absolute media URL. S3: https://{domain}/{key}. Local/prod (no S3): MEDIA_URL + key.
     """
     if not file_field_or_key:
         return None
@@ -25,8 +25,11 @@ def build_media_url(file_field_or_key, request=None):
         domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
         if domain:
             return f"https://{domain.rstrip('/')}/{key.lstrip('/')}"
+    # Local dev and prod (no S3): key is relative to MEDIA_ROOT; URL must be under MEDIA_URL
+    media_url = (getattr(settings, 'MEDIA_URL', '') or '').rstrip('/')
+    path = f"{media_url}/{key.lstrip('/')}" if media_url else key.lstrip('/')
     if request:
-        return request.build_absolute_uri(key)
+        return request.build_absolute_uri(path)
     return None
 
 def get_top_voted_contents(topic, media_type, limit=None):
