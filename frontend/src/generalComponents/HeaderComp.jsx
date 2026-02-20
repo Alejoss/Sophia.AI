@@ -38,17 +38,17 @@ const HeaderComp = () => {
     // Navigate to profile with section parameter
     if (section === 'library') {
       window.location.href = '/content/library_user';
+      return;
+    }
+    // Use the Profile component's section change handler if available
+    if (window.handleProfileSectionChange) {
+      window.handleProfileSectionChange(section);
     } else {
-      // Use the Profile component's section change handler if available
-      if (window.handleProfileSectionChange) {
-        window.handleProfileSectionChange(section);
-      } else {
-        // Fallback: update URL and reload
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('section', section);
-        window.history.pushState({}, '', currentUrl);
-        window.location.reload();
-      }
+      // Fallback: update URL and reload
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.set('section', section);
+      window.history.pushState({}, '', currentUrl);
+      window.location.reload();
     }
   };
 
@@ -117,7 +117,6 @@ const HeaderComp = () => {
 
   const navLinks = [
     { to: '/search', label: 'Buscar' },
-    ...(isAuthenticated ? [{ to: '/content/library_user', label: 'Biblioteca' }] : []),
     { to: '/knowledge_path', label: 'Caminos de conocimiento' },
     { to: '/content/topics', label: 'Temas' },
     { to: '/events', label: 'Eventos' },

@@ -13,6 +13,7 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  Autocomplete,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -29,6 +30,8 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState({});
   const [canceling, setCanceling] = useState({});
+  const [userOptions, setUserOptions] = useState([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,6 +51,22 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
 
     fetchData();
   }, [topicId]);
+
+  // Debounced user search for autocomplete
+  useEffect(() => {
+    const q = usernameInput.trim();
+    if (q.length < 2) {
+      setUserOptions([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setUserSearchLoading(true);
+      const results = await contentApi.searchUsersByUsername(q);
+      setUserOptions(results || []);
+      setUserSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [usernameInput]);
 
   const handleInviteModerator = async () => {
     if (!usernameInput.trim()) {
@@ -169,13 +188,28 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
 
       {/* Invite Moderator */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-        <TextField
-          label="Nombre de Usuario"
-          value={usernameInput}
-          onChange={(e) => setUsernameInput(e.target.value)}
-          size="small"
-          placeholder="Ingrese el nombre de usuario"
-          helperText="Ingrese el nombre de usuario del moderador a invitar"
+        <Autocomplete
+          freeSolo
+          options={userOptions}
+          getOptionLabel={(option) =>
+            typeof option === "string" ? option : option?.username ?? ""
+          }
+          inputValue={usernameInput}
+          onInputChange={(_, value) => setUsernameInput(value ?? "")}
+          onChange={(_, option) => {
+            if (option && typeof option === "object" && option.username) {
+              setUsernameInput(option.username);
+            }
+          }}
+          loading={userSearchLoading}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Nombre de usuario"
+              size="small"
+              placeholder="Escriba para buscar o ingrese el username"
+            />
+          )}
         />
         <TextField
           label="Mensaje (opcional)"

@@ -553,6 +553,18 @@ const contentApi = {
         }
     },
 
+    searchUsersByUsername: async (query) => {
+        try {
+            const response = await axiosInstance.get('/content/users/search/', {
+                params: { q: query || '' }
+            });
+            return response.data?.results ?? [];
+        } catch (error) {
+            console.error('Error searching users:', error.response || error);
+            return [];
+        }
+    },
+
     inviteTopicModerator: async (topicId, username, message = '') => {
         try {
             const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invite/`, {

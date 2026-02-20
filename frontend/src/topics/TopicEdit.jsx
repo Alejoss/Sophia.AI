@@ -209,8 +209,17 @@ const TopicEdit = () => {
   return (
     <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 1.5 }, maxWidth: 800, mx: "auto" }}>
       <Paper sx={{ p: 1.5, position: "relative" }}>
-        {/* View Topic and Edit Content Buttons */}
-        <Box sx={{ position: "absolute", top: -10, right: 12, zIndex: 1, display: "flex", gap: 1 }}>
+        {/* View Topic and Edit Content Buttons - in flow so they wrap and never overflow */}
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+            justifyContent: "flex-end",
+            mb: 2,
+            minWidth: 0,
+          }}
+        >
           <Button
             variant="contained"
             color="primary"

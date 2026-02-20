@@ -8,9 +8,11 @@ import {
     Box,
     Typography,
     Alert,
-    CircularProgress
+    CircularProgress,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
+import UploadContentForm from '../content/UploadContentForm';
 import contentApi from '../api/contentApi';
 
 const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
@@ -18,21 +20,35 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
-    const [showContentSelect, setShowContentSelect] = useState(true);
+    const [step, setStep] = useState('choice'); // 'choice' | 'library' | 'upload' | 'message'
+    const [uploadMode, setUploadMode] = useState('file'); // 'url' | 'file'
+    const [uploadInProgress, setUploadInProgress] = useState(false);
 
     const handleContentSelection = (selectedProfiles) => {
         setSelectedContentProfiles(selectedProfiles);
     };
 
     const handleCancelContentSelect = () => {
-        setShowContentSelect(false);
+        setStep('choice');
         onClose();
     };
 
-    const handleSaveContentSelect = (selectedIds) => {
-        // selectedIds are content profile IDs, but we need to keep the full objects
-        // The onSelectionChange callback provides the full objects
-        setShowContentSelect(false);
+    const handleBackToChoice = () => {
+        setStep('choice');
+    };
+
+    const handleSaveContentSelect = () => {
+        setStep('message');
+    };
+
+    const handleContentUploaded = (contentProfile) => {
+        setSelectedContentProfiles([contentProfile]);
+        setStep('message');
+    };
+
+    const handleChangeSelection = () => {
+        setSelectedContentProfiles([]);
+        setStep('choice');
     };
 
     const handleSubmit = async () => {
@@ -83,75 +99,157 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
             setSelectedContentProfiles([]);
             setMessage('');
             setError(null);
-            setShowContentSelect(true);
+            setStep('choice');
+            setUploadInProgress(false);
             onClose();
         }
     };
 
+    const renderStepContent = () => {
+        if (step === 'choice') {
+            return (
+                <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Elige de la biblioteca, desde una URL o sube un archivo para sugerir.
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            onClick={() => setStep('library')}
+                            sx={{ textTransform: 'none', py: 2 }}
+                        >
+                            Elegir de la biblioteca
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            size="large"
+                            fullWidth
+                            onClick={() => { setUploadMode('url'); setStep('upload'); }}
+                            sx={{ textTransform: 'none', py: 2 }}
+                        >
+                            Desde URL
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            size="large"
+                            fullWidth
+                            onClick={() => { setUploadMode('file'); setStep('upload'); }}
+                            sx={{ textTransform: 'none', py: 2 }}
+                        >
+                            Subir archivo
+                        </Button>
+                    </Box>
+                </Box>
+            );
+        }
+
+        if (step === 'library') {
+            return (
+                <Box>
+                    <Button
+                        variant="text"
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleBackToChoice}
+                        sx={{ mb: 2, textTransform: 'none' }}
+                    >
+                        Volver
+                    </Button>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Selecciona el contenido que deseas sugerir para este tema.
+                    </Typography>
+                    <LibrarySelectMultiple
+                        onCancel={handleCancelContentSelect}
+                        onSave={handleSaveContentSelect}
+                        onSelectionChange={handleContentSelection}
+                        title="Seleccionar contenido"
+                        maxSelections={null}
+                        selectedIds={selectedContentProfiles.map((p) => p.id)}
+                        compact={true}
+                    />
+                </Box>
+            );
+        }
+
+        if (step === 'upload') {
+            return (
+                <Box>
+                    <Button
+                        variant="text"
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleBackToChoice}
+                        sx={{ mb: 2, textTransform: 'none' }}
+                        disabled={uploadInProgress}
+                    >
+                        Volver
+                    </Button>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {uploadMode === 'url'
+                            ? 'Indica la URL del contenido que quieres sugerir.'
+                            : 'Sube el archivo del contenido que quieres sugerir.'}
+                    </Typography>
+                    <UploadContentForm
+                        onContentUploaded={handleContentUploaded}
+                        onUploadingChange={setUploadInProgress}
+                        initialUrlMode={uploadMode === 'url'}
+                        showModeToggle={false}
+                    />
+                </Box>
+            );
+        }
+
+        // step === 'message'
+        return (
+            <Box>
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                        {error}
+                    </Alert>
+                )}
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Has seleccionado {selectedContentProfiles.length} contenido(s). Opcionalmente,
+                    puedes agregar un mensaje explicando por qué sugieres este contenido.
+                </Typography>
+
+                <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Mensaje (opcional)"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Explica por qué este contenido sería valioso para el tema..."
+                    helperText={`${message.length}/500 caracteres`}
+                    inputProps={{ maxLength: 500 }}
+                    sx={{ mb: 2 }}
+                    disabled={submitting}
+                />
+
+                <Button
+                    variant="outlined"
+                    onClick={handleChangeSelection}
+                    disabled={submitting}
+                    sx={{ mr: 1 }}
+                >
+                    Cambiar selección
+                </Button>
+            </Box>
+        );
+    };
+
     return (
-        <Dialog 
-            open={open} 
+        <Dialog
+            open={open}
             onClose={handleClose}
             maxWidth="md"
             fullWidth
             disableEscapeKeyDown={submitting}
         >
-            <DialogContent sx={{ pt: 3 }}>
-                {showContentSelect ? (
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Selecciona el contenido que deseas sugerir para este tema.
-                        </Typography>
-                        <LibrarySelectMultiple
-                            onCancel={handleCancelContentSelect}
-                            onSave={handleSaveContentSelect}
-                            onSelectionChange={handleContentSelection}
-                            title="Seleccionar contenido"
-                            maxSelections={null}
-                            selectedIds={selectedContentProfiles.map(p => p.id)}
-                            compact={true}
-                        />
-                    </Box>
-                ) : (
-                    <Box>
-                        {error && (
-                            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                                {error}
-                            </Alert>
-                        )}
-
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Has seleccionado {selectedContentProfiles.length} contenido(s). 
-                            Opcionalmente, puedes agregar un mensaje explicando por qué sugieres este contenido.
-                        </Typography>
-
-                        <TextField
-                            fullWidth
-                            multiline
-                            rows={4}
-                            label="Mensaje (opcional)"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Explica por qué este contenido sería valioso para el tema..."
-                            helperText={`${message.length}/500 caracteres`}
-                            inputProps={{ maxLength: 500 }}
-                            sx={{ mb: 2 }}
-                            disabled={submitting}
-                        />
-
-                        <Button
-                            variant="outlined"
-                            onClick={() => setShowContentSelect(true)}
-                            disabled={submitting}
-                            sx={{ mr: 1 }}
-                        >
-                            Cambiar selección
-                        </Button>
-                    </Box>
-                )}
-            </DialogContent>
+            <DialogContent sx={{ pt: 3 }}>{renderStepContent()}</DialogContent>
             <DialogActions>
-                {!showContentSelect && (
+                {step === 'message' && (
                     <>
                         <Button onClick={handleClose} disabled={submitting}>
                             Cancelar

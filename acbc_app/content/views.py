@@ -1574,6 +1574,20 @@ class TopicModeratorsView(APIView):
             )
 
 
+class UserSearchView(APIView):
+    """Search users by username for autocomplete (e.g. when inviting topic moderators)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        q = (request.query_params.get('q') or '').strip()
+        if not q:
+            return Response({'results': []}, status=status.HTTP_200_OK)
+        users = User.objects.filter(
+            username__icontains=q
+        ).values('id', 'username').order_by('username')[:15]
+        return Response({'results': list(users)}, status=status.HTTP_200_OK)
+
+
 class TopicModeratorInviteView(APIView):
     """Create a moderator invitation for a topic. Only the creator can send invitations."""
     permission_classes = [IsAuthenticated]

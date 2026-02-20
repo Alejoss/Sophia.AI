@@ -1,8 +1,9 @@
 
 import React from "react";
-
+import { Link } from 'react-router-dom';
 import {
   Box,
+  Button,
   List,
   ListItem,
   ListItemButton,
@@ -22,11 +23,11 @@ import {
   CurrencyBitcoin as CryptoIcon,
   AccountTree as KnowledgePathIcon,
   Notifications as NotificationsIcon,
-  LibraryBooks as LibraryIcon,
   EmojiEvents as BadgeIcon,
   Lightbulb as LightbulbIcon,
   Security as SecurityIcon,
-  AcUnit as TopicIcon
+  AcUnit as TopicIcon,
+  LibraryBooks as LibraryIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 
@@ -100,13 +101,6 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
         path: null
       },
       {
-        label: 'Tu biblioteca',
-        section: 'library',
-        icon: LibraryIcon,
-        path: '/content/library_user',
-        showDividerBefore: true // Flag to show divider before this item
-      },
-      {
         label: 'Sugerencias',
         section: 'suggestions',
         icon: LightbulbIcon,
@@ -155,68 +149,44 @@ const ProfileVerticalNavigation = ({
       }}
     >
       <Box sx={{ p: 2 }}>
-        <Typography 
-          variant="h6" 
-          component="h2" 
-          sx={{ 
-            mb: 2, 
-            color: 'text.primary',
-            fontWeight: 600 
-          }}
-        >
-          {isOwnProfile ? 'Tu perfil' : 'Perfil'}
-        </Typography>
-        
+        {isOwnProfile ? (
+          <Button
+            component={Link}
+            to="/content/library_user"
+            variant="contained"
+            startIcon={<LibraryIcon />}
+            fullWidth
+            sx={{
+              mb: 2,
+              py: 1.25,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '1rem',
+            }}
+          >
+            Mi Biblioteca
+          </Button>
+        ) : (
+          <Typography
+            variant="h6"
+            component="h2"
+            sx={{
+              mb: 2,
+              color: 'text.primary',
+              fontWeight: 600,
+            }}
+          >
+            Perfil
+          </Typography>
+        )}
+
         <Divider sx={{ mb: 2 }} />
         
         <List sx={{ p: 0 }}>
           {menuItems.map((item, index) => {
             const IconComponent = item.icon;
             const isItemActive = activeSection === item.section;
-            
-            // Show divider before library item if flag is set
-            const showDivider = item.showDividerBefore;
-            
-            // Handle library link differently (external link)
-            if (item.path && item.section === 'library') {
-              return (
-                <React.Fragment key={index}>
-                  {showDivider && <Divider sx={{ my: 1, mx: 2 }} />}
-                  <ListItem disablePadding sx={{ mb: 0.5 }}>
-                    <ListItemButton
-                      component="a"
-                      href={item.path}
-                      sx={{
-                        borderRadius: 0.5,
-                        mx: 1,
-                        backgroundColor: 'transparent',
-                        color: 'text.primary',
-                        '&:hover': {
-                          backgroundColor: 'action.hover',
-                        }
-                      }}
-                    >
-                      <ListItemIcon sx={{ 
-                        color: 'text.secondary',
-                        minWidth: 40 
-                      }}>
-                        <IconComponent />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={item.label}
-                        sx={{
-                          '& .MuiListItemText-primary': {
-                            fontWeight: 400,
-                            fontSize: '0.95rem'
-                          }
-                        }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                </React.Fragment>
-              );
-            }
-            
+
             // Handle suggestions action button (opens modal)
             if (item.isAction && item.section === 'suggestions') {
               return (

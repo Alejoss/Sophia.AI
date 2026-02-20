@@ -258,7 +258,16 @@ const TopicDetail = () => {
 
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                {isAuthenticated && (
+                {/* Dueño y moderadores: Editar Contenido. Resto de usuarios autenticados: Sugerir Contenido */}
+                {isModerator ? (
+                    <Button
+                        variant="contained"
+                        startIcon={<EditIcon />}
+                        onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
+                    >
+                        Editar Contenido
+                    </Button>
+                ) : isAuthenticated && (
                     <>
                         <Button
                             variant="contained"

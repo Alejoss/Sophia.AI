@@ -219,57 +219,66 @@ const LibraryUser = () => {
           </Button>
         </Box>
 
-        <TextField
-          placeholder="Buscar en tu biblioteca..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" />
-              </InputAdornment>
-            ),
-          }}
+        <Box
           sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 3,
             mb: 2,
-            width: { xs: "100%", sm: 400 },
-            "& .MuiOutlinedInput-root": {
-              backgroundColor: "background.paper",
-            },
-          }}
-        />
-
-        <ToggleButtonGroup
-          value={mediaFilter}
-          exclusive
-          onChange={handleFilterChange}
-          aria-label="media type filter"
-          sx={{
-            "& .MuiToggleButton-root": {
-              color: "text.primary",
-              backgroundColor: "background.paper",
-              border: "1px solid",
-              borderColor: "divider",
-              "&.Mui-selected": {
-                backgroundColor: "primary.main",
-                color: "primary.contrastText",
-                "&:hover": {
-                  backgroundColor: "primary.dark",
-                },
-              },
-              "&:hover": {
-                backgroundColor: "action.hover",
-              },
-            },
           }}
         >
-          <ToggleButton value="ALL">Todos</ToggleButton>
-          <ToggleButton value="IMAGE">Imágenes</ToggleButton>
-          <ToggleButton value="TEXT">Texto</ToggleButton>
-          <ToggleButton value="VIDEO">Video</ToggleButton>
-          <ToggleButton value="AUDIO">Audio</ToggleButton>
-        </ToggleButtonGroup>
+          <TextField
+            placeholder="Buscar en tu biblioteca..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              width: { xs: "100%", sm: 400 },
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: "background.paper",
+              },
+            }}
+          />
+
+          <ToggleButtonGroup
+            value={mediaFilter}
+            exclusive
+            onChange={handleFilterChange}
+            aria-label="media type filter"
+            sx={{
+              "& .MuiToggleButton-root": {
+                color: "text.primary",
+                backgroundColor: "background.paper",
+                border: "1px solid",
+                borderColor: "divider",
+                "&.Mui-selected": {
+                  backgroundColor: "primary.main",
+                  color: "primary.contrastText",
+                  "&:hover": {
+                    backgroundColor: "primary.dark",
+                  },
+                },
+                "&:hover": {
+                  backgroundColor: "action.hover",
+                },
+              },
+            }}
+          >
+            <ToggleButton value="ALL">Todos</ToggleButton>
+            <ToggleButton value="IMAGE">Imágenes</ToggleButton>
+            <ToggleButton value="TEXT">Texto</ToggleButton>
+            <ToggleButton value="VIDEO">Video</ToggleButton>
+            <ToggleButton value="AUDIO">Audio</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
       </Box>
 
       {mediaFilter === "TEXT" ? (

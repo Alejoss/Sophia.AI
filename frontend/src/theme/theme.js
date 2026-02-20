@@ -75,6 +75,12 @@ const createThemeConfig = (mode) => ({
             default: '#121212', // Very dark gray (not pure black)
             paper: '#1E1E1E', // Slightly lighter for cards/surfaces
           },
+          // Softer error/danger color in dark mode (default red is too harsh)
+          error: {
+            main: '#e57373',   // Muted red (Material Red 300)
+            light: '#ef9a9a',
+            dark: '#c62828',
+          },
         }
       : {
           // Light mode palette
