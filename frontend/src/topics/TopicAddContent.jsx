@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     Box,
     Typography,
     Paper,
     Button,
+    Snackbar,
+    Alert,
+    Link as MuiLink,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 import UploadContentForm from '../content/UploadContentForm';
 import contentApi from '../api/contentApi';
@@ -18,9 +22,12 @@ const TopicAddContent = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [successMessage, setSuccessMessage] = useState(null);
     const [selectedContentProfileIds, setSelectedContentProfileIds] = useState([]);
     const [addSourceMode, setAddSourceMode] = useState(null); // null | 'library' | 'upload'
     const [uploadMode, setUploadMode] = useState('file'); // 'url' | 'file'
+
+    const topicTitle = topicData?.topic?.title ?? '';
 
     useEffect(() => {
         const fetchTopic = async () => {
@@ -36,7 +43,7 @@ const TopicAddContent = () => {
         fetchTopic();
     }, [topicId]);
 
-    const handleCancel = () => {
+    const goToTopicView = () => {
         navigate(`/content/topics/${topicId}`);
     };
 
@@ -46,12 +53,16 @@ const TopicAddContent = () => {
 
     const handleSave = async (selectedIds) => {
         try {
+            setSaving(true);
             await contentApi.addContentToTopic(topicId, selectedIds);
-            navigate(`/content/topics/${topicId}`);
+            setSuccessMessage('Contenido agregado al tema correctamente.');
+            setAddSourceMode(null);
         } catch (err) {
             console.error('TopicAddContent - Failed to add content to topic:', err);
             setError('Error al agregar contenido al tema');
             throw err;
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -61,6 +72,7 @@ const TopicAddContent = () => {
         try {
             setSaving(true);
             await contentApi.addContentToTopic(topicId, [profileId]);
+            setSuccessMessage('Contenido agregado al tema correctamente.');
             setAddSourceMode(null);
         } catch (err) {
             console.error('Failed to add uploaded content to topic:', err);
@@ -88,7 +100,7 @@ const TopicAddContent = () => {
         return (
             <Box sx={{ p: 3 }}>
                 <Typography color="error">{error}</Typography>
-                <Button onClick={() => navigate(`/content/topics/${topicId}`)}>
+                <Button onClick={goToTopicView} sx={{ textTransform: 'none', mt: 2 }}>
                     Volver al tema
                 </Button>
             </Box>
@@ -97,33 +109,51 @@ const TopicAddContent = () => {
 
     if (addSourceMode === 'library') {
         return (
-            <LibrarySelectMultiple
-                title="Agregar Contenido al Tema"
-                description="Selecciona contenido de tu biblioteca para agregar a este tema"
-                onCancel={handleBackToSourceChoice}
-                onSave={handleSave}
-                onSelectionChange={handleSelectionChange}
-                filterFunction={filterContent}
-                contextName={topicData?.topic?.title ?? topicId}
-                selectedIds={selectedContentProfileIds}
-            />
+            <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Button
+                        variant="text"
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleBackToSourceChoice}
+                        sx={{ textTransform: 'none' }}
+                        disabled={saving}
+                    >
+                        Volver
+                    </Button>
+                </Box>
+                <LibrarySelectMultiple
+                    title={topicTitle ? `Agregar contenido al tema — ${topicTitle}` : 'Agregar contenido al tema'}
+                    description="Selecciona contenido de tu biblioteca para agregar a este tema"
+                    onCancel={handleBackToSourceChoice}
+                    onSave={handleSave}
+                    onSelectionChange={handleSelectionChange}
+                    filterFunction={filterContent}
+                    contextName={topicTitle || topicId}
+                    selectedIds={selectedContentProfileIds}
+                />
+            </Box>
         );
     }
 
     if (addSourceMode === 'upload') {
         return (
             <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 800, mx: 'auto' }}>
-                <Button
-                    variant="text"
-                    startIcon={<ArrowBackIcon />}
-                    onClick={handleBackToSourceChoice}
-                    sx={{ mb: 2, textTransform: 'none' }}
-                    disabled={saving}
-                >
-                    Volver
-                </Button>
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Button
+                        variant="text"
+                        startIcon={<ArrowBackIcon />}
+                        onClick={handleBackToSourceChoice}
+                        sx={{ textTransform: 'none' }}
+                        disabled={saving}
+                    >
+                        Volver
+                    </Button>
+                </Box>
                 <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                    <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
+                        Agregar contenido al tema{topicTitle ? ` — ${topicTitle}` : ''}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {uploadMode === 'url'
                             ? 'Agregar contenido desde URL'
                             : 'Subir archivo'}
@@ -142,15 +172,35 @@ const TopicAddContent = () => {
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 600, mx: 'auto' }}>
             <Paper elevation={2} sx={{ p: 4 }}>
-                <Typography variant="h6" gutterBottom align="center" sx={{ mb: 1 }}>
+                <Typography
+                    variant="h6"
+                    gutterBottom
+                    sx={{
+                        mb: 0.5,
+                        fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
+                        fontWeight: 500,
+                        fontSize: '1.25rem',
+                    }}
+                >
                     Agregar contenido al tema
                 </Typography>
-                {topicData?.topic?.title && (
-                    <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-                        {topicData.topic.title}
+                {topicTitle && (
+                    <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                        <MuiLink
+                            component={Link}
+                            to={`/content/topics/${topicId}`}
+                            sx={{
+                                color: 'primary.main',
+                                textDecoration: 'underline',
+                                fontWeight: 500,
+                                '&:hover': { textDecoration: 'underline' },
+                            }}
+                        >
+                            {topicTitle}
+                        </MuiLink>
                     </Typography>
                 )}
-                <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     Elige de la biblioteca, desde una URL o sube un archivo.
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -180,14 +230,36 @@ const TopicAddContent = () => {
                         Subir archivo
                     </Button>
                 </Box>
-                <Button
-                    variant="outlined"
-                    onClick={handleCancel}
-                    sx={{ mt: 3, width: '100%', textTransform: 'none' }}
-                >
-                    Cancelar
-                </Button>
+                <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={goToTopicView}
+                        sx={{ width: '100%', textTransform: 'none' }}
+                    >
+                        Volver al tema
+                    </Button>
+                    <Button
+                        component={Link}
+                        to={`/content/topics/${topicId}/edit-content`}
+                        variant="text"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        sx={{ textTransform: 'none', alignSelf: 'center' }}
+                    >
+                        Editar contenido del tema
+                    </Button>
+                </Box>
             </Paper>
+            <Snackbar
+                open={Boolean(successMessage)}
+                autoHideDuration={4000}
+                onClose={() => setSuccessMessage(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSuccessMessage(null)} severity="success" variant="filled">
+                    {successMessage}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

@@ -1164,14 +1164,14 @@ const ContentDisplay = ({
                 }}
                 data-action-button
               >
-                <Tooltip title="Ver detalles">
+                <Tooltip title="Ver detalles (abre en nueva pestaña)">
                   <IconButton
                     size="small"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Navigate to ContentDetailsLibrary with the content ID
-                      const contentId = contentData.id || content.id;
-                      navigate(`/content/${contentId}/library`);
+                      const id = contentData.id || content.id;
+                      const path = `/content/${id}/library`;
+                      window.open(path, '_blank', 'noopener,noreferrer');
                     }}
                     sx={{
                       bgcolor: "background.paper",

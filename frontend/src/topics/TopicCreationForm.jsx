@@ -24,12 +24,14 @@ const TopicCreationForm = () => {
         e.preventDefault();
         try {
             const response = await contentApi.createTopic(formData);
-            setSuccess(true);
             setError(null);
-            // Clear form
+            const topicId = response?.id ?? response?.data?.id;
+            if (topicId) {
+                navigate(`/content/topics/${topicId}/edit`, { replace: true });
+                return;
+            }
+            setSuccess(true);
             setFormData({ title: '', description: '' });
-            // Redirect to topic edit page after successful creation
-            setTimeout(() => navigate(`/content/topics/${response.id}/edit`), 2000);
         } catch (err) {
             setError(err.response?.data?.error || 'Error al crear el tema');
             setSuccess(false);

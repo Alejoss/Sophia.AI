@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
@@ -9,7 +9,9 @@ import {
     Grid,
     Chip,
     IconButton,
-    Link
+    List,
+    ListItem,
+    ListItemText
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import NoteIcon from '@mui/icons-material/Note';
@@ -238,6 +240,74 @@ const TopicDetail = () => {
         );
     };
 
+    const renderTextSection = (contents) => {
+        if (!contents || contents.length === 0) return null;
+
+        const displayContents = contents.slice(0, 3);
+        const hasMore = contents.length > 3;
+
+        return (
+            <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography 
+                        variant="h6" 
+                        sx={{ 
+                            textTransform: 'capitalize',
+                            fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                            fontWeight: 400,
+                            fontSize: "18px"
+                        }} 
+                        color="text.primary"
+                    >
+                        Textos
+                    </Typography>
+                    {hasMore && (
+                        <Button
+                            endIcon={<ArrowForwardIcon />}
+                            onClick={() => navigate(`/content/topics/${topicId}/text`)}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Ver todos los {contents.length} textos
+                        </Button>
+                    )}
+                </Box>
+                <List disablePadding sx={{ bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                    {displayContents.map((content) => {
+                        const title = content.selected_profile?.title || content.original_title || 'Sin título';
+                        const author = content.selected_profile?.author || content.original_author;
+                        return (
+                            <ListItem
+                                key={content.id}
+                                component={RouterLink}
+                                to={`/content/${content.id}/topic/${topicId}`}
+                                sx={{
+                                    display: 'block',
+                                    textAlign: 'left',
+                                    textDecoration: 'none',
+                                    color: 'inherit',
+                                    py: 1.5,
+                                    '&:hover': { bgcolor: 'action.hover' },
+                                }}
+                            >
+                                <ListItemText
+                                    primary={title}
+                                    secondary={author || null}
+                                    primaryTypographyProps={{
+                                        sx: {
+                                            color: 'primary.main',
+                                            textDecoration: 'underline',
+                                            fontWeight: 500,
+                                        },
+                                    }}
+                                />
+                            </ListItem>
+                        );
+                    })}
+                </List>
+            </Box>
+        );
+    };
+
     if (loading) return <Typography>Cargando detalles del tema...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
     if (!topic) return <Typography>Tema no encontrado</Typography>;
@@ -297,11 +367,11 @@ const TopicDetail = () => {
                 )}
             </Box>
 
-            {/* Content sections by type */}
+            {/* Content sections by type: images, videos, audios first; texts at the end as list */}
             {renderContentSection('image', contentByType.image)}
-            {renderContentSection('text', contentByType.text)}
             {renderContentSection('video', contentByType.video)}
             {renderContentSection('audio', contentByType.audio)}
+            {renderTextSection(contentByType.text)}
 
             {Object.keys(contentByType).length === 0 && (
                 <Typography variant="body1" color="text.secondary" align="center">

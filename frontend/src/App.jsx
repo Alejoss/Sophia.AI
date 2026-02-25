@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext.jsx';
@@ -66,6 +66,12 @@ import EventEdit from './events/EventEdit.jsx';
 import UserEvents from './events/UserEvents.jsx';
 import ManageEvent from './events/ManageEvent.jsx';
 
+/** Redirects /content/:contentId to /content/:contentId/library so bare content URLs show the library view. */
+const ContentIdRedirect = () => {
+  const { contentId } = useParams();
+  return <Navigate to={`/content/${contentId}/library`} replace />;
+};
+
 const AppContent = () => {
   const { theme } = useThemeMode();
   
@@ -106,6 +112,7 @@ const AppContent = () => {
               <Route path="topics/:topicId" element={<ProtectedRoute><TopicDetail /></ProtectedRoute>} />
               <Route path="topics/:topicId/suggestions" element={<ProtectedRoute><TopicContentSuggestionsPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/:mediaType" element={<ProtectedRoute><TopicContentMediaType /></ProtectedRoute>} />
+              <Route path=":contentId" element={<ContentIdRedirect />} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />

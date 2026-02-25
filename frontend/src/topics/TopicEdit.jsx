@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SaveIcon from "@mui/icons-material/Save";
 import contentApi from "../api/contentApi";
@@ -89,6 +89,12 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
             </ListItemIcon>
             <ListItemText primary="Tamaño máximo: 2MB" />
           </ListItem>
+          <ListItem>
+            <ListItemIcon>
+              <CheckCircleIcon color="disabled" />
+            </ListItemIcon>
+            <ListItemText primary="Recomendado: imagen en proporción 1:1 (cuadrada)" />
+          </ListItem>
         </List>
 
         {error && (
@@ -143,7 +149,12 @@ const TopicEdit = () => {
     description: "",
   });
   const [saving, setSaving] = useState(false);
-  
+
+  const isFormDirty =
+    topic &&
+    (formData.title !== (topic.title || "") ||
+      formData.description !== (topic.description || ""));
+
   const isCreator = user && topic && topic.creator === user.id;
 
   useEffect(() => {
@@ -209,35 +220,50 @@ const TopicEdit = () => {
   return (
     <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 1.5 }, maxWidth: 800, mx: "auto" }}>
       <Paper sx={{ p: 1.5, position: "relative" }}>
-        {/* View Topic and Edit Content Buttons - in flow so they wrap and never overflow */}
+        {/* Ver Tema (left), Editar Contenido + Guardar Cambios (right) */}
         <Box
           sx={{
             display: "flex",
             flexWrap: "wrap",
             gap: 1,
-            justifyContent: "flex-end",
+            justifyContent: "space-between",
+            alignItems: "center",
             mb: 2,
             minWidth: 0,
           }}
         >
           <Button
-            variant="contained"
-            color="primary"
-            startIcon={<EditIcon />}
-            onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
-            size="small"
-          >
-            Editar Contenido
-          </Button>
-          <Button
             component={Link}
             to={`/content/topics/${topicId}`}
-            startIcon={<OpenInNewIcon />}
-            variant="outlined"
+            variant="text"
+            startIcon={<ArrowBackIcon />}
             size="small"
+            sx={{ textTransform: "none" }}
           >
             Ver Tema
           </Button>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<EditIcon />}
+              onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
+              size="small"
+            >
+              Editar Contenido
+            </Button>
+            <Button
+              type="submit"
+              form="topic-edit-form"
+              variant="contained"
+              color="primary"
+              startIcon={<SaveIcon />}
+              disabled={saving || !formData.title || !isFormDirty}
+              size="small"
+            >
+              {saving ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </Box>
         </Box>
 
         <Box
@@ -302,7 +328,7 @@ const TopicEdit = () => {
 
           {/* Topic Title and Description Form */}
           <Box sx={{ flex: 1 }}>
-            <form onSubmit={handleSubmit}>
+            <form id="topic-edit-form" onSubmit={handleSubmit}>
               <TextField
                 fullWidth
                 label="Título"
@@ -326,16 +352,6 @@ const TopicEdit = () => {
                 maxRows={24}
                 placeholder="Describe el tema"
               />
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                disabled={saving || !formData.title}
-                sx={{ mt: 2 }}
-              >
-                {saving ? "Guardando..." : "Guardar Cambios"}
-              </Button>
             </form>
           </Box>
         </Box>

@@ -30,9 +30,13 @@ import {
   Stack,
   ToggleButtonGroup,
   ToggleButton,
-  Snackbar
+  Snackbar,
+  Collapse,
+  Chip
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const getMediaType = (file) => {
   if (!file || !file.type) return null;
@@ -226,6 +230,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
   
   // Notify parent when uploading state changes
   useEffect(() => {
@@ -238,7 +243,10 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   const [previewError, setPreviewError] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const fileInputRef = React.useRef(null);
-  
+  const [titleAuthorExpanded, setTitleAuthorExpanded] = useState(false);
+
+  const MEDIA_TYPE_LABELS = { IMAGE: 'Imagen', VIDEO: 'Video', AUDIO: 'Audio', TEXT: 'Texto' };
+
   // Determine initial isUrlMode value
   const initialIsUrlMode = initialUrlMode !== null ? initialUrlMode : !!initialData?.url;
   
@@ -278,7 +286,16 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
   // Watch the URL field for changes
   const url = watch('url');
-  const urlDebounceTimeout = React.useRef(null);
+
+  // Auto-set media type to VIDEO when URL is YouTube (immediate, no debounce)
+  useEffect(() => {
+    if (!isUrlMode || !url || typeof url !== 'string') return;
+    const trimmed = url.trim();
+    const withProtocol = trimmed.match(/^https?:\/\//i) ? trimmed : `https://${trimmed}`;
+    if (withProtocol.includes('youtube.com') || withProtocol.includes('youtu.be')) {
+      setValue('media_type', 'VIDEO');
+    }
+  }, [isUrlMode, url, setValue]);
 
   // Initialize form with initialData when in edit mode
   useEffect(() => {
@@ -327,12 +344,6 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
 
     console.log('\n=== URL Preview Effect ===');
     console.log('URL changed:', url);
-
-    // Clear any previous timeout and error immediately when URL changes
-    if (urlDebounceTimeout.current) {
-      console.log('Clearing previous debounce timeout');
-      clearTimeout(urlDebounceTimeout.current);
-    }
     setPreviewError(null); // Clear error when URL changes
 
     // Helper function to normalize URL (add protocol if missing)
@@ -354,11 +365,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       return trimmed.includes('.') && trimmed.length > 4;
     };
 
-    // Set a new timeout to fetch preview - increased debounce for better UX
-    console.log('Setting debounce timeout for preview fetch');
-    urlDebounceTimeout.current = setTimeout(async () => {
-      console.log('Debounce timeout triggered, fetching preview...');
-      
+    const fetchPreview = async () => {
       // Check if URL looks valid before attempting fetch
       if (!looksLikeUrl(url)) {
         console.log('URL does not look valid, skipping preview');
@@ -373,6 +380,12 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
         // Normalize URL before fetching
         const normalizedUrl = normalizeUrl(url);
         console.log('Fetching metadata for URL:', normalizedUrl);
+
+        // Auto-detect YouTube and set media type to Video
+        if (normalizedUrl && (normalizedUrl.includes('youtube.com') || normalizedUrl.includes('youtu.be'))) {
+          setValue('media_type', 'VIDEO');
+        }
+
         const metadata = await contentApi.fetchUrlMetadata(normalizedUrl);
         console.log('Received metadata:', metadata);
         setPreviewData(metadata);
@@ -396,15 +409,11 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       } finally {
         setIsLoadingPreview(false);
       }
-    }, 4000); // Increased debounce to 4000ms to give user more time
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (urlDebounceTimeout.current) {
-        console.log('Cleaning up debounce timeout on unmount');
-        clearTimeout(urlDebounceTimeout.current);
-      }
     };
+
+    fetchPreview();
+
+    return undefined;
   }, [url, isUrlMode]); // Removed setValue, trigger, watch from dependencies to avoid unnecessary re-runs
 
   const onSubmit = async (data) => {
@@ -620,6 +629,55 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   const fileInputRegistration = register('file');
   const { ref: fileInputRegisterRef, onChange: fileInputOnChange, ...fileInputRest } = fileInputRegistration;
 
+  const handleFileDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isUploading) {
+      setIsDragActive(true);
+    }
+  };
+
+  const handleFileDragEnter = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isUploading) {
+      setIsDragActive(true);
+    }
+  };
+
+  const handleFileDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only reset when leaving the drop area, not when moving between children
+    if (event.currentTarget.contains(event.relatedTarget)) {
+      return;
+    }
+    setIsDragActive(false);
+  };
+
+  const handleFileDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+
+    if (isUploading) return;
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const [file] = files;
+    if (!file) return;
+
+    // Update react-hook-form value and trigger validation
+    setValue('file', [file], { shouldValidate: true });
+    if (typeof trigger === 'function') {
+      trigger('file');
+    }
+    setHasSavedSuccessfully(false);
+  };
+
   return (
     <Paper elevation={2} sx={{ p: 3, width: '100%' }}>
       {showModeToggle && (
@@ -693,32 +751,65 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500 }}>
               Archivo:
             </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
-              <Button
-                variant="outlined"
-                sx={{ textTransform: 'none' }}
-                disabled={isUploading}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Seleccionar archivo
-              </Button>
-              <input
-                type="file"
-                {...fileInputRest}
-                ref={(e) => {
-                  fileInputRef.current = e;
-                  fileInputRegisterRef(e);
-                }}
-                onChange={(e) => {
-                  fileInputOnChange(e);
-                  setHasSavedSuccessfully(false);
-                }}
-                style={{ display: 'none' }}
-              />
-              <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
-                {watch('file')?.[0]?.name ? watch('file')[0].name : 'Ningún archivo seleccionado'}
+            <Box
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleFileDragOver}
+              onDragEnter={handleFileDragEnter}
+              onDragLeave={handleFileDragLeave}
+              onDrop={handleFileDrop}
+              sx={{
+                border: '2px dashed',
+                borderRadius: 1,
+                p: 2,
+                cursor: isUploading ? 'default' : 'pointer',
+                borderColor: isDragActive ? 'primary.main' : 'divider',
+                backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
+                transition: 'background-color 0.15s ease, border-color 0.15s ease',
+              }}
+            >
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                <Button
+                  variant="outlined"
+                  sx={{ textTransform: 'none' }}
+                  disabled={isUploading}
+                >
+                  Seleccionar archivo
+                </Button>
+                <input
+                  type="file"
+                  {...fileInputRest}
+                  ref={(e) => {
+                    fileInputRef.current = e;
+                    fileInputRegisterRef(e);
+                  }}
+                  onChange={(e) => {
+                    fileInputOnChange(e);
+                    setHasSavedSuccessfully(false);
+                  }}
+                  style={{ display: 'none' }}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                  {watch('file')?.[0]?.name ? watch('file')[0].name : 'Ningún archivo seleccionado'}
+                </Typography>
+              </Stack>
+              {watch('file')?.[0] && (() => {
+                const inferredType = getMediaType(watch('file')[0]);
+                return inferredType ? (
+                  <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">Tipo detectado:</Typography>
+                    <Chip
+                      size="small"
+                      label={MEDIA_TYPE_LABELS[inferredType] ?? inferredType}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                ) : null;
+              })()}
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                O arrastra y suelta un archivo aquí
               </Typography>
-            </Stack>
+            </Box>
             {errors.file && (
               <FormHelperText error>
                 {errors.file.message}
@@ -774,36 +865,88 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           </>
         )}
 
-        {/* Common Fields */}
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <TextField
-            label="Autor"
-            variant="outlined"
-            {...register('author')}
-            value={watch('author') || ''}
-            onChange={(e) => {
-              setValue('author', e.target.value);
-              setHasSavedSuccessfully(false);
-            }}
-            error={!!errors.author}
-            helperText={errors.author?.message}
-          />
-        </FormControl>
-
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <TextField
-            label="Título"
-            variant="outlined"
-            {...register('title')}
-            value={watch('title') || ''}
-            onChange={(e) => {
-              setValue('title', e.target.value);
-              setHasSavedSuccessfully(false);
-            }}
-            error={!!errors.title}
-            helperText={errors.title?.message}
-          />
-        </FormControl>
+        {/* Common Fields: collapsible for file+image, otherwise always visible */}
+        {!isUrlMode && getMediaType(watch('file')?.[0]) === 'IMAGE' ? (
+          <Box sx={{ mb: 2 }}>
+            <Button
+              fullWidth
+              onClick={() => setTitleAuthorExpanded((e) => !e)}
+              endIcon={titleAuthorExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{
+                justifyContent: 'space-between',
+                textTransform: 'none',
+                color: 'text.secondary',
+                py: 1,
+                '&:hover': { backgroundColor: 'action.hover' },
+              }}
+            >
+              Título y autor (opcional)
+            </Button>
+            <Collapse in={titleAuthorExpanded}>
+              <Box sx={{ pl: 0, pr: 0, pt: 0, pb: 1 }}>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <TextField
+                    label="Autor"
+                    variant="outlined"
+                    {...register('author')}
+                    value={watch('author') || ''}
+                    onChange={(e) => {
+                      setValue('author', e.target.value);
+                      setHasSavedSuccessfully(false);
+                    }}
+                    error={!!errors.author}
+                    helperText={errors.author?.message}
+                  />
+                </FormControl>
+                <FormControl fullWidth sx={{ mb: 0 }}>
+                  <TextField
+                    label="Título"
+                    variant="outlined"
+                    {...register('title')}
+                    value={watch('title') || ''}
+                    onChange={(e) => {
+                      setValue('title', e.target.value);
+                      setHasSavedSuccessfully(false);
+                    }}
+                    error={!!errors.title}
+                    helperText={errors.title?.message}
+                  />
+                </FormControl>
+              </Box>
+            </Collapse>
+          </Box>
+        ) : (
+          <>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <TextField
+                label="Autor"
+                variant="outlined"
+                {...register('author')}
+                value={watch('author') || ''}
+                onChange={(e) => {
+                  setValue('author', e.target.value);
+                  setHasSavedSuccessfully(false);
+                }}
+                error={!!errors.author}
+                helperText={errors.author?.message}
+              />
+            </FormControl>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <TextField
+                label="Título"
+                variant="outlined"
+                {...register('title')}
+                value={watch('title') || ''}
+                onChange={(e) => {
+                  setValue('title', e.target.value);
+                  setHasSavedSuccessfully(false);
+                }}
+                error={!!errors.title}
+                helperText={errors.title?.message}
+              />
+            </FormControl>
+          </>
+        )}
 
         {/* Producer and Visibility Options - Only for File Upload */}
         {!isUrlMode && (
