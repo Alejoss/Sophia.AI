@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  Avatar, 
   Chip, 
   Tabs, 
   Tab, 
   Box, 
   Typography,
   Button,
+  Grid,
+  Card,
+  CardContent,
+  CardMedia,
+  CardActionArea,
   List,
   ListItem,
   ListItemText,
@@ -332,162 +336,121 @@ const TopicsUser = () => {
         </Alert>
       )}
 
-      {/* Created Topics Tab */}
+      {/* Created Topics Tab - cards like TopicList */}
       {activeTab === 0 && !createdLoading && !createdError && (
-        <div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+        <Box>
+          <Grid container spacing={3}>
             {createdTopics.map((topic) => {
-              const imageUrl = getTopicImageUrl(topic);
+              const imageUrl = getTopicImageUrl(topic) || `https://picsum.photos/800/400?random=${topic.id}`;
               return (
-                <div 
-                  key={topic.id}
-                  className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px] cursor-pointer"
-                  onClick={() => navigate(`/content/topics/${topic.id}`)}
-                >
-                  {/* Image and Title Section */}
-                  <div className="flex items-start mb-4">
-                    <Avatar 
-                      src={imageUrl || undefined}
-                      alt={topic.title}
-                      sx={{ 
-                        width: 80, 
-                        height: 80, 
-                        mr: 3,
-                        bgcolor: 'grey.300',
-                        flexShrink: 0
-                      }}
-                    >
-                      {topic.title.charAt(0).toUpperCase()}
-                    </Avatar>
-                    
-                    <div className="flex-1 min-w-0">
-                      {/* Title Section */}
-                      <Typography
-                        variant="h6"
+                <Grid item xs={12} sm={6} md={4} key={topic.id}>
+                  <Card>
+                    <CardActionArea onClick={() => navigate(`/content/topics/${topic.id}`)}>
+                      <CardMedia
+                        component="img"
+                        height="140"
+                        image={imageUrl}
+                        alt={topic.title}
                         sx={{
-                          fontWeight: 600,
-                          mb: 1,
-                          cursor: 'pointer',
-                          '&:hover': { color: 'primary.main' }
+                          objectFit: 'cover',
+                          objectPosition: topic.topic_image_focal_x != null && topic.topic_image_focal_y != null
+                            ? `${(topic.topic_image_focal_x * 100).toFixed(1)}% ${(topic.topic_image_focal_y * 100).toFixed(1)}%`
+                            : '50% 50%',
                         }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/content/topics/${topic.id}`);
-                        }}
-                      >
-                        {topic.title}
-                      </Typography>
-
-                      {/* Description */}
-                      {topic.description && (
-                        <p className="text-gray-600 mb-3 line-clamp-3">{topic.description}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions and Date */}
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>{topic.created_at ? new Date(topic.created_at).toLocaleDateString() : ''}</span>
-                    <Link
-                      to={`/content/topics/${topic.id}/edit`}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <EditIcon className="w-4 h-4" />
-                      Editar
-                    </Link>
-                  </div>
-                </div>
+                      />
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom color="text.primary">
+                          {topic.title}
+                        </Typography>
+                        {topic.description && (
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {topic.description}
+                          </Typography>
+                        )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {topic.created_at ? new Date(topic.created_at).toLocaleDateString() : ''}
+                          </Typography>
+                          <Link
+                            to={`/content/topics/${topic.id}/edit`}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <EditIcon sx={{ fontSize: 18 }} />
+                            <Typography component="span" variant="caption">Editar</Typography>
+                          </Link>
+                        </Box>
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Grid>
               );
             })}
-          </div>
+          </Grid>
 
-          {/* No Created Topics Message */}
           {createdTopics.length === 0 && (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no has creado temas</h3>
-              <p className="text-gray-500 mb-6">Comienza creando tu primer tema para organizar y compartir contenido relacionado.</p>
-              <Link 
-                to="/content/create_topic"
-                className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
-              >
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>Aún no has creado temas</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Comienza creando tu primer tema para organizar y compartir contenido relacionado.</Typography>
+              <Button component={Link} to="/content/create_topic" variant="contained" color="primary">
                 Crear Tu Primer Tema
-              </Link>
-            </div>
+              </Button>
+            </Box>
           )}
-        </div>
+        </Box>
       )}
 
-      {/* Moderated Topics Tab */}
+      {/* Moderated Topics Tab - cards like TopicList */}
       {activeTab === 1 && !moderatedLoading && !moderatedError && (
-        <div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+        <Box>
+          <Grid container spacing={3}>
             {moderatedTopics.map((topic) => {
-              const imageUrl = getTopicImageUrl(topic);
+              const imageUrl = getTopicImageUrl(topic) || `https://picsum.photos/800/400?random=${topic.id}`;
               return (
-                <div 
-                  key={topic.id}
-                  className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px] cursor-pointer"
-                  onClick={() => navigate(`/content/topics/${topic.id}`)}
-                >
-                  {/* Image and Title Section */}
-                  <div className="flex items-start mb-4">
-                    <Avatar 
-                      src={imageUrl || undefined}
-                      alt={topic.title}
-                      sx={{ 
-                        width: 80, 
-                        height: 80, 
-                        mr: 3,
-                        bgcolor: 'grey.300',
-                        flexShrink: 0
-                      }}
-                    >
-                      {topic.title.charAt(0).toUpperCase()}
-                    </Avatar>
-                    
-                    <div className="flex-1 min-w-0">
-                      {/* Title Section */}
-                      <Typography
-                        variant="h6"
+                <Grid item xs={12} sm={6} md={4} key={topic.id}>
+                  <Card>
+                    <CardActionArea onClick={() => navigate(`/content/topics/${topic.id}`)}>
+                      <CardMedia
+                        component="img"
+                        height="140"
+                        image={imageUrl}
+                        alt={topic.title}
                         sx={{
-                          fontWeight: 600,
-                          mb: 1,
-                          cursor: 'pointer',
-                          '&:hover': { color: 'primary.main' }
+                          objectFit: 'cover',
+                          objectPosition: topic.topic_image_focal_x != null && topic.topic_image_focal_y != null
+                            ? `${(topic.topic_image_focal_x * 100).toFixed(1)}% ${(topic.topic_image_focal_y * 100).toFixed(1)}%`
+                            : '50% 50%',
                         }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/content/topics/${topic.id}`);
-                        }}
-                      >
-                        {topic.title}
-                      </Typography>
-
-                      {/* Description */}
-                      {topic.description && (
-                        <p className="text-gray-600 mb-3 line-clamp-3">{topic.description}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>{topic.created_at ? new Date(topic.created_at).toLocaleDateString() : ''}</span>
-                  </div>
-                </div>
+                      />
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom color="text.primary">
+                          {topic.title}
+                        </Typography>
+                        {topic.description && (
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {topic.description}
+                          </Typography>
+                        )}
+                        {topic.created_at && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                            {new Date(topic.created_at).toLocaleDateString()}
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Grid>
               );
             })}
-          </div>
+          </Grid>
 
-          {/* No Moderated Topics Message */}
           {moderatedTopics.length === 0 && (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no eres moderador de ningún tema</h3>
-              <p className="text-gray-500 mb-6">Los temas en los que eres moderador aparecerán aquí una vez que aceptes una invitación.</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>Aún no eres moderador de ningún tema</Typography>
+              <Typography variant="body2" color="text.secondary">Los temas en los que eres moderador aparecerán aquí una vez que aceptes una invitación.</Typography>
+            </Box>
           )}
-        </div>
+        </Box>
       )}
 
       {/* Invitations Tab */}

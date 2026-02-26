@@ -228,7 +228,12 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         if instance.topic_image:
-            ret['topic_image'] = build_media_url(instance.topic_image, self.context.get('request'))
+            url = build_media_url(instance.topic_image, self.context.get('request'))
+            if url and getattr(instance, 'updated_at', None):
+                sep = '&' if '?' in url else '?'
+                ret['topic_image'] = f"{url}{sep}t={int(instance.updated_at.timestamp())}"
+            else:
+                ret['topic_image'] = url
         return ret
 
     def validate_title(self, value):
@@ -263,7 +268,12 @@ class TopicContentSerializer(serializers.ModelSerializer):
         self.context['topic'] = instance
         ret = super().to_representation(instance)
         if instance.topic_image:
-            ret['topic_image'] = build_media_url(instance.topic_image, self.context.get('request'))
+            url = build_media_url(instance.topic_image, self.context.get('request'))
+            if url and getattr(instance, 'updated_at', None):
+                sep = '&' if '?' in url else '?'
+                ret['topic_image'] = f"{url}{sep}t={int(instance.updated_at.timestamp())}"
+            else:
+                ret['topic_image'] = url
         return ret
 
 
@@ -340,7 +350,11 @@ class TopicIdTitleSerializer(serializers.ModelSerializer):
     
     def get_topic_image(self, obj):
         if obj.topic_image:
-            return build_media_url(obj.topic_image, self.context.get('request'))
+            url = build_media_url(obj.topic_image, self.context.get('request'))
+            if url and getattr(obj, 'updated_at', None):
+                sep = '&' if '?' in url else '?'
+                return f"{url}{sep}t={int(obj.updated_at.timestamp())}"
+            return url
         return None
 
 

@@ -430,7 +430,7 @@ class UploadContentView(APIView):
                     validator(normalized_url)
                 except ValidationError:
                     return Response(
-                        {'error': 'Formato de URL inválido'}, 
+                        {'error': 'Formato de URL invalido'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -441,7 +441,7 @@ class UploadContentView(APIView):
                 valid_media_types = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
                 if media_type not in valid_media_types:
                     return Response(
-                        {'error': f'Tipo de medio inválido. Debe ser uno de: {", ".join(valid_media_types)}'}, 
+                        {'error': f'Tipo de medio invalido. Debe ser uno de: {", ".join(valid_media_types)}'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
@@ -596,7 +596,7 @@ class UploadContentPresignView(APIView):
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
             logger.warning("S3 presign: S3 not configured (missing credentials), returning 503")
             return Response(
-                {'error': 'S3 no está configurado para subida directa'},
+                {'error': 'S3 no esta configurado para subida directa'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         filename = request.data.get('filename')
@@ -610,16 +610,16 @@ class UploadContentPresignView(APIView):
             )
         if not media_type or media_type not in VALID_MEDIA_TYPES:
             return Response(
-                {'error': f'media_type inválido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
+                {'error': f'media_type invalido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         try:
             file_size = int(file_size)
         except (TypeError, ValueError):
-            return Response({'error': 'file_size debe ser un número'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'file_size debe ser un numero'}, status=status.HTTP_400_BAD_REQUEST)
         if file_size <= 0 or file_size > UPLOAD_CONTENT_MAX_SIZE:
             return Response(
-                {'error': 'El tamaño del archivo debe estar entre 1 byte y 5 GB'},
+                {'error': 'El tamano del archivo debe estar entre 1 byte y 5 GB'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         # Sanitize filename for key (keep extension). Structure: content/{media_type}/{user_id}/{uuid}_{name}
@@ -700,7 +700,7 @@ class UploadContentConfirmView(APIView):
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None):
             logger.warning("S3 confirm: S3 not configured, returning 503")
             return Response(
-                {'error': 'S3 no está configurado'},
+                {'error': 'S3 no esta configurado'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         key = request.data.get('key')
@@ -709,7 +709,7 @@ class UploadContentConfirmView(APIView):
         key = key.strip()
         # Prevent path traversal
         if '..' in key or key.startswith('/'):
-            return Response({'error': 'key inválido'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         logger.info(
             "S3 confirm: checking object in S3",
@@ -718,7 +718,7 @@ class UploadContentConfirmView(APIView):
         media_type = request.data.get('media_type')
         if not media_type or media_type not in VALID_MEDIA_TYPES:
             return Response(
-                {'error': f'media_type inválido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
+                {'error': f'media_type invalido. Debe ser uno de: {", ".join(VALID_MEDIA_TYPES)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         title = request.data.get('title') or key.split('/')[-1].split('_', 1)[-1]
@@ -753,7 +753,7 @@ class UploadContentConfirmView(APIView):
                 extra={'s3_key': key, 'bucket': bucket, 'error': str(e)}
             )
             return Response(
-                {'error': 'El archivo no se encontró en el almacenamiento. Sube primero con la URL de subida.'},
+                {'error': 'El archivo no se encontro en el almacenamiento. Sube primero con la URL de subida.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         logger.info("S3 confirm: head_object OK, creating Content/FileDetails", extra={'s3_key': key})
@@ -876,7 +876,7 @@ class UserContentListView(APIView):
                 exc_info=True
             )
             return Response(
-                {'error': 'Ocurrió un error al obtener el contenido'}, 
+                {'error': 'Ocurrio un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -907,7 +907,7 @@ class UserContentWithDetailsView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {'error': 'Ocurrió un error al obtener el contenido'}, 
+                {'error': 'Ocurrio un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -947,7 +947,7 @@ class UserContentByIdView(APIView):
             )
         except Exception as e:
             return Response(
-                {'error': 'Ocurrió un error al obtener el contenido'}, 
+                {'error': 'Ocurrio un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1054,7 +1054,7 @@ class CollectionContentView(APIView):
         content_profile_ids = request.data.get('content_profile_ids')
         if not content_profile_ids or not isinstance(content_profile_ids, list):
             return Response(
-                {'error': 'content_profile_ids debe ser un array no vacío'}, 
+                {'error': 'content_profile_ids debe ser un array no vacio'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -1323,36 +1323,54 @@ class TopicDetailView(APIView):
         return Response(serializer.data)
 
     def patch(self, request, pk):
+        logger.info("Topic PATCH topic_id=%s", pk)
         topic = get_object_or_404(Topic, pk=pk)
-        
-        # Check if user is author or moderator
+
         if not topic.is_moderator_or_creator(request.user):
-                return Response(
-                    {"error": "No tiene permiso para actualizar este tema."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        
-        # Handle image update if present
-        if 'topic_image' in request.FILES:
+            logger.warning("Topic PATCH forbidden topic_id=%s", pk)
+            return Response(
+                {"error": "No tiene permiso para actualizar este tema."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        except Exception as e:
+            logger.exception("Topic PATCH copy request.data failed: %s", e)
+            return Response({"error": "Error procesando la peticion."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        has_image = "topic_image" in request.FILES
+        logger.info("Topic PATCH topic_id=%s has_image=%s", pk, has_image)
+
+        if has_image:
             if topic.topic_image:
                 old_image_path = os.path.join(settings.MEDIA_ROOT, str(topic.topic_image))
                 if os.path.exists(old_image_path):
                     os.remove(old_image_path)
                 topic.topic_image.delete(save=False)
-            
-            request.data['topic_image'] = request.FILES['topic_image']
-        
+            data["topic_image"] = request.FILES["topic_image"]
+
         serializer = TopicDetailSerializer(
             topic,
-            data=request.data,
-            context={'request': request},
+            data=data,
+            context={"request": request},
             partial=True
         )
-        
-        if serializer.is_valid():
+
+        if not serializer.is_valid():
+            logger.warning("Topic PATCH invalid topic_id=%s errors=%s", pk, serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
             serializer.save()
+            logger.info("Topic PATCH saved topic_id=%s", pk)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Topic PATCH save failed topic_id=%s: %s", pk, e)
+            return Response(
+                {"error": "Error al guardar el tema."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class TopicContentSimpleView(APIView):
@@ -1632,7 +1650,7 @@ class TopicModeratorInviteView(APIView):
             
             if existing_invitation:
                 return Response(
-                    {"error": f"Ya existe una invitación pendiente para {username}."},
+                    {"error": f"Ya existe una invitacion pendiente para {username}."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1679,7 +1697,7 @@ class TopicModeratorInviteView(APIView):
             )
         except Exception as e:
             return Response(
-                {"error": f"Error al crear la invitación: {str(e)}"},
+                {"error": f"Error al crear la invitacion: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1715,14 +1733,14 @@ class TopicModeratorAcceptView(APIView):
         # Check if user is the invited user
         if invitation.invited_user != request.user:
             return Response(
-                {"error": "Solo el usuario invitado puede aceptar la invitación."},
+                {"error": "Solo el usuario invitado puede aceptar la invitacion."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         # Check if invitation is pending
         if invitation.status != 'PENDING':
             return Response(
-                {"error": "Esta invitación ya no está pendiente."},
+                {"error": "Esta invitacion ya no esta pendiente."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -1750,7 +1768,7 @@ class TopicModeratorAcceptView(APIView):
             )
         except Exception as e:
             return Response(
-                {"error": f"Error al aceptar la invitación: {str(e)}"},
+                {"error": f"Error al aceptar la invitacion: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1766,14 +1784,14 @@ class TopicModeratorDeclineView(APIView):
         # Check if user is the invited user
         if invitation.invited_user != request.user:
             return Response(
-                {"error": "Solo el usuario invitado puede rechazar la invitación."},
+                {"error": "Solo el usuario invitado puede rechazar la invitacion."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         # Check if invitation is pending
         if invitation.status != 'PENDING':
             return Response(
-                {"error": "Esta invitación ya no está pendiente."},
+                {"error": "Esta invitacion ya no esta pendiente."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -1801,7 +1819,7 @@ class TopicModeratorDeclineView(APIView):
             )
         except Exception as e:
             return Response(
-                {"error": f"Error al rechazar la invitación: {str(e)}"},
+                {"error": f"Error al rechazar la invitacion: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1942,7 +1960,7 @@ class PublicationDetailView(APIView):
             return Response(serializer.data)
         except Publication.DoesNotExist:
             return Response(
-                {'error': 'Publicación no encontrada'},
+                {'error': 'Publicacion no encontrada'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -2158,7 +2176,7 @@ class ContentProfileCreateView(APIView):
                 return Response(
                     {
                         'error': 'Error al crear el perfil de contenido',
-                        'details': 'Ocurrió un error en la base de datos al crear el perfil'
+                        'details': 'Ocurrio un error en la base de datos al crear el perfil'
                     }, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -2185,7 +2203,7 @@ class ContentProfileCreateView(APIView):
                 return Response(
                     {
                         'error': 'Error al serializar el perfil de contenido',
-                        'details': 'Ocurrió un error al preparar la respuesta'
+                        'details': 'Ocurrio un error al preparar la respuesta'
                     }, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -2202,8 +2220,8 @@ class ContentProfileCreateView(APIView):
             )
             return Response(
                 {
-                    'error': 'Ocurrió un error inesperado',
-                    'details': 'Por favor, revise los registros del servidor para más información'
+                    'error': 'Ocurrio un error inesperado',
+                    'details': 'Por favor, revise los registros del servidor para mas informacion'
                 }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -2426,7 +2444,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response({
-                    'error': 'La URL debe apuntar a una página web'
+                    'error': 'La URL debe apuntar a una pagina web'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Parse HTML
@@ -2489,7 +2507,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response(
-                    {'error': 'No se pudo extraer información de vista previa de esta URL'}, 
+                    {'error': 'No se pudo extraer informacion de vista previa de esta URL'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -2697,7 +2715,7 @@ class ContentUpdateView(APIView):
                         'url': request.data['url'],
                     })
                     return Response(
-                        {'error': 'Formato de URL inválido'}, 
+                        {'error': 'Formato de URL invalido'}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
@@ -2874,7 +2892,7 @@ class TopicContentSuggestionAcceptView(APIView):
         # Check if suggestion is pending
         if suggestion.status != 'PENDING':
             return Response(
-                {"error": "Esta sugerencia ya no está pendiente."},
+                {"error": "Esta sugerencia ya no esta pendiente."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -2931,7 +2949,7 @@ class TopicContentSuggestionRejectView(APIView):
         # Check if suggestion is pending
         if suggestion.status != 'PENDING':
             return Response(
-                {"error": "Esta sugerencia ya no está pendiente."},
+                {"error": "Esta sugerencia ya no esta pendiente."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
