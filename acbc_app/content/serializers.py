@@ -217,9 +217,12 @@ class TopicBasicSerializer(serializers.ModelSerializer):
         }
     )
 
+    topic_image_focal_x = serializers.FloatField(required=False, min_value=0, max_value=1)
+    topic_image_focal_y = serializers.FloatField(required=False, min_value=0, max_value=1)
+
     class Meta:
         model = Topic
-        fields = ['id', 'title', 'description', 'creator', 'topic_image']
+        fields = ['id', 'title', 'description', 'creator', 'topic_image', 'topic_image_focal_x', 'topic_image_focal_y']
         read_only_fields = ['creator']
 
     def to_representation(self, instance):

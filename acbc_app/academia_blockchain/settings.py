@@ -91,6 +91,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'academia_blockchain.sentry_config.SentryUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
@@ -646,3 +647,7 @@ if ENVIRONMENT == "PRODUCTION":
     # Use WhiteNoise's compressed storage (without manifest to avoid missing file errors)
     # CompressedStaticFilesStorage compresses files but doesn't require manifest
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Sentry: init when SENTRY_DSN is set (production / beta)
+from academia_blockchain.sentry_config import configure_sentry
+configure_sentry()

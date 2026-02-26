@@ -65,9 +65,14 @@ class UserBadgeViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Return badges for the requested user."""
-        user_id = self.kwargs.get('user_id', None)
-        
+        """Return badges for the requested user (user_id via query param)."""
+        user_id = self.request.query_params.get('user_id') or self.kwargs.get('user_id')
+        if user_id is not None:
+            try:
+                user_id = int(user_id)
+            except (TypeError, ValueError):
+                user_id = None
+
         if user_id:
             # View badges of a specific user (public)
             user = get_object_or_404(User, id=user_id)

@@ -13,17 +13,17 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
     navigate(`/content/topics/${topic.id}`);
   };
 
-  // Size configurations
+  // Size configurations (cover image: más ancha que alta, 16:9)
   const sizeConfig = {
     small: {
-      imageSize: 80,
+      coverHeight: 150,
       titleVariant: "h6",
       padding: 2,
       marginBottom: 2,
       descriptionVariant: "body2",
     },
     large: {
-      imageSize: 200,
+      coverHeight: 280,
       titleVariant: "h4",
       padding: 3,
       marginBottom: 3,
@@ -34,91 +34,98 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
   const config = sizeConfig[size];
 
   return (
-    <Paper sx={{ p: config.padding, mb: config.marginBottom }}>
-      <Box
-  sx={{
-    display: {
-      xs: "block", // mobile → stacked
-      md: "flex",  // md and up → flex
-    },
-    alignItems: "flex-start",
-    gap: 3,
-    mb: config.marginBottom,
-    "& > *:not(:last-child)": {
-      mb: {
-        xs: 2, // vertical spacing when stacked on mobile
-        md: 0, // reset on desktop
-      },
-    },
-  }}
->
-        {/* Topic Image */}
-        <Box sx={{ width: config.imageSize, height: config.imageSize }}>
+    <Paper sx={{ overflow: "hidden", mb: config.marginBottom }}>
+      <Box sx={{ mb: config.marginBottom }}>
+        {/* Topic Image - portada a todo ancho; título y botón sobre la imagen con gradiente */}
+        <Box
+          sx={{
+            position: "relative",
+            width: "100%",
+            aspectRatio: "16 / 9",
+            maxHeight: config.coverHeight,
+            overflow: "hidden",
+          }}
+        >
           <img
             src={
               topic.topic_image ||
-              `https://picsum.photos/400/400?random=${topic.id}`
+              `https://picsum.photos/800/450?random=${topic.id}`
             }
             alt={topic.title}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              borderRadius: "2px",
+              objectPosition: `${((topic.topic_image_focal_x ?? 0.5) * 100).toFixed(1)}% ${((topic.topic_image_focal_y ?? 0.5) * 100).toFixed(1)}%`,
+              display: "block",
             }}
           />
-        </Box>
-
-        {/* Topic Info */}
-        <Box
-          sx={{
-            flex: {
-              xs: "unset", // mobile (no flex grow/shrink)
-              md: 1, // from md and up → flex: 1
-            },
-          }}
-        >
+          {/* Gradiente y título/botón superpuestos */}
           <Box
             sx={{
-              display: {
-                xs: "block", // mobile
-                md: "flex", // from md and up
-              },
-              justifyContent: "space-between",
-              alignItems: "flex-start",
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 40%, transparent 100%)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
+              p: 2,
             }}
           >
-            {" "}
-            <Typography
-              variant={config.titleVariant}
-              gutterBottom
-              onClick={handleTitleClick}
+            <Box
               sx={{
-                cursor: "pointer",
-                "&:hover": {
-                  color: "primary.main",
-                },
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
               }}
             >
-              {topic.title}
-            </Typography>
-            {isCreator && (
-              <Button
-                variant="outlined"
-                startIcon={<EditIcon />}
-                onClick={onEdit}
-                size={size === "small" ? "small" : "medium"}
+              <Typography
+                variant={config.titleVariant}
+                onClick={handleTitleClick}
+                sx={{
+                  cursor: "pointer",
+                  color: "white",
+                  fontWeight: 600,
+                  textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+                  "&:hover": {
+                    color: "grey.200",
+                  },
+                }}
               >
-                Editar Tema
-              </Button>
-            )}
+                {topic.title}
+              </Typography>
+              {isCreator && (
+                <Button
+                  variant="contained"
+                  size={size === "small" ? "small" : "medium"}
+                  startIcon={<EditIcon />}
+                  onClick={onEdit}
+                  sx={{
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    color: "grey.900",
+                    "&:hover": {
+                      backgroundColor: "white",
+                    },
+                  }}
+                >
+                  Editar Tema
+                </Button>
+              )}
+            </Box>
           </Box>
-          {topic.description && (
-            <Typography variant={config.descriptionVariant} sx={{ mt: 2 }}>
+        </Box>
+
+        {/* Descripción debajo de la portada */}
+        {topic.description && (
+          <Box sx={{ px: config.padding, pt: 2, pb: config.padding }}>
+            <Typography variant={config.descriptionVariant}>
               {topic.description}
             </Typography>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
     </Paper>
   );

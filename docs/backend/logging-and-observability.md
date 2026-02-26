@@ -21,10 +21,10 @@
 
 ## Sentry
 
-- **Status**: `sentry_config.py` is prepared but not wired. Sentry is not configured in `settings.py` or `LOGGING`.
-- **When to use**: Production error tracking and performance monitoring.
-- **Setup**: Set `SENTRY_DSN`; call `configure_sentry()` from `settings.py`; optionally add Sentry handler to `LOGGING` for `django` / `django.request`. Use `ENVIRONMENT` and `traces_sample_rate` (e.g. &lt; 1.0) to control volume.
-- **PII**: Use `send_default_pii` only if required; prefer keeping PII out of Sentry events.
+- **Status**: Sentry is wired. Backend: `sentry_config.configure_sentry()` is called at the end of `settings.py` when `SENTRY_DSN` is set; `SentryUserMiddleware` adds user context. Frontend: `@sentry/react` in `main.jsx` when `VITE_SENTRY_DSN` is set, with `ErrorBoundary` and optional Replay.
+- **Backend**: Set `SENTRY_DSN` in `acbc_app/.env`. Optional: `SENTRY_TRACES_SAMPLE_RATE` (default 0.1), `SENTRY_PROFILES_SAMPLE_RATE` (default 0.0).
+- **Frontend**: Set `VITE_SENTRY_DSN` in `frontend/.env` for beta/production. Rebuild after changing.
+- **PII**: `send_default_pii=True` in backend; Replay on frontend uses `maskAllText: true`, `blockAllMedia: true`.
 
 ## Recommendations
 

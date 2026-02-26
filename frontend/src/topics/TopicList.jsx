@@ -86,7 +86,12 @@ const TopicList = () => {
                                     height="140"
                                     image={topic.topic_image || `https://picsum.photos/800/400?random=${topic.id}`}
                                     alt={topic.title}
-                                    sx={{ objectFit: 'cover' }}
+                                    sx={{
+                                        objectFit: 'cover',
+                                        objectPosition: topic.topic_image_focal_x != null && topic.topic_image_focal_y != null
+                                            ? `${(topic.topic_image_focal_x * 100).toFixed(1)}% ${(topic.topic_image_focal_y * 100).toFixed(1)}%`
+                                            : '50% 50%',
+                                    }}
                                 />
                                 <CardContent>
                                     <Typography variant="h6" gutterBottom color="text.primary">

@@ -54,6 +54,7 @@ acbc_app/gamification/
     └── commands/
         ├── create_initial_badges.py      # Crear badges iniciales
         ├── grant_founder_badges.py       # Otorgar badges de fundador
+        ├── remove_founder_badges.py      # Eliminar badges founder_member
         └── populate_test_badges.py       # Poblar badges de prueba
 ```
 
@@ -66,7 +67,8 @@ frontend/src/gamification/
 ├── FeaturedBadgeSelector.jsx   # Selector de badge destacado
 ├── BadgeNotification.jsx       # Notificaciones de badges (placeholder)
 ├── useBadges.js               # Hook personalizado para badges
-└── badgeConstants.js          # Constantes (colores, tamaños)
+├── badgeConstants.js          # Constantes (colores, tamaños, umbrales)
+└── badgeIconMap.js            # Mapeo de iconos por código de badge
 ```
 
 ---
@@ -348,7 +350,7 @@ GET /api/gamification/badges/
 **Respuesta:**
 ```json
 {
-  "count": 9,
+  "count": 11,
   "results": [
     {
       "id": 1,
@@ -439,7 +441,7 @@ Componente reutilizable para mostrar un badge individual.
 - `badge` (Object): Objeto badge con información
 - `showName` (Boolean): Si mostrar el nombre del badge (default: true)
 - `size` (String): Tamaño explícito ('extraTiny', 'tiny', 'small', 'medium', 'large')
-- `context` (String): Contexto para tamaño automático ('comment', 'header', 'profile', 'badgeList')
+- `context` (String): Contexto para tamaño automático ('comment', 'header', 'profile', 'badgeList', 'notification')
 
 **Características:**
 - Muestra imagen del badge o imagen por defecto (`badge_sky_blue.png`)
@@ -452,6 +454,7 @@ Componente reutilizable para mostrar un badge individual.
 - `header`: tiny (32px) - Removido del header
 - `profile`: tiny (32px)
 - `badgeList`: small (48px)
+- `notification`: small (48px)
 - `default`: medium (64px)
 
 ### BadgeList
@@ -635,6 +638,11 @@ Los badges destacados se muestran automáticamente en los comentarios mediante e
 ---
 
 ## Changelog
+
+### Versión 1.2.1 (Revisión documentación / código)
+- ✅ Documentación comparada con el código: alineada
+- ✅ Backend: `UserBadgeViewSet.get_queryset()` ahora acepta `user_id` por query param (`?user_id=123`) además de kwargs
+- ✅ Doc: añadido `remove_founder_badges.py` al árbol de comandos, `badgeIconMap.js` al frontend, contexto `notification`, count de badges 11 en ejemplo API
 
 ### Versión 1.2 (Fase 1.5 - Badges de Temas)
 - ✅ Badge "Curador de Conexiones" agregado (CONTRIBUTION, 45 puntos)

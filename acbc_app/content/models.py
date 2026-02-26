@@ -223,6 +223,8 @@ class Topic(models.Model):
         blank=True,
         max_length=255
     )
+    topic_image_focal_x = models.FloatField(default=0.5, blank=True)
+    topic_image_focal_y = models.FloatField(default=0.5, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     moderators = models.ManyToManyField(User, related_name='moderated_topics')

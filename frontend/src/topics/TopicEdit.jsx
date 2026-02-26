@@ -28,6 +28,10 @@ import ContentSuggestionsManager from "./ContentSuggestionsManager";
 
 const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
   const [error, setError] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [focalX, setFocalX] = useState(0.5);
+  const [focalY, setFocalY] = useState(0.5);
 
   const validateFile = (file) => {
     const maxSize = 2 * 1024 * 1024; // 2MB in bytes
@@ -44,10 +48,52 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
     return null;
   };
 
+  const onClose = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewFile(null);
+    setPreviewUrl(null);
+    setFocalX(0.5);
+    setFocalY(0.5);
+    setError(null);
+    handleClose();
+  };
+
+  const onFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewFile(file);
+    setFocalX(0.5);
+    setFocalY(0.5);
+    e.target.value = "";
+  };
+
+  const onPreviewClick = (e) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setFocalX(Math.max(0, Math.min(1, x)));
+    setFocalY(Math.max(0, Math.min(1, y)));
+  };
+
+  const onConfirmUpload = () => {
+    if (!previewFile) return;
+    handleImageUpload(previewFile, focalX, focalY);
+    onClose();
+  };
+
   return (
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={onClose}
       aria-labelledby="image-upload-modal"
     >
       <Box
@@ -56,80 +102,116 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: 400,
+          width: previewFile ? 480 : 400,
+          maxWidth: "95vw",
           bgcolor: "background.paper",
           borderRadius: 0.5,
           boxShadow: 24,
           p: 4,
         }}
       >
-        <Typography 
-          variant="h6" 
-          gutterBottom 
+        <Typography
+          variant="h6"
+          gutterBottom
           color="text.primary"
           sx={{
             fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
             fontWeight: 400,
-            fontSize: "18px"
+            fontSize: "18px",
           }}
         >
           Subir Imagen del Tema
         </Typography>
 
-        <List>
-          <ListItem>
-            <ListItemIcon>
-              <CheckCircleIcon color="disabled" />
-            </ListItemIcon>
-            <ListItemText primary="Formatos: JPEG, PNG o GIF" />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon>
-              <CheckCircleIcon color="disabled" />
-            </ListItemIcon>
-            <ListItemText primary="Tamaño máximo: 2MB" />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon>
-              <CheckCircleIcon color="disabled" />
-            </ListItemIcon>
-            <ListItemText primary="Recomendado: imagen en proporción 1:1 (cuadrada)" />
-          </ListItem>
-        </List>
+        {!previewFile ? (
+          <>
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="disabled" />
+                </ListItemIcon>
+                <ListItemText primary="Formatos: JPEG, PNG o GIF" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="disabled" />
+                </ListItemIcon>
+                <ListItemText primary="Tamaño máximo: 2MB" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="disabled" />
+                </ListItemIcon>
+                <ListItemText primary="Recomendado: imagen más ancha que alta (ej. 16:9, como miniatura de YouTube)" />
+              </ListItem>
+            </List>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
 
-        <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
-          <Button variant="contained" color="primary" component="label">
-            Subir Imagen
-            <input
-              type="file"
-              hidden
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const validationError = validateFile(file);
-                  if (validationError) {
-                    setError(validationError);
-                  } else {
-                    setError(null);
-                    handleImageUpload(file);
-                    handleClose();
-                  }
-                }
-                e.target.value = "";
+            <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+              <Button variant="contained" color="primary" component="label">
+                Elegir imagen
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={onFileSelect}
+                />
+              </Button>
+              <Button variant="outlined" onClick={onClose}>
+                Cancelar
+              </Button>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Haz clic en la zona que quieras centrar en la portada.
+            </Typography>
+            <Box
+              onClick={onPreviewClick}
+              sx={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: "16/9",
+                maxHeight: 220,
+                borderRadius: 1,
+                overflow: "hidden",
+                cursor: "crosshair",
+                bgcolor: "grey.200",
+                "& img": { width: "100%", height: "100%", objectFit: "cover" },
               }}
-            />
-          </Button>
-          <Button variant="outlined" onClick={handleClose}>
-            Cancelar
-          </Button>
-        </Box>
+            >
+              <img src={previewUrl} alt="Vista previa" />
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: `${focalX * 100}%`,
+                  top: `${focalY * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  border: "2px solid white",
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                  pointerEvents: "none",
+                }}
+              />
+            </Box>
+            <Box sx={{ mt: 2, display: "flex", gap: 2, justifyContent: "flex-end" }}>
+              <Button variant="outlined" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button variant="contained" color="primary" onClick={onConfirmUpload}>
+                Subir imagen
+              </Button>
+            </Box>
+          </>
+        )}
       </Box>
     </Modal>
   );
@@ -176,9 +258,11 @@ const TopicEdit = () => {
     fetchTopic();
   }, [topicId]);
 
-  const handleImageUpload = async (file) => {
+  const handleImageUpload = async (file, focalX = 0.5, focalY = 0.5) => {
     const formData = new FormData();
     formData.append("topic_image", file);
+    formData.append("topic_image_focal_x", String(focalX));
+    formData.append("topic_image_focal_y", String(focalY));
 
     try {
       const updatedTopic = await contentApi.updateTopicImage(topicId, formData);
@@ -266,68 +350,53 @@ const TopicEdit = () => {
           </Box>
         </Box>
 
+        {/* Topic Image - portada (más ancha que alta, 16:9) */}
         <Box
           sx={{
-            display: {
-              xs: "block", // mobile
-              md: "flex", // from md and up
-            },
-            alignItems: "flex-start",
-            gap: 3,
+            position: "relative",
+            width: "100%",
+            aspectRatio: "16 / 9",
+            maxHeight: 280,
+            borderRadius: "4px",
+            overflow: "hidden",
             mb: 3,
           }}
         >
-          {/* Topic Image */}
-         <Box
-  sx={{
-    position: "relative",
-    width: {
-      xs: 160, // smaller on mobile
-      sm: 160, // small tablets
-      md: 200, // default on desktop
-    },
-    height: {
-      xs: 160,
-      sm: 160,
-      md: 200,
-    },
-  }}
->
-            <img
-              src={
-                topic.topic_image
-                  ? `${topic.topic_image}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`
-                  : "/default-topic-image.png"
-              }
-              alt={topic.title}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                borderRadius: "2px",
-              }}
-            />
-            <Button
-              component="span"
-              variant="contained"
-              startIcon={<EditIcon />}
-              onClick={() => setIsModalOpen(true)}
-              sx={{
-                position: "absolute",
-                bottom: 8,
-                right: 8,
-                backgroundColor: "rgba(0, 0, 0, 0.6)",
-                "&:hover": {
-                  backgroundColor: "rgba(0, 0, 0, 0.8)",
-                },
-              }}
-            >
-              Editar Imagen
-            </Button>
-          </Box>
+          <img
+            src={
+              topic.topic_image
+                ? `${topic.topic_image}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`
+                : "/default-topic-image.png"
+            }
+            alt={topic.title}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: `${((topic.topic_image_focal_x ?? 0.5) * 100).toFixed(1)}% ${((topic.topic_image_focal_y ?? 0.5) * 100).toFixed(1)}%`,
+            }}
+          />
+          <Button
+            component="span"
+            variant="contained"
+            startIcon={<EditIcon />}
+            onClick={() => setIsModalOpen(true)}
+            sx={{
+              position: "absolute",
+              bottom: 8,
+              right: 8,
+              backgroundColor: "rgba(0, 0, 0, 0.6)",
+              "&:hover": {
+                backgroundColor: "rgba(0, 0, 0, 0.8)",
+              },
+            }}
+          >
+            Editar Imagen
+          </Button>
+        </Box>
 
-          {/* Topic Title and Description Form */}
-          <Box sx={{ flex: 1 }}>
+        {/* Topic Title and Description Form */}
+        <Box>
             <form id="topic-edit-form" onSubmit={handleSubmit}>
               <TextField
                 fullWidth
@@ -354,7 +423,6 @@ const TopicEdit = () => {
               />
             </form>
           </Box>
-        </Box>
 
         <Divider sx={{ my: 3 }} />
 
