@@ -13,6 +13,7 @@
   - **Recommended**: Use passwords without special characters that cause issues (`$`, `!`, `%`, `` ` ``). Safe characters: letters, numbers, `-`, `_`, `.`, `@`, `#`
 - [ ] Set up Google OAuth credentials (if using)
 - [ ] Configure frontend `.env` with production API URL
+- [ ] **Email:** Leave `SEND_EMAILS` unset (or `false`) until Postmark is approved; then set `SEND_EMAILS=true` and `POSTMARK_SERVER_TOKEN` in `acbc_app/.env`. See [Email features](docs/deployment/email-features.md).
 
 ### Deployment Steps
 

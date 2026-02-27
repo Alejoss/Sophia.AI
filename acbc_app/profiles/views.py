@@ -48,6 +48,10 @@ class CheckAuth(APIView):
 
     @method_decorator(csrf_exempt)
     def get(self, request):
+        # Temporary debug prints for auth issues
+        print("[DEBUG][CheckAuth.get] Incoming auth check")
+        print(f"[DEBUG][CheckAuth.get] request.user.is_authenticated: {request.user.is_authenticated}")
+        print(f"[DEBUG][CheckAuth.get] Cookies keys: {list(request.COOKIES.keys())}")
         logger.debug(f"Authentication check requested - User: {request.user.username if request.user.is_authenticated else 'anonymous'}")
         
         # Check if user is authenticated via session
@@ -57,14 +61,18 @@ class CheckAuth(APIView):
         if not is_authenticated:
             refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
             if refresh_token:
+                print("[DEBUG][CheckAuth.get] Refresh token cookie present (masked length only)")
+                print(f"[DEBUG][CheckAuth.get] Refresh token length: {len(refresh_token)}")
                 try:
                     # Try to validate the refresh token
                     RefreshToken(refresh_token)
                     is_authenticated = True
                     logger.debug("User authenticated via refresh token")
                 except Exception as e:
+                    print(f"[DEBUG][CheckAuth.get] Refresh token validation failed: {str(e)}")
                     logger.debug(f"Refresh token validation failed: {str(e)}")
         
+        print(f"[DEBUG][CheckAuth.get] Final is_authenticated: {is_authenticated}")
         logger.info(f"Authentication check completed - User: {request.user.username if request.user.is_authenticated else 'anonymous'}, Is authenticated: {is_authenticated}")
         return Response({'is_authenticated': is_authenticated}, status=status.HTTP_200_OK)
 
@@ -399,6 +407,12 @@ class LoginView(APIView):
         password = request.data.get('password')
         client_ip = self.get_client_ip(request)
 
+        # Temporary debug prints for login issues (do NOT print password)
+        print("[DEBUG][LoginView.post] Login attempt received")
+        print(f"[DEBUG][LoginView.post] Username/Email: {username_or_email}")
+        print(f"[DEBUG][LoginView.post] Client IP: {client_ip}")
+        print(f"[DEBUG][LoginView.post] request.data keys: {list(request.data.keys())}")
+
         # Rate limiting check
         cache_key = f'login_attempts_{client_ip}'
         attempts = cache.get(cache_key, 0)
@@ -441,12 +455,14 @@ class LoginView(APIView):
                 logger.info(f"[LOGIN] Username login successful: {username_or_email}")
 
         if user:
+            print(f"[DEBUG][LoginView.post] Authentication successful for: {user.username}")
             login(request, user)
             cache.delete(cache_key)  # Reset rate limiting on success
             logger.info(f"[LOGIN RATE LIMIT] SUCCESS - Reset attempt counter for IP {client_ip}, Username/Email: {login_identifier}, Username: {user.username}. Previous attempts: {attempts}")
 
             try:
                 # Generate JWT tokens
+                print(f"[DEBUG][LoginView.post] Generating JWT tokens for user: {user.username}")
                 refresh = RefreshToken.for_user(user)
                 access_token = str(refresh.access_token)
                 refresh_token = str(refresh)
@@ -458,6 +474,9 @@ class LoginView(APIView):
                 }
 
                 response = Response(response_data)
+
+                print(f"[DEBUG][LoginView.post] Access token length: {len(access_token)}")
+                print(f"[DEBUG][LoginView.post] Setting refresh cookie, token length: {len(refresh_token)}")
 
                 # Set refresh token in HTTP-only cookie
                 response.set_cookie(
@@ -471,6 +490,7 @@ class LoginView(APIView):
 
                 return response
             except Exception as e:
+                print(f"[DEBUG][LoginView.post] Error generating tokens: {str(e)}")
                 logger.error(f"Error generating tokens during login for user {user.username}: {str(e)}", exc_info=True)
                 return Response(
                     {'error': 'Error al generar tokens'},
@@ -479,6 +499,7 @@ class LoginView(APIView):
         else:
             # Increment failed attempts
             new_attempt_count = attempts + 1
+            print(f"[DEBUG][LoginView.post] Invalid credentials for: {username_or_email}, attempts {attempts} -> {new_attempt_count}")
             cache.set(cache_key, new_attempt_count, timeout=300)  # 5 minutes timeout
             logger.warning(f"[LOGIN RATE LIMIT] FAILED ATTEMPT - IP: {client_ip}, Username/Email: {login_identifier}, Failed attempts incremented: {attempts} -> {new_attempt_count} (will reset in 300 seconds)")
             return Response(
@@ -641,19 +662,28 @@ class RefreshTokenView(APIView):
             Response with new access token
         """
         try:
+            # Temporary debug prints for token refresh issues
+            print("[DEBUG][TokenRefreshView.post] Token refresh attempt")
+            print(f"[DEBUG][TokenRefreshView.post] request.user.is_authenticated: {request.user.is_authenticated}")
+            print(f"[DEBUG][TokenRefreshView.post] Cookies keys: {list(request.COOKIES.keys())}")
+
             logger.debug(f"Token refresh attempt for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             refresh_token = request.COOKIES.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
             
             if not refresh_token:
+                print("[DEBUG][TokenRefreshView.post] No refresh token cookie found")
                 logger.warning(f"No refresh token found in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
                     {'error': 'No se encontró token de actualización'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
+            print("[DEBUG][TokenRefreshView.post] Refresh token cookie present (masked length only)")
+            print(f"[DEBUG][TokenRefreshView.post] Refresh token length: {len(refresh_token)}")
             logger.debug(f"Found refresh token in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
+            print(f"[DEBUG][TokenRefreshView.post] New access token length: {len(access_token)}")
             logger.debug(f"Generated new access token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
 
             return Response({
@@ -661,6 +691,7 @@ class RefreshTokenView(APIView):
             })
 
         except Exception as e:
+            print(f"[DEBUG][TokenRefreshView.post] Exception during refresh: {str(e)}")
             logger.error(f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'Token de actualización inválido'},
@@ -677,11 +708,17 @@ class GoogleLoginView(SocialLoginView):
     callback_url = None
 
     def post(self, request, *args, **kwargs):
+        # Temporary debug prints for Google login issues
+        print("[DEBUG][GoogleLoginView.post] Google login attempt started")
+        print(f"[DEBUG][GoogleLoginView.post] request.user.is_authenticated: {request.user.is_authenticated}")
+        print(f"[DEBUG][GoogleLoginView.post] request.data keys: {list(request.data.keys())}")
+
         logger.info(f"Starting Google login process for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         
         # Check for access token
         id_token = request.data.get('access_token')
         if not id_token:
+            print("[DEBUG][GoogleLoginView.post] No access_token field in request.data")
             logger.error(f"No access token provided in request for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return Response(
                 {'error': 'No se proporcionó token de acceso'},
@@ -709,6 +746,7 @@ class GoogleLoginView(SocialLoginView):
         # Verify and decode the ID token
         try:
             logger.info(f"Verifying ID token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+            print(f"[DEBUG][GoogleLoginView.post] ID token length: {len(id_token)}")
             unverified_header = jwt.get_unverified_header(id_token)
             key_id = unverified_header['kid']
             
@@ -749,6 +787,8 @@ class GoogleLoginView(SocialLoginView):
                         'leeway': 10          # Allow 10 seconds of clock skew
                     }
                 )
+                print(f"[DEBUG][GoogleLoginView.post] Decoded token email: {decoded_token.get('email')}")
+                print(f"[DEBUG][GoogleLoginView.post] Decoded token sub: {decoded_token.get('sub')}")
                 logger.info(f"Successfully decoded and verified ID token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             except jwt.ExpiredSignatureError:
                 logger.error(f"Token has expired for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
@@ -784,8 +824,10 @@ class GoogleLoginView(SocialLoginView):
                 uid=decoded_token['sub']
             )
             user = social_account.user
+            print(f"[DEBUG][GoogleLoginView.post] Found existing social account for uid={decoded_token.get('sub')} username={user.username}")
             logger.info(f"Found existing user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
         except SocialAccount.DoesNotExist:
+            print(f"[DEBUG][GoogleLoginView.post] No existing social account for uid={decoded_token.get('sub')}, will create user if needed")
             logger.info(f"No existing social account found for user {request.user.username if request.user.is_authenticated else 'anonymous'}, creating new user")
             # Create new user
             email = decoded_token.get('email')
@@ -798,6 +840,7 @@ class GoogleLoginView(SocialLoginView):
             
             try:
                 user = User.objects.get(email=email)
+                print(f"[DEBUG][GoogleLoginView.post] Found existing Django user with email={email}, username={user.username}")
                 logger.info(f"Found existing user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             except User.DoesNotExist:
                 logger.info(f"Creating new user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
@@ -815,6 +858,7 @@ class GoogleLoginView(SocialLoginView):
                     first_name=decoded_token.get('given_name', ''),
                     last_name=decoded_token.get('family_name', '')
                 )
+                print(f"[DEBUG][GoogleLoginView.post] Created new Django user username={username}, email={email}")
                 logger.info(f"Created new user: {username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             
             # Create social account
@@ -824,6 +868,7 @@ class GoogleLoginView(SocialLoginView):
                 uid=decoded_token['sub'],
                 extra_data=decoded_token
             )
+            print(f"[DEBUG][GoogleLoginView.post] Created SocialAccount for user={user.username}, uid={decoded_token.get('sub')}")
             logger.info(f"Created social account for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
 
         # Handle profile picture
@@ -864,6 +909,7 @@ class GoogleLoginView(SocialLoginView):
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
+            print(f"[DEBUG][GoogleLoginView.post] Generated JWT tokens for user={user.username}. Access token length={len(access_token)}, refresh token length={len(refresh_token)}")
 
             # Prepare response
             response_data = {

@@ -566,13 +566,18 @@ LOGIN_URL = "account_login"
 LOGIN_REDIRECT_URL = "profiles:set_jwt_token"
 LOGOUT_REDIRECT_URL = "http://localhost:5173/profiles/login"
 LANGUAGE_CODE = "en-us"
-SEND_EMAILS = False
+# Set to True in .env when Postmark (or email) is ready; keeps all email features disabled until then
+SEND_EMAILS = os.getenv("SEND_EMAILS", "false").lower() == "true"
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 
-# Email configuration (Postmark)
-EMAIL_BACKEND = "postmarker.django.EmailBackend"
+# Email configuration (Postmark). When SEND_EMAILS=False, use dummy backend so no real emails are sent
+# (e.g. password reset and any Django send_mail() do not call Postmark).
+if SEND_EMAILS:
+    EMAIL_BACKEND = "postmarker.django.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.dummy.EmailBackend"
 
 POSTMARK = {
     "TOKEN": os.getenv("POSTMARK_SERVER_TOKEN", ""),

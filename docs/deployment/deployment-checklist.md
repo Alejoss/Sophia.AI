@@ -59,8 +59,9 @@ DB_PORT=5432
 
 **Opcionales (pero recomendados):**
 ```bash
-# Email (si usas Postmark)
-POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
+# Email: por defecto desactivado (SEND_EMAILS=false). Cuando Postmark esté aprobado:
+# SEND_EMAILS=true
+# POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
 EMAIL_FROM=noreply@academiablockchain.com
 ADMIN_EMAIL=admin@academiablockchain.com
 

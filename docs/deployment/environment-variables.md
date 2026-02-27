@@ -136,6 +136,20 @@ Location: `acbc_app/.env`
 - **Default**: `us-west-2`
 - **Example**: `AWS_S3_REGION_NAME=us-east-1`
 
+### Email (Optional – Postmark)
+
+#### `SEND_EMAILS`
+- **Description**: Enable sending of emails (password reset, confirmations, suggestions to admins). When `false` or unset, no emails are sent (dummy backend).
+- **Required**: No
+- **Default**: `false`
+- **Example**: `SEND_EMAILS=true`
+- **Note**: Keep `false` or unset until Postmark is approved; see [Email features](email-features.md).
+
+#### `POSTMARK_SERVER_TOKEN`
+- **Description**: Postmark server token (required when `SEND_EMAILS=true` in production).
+- **Required**: Yes if `SEND_EMAILS=true` in production
+- **Example**: `POSTMARK_SERVER_TOKEN=your-server-token`
+
 ### Monitoring (Optional)
 
 #### `SENTRY_DSN`
