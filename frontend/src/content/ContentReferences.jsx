@@ -38,7 +38,12 @@ const ContentReferences = ({ references }) => {
                                         width: 40, 
                                         height: 40, 
                                         mr: 2,
-                                        bgcolor: 'grey.300'
+                                        bgcolor: 'grey.300',
+                                        ...(path.image_focal_x != null && path.image_focal_y != null && {
+                                            '& .MuiAvatar-img': {
+                                                objectPosition: `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`,
+                                            },
+                                        }),
                                     }}
                                 >
                                     {path.title.charAt(0).toUpperCase()}

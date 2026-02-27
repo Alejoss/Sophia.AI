@@ -59,9 +59,8 @@ DB_PORT=5432
 
 **Opcionales (pero recomendados):**
 ```bash
-# Email (si usas Mailgun)
-MAILGUN_DOMAIN=<tu-dominio-mailgun>
-MAILGUN_API_KEY=<tu-api-key>
+# Email (si usas Postmark)
+POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
 EMAIL_FROM=noreply@academiablockchain.com
 ADMIN_EMAIL=admin@academiablockchain.com
 

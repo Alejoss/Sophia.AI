@@ -389,6 +389,9 @@ const KnowledgePathDetail = () => {
               width: '100%',
               height: { xs: 200, md: 300 },
               objectFit: 'cover',
+              objectPosition: knowledgePath.image_focal_x != null && knowledgePath.image_focal_y != null
+                ? `${(knowledgePath.image_focal_x * 100).toFixed(1)}% ${(knowledgePath.image_focal_y * 100).toFixed(1)}%`
+                : '50% 50%',
               display: 'block',
             }}
           />

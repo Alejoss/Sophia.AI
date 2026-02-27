@@ -17,7 +17,9 @@ const TopicsByUser = ({ userId, userName }) => {
         // In the future, we might want a specific endpoint for this
         const allTopics = await contentApi.getTopics();
         const userTopics = Array.isArray(allTopics) 
-          ? allTopics.filter(topic => topic.creator === userId)
+          ? allTopics.filter(topic => 
+              topic.creator != null && userId != null && String(topic.creator) === String(userId)
+            )
           : [];
         setTopics(userTopics);
       } catch (err) {

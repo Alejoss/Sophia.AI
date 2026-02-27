@@ -42,6 +42,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
+import ImageUploadModal from "../components/ImageUploadModal";
 
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
@@ -62,6 +63,8 @@ const KnowledgePathEdit = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [imageCacheBuster, setImageCacheBuster] = useState(0);
 
   // Autosave state
   const [saveState, setSaveState] = useState({ status: "idle", message: null, updatedAt: null });
@@ -178,6 +181,51 @@ const KnowledgePathEdit = () => {
     setImageFile(file);
     const nextUrl = URL.createObjectURL(file);
     setImagePreviewUrl(nextUrl);
+  };
+
+  const handleImageUpload = async (file, focalX = 0.5, focalY = 0.5) => {
+    try {
+      const payload = {
+        title,
+        description,
+        is_visible: isVisible,
+        image: file,
+        image_focal_x: focalX,
+        image_focal_y: focalY,
+      };
+      const updated = await knowledgePathsApi.updateKnowledgePath(pathId, payload);
+      setKnowledgePath((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+      if (updated?.image) setImagePreviewUrl(updated.image);
+      setImageFile(null);
+      setImageCacheBuster(Date.now());
+      lastSavedRef.current = {
+        ...lastSavedRef.current,
+        imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
+      };
+    } catch (err) {
+      setSaveState({
+        status: "error",
+        message: err.response?.data?.error || err.message || "Error al actualizar la imagen",
+        updatedAt: null,
+      });
+    }
+  };
+
+  const handleFocalOnlyUpdate = async (focalX, focalY) => {
+    try {
+      const updated = await knowledgePathsApi.updateKnowledgePath(pathId, {
+        image_focal_x: focalX,
+        image_focal_y: focalY,
+      });
+      setKnowledgePath((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+      setImageCacheBuster(Date.now());
+    } catch (err) {
+      setSaveState({
+        status: "error",
+        message: err.response?.data?.error || err.message || "Error al actualizar el foco de la imagen",
+        updatedAt: null,
+      });
+    }
   };
 
   const isDirty = useMemo(() => {
@@ -368,12 +416,13 @@ const KnowledgePathEdit = () => {
         {imagePreviewUrl || knowledgePath?.image ? (
           <Box
             component="img"
-            src={imagePreviewUrl || knowledgePath?.image || null}
+            src={`${imagePreviewUrl || knowledgePath?.image || ""}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`}
             alt={title || knowledgePath?.title || "Knowledge path"}
             sx={{
               width: "100%",
               height: { xs: 180, md: 240 },
               objectFit: "cover",
+              objectPosition: `${((knowledgePath?.image_focal_x ?? 0.5) * 100).toFixed(1)}% ${((knowledgePath?.image_focal_y ?? 0.5) * 100).toFixed(1)}%`,
               display: "block",
             }}
           />
@@ -496,12 +545,13 @@ const KnowledgePathEdit = () => {
                     {imagePreviewUrl || knowledgePath?.image ? (
                       <Box
                         component="img"
-                        src={imagePreviewUrl || knowledgePath?.image || null}
+                        src={`${imagePreviewUrl || knowledgePath?.image || ""}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`}
                         alt={title || "Portada"}
                         sx={{
                           width: "100%",
                           height: "100%",
                           objectFit: "cover",
+                          objectPosition: `${((knowledgePath?.image_focal_x ?? 0.5) * 100).toFixed(1)}% ${((knowledgePath?.image_focal_y ?? 0.5) * 100).toFixed(1)}%`,
                         }}
                       />
                     ) : (
@@ -522,18 +572,14 @@ const KnowledgePathEdit = () => {
                     )}
                   </Box>
                   <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
-                    <input
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      id="knowledge-path-cover-upload"
-                      type="file"
-                      onChange={(e) => handlePickImage(e.target.files?.[0])}
-                    />
-                    <label htmlFor="knowledge-path-cover-upload">
-                      <Button component="span" variant="outlined" startIcon={<PhotoCameraIcon />} sx={{ textTransform: "none", borderRadius: 2, mb: 1 }}>
-                        Cambiar portada
-                      </Button>
-                    </label>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PhotoCameraIcon />}
+                      onClick={() => setIsImageModalOpen(true)}
+                      sx={{ textTransform: "none", borderRadius: 2, mb: 1 }}
+                    >
+                      Cambiar portada
+                    </Button>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                       Recomendado: imagen 16:9 o más ancha.
                     </Typography>
@@ -784,6 +830,17 @@ const KnowledgePathEdit = () => {
           {reorderState.message}
         </Alert>
       </Snackbar>
+
+      <ImageUploadModal
+        open={isImageModalOpen}
+        handleClose={() => setIsImageModalOpen(false)}
+        handleImageUpload={handleImageUpload}
+        existingImageUrl={imagePreviewUrl || knowledgePath?.image}
+        existingFocalX={knowledgePath?.image_focal_x ?? 0.5}
+        existingFocalY={knowledgePath?.image_focal_y ?? 0.5}
+        onFocalOnlyUpdate={handleFocalOnlyUpdate}
+        entityLabel="camino de conocimiento"
+      />
     </Container>
   );
 };

@@ -71,6 +71,9 @@ const knowledgePathsApi = {
                 formData.append('title', knowledgePathData.title);
                 formData.append('description', knowledgePathData.description);
                 formData.append('image', knowledgePathData.image);
+                if (knowledgePathData.image_focal_x !== undefined) formData.append('image_focal_x', String(knowledgePathData.image_focal_x));
+                if (knowledgePathData.image_focal_y !== undefined) formData.append('image_focal_y', String(knowledgePathData.image_focal_y));
+                if (knowledgePathData.is_visible !== undefined) formData.append('is_visible', String(knowledgePathData.is_visible));
                 
                 console.log('knowledgePathsApi.updateKnowledgePath - Using FormData');
                 console.log('knowledgePathsApi.updateKnowledgePath - FormData contents:');
@@ -84,7 +87,7 @@ const knowledgePathsApi = {
                     }
                 });
             } else {
-                // Use JSON for regular updates
+                // Use JSON for regular updates (including focal-only updates)
                 const { image, ...jsonData } = knowledgePathData;
                 console.log('knowledgePathsApi.updateKnowledgePath - Using JSON data:', jsonData);
                 response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, jsonData);

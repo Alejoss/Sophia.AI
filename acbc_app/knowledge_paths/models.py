@@ -40,6 +40,8 @@ class KnowledgePath(models.Model):
         max_length=255,  # Increase max length to handle longer filenames
         help_text="Cover image for the knowledge path"
     )
+    image_focal_x = models.FloatField(default=0.5, blank=True)
+    image_focal_y = models.FloatField(default=0.5, blank=True)
     is_visible = models.BooleanField(default=False, help_text="Whether this knowledge path is visible to other users")
 
     class Meta:

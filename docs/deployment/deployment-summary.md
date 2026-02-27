@@ -60,9 +60,8 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=<tu-client-id>
 ### Opcionales (pero recomendadas)
 
 ```bash
-# Email
-MAILGUN_DOMAIN=<tu-dominio>
-MAILGUN_API_KEY=<tu-api-key>
+# Email (Postmark)
+POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
 EMAIL_FROM=noreply@academiablockchain.com
 ADMIN_EMAIL=admin@academiablockchain.com
 

@@ -207,6 +207,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image = serializers.ImageField(max_length=None, allow_empty_file=True, required=False)
+    creator_username = serializers.CharField(source='creator.username', read_only=True)
     title = serializers.CharField(
         max_length=200,
         required=True,
@@ -222,7 +223,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Topic
-        fields = ['id', 'title', 'description', 'creator', 'topic_image', 'topic_image_focal_x', 'topic_image_focal_y']
+        fields = ['id', 'title', 'description', 'creator', 'creator_username', 'topic_image', 'topic_image_focal_x', 'topic_image_focal_y']
         read_only_fields = ['creator']
 
     def to_representation(self, instance):

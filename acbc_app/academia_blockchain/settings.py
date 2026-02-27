@@ -571,9 +571,16 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 
-# Email configuration
-MAILGUN_DOMAIN = os.getenv('MAILGUN_DOMAIN', '')
-MAILGUN_API_KEY = os.getenv('MAILGUN_API_KEY', '')
+# Email configuration (Postmark)
+EMAIL_BACKEND = "postmarker.django.EmailBackend"
+
+POSTMARK = {
+    "TOKEN": os.getenv("POSTMARK_SERVER_TOKEN", ""),
+    # In development, allow test mode; in production use real token (no test mode)
+    "TEST_MODE": ENVIRONMENT != "PRODUCTION",
+    "VERBOSITY": int(os.getenv("POSTMARK_VERBOSITY", "0")),
+}
+
 EMAIL_FROM = os.getenv('EMAIL_FROM', 'academiablockchain@no-reply.com')
 EMAIL_FROM_NAME = os.getenv('EMAIL_FROM_NAME', 'Academia Blockchain')
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', '')
@@ -582,9 +589,9 @@ EMAIL_MAX_RETRIES = int(os.getenv('EMAIL_MAX_RETRIES', '3'))
 
 # Validate email configuration in production
 if ENVIRONMENT == "PRODUCTION" and SEND_EMAILS:
-    if not MAILGUN_DOMAIN or not MAILGUN_API_KEY:
+    if not POSTMARK["TOKEN"]:
         raise ValueError(
-            "MAILGUN_DOMAIN and MAILGUN_API_KEY must be set in production when SEND_EMAILS=True"
+            "POSTMARK_SERVER_TOKEN must be set in production when SEND_EMAILS=True"
         )
 
 if ENVIRONMENT == "PRODUCTION":

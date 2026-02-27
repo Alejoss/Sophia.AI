@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useRef, useContext } from 'react';
 import { getUserFromLocalStorage, isAuthenticated, setUserInLocalStorage, setAuthenticationStatus, 
   getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus } from './localStorageUtils';
-import { checkAuth } from '../api/profilesApi';
+import { checkAuth, getUserProfile } from '../api/profilesApi';
 import { jwtDecode } from 'jwt-decode';
 import axiosInstance from '../api/axiosConfig';
 
@@ -117,10 +117,17 @@ export const AuthProvider = ({ children }) => {
 
         if (backendAuthStatus && storedUser && storedAccessToken) {
           scheduleTokenRefresh(storedAccessToken);
-          
+          let userToUse = storedUser;
+          if (storedUser.id == null) {
+            const profile = await getUserProfile();
+            if (profile?.user) {
+              userToUse = profile.user;
+              setUserInLocalStorage(userToUse);
+            }
+          }
           setAuthState({
             isAuthenticated: true,
-            user: storedUser
+            user: userToUse
           });
         } else {
           clearAuthState();

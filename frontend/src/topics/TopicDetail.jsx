@@ -43,44 +43,36 @@ const TopicDetail = () => {
     useEffect(() => {
         const fetchTopic = async () => {
             try {
-                console.log(`Fetching topic ${topicId}...`);
                 const data = await contentApi.getTopicDetails(topicId);
-                console.log('Received topic data:', data);
                 setTopic(data);
                 
-                // Check if contents exists before processing
                 if (!data.contents) {
-                    console.log('No contents in topic data');
                     setContentByType({});
                     setLoading(false);
                     return;
                 }
                 
-                // Group content by media type
                 const grouped = data.contents.reduce((acc, content) => {
                     const type = content.media_type.toLowerCase();
-                    console.log(`Processing content of type: ${type}`, content);
-                    if (!acc[type]) {
-                        acc[type] = [];
-                    }
+                    if (!acc[type]) acc[type] = [];
                     acc[type].push(content);
                     return acc;
                 }, {});
 
-                // Sort each group by created_at
                 Object.keys(grouped).forEach(type => {
                     grouped[type].sort((a, b) => 
                         new Date(b.created_at) - new Date(a.created_at)
                     );
                 });
 
-                console.log('Grouped content by type:', grouped);
                 setContentByType(grouped);
                 
-                // Check if user is moderator or creator
-                const userIsModerator = isAuthenticated && (
-                    data.creator === user?.id || 
-                    (data.moderators || []).some(mod => mod.id === user?.id)
+                const creatorId = typeof data.creator === 'object' ? data.creator.id : data.creator;
+                const userId = user?.id;
+                const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
+                const userIsModerator = isCreator || (
+                    isAuthenticated &&
+                    (data.moderators || []).some(mod => String(mod.id) === String(userId))
                 );
                 setIsModerator(userIsModerator);
                 
@@ -91,12 +83,6 @@ const TopicDetail = () => {
                 
                 setLoading(false);
             } catch (err) {
-                console.error('Error fetching topic:', err);
-                console.error('Error details:', {
-                    message: err.message,
-                    status: err.response?.status,
-                    data: err.response?.data
-                });
                 setError('Error al cargar los detalles del tema');
                 setLoading(false);
             }
@@ -110,7 +96,7 @@ const TopicDetail = () => {
             const suggestions = await contentApi.getTopicContentSuggestions(topicId, { status: 'PENDING' });
             setPendingSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
         } catch (err) {
-            console.error('Error fetching pending suggestions count:', err);
+            // ignore
         }
     };
 
@@ -141,7 +127,7 @@ const TopicDetail = () => {
                     setContentByType(grouped);
                 }
             } catch (err) {
-                console.error('Error refreshing topic:', err);
+                // ignore
             }
         };
         fetchTopic();
@@ -312,12 +298,9 @@ const TopicDetail = () => {
     if (error) return <Typography color="error">{error}</Typography>;
     if (!topic) return <Typography>Tema no encontrado</Typography>;
 
-    console.log('Auth check:', {
-        isAuthenticated: isAuthenticated,
-        topicCreator: topic.creator,
-        authUser: user,
-        condition: isAuthenticated && topic.creator === user?.id
-    });
+    const creatorId = typeof topic.creator === 'object' ? topic.creator.id : topic.creator;
+    const userId = user?.id;
+    const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
 
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
@@ -329,7 +312,7 @@ const TopicDetail = () => {
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                 {/* Dueño y moderadores: Editar Contenido. Resto de usuarios autenticados: Sugerir Contenido */}
-                {isModerator ? (
+                {(isCreator || isModerator) ? (
                     <Button
                         variant="contained"
                         startIcon={<EditIcon />}

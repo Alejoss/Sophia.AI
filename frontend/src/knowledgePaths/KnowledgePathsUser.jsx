@@ -159,32 +159,62 @@ const KnowledgePathsUser = () => {
                 key={path.id}
                 className="block bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow overflow-hidden"
               >
-                {/* Cover Image */}
-                {path.image ? (
-                  <CardMedia
-                    component="img"
-                    height="140"
-                    image={path.image}
-                    alt={path.title}
-                    sx={{ objectFit: 'cover' }}
-                  />
-                ) : (
+                {/* Cover Image with Edit button overlay */}
+                <Box sx={{ position: 'relative' }}>
+                  {path.image ? (
+                    <CardMedia
+                      component="img"
+                      height="140"
+                      image={path.image}
+                      alt={path.title}
+                      sx={{
+                        objectFit: 'cover',
+                        objectPosition: path.image_focal_x != null && path.image_focal_y != null
+                          ? `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`
+                          : '50% 50%',
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: 140,
+                        bgcolor: 'grey.300',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '3rem',
+                        color: 'text.secondary',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {path.title.charAt(0).toUpperCase()}
+                    </Box>
+                  )}
                   <Box
                     sx={{
-                      width: '100%',
-                      height: 140,
-                      bgcolor: 'grey.300',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '3rem',
-                      color: 'text.secondary',
-                      fontWeight: 700,
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      bgcolor: 'rgba(255,255,255,0.9)',
+                      borderRadius: 1,
                     }}
                   >
-                    {path.title.charAt(0).toUpperCase()}
+                    <Button
+                      component={Link}
+                      to={`/knowledge_path/${path.id}/edit`}
+                      variant="outlined"
+                      size="small"
+                      startIcon={<EditIcon />}
+                      sx={{ 
+                        textTransform: 'none',
+                        minWidth: 'auto'
+                      }}
+                    >
+                      Editar
+                    </Button>
                   </Box>
-                )}
+                </Box>
                 
                 {/* Content Section */}
                 <div className="p-6">
@@ -227,7 +257,7 @@ const KnowledgePathsUser = () => {
                     <p className="text-gray-600 mb-3 line-clamp-7">{path.description}</p>
                   </div>
 
-                  {/* Footer: Vote, Date, and Actions */}
+                  {/* Footer: Vote and Date (bottom-right) */}
                   <Box 
                     sx={{ 
                       mt: 3,
@@ -235,40 +265,25 @@ const KnowledgePathsUser = () => {
                       borderTop: 1,
                       borderColor: 'divider',
                       display: 'flex',
-                      justifyContent: 'space-between',
+                      justifyContent: 'flex-end',
                       alignItems: 'center',
                       flexWrap: 'wrap',
                       gap: 2
                     }}
                   >
-                    {/* Vote Component */}
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <VoteComponent 
-                        type="knowledge_path"
-                        ids={{ pathId: path.id }}
-                        initialVoteCount={Number(path.vote_count) || 0}
-                        initialUserVote={Number(path.user_vote) || 0}
-                      />
-                    </Box>
-
-                    {/* Date and Edit Button */}
                     <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                       <Typography variant="caption" color="text.secondary">
                         {new Date(path.created_at).toLocaleDateString()}
                       </Typography>
-                      <Button
-                        component={Link}
-                        to={`/knowledge_path/${path.id}/edit`}
-                        variant="outlined"
-                        size="small"
-                        startIcon={<EditIcon />}
-                        sx={{ 
-                          textTransform: 'none',
-                          minWidth: 'auto'
-                        }}
-                      >
-                        Editar
-                      </Button>
+                      {/* Vote Component */}
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <VoteComponent 
+                          type="knowledge_path"
+                          ids={{ pathId: path.id }}
+                          initialVoteCount={Number(path.vote_count) || 0}
+                          initialUserVote={Number(path.user_vote) || 0}
+                        />
+                      </Box>
                     </Stack>
                   </Box>
                 </div>
@@ -361,7 +376,12 @@ const KnowledgePathsUser = () => {
                     height="140"
                     image={path.image}
                     alt={path.title}
-                    sx={{ objectFit: 'cover' }}
+                    sx={{
+                      objectFit: 'cover',
+                      objectPosition: path.image_focal_x != null && path.image_focal_y != null
+                        ? `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`
+                        : '50% 50%',
+                    }}
                   />
                 ) : (
                   <Box

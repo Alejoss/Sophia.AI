@@ -7,7 +7,13 @@ import { useAuth } from "../context/AuthContext";
 const TopicHeader = ({ topic, onEdit, size = "large" }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  const isCreator = isAuthenticated && topic.creator === user?.id;
+  const creatorId = typeof topic.creator === "object" ? topic.creator.id : topic.creator;
+  const userId = user?.id;
+  const isCreator =
+    isAuthenticated &&
+    creatorId != null &&
+    userId != null &&
+    String(creatorId) === String(userId);
 
   const handleTitleClick = () => {
     navigate(`/content/topics/${topic.id}`);
@@ -119,11 +125,22 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
         </Box>
 
         {/* Descripción debajo de la portada */}
-        {topic.description && (
+        {(topic.description || topic.creator) && (
           <Box sx={{ px: config.padding, pt: 2, pb: config.padding }}>
-            <Typography variant={config.descriptionVariant}>
-              {topic.description}
-            </Typography>
+            {topic.description && (
+              <Typography variant={config.descriptionVariant} sx={{ mb: topic.creator ? 1 : 0 }}>
+                {topic.description}
+              </Typography>
+            )}
+            {topic.creator && (
+              <Typography variant="body2" color="text.secondary">
+                Creado por{" "}
+                {topic.creator_username ||
+                  (typeof topic.creator === "object"
+                    ? topic.creator.username
+                    : topic.creator)}
+              </Typography>
+            )}
           </Box>
         )}
       </Box>

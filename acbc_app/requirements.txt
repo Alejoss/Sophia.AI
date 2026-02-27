@@ -44,3 +44,4 @@ uritemplate==4.1.1
 beautifulsoup4>=4.9.3
 python-magic>=0.4.24
 sentry-sdk>=2.0.0
+postmarker>=1.0.0

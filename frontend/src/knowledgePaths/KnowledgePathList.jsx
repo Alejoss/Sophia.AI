@@ -157,7 +157,12 @@ const KnowledgePathList = () => {
                     height="140"
                     image={path.image}
                     alt={path.title}
-                    sx={{ objectFit: 'cover' }}
+                    sx={{
+                      objectFit: 'cover',
+                      objectPosition: path.image_focal_x != null && path.image_focal_y != null
+                        ? `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`
+                        : '50% 50%',
+                    }}
                   />
                 ) : (
                   <Box

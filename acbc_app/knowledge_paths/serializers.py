@@ -61,7 +61,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
         model = KnowledgePath
         fields = [
             'id', 'title', 'author', 'author_id', 'description', 'created_at', 
-            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image', 'is_visible', 'can_be_visible'
+            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible'
         ]
 
     def get_can_be_visible(self, obj):
@@ -101,10 +101,12 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
     title = serializers.CharField(required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     can_be_visible = serializers.SerializerMethodField()
+    image_focal_x = serializers.FloatField(required=False, min_value=0, max_value=1)
+    image_focal_y = serializers.FloatField(required=False, min_value=0, max_value=1)
     
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'created_at', 'image', 'is_visible', 'can_be_visible']
+        fields = ['id', 'title', 'description', 'author', 'created_at', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible']
         read_only_fields = ['author', 'created_at']
 
     def get_can_be_visible(self, obj):
@@ -137,6 +139,12 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
                 instance.image.delete(save=False)
             instance.image = validated_data['image']
         
+        # Update focal point
+        if 'image_focal_x' in validated_data:
+            instance.image_focal_x = validated_data['image_focal_x']
+        if 'image_focal_y' in validated_data:
+            instance.image_focal_y = validated_data['image_focal_y']
+        
         # Update other fields
         instance.title = validated_data.get('title', instance.title)
         instance.description = validated_data.get('description', instance.description)
@@ -160,7 +168,7 @@ class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'image']
+        fields = ['id', 'title', 'image', 'image_focal_x', 'image_focal_y']
     
     def get_image(self, obj):
         if obj.image:
@@ -175,7 +183,7 @@ class KnowledgePathEngagedSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'author_id', 'created_at', 'image']
+        fields = ['id', 'title', 'description', 'author', 'author_id', 'created_at', 'image', 'image_focal_x', 'image_focal_y']
 
     def get_image(self, obj):
         if obj.image:
@@ -194,7 +202,7 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgePath
         fields = ['id', 'title', 'description', 'author', 'author_id', 
-                 'created_at', 'vote_count', 'user_vote', 'image', 'is_visible', 'can_be_visible']
+                 'created_at', 'vote_count', 'user_vote', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible']
 
     def get_can_be_visible(self, obj):
         return obj.can_be_visible()
