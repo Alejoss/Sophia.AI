@@ -39,6 +39,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import SettingsIcon from "@mui/icons-material/Settings";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
@@ -76,6 +77,8 @@ const KnowledgePathEdit = () => {
   const [reorderState, setReorderState] = useState({ status: "idle", message: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, node: null });
   const [isDeletingNode, setIsDeletingNode] = useState(false);
+  const [deletePathDialogOpen, setDeletePathDialogOpen] = useState(false);
+  const [isDeletingPath, setIsDeletingPath] = useState(false);
 
   const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
   const initialTab = tabFromQuery === "details" ? 0 : 1; // Default to Curriculum (tab 1)
@@ -345,6 +348,25 @@ const KnowledgePathEdit = () => {
 
   const handleAddNode = () => navigate(`/knowledge_path/${pathId}/add-node`);
   const handleAddQuiz = () => navigate(`/quizzes/${pathId}/create`);
+
+  const openDeletePathDialog = () => setDeletePathDialogOpen(true);
+  const closeDeletePathDialog = () => setDeletePathDialogOpen(false);
+
+  const confirmDeletePath = async () => {
+    setIsDeletingPath(true);
+    try {
+      await knowledgePathsApi.deleteKnowledgePath(pathId);
+      closeDeletePathDialog();
+      navigate("/profiles/my_profile?section=knowledge-paths", { replace: true });
+    } catch (err) {
+      setReorderState({
+        status: "error",
+        message: err.response?.data?.error || "Error al eliminar el camino de conocimiento",
+      });
+    } finally {
+      setIsDeletingPath(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -796,6 +818,43 @@ const KnowledgePathEdit = () => {
           </Paper>
         </Stack>
       )}
+
+      {/* Zona de peligro: eliminar camino */}
+      <Paper elevation={1} sx={{ mt: 4, p: 3, borderRadius: 3, border: "1px solid", borderColor: "error.light" }}>
+        <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
+          Zona de peligro
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Si eliminas este camino de conocimiento se borrarán también todos sus nodos y no podrás recuperarlos.
+        </Typography>
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteForeverIcon />}
+          onClick={openDeletePathDialog}
+          sx={{ textTransform: "none" }}
+        >
+          Eliminar camino de conocimiento
+        </Button>
+      </Paper>
+
+      {/* Delete path dialog */}
+      <Dialog open={deletePathDialogOpen} onClose={closeDeletePathDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Eliminar camino de conocimiento</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            ¿Seguro que deseas eliminar <strong>{knowledgePath?.title || "este camino"}</strong>? Se eliminarán todos los nodos y esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeletePathDialog} disabled={isDeletingPath} sx={{ textTransform: "none" }}>
+            Cancelar
+          </Button>
+          <Button onClick={confirmDeletePath} disabled={isDeletingPath} color="error" variant="contained" sx={{ textTransform: "none" }}>
+            {isDeletingPath ? "Eliminando…" : "Eliminar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete node dialog */}
       <Dialog open={deleteDialog.open} onClose={closeDeleteNode} maxWidth="xs" fullWidth>
