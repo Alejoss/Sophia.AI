@@ -21,6 +21,7 @@ const PublicationCreationForm = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingContent, setIsUploadingContent] = useState(false);
+  const [hasPendingContent, setHasPendingContent] = useState(false);
 
   const handleContentSelected = (contentProfile) => {
     console.log("Content selected for publication:", contentProfile);
@@ -78,6 +79,7 @@ const PublicationCreationForm = () => {
         onContentRemoved={handleContentRemoved}
         previewVariant="detailed"
         onUploadingChange={setIsUploadingContent}
+        onPendingContentChange={setHasPendingContent}
       />
 
       <Paper elevation={2} sx={{ p: 4 }}>
@@ -88,7 +90,8 @@ const PublicationCreationForm = () => {
         <TextField
           fullWidth
           multiline
-          rows={4}
+          minRows={5}
+          maxRows={24}
           label="Contenido de Texto"
           value={formData.text_content}
           onChange={(e) =>
@@ -119,7 +122,7 @@ const PublicationCreationForm = () => {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={isLoading || isUploadingContent}
+            disabled={isLoading || isUploadingContent || hasPendingContent}
           >
             {isLoading ? "Creando..." : "Crear Publicación"}
           </Button>

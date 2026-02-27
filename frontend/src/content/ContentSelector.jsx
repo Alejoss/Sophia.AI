@@ -12,6 +12,7 @@ const ContentSelector = ({
   showPreview = true,
   previewVariant = "detailed",
   onUploadingChange,
+  onPendingContentChange,
 }) => {
   const [showContentOptions, setShowContentOptions] = useState(
     !selectedContent
@@ -20,7 +21,13 @@ const ContentSelector = ({
   const [uploadMode, setUploadMode] = useState('file'); // 'file' or 'url'
   const [showContentModal, setShowContentModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [hasPendingContent, setHasPendingContent] = useState(false);
+
+  const handlePendingContentChange = useCallback((pending) => {
+    setHasPendingContent(pending);
+    if (onPendingContentChange) onPendingContentChange(pending);
+  }, [onPendingContentChange]);
+
   const handleUploadingChange = useCallback((uploading) => {
     setIsUploading(uploading);
     if (onUploadingChange) {
@@ -39,11 +46,12 @@ const ContentSelector = ({
   const handleCancelUpload = useCallback(() => {
     setContentMode(null);
     setIsUploading(false);
-    // Don't reset uploadMode here - keep it so user can click the button again
+    setHasPendingContent(false);
+    if (onPendingContentChange) onPendingContentChange(false);
     if (onUploadingChange) {
       onUploadingChange(false);
     }
-  }, [onUploadingChange]);
+  }, [onUploadingChange, onPendingContentChange]);
 
   const handleContentUpload = useCallback((uploadedContent) => {
     console.log("Uploaded content received:", uploadedContent);
@@ -51,10 +59,12 @@ const ContentSelector = ({
     setContentMode(null);
     setShowContentOptions(false);
     setIsUploading(false);
+    setHasPendingContent(false);
+    if (onPendingContentChange) onPendingContentChange(false);
     if (onUploadingChange) {
       onUploadingChange(false);
     }
-  }, [onContentSelected, onUploadingChange]);
+  }, [onContentSelected, onUploadingChange, onPendingContentChange]);
 
   const handleContentSelect = useCallback((selectedContent) => {
     console.log("Selected content received:", selectedContent);
@@ -181,6 +191,7 @@ const ContentSelector = ({
           <UploadContentForm 
             onContentUploaded={handleContentUpload}
             onUploadingChange={handleUploadingChange}
+            onHasPendingContentChange={handlePendingContentChange}
             initialUrlMode={uploadMode === 'url'}
             showModeToggle={false}
           />

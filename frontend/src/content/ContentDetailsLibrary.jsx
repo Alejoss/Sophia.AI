@@ -55,11 +55,25 @@ const ContentDetailsLibrary = () => {
     const profile = content.selected_profile;
     const isOwner = profile?.user && currentUser && parseInt(profile.user) === parseInt(currentUser.id);
 
+    // Determine if we are viewing this content from the current user's own library context.
+    const searchParams = new URLSearchParams(location.search);
+    const contextParam = searchParams.get('context');
+    const contextUserId = searchParams.get('id') || searchParams.get('userId');
+    const isOwnLibraryView =
+        contextParam === 'library' &&
+        currentUser &&
+        (
+            !contextUserId || // when no user id is provided, the API call defaults to the current user
+            parseInt(contextUserId) === parseInt(currentUser.id)
+        );
+
+    const isInUserLibrary = isOwner || isOwnLibraryView;
+
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
             {/* Action Buttons */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                {isOwner ? (
+                {isInUserLibrary ? (
                     // Owner actions
                     <>
                         <Button

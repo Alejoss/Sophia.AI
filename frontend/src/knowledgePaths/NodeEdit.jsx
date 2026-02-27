@@ -30,6 +30,7 @@ const NodeEdit = () => {
   const [nodeQuiz, setNodeQuiz] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hasPendingContent, setHasPendingContent] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -162,6 +163,7 @@ const NodeEdit = () => {
               }));
             }}
             previewVariant="detailed"
+            onPendingContentChange={setHasPendingContent}
           />
 
           {/* Quiz Section */}
@@ -204,7 +206,8 @@ const NodeEdit = () => {
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               multiline
-              rows={4}
+              minRows={5}
+              maxRows={24}
             />
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -212,6 +215,7 @@ const NodeEdit = () => {
                 type="submit"
                 variant="contained"
                 color="success"
+                disabled={hasPendingContent}
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
                 Guardar Cambios

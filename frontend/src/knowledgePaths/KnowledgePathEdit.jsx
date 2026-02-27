@@ -535,7 +535,7 @@ const KnowledgePathEdit = () => {
                       </Button>
                     </label>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                      Recomendado: imagen 16:9 para mejor visualización.
+                      Recomendado: imagen 16:9 o más ancha.
                     </Typography>
                   </Box>
                 </Stack>
@@ -584,7 +584,8 @@ const KnowledgePathEdit = () => {
                 onChange={(e) => setDescription(e.target.value)}
                 fullWidth
                 multiline
-                minRows={4}
+                minRows={5}
+                maxRows={24}
                 placeholder="Explica qué aprenderá el alumno y cómo está organizado el camino."
                 sx={{ mt: 1 }}
               />

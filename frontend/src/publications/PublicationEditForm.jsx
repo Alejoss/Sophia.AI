@@ -16,6 +16,7 @@ const PublicationEditForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [isUploadingContent, setIsUploadingContent] = useState(false);
+  const [hasPendingContent, setHasPendingContent] = useState(false);
 
   useEffect(() => {
     const fetchPublicationDetails = async () => {
@@ -136,6 +137,7 @@ const PublicationEditForm = () => {
         onContentRemoved={handleContentRemoved}
         previewVariant="preview"
         onUploadingChange={setIsUploadingContent}
+        onPendingContentChange={setHasPendingContent}
       />
 
       <Paper elevation={2} sx={{ p: 4 }}>
@@ -146,7 +148,8 @@ const PublicationEditForm = () => {
         <TextField
           fullWidth
           multiline
-          rows={4}
+          minRows={5}
+          maxRows={24}
           label="Contenido de Texto"
           value={formData.text_content}
           onChange={(e) => setFormData({ ...formData, text_content: e.target.value })}
@@ -175,7 +178,7 @@ const PublicationEditForm = () => {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={isLoading || isUploadingContent}
+            disabled={isLoading || isUploadingContent || hasPendingContent}
           >
             {isLoading ? 'Actualizando...' : 'Actualizar Publicación'}
           </Button>

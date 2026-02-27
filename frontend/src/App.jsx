@@ -6,7 +6,6 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 import ProtectedRoute from './components/ProtectedRoute';
-import SentryTestButton from './components/SentryTestButton';
 
 import Home from './generalComponents/Home.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
@@ -167,7 +166,6 @@ const AppContent = () => {
           </Route>
           </Routes>
         </AuthProvider>
-        <SentryTestButton />
       </Router>
     </MuiThemeProvider>
   );

@@ -40,9 +40,9 @@
    ```
    The script reads DB credentials from `acbc_app/.env`, frees port 80 if host nginx/apache is using it, then builds and starts the stack.
 
-   **Or build and run manually** (from project root, e.g. `/opt/acbc-app`):
+   **Or build and run manually** (from **project root** only, e.g. `cd /opt/acbc-app` then):
    ```bash
-   # Deploy creates .env.compose from acbc_app/.env; use it for compose
+   # deploy.sh creates .env.compose in the project root; run from there
    docker compose --env-file .env.compose -f docker-compose.prod.yml down
    docker compose --env-file .env.compose -f docker-compose.prod.yml build --no-cache
    # Free port 80 first if needed: sudo systemctl stop nginx

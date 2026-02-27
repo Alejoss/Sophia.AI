@@ -118,9 +118,6 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                 
                 {hasContent && (
                   <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Contenido Referenciado:
-                    </Typography>
                     
                     <ContentDisplay 
                       content={publication.content}
@@ -130,8 +127,11 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                     />
                   </Box>
                 )}
-                
-                <Typography variant="body1">
+
+                <Typography
+                  variant="body1"
+                  sx={{ whiteSpace: 'pre-wrap' }}
+                >
                   {publication.text_content}
                 </Typography>
 

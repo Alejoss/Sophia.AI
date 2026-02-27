@@ -216,8 +216,8 @@ const createSchema = () => yup.object({
     then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], 'Por favor selecciona un tipo de medio válido').required('El tipo de medio es requerido'),
     otherwise: () => yup.string().nullable()
   }),
-  title: yup.string().max(100, 'El título no debe exceder 100 caracteres'),
-  author: yup.string().max(100, 'El autor no debe exceder 100 caracteres'),
+  title: yup.string().max(255, 'El título no debe exceder 255 caracteres'),
+  author: yup.string().max(255, 'El autor no debe exceder 255 caracteres'),
   is_producer: yup.boolean(),
   is_visible: yup.boolean(),
   isUrlMode: yup.boolean()
@@ -225,7 +225,7 @@ const createSchema = () => yup.object({
 
 const schema = createSchema();
 
-const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true }) => {
+const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true, onHasPendingContentChange }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -284,8 +284,19 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     setValue('isUrlMode', isUrlMode, { shouldValidate: false });
   }, [isUrlMode, setValue]);
 
-  // Watch the URL field for changes
+  // Watch the URL and file fields for changes
   const url = watch('url');
+  const file = watch('file');
+
+  // Notify parent when user has pending content (URL or file filled but not yet saved)
+  useEffect(() => {
+    if (typeof onHasPendingContentChange !== 'function') return;
+    const hasPending = !hasSavedSuccessfully && (
+      (isUrlMode && url && String(url).trim() !== '') ||
+      (!isUrlMode && file && file[0])
+    );
+    onHasPendingContentChange(!!hasPending);
+  }, [hasSavedSuccessfully, isUrlMode, url, file, onHasPendingContentChange]);
 
   // Auto-set media type to VIDEO when URL is YouTube (immediate, no debounce)
   useEffect(() => {

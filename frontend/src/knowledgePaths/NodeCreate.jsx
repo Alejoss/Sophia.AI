@@ -27,6 +27,7 @@ const NodeCreate = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isUploadingContent, setIsUploadingContent] = useState(false);
+  const [hasPendingContent, setHasPendingContent] = useState(false);
 
   useEffect(() => {
     const fetchKnowledgePath = async () => {
@@ -123,6 +124,7 @@ const NodeCreate = () => {
             onContentRemoved={handleContentRemoved}
             previewVariant="detailed"
             onUploadingChange={handleUploadingChange}
+            onPendingContentChange={setHasPendingContent}
           />
 
           <Box 
@@ -146,7 +148,8 @@ const NodeCreate = () => {
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               multiline
-              rows={4}
+              minRows={5}
+              maxRows={24}
             />
 
             {isUploadingContent && (
@@ -160,7 +163,7 @@ const NodeCreate = () => {
                 type="submit"
                 variant="contained"
                 color="primary"
-                disabled={!formData.content_profile_id || submitting || isUploadingContent}
+                disabled={!formData.content_profile_id || submitting || isUploadingContent || hasPendingContent}
                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
               >
                 {submitting ? 'Agregando...' : 'Agregar Nodo'}

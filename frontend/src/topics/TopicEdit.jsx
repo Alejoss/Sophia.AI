@@ -26,12 +26,24 @@ import { useAuth } from "../context/AuthContext";
 import TopicModerators from "./TopicModerators";
 import ContentSuggestionsManager from "./ContentSuggestionsManager";
 
-const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
+const ImageUploadModal = ({
+  open,
+  handleClose,
+  handleImageUpload,
+  existingImageUrl,
+  existingFocalX = 0.5,
+  existingFocalY = 0.5,
+  onFocalOnlyUpdate,
+}) => {
   const [error, setError] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [focalX, setFocalX] = useState(0.5);
   const [focalY, setFocalY] = useState(0.5);
+  /** 'choice' = pick "new image" vs "focal only"; 'upload' = file then focal; 'focal_only' = only adjust focal on existing image */
+  const [mode, setMode] = useState(null);
+
+  const hasExistingImage = Boolean(existingImageUrl);
 
   const validateFile = (file) => {
     const maxSize = 2 * 1024 * 1024; // 2MB in bytes
@@ -49,14 +61,25 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
   };
 
   const onClose = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl && previewFile) URL.revokeObjectURL(previewUrl);
     setPreviewFile(null);
     setPreviewUrl(null);
+    setMode(null);
     setFocalX(0.5);
     setFocalY(0.5);
     setError(null);
     handleClose();
   };
+
+  React.useEffect(() => {
+    if (open) {
+      setMode(hasExistingImage ? "choice" : "upload");
+      if (hasExistingImage) {
+        setFocalX(existingFocalX);
+        setFocalY(existingFocalY);
+      }
+    }
+  }, [open, hasExistingImage, existingFocalX, existingFocalY]);
 
   const onFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -90,6 +113,18 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
     onClose();
   };
 
+  const onConfirmFocalOnly = () => {
+    if (typeof onFocalOnlyUpdate === "function") {
+      onFocalOnlyUpdate(focalX, focalY);
+    }
+    onClose();
+  };
+
+  const showChoice = open && hasExistingImage && mode === "choice";
+  const showUploadForm = mode === "upload" && !previewFile;
+  const showPreview = (mode === "upload" && previewFile) || mode === "focal_only";
+  const previewSrc = mode === "focal_only" ? existingImageUrl : previewUrl;
+
   return (
     <Modal
       open={open}
@@ -102,7 +137,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: previewFile ? 480 : 400,
+          width: showPreview ? 480 : 400,
           maxWidth: "95vw",
           bgcolor: "background.paper",
           borderRadius: 0.5,
@@ -120,10 +155,33 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
             fontSize: "18px",
           }}
         >
-          Subir Imagen del Tema
+          {showChoice ? "Editar imagen del tema" : showPreview && mode === "focal_only" ? "Cambiar zona de la portada" : "Subir Imagen del Tema"}
         </Typography>
 
-        {!previewFile ? (
+        {showChoice ? (
+          <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Puedes subir una imagen nueva o solo ajustar qué parte de la imagen actual se muestra en la portada.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setMode("upload")}
+            >
+              Subir nueva imagen
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={() => setMode("focal_only")}
+            >
+              Cambiar el foco de la imagen actual
+            </Button>
+            <Button variant="text" onClick={onClose} sx={{ mt: 1 }}>
+              Cancelar
+            </Button>
+          </Box>
+        ) : showUploadForm ? (
           <>
             <List>
               <ListItem>
@@ -167,7 +225,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
               </Button>
             </Box>
           </>
-        ) : (
+        ) : showPreview && previewSrc ? (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Haz clic en la zona que quieras centrar en la portada.
@@ -186,7 +244,7 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
                 "& img": { width: "100%", height: "100%", objectFit: "cover" },
               }}
             >
-              <img src={previewUrl} alt="Vista previa" />
+              <img src={previewSrc} alt="Vista previa" />
               <Box
                 sx={{
                   position: "absolute",
@@ -206,12 +264,18 @@ const ImageUploadModal = ({ open, handleClose, handleImageUpload }) => {
               <Button variant="outlined" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button variant="contained" color="primary" onClick={onConfirmUpload}>
-                Subir imagen
-              </Button>
+              {mode === "focal_only" ? (
+                <Button variant="contained" color="primary" onClick={onConfirmFocalOnly}>
+                  Guardar foco
+                </Button>
+              ) : (
+                <Button variant="contained" color="primary" onClick={onConfirmUpload}>
+                  Subir imagen
+                </Button>
+              )}
             </Box>
           </>
-        )}
+        ) : null}
       </Box>
     </Modal>
   );
@@ -271,6 +335,20 @@ const TopicEdit = () => {
       setError(null);
     } catch (err) {
       setError("Error al actualizar la imagen del tema");
+    }
+  };
+
+  const handleFocalOnlyUpdate = async (focalX, focalY) => {
+    try {
+      const updatedTopic = await contentApi.updateTopic(topicId, {
+        topic_image_focal_x: focalX,
+        topic_image_focal_y: focalY,
+      });
+      setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
+      setImageCacheBuster(Date.now());
+      setError(null);
+    } catch (err) {
+      setError("Error al actualizar el foco de la imagen");
     }
   };
 
@@ -534,6 +612,10 @@ const TopicEdit = () => {
         open={isModalOpen}
         handleClose={() => setIsModalOpen(false)}
         handleImageUpload={handleImageUpload}
+        existingImageUrl={topic?.topic_image}
+        existingFocalX={topic?.topic_image_focal_x ?? 0.5}
+        existingFocalY={topic?.topic_image_focal_y ?? 0.5}
+        onFocalOnlyUpdate={handleFocalOnlyUpdate}
       />
     </Box>
   );
