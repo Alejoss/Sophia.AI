@@ -1,16 +1,29 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Chip, Tabs, Tab, Box, Typography, CardMedia, Button, Stack } from '@mui/material';
+import {
+  Container,
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  CardMedia,
+  Chip,
+  Tabs,
+  Tab,
+  Button,
+  Stack,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EditIcon from '@mui/icons-material/Edit';
 import SchoolIcon from '@mui/icons-material/School';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
-import { AuthContext } from '../context/AuthContext';
 
 const KnowledgePathsUser = () => {
-  const { authState } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState(0); // 0 = Created, 1 = Engaged
   
   // Created knowledge paths state
@@ -85,30 +98,35 @@ const KnowledgePathsUser = () => {
   const isLoading = createdLoading || engagedLoading;
   const currentError = activeTab === 0 ? createdError : engagedError;
 
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-4">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
-        <Typography
-          variant="h4"
-          gutterBottom
-          sx={{
-            fontSize: {
-              xs: "1.5rem", // ~24px on mobile
-              sm: "1.75rem", // ~28px on small screens
-              md: "2.125rem", // ~34px on desktop (default h4)
-            },
-            fontWeight: 600,
-          }}
-        >
+    <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+          flexWrap: { xs: 'wrap', md: 'nowrap' },
+        }}
+      >
+        <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
           Caminos de Conocimiento
         </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
           <Button
             component={Link}
             to="/knowledge_path"
             variant="outlined"
             color="primary"
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}
           >
             Ver Todos los Caminos
           </Button>
@@ -117,7 +135,7 @@ const KnowledgePathsUser = () => {
             to="/knowledge_path/create"
             variant="contained"
             color="primary"
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}
           >
             Crear Nuevo Camino
           </Button>
@@ -125,42 +143,214 @@ const KnowledgePathsUser = () => {
       </Box>
 
       {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="knowledge paths tabs">
-          <Tab 
-            label={`Creados (${createdPaths.length})`} 
-            icon={<EditIcon />} 
-            iconPosition="start"
-          />
-          <Tab 
-            label={`En los que participo (${engagedPaths.length})`} 
-            icon={<SchoolIcon />} 
-            iconPosition="start"
-          />
+          <Tab label={`Creados (${createdPaths.length})`} icon={<EditIcon />} iconPosition="start" />
+          <Tab label={`En los que participo (${engagedPaths.length})`} icon={<SchoolIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="text-center py-8">Cargando...</div>
-      )}
-
       {/* Error State */}
       {currentError && (
-        <div className="text-red-500 text-center py-8">{currentError}</div>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {currentError}
+        </Alert>
       )}
 
-      {/* Created Knowledge Paths Tab */}
-      {activeTab === 0 && !isLoading && !currentError && (
-        <div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+      {/* Created Knowledge Paths Tab - same card layout as KnowledgePathList */}
+      {activeTab === 0 && !currentError && (
+        <Box>
+          <Grid container spacing={3}>
             {createdPaths.map((path) => (
-              <div 
-                key={path.id}
-                className="block bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow overflow-hidden"
+              <Grid item xs={12} sm={6} lg={4} key={path.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    '&:hover': { boxShadow: 4 },
+                  }}
+                >
+                  <Box sx={{ position: 'relative' }}>
+                    {path.image ? (
+                      <CardMedia
+                        component="img"
+                        height="140"
+                        image={path.image}
+                        alt={path.title}
+                        sx={{
+                          objectFit: 'cover',
+                          objectPosition: path.image_focal_x != null && path.image_focal_y != null
+                            ? `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`
+                            : '50% 50%',
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: 140,
+                          bgcolor: 'grey.300',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '3rem',
+                          color: 'text.secondary',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {path.title.charAt(0).toUpperCase()}
+                      </Box>
+                    )}
+                    <Box sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(255,255,255,0.9)', borderRadius: 1 }}>
+                      <Button
+                        component={Link}
+                        to={`/knowledge_path/${path.id}/edit`}
+                        variant="outlined"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        sx={{ textTransform: 'none', minWidth: 'auto' }}
+                      >
+                        Editar
+                      </Button>
+                    </Box>
+                  </Box>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography
+                        component={Link}
+                        to={`/knowledge_path/${path.id}`}
+                        variant="h5"
+                        sx={{
+                          display: 'block',
+                          mb: 1,
+                          textDecoration: 'none',
+                          color: 'text.primary',
+                          '&:hover': { color: 'primary.main' },
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {path.title}
+                      </Typography>
+                      <Box sx={{ mb: 1.5 }}>
+                        <Chip
+                          icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                          label={path.is_visible ? 'Público' : 'Privado'}
+                          color={path.is_visible ? 'success' : 'default'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {path.description}
+                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <VoteComponent
+                          type="knowledge_path"
+                          ids={{ pathId: path.id }}
+                          initialVoteCount={Number(path.vote_count) || 0}
+                          initialUserVote={Number(path.user_vote) || 0}
+                        />
+                      </Box>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        pt: 2,
+                        borderTop: 1,
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Por {path.author}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(path.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+          {createdPaths.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
+                Aún no has creado caminos de conocimiento
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Comienza creando tu primer camino de conocimiento para organizar y compartir tu viaje de aprendizaje.
+              </Typography>
+              <Button component={Link} to="/knowledge_path/create" variant="contained" color="primary" sx={{ textTransform: 'none' }}>
+                Crear Tu Primer Camino
+              </Button>
+            </Box>
+          )}
+          {createdTotalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 4 }}>
+              <Button
+                onClick={() => handleCreatedPageChange(createdCurrentPage - 1)}
+                disabled={!createdHasPrevious}
+                variant="contained"
+                color={createdHasPrevious ? 'primary' : 'inherit'}
+                sx={{
+                  bgcolor: createdHasPrevious ? 'primary.main' : 'grey.300',
+                  color: createdHasPrevious ? 'white' : 'text.disabled',
+                  textTransform: 'none',
+                  '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
+                }}
               >
-                {/* Cover Image with Edit button overlay */}
-                <Box sx={{ position: 'relative' }}>
+                Anterior
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                Página {createdCurrentPage} de {createdTotalPages}
+              </Typography>
+              <Button
+                onClick={() => handleCreatedPageChange(createdCurrentPage + 1)}
+                disabled={!createdHasNext}
+                variant="contained"
+                color={createdHasNext ? 'primary' : 'inherit'}
+                sx={{
+                  bgcolor: createdHasNext ? 'primary.main' : 'grey.300',
+                  color: createdHasNext ? 'white' : 'text.disabled',
+                  textTransform: 'none',
+                  '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
+                }}
+              >
+                Siguiente
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Engaged Knowledge Paths Tab - same card layout as KnowledgePathList */}
+      {activeTab === 1 && !currentError && (
+        <Box>
+          <Grid container spacing={3}>
+            {engagedPaths.map((path) => (
+              <Grid item xs={12} sm={6} lg={4} key={path.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    '&:hover': { boxShadow: 4 },
+                  }}
+                >
                   {path.image ? (
                     <CardMedia
                       component="img"
@@ -191,298 +381,89 @@ const KnowledgePathsUser = () => {
                       {path.title.charAt(0).toUpperCase()}
                     </Box>
                   )}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      bgcolor: 'rgba(255,255,255,0.9)',
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Button
-                      component={Link}
-                      to={`/knowledge_path/${path.id}/edit`}
-                      variant="outlined"
-                      size="small"
-                      startIcon={<EditIcon />}
-                      sx={{ 
-                        textTransform: 'none',
-                        minWidth: 'auto'
-                      }}
-                    >
-                      Editar
-                    </Button>
-                  </Box>
-                </Box>
-                
-                {/* Content Section */}
-                <div className="p-6">
-                  <div className="flex-1 min-w-0">
-                    {/* Title Section */}
-                    <Box sx={{ mb: 2, textAlign: 'center' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box sx={{ mb: 2 }}>
                       <Typography
                         component={Link}
                         to={`/knowledge_path/${path.id}`}
-                        variant="h6"
+                        variant="h5"
                         sx={{
-                          fontWeight: 700,
-                          color: 'text.primary',
-                          textDecoration: 'none',
                           display: 'block',
+                          mb: 1.5,
+                          textDecoration: 'none',
+                          color: 'text.primary',
+                          '&:hover': { color: 'primary.main' },
                           wordBreak: 'break-word',
-                          '&:hover': {
-                            color: 'primary.main',
-                            textDecoration: 'none',
-                          },
                         }}
                       >
-                        <br />
                         {path.title}
                       </Typography>
-                    </Box>
-
-                    {/* Visibility Status */}
-                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'left' }}>
-                      <Chip
-                        icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                        label={path.is_visible ? 'Público' : 'Privado'}
-                        color={path.is_visible ? 'success' : 'default'}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Box>
-
-                    {/* Description */}
-                    <p className="text-gray-600 mb-3 line-clamp-7">{path.description}</p>
-                  </div>
-
-                  {/* Footer: Vote and Date (bottom-right) */}
-                  <Box 
-                    sx={{ 
-                      mt: 3,
-                      pt: 2,
-                      borderTop: 1,
-                      borderColor: 'divider',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 2
-                    }}
-                  >
-                    <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(path.created_at).toLocaleDateString()}
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {path.description}
                       </Typography>
-                      {/* Vote Component */}
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <VoteComponent 
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <VoteComponent
                           type="knowledge_path"
                           ids={{ pathId: path.id }}
                           initialVoteCount={Number(path.vote_count) || 0}
                           initialUserVote={Number(path.user_vote) || 0}
                         />
                       </Box>
-                    </Stack>
-                  </Box>
-                </div>
-              </div>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        pt: 2,
+                        borderTop: 1,
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Typography
+                        component={Link}
+                        to={path.author_id ? `/profiles/user_profile/${path.author_id}` : '#'}
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
+                      >
+                        Por {path.author}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(path.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
             ))}
-          </div>
-
-          {/* No Created Knowledge Paths Message */}
-          {createdPaths.length === 0 && (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">Aún no has creado caminos de conocimiento</h3>
-              <p className="text-gray-500 mb-6">Comienza creando tu primer camino de conocimiento para organizar y compartir tu viaje de aprendizaje.</p>
-              <Link 
-                to="/knowledge_path/create"
-                className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
-              >
-                Crear Tu Primer Camino
-              </Link>
-            </div>
-          )}
-
-          {/* Created Paths Pagination Controls */}
-          {createdTotalPages > 1 && (
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 2,
-                mt: 4,
-              }}
-            >
-              <Button
-                onClick={() => handleCreatedPageChange(createdCurrentPage - 1)}
-                disabled={!createdHasPrevious}
-                variant="contained"
-                color={createdHasPrevious ? 'primary' : 'inherit'}
-                sx={{
-                  bgcolor: createdHasPrevious ? 'primary.main' : 'grey.300',
-                  color: createdHasPrevious ? 'white' : 'text.disabled',
-                  textTransform: 'none',
-                  '&:disabled': {
-                    bgcolor: 'grey.300',
-                    color: 'text.disabled',
-                  },
-                }}
-              >
-                Anterior
-              </Button>
-              
-              <Typography variant="body2" color="text.secondary">
-                Página {createdCurrentPage} de {createdTotalPages}
+          </Grid>
+          {engagedPaths.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
+                Aún no participas en caminos de conocimiento
               </Typography>
-              
-              <Button
-                onClick={() => handleCreatedPageChange(createdCurrentPage + 1)}
-                disabled={!createdHasNext}
-                variant="contained"
-                color={createdHasNext ? 'primary' : 'inherit'}
-                sx={{
-                  bgcolor: createdHasNext ? 'primary.main' : 'grey.300',
-                  color: createdHasNext ? 'white' : 'text.disabled',
-                  textTransform: 'none',
-                  '&:disabled': {
-                    bgcolor: 'grey.300',
-                    color: 'text.disabled',
-                  },
-                }}
-              >
-                Siguiente
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Comienza explorando caminos de conocimiento creados por otros usuarios para iniciar tu viaje de aprendizaje.
+              </Typography>
+              <Button component={Link} to="/knowledge_path" variant="contained" color="primary" sx={{ textTransform: 'none' }}>
+                Explorar Caminos de Conocimiento
               </Button>
             </Box>
           )}
-        </div>
-      )}
-
-      {/* Engaged Knowledge Paths Tab */}
-      {activeTab === 1 && !isLoading && !currentError && (
-        <div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-            {engagedPaths.map((path) => (
-              <div 
-                key={path.id}
-                className="block bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow overflow-hidden"
-              >
-                {/* Cover Image */}
-                {path.image ? (
-                  <CardMedia
-                    component="img"
-                    height="140"
-                    image={path.image}
-                    alt={path.title}
-                    sx={{
-                      objectFit: 'cover',
-                      objectPosition: path.image_focal_x != null && path.image_focal_y != null
-                        ? `${(path.image_focal_x * 100).toFixed(1)}% ${(path.image_focal_y * 100).toFixed(1)}%`
-                        : '50% 50%',
-                    }}
-                  />
-                ) : (
-                  <Box
-                    sx={{
-                      width: '100%',
-                      height: 140,
-                      bgcolor: 'grey.300',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '3rem',
-                      color: 'text.secondary',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {path.title.charAt(0).toUpperCase()}
-                  </Box>
-                )}
-                
-                {/* Content Section */}
-                <div className="p-6">
-                  <div className="flex-1 min-w-0">
-                    {/* Title Section */}
-                    <Box sx={{ mb: 2, textAlign: 'center' }}>
-                      <Typography
-                        component={Link}
-                        to={`/knowledge_path/${path.id}`}
-                        variant="h6"
-                        sx={{
-                          fontWeight: 700,
-                          color: 'text.primary',
-                          textDecoration: 'none',
-                          display: 'block',
-                          wordBreak: 'break-word',
-                          '&:hover': {
-                            color: 'primary.main',
-                            textDecoration: 'none',
-                          },
-                        }}
-                      >
-                        {path.title}
-                      </Typography>
-                    </Box>
-
-                    {/* Author Info */}
-                    <Box sx={{ mb: 2, textAlign: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Por {path.author}
-                      </Typography>
-                    </Box>
-
-                    {/* Description */}
-                    <p className="text-gray-600 mb-3 line-clamp-7">{path.description}</p>
-                  </div>
-
-                  {/* Footer: Date */}
-                  <Box 
-                    sx={{ 
-                      mt: 3,
-                      pt: 2,
-                      borderTop: 1,
-                      borderColor: 'divider',
-                      display: 'flex',
-                      justifyContent: 'flex-start',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(path.created_at).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* No Engaged Knowledge Paths Message */}
-          {engagedPaths.length === 0 && (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold !text-gray-600 mb-4">Aún no participas en caminos de conocimiento</h3>
-              <p className="text-gray-500 mb-6">Comienza explorando caminos de conocimiento creados por otros usuarios para iniciar tu viaje de aprendizaje.</p>
-              <Link 
-                to="/knowledge_path"
-                className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-3 px-6 rounded-lg transition-colors"
-              >
-                Explorar Caminos de Conocimiento
-              </Link>
-            </div>
-          )}
-
-          {/* Engaged Paths Pagination Controls */}
           {engagedTotalPages > 1 && (
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 2,
-                mt: 4,
-              }}
-            >
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 4 }}>
               <Button
                 onClick={() => handleEngagedPageChange(engagedCurrentPage - 1)}
                 disabled={!engagedHasPrevious}
@@ -492,19 +473,14 @@ const KnowledgePathsUser = () => {
                   bgcolor: engagedHasPrevious ? 'primary.main' : 'grey.300',
                   color: engagedHasPrevious ? 'white' : 'text.disabled',
                   textTransform: 'none',
-                  '&:disabled': {
-                    bgcolor: 'grey.300',
-                    color: 'text.disabled',
-                  },
+                  '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
                 }}
               >
                 Anterior
               </Button>
-              
               <Typography variant="body2" color="text.secondary">
                 Página {engagedCurrentPage} de {engagedTotalPages}
               </Typography>
-              
               <Button
                 onClick={() => handleEngagedPageChange(engagedCurrentPage + 1)}
                 disabled={!engagedHasNext}
@@ -514,19 +490,16 @@ const KnowledgePathsUser = () => {
                   bgcolor: engagedHasNext ? 'primary.main' : 'grey.300',
                   color: engagedHasNext ? 'white' : 'text.disabled',
                   textTransform: 'none',
-                  '&:disabled': {
-                    bgcolor: 'grey.300',
-                    color: 'text.disabled',
-                  },
+                  '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
                 }}
               >
                 Siguiente
               </Button>
             </Box>
           )}
-        </div>
+        </Box>
       )}
-    </div>
+    </Container>
   );
 };
 
