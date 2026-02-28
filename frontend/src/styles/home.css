@@ -51,7 +51,13 @@
   z-index: 0;
 }
 
-/* Hero Overlay */
+/* Hero background for authenticated home (sobre nosotros): imagen sin overlay, enfocada en la parte superior */
+.home-hero-background-authenticated {
+  background-image: url('/images/sobre_nosotros_hero_image.jpg');
+  background-position: top center;
+}
+
+/* Hero Overlay - light overlay on image; text has its own 0.66 box */
 .home-hero-overlay {
   position: absolute;
   top: 0;
@@ -60,6 +66,11 @@
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.6);
   z-index: 1;
+}
+
+/* Sin overlay blanco en el hero autenticado; solo la caja del texto tiene fondo */
+.home-hero-overlay-authenticated {
+  background-color: transparent;
 }
 
 /* Hero Content */
