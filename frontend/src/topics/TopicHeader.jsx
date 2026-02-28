@@ -1,6 +1,6 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { Box, Typography, Paper, Button } from "@mui/material";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { Box, Typography, Paper, Button, Link as MuiLink } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { useAuth } from "../context/AuthContext";
 
@@ -135,10 +135,24 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
             {topic.creator && (
               <Typography variant="body2" color="text.secondary">
                 Creado por{" "}
-                {topic.creator_username ||
+                {creatorId != null ? (
+                  <MuiLink
+                    component={RouterLink}
+                    to={`/profiles/user_profile/${creatorId}`}
+                    color="inherit"
+                    sx={{ fontWeight: 500, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                  >
+                    {topic.creator_username ||
+                      (typeof topic.creator === "object"
+                        ? topic.creator.username
+                        : topic.creator)}
+                  </MuiLink>
+                ) : (
+                  topic.creator_username ||
                   (typeof topic.creator === "object"
                     ? topic.creator.username
-                    : topic.creator)}
+                    : topic.creator)
+                )}
               </Typography>
             )}
           </Box>

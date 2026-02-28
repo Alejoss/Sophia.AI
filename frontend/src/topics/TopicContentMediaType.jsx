@@ -5,7 +5,7 @@ import {
     Typography, 
     Grid,
     Chip,
-    IconButton,
+    Button,
     Link
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -140,26 +140,25 @@ const TopicContentMediaType = () => {
             />
 
             <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <IconButton 
-                        onClick={() => navigate(`/content/topics/${topicId}`)}
-                        sx={{ mr: 2 }}
-                    >
-                        <ArrowBackIcon />
-                    </IconButton>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        textTransform: 'capitalize',
+                <Button
+                    onClick={() => navigate(`/content/topics/${topicId}`)}
+                    startIcon={<ArrowBackIcon />}
+                    sx={{ mb: 2, textTransform: 'none' }}
+                >
+                    Regresar a la vista principal del tema
+                </Button>
+                <Typography 
+                    variant="h5" 
+                    sx={{ 
+                        mb: 2,
                         fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
                         fontWeight: 400,
                         fontSize: "20px"
-                      }} 
-                      color="text.primary"
-                    >
-                        Todos los {mediaType}s
-                    </Typography>
-                </Box>
+                    }} 
+                    color="text.primary"
+                >
+                    {mediaType === 'image' ? 'Todas las imágenes' : mediaType === 'text' ? 'Todos los textos' : `Todos los ${mediaType}s`}
+                </Typography>
 
                 <Grid container spacing={3}>
                     {contents.map((content) => (
@@ -168,6 +167,7 @@ const TopicContentMediaType = () => {
                                 content={content}
                                 variant="card"
                                 showAuthor={true}
+                                topicId={topicId}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             />
                         </Grid>

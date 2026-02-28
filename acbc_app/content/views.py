@@ -14,7 +14,7 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
@@ -1278,36 +1278,21 @@ class TopicDetailView(APIView):
             pk=pk
         )
 
-        # Get top 3 most upvoted contents for each media type
-        top_contents = {}
-        for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
-            contents = get_top_voted_contents(topic, media_type)
-            top_contents[media_type] = contents
-
-        # Create ordered list of contents
+        # Get contents ordered by vote count per media type (same order as "ver todos")
         ordered_contents = []
         for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
-            ordered_contents.extend(top_contents[media_type])
+            ordered_contents.extend(get_top_voted_contents(topic, media_type))
 
-        # Update the topic's contents with the ordered list
-        topic.contents.set(ordered_contents)
-        
-        # Reload the contents with file_details prefetched
-        content_ids = [content.id for content in ordered_contents]
-        reloaded_contents = Content.objects.filter(id__in=content_ids).prefetch_related('file_details')
-        
-        # Create a mapping of content objects with file_details loaded
-        content_map = {content.id: content for content in reloaded_contents}
-        
-        # Replace the contents in the topic with the reloaded ones
-        topic.contents.clear()
-        for content_id in content_ids:
-            if content_id in content_map:
-                topic.contents.add(content_map[content_id])
+        # Prefetch file_details for the ordered contents
+        content_ids = [c.id for c in ordered_contents]
+        contents_prefetched = {
+            c.id: c for c in Content.objects.filter(id__in=content_ids).prefetch_related('file_details')
+        }
+        ordered_contents = [contents_prefetched[cid] for cid in content_ids if cid in contents_prefetched]
 
         # Get the appropriate profile for each content
         contents_with_profiles = []
-        for content in topic.contents.all():
+        for content in ordered_contents:
             selected_profile = self.get_content_profile(content, request, topic)
             contents_with_profiles.append({
                 'content': content,
@@ -1318,6 +1303,7 @@ class TopicDetailView(APIView):
             'request': request,
             'user': request.user,
             'topic': topic,
+            'ordered_contents': ordered_contents,
             'selected_profiles': {item['content'].id: item['selected_profile'] for item in contents_with_profiles}
         })
         return Response(serializer.data)
@@ -1887,9 +1873,17 @@ class TopicContentMediaTypeView(APIView):
     def get(self, request, pk, media_type):
         topic = get_object_or_404(Topic, pk=pk)
         media_type = media_type.upper()
-        contents = topic.contents.filter(media_type=media_type)\
-            .prefetch_related('file_details')\
-            .order_by('-created_at')
+        content_type = ContentType.objects.get_for_model(Content)
+        vote_count_subquery = Subquery(
+            VoteCount.objects.filter(
+                content_type=content_type,
+                object_id=OuterRef('id'),
+                topic=topic
+            ).values('vote_count')[:1]
+        )
+        contents = topic.contents.filter(media_type=media_type).annotate(
+            vote_count_value=Coalesce(vote_count_subquery, 0)
+        ).order_by('-vote_count_value', '-created_at').prefetch_related('file_details')
 
         # Get the appropriate profile for each content
         contents_with_profiles = []

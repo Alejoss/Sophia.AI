@@ -52,18 +52,13 @@ const TopicDetail = () => {
                     return;
                 }
                 
+                // Contents ordered by vote count (from API).
                 const grouped = data.contents.reduce((acc, content) => {
                     const type = content.media_type.toLowerCase();
                     if (!acc[type]) acc[type] = [];
                     acc[type].push(content);
                     return acc;
                 }, {});
-
-                Object.keys(grouped).forEach(type => {
-                    grouped[type].sort((a, b) => 
-                        new Date(b.created_at) - new Date(a.created_at)
-                    );
-                });
 
                 setContentByType(grouped);
                 
@@ -109,6 +104,7 @@ const TopicDetail = () => {
                 setTopic(data);
                 
                 if (data.contents) {
+                    // Contents ordered by vote count (from API).
                     const grouped = data.contents.reduce((acc, content) => {
                         const type = content.media_type.toLowerCase();
                         if (!acc[type]) {
@@ -117,13 +113,7 @@ const TopicDetail = () => {
                         acc[type].push(content);
                         return acc;
                     }, {});
-                    
-                    Object.keys(grouped).forEach(type => {
-                        grouped[type].sort((a, b) => 
-                            new Date(b.created_at) - new Date(a.created_at)
-                        );
-                    });
-                    
+
                     setContentByType(grouped);
                 }
             } catch (err) {
@@ -217,6 +207,7 @@ const TopicDetail = () => {
                                 content={content}
                                 variant="card"
                                 showAuthor={true}
+                                topicId={topicId}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             />
                         </Grid>

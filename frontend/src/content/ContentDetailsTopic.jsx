@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
-    IconButton,
     Button,
     Paper
 } from '@mui/material';
@@ -31,7 +30,6 @@ const ContentDetailsTopic = () => {
     useEffect(() => {
         const fetchContentAndTopic = async () => {
             try {
-                console.log(`ContentDetailsTopic: Fetching content ${contentId} and topic ${topicId}...`);
                 const [contentData, topicData] = await Promise.all([
                     contentApi.getContentDetails(contentId, 'topic', topicId),
                     contentApi.getTopicDetails(topicId)
@@ -74,33 +72,37 @@ const ContentDetailsTopic = () => {
     const currentUserId = authState.user?.id;
     const isOwnContent = profileUserId && currentUserId && parseInt(profileUserId) === parseInt(currentUserId);
 
+    const mediaTypeRaw = content.media_type || content.content?.media_type || '';
+    const mediaType = String(mediaTypeRaw).toLowerCase();
+    const mediaTypeLabels = {
+        image: 'Todas las imágenes',
+        video: 'Todos los videos',
+        text: 'Todos los textos',
+        audio: 'Todos los audios',
+    };
+    const allOfTypeLabel = mediaTypeLabels[mediaType] || `Todos los ${mediaType}s`;
+    const backPath = mediaType
+        ? `/content/topics/${topicId}/${mediaType}`
+        : `/content/topics/${topicId}`;
+
     return (
         <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
-            {/* Back Button at the very top */}
-            <Box sx={{ mb: 2 }}>
-                <IconButton 
-                    onClick={() => navigate(`/content/topics/${topicId}`)}
-                    sx={{ 
-                        mr: 2,
-                        color: 'primary.main',
-                        backgroundColor: 'background.paper',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        '&:hover': {
-                            backgroundColor: 'primary.light',
-                            color: 'primary.contrastText'
-                        }
-                    }}
-                >
-                    <ArrowBackIcon />
-                </IconButton>
-            </Box>
-
             <TopicHeader 
                 topic={topic}
                 onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
                 size="small"
             />
+
+            <Box sx={{ mb: 2 }}>
+                <Button
+                    component={Link}
+                    to={backPath}
+                    startIcon={<ArrowBackIcon />}
+                    sx={{ mb: 2, textTransform: 'none' }}
+                >
+                    {mediaType ? allOfTypeLabel : 'Regresar a la vista principal del tema'}
+                </Button>
+            </Box>
 
             <Paper sx={{ p: 3, mb: 4 }}>
                 {/* Action Buttons */}
@@ -148,23 +150,6 @@ const ContentDetailsTopic = () => {
                         initialUserVote={content.user_vote || 0}
                     />
                 </Box>
-
-                {/* Debug logging for VoteComponent props */}
-                {(() => {
-                    console.log('=== ContentDetailsTopic: VoteComponent props ===');
-                    console.log('VoteComponent props:', {
-                        type: 'content',
-                        ids: { topicId, contentId },
-                        initialVoteCount: content.vote_count || 0,
-                        initialUserVote: content.user_vote || 0,
-                        voteCountType: typeof content.vote_count,
-                        userVoteType: typeof content.user_vote,
-                        voteCountValue: content.vote_count,
-                        userVoteValue: content.user_vote
-                    });
-                    console.log('=== End ContentDetailsTopic VoteComponent props ===');
-                    return null;
-                })()}
 
                 {/* Content Display */}
                 <ContentDisplay 

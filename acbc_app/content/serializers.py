@@ -244,14 +244,29 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
 
 class TopicDetailSerializer(TopicBasicSerializer):
-    contents = ContentWithSelectedProfileSerializer(many=True, read_only=True)
+    contents = serializers.SerializerMethodField()
     moderators = UserSerializer(many=True, read_only=True)
-    
+
     class Meta(TopicBasicSerializer.Meta):
         fields = TopicBasicSerializer.Meta.fields + ['contents', 'moderators']
 
+    def get_contents(self, instance):
+        ordered_contents = self.context.get('ordered_contents')
+        if ordered_contents is not None:
+            to_serialize = ordered_contents
+        else:
+            to_serialize = instance.contents.all()
+        return ContentWithSelectedProfileSerializer(
+            to_serialize,
+            many=True,
+            context={
+                'request': self.context.get('request'),
+                'topic': instance,
+                'selected_profiles': self.context.get('selected_profiles', {}),
+            }
+        ).data
+
     def to_representation(self, instance):
-        # Pass user context to the content serializer
         self.context['user'] = self.context.get('user')
         return super().to_representation(instance)
 

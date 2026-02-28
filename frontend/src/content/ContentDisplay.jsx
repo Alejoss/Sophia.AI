@@ -36,6 +36,7 @@ import FolderIcon from "@mui/icons-material/Folder";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import { formatFileSize } from "../utils/fileUtils";
+import VoteComponent from "../votes/VoteComponent";
 
 const ContentDisplay = ({
   content,
@@ -1385,6 +1386,16 @@ const ContentDisplay = ({
                     />
                   )}
                 </Box>
+                {contentData.vote_count !== undefined && topicId && (
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 2 }} onClick={(e) => e.stopPropagation()}>
+                    <VoteComponent
+                      type="content"
+                      ids={{ topicId, contentId: contentData.id }}
+                      initialVoteCount={contentData.vote_count ?? 0}
+                      initialUserVote={contentData.user_vote ?? 0}
+                    />
+                  </Box>
+                )}
               </CardContent>
               {showActions && (
                 <CardActions sx={{
