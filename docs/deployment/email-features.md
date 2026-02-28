@@ -1,5 +1,7 @@
 # Email Features and How to Disable Them
 
+Email is sent via **Postmark** using the **postmarker** Django backend. When `SEND_EMAILS=true`, Django uses `postmarker.django.EmailBackend`; the app’s `EmailService` (suggestions to admins, etc.) uses the same backend, so all email goes through Postmark.
+
 ## Features that send email
 
 | Feature | Backend | When it runs | Controlled by |
@@ -29,15 +31,21 @@ So until you enable email, none of these features will actually send mail (e.g. 
 
 No code or UI change is required; the backend will use the dummy email backend and `EmailService` will no-op.
 
-## How to enable email (after Postmark is approved)
+## How to enable email (activate Postmark)
 
-1. In **`acbc_app/.env`** set:
+1. **Get a Postmark server token** from [Postmark](https://postmarkapp.com/) (Server → API Tokens). Use a test token in development if needed.
+2. In **`acbc_app/.env`** set:
    ```env
    SEND_EMAILS=true
    POSTMARK_SERVER_TOKEN=<your-postmark-server-token>
    ```
-2. Optionally set `EMAIL_FROM`, `EMAIL_FROM_NAME`, `ADMIN_EMAIL`.
-3. Restart the backend so settings are reloaded (e.g. `docker compose -f docker-compose.prod.yml restart backend`).
+3. Optionally set:
+   - `EMAIL_FROM` – sender address (default: `academiablockchain@no-reply.com`)
+   - `EMAIL_FROM_NAME` – sender name (default: `Academia Blockchain`)
+   - `ADMIN_EMAIL` – where to send suggestion/feedback emails (or use staff users’ emails)
+4. Restart the backend so settings are reloaded (e.g. `docker compose -f docker-compose.prod.yml restart backend`).
+
+In production, `POSTMARK_SERVER_TOKEN` is required when `SEND_EMAILS=true`; the app will raise at startup if it is missing.
 
 ## Summary
 

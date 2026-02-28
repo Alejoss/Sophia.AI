@@ -25,7 +25,7 @@ def send_email_message(receiver_email, subject, message):
         message: Plain text message content
         
     Returns:
-        Response object from Mailgun API (for backward compatibility)
+        Mock response object for backward compatibility (status_code=200 on success)
         
     Note:
         This function now uses EmailService internally.

@@ -1572,22 +1572,22 @@ class EmailServiceTests(TestCase):
             EmailService._validate_email('')
     
     @patch('profiles.email_service.settings')
-    def test_validate_configuration_missing_domain(self, mock_settings):
-        """Test configuration validation with missing domain"""
-        mock_settings.MAILGUN_DOMAIN = ''
-        mock_settings.MAILGUN_API_KEY = 'test-key'
+    def test_validate_configuration_missing_postmark_token(self, mock_settings):
+        """Test configuration validation when SEND_EMAILS is True but Postmark token is missing"""
+        mock_settings.SEND_EMAILS = True
+        mock_settings.POSTMARK = {'TOKEN': ''}
         
         with self.assertRaises(EmailConfigurationError):
             EmailService._validate_configuration()
     
     @patch('profiles.email_service.settings')
-    def test_validate_configuration_missing_api_key(self, mock_settings):
-        """Test configuration validation with missing API key"""
-        mock_settings.MAILGUN_DOMAIN = 'test-domain'
-        mock_settings.MAILGUN_API_KEY = ''
+    def test_validate_configuration_postmark_configured(self, mock_settings):
+        """Test configuration validation passes when Postmark token is set"""
+        mock_settings.SEND_EMAILS = True
+        mock_settings.POSTMARK = {'TOKEN': 'test-token'}
         
-        with self.assertRaises(EmailConfigurationError):
-            EmailService._validate_configuration()
+        # Should not raise
+        EmailService._validate_configuration()
     
     @patch('profiles.email_service.settings')
     def test_is_email_enabled(self, mock_settings):
@@ -1621,11 +1621,11 @@ class EmailServiceTests(TestCase):
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('profiles.email_service.requests.post')
-    def test_send_email_success(self, mock_post, mock_validate_email, mock_validate_config, mock_is_enabled):
-        """Test successful email sending"""
+    @patch('profiles.email_service.EmailMultiAlternatives')
+    def test_send_email_success(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
+        """Test successful email sending via Django backend (Postmark when enabled)"""
         mock_is_enabled.return_value = True
-        mock_post.return_value.status_code = 200
+        mock_ema_instance = mock_ema_class.return_value
         
         result = EmailService.send_email(
             receiver_email='test@example.com',
@@ -1634,7 +1634,7 @@ class EmailServiceTests(TestCase):
         )
         
         self.assertTrue(result)
-        mock_post.assert_called_once()
+        mock_ema_instance.send.assert_called_once_with(fail_silently=False)
     
     @patch('profiles.email_service.EmailService._is_email_enabled')
     def test_send_email_disabled(self, mock_is_enabled):
@@ -1652,12 +1652,11 @@ class EmailServiceTests(TestCase):
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('profiles.email_service.requests.post')
-    def test_send_email_timeout(self, mock_post, mock_validate_email, mock_validate_config, mock_is_enabled):
-        """Test email sending with timeout"""
-        import requests
+    @patch('profiles.email_service.EmailMultiAlternatives')
+    def test_send_email_send_failure(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
+        """Test email sending when backend send raises"""
         mock_is_enabled.return_value = True
-        mock_post.side_effect = requests.exceptions.Timeout("Request timeout")
+        mock_ema_class.return_value.send.side_effect = Exception("Backend error")
         
         with self.assertRaises(EmailServiceError):
             EmailService.send_email(

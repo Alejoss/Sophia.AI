@@ -1,13 +1,13 @@
 """
-Email service for sending emails via Mailgun API.
-Provides a robust, production-ready email sending service with proper error handling,
-validation, and logging.
+Email service for sending emails via Django's email backend (Postmark when enabled).
+Uses postmarker.django.EmailBackend when SEND_EMAILS=True and POSTMARK_SERVER_TOKEN is set.
+Provides validation, SEND_EMAILS check, and logging.
 """
 import logging
-import requests
 from typing import List, Optional, Dict, Any
 from django.core.validators import validate_email, ValidationError
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.contrib.auth.models import User
 from django.template.loader import render_to_string
 
@@ -31,40 +31,40 @@ class EmailValidationError(EmailServiceError):
 
 class EmailService:
     """
-    Service class for sending emails via Mailgun API.
-    
+    Service class for sending emails via Django's email backend.
+    When SEND_EMAILS=True, the backend is Postmark (postmarker.django.EmailBackend).
+
     Features:
-    - Configuration validation
-    - Email address validation
     - Respects SEND_EMAILS setting
-    - Timeout handling
-    - Structured logging
+    - Configuration validation (Postmark token when enabled)
+    - Email address validation
     - HTML and plain text support
-    - Error handling with specific exceptions
+    - Optional Postmark tags via PostmarkEmailMessage when available
     """
-    
+
     @staticmethod
     def _validate_configuration() -> None:
         """
-        Validate that email configuration is properly set up.
-        
+        Validate that email configuration is properly set up for sending.
+        When SEND_EMAILS is True, POSTMARK_SERVER_TOKEN must be set (Django already enforces in production).
+
         Raises:
             EmailConfigurationError: If configuration is invalid
         """
-        if not settings.MAILGUN_DOMAIN:
-            raise EmailConfigurationError("MAILGUN_DOMAIN is not configured")
-        
-        if not settings.MAILGUN_API_KEY:
-            raise EmailConfigurationError("MAILGUN_API_KEY is not configured")
-    
+        if not EmailService._is_email_enabled():
+            return
+        postmark_config = getattr(settings, 'POSTMARK', {})
+        token = postmark_config.get('TOKEN', '') if isinstance(postmark_config, dict) else ''
+        if not token:
+            raise EmailConfigurationError(
+                "POSTMARK_SERVER_TOKEN is not set. Set it in .env when SEND_EMAILS=true."
+            )
+
     @staticmethod
     def _validate_email(email: str) -> None:
         """
         Validate email address format.
-        
-        Args:
-            email: Email address to validate
-            
+
         Raises:
             EmailValidationError: If email format is invalid
         """
@@ -72,17 +72,19 @@ class EmailService:
             validate_email(email)
         except ValidationError as e:
             raise EmailValidationError(f"Invalid email address: {email}") from e
-    
+
     @staticmethod
     def _is_email_enabled() -> bool:
-        """
-        Check if email sending is enabled.
-        
-        Returns:
-            bool: True if emails should be sent, False otherwise
-        """
+        """Return True if email sending is enabled (SEND_EMAILS=true)."""
         return getattr(settings, 'SEND_EMAILS', False)
-    
+
+    @staticmethod
+    def _build_from_address(from_email: Optional[str] = None, from_name: Optional[str] = None) -> str:
+        """Build 'Name <email>' from address."""
+        from_email = from_email or getattr(settings, 'EMAIL_FROM', 'academiablockchain@no-reply.com')
+        from_name = from_name or getattr(settings, 'EMAIL_FROM_NAME', 'Academia Blockchain')
+        return f"{from_name} <{from_email}>"
+
     @staticmethod
     def send_email(
         receiver_email: str,
@@ -94,109 +96,91 @@ class EmailService:
         tags: Optional[List[str]] = None,
     ) -> bool:
         """
-        Send an email via Mailgun API.
-        
+        Send an email via Django's email backend (Postmark when SEND_EMAILS=true).
+
         Args:
             receiver_email: Recipient email address
             subject: Email subject
-            html_message: HTML content of the email (optional)
-            text_message: Plain text content of the email (optional)
-            from_email: Sender email address (defaults to EMAIL_FROM setting)
-            from_name: Sender name (defaults to EMAIL_FROM_NAME setting)
-            tags: List of tags for Mailgun tracking (optional)
-            
+            html_message: HTML content (optional)
+            text_message: Plain text content (optional)
+            from_email: Sender email (defaults to EMAIL_FROM)
+            from_name: Sender name (defaults to EMAIL_FROM_NAME)
+            tags: Optional list of tags for Postmark (used if PostmarkEmailMessage available)
+
         Returns:
-            bool: True if email was sent successfully, False otherwise
-            
+            bool: True if sent successfully, False if SEND_EMAILS is False
+
         Raises:
-            EmailConfigurationError: If configuration is invalid
-            EmailValidationError: If email address is invalid
-            EmailServiceError: For other email sending errors
+            EmailConfigurationError: If Postmark token missing when SEND_EMAILS=True
+            EmailValidationError: If email address invalid
+            EmailServiceError: For other send errors
         """
-        # Check if email sending is enabled
         if not EmailService._is_email_enabled():
             logger.info(
-                f"Email sending is disabled (SEND_EMAILS=False). "
-                f"Would send email to {receiver_email} with subject: {subject}"
+                "Email sending is disabled (SEND_EMAILS=False). "
+                "Would send email to %s with subject: %s",
+                receiver_email, subject
             )
             return False
-        
-        # Validate configuration
-        try:
-            EmailService._validate_configuration()
-        except EmailConfigurationError as e:
-            logger.error(f"Email configuration error: {str(e)}")
-            raise
-        
-        # Validate email addresses
+
+        EmailService._validate_configuration()
         try:
             EmailService._validate_email(receiver_email)
             if from_email:
                 EmailService._validate_email(from_email)
         except EmailValidationError as e:
-            logger.error(f"Email validation error: {str(e)}")
+            logger.error("Email validation error: %s", str(e))
             raise
-        
-        # Ensure at least one message format is provided
+
         if not html_message and not text_message:
             raise EmailServiceError("Either html_message or text_message must be provided")
-        
-        # Set defaults
-        from_email = from_email or getattr(settings, 'EMAIL_FROM', 'academiablockchain@no-reply.com')
-        from_name = from_name or getattr(settings, 'EMAIL_FROM_NAME', 'Academia Blockchain')
-        from_address = f"{from_name} <{from_email}>"
-        
-        # Prepare Mailgun API request
-        domain_name = settings.MAILGUN_DOMAIN
-        api_key = settings.MAILGUN_API_KEY
-        timeout = getattr(settings, 'EMAIL_TIMEOUT', 10)
-        
-        url = f"https://api.mailgun.net/v3/{domain_name}/messages"
-        
-        data = {
-            "from": from_address,
-            "to": [receiver_email],
-            "subject": subject,
-        }
-        
-        if html_message:
-            data["html"] = html_message
-        if text_message:
-            data["text"] = text_message
-        if tags:
-            data["o:tag"] = tags
-        
-        # Send email with timeout
+
+        text_message = text_message or ""
+        from_address = EmailService._build_from_address(from_email, from_name)
+
         try:
-            logger.info(f"Sending email to {receiver_email} with subject: {subject}")
-            response = requests.post(
-                url,
-                auth=("api", api_key),
-                data=data,
-                timeout=timeout
-            )
-            
-            # Check response status
-            if response.status_code == 200:
-                logger.info(f"Email sent successfully to {receiver_email}")
-                return True
+            # Use PostmarkEmailMessage for tags when available and tags requested
+            if tags:
+                try:
+                    from postmarker.django import PostmarkEmailMessage
+                    msg = PostmarkEmailMessage(
+                        subject=subject,
+                        body=text_message,
+                        from_email=from_address,
+                        to=[receiver_email],
+                        tag=tags[0] if tags else None,
+                    )
+                    if html_message:
+                        msg.attach_alternative(html_message, "text/html")
+                    msg.send(fail_silently=False)
+                except ImportError:
+                    # Fallback to standard backend without tags
+                    msg = EmailMultiAlternatives(
+                        subject=subject,
+                        body=text_message,
+                        from_email=from_address,
+                        to=[receiver_email],
+                    )
+                    if html_message:
+                        msg.attach_alternative(html_message, "text/html")
+                    msg.send(fail_silently=False)
             else:
-                error_msg = (
-                    f"Mailgun API error: Status {response.status_code}, "
-                    f"Response: {response.text}"
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_message,
+                    from_email=from_address,
+                    to=[receiver_email],
                 )
-                logger.error(error_msg)
-                raise EmailServiceError(error_msg)
-                
-        except requests.exceptions.Timeout:
-            error_msg = f"Email sending timeout after {timeout} seconds to {receiver_email}"
-            logger.error(error_msg)
-            raise EmailServiceError(error_msg)
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Email sending request error to {receiver_email}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            raise EmailServiceError(error_msg) from e
-    
+                if html_message:
+                    msg.attach_alternative(html_message, "text/html")
+                msg.send(fail_silently=False)
+
+            logger.info("Email sent successfully to %s", receiver_email)
+            return True
+        except Exception as e:
+            logger.error("Email send failed to %s: %s", receiver_email, str(e), exc_info=True)
+            raise EmailServiceError(f"Email sending failed: {str(e)}") from e
+
     @staticmethod
     def send_template_email(
         receiver_email: str,
@@ -209,98 +193,69 @@ class EmailService:
     ) -> bool:
         """
         Send an email using a Django template.
-        
-        Args:
-            receiver_email: Recipient email address
-            subject: Email subject
-            template_name: Name of the template (without .html extension)
-            context: Context dictionary for template rendering
-            from_email: Sender email address (optional)
-            from_name: Sender name (optional)
-            tags: List of tags for Mailgun tracking (optional)
-            
-        Returns:
-            bool: True if email was sent successfully, False otherwise
+        Renders profiles/emails/{template_name}.html and optionally .txt.
         """
+        import re
+        from html import unescape
+
+        html_template = f"profiles/emails/{template_name}.html"
+        html_message = render_to_string(html_template, context)
+
         try:
-            # Render HTML template
-            html_template = f"profiles/emails/{template_name}.html"
-            html_message = render_to_string(html_template, context)
-            
-            # Render text template if it exists, otherwise use HTML stripped
             text_template = f"profiles/emails/{template_name}.txt"
-            try:
-                text_message = render_to_string(text_template, context)
-            except Exception:
-                # If text template doesn't exist, create a simple text version
-                import re
-                from html import unescape
-                # Remove HTML tags and decode entities
-                text_message = re.sub(r'<[^>]+>', '', html_message)
-                text_message = unescape(text_message).strip()
-            
-            return EmailService.send_email(
-                receiver_email=receiver_email,
-                subject=subject,
-                html_message=html_message,
-                text_message=text_message,
-                from_email=from_email,
-                from_name=from_name,
-                tags=tags,
-            )
-        except Exception as e:
-            logger.error(
-                f"Error rendering email template {template_name} for {receiver_email}: {str(e)}",
-                exc_info=True
-            )
-            raise EmailServiceError(f"Template rendering error: {str(e)}") from e
-    
+            text_message = render_to_string(text_template, context)
+        except Exception:
+            text_message = re.sub(r'<[^>]+>', '', html_message)
+            text_message = unescape(text_message).strip()
+
+        return EmailService.send_email(
+            receiver_email=receiver_email,
+            subject=subject,
+            html_message=html_message,
+            text_message=text_message,
+            from_email=from_email,
+            from_name=from_name,
+            tags=tags,
+        )
+
     @staticmethod
     def get_admin_emails() -> List[str]:
         """
         Get list of administrator email addresses.
-        
-        Checks ADMIN_EMAIL setting first, then falls back to staff users.
-        
-        Returns:
-            List[str]: List of admin email addresses
+        Uses ADMIN_EMAIL setting first, then staff users.
         """
         admin_emails = []
-        
-        # Check ADMIN_EMAIL setting
         admin_email = getattr(settings, 'ADMIN_EMAIL', '')
         if admin_email:
             try:
                 EmailService._validate_email(admin_email)
                 admin_emails.append(admin_email)
             except EmailValidationError:
-                logger.warning(f"Invalid ADMIN_EMAIL setting: {admin_email}")
-        
-        # Get emails from staff users
+                logger.warning("Invalid ADMIN_EMAIL setting: %s", admin_email)
+
         try:
-            staff_users = User.objects.filter(is_staff=True, is_active=True)
-            for staff_user in staff_users:
+            for staff_user in User.objects.filter(is_staff=True, is_active=True):
                 if staff_user.email:
                     try:
                         EmailService._validate_email(staff_user.email)
                         admin_emails.append(staff_user.email)
                     except EmailValidationError:
                         logger.warning(
-                            f"Invalid email for staff user {staff_user.username}: {staff_user.email}"
+                            "Invalid email for staff user %s: %s",
+                            staff_user.username, staff_user.email
                         )
         except Exception as e:
-            logger.error(f"Error fetching staff user emails: {str(e)}", exc_info=True)
-        
-        # Remove duplicates while preserving order
+            logger.error("Error fetching staff user emails: %s", str(e), exc_info=True)
+
         seen = set()
-        unique_emails = []
-        for email in admin_emails:
-            if email.lower() not in seen:
-                seen.add(email.lower())
-                unique_emails.append(email)
-        
-        return unique_emails
-    
+        unique = []
+        for e in admin_emails:
+            key = e.lower()
+            if key not in seen:
+                seen.add(key)
+                unique.append(e)
+        return unique
+
     @staticmethod
     def send_to_admins(
         subject: str,
@@ -314,34 +269,18 @@ class EmailService:
     ) -> Dict[str, Any]:
         """
         Send email to all administrators.
-        
-        Args:
-            subject: Email subject
-            html_message: HTML content (optional, ignored if template_name is provided)
-            text_message: Plain text content (optional, ignored if template_name is provided)
-            template_name: Name of template to use (optional, takes precedence over html/text)
-            context: Context dictionary for template (required if template_name is provided)
-            from_email: Sender email (optional)
-            from_name: Sender name (optional)
-            tags: List of tags (optional)
-            
-        Returns:
-            Dict with 'sent' (list of successful emails) and 'failed' (list of failed emails)
+        Returns dict with 'sent' and 'failed' lists of email addresses.
         """
         admin_emails = EmailService.get_admin_emails()
-        
         if not admin_emails:
             logger.warning("No admin emails found to send notification")
             return {'sent': [], 'failed': []}
-        
+
         results = {'sent': [], 'failed': []}
-        
-        # If template is provided, use it; otherwise use html/text messages
         if template_name and context:
-            # Use template for all admins
             for admin_email in admin_emails:
                 try:
-                    success = EmailService.send_template_email(
+                    if EmailService.send_template_email(
                         receiver_email=admin_email,
                         subject=subject,
                         template_name=template_name,
@@ -349,22 +288,17 @@ class EmailService:
                         from_email=from_email,
                         from_name=from_name,
                         tags=tags,
-                    )
-                    if success:
+                    ):
                         results['sent'].append(admin_email)
                     else:
                         results['failed'].append(admin_email)
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send email to admin {admin_email}: {str(e)}",
-                        exc_info=True
-                    )
+                    logger.error("Failed to send email to admin %s: %s", admin_email, str(e), exc_info=True)
                     results['failed'].append(admin_email)
         else:
-            # Use direct html/text messages
             for admin_email in admin_emails:
                 try:
-                    success = EmailService.send_email(
+                    if EmailService.send_email(
                         receiver_email=admin_email,
                         subject=subject,
                         html_message=html_message,
@@ -372,21 +306,16 @@ class EmailService:
                         from_email=from_email,
                         from_name=from_name,
                         tags=tags,
-                    )
-                    if success:
+                    ):
                         results['sent'].append(admin_email)
                     else:
                         results['failed'].append(admin_email)
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send email to admin {admin_email}: {str(e)}",
-                        exc_info=True
-                    )
+                    logger.error("Failed to send email to admin %s: %s", admin_email, str(e), exc_info=True)
                     results['failed'].append(admin_email)
-        
+
         logger.info(
-            f"Email notification sent to {len(results['sent'])} admins, "
-            f"failed for {len(results['failed'])} admins"
+            "Email notification sent to %s admins, failed for %s admins",
+            len(results['sent']), len(results['failed'])
         )
-        
         return results

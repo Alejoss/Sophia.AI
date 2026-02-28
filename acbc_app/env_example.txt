@@ -94,18 +94,19 @@ GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-google-oauth-secret-key
 
 
 # ============================================================================
-# EMAIL CONFIGURATION (Optional - Required if SEND_EMAILS=True)
+# EMAIL CONFIGURATION (Optional - Postmark)
 # ============================================================================
+# See docs/deployment/email-features.md for details.
 
-# Mailgun Domain
-# Your Mailgun domain (e.g., mg.yourdomain.com)
-# Required if using Mailgun for email sending
-MAILGUN_DOMAIN=
+# Send Emails
+# Enable/disable email sending. When false or unset, no emails are sent.
+# Set to True to enable (requires POSTMARK_SERVER_TOKEN).
+SEND_EMAILS=False
 
-# Mailgun API Key
-# Your Mailgun API key
-# Required if using Mailgun for email sending
-MAILGUN_API_KEY=
+# Postmark Server Token
+# Required when SEND_EMAILS=True. Get from Postmark: Server → API Tokens.
+# In production, the app will not start if SEND_EMAILS=True and this is missing.
+POSTMARK_SERVER_TOKEN=
 
 # Email From Address
 # Default sender email address
@@ -118,24 +119,16 @@ EMAIL_FROM=academiablockchain@no-reply.com
 EMAIL_FROM_NAME=Academia Blockchain
 
 # Admin Email
-# Email address for admin notifications
+# Where to send suggestion/feedback notifications (or use staff users' emails)
 ADMIN_EMAIL=
 
 # Email Timeout (seconds)
-# How long to wait for email server response
 # Default: 10
 EMAIL_TIMEOUT=10
 
 # Email Max Retries
-# Number of retry attempts for failed emails
 # Default: 3
 EMAIL_MAX_RETRIES=3
-
-# Send Emails
-# Enable/disable email sending
-# Set to True to enable email functionality
-# Note: If True in PRODUCTION, MAILGUN_DOMAIN and MAILGUN_API_KEY are required
-SEND_EMAILS=False
 
 
 # ============================================================================
@@ -199,8 +192,7 @@ POSTGRES_PASSWORD=<strong-secure-password>
 GOOGLE_OAUTH_CLIENT_ID=your-production-client-id.apps.googleusercontent.com
 GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-production-secret-key
 
-MAILGUN_DOMAIN=mg.yourdomain.com
-MAILGUN_API_KEY=your-mailgun-api-key
+POSTMARK_SERVER_TOKEN=your-postmark-server-token
 EMAIL_FROM=noreply@yourdomain.com
 EMAIL_FROM_NAME=Academia Blockchain
 ADMIN_EMAIL=admin@yourdomain.com
@@ -261,7 +253,7 @@ IMPORTANT NOTES
    - The application will raise errors if required production variables are missing
    - DEBUG=True will cause an error in PRODUCTION environment
    - ALLOWED_HOSTS is required in PRODUCTION environment
-   - If SEND_EMAILS=True in PRODUCTION, MAILGUN_DOMAIN and MAILGUN_API_KEY are required
+   - If SEND_EMAILS=True in PRODUCTION, POSTMARK_SERVER_TOKEN is required
 
 4. GENERATING SECRET KEY:
    Run this command to generate a secure secret key:
