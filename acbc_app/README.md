@@ -79,11 +79,17 @@ docker-compose exec backend python manage.py populate_interactions
 
 *Note: Run these commands in order as they have dependencies on each other. You can add --clear flag to any command to clear existing data before populating, or --skip-existing to skip objects that already exist.*
 
-*To run the django tests in the docker container run*
+*To run the Django tests, ensure the stack is up, then from the **project root** (where docker-compose.yml is):*
 
-docker-compose exec backend python manage.py test -v 2
-docker-compose exec backend python manage.py test quizzes -v 2
-docker-compose exec backend python manage.py test profiles.tests.test_token_refresh -v 2
+```bash
+# Full test suite (events + profiles, ~152 tests)
+docker-compose exec backend python manage.py test tests profiles -v 2
+
+# Examples: events only, profiles only, or a specific module
+docker-compose exec backend python tests/run_events_tests.py
+docker-compose exec backend python manage.py test profiles -v 2
+docker-compose exec backend python manage.py test tests.test_events_models -v 2
+```
 
 ## Documentation
 

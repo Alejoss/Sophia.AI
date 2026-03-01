@@ -56,6 +56,7 @@ class Profile(models.Model):
     is_teacher = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to=upload_profile_picture, null=True, blank=True)
     total_points = models.IntegerField(default=0, help_text="Total gamification points earned by the user")
+    username_change_count = models.PositiveSmallIntegerField(default=0, help_text="Number of times the user has changed their username (max 2)")
     featured_badge = models.ForeignKey(
         'gamification.UserBadge',
         on_delete=models.SET_NULL,

@@ -13,16 +13,6 @@ export const useThemeMode = () => {
 };
 
 /**
- * Get system preference for color scheme
- */
-const getSystemPreference = () => {
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  return 'light';
-};
-
-/**
  * Get stored theme preference from localStorage
  */
 const getStoredPreference = () => {
@@ -50,11 +40,11 @@ const setStoredPreference = (mode) => {
  * Manages dark/light mode state and provides theme to Material-UI
  */
 export const ThemeProvider = ({ children }) => {
-  // Initialize mode: stored preference OR system preference OR 'light'
+  // Initialize mode: stored preference OR 'light' (never system preference)
   const [mode, setMode] = useState(() => {
     const stored = getStoredPreference();
     if (stored) return stored;
-    return getSystemPreference();
+    return 'light';
   });
 
   // Create theme based on current mode
@@ -64,28 +54,6 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', mode);
   }, [mode]);
-
-  // Listen to system preference changes (only if no stored preference)
-  useEffect(() => {
-    const stored = getStoredPreference();
-    if (stored) return; // Don't listen if user has manually set preference
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      setMode(e.matches ? 'dark' : 'light');
-    };
-
-    // Modern browsers
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    } 
-    // Fallback for older browsers
-    else if (mediaQuery.addListener) {
-      mediaQuery.addListener(handleChange);
-      return () => mediaQuery.removeListener(handleChange);
-    }
-  }, []);
 
   /**
    * Toggle between light and dark mode

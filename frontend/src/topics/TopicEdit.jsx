@@ -9,12 +9,17 @@ import {
   Divider,
   Alert,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SaveIcon from "@mui/icons-material/Save";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
 import TopicModerators from "./TopicModerators";
@@ -35,13 +40,15 @@ const TopicEdit = () => {
     description: "",
   });
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingTopic, setIsDeletingTopic] = useState(false);
 
   const isFormDirty =
     topic &&
     (formData.title !== (topic.title || "") ||
       formData.description !== (topic.description || ""));
 
-  const creatorId = topic ? (typeof topic.creator === "object" ? topic.creator.id : topic.creator) : null;
+  const creatorId = topic ? (typeof topic.creator === "object" ? topic.creator?.id : topic.creator) : null;
   const userId = user?.id;
   const isCreator =
     !!user &&
@@ -119,6 +126,19 @@ const TopicEdit = () => {
       setError("Error al actualizar los detalles del tema");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteTopic = async () => {
+    setIsDeletingTopic(true);
+    try {
+      await contentApi.deleteTopic(topicId);
+      setDeleteDialogOpen(false);
+      navigate("/content/topics", { replace: true });
+    } catch (err) {
+      setError(err?.error || err?.detail || "Error al eliminar el tema. Por favor, inténtelo de nuevo.");
+    } finally {
+      setIsDeletingTopic(false);
     }
   };
 
@@ -353,7 +373,53 @@ const TopicEdit = () => {
             </Alert>
           )}
         </Box>
+
+        {isCreator && (
+          <Paper
+            elevation={1}
+            sx={{
+              mt: 4,
+              p: 3,
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "error.light",
+            }}
+          >
+            <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
+              Zona de peligro
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Si eliminas este tema se borrarán también su contenido asociado, moderadores e invitaciones y no podrás recuperarlos.
+            </Typography>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteForeverIcon />}
+              onClick={() => setDeleteDialogOpen(true)}
+              sx={{ textTransform: "none" }}
+            >
+              Eliminar tema
+            </Button>
+          </Paper>
+        )}
       </Paper>
+
+      <Dialog open={deleteDialogOpen} onClose={() => !isDeletingTopic && setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Eliminar tema</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            ¿Seguro que deseas eliminar <strong>{topic?.title || "este tema"}</strong>? Se eliminará el contenido asociado, moderadores e invitaciones y esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingTopic} sx={{ textTransform: "none" }}>
+            Cancelar
+          </Button>
+          <Button onClick={handleDeleteTopic} disabled={isDeletingTopic} color="error" variant="contained" sx={{ textTransform: "none" }}>
+            {isDeletingTopic ? "Eliminando…" : "Eliminar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ImageUploadModal
         open={isModalOpen}

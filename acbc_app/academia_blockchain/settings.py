@@ -655,6 +655,16 @@ else:
     STATIC_URL = '/static/'
     STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
+# Use SQLite for tests when running locally without PostgreSQL (manage.py test or run_events_tests.py)
+import sys
+if "test" in sys.argv or "run_events_tests" in " ".join(sys.argv) or os.getenv("USE_SQLITE_FOR_TESTS") == "1":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+
 # WhiteNoise configuration for serving static files in production
 # WhiteNoise allows Django to serve static files even when DEBUG=False
 # This is configured via middleware, but we can add storage settings for optimization

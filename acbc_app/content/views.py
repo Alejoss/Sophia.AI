@@ -1358,6 +1358,22 @@ class TopicDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def delete(self, request, pk):
+        logger.info("Topic DELETE topic_id=%s user=%s", pk, request.user.username)
+        topic = get_object_or_404(Topic, pk=pk)
+
+        if topic.creator != request.user:
+            logger.warning("Topic DELETE forbidden topic_id=%s user=%s (only creator can delete)", pk, request.user.username)
+            return Response(
+                {"error": "Solo el creador del tema puede eliminarlo."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        topic_title = topic.title
+        topic.delete()
+        logger.info("Topic DELETE success topic_id=%s title=%s", pk, topic_title)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class TopicContentSimpleView(APIView):
     """Topic content view optimized for content management operations"""

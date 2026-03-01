@@ -17,6 +17,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib.contenttypes.models import ContentType
 from content.models import Content, Topic
 from gamification.models import Badge, UserBadge
+from profiles.email_service import EmailService, EmailServiceError, EmailValidationError, EmailConfigurationError
 
 
 class ProfileModelTests(TestCase):
@@ -296,6 +297,61 @@ class ProfileAPITests(APITestCase):
         
         # Should fail validation
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_username_change_when_count_under_limit(self):
+        """Test user can change username when count < 2"""
+        url = reverse('profiles:user_profile')
+        data = {'username': 'newusername'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['username'], 'newusername')
+        self.profile.refresh_from_db()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'newusername')
+        self.assertEqual(self.profile.username_change_count, 1)
+
+    def test_username_change_when_count_at_limit(self):
+        """Test user cannot change username when count >= 2"""
+        self.profile.username_change_count = 2
+        self.profile.save()
+        url = reverse('profiles:user_profile')
+        data = {'username': 'attemptedchange'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'testuser')
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.username_change_count, 2)
+
+    def test_username_change_same_username_no_increment(self):
+        """Test saving same username does not increment count"""
+        url = reverse('profiles:user_profile')
+        data = {'username': 'testuser'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.username_change_count, 0)
+
+    def test_username_change_duplicate_returns_400(self):
+        """Test duplicate username returns 400"""
+        User.objects.create_user(username='existinguser', email='existing@example.com', password='pass')
+        url = reverse('profiles:user_profile')
+        data = {'username': 'existinguser'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'testuser')
+
+    def test_username_change_response_includes_updated_user_and_count(self):
+        """Test response includes updated user and username_change_count after username change"""
+        url = reverse('profiles:user_profile')
+        data = {'username': 'updatedname'}
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['username'], 'updatedname')
+        self.assertEqual(response.data['username_change_count'], 1)
 
     def test_get_profile_with_featured_badge(self):
         """Test retrieving profile with featured badge"""
@@ -857,10 +913,10 @@ class NotificationTests(APITestCase):
         # Should have one notification
         self.assertEqual(len(notifications), 1)
         
-        # Verify notification content
+        # Verify notification content (app uses Spanish for notification verbs)
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'commented on your knowledge path')
-        self.assertIn('testuser commented on your knowledge path', notification['description'])
+        self.assertEqual(notification['verb'], 'comentó en tu camino de conocimiento')
+        self.assertIn('testuser comentó en tu camino de conocimiento', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -900,10 +956,10 @@ class NotificationTests(APITestCase):
         # Should have one notification
         self.assertEqual(len(notifications), 1)
         
-        # Verify notification content
+        # Verify notification content (app uses Spanish for notification verbs)
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'requested a certificate for your knowledge path')
-        self.assertIn('testuser requested a certificate for your knowledge path', notification['description'])
+        self.assertEqual(notification['verb'], 'solicitó un certificado para tu camino de conocimiento')
+        self.assertIn('testuser solicitó un certificado para tu camino de conocimiento', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -948,10 +1004,10 @@ class NotificationTests(APITestCase):
         # Should have one notification
         self.assertEqual(len(notifications), 1)
         
-        # Verify notification content
+        # Verify notification content (app uses Spanish for notification verbs)
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'approved your certificate request for')
-        self.assertIn('testuser approved your certificate request for', notification['description'])
+        self.assertEqual(notification['verb'], 'aprobó tu solicitud de certificado para')
+        self.assertIn('testuser aprobó tu solicitud de certificado para', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -996,10 +1052,10 @@ class NotificationTests(APITestCase):
         # Should have one notification
         self.assertEqual(len(notifications), 1)
         
-        # Verify notification content
+        # Verify notification content (app uses Spanish for notification verbs)
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'rejected your certificate request for')
-        self.assertIn('testuser rejected your certificate request for', notification['description'])
+        self.assertEqual(notification['verb'], 'rechazó tu solicitud de certificado para')
+        self.assertIn('testuser rechazó tu solicitud de certificado para', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
 
@@ -1052,9 +1108,9 @@ class NotificationTests(APITestCase):
         # Should have only one notification due to spam protection
         self.assertEqual(len(notifications), 1)
         
-        # Verify notification content
+        # Verify notification content (app uses Spanish for notification verbs)
         notification = notifications[0]
-        self.assertEqual(notification['verb'], 'requested a certificate for your knowledge path')
+        self.assertEqual(notification['verb'], 'solicitó un certificado para tu camino de conocimiento')
         self.assertTrue(notification['unread'])
 
     def test_certificate_notification_no_self_notification(self):

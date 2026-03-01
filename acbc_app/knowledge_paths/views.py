@@ -442,6 +442,67 @@ class KnowledgePathDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def delete(self, request, pk):
+        """Require authentication and author permission to delete a knowledge path"""
+        try:
+            if not request.user.is_authenticated:
+                knowledge_paths_logger.warning("Unauthenticated knowledge path deletion attempt", extra={
+                    'knowledge_path_id': pk,
+                })
+                return Response(
+                    {"error": "Authentication required to delete knowledge paths"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+
+            # Check if user is the author
+            if knowledge_path.author != request.user:
+                knowledge_paths_logger.warning("Unauthorized knowledge path deletion attempt", extra={
+                    'user_id': request.user.id,
+                    'knowledge_path_id': pk,
+                    'author_id': knowledge_path.author.id,
+                })
+                return Response(
+                    {"error": "You do not have permission to delete this knowledge path"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            path_title = knowledge_path.title
+            knowledge_paths_logger.info("Knowledge path deletion request", extra={
+                'user_id': request.user.id,
+                'knowledge_path_id': pk,
+                'title': path_title,
+            })
+
+            knowledge_path.delete()
+
+            knowledge_paths_logger.info("Knowledge path deleted successfully", extra={
+                'user_id': request.user.id,
+                'knowledge_path_id': pk,
+            })
+
+            # Log business event
+            log_business_event(
+                event_type="knowledge_path_deleted",
+                user_id=request.user.id,
+                object_id=pk,
+                object_type='knowledge_path',
+                extra={
+                    'title': path_title,
+                }
+            )
+
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            log_error(e, "Error deleting knowledge path", request.user.id, {
+                'knowledge_path_id': pk,
+            })
+            return Response(
+                {'error': 'An error occurred while deleting the knowledge path'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class NodeCreateView(APIView):
     permission_classes = [IsAuthenticated]
 

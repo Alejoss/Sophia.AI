@@ -38,6 +38,9 @@ const Home = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const isDark = theme.palette.mode === 'dark';
+  // Hero/content box background: light glass in light mode, dark glass in dark mode for text contrast
+  const heroBoxBg = isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.77)';
   const isAuthenticated = authState?.isAuthenticated ?? false;
 
   useEffect(() => {
@@ -70,7 +73,7 @@ const Home = () => {
               endIcon={<ArrowForwardIcon />}
               onClick={() => navigate("/profiles/my_profile")}
               sx={{
-                borderColor: 'rgba(0,0,0,0.23)',
+                borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.23)',
                 color: 'text.secondary',
                 px: 3,
                 py: 1.25,
@@ -78,11 +81,11 @@ const Home = () => {
                 fontWeight: 500,
                 textTransform: 'none',
                 borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.9)',
+                bgcolor: isDark ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.9)',
                 '&:hover': {
                   borderColor: '#FF6B35',
                   color: '#FF6B35',
-                  bgcolor: 'rgba(255,255,255,0.95)',
+                  bgcolor: isDark ? 'rgba(45,45,45,0.95)' : 'rgba(255,255,255,0.95)',
                   boxShadow: 1
                 },
                 transition: 'all 0.2s ease'
@@ -100,7 +103,7 @@ const Home = () => {
                   mx: 'auto',
                   maxWidth: 720,
                   borderRadius: 2,
-                  bgcolor: 'rgba(255,255,255,0.77)',
+                  bgcolor: heroBoxBg,
                   boxShadow: 2,
                 }}
               >
@@ -254,7 +257,7 @@ const Home = () => {
                 maxWidth: 720,
                 textAlign: 'center',
                 borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.77)',
+                bgcolor: heroBoxBg,
                 boxShadow: 2,
               }}
             >
@@ -319,7 +322,7 @@ const Home = () => {
                 mx: 'auto',
                 maxWidth: 720,
                 borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.77)',
+                bgcolor: heroBoxBg,
                 boxShadow: 2,
               }}
             >
@@ -632,7 +635,7 @@ const Home = () => {
                 width: '100%',
                 textAlign: 'center',
                 borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.77)',
+                bgcolor: heroBoxBg,
                 boxShadow: 2,
               }}
             >

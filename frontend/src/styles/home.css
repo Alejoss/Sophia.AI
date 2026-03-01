@@ -73,6 +73,11 @@
   background-color: transparent;
 }
 
+/* Dark mode: overlay oscuro para mejor contraste con las cajas de contenido */
+[data-theme="dark"] .home-hero-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
 /* Hero Content */
 .home-hero-content {
   position: relative;

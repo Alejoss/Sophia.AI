@@ -196,29 +196,40 @@ This document outlines the comprehensive test coverage for the events functional
 
 ## Running the Tests
 
-### **Run All Events Tests**
+This project uses **Django's built-in test framework** (not pytest). The app runs in Docker, so run all test commands **inside the backend container** from the **project root** (where `docker-compose.yml` is).
+
+### **Recommended: run tests in Docker**
+
+Ensure the stack is up (`docker-compose up -d` or `docker-compose up --build`), then from the **project root**:
+
 ```bash
-cd acbc_app
-python tests/run_events_tests.py
+# Full suite (events + profiles, ~152 tests)
+docker-compose exec backend python manage.py test tests profiles -v 2
 ```
 
-### **Run Specific Test Categories**
+### **Events tests only**
 ```bash
-# Model tests only
-python manage.py test tests.test_events_models
-
-# API tests only  
-python manage.py test tests.test_events_views
-
-# Integration tests only
-python manage.py test tests.test_events_integration
+docker-compose exec backend python tests/run_events_tests.py
 ```
 
-### **Run with Coverage**
+### **Run specific test categories**
 ```bash
-coverage run --source='.' manage.py test tests.test_events_*
-coverage report
-coverage html
+# From project root, with backend container running:
+docker-compose exec backend python manage.py test tests.test_events_models -v 2
+docker-compose exec backend python manage.py test tests.test_events_views -v 2
+docker-compose exec backend python manage.py test tests.test_events_integration -v 2
+docker-compose exec backend python manage.py test profiles -v 2
+```
+
+### **Without Docker (local Python)**
+
+If you run tests on the host (e.g. `cd acbc_app` then `python manage.py test tests profiles`), the settings use an in-memory SQLite test DB when it detects test mode. For consistency with production (PostgreSQL), prefer running tests in Docker.
+
+### **Run with coverage**
+```bash
+docker-compose exec backend coverage run --source='.' manage.py test tests profiles
+docker-compose exec backend coverage report
+docker-compose exec backend coverage html
 ```
 
 ## Conclusion

@@ -273,8 +273,12 @@ docker-compose exec backend bash
 docker-compose exec frontend bash
 docker-compose exec postgres bash
 
-# Run tests
-docker-compose exec backend python manage.py test -v 2
+# Run full test suite (events + profiles, ~152 tests)
+docker-compose exec backend python manage.py test tests profiles -v 2
+
+# Run only events or only profiles
+docker-compose exec backend python tests/run_events_tests.py
+docker-compose exec backend python manage.py test profiles -v 2
 
 # Database troubleshooting
 docker-compose exec postgres psql -U postgres

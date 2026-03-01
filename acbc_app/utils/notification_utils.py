@@ -337,6 +337,12 @@ def notify_knowledge_path_completion(user, knowledge_path):
         user: The User instance who completed the path
         knowledge_path: The KnowledgePath instance that was completed
     """
+    if not knowledge_path.author:
+        logger.debug("Knowledge path has no author - skipping completion notification", extra={
+            'knowledge_path_id': knowledge_path.id,
+        })
+        return
+
     logger.info("Creating knowledge path completion notification", extra={
         'user_id': user.id,
         'user_username': user.username,

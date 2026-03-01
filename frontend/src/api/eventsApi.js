@@ -53,6 +53,18 @@ export const updateEvent = async (eventId, eventData) => {
   }
 };
 
+export const deleteEvent = async (eventId) => {
+  try {
+    await axiosInstance.delete(`/events/${eventId}/`);
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    if (error.response) {
+      throw error.response.data;
+    }
+    throw error;
+  }
+};
+
 // Event Registration API functions
 export const registerForEvent = async (eventId) => {
   try {

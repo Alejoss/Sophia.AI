@@ -90,7 +90,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             'user', 'interests', 'profile_description', 'external_url', 'timezone', 'is_teacher', 
-            'profile_picture', 'badges', 'total_points', 'featured_badge', 'featured_badge_id'
+            'profile_picture', 'badges', 'total_points', 'username_change_count', 'featured_badge', 'featured_badge_id'
         ]
 
     def get_profile_picture(self, obj):

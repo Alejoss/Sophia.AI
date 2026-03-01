@@ -1,21 +1,25 @@
 #!/usr/bin/env python
 """
 Test runner for events functionality tests.
-Run this script to execute all events-related tests.
+Run this script to execute all events-related tests using Django's test runner.
 """
 
 import os
 import sys
 import django
-from django.conf import settings
-from django.test.utils import get_runner
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Use SQLite for tests when PostgreSQL is not available (run before Django setup)
+os.environ.setdefault("USE_SQLITE_FOR_TESTS", "1")
+
 # Set up Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'academia_blockchain.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "academia_blockchain.settings")
 django.setup()
+
+from django.conf import settings
+from django.test.utils import get_runner
 
 def run_events_tests():
     """Run all events-related tests."""

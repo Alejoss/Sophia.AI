@@ -73,10 +73,10 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
             
             await Promise.all(promises);
             
-            // Clear form
+            // Clear form and reset to initial step for next open
             setSelectedContentProfiles([]);
             setMessage('');
-            setShowContentSelect(true);
+            setStep('choice');
             
             if (onSuccess) {
                 onSuccess();

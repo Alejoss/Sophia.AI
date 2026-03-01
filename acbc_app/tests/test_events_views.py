@@ -115,7 +115,7 @@ class EventDetailAPITest(TestCase):
         """Test GET request for non-existent event."""
         response = self.client.get(reverse('events:event-detail', kwargs={'pk': 99999}))
         
-        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_event_success(self):
         """Test PUT request to update event."""

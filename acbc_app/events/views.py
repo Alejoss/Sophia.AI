@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from django.http import Http404
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
@@ -87,13 +88,13 @@ class EventDetail(APIView):
             
             logger.debug(f"Event detail retrieved successfully - Event: {event.title}, Owner: {event.owner.username}")
             return Response(serializer.data)
-        except Event.DoesNotExist:
-            logger.warning(f"Event not found - Event ID: {pk}")
-            return Response(
-                {'error': 'Event not found'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
+            if isinstance(e, Http404):
+                logger.warning(f"Event not found - Event ID: {pk}")
+                return Response(
+                    {'error': 'Event not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
             logger.error(f"Error retrieving event detail for event {pk}: {str(e)}", exc_info=True)
             return Response(
                 {'error': 'An error occurred while retrieving the event'}, 

@@ -134,6 +134,33 @@ class UserProfileView(APIView):
                 user_profile.external_url = external_url
                 logger.debug(f"External URL updated for user {request.user.username}")
             
+            # Handle username update (max 2 changes allowed)
+            new_username = request.data.get('username')
+            if new_username is not None:
+                new_username = new_username.strip()
+                current_username = request.user.username
+                if new_username != current_username:
+                    if user_profile.username_change_count >= 2:
+                        return Response(
+                            {'error': 'No puedes cambiar tu nombre de usuario más veces.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    if User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                        return Response(
+                            {'error': 'Ya existe un usuario con ese nombre.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    # Validate username format (Django User allows 150 chars, alphanumeric + @/./+/-/_)
+                    if not new_username or len(new_username) > 150:
+                        return Response(
+                            {'error': 'El nombre de usuario no es válido.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    request.user.username = new_username
+                    request.user.save()
+                    user_profile.username_change_count += 1
+                    logger.debug(f"Username updated for user {request.user.pk} to {new_username}, count now {user_profile.username_change_count}")
+            
             # Handle featured_badge_id update
             featured_badge_id = request.data.get('featured_badge_id')
             if featured_badge_id is not None:

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchEventById, updateEvent } from '../api/eventsApi';
+import { fetchEventById, updateEvent, deleteEvent } from '../api/eventsApi';
 import '../styles/events.css';
 
 const PLATFORM_CHOICES = [
@@ -42,6 +42,8 @@ const EventEdit = () => {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -217,6 +219,20 @@ const EventEdit = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    setIsDeletingEvent(true);
+    setError(null);
+    try {
+      await deleteEvent(eventId);
+      setDeleteDialogOpen(false);
+      navigate('/events', { replace: true });
+    } catch (err) {
+      setError(err?.detail || err?.error || 'Error al eliminar el evento. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsDeletingEvent(false);
     }
   };
 
@@ -401,7 +417,61 @@ const EventEdit = () => {
           </button>
         </div>
       </form>
-      
+
+      <div className="danger-zone">
+        <h3>Zona de peligro</h3>
+        <p>Si eliminas este evento se borrarán también todas las inscripciones y no podrás recuperarlos.</p>
+        <button
+          type="button"
+          className="btn btn-danger"
+          onClick={() => setDeleteDialogOpen(true)}
+        >
+          Eliminar evento
+        </button>
+      </div>
+
+      {deleteDialogOpen && (
+        <div className="modal-overlay" onClick={() => !isDeletingEvent && setDeleteDialogOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Eliminar evento</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => !isDeletingEvent && setDeleteDialogOpen(false)}
+                disabled={isDeletingEvent}
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                ¿Seguro que deseas eliminar <strong>{form.title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={isDeletingEvent}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteEvent}
+                disabled={isDeletingEvent}
+              >
+                {isDeletingEvent ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {success && <div className="success-message">{success}</div>}
       {error && <div className="error-message">{error}</div>}
     </div>

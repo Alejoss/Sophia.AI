@@ -58,7 +58,7 @@ const knowledgePathsApi = {
 
     deleteKnowledgePath: async (pathId) => {
         try {
-            await axiosInstance.delete(`/knowledge_paths/${pathId}/`);
+            await axiosInstance.delete(`/content/knowledge-paths/${pathId}/`);
         } catch (error) {
             console.error('Error deleting knowledge path:', error);
             throw error;

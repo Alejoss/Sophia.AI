@@ -529,6 +529,15 @@ const contentApi = {
         }
     },
 
+    deleteTopic: async (topicId) => {
+        try {
+            await axiosInstance.delete(`/content/topics/${topicId}/`);
+        } catch (error) {
+            console.error('Error deleting topic:', error);
+            throw error;
+        }
+    },
+
     addTopicModerators: async (topicId, usernames) => {
         try {
             const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/`, {

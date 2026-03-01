@@ -16,11 +16,12 @@ import LinkIcon from '@mui/icons-material/Link';
 import InterestsIcon from '@mui/icons-material/Interests';
 import DescriptionIcon from '@mui/icons-material/Description';
 import { AuthContext } from '../context/AuthContext';
+import { getAccessTokenFromLocalStorage } from '../context/localStorageUtils';
 import { getUserProfile, updateProfile } from '../api/profilesApi';
 
 const EditProfile = () => {
     const navigate = useNavigate();
-    const { authState } = useContext(AuthContext);
+    const { updateAuthState } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
@@ -33,8 +34,11 @@ const EditProfile = () => {
     });
     const [previewUrl, setPreviewUrl] = useState(null);
     const [interestInput, setInterestInput] = useState('');
+    const [usernameChangeCount, setUsernameChangeCount] = useState(0);
+    const [originalUsername, setOriginalUsername] = useState('');
     const MAX_DESCRIPTION_LENGTH = 500;
     const MAX_INTERESTS = 10;
+    const MAX_USERNAME_CHANGES = 2;
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -52,6 +56,8 @@ const EditProfile = () => {
                     external_url: profile.external_url || '',
                     profile_picture: null
                 });
+                setUsernameChangeCount(profile.username_change_count ?? 0);
+                setOriginalUsername(profile.user.username || '');
                 setPreviewUrl(profile.profile_picture);
                 setError(null);
             } catch (err) {
@@ -147,6 +153,7 @@ const EditProfile = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
+        setError(null);
 
         try {
             const formDataToSend = new FormData();
@@ -159,17 +166,29 @@ const EditProfile = () => {
             if (formData.profile_picture) {
                 formDataToSend.append('profile_picture', formData.profile_picture);
             }
+            const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
+            const usernameChanged = formData.username.trim() !== originalUsername;
+            if (canEditUsername && usernameChanged && formData.username.trim()) {
+                formDataToSend.append('username', formData.username.trim());
+            }
 
-            await updateProfile(formDataToSend);
+            const response = await updateProfile(formDataToSend);
+            if (usernameChanged && response?.user) {
+                const accessToken = getAccessTokenFromLocalStorage();
+                updateAuthState(response.user, accessToken);
+            }
             navigate('/profiles/my_profile');
         } catch (err) {
-            setError('Error al actualizar el perfil');
+            const msg = err.response?.data?.error || err.response?.data?.username?.[0] || 'Error al actualizar el perfil';
+            setError(msg);
         } finally {
             setSaving(false);
         }
     };
 
     const remainingChars = MAX_DESCRIPTION_LENGTH - formData.profile_description.length;
+    const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
+    const remainingUsernameChanges = MAX_USERNAME_CHANGES - usernameChangeCount;
 
     if (loading) {
         return (
@@ -223,14 +242,22 @@ const EditProfile = () => {
                         </Button>
                     </Box>
 
-                    {/* Nombre de usuario (deshabilitado) */}
+                    {/* Nombre de usuario */}
                     <TextField
                         name="username"
                         label="Nombre de usuario"
                         value={formData.username}
+                        onChange={handleInputChange}
                         fullWidth
-                        disabled
+                        disabled={!canEditUsername}
                         sx={{ mb: 3 }}
+                        helperText={
+                            canEditUsername
+                                ? remainingUsernameChanges === 2
+                                    ? 'Puedes cambiar tu nombre de usuario hasta 2 veces. Te quedan 2 cambios.'
+                                    : `Puedes cambiar tu nombre de usuario hasta 2 veces. Te queda ${remainingUsernameChanges} cambio.`
+                                : 'Ya no puedes cambiar tu nombre de usuario.'
+                        }
                     />
 
                     {/* URL Externa */}
