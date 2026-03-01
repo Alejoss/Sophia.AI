@@ -24,10 +24,15 @@ import {
   Checkbox,
   IconButton,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import QuizIcon from '@mui/icons-material/Quiz';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizApi from '../api/quizzesApi';
@@ -42,6 +47,8 @@ const QuizForm = () => {
   const [error, setError] = useState(null);
   const [currentPathId, setCurrentPathId] = useState(initialPathId);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingQuiz, setIsDeletingQuiz] = useState(false);
   
   const [quizData, setQuizData] = useState({
     title: '',
@@ -255,6 +262,24 @@ const QuizForm = () => {
   const handleRemoveQuestion = (questionIndex) => {
     const updatedQuestions = quizData.questions.filter((_, i) => i !== questionIndex);
     setQuizData(prev => ({ ...prev, questions: updatedQuestions }));
+  };
+
+  const openDeleteDialog = () => setDeleteDialogOpen(true);
+  const closeDeleteDialog = () => setDeleteDialogOpen(false);
+
+  const confirmDeleteQuiz = async () => {
+    if (!quizId) return;
+    setIsDeletingQuiz(true);
+    setError(null);
+    try {
+      await quizApi.deleteQuiz(quizId);
+      closeDeleteDialog();
+      navigate(`/knowledge_path/${currentPathId}/edit`);
+    } catch (err) {
+      setError(err?.message || err?.response?.data?.error || 'Error al eliminar el cuestionario');
+    } finally {
+      setIsDeletingQuiz(false);
+    }
   };
 
   if (loading) {
@@ -530,7 +555,56 @@ const QuizForm = () => {
             </Stack>
           </form>
         </Paper>
+
+        {/* Zona de peligro: eliminar cuestionario (solo en modo edición) */}
+        {mode === 'edit' && (
+          <Paper
+            elevation={1}
+            sx={{
+              mt: 2,
+              p: 3,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'error.light',
+            }}
+          >
+            <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
+              Zona de peligro
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Si eliminas este cuestionario se borrarán todas sus preguntas y respuestas y no podrás recuperarlos.
+            </Typography>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteForeverIcon />}
+              onClick={openDeleteDialog}
+              sx={{ textTransform: 'none' }}
+            >
+              Eliminar cuestionario
+            </Button>
+          </Paper>
+        )}
+
       </Stack>
+
+      {/* Diálogo de confirmación para eliminar cuestionario */}
+      <Dialog open={deleteDialogOpen} onClose={closeDeleteDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Eliminar cuestionario</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            ¿Seguro que deseas eliminar <strong>{quizData.title || 'este cuestionario'}</strong>? Se eliminarán todas las preguntas y esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteDialog} disabled={isDeletingQuiz} sx={{ textTransform: 'none' }}>
+            Cancelar
+          </Button>
+          <Button onClick={confirmDeleteQuiz} disabled={isDeletingQuiz} color="error" variant="contained" sx={{ textTransform: 'none' }}>
+            {isDeletingQuiz ? 'Eliminando…' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
