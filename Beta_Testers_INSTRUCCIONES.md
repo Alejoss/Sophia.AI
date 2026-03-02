@@ -5,7 +5,11 @@ Gracias por estar aquí.
 Antes que nada, queremos invitarte a algo simple:
 déjate llevar por tu intuición.
 
-No hay prisa. No hay una forma correcta de usar la plataforma.
+Sin embargo, para ajustar las expectativas, ten en cuenta que:
+
+ACADEMIA BLOCKCHAIN SE ASEMEJA MÁS A UNA BIBLIOTECA COMPARTIDA QUE A UNA RED SOCIAL
+
+Por lo demás, no hay prisa. No hay una forma correcta de usar la plataforma.
 Explora, haz clic, entra en rutas, lee comentarios, curiosea.
 
 🧭 Puedes empezar por donde quieras
