@@ -21,7 +21,7 @@
    ```bash
    ssh root@159.65.69.165
    ```
-   Then go to the app directory:
+   Then go to the app directory:b
    ```bash
    cd /opt/acbc-app
    ```

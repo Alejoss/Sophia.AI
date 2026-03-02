@@ -151,27 +151,27 @@ const TopicCreationForm = () => {
                         </Box>
 
                         <Typography variant="body2" color="text.secondary">
-                            Un buen tema es específico y permite desarrollar contenido enfocado.
+                            Crear un Tema es un ejercicio de curaduría: eliges y organizas el mejor contenido que has encontrado sobre algo que te importa.
                         </Typography>
 
                         <Box sx={{ mt: 1 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Recomendaciones:
+                                Piensa en esto cuando definas el título:
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Se restringe a un aspecto concreto.
+                                • Se restringe a un aspecto concreto, no a “todo sobre X”.
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 • Incluye contexto (lugar, tiempo o enfoque).
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Permite conectar contenido específico.
+                                • Permite conectar contenido específico que realmente quieras guardar y compartir.
                             </Typography>
                         </Box>
 
                         <Box sx={{ mt: 2 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Evita títulos amplios como:
+                                Evita títulos demasiado amplios como:
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 • Terrorismo
@@ -186,7 +186,7 @@ const TopicCreationForm = () => {
 
                         <Box sx={{ mt: 2 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Mejores ejemplos:
+                                Mejores ejemplos de temas:
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 • Beneficios del consumo de miel para la salud
@@ -200,9 +200,15 @@ const TopicCreationForm = () => {
                         </Box>
 
                         <Box sx={{ mt: 2 }}>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                Pregúntate: ¿Alguien podría aportar contenido sobre este tema, sin preguntarte de qué se trata?
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Preguntas que pueden ayudarte:
                             </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                • ¿Cuál es el mejor contenido que he encontrado sobre esto?
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                • ¿Qué me habría gustado tener organizado en un solo lugar?
+                            </Typography>                        
                         </Box>
                     </Paper>
                 </Grid>

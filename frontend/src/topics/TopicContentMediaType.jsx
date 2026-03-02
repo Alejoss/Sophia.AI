@@ -167,6 +167,7 @@ const TopicContentMediaType = () => {
                                 content={content}
                                 variant="card"
                                 showAuthor={true}
+                                showTitle={mediaType !== 'image'}
                                 topicId={topicId}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             />

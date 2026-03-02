@@ -47,6 +47,7 @@ const ContentDisplay = ({
   onClick,
   maxImageHeight = 300,
   showAuthor = true,
+  showTitle = true,
   additionalActions,
   topicId = null,
 }) => {
@@ -1315,20 +1316,22 @@ const ContentDisplay = ({
                   sm: 2,    // Standard padding on larger screens
                 },
               }}>
-                <Typography 
-                  gutterBottom 
-                  variant="h6" 
-                  component="div"
-                  color="text.primary"
-                  sx={{
-                    fontSize: {
-                      xs: "1.1rem",  // Slightly smaller on mobile
-                      sm: "1.25rem",  // Standard size on larger screens
-                    },
-                  }}
-                >
-                  {title}
-                </Typography>
+                {showTitle && (
+                  <Typography 
+                    gutterBottom 
+                    variant="h6" 
+                    component="div"
+                    color="text.primary"
+                    sx={{
+                      fontSize: {
+                        xs: "1.1rem",  // Slightly smaller on mobile
+                        sm: "1.25rem",  // Standard size on larger screens
+                      },
+                    }}
+                  >
+                    {title}
+                  </Typography>
+                )}
                 {showAuthor && author && (
                   <Typography variant="body2" color="text.secondary">
                     By {author}

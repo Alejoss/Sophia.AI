@@ -207,6 +207,7 @@ const TopicDetail = () => {
                                 content={content}
                                 variant="card"
                                 showAuthor={true}
+                                showTitle={type !== 'image'}
                                 topicId={topicId}
                                 onClick={() => navigate(`/content/${content.id}/topic/${topicId}`)}
                             />
