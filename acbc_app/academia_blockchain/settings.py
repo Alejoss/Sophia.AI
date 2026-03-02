@@ -591,7 +591,8 @@ EMAIL_FROM_NAME = os.getenv('EMAIL_FROM_NAME', 'Academia Blockchain')
 # Django default from address (used by send_mail and Postmark backend)
 DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>"
 SERVER_EMAIL = EMAIL_FROM  # For error reports to admins
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'alejandro@academiablockchain.com')
+# Primary admin/support email for suggestion notifications (not taken from .env)
+ADMIN_EMAIL = 'alejandro@academiablockchain.com'
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))  # Timeout in seconds
 EMAIL_MAX_RETRIES = int(os.getenv('EMAIL_MAX_RETRIES', '3'))
 

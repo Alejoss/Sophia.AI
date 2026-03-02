@@ -1357,6 +1357,7 @@ class SuggestionCreateView(APIView):
         """
         from profiles.email_service import EmailService, EmailServiceError
         from django.contrib.sites.shortcuts import get_current_site
+        from django.conf import settings
         
         try:
             # Get site URL for template context
@@ -1381,25 +1382,19 @@ class SuggestionCreateView(APIView):
                 'site_url': site_url,
             }
             
-            # Send email using template
-            results = EmailService.send_to_admins(
+            # Send email using template to the primary admin email only
+            admin_email = getattr(settings, 'ADMIN_EMAIL', 'alejandro@academiablockchain.com')
+            EmailService.send_template_email(
+                receiver_email=admin_email,
                 subject=subject,
                 template_name='suggestion_notification',
                 context=context,
                 tags=['suggestion', 'notification', 'admin']
             )
             
-            # Log results
-            if results['sent']:
-                logger.info(
-                    f"Suggestion notification email sent successfully to {len(results['sent'])} admin(s): "
-                    f"{', '.join(results['sent'])}"
-                )
-            if results['failed']:
-                logger.warning(
-                    f"Failed to send suggestion notification email to {len(results['failed'])} admin(s): "
-                    f"{', '.join(results['failed'])}"
-                )
+            logger.info(
+                f"Suggestion notification email sent successfully to primary admin: {admin_email}"
+            )
                 
         except EmailServiceError as e:
             # Log error but don't fail the request

@@ -25,7 +25,6 @@
    ```bash
    cd /opt/acbc-app
    ```
-   (If your droplet has a different IP, use `ssh root@YOUR_DROPLET_IP` and the path where the app is installed.)
 
    **First-time on this server?** Run once so `git pull` is not blocked by script permissions:
    ```bash
