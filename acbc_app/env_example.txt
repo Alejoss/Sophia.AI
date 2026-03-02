@@ -194,8 +194,6 @@ GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-production-secret-key
 
 POSTMARK_SERVER_TOKEN=your-postmark-server-token
 EMAIL_FROM=noreply@yourdomain.com
-EMAIL_FROM_NAME=Academia Blockchain
-ADMIN_EMAIL=admin@yourdomain.com
 SEND_EMAILS=True
 
 AWS_ACCESS_KEY_ID=your-aws-access-key
