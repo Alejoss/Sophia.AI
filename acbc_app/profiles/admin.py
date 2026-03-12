@@ -1,5 +1,5 @@
 from django.contrib import admin
-from profiles.models import Profile, UserNodeCompletion, CryptoCurrency, AcceptedCrypto, Suggestion
+from profiles.models import Profile, UserNodeCompletion, CryptoCurrency, AcceptedCrypto, Suggestion, NewsletterSubscription
 import os
 
 
@@ -53,3 +53,10 @@ class SuggestionAdmin(admin.ModelAdmin):
             return obj.message[:100] + '...'
         return obj.message
     message_preview.short_description = 'Mensaje'
+
+
+@admin.register(NewsletterSubscription)
+class NewsletterSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('email', 'created_at', 'source')
+    search_fields = ('email', 'source')
+    list_filter = ('source', 'created_at')

@@ -159,3 +159,19 @@ class Suggestion(models.Model):
 
     def __str__(self):
         return f"Sugerencia de {self.user.username} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class NewsletterSubscription(models.Model):
+    """
+    Stores newsletter subscriptions for users that provide an email address.
+    """
+
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    source = models.CharField(max_length=100, blank=True, help_text="Optional source tag (e.g. landing, footer)")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email

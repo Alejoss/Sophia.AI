@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Suscríbete a la newsletter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+            color: #e5e7eb;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .card {
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 1.25rem;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.65);
+            max-width: 420px;
+            width: 100%;
+            padding: 1.75rem 1.75rem 1.5rem;
+        }
+        h1 {
+            font-size: 1.6rem;
+            margin: 0 0 0.25rem;
+        }
+        p {
+            margin: 0 0 1.5rem;
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        label {
+            font-size: 0.85rem;
+            color: #d1d5db;
+        }
+        input[type="email"] {
+            margin-top: 0.25rem;
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            border-radius: 0.6rem;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: rgba(15, 23, 42, 0.8);
+            color: #e5e7eb;
+            font-size: 0.95rem;
+        }
+        input[type="email"]:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6);
+        }
+        button {
+            margin-top: 0.5rem;
+            width: 100%;
+            padding: 0.7rem 0.9rem;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+            box-shadow: 0 12px 25px rgba(21, 128, 61, 0.55);
+        }
+        button:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.02);
+            box-shadow: 0 16px 32px rgba(21, 128, 61, 0.7);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 8px 16px rgba(21, 128, 61, 0.5);
+        }
+        small {
+            display: block;
+            margin-top: 0.75rem;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        .errorlist {
+            list-style: none;
+            margin: 0.25rem 0 0;
+            padding: 0;
+            color: #fecaca;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Suscríbete a la newsletter</h1>
+        <p>Recibe en tu correo las próximas novedades de Academia Blockchain.</p>
+        <form method="post">
+            {% csrf_token %}
+            <label>
+                Email
+                {{ form.email }}
+            </label>
+            {% if form.email.errors %}
+                <ul class="errorlist">
+                    {% for error in form.email.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            <button type="submit">Quiero suscribirme</button>
+            <small>Solo usaremos tu correo para enviarte noticias relevantes. Podrás darte de baja en cualquier momento.</small>
+        </form>
+    </div>
+</body>
+</html>
+

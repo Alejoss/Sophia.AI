@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>¡Gracias por suscribirte!</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+            color: #e5e7eb;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .card {
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 1.25rem;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.65);
+            max-width: 420px;
+            width: 100%;
+            padding: 1.75rem 1.75rem 1.5rem;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.7rem;
+            margin: 0 0 0.25rem;
+        }
+        p {
+            margin: 0.5rem 0;
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+        strong {
+            color: #e5e7eb;
+        }
+        a {
+            display: inline-block;
+            margin-top: 1.25rem;
+            padding: 0.55rem 1.1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            color: #e5e7eb;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: background-color 0.08s ease, color 0.08s ease, border-color 0.08s ease;
+        }
+        a:hover {
+            background-color: rgba(148, 163, 184, 0.1);
+            border-color: rgba(148, 163, 184, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>¡Listo! 🎉</h1>
+        <p>Gracias por suscribirte a la newsletter de <strong>Academia Blockchain</strong>.</p>
+        {% if email %}
+            <p>Te escribiremos a <strong>{{ email }}</strong> cuando haya novedades importantes.</p>
+        {% endif %}
+        <a href="/">Volver a la página principal</a>
+    </div>
+</body>
+</html>
+

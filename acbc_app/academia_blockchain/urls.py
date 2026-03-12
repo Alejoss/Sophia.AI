@@ -7,7 +7,8 @@ from django.views.static import serve
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from profiles.views import GoogleLoginView
+from profiles.views import GoogleLoginView, newsletter_subscribe
+
 
 def health_check(request):
     """Health check endpoint for monitoring"""
@@ -29,6 +30,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
+    path('subscribe/', newsletter_subscribe, name='newsletter_subscribe'),
     path('api/profiles/', include('profiles.urls')),
     path('api/events/', include('events.urls')),
     path('api/content/', include('content.urls')),

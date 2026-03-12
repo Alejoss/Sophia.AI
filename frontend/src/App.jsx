@@ -8,6 +8,7 @@ import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/Home.jsx';
+import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
 import Profile from './profiles/Profile.jsx';
@@ -83,6 +84,7 @@ const AppContent = () => {
           <Routes>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
                 <GoogleOAuthInitializer>

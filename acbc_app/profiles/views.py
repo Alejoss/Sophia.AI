@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
+from django import forms
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth.models import User
@@ -23,13 +24,15 @@ from django.conf import settings
 from django.core.cache import cache
 from datetime import timedelta
 from django.core.files.base import ContentFile
+from django.views.decorators.http import require_http_methods
 import requests
 from datetime import datetime
 import jwt
 import json
 
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion, NewsletterSubscription
+from profiles.email_service import EmailService, EmailServiceError
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
@@ -41,6 +44,125 @@ from django.db import connection
 from django.db.models import Count
 
 logger = logging.getLogger(__name__)
+
+
+class NewsletterSubscriptionForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        max_length=254,
+        widget=forms.EmailInput(attrs={"placeholder": "tu@email"})
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def newsletter_subscribe(request):
+    """
+    Simple HTML form for newsletter subscriptions.
+    Stores the email in the database and notifies the admin by email.
+    """
+    if request.method == "POST":
+        form = NewsletterSubscriptionForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"].strip().lower()
+
+            subscription, created = NewsletterSubscription.objects.get_or_create(
+                email=email,
+                defaults={"source": "subscribe_page"},
+            )
+
+            if created:
+                try:
+                    subject = "Nueva suscripción a la newsletter"
+                    html_message = (
+                        "<p>Hay una nueva suscripción a la newsletter.</p>"
+                        f"<p><strong>Email:</strong> {email}</p>"
+                    )
+                    text_message = (
+                        "Hay una nueva suscripción a la newsletter.\n"
+                        f"Email: {email}"
+                    )
+                    EmailService.send_email(
+                        receiver_email="alejandro@academiablockchain.com",
+                        subject=subject,
+                        html_message=html_message,
+                        text_message=text_message,
+                        tags=["newsletter", "subscription"],
+                    )
+                except EmailServiceError as e:
+                    logger.error(
+                        "Error sending newsletter subscription notification email: %s",
+                        str(e),
+                        exc_info=True,
+                    )
+
+            return render(
+                request,
+                "newsletter/subscribe_success.html",
+                {"email": email},
+            )
+    else:
+        form = NewsletterSubscriptionForm()
+
+    return render(request, "newsletter/subscribe.html", {"form": form})
+
+
+class NewsletterSubscriptionApiView(APIView):
+    """
+    API endpoint for newsletter subscriptions.
+    Expects JSON body: {"email": "<email>"}
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        if not email:
+            return Response(
+                {"detail": "El email es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        form = NewsletterSubscriptionForm({"email": email})
+        if not form.is_valid():
+            return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        subscription, created = NewsletterSubscription.objects.get_or_create(
+            email=email,
+            defaults={"source": "frontend_subscribe"},
+        )
+
+        if created:
+            try:
+                subject = "Nueva suscripción a la newsletter"
+                html_message = (
+                    "<p>Hay una nueva suscripción a la newsletter.</p>"
+                    f"<p><strong>Email:</strong> {email}</p>"
+                )
+                text_message = (
+                    "Hay una nueva suscripción a la newsletter.\n"
+                    f"Email: {email}"
+                )
+                EmailService.send_email(
+                    receiver_email="alejandro@academiablockchain.com",
+                    subject=subject,
+                    html_message=html_message,
+                    text_message=text_message,
+                    tags=["newsletter", "subscription"],
+                )
+            except EmailServiceError as e:
+                logger.error(
+                    "Error sending newsletter subscription notification email (API): %s",
+                    str(e),
+                    exc_info=True,
+                )
+
+        return Response(
+            {
+                "email": email,
+                "created": created,
+                "message": "Suscripción registrada correctamente.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class CheckAuth(APIView):

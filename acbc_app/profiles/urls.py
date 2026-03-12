@@ -39,4 +39,7 @@ urlpatterns = [
     
     # Password change endpoint
     path('change-password/', views.ChangePasswordView.as_view(), name='change_password'),
+
+    # Newsletter subscription API
+    path('newsletter/subscribe/', views.NewsletterSubscriptionApiView.as_view(), name='newsletter_subscribe_api'),
 ]

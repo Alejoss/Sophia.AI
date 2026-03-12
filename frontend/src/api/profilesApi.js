@@ -293,6 +293,18 @@ const changePassword = async (oldPassword, newPassword, confirmPassword) => {
   }
 };
 
+const submitNewsletterSubscription = async (email) => {
+  try {
+    const response = await axiosInstance.post('/profiles/newsletter/subscribe/', {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting newsletter subscription:', error);
+    throw error;
+  }
+};
+
 export { 
   getUserProfile, 
   apiLogout, 
@@ -315,5 +327,6 @@ export {
   addAcceptedCrypto,
   deleteAcceptedCrypto,
   submitSuggestion,
-  changePassword
+  changePassword,
+  submitNewsletterSubscription,
 };
