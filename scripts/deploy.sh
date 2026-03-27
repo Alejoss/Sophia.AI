@@ -11,6 +11,42 @@ cd "$PROJECT_ROOT"
 
 echo "🚀 Starting production deployment..."
 
+usage() {
+    cat <<EOF
+Usage: ./scripts/deploy.sh [options]
+
+Options:
+  --no-cache               Build Docker images without cache (slow, clean rebuild)
+  --skip-build             Skip Docker image build step
+  --skip-down              Do not run 'docker compose down' before deployment
+  --allow-non-production   Allow deploy when ENVIRONMENT is not PRODUCTION
+  -h, --help               Show this help
+EOF
+}
+
+NO_CACHE_BUILD=false
+SKIP_BUILD=false
+SKIP_DOWN=false
+ALLOW_NON_PRODUCTION=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --no-cache) NO_CACHE_BUILD=true ;;
+        --skip-build) SKIP_BUILD=true ;;
+        --skip-down) SKIP_DOWN=true ;;
+        --allow-non-production) ALLOW_NON_PRODUCTION=true ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,10 +73,11 @@ if [ -z "$ACADEMIA_BLOCKCHAIN_SKEY" ] || [ "$ACADEMIA_BLOCKCHAIN_SKEY" = "django
 fi
 
 if [ "$ENVIRONMENT" != "PRODUCTION" ]; then
-    echo -e "${YELLOW}⚠️  Warning: ENVIRONMENT is not set to PRODUCTION${NC}"
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [ "$ALLOW_NON_PRODUCTION" = true ]; then
+        echo -e "${YELLOW}⚠️  ENVIRONMENT is not PRODUCTION, continuing due to --allow-non-production${NC}"
+    else
+        echo -e "${RED}❌ Error: ENVIRONMENT is not set to PRODUCTION.${NC}"
+        echo "Set ENVIRONMENT=PRODUCTION in acbc_app/.env or run with --allow-non-production."
         exit 1
     fi
 fi
@@ -73,10 +110,14 @@ if [ -f "nginx/nginx-ssl.conf" ]; then
     export NGINX_CONF=./nginx/nginx-ssl.conf
 fi
 
-# Stop existing containers first (frees port 80 if our nginx container was using it)
-echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml down || true
-sleep 2
+if [ "$SKIP_DOWN" = true ]; then
+    echo -e "${YELLOW}⏭️  Skipping full shutdown (--skip-down)${NC}"
+else
+    # Stop existing containers first (frees port 80 if our nginx container was using it)
+    echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml down || true
+    sleep 2
+fi
 
 # If port 80 is still in use (e.g. host nginx/apache), stop it so our container can bind
 if command -v ss >/dev/null 2>&1; then
@@ -104,11 +145,23 @@ elif command -v lsof >/dev/null 2>&1; then
 fi
 
 # Build images (use root .env as well so VITE_* are available for frontend build)
-echo -e "${YELLOW}🔨 Building Docker images...${NC}"
-if [ -f ".env" ]; then
-  docker compose --env-file "$COMPOSE_ENV_FILE" --env-file .env -f docker-compose.prod.yml build --no-cache
+if [ "$SKIP_BUILD" = true ]; then
+  echo -e "${YELLOW}⏭️  Skipping image build (--skip-build)${NC}"
 else
-  docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml build --no-cache
+  echo -e "${YELLOW}🔨 Building Docker images...${NC}"
+  BUILD_FLAGS=""
+  if [ "$NO_CACHE_BUILD" = true ]; then
+    BUILD_FLAGS="--no-cache"
+    echo -e "${YELLOW}🧹 Using no-cache build (slow but clean)${NC}"
+  else
+    echo -e "${YELLOW}⚡ Using build cache for faster deploy${NC}"
+  fi
+
+  if [ -f ".env" ]; then
+    docker compose --env-file "$COMPOSE_ENV_FILE" --env-file .env -f docker-compose.prod.yml build $BUILD_FLAGS
+  else
+    docker compose --env-file "$COMPOSE_ENV_FILE" -f docker-compose.prod.yml build $BUILD_FLAGS
+  fi
 fi
 
 # Start services

@@ -39,12 +39,24 @@
    ./scripts/deploy.sh
    ```
    The script reads DB credentials from `acbc_app/.env`, frees port 80 if host nginx/apache is using it, then builds and starts the stack.
+   It now uses Docker build cache by default (faster) and runs in non-interactive mode (no "press Enter" prompt).
+
+   **Fast path for lighter changes (less downtime):**
+   ```bash
+   ./scripts/deploy-light.sh
+   ```
+   This runs deployment with `--skip-down` and cached build.
+
+   **Clean rebuild only when needed (slow):**
+   ```bash
+   ./scripts/deploy.sh --no-cache
+   ```
 
    **Or build and run manually** (from **project root** only, e.g. `cd /opt/acbc-app` then):
    ```bash
    # deploy.sh creates .env.compose in the project root; run from there
    docker compose --env-file .env.compose -f docker-compose.prod.yml down
-   docker compose --env-file .env.compose -f docker-compose.prod.yml build --no-cache
+   docker compose --env-file .env.compose -f docker-compose.prod.yml build
    # Free port 80 first if needed: sudo systemctl stop nginx
    docker compose --env-file .env.compose -f docker-compose.prod.yml up -d
    sleep 10

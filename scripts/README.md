@@ -49,6 +49,21 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
 
+**Common options:**
+```bash
+# Fast default (uses build cache)
+./scripts/deploy.sh
+
+# Clean rebuild (slower)
+./scripts/deploy.sh --no-cache
+
+# Skip full stop/start (lighter deploy)
+./scripts/deploy.sh --skip-down
+
+# Skip image build
+./scripts/deploy.sh --skip-build
+```
+
 **What it does:**
 - Validates environment configuration
 - Stops existing containers
@@ -57,6 +72,20 @@ chmod +x scripts/deploy.sh
 - Runs database migrations
 - Collects static files
 - Performs health checks
+
+### `deploy-light.sh`
+Lightweight wrapper for faster deploys with less downtime.
+
+**Usage:**
+```bash
+chmod +x scripts/deploy-light.sh
+./scripts/deploy-light.sh
+```
+
+**What it does:**
+- Runs `deploy.sh --skip-down`
+- Uses Docker build cache (default behavior of `deploy.sh`)
+- Keeps migrations, collectstatic, and health checks
 
 ### `setup-ssl.sh`
 Sets up SSL certificates using Let's Encrypt.
