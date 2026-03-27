@@ -11,19 +11,55 @@ See [Authentication Documentation](authentication.md) for detailed authenticatio
 ## Profiles
 
 ### Get Current User Profile
-- **GET** `/api/profiles/me/`
+- **GET** `/api/profiles/user_profile/`
 - **Auth**: Required
 - **Response**: User profile object
 
 ### Update Profile
-- **PATCH** `/api/profiles/me/`
+- **PUT/PATCH** `/api/profiles/user_profile/`
 - **Auth**: Required
 - **Body**: Profile fields to update
 
 ### Get User Profile
 - **GET** `/api/profiles/{id}/`
-- **Auth**: Optional
+- **Auth**: Required
 - **Response**: Public profile information
+
+## Authentication (Primary SPA Flow)
+
+### Register
+- **POST** `/api/profiles/register/`
+- **Auth**: Public
+- **Body**: `username`, `email`, `password`
+- **Response**: User payload + `access_token` and refresh cookie
+
+### Login
+- **POST** `/api/profiles/login/`
+- **Auth**: Public
+- **Body**: `username` (username or email), `password`
+- **Response**: User payload + `access_token` and refresh cookie
+
+### Refresh Token
+- **POST** `/api/profiles/refresh_token/`
+- **Auth**: Public (cookie-based)
+- **Body**: None
+- **Response**: New `access_token` (refresh cookie rotated when enabled)
+
+### Check Auth
+- **GET** `/api/profiles/check_auth/`
+- **Auth**: Public
+- **Response**: `is_authenticated`, optional `user`, and `reason`
+
+### Logout
+- **POST** `/api/profiles/logout/`
+- **Auth**: Public
+- **Response**: Confirmation + refresh cookie deletion
+
+### Google OAuth Login
+- **POST** `/api/rest-auth/google/login/`
+- **Auth**: Public
+- **Body**: `access_token` (Google ID token credential from frontend)
+- **Response**: User payload + `access_token` and refresh cookie
 
 ## Content
 

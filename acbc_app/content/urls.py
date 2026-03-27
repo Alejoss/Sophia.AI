@@ -47,7 +47,11 @@ from .views import (
     TopicContentSuggestionAcceptView,
     TopicContentSuggestionRejectView,
     TopicContentSuggestionDeleteView,
-    UserContentSuggestionsView
+    UserContentSuggestionsView,
+    FileSuggestionCreateView,
+    FileSuggestionListView,
+    FileSuggestionAcceptView,
+    FileSuggestionRejectView
 )
 
 app_name = "content"
@@ -101,6 +105,10 @@ urlpatterns = [
     path('topics/<int:pk>/content-suggestions/<int:suggestion_id>/reject/', TopicContentSuggestionRejectView.as_view(), name='topic-content-suggestion-reject'),
     path('topics/<int:pk>/content-suggestions/<int:suggestion_id>/', TopicContentSuggestionDeleteView.as_view(), name='topic-content-suggestion-delete'),
     path('user/content-suggestions/', UserContentSuggestionsView.as_view(), name='user-content-suggestions'),
+    path('content/<int:pk>/file-suggestions/', FileSuggestionCreateView.as_view(), name='file-suggestion-create'),
+    path('content/<int:pk>/file-suggestions/list/', FileSuggestionListView.as_view(), name='file-suggestion-list'),
+    path('file-suggestions/<int:suggestion_id>/accept/', FileSuggestionAcceptView.as_view(), name='file-suggestion-accept'),
+    path('file-suggestions/<int:suggestion_id>/reject/', FileSuggestionRejectView.as_view(), name='file-suggestion-reject'),
     path('recent-user-content/', RecentUserContentView.as_view(), name='recent-user-content'),
     path('references/<int:pk>/', ContentReferencesView.as_view(), name='content-references'),
     path('preview-url/', URLPreviewView.as_view(), name='preview-url'),

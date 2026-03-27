@@ -36,7 +36,24 @@ const KnowledgePathList = () => {
         
         // Safety check: ensure data.results is always an array
         const results = Array.isArray(data.results) ? data.results : [];
-        setKnowledgePaths(results);
+        // Sort by vote count (descending) so the most voted paths appear first.
+        // Tie-breakers help keep ordering deterministic across renders/pages.
+        const sortedResults = [...results].sort((a, b) => {
+          const voteA = Number(a.vote_count) || 0;
+          const voteB = Number(b.vote_count) || 0;
+          if (voteB !== voteA) return voteB - voteA;
+
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (timeB !== timeA) return timeB - timeA;
+
+          // Fallback to id to avoid random order when both votes and dates are equal.
+          const idA = Number(a.id) || 0;
+          const idB = Number(b.id) || 0;
+          return idB - idA;
+        });
+
+        setKnowledgePaths(sortedResults);
         
         setTotalPages(Math.ceil((data.count || 0) / 9));
         setHasNext(!!data.next);

@@ -5,6 +5,8 @@ const GoogleOAuthInitializer = ({ children }) => {
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
 
   useEffect(() => {
+    if (!clientId) return undefined;
+
     // Load the Google OAuth script
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -14,13 +16,32 @@ const GoogleOAuthInitializer = ({ children }) => {
 
     return () => {
       // Cleanup script on unmount
-      document.head.removeChild(script);
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
     };
-  }, []);
+  }, [clientId]);
 
   if (!clientId) {
     console.error('Google OAuth Client ID is not defined in environment variables');
-    return null;
+    return (
+      <>
+        <div
+          style={{
+            margin: '0 0 12px 0',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            backgroundColor: '#fff3cd',
+            color: '#664d03',
+            border: '1px solid #ffecb5',
+            fontSize: '0.95rem',
+          }}
+        >
+          El inicio de sesion con Google no esta disponible temporalmente.
+        </div>
+        {children}
+      </>
+    );
   }
 
   return (

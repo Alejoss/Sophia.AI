@@ -55,7 +55,25 @@ const KnowledgePathCreationForm = () => {
       const data = await knowledgePathsApi.createKnowledgePath(submitData);
       navigate(`/knowledge_path/${data.id}/edit`);
     } catch (err) {
-      setError(err.message || 'Error al crear el camino de conocimiento');
+      const data = err.response?.data;
+      let msg = err.message || 'Error al crear el camino de conocimiento';
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const fieldLabel = { image: 'Imagen', title: 'Título', description: 'Descripción' };
+        const lines = [];
+        for (const [key, val] of Object.entries(data)) {
+          if (key === 'detail') continue;
+          const label = fieldLabel[key] || key;
+          const parts = Array.isArray(val) ? val : [val];
+          parts.forEach((p) => lines.push(`${label}: ${p}`));
+        }
+        if (lines.length) {
+          msg = lines.join('\n');
+        } else if (data.detail != null) {
+          const d = data.detail;
+          msg = Array.isArray(d) ? d.join('\n') : String(d);
+        }
+      }
+      setError(msg);
     }
   };
 
@@ -70,7 +88,7 @@ const KnowledgePathCreationForm = () => {
                 Crear Camino de Conocimiento
               </Typography>
               {error && (
-                <Alert severity="error">
+                <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>
                   {error}
                 </Alert>
               )}

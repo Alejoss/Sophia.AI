@@ -1,9 +1,7 @@
-import React, { createContext, useState, useEffect, useRef, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { getUserFromLocalStorage, isAuthenticated, setUserInLocalStorage, setAuthenticationStatus, 
   getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus } from './localStorageUtils';
 import { checkAuth, getUserProfile } from '../api/profilesApi';
-import { jwtDecode } from 'jwt-decode';
-import axiosInstance from '../api/axiosConfig';
 
 export const AuthContext = createContext();
 
@@ -37,13 +35,10 @@ export const AuthProvider = ({ children }) => {
     user: null,
   });
   const [authInitialized, setAuthInitialized] = useState(false);
-  
-  const refreshTimeoutRef = useRef(null);
 
   const updateAuthState = (userData, accessToken) => {
     if (accessToken) {
       setAccessTokenInLocalStorage(accessToken);
-      scheduleTokenRefresh(accessToken);
     }
 
     setUserInLocalStorage(userData);
@@ -71,41 +66,6 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: false,
       user: null
     });
-
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
-      refreshTimeoutRef.current = null;
-    }
-  };
-
-  const scheduleTokenRefresh = (token) => {
-    try {
-      const decodedToken = jwtDecode(token);
-      const expiresAt = decodedToken.exp * 1000;
-      const now = Date.now();
-      const timeUntilExpiry = expiresAt - now;
-      const refreshTime = Math.max(0, timeUntilExpiry - 60000); // Refresh 1 minute before expiry
-      
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      
-      refreshTimeoutRef.current = setTimeout(async () => {
-        try {
-          const response = await axiosInstance.post('/profiles/refresh_token/');
-          if (response.data.access_token) {
-            setAccessTokenInLocalStorage(response.data.access_token);
-            scheduleTokenRefresh(response.data.access_token);
-          } else {
-            clearAuthState();
-          }
-        } catch (error) {
-          clearAuthState();
-        }
-      }, refreshTime);
-    } catch (error) {
-      // Token refresh scheduling failed
-    }
   };
 
   useEffect(() => {
@@ -116,7 +76,6 @@ export const AuthProvider = ({ children }) => {
         const storedAccessToken = getAccessTokenFromLocalStorage();
 
         if (backendAuthStatus && storedUser && storedAccessToken) {
-          scheduleTokenRefresh(storedAccessToken);
           let userToUse = storedUser;
           if (storedUser.id == null) {
             const profile = await getUserProfile();
@@ -140,11 +99,15 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
+  }, []);
 
+  useEffect(() => {
+    const onRefreshFailed = () => {
+      clearAuthState();
+    };
+    window.addEventListener('auth:token_refresh_failed', onRefreshFailed);
     return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
+      window.removeEventListener('auth:token_refresh_failed', onRefreshFailed);
     };
   }, []);
 

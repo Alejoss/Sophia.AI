@@ -1,7 +1,6 @@
 // src/api/profilesAPI.js
 import axiosInstance from './axiosConfig.js';
 import Cookies from "js-cookie";
-import { getUserFromLocalStorage } from '../context/localStorageUtils';
 
 const checkAuth = async () => {
   try {
@@ -77,12 +76,6 @@ const apiLogin = async ({ username, password }) => {
     if (response.data.access_token) {
       // Set the token in the axios instance
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-      
-      // Set the token in AuthContext using the new approach
-      if (window.authContext) {
-        const { access_token, ...userData } = response.data;
-        window.authContext.updateAuthState(userData, access_token);
-      }
     }
     
     return response;
@@ -99,12 +92,6 @@ const apiRegister = async (userData) => {
     if (response.data.access_token) {
       // Set the token in the axios instance
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-      
-      // Set the token in AuthContext using the new approach
-      if (window.authContext) {
-        const { access_token, ...userData } = response.data;
-        window.authContext.updateAuthState(userData, access_token);
-      }
     }
     
     return response;

@@ -6,16 +6,23 @@ import App from './App.jsx';
 import './index.css';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+const userAgent = navigator.userAgent || '';
+const isTelegramOrWebView = /Telegram|wv|WebView/i.test(userAgent);
+
 if (SENTRY_DSN) {
+  const sentryIntegrations = [Sentry.browserTracingIntegration()];
+  if (!isTelegramOrWebView) {
+    sentryIntegrations.push(
+      Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true })
+    );
+  }
+
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: import.meta.env.MODE || 'development',
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
-    ],
+    integrations: sentryIntegrations,
     tracesSampleRate: 0.1,
-    replaysSessionSampleRate: 0.1,
+    replaysSessionSampleRate: isTelegramOrWebView ? 0 : 0.1,
   });
 }
 

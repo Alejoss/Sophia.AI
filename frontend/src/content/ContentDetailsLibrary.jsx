@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Card, Typography, Box, Button } from '@mui/material';
+import { Card, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
@@ -15,6 +15,12 @@ const ContentDetailsLibrary = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [references, setReferences] = useState(null);
+    const [fileSuggestions, setFileSuggestions] = useState([]);
+    const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
+    const [suggestionFile, setSuggestionFile] = useState(null);
+    const [suggestionMessage, setSuggestionMessage] = useState('');
+    const [suggestionError, setSuggestionError] = useState('');
+    const [suggestionSuccess, setSuggestionSuccess] = useState('');
     const { contentId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -36,6 +42,15 @@ const ContentDetailsLibrary = () => {
                 
                 setContent(contentData);
                 setReferences(referencesData);
+
+                try {
+                    const suggestions = await contentApi.listFileSuggestions(contentId);
+                    setFileSuggestions(Array.isArray(suggestions) ? suggestions : []);
+                } catch (listErr) {
+                    // Suggestions are optional in this view; don't block the page.
+                    console.warn('Error loading file suggestions:', listErr);
+                    setFileSuggestions([]);
+                }
             } catch (err) {
                 console.error('Error in ContentDetailsLibrary:', err);
                 console.error('Error response:', err.response);
@@ -68,6 +83,68 @@ const ContentDetailsLibrary = () => {
         );
 
     const isInUserLibrary = isOwner || isOwnLibraryView;
+    const isOriginalUploader = !!content?.is_original_uploader;
+    const hasFileAvailable = !!(content?.has_file_available || content?.file_details?.file);
+    const canSuggestFile = !!(content?.can_suggest_file && !hasFileAvailable);
+    const pendingSuggestions = fileSuggestions.filter(s => s.status === 'PENDING');
+
+    const refreshFileSuggestions = async () => {
+        try {
+            const suggestions = await contentApi.listFileSuggestions(contentId);
+            setFileSuggestions(Array.isArray(suggestions) ? suggestions : []);
+        } catch (err) {
+            console.warn('Error refreshing file suggestions:', err);
+        }
+    };
+
+    const refreshContentData = async () => {
+        const searchParams = new URLSearchParams(location.search);
+        const context = searchParams.get('context') || 'library';
+        const contextId = searchParams.get('id') || searchParams.get('userId') || currentUser?.id;
+        const updatedContent = await contentApi.getContentDetails(contentId, context, contextId);
+        setContent(updatedContent);
+    };
+
+    const handleSubmitFileSuggestion = async () => {
+        setSuggestionError('');
+        setSuggestionSuccess('');
+        if (!suggestionFile) {
+            setSuggestionError('Debes seleccionar un archivo.');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', suggestionFile);
+            formData.append('message', suggestionMessage || '');
+            await contentApi.createFileSuggestion(contentId, formData);
+            setSuggestionSuccess('Sugerencia enviada correctamente.');
+            setSuggestionFile(null);
+            setSuggestionMessage('');
+            setSuggestDialogOpen(false);
+            await refreshFileSuggestions();
+        } catch (err) {
+            setSuggestionError(err?.response?.data?.error || 'No se pudo enviar la sugerencia.');
+        }
+    };
+
+    const handleAcceptSuggestion = async (suggestionId) => {
+        try {
+            await contentApi.acceptFileSuggestion(suggestionId);
+            await Promise.all([refreshFileSuggestions(), refreshContentData()]);
+        } catch (err) {
+            setSuggestionError(err?.response?.data?.error || 'No se pudo aceptar la sugerencia.');
+        }
+    };
+
+    const handleRejectSuggestion = async (suggestionId) => {
+        try {
+            await contentApi.rejectFileSuggestion(suggestionId, '');
+            await refreshFileSuggestions();
+        } catch (err) {
+            setSuggestionError(err?.response?.data?.error || 'No se pudo rechazar la sugerencia.');
+        }
+    };
 
     return (
         <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
@@ -104,13 +181,34 @@ const ContentDetailsLibrary = () => {
                 )}
             </Box>
 
+            {suggestionError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {suggestionError}
+                </Alert>
+            )}
+            {suggestionSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                    {suggestionSuccess}
+                </Alert>
+            )}
+
             <Card sx={{ padding: 3 }}>
                 {/* Content Display */}
                 <ContentDisplay 
                     content={content}
                     variant="detailed"
                     showAuthor={true}
+                    showSuggestFileButton={canSuggestFile}
+                    onSuggestFile={() => setSuggestDialogOpen(true)}
                 />
+
+                <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 1 }}
+                >
+                    Luego podrás editar la imagen miniatura
+                </Typography>
 
                 {/* Content References Section */}
                 {references && (
@@ -118,7 +216,98 @@ const ContentDetailsLibrary = () => {
                         <ContentReferences references={references} />
                     </Box>
                 )}
+
+                {isOriginalUploader && !hasFileAvailable && pendingSuggestions.length > 0 && (
+                    <Box sx={{ mt: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Sugerencias de archivo pendientes
+                        </Typography>
+                        {pendingSuggestions.map((suggestion) => (
+                            <Box
+                                key={suggestion.id}
+                                sx={{
+                                    p: 2,
+                                    mb: 1,
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: 1,
+                                }}
+                            >
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    Sugerido por: {suggestion?.suggested_by?.username || 'Usuario'}
+                                </Typography>
+                                {suggestion?.message && (
+                                    <Typography variant="body2" sx={{ mb: 1 }}>
+                                        {suggestion.message}
+                                    </Typography>
+                                )}
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                    {suggestion?.file && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => window.open(suggestion.file, '_blank')}
+                                        >
+                                            Ver archivo sugerido
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        onClick={() => handleAcceptSuggestion(suggestion.id)}
+                                    >
+                                        Aceptar
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={() => handleRejectSuggestion(suggestion.id)}
+                                    >
+                                        Rechazar
+                                    </Button>
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
             </Card>
+
+            <Dialog open={suggestDialogOpen} onClose={() => setSuggestDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Sugerir archivo</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Sube un archivo que corresponda a este contenido con URL.
+                    </Typography>
+                    <Button variant="outlined" component="label" sx={{ mb: 2 }}>
+                        Seleccionar archivo
+                        <input
+                            type="file"
+                            hidden
+                            onChange={(e) => setSuggestionFile(e.target.files?.[0] || null)}
+                        />
+                    </Button>
+                    {suggestionFile && (
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                            Archivo seleccionado: {suggestionFile.name}
+                        </Typography>
+                    )}
+                    <TextField
+                        label="Mensaje (opcional)"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={suggestionMessage}
+                        onChange={(e) => setSuggestionMessage(e.target.value)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSuggestDialogOpen(false)}>Cancelar</Button>
+                    <Button variant="contained" onClick={handleSubmitFileSuggestion}>
+                        Enviar sugerencia
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

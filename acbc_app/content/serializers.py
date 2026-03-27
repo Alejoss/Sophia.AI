@@ -2,7 +2,7 @@ from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
+from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion, FileSuggestion
 from content.utils import build_media_url
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
@@ -44,13 +44,18 @@ class ContentSerializer(serializers.ModelSerializer):
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
     favicon = serializers.SerializerMethodField()
+    has_file_available = serializers.SerializerMethodField()
+    is_original_uploader = serializers.SerializerMethodField()
+    can_suggest_file = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
         fields = [
             'id', 'media_type', 'file_details', 'topics', 'created_at',
             'original_title', 'original_author', 'uploaded_by', 'url',
-            'vote_count', 'user_vote', 'favicon'
+            'has_spanish_subtitles', 'has_spanish_dubbing',
+            'vote_count', 'user_vote', 'favicon',
+            'has_file_available', 'is_original_uploader', 'can_suggest_file'
         ]
     
     def get_file_details(self, obj):
@@ -120,6 +125,28 @@ class ContentSerializer(serializers.ModelSerializer):
                     pass
             return None
 
+    def _has_file(self, obj):
+        return bool(getattr(getattr(obj, 'file_details', None), 'file', None))
+
+    def get_has_file_available(self, obj):
+        return self._has_file(obj)
+
+    def get_is_original_uploader(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return bool(obj.uploaded_by_id and obj.uploaded_by_id == request.user.id)
+
+    def get_can_suggest_file(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        if not obj.url:
+            return False
+        if self._has_file(obj):
+            return False
+        return bool(obj.uploaded_by_id and obj.uploaded_by_id != request.user.id)
+
     def update(self, instance, validated_data):
         print(f"\n=== ContentSerializer update ===")
         print(f"Instance before update: {instance}")
@@ -141,14 +168,22 @@ class ContentProfileSerializer(serializers.ModelSerializer):
     is_visible = serializers.BooleanField(default=True)
     is_producer = serializers.BooleanField(default=False)
     user = UserSerializer(read_only=True)
+    thumbnail = serializers.ImageField(required=False, allow_null=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+
+        # Ensure we always return an absolute URL for the thumbnail.
+        request = self.context.get('request')
+        data['thumbnail'] = (
+            build_media_url(instance.thumbnail, request) if instance.thumbnail else None
+        )
+
         return data
 
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'is_visible', 'is_producer', 'collection', 'collection_name', 'content', 'user']
+        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'is_visible', 'is_producer', 'collection', 'collection_name', 'content', 'user']
 
 
 class ContentWithSelectedProfileSerializer(ContentSerializer):
@@ -160,6 +195,7 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
     def get_selected_profile(self, content):
         # Get the pre-selected profile from context
         profile = self.context.get('selected_profile')
+        request = self.context.get('request')
         
         # If no direct selected_profile, check if we have selected_profiles dict
         if not profile and 'selected_profiles' in self.context:
@@ -171,6 +207,7 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
                 'title': profile.title or content.original_title,
                 'author': profile.author or content.original_author,
                 'personal_note': profile.personal_note,
+                'thumbnail': build_media_url(profile.thumbnail, request) if profile.thumbnail else None,
                 'is_visible': profile.is_visible,
                 'is_producer': profile.is_producer,
                 'user': profile.user.id,
@@ -183,6 +220,7 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
             'title': content.original_title,
             'author': content.original_author,
             'personal_note': None,
+            'thumbnail': None,
             'is_visible': True,
             'is_producer': False,
             'user': content.uploaded_by.id if content.uploaded_by else None,
@@ -411,7 +449,11 @@ class SimpleContentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Content
-        fields = ['id', 'media_type', 'original_title', 'url']
+        fields = [
+            'id', 'media_type', 'original_title', 'url',
+            'has_spanish_subtitles', 'has_spanish_dubbing',
+            'uploaded_by'
+        ]
     
     def get_url(self, obj):
         """Get URL for icon determination only"""
@@ -464,12 +506,17 @@ class PreviewContentSerializer(serializers.ModelSerializer):
     file_details = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     favicon = serializers.SerializerMethodField()
+    has_file_available = serializers.SerializerMethodField()
+    is_original_uploader = serializers.SerializerMethodField()
+    can_suggest_file = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
         fields = [
             'id', 'media_type', 'file_details', 'original_title', 
-            'original_author', 'uploaded_by', 'url', 'favicon'
+            'original_author', 'uploaded_by', 'url',
+            'has_spanish_subtitles', 'has_spanish_dubbing',
+            'favicon', 'has_file_available', 'is_original_uploader', 'can_suggest_file'
         ]
     
     def get_file_details(self, obj):
@@ -534,6 +581,28 @@ class PreviewContentSerializer(serializers.ModelSerializer):
                     pass
             return None
 
+    def _has_file(self, obj):
+        return bool(getattr(getattr(obj, 'file_details', None), 'file', None))
+
+    def get_has_file_available(self, obj):
+        return self._has_file(obj)
+
+    def get_is_original_uploader(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return bool(obj.uploaded_by_id and obj.uploaded_by_id == request.user.id)
+
+    def get_can_suggest_file(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        if not obj.url:
+            return False
+        if self._has_file(obj):
+            return False
+        return bool(obj.uploaded_by_id and obj.uploaded_by_id != request.user.id)
+
 
 class PreviewContentProfileSerializer(serializers.ModelSerializer):
     """
@@ -541,14 +610,22 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
     Includes file details, favicon, and Open Graph metadata but excludes vote data and heavy metadata.
     """
     content = PreviewContentSerializer(read_only=True)
+    thumbnail = serializers.ImageField(required=False, allow_null=True)
     
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'content']
+        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'content']
         
     def to_representation(self, instance):
         try:
             data = super().to_representation(instance)
+
+            # Ensure we always return an absolute URL for the thumbnail.
+            request = self.context.get('request')
+            data['thumbnail'] = (
+                build_media_url(instance.thumbnail, request) if instance.thumbnail else None
+            )
+
             # Ensure title falls back to original_title if not set
             if not data['title'] and data['content'] and data['content']['original_title']:
                 data['title'] = data['content']['original_title']
@@ -561,6 +638,7 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
                 'title': getattr(instance, 'title', 'Untitled'),
                 'author': getattr(instance, 'author', ''),
                 'personal_note': getattr(instance, 'personal_note', ''),
+                'thumbnail': None,
                 'content': {
                     'id': getattr(instance.content, 'id', None) if instance.content else None,
                     'media_type': getattr(instance.content, 'media_type', 'TEXT') if instance.content else 'TEXT',
@@ -650,3 +728,24 @@ class ContentSuggestionSerializer(serializers.ModelSerializer):
         ).first()
         
         return vote.value if vote else 0
+
+
+class FileSuggestionSerializer(serializers.ModelSerializer):
+    suggested_by = UserSerializer(read_only=True)
+    reviewed_by = UserSerializer(read_only=True)
+    file = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FileSuggestion
+        fields = [
+            'id', 'content', 'suggested_by', 'reviewed_by', 'status',
+            'file', 'file_size', 'message', 'rejection_reason',
+            'created_at', 'updated_at', 'reviewed_at'
+        ]
+        read_only_fields = [
+            'id', 'content', 'suggested_by', 'reviewed_by', 'status',
+            'file_size', 'created_at', 'updated_at', 'reviewed_at'
+        ]
+
+    def get_file(self, obj):
+        return build_media_url(obj.file, self.context.get('request')) if obj.file else None

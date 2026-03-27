@@ -23,9 +23,10 @@ from utils.permissions import IsAuthor
 from utils.notification_utils import (
     notify_topic_moderator_invitation,
     notify_topic_moderator_invitation_accepted,
-    notify_topic_moderator_invitation_declined
+    notify_topic_moderator_invitation_declined,
+    notify_topic_moderator_removed,
 )
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion
+from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion, FileSuggestion
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
 from content.serializers import (
@@ -42,7 +43,8 @@ from content.serializers import (
     TopicIdTitleSerializer,
     PublicationBasicSerializer,
     TopicModeratorInvitationSerializer,
-    ContentSuggestionSerializer
+    ContentSuggestionSerializer,
+    FileSuggestionSerializer
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
@@ -96,21 +98,29 @@ class ContentDetailView(APIView):
             return None
 
         try:
+            context_id_int = int(context_id)
+        except (TypeError, ValueError):
+            return None
+
+        try:
             # Try to get profile based on context
             if context == 'topic':
-                topic = Topic.objects.get(id=context_id)
+                topic = Topic.objects.get(id=context_id_int)
                 return ContentProfile.objects.get(content=content, user=topic.creator)
             
             elif context == 'library':
-                library_owner = User.objects.get(id=context_id)
+                # Prevent profile data leaks across users in library context.
+                if context_id_int != request.user.id and not request.user.is_staff:
+                    return None
+                library_owner = User.objects.get(id=context_id_int)
                 return ContentProfile.objects.get(content=content, user=library_owner)
             
             elif context == 'publication':
-                publication = Publication.objects.get(id=context_id)
+                publication = Publication.objects.get(id=context_id_int)
                 return ContentProfile.objects.get(content=content, user=publication.user)
             
             elif context == 'knowledge_path':
-                path = KnowledgePath.objects.get(id=context_id)
+                path = KnowledgePath.objects.get(id=context_id_int)
                 return ContentProfile.objects.get(content=content, user=path.author)
 
         except (Topic.DoesNotExist, User.DoesNotExist, 
@@ -447,12 +457,26 @@ class UploadContentView(APIView):
                 
                 title = request.data.get('title', normalized_url)
                 
+                has_spanish_subtitles = request.data.get('has_spanish_subtitles')
+                if isinstance(has_spanish_subtitles, str):
+                    has_spanish_subtitles = has_spanish_subtitles.lower() == 'true'
+                else:
+                    has_spanish_subtitles = bool(has_spanish_subtitles)
+
+                has_spanish_dubbing = request.data.get('has_spanish_dubbing')
+                if isinstance(has_spanish_dubbing, str):
+                    has_spanish_dubbing = has_spanish_dubbing.lower() == 'true'
+                else:
+                    has_spanish_dubbing = bool(has_spanish_dubbing)
+
                 content = Content.objects.create(
                     uploaded_by=request.user,
                     media_type=media_type,
                     original_title=title,
                     original_author=request.data.get('author'),
-                    url=normalized_url  # Store the normalized URL
+                    url=normalized_url,  # Store the normalized URL
+                    has_spanish_subtitles=has_spanish_subtitles,
+                    has_spanish_dubbing=has_spanish_dubbing
                 )
 
                 content_profile = ContentProfile.objects.create(
@@ -521,11 +545,25 @@ class UploadContentView(APIView):
                 else:
                     is_producer = bool(is_producer)
 
+                has_spanish_subtitles = request.data.get('has_spanish_subtitles')
+                if isinstance(has_spanish_subtitles, str):
+                    has_spanish_subtitles = has_spanish_subtitles.lower() == 'true'
+                else:
+                    has_spanish_subtitles = bool(has_spanish_subtitles)
+
+                has_spanish_dubbing = request.data.get('has_spanish_dubbing')
+                if isinstance(has_spanish_dubbing, str):
+                    has_spanish_dubbing = has_spanish_dubbing.lower() == 'true'
+                else:
+                    has_spanish_dubbing = bool(has_spanish_dubbing)
+
                 content = Content.objects.create(
                     uploaded_by=request.user,
                     media_type=media_type,
                     original_title=title,
-                    original_author=request.data.get('author')
+                    original_author=request.data.get('author'),
+                    has_spanish_subtitles=has_spanish_subtitles,
+                    has_spanish_dubbing=has_spanish_dubbing
                 )
 
                 content_profile = ContentProfile.objects.create(
@@ -734,6 +772,16 @@ class UploadContentConfirmView(APIView):
             is_producer = is_producer.lower() == 'true'
         else:
             is_producer = bool(is_producer) if is_producer is not None else False
+        has_spanish_subtitles = request.data.get('has_spanish_subtitles')
+        if isinstance(has_spanish_subtitles, str):
+            has_spanish_subtitles = has_spanish_subtitles.lower() == 'true'
+        else:
+            has_spanish_subtitles = bool(has_spanish_subtitles) if has_spanish_subtitles is not None else False
+        has_spanish_dubbing = request.data.get('has_spanish_dubbing')
+        if isinstance(has_spanish_dubbing, str):
+            has_spanish_dubbing = has_spanish_dubbing.lower() == 'true'
+        else:
+            has_spanish_dubbing = bool(has_spanish_dubbing) if has_spanish_dubbing is not None else False
         file_size = request.data.get('file_size')
         try:
             file_size = int(file_size) if file_size is not None else None
@@ -761,7 +809,9 @@ class UploadContentConfirmView(APIView):
             uploaded_by=request.user,
             media_type=media_type,
             original_title=title,
-            original_author=author
+            original_author=author,
+            has_spanish_subtitles=has_spanish_subtitles,
+            has_spanish_dubbing=has_spanish_dubbing
         )
         content_profile = ContentProfile.objects.create(
             content=content,
@@ -1079,6 +1129,7 @@ class CollectionContentView(APIView):
 class ContentProfileView(APIView):
     """Update content profile details"""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def patch(self, request, content_profile_id):
         content_profile = get_object_or_404(
@@ -1087,11 +1138,17 @@ class ContentProfileView(APIView):
             user=request.user
         )
         
-        # If trying to change visibility, check permission: must be producer or profile owner
+        # Enforce producer claim when attempting to make content invisible.
+        # Anyone can keep it visible, but hiding requires producer status.
         if 'is_visible' in request.data:
-            is_producer = request.data.get('is_producer', False)
-            is_owner = content_profile.user_id == request.user.id
-            if not is_producer and not is_owner:
+            requested_visible = str(request.data.get('is_visible')).lower() in ('true', '1', 'yes', 'on')
+            claimed_is_producer = request.data.get('is_producer', None)
+            if claimed_is_producer is None:
+                effective_is_producer = bool(content_profile.is_producer)
+            else:
+                effective_is_producer = str(claimed_is_producer).lower() in ('true', '1', 'yes', 'on')
+
+            if not requested_visible and not effective_is_producer:
                 return Response(
                     {'error': 'Debe reclamar ser el productor para cambiar la visibilidad'},
                     status=status.HTTP_403_FORBIDDEN
@@ -1652,7 +1709,7 @@ class TopicModeratorInviteView(APIView):
             
             if existing_invitation:
                 return Response(
-                    {"error": f"Ya existe una invitacion pendiente para {username}."},
+                    {"error": f"Ya existe una invitación pendiente para {username}."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1715,6 +1772,12 @@ class TopicModeratorInvitationsView(APIView):
         if topic.creator == request.user:
             invitations = TopicModeratorInvitation.objects.filter(topic=topic).order_by('-created_at')
         else:
+            # Only invited users can see their own invitations; other users get 403.
+            if not TopicModeratorInvitation.objects.filter(topic=topic, invited_user=request.user).exists():
+                return Response(
+                    {"error": "No tiene permiso para ver invitaciones de este tema."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             invitations = TopicModeratorInvitation.objects.filter(
                 topic=topic,
                 invited_user=request.user
@@ -2442,10 +2505,33 @@ class URLPreviewView(APIView):
             
             # Check content type
             content_type = response.headers.get('content-type', '').lower()
-            
+
+            if content_type.startswith('application/pdf'):
+                parsed_url = urlparse(url)
+                file_name = os.path.basename(parsed_url.path)
+                pdf_title = file_name if file_name else 'Documento PDF'
+
+                metadata = {
+                    'title': pdf_title,
+                    'description': 'Documento PDF',
+                    'type': 'document',
+                    'siteName': parsed_url.netloc,
+                }
+
+                logger.info(
+                    "URL preview successful for PDF",
+                    extra={
+                        'user_id': user_id,
+                        'username': username,
+                        'url': url,
+                        'title': metadata.get('title'),
+                    }
+                )
+                return Response(metadata)
+
             if not content_type.startswith('text/html'):
                 logger.warning(
-                    "URL preview failed: not HTML content",
+                    "URL preview failed: unsupported content type",
                     extra={
                         'user_id': user_id,
                         'username': username,
@@ -2454,7 +2540,7 @@ class URLPreviewView(APIView):
                     }
                 )
                 return Response({
-                    'error': 'La URL debe apuntar a una pagina web'
+                    'error': 'La URL debe apuntar a una pagina web o PDF'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Parse HTML
@@ -2694,6 +2780,22 @@ class ContentUpdateView(APIView):
                     {'error': 'No tiene permiso para editar este contenido'},
                     status=status.HTTP_403_FORBIDDEN
                 )
+
+            # Source updates are only allowed for original uploader while no other
+            # users depend on this content as their library source.
+            if not content.can_be_modified_by(request.user):
+                other_users_count = content.get_other_user_profiles_count()
+                return Response(
+                    {
+                        'error': (
+                            f'No se puede cambiar la fuente de este contenido porque '
+                            f'{other_users_count} otro(s) usuario(s) lo han agregado a sus bibliotecas'
+                            if other_users_count > 0
+                            else 'No se puede cambiar la fuente de este contenido'
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
             
             # Validate media_type if provided
             if 'media_type' in request.data:
@@ -2839,6 +2941,155 @@ class TopicContentSuggestionCreateView(APIView):
         
         serializer = ContentSuggestionSerializer(suggestion, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class FileSuggestionCreateView(APIView):
+    """Create a file suggestion for URL-based content."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        file_obj = request.FILES.get('file')
+        message = request.data.get('message', '')
+
+        if not file_obj:
+            return Response(
+                {"error": "Debe adjuntar un archivo."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if content.uploaded_by_id == request.user.id:
+            return Response(
+                {"error": "No puede sugerir archivo para su propio contenido."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not content.url:
+            return Response(
+                {"error": "Solo se permite sugerir archivo para contenidos con URL."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        has_file = hasattr(content, 'file_details') and content.file_details and bool(content.file_details.file)
+        if has_file:
+            return Response(
+                {"error": "Este contenido ya tiene un archivo asociado."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        existing_pending = FileSuggestion.objects.filter(
+            content=content,
+            suggested_by=request.user,
+            status='PENDING'
+        ).exists()
+        if existing_pending:
+            return Response(
+                {"error": "Ya tiene una sugerencia pendiente para este contenido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        suggestion = FileSuggestion.objects.create(
+            content=content,
+            suggested_by=request.user,
+            file=file_obj,
+            file_size=getattr(file_obj, 'size', None),
+            message=message,
+            status='PENDING'
+        )
+
+        serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class FileSuggestionListView(APIView):
+    """List file suggestions for a content.
+
+    - Original uploader sees all suggestions for the content.
+    - Other users only see their own suggestions.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+
+        if content.uploaded_by_id == request.user.id:
+            suggestions = FileSuggestion.objects.filter(content=content).order_by('-created_at')
+        else:
+            suggestions = FileSuggestion.objects.filter(
+                content=content,
+                suggested_by=request.user
+            ).order_by('-created_at')
+
+        serializer = FileSuggestionSerializer(suggestions, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FileSuggestionAcceptView(APIView):
+    """Accept a file suggestion and attach file to existing content."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, suggestion_id):
+        suggestion = get_object_or_404(FileSuggestion, pk=suggestion_id)
+        content = suggestion.content
+
+        if content.uploaded_by_id != request.user.id:
+            return Response(
+                {"error": "Solo el uploader original puede aceptar sugerencias."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if suggestion.status != 'PENDING':
+            return Response(
+                {"error": "Esta sugerencia ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        file_details, _created = FileDetails.objects.get_or_create(content=content)
+        file_details.file = suggestion.file
+        file_details.file_size = suggestion.file_size
+        file_details.save()
+
+        suggestion.status = 'ACCEPTED'
+        suggestion.reviewed_by = request.user
+        suggestion.reviewed_at = timezone.now()
+        suggestion.rejection_reason = None
+        suggestion.save()
+
+        serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FileSuggestionRejectView(APIView):
+    """Reject a file suggestion."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, suggestion_id):
+        suggestion = get_object_or_404(FileSuggestion, pk=suggestion_id)
+        content = suggestion.content
+
+        if content.uploaded_by_id != request.user.id:
+            return Response(
+                {"error": "Solo el uploader original puede rechazar sugerencias."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if suggestion.status != 'PENDING':
+            return Response(
+                {"error": "Esta sugerencia ya no está pendiente."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        rejection_reason = request.data.get('rejection_reason', '')
+        suggestion.status = 'REJECTED'
+        suggestion.reviewed_by = request.user
+        suggestion.reviewed_at = timezone.now()
+        suggestion.rejection_reason = rejection_reason
+        suggestion.save()
+
+        serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TopicContentSuggestionsView(APIView):

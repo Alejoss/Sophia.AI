@@ -14,7 +14,7 @@ urlpatterns = [
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
 
-    path('<int:pk>/', views.UserDetailView.as_view(), name='file-detail'),
+    path('users/<int:pk>/', views.UserDetailView.as_view(), name='user-detail'),
     path('activate_account/', views.activate_account, name="activate_account"),
 
     path('set_jwt_token/', views.set_jwt_token, name="set_jwt_token"),

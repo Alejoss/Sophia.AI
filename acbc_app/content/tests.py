@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from content.models import (
     Library, Collection, Content, ContentProfile, 
-    FileDetails, Topic, Publication, TopicModeratorInvitation
+    FileDetails, Topic, Publication, TopicModeratorInvitation, FileSuggestion
 )
 from django.utils import timezone
 import json
@@ -266,12 +266,17 @@ class ContentAPITests(APITestCase):
             'title': 'New Content',
             'author': 'Test Author',
             'is_visible': True,
-            'is_producer': False
+            'is_producer': False,
+            'has_spanish_subtitles': True,
+            'has_spanish_dubbing': True
         }
         response = self.client.post(url, data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Content.objects.count(), 2)
         self.assertEqual(ContentProfile.objects.count(), 2)
+        uploaded_content = Content.objects.exclude(id=self.content.id).first()
+        self.assertTrue(uploaded_content.has_spanish_subtitles)
+        self.assertTrue(uploaded_content.has_spanish_dubbing)
 
     def test_create_content_profile(self):
         """Test the direct model creation - the API tests are still being debugged"""
@@ -316,6 +321,10 @@ class ContentAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['original_title'], 'Test Content')
+        self.assertIn('has_spanish_subtitles', response.data)
+        self.assertIn('has_spanish_dubbing', response.data)
+        self.assertFalse(response.data['has_spanish_subtitles'])
+        self.assertFalse(response.data['has_spanish_dubbing'])
 
     def test_get_user_content(self):
         """Test retrieving user's content"""
@@ -354,7 +363,7 @@ class ContentAPITests(APITestCase):
         }
         response = self.client.patch(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertIn('You must claim to be the producer to change visibility', response.data['error'])
+        self.assertIn('Debe reclamar ser el productor para cambiar la visibilidad', response.data['error'])
 
     def test_update_content_profile_visibility_with_producer_claim(self):
         """Test that visibility can be changed when claiming to be the producer"""
@@ -392,7 +401,9 @@ class ContentAPITests(APITestCase):
         data = {
             'url': 'https://new-url.com',
             'original_title': 'Updated URL Content',
-            'original_author': 'Updated Author'
+            'original_author': 'Updated Author',
+            'has_spanish_subtitles': True,
+            'has_spanish_dubbing': True
         }
         
         response = self.client.put(update_url, data, format='json')
@@ -403,6 +414,8 @@ class ContentAPITests(APITestCase):
         self.assertEqual(url_content.url, 'https://new-url.com')
         self.assertEqual(url_content.original_title, 'Updated URL Content')
         self.assertEqual(url_content.original_author, 'Updated Author')
+        self.assertTrue(url_content.has_spanish_subtitles)
+        self.assertTrue(url_content.has_spanish_dubbing)
 
     def test_update_content_source_media_type(self):
         """Test updating content media type"""
@@ -440,7 +453,7 @@ class ContentAPITests(APITestCase):
         
         response = self.client.put(update_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('Invalid URL format', response.data['error'])
+        self.assertIn('Formato de URL invalido', response.data['error'])
 
     def test_update_content_not_owner(self):
         """Test that non-owners cannot update content"""
@@ -460,7 +473,51 @@ class ContentAPITests(APITestCase):
         
         response = self.client.put(update_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertIn('You do not have permission to edit this content', response.data['error'])
+        self.assertIn('No tiene permiso para editar este contenido', response.data['error'])
+
+    def test_update_content_source_blocked_when_other_users_depend_on_it(self):
+        """Test source update is blocked when other users also reference the same content."""
+        other_user = User.objects.create_user(
+            username='dependentuser',
+            email='dependent@example.com',
+            password='testpass123'
+        )
+        ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            title='Dependent Profile'
+        )
+
+        update_url = f'/api/content/content_update/{self.content.id}/'
+        data = {
+            'original_title': 'Should Not Update'
+        }
+
+        response = self.client.put(update_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('No se puede cambiar la fuente de este contenido', response.data['error'])
+
+    def test_get_content_detail_library_context_does_not_leak_other_user_profile(self):
+        """Test library context cannot request another user's private content profile."""
+        other_user = User.objects.create_user(
+            username='otherlibraryuser',
+            email='otherlibrary@example.com',
+            password='testpass123'
+        )
+        other_profile = ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            title='Other User Private Title',
+            personal_note='Very private note'
+        )
+
+        detail_url = f'/api/content/content_details/{self.content.id}/?context=library&id={other_user.id}'
+        response = self.client.get(detail_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('selected_profile', response.data)
+        # Should not return the requested other user's profile.
+        self.assertNotEqual(response.data['selected_profile'].get('id'), other_profile.id)
 
     def test_upload_url_content_basic(self):
         """Test basic URL content upload with minimal data."""
@@ -468,7 +525,9 @@ class ContentAPITests(APITestCase):
         data = {
             'url': url,
             'title': 'Test URL Content',
-            'author': 'Test Author'
+            'author': 'Test Author',
+            'has_spanish_subtitles': True,
+            'has_spanish_dubbing': False
         }
 
         response = self.client.post(self.upload_url, data)
@@ -480,6 +539,8 @@ class ContentAPITests(APITestCase):
         self.assertEqual(content.original_title, 'Test URL Content')
         self.assertEqual(content.original_author, 'Test Author')
         self.assertEqual(content.uploaded_by, self.user)
+        self.assertTrue(content.has_spanish_subtitles)
+        self.assertFalse(content.has_spanish_dubbing)
 
         # Verify ContentProfile object
         profile = ContentProfile.objects.get(content=content)
@@ -543,7 +604,7 @@ class ContentAPITests(APITestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
-        self.assertEqual(response.data['error'], 'No file or URL provided')
+        self.assertEqual(response.data['error'], 'No se proporcionó archivo ni URL')
 
         # Test invalid URL format
         response = self.client.post(self.upload_url, {
@@ -552,7 +613,7 @@ class ContentAPITests(APITestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
-        self.assertEqual(response.data['error'], 'Invalid URL format')
+        self.assertEqual(response.data['error'], 'Formato de URL invalido')
 
         # Test both URL and file provided
         with open('test_file.txt', 'w') as f:
@@ -567,7 +628,7 @@ class ContentAPITests(APITestCase):
         
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
-        self.assertEqual(response.data['error'], 'Cannot provide both file and URL')
+        self.assertEqual(response.data['error'], 'No se puede proporcionar tanto archivo como URL')
 
         # Clean up test file
         os.remove('test_file.txt')
@@ -582,7 +643,7 @@ class ContentAPITests(APITestCase):
         self.assertTrue(response.data['can_modify'])
         self.assertEqual(response.data['other_users_count'], 0)
         self.assertTrue(response.data['is_original_uploader'])
-        self.assertEqual(response.data['message'], 'Content can be modified')
+        self.assertEqual(response.data['message'], 'El contenido puede ser modificado')
 
     def test_content_modification_check_with_other_profiles(self):
         """Test the content modification check when other users have the content"""
@@ -606,7 +667,7 @@ class ContentAPITests(APITestCase):
         self.assertFalse(response.data['can_modify'])
         self.assertEqual(response.data['other_users_count'], 1)
         self.assertTrue(response.data['is_original_uploader'])
-        self.assertIn('Cannot change the source of this content because 1 other user(s) have added it to their libraries', response.data['message'])
+        self.assertIn('No se puede cambiar la fuente de este contenido porque 1 otro(s) usuario(s) lo han agregado a sus bibliotecas', response.data['message'])
 
     def test_content_modification_check_not_original_uploader(self):
         """Test the content modification check when user is not the original uploader"""
@@ -982,7 +1043,10 @@ class ContentSourceEditTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['can_modify'])
         self.assertEqual(response.data['other_users_count'], 1)
-        self.assertIn('Cannot change the source of this content because 1 other user(s) have added it to their libraries', response.data['message'])
+        self.assertIn(
+            'No se puede cambiar la fuente de este contenido porque 1 otro(s) usuario(s) lo han agregado a sus bibliotecas',
+            response.data['message']
+        )
 
     def test_content_source_edit_not_original_uploader(self):
         """Test that non-original uploaders cannot modify content"""
@@ -1412,3 +1476,99 @@ class UserTopicsAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['id'], pending_invitation.id)
+
+
+class FileSuggestionAPITests(APITestCase):
+    def setUp(self):
+        self.uploader = User.objects.create_user(
+            username='uploader',
+            email='uploader@example.com',
+            password='testpass123'
+        )
+        self.suggester = User.objects.create_user(
+            username='suggester',
+            email='suggester@example.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='other',
+            email='other@example.com',
+            password='testpass123'
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.uploader,
+            media_type='TEXT',
+            original_title='URL content',
+            url='https://example.com/resource'
+        )
+        self.file_details = FileDetails.objects.create(content=self.content)
+
+    def test_create_file_suggestion_success(self):
+        self.client.force_authenticate(user=self.suggester)
+        url = reverse('content:file-suggestion-create', args=[self.content.id])
+        upload = SimpleUploadedFile('notes.pdf', b'pdf-content', content_type='application/pdf')
+        response = self.client.post(url, {'file': upload, 'message': 'archivo para descargar'}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(FileSuggestion.objects.count(), 1)
+        self.assertEqual(FileSuggestion.objects.first().status, 'PENDING')
+
+    def test_create_file_suggestion_forbidden_for_uploader(self):
+        self.client.force_authenticate(user=self.uploader)
+        url = reverse('content:file-suggestion-create', args=[self.content.id])
+        upload = SimpleUploadedFile('notes.pdf', b'pdf-content', content_type='application/pdf')
+        response = self.client.post(url, {'file': upload}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_accept_file_suggestion_only_uploader(self):
+        suggestion = FileSuggestion.objects.create(
+            content=self.content,
+            suggested_by=self.suggester,
+            file=SimpleUploadedFile('notes.pdf', b'pdf-content', content_type='application/pdf'),
+            file_size=11,
+            status='PENDING'
+        )
+
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('content:file-suggestion-accept', args=[suggestion.id])
+        forbidden_response = self.client.post(url)
+        self.assertEqual(forbidden_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.uploader)
+        ok_response = self.client.post(url)
+        self.assertEqual(ok_response.status_code, status.HTTP_200_OK)
+        suggestion.refresh_from_db()
+        self.file_details.refresh_from_db()
+        self.assertEqual(suggestion.status, 'ACCEPTED')
+        self.assertTrue(bool(self.file_details.file))
+        self.assertEqual(self.content.id, suggestion.content_id)
+        self.assertEqual(self.content.url, 'https://example.com/resource')
+
+    def test_list_file_suggestions_visibility(self):
+        own = FileSuggestion.objects.create(
+            content=self.content,
+            suggested_by=self.suggester,
+            file=SimpleUploadedFile('a.pdf', b'a', content_type='application/pdf'),
+            status='PENDING'
+        )
+        other = FileSuggestion.objects.create(
+            content=self.content,
+            suggested_by=self.other_user,
+            file=SimpleUploadedFile('b.pdf', b'b', content_type='application/pdf'),
+            status='PENDING'
+        )
+
+        list_url = reverse('content:file-suggestion-list', args=[self.content.id])
+
+        self.client.force_authenticate(user=self.suggester)
+        suggester_response = self.client.get(list_url)
+        self.assertEqual(suggester_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(suggester_response.data), 1)
+        self.assertEqual(suggester_response.data[0]['id'], own.id)
+
+        self.client.force_authenticate(user=self.uploader)
+        uploader_response = self.client.get(list_url)
+        self.assertEqual(uploader_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(uploader_response.data), 2)
+        returned_ids = {item['id'] for item in uploader_response.data}
+        self.assertIn(own.id, returned_ids)
+        self.assertIn(other.id, returned_ids)

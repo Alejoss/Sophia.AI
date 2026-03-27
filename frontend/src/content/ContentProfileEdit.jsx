@@ -35,6 +35,8 @@ const ContentProfileEdit = () => {
         is_visible: true,
         is_producer: false,
     });
+    const [thumbnailFile, setThumbnailFile] = useState(null);
+    const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [error, setError] = useState('');
     const { authState } = useContext(AuthContext);
@@ -61,6 +63,12 @@ const ContentProfileEdit = () => {
                     is_visible: profile?.is_visible ?? true,
                     is_producer: profile?.is_producer ?? false,
                 });
+
+                // Thumbnail preview: first use the user's existing thumbnail, then fallback to og_image.
+                setThumbnailFile(null);
+                setThumbnailPreviewUrl(
+                    profile?.thumbnail || data.file_details?.og_image || null
+                );
             } catch (err) {
                 setError('Error al cargar el contenido');
                 console.error(err);
@@ -83,7 +91,21 @@ const ContentProfileEdit = () => {
                 setError('No se encontró el perfil de contenido');
                 return;
             }
-            await contentApi.updateContentProfile(content.selected_profile.id, formData);
+
+            // If the user selected a new thumbnail, send multipart/form-data.
+            if (thumbnailFile) {
+                const fd = new FormData();
+                fd.append('title', formData.title ?? '');
+                fd.append('author', formData.author ?? '');
+                fd.append('personal_note', formData.personal_note ?? '');
+                fd.append('is_visible', String(!!formData.is_visible));
+                fd.append('is_producer', String(!!formData.is_producer));
+                fd.append('thumbnail', thumbnailFile);
+                await contentApi.updateContentProfile(content.selected_profile.id, fd);
+            } else {
+                await contentApi.updateContentProfile(content.selected_profile.id, formData);
+            }
+
             navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`);
         } catch (err) {
             if (err.response?.data?.error?.includes('producer')) {
@@ -113,13 +135,24 @@ const ContentProfileEdit = () => {
                 <Typography variant="h4" gutterBottom>
                     Editar perfil de contenido
                 </Typography>
-                <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => navigate(`/content/${contentId}/source-edit`)}
-                >
-                    Editar fuente del contenido
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    {content?.can_suggest_file && (
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
+                        >
+                            Sugerir archivo
+                        </Button>
+                    )}
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => navigate(`/content/${contentId}/source-edit`)}
+                    >
+                        Editar fuente del contenido
+                    </Button>
+                </Box>
             </Box>
 
             {error && (
@@ -144,6 +177,76 @@ const ContentProfileEdit = () => {
                             />
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                 Subido: {formatDate(content.created_at)}
+                            </Typography>
+                        </Box>
+
+                        {/* Thumbnail editor */}
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                                Miniatura (thumbnail)
+                            </Typography>
+
+                            {thumbnailPreviewUrl ? (
+                                <Box
+                                    sx={{
+                                        width: "100%",
+                                        maxWidth: 320,
+                                        height: 160,
+                                        borderRadius: 1,
+                                        overflow: "hidden",
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        bgcolor: "grey.50",
+                                        mb: 1,
+                                    }}
+                                >
+                                    <img
+                                        src={thumbnailPreviewUrl}
+                                        alt="Miniatura actual"
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                            display: "block",
+                                        }}
+                                    />
+                                </Box>
+                            ) : (
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    No hay miniatura disponible.
+                                </Typography>
+                            )}
+
+                            <Button
+                                variant="outlined"
+                                component="label"
+                                size="small"
+                                sx={{ textTransform: "none" }}
+                            >
+                                Cambiar miniatura
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    hidden
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        // Revoke previous blob preview (if any) to avoid memory leaks.
+                                        setThumbnailFile(file);
+                                        if (
+                                            typeof thumbnailPreviewUrl === "string" &&
+                                            thumbnailPreviewUrl.startsWith("blob:")
+                                        ) {
+                                            URL.revokeObjectURL(thumbnailPreviewUrl);
+                                        }
+                                        setThumbnailPreviewUrl(URL.createObjectURL(file));
+                                    }}
+                                />
+                            </Button>
+
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                Se reemplazará la miniatura actual de este contenido.
                             </Typography>
                         </Box>
 

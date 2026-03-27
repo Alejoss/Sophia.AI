@@ -223,14 +223,12 @@ const Home = () => {
         <Box
           sx={{
             position: 'relative',
-            width: '100vw',
-            left: '50%',
-            right: '50%',
-            marginLeft: 'calc(-50vw + 1rem)',
-            marginRight: 'calc(-50vw + 1rem)',
+            width: 'calc(100% + 2rem)',
+            marginLeft: '-1rem',
+            marginRight: '-1rem',
             minHeight: { xs: 280, md: 320 },
             mb: { xs: 6, md: 8 },
-            overflow: 'hidden',
+            overflowX: 'clip',
             backgroundImage: 'url(/images/apoyar_proyecto_background.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -585,13 +583,11 @@ const Home = () => {
       <Box
         sx={{
           position: 'relative',
-          width: '100vw',
-          left: '50%',
-          right: '50%',
-          marginLeft: 'calc(-50vw + 1rem)',
-          marginRight: 'calc(-50vw + 1rem)',
+          width: 'calc(100% + 2rem)',
+          marginLeft: '-1rem',
+          marginRight: '-1rem',
           mb: { xs: 4, md: 6 },
-          overflow: 'hidden',
+          overflowX: 'clip',
         }}
       >
         <Box sx={{ position: 'relative', width: '100%' }}>

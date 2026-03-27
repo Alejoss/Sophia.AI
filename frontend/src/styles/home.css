@@ -8,15 +8,13 @@
 /* Compensates for .main-content padding-top but leaves space for header */
 .home-hero-section {
   position: relative;
-  width: 100vw;
-  left: 50%;
-  right: 50%;
-  margin-left: calc(-50vw + 1rem);
-  margin-right: calc(-50vw + 1rem);
+  width: calc(100% + 2rem);
+  margin-left: -1rem;
+  margin-right: -1rem;
   margin-top: -60px; /* Partially compensate for .main-content padding-top, leaving space for header */
   min-height: 60vh;
   margin-bottom: 2rem;
-  overflow: hidden;
+  overflow-x: clip;
   display: flex;
   align-items: center;
   justify-content: center;

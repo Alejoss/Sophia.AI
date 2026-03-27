@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from content.models import Content, Topic
 from gamification.models import Badge, UserBadge
 from profiles.email_service import EmailService, EmailServiceError, EmailValidationError, EmailConfigurationError
@@ -478,7 +479,7 @@ class AuthenticationTests(APITestCase):
         self.assertTrue(response.data['is_authenticated'])
 
     def test_check_auth_authenticated_via_cookie(self):
-        """Test authentication check for user authenticated via JWT cookie."""
+        """Test check_auth with refresh cookie but without active access session."""
         # Step 1: Log in to get the cookie
         login_url = reverse('profiles:login')
         login_data = {
@@ -493,7 +494,27 @@ class AuthenticationTests(APITestCase):
         check_auth_url = reverse('profiles:check_auth')
         auth_response = self.client.get(check_auth_url)
         self.assertEqual(auth_response.status_code, status.HTTP_200_OK)
-        self.assertTrue(auth_response.data['is_authenticated'])
+        self.assertFalse(auth_response.data['is_authenticated'])
+        self.assertEqual(auth_response.data['reason'], 'refresh_token_present_requires_refresh')
+
+    def test_login_rate_limit_blocks_after_20_failed_attempts(self):
+        """Test login rate limiting blocks requests after 20 failed attempts."""
+        login_url = reverse('profiles:login')
+        cache_key = 'login_attempts_127.0.0.1'
+        cache.delete(cache_key)
+
+        for _ in range(20):
+            response = self.client.post(login_url, {
+                'username': self.user_data['username'],
+                'password': 'wrong-password'
+            }, format='json')
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        blocked_response = self.client.post(login_url, {
+            'username': self.user_data['username'],
+            'password': 'wrong-password'
+        }, format='json')
+        self.assertEqual(blocked_response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
     def test_logout(self):
         """Test user logout"""
@@ -567,6 +588,8 @@ class TokenRefreshTest(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertIn('access_token', response.data)
+        if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS'):
+            self.assertIn(settings.SIMPLE_JWT['REFRESH_COOKIE'], response.cookies)
         
         # Verify the new access token is valid
         new_token = response.data['access_token']

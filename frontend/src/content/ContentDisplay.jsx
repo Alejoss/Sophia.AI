@@ -50,6 +50,8 @@ const ContentDisplay = ({
   showTitle = true,
   additionalActions,
   topicId = null,
+  showSuggestFileButton = false,
+  onSuggestFile = null,
 }) => {
   const [renderError, setRenderError] = useState(null);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -76,6 +78,13 @@ const ContentDisplay = ({
   const fileDetails = contentData.file_details;
   const url = contentData.url || fileDetails?.url;
   const favicon = contentData.favicon;
+  const downloadableFileUrl = fileDetails?.file
+    ? resolveMediaUrl(fileDetails.url ?? fileDetails.file)
+    : null;
+  const selectedProfileThumbnail = content?.selected_profile?.thumbnail;
+  const previewProfileThumbnail = content?.thumbnail;
+  const customThumbnail = selectedProfileThumbnail || previewProfileThumbnail;
+  const hasFileAvailable = Boolean(contentData?.has_file_available || fileDetails?.file);
 
   // Debug logging for preview mode (moved after variable declarations)
   if (variant === "preview") {
@@ -170,8 +179,9 @@ const ContentDisplay = ({
     const isClickable = fileUrl || url;
 
     switch (mediaTypeUpper) {
-      case "IMAGE":
-        if (!fileUrl) {
+      case "IMAGE": {
+        const thumbUrl = customThumbnail || fileUrl;
+        if (!thumbUrl) {
           console.warn("No file URL found for image content:", contentData);
           return (
             <Box
@@ -216,7 +226,7 @@ const ContentDisplay = ({
             title={isClickable ? "Haz clic para abrir la imagen en una nueva pestaña" : undefined}
           >
             <img
-              src={fileUrl}
+              src={thumbUrl}
               alt={title || contentData.original_title || "Content image"}
               style={{
                 maxWidth: "100%",
@@ -226,7 +236,7 @@ const ContentDisplay = ({
               onError={(e) => {
                 console.error(
                   "Image failed to load in detailed mode:",
-                  fileUrl
+                  thumbUrl
                 );
                 e.target.style.display = "none";
                 e.target.nextSibling.style.display = "flex";
@@ -247,8 +257,42 @@ const ContentDisplay = ({
             </Box>
           </Box>
         );
+      }
       case "VIDEO":
-        if (!fileUrl) {
+        if (!fileUrl || !fileDetails?.file) {
+          const thumbUrl = customThumbnail || fileDetails?.og_image;
+          if (thumbUrl) {
+            return (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  width: "100%",
+                  height: 200,
+                  bgcolor: "grey.100",
+                  borderRadius: 0.5,
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <img
+                  src={thumbUrl}
+                  alt="Content thumbnail"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    console.error("Thumbnail failed to load in detailed mode:", thumbUrl);
+                    e.target.style.display = "none";
+                  }}
+                />
+              </Box>
+            );
+          }
           return (
             <Box
               sx={{
@@ -291,7 +335,40 @@ const ContentDisplay = ({
           </Box>
         );
       case "AUDIO":
-        if (!fileUrl) {
+        if (!fileUrl || !fileDetails?.file) {
+          const thumbUrl = customThumbnail || fileDetails?.og_image;
+          if (thumbUrl) {
+            return (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  width: "100%",
+                  height: 100,
+                  bgcolor: "grey.100",
+                  borderRadius: 0.5,
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <img
+                  src={thumbUrl}
+                  alt="Content thumbnail"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    console.error("Thumbnail failed to load in detailed mode:", thumbUrl);
+                    e.target.style.display = "none";
+                  }}
+                />
+              </Box>
+            );
+          }
           return (
             <Box
               sx={{
@@ -632,6 +709,30 @@ const ContentDisplay = ({
                 </Stack>
               </Box>
             )}
+
+            {(contentData.has_spanish_subtitles || contentData.has_spanish_dubbing) && (
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  Accesibilidad en español
+                </Typography>
+                <Stack spacing={1}>
+                  {contentData.has_spanish_subtitles && (
+                    <Typography variant="body2" color="text.primary">
+                      Subtitulado en español
+                    </Typography>
+                  )}
+                  {contentData.has_spanish_dubbing && (
+                    <Typography variant="body2" color="text.primary">
+                      Doblado al español
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            )}
           </Box>
         </Box>
       );
@@ -925,12 +1026,28 @@ const ContentDisplay = ({
                 }}
               >
                 {(() => {
-                  // Priority order: 1) file image, 2) og_image, 3) favicon, 4) media type icon
+                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image, 4) favicon, 5) media type icon
 
                   // 1. Check if content has a file that is an image
                   const isImage =
                     contentData.media_type?.toUpperCase() === "IMAGE";
                   const hasImageFile = isImage && fileDetails?.file;
+
+                  // 0. Check for user-defined thumbnail (ContentProfile)
+                  if (customThumbnail && !imageLoadError) {
+                    return (
+                      <img
+                        src={customThumbnail}
+                        alt="Content thumbnail"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={() => setImageLoadError(true)}
+                      />
+                    );
+                  }
 
                   if (hasImageFile) {
                     const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
@@ -1107,6 +1224,24 @@ const ContentDisplay = ({
                     />
                   )}
 
+                  {contentData.has_spanish_subtitles && (
+                    <Chip
+                      label="Subtitulado en español"
+                      size="small"
+                      variant="outlined"
+                      color="success"
+                    />
+                  )}
+
+                  {contentData.has_spanish_dubbing && (
+                    <Chip
+                      label="Doblado al español"
+                      size="small"
+                      variant="outlined"
+                      color="success"
+                    />
+                  )}
+
                   {/* Site Name for URLs */}
                   {fileDetails?.og_site_name && (
                     <Chip
@@ -1247,12 +1382,28 @@ const ContentDisplay = ({
                 }}
               >
                 {(() => {
-                  // Priority order: 1) file image, 2) og_image, 3) favicon, 4) media type icon
+                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image, 4) favicon, 5) media type icon
 
                   // 1. Check if content has a file that is an image
                   const isImage =
                     contentData.media_type?.toUpperCase() === "IMAGE";
                   const hasImageFile = isImage && fileDetails?.file;
+
+                  // 0. Check for user-defined thumbnail (ContentProfile)
+                  if (customThumbnail && !imageLoadError) {
+                    return (
+                      <img
+                        src={customThumbnail}
+                        alt="Content thumbnail"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={() => setImageLoadError(true)}
+                      />
+                    );
+                  }
 
                   if (hasImageFile) {
                     const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
@@ -1389,6 +1540,20 @@ const ContentDisplay = ({
                     />
                   )}
                 </Box>
+                {downloadableFileUrl && (
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(downloadableFileUrl, "_blank");
+                      }}
+                    >
+                      Descargar archivo
+                    </Button>
+                  </Box>
+                )}
                 {contentData.vote_count !== undefined && topicId && (
                   <Box sx={{ display: "flex", alignItems: "center", mt: 2 }} onClick={(e) => e.stopPropagation()}>
                     <VoteComponent
@@ -1484,6 +1649,20 @@ const ContentDisplay = ({
               </Box>
 
               {renderContentByType()}
+
+              {!hasFileAvailable && showSuggestFileButton && onSuggestFile && (
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSuggestFile();
+                    }}
+                  >
+                    Sugerir archivo
+                  </Button>
+                </Box>
+              )}
 
               {/* Personal Note */}
               {profile?.personal_note && (

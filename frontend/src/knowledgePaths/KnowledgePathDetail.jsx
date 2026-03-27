@@ -481,7 +481,10 @@ const KnowledgePathDetail = () => {
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap', gap: 1.5 }}>
               <Box
                 sx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.95)',
+                  bgcolor: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(18, 18, 18, 0.9)'
+                      : 'rgba(255, 255, 255, 0.95)',
                   borderRadius: 2,
                   p: 0.5,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
@@ -494,7 +497,10 @@ const KnowledgePathDetail = () => {
               </Box>
               <Box
                 sx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.95)',
+                  bgcolor: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(18, 18, 18, 0.9)'
+                      : 'rgba(255, 255, 255, 0.95)',
                   borderRadius: 2,
                   p: 0.5,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.2)',

@@ -29,9 +29,9 @@ const Notifications = ({
       return notification.description;
     } else if (notification.verb === 'rechazó tu solicitud de certificado para') {
       return notification.description;
-    } else if (notification.verb === 'votó positivamente tu contenido') {
+    } else if (notification.verb === 'votó a favor de tu contenido') {
       return notification.description;
-    } else if (notification.verb === 'votó positivamente tu camino de conocimiento') {
+    } else if (notification.verb === 'votó a favor de tu camino de conocimiento') {
       return notification.description;
     } else if (notification.verb === 'se registró en tu evento') {
       return notification.description;

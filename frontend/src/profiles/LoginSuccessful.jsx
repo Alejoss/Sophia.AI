@@ -4,7 +4,9 @@ import {
   Box, 
   Typography,
   Fade,
-  Grow
+  Grow,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { 
   School as SchoolIcon,
@@ -15,6 +17,8 @@ import { AuthContext } from '../context/AuthContext';
 const LoginSuccessful = () => {
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState(null);
   const [isReturningUser, setIsReturningUser] = useState(false);
@@ -74,9 +78,10 @@ const LoginSuccessful = () => {
 
   return (
     <Box sx={{ 
-      height: '100vh',
+      height: '100dvh',
       width: '100vw',
       display: 'flex',
+      flexDirection: { xs: 'column', md: 'row' },
       position: 'fixed',
       top: 0,
       left: 0,
@@ -89,18 +94,29 @@ const LoginSuccessful = () => {
         <Fade in={!loading} timeout={800}>
           <Box sx={{
             position: 'absolute',
-            top: 100,
+            top: { xs: 78, sm: 88, md: 100 },
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 1100,
             textAlign: 'center',
             bgcolor: 'rgba(255, 255, 255, 0.95)',
-            px: 4,
-            py: 2,
+            width: { xs: 'calc(100% - 24px)', sm: 'auto' },
+            maxWidth: { xs: 360, sm: 520 },
+            px: { xs: 2, sm: 4 },
+            py: { xs: 1.5, sm: 2 },
             borderRadius: 3,
             boxShadow: 3
           }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary' }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 600,
+                color: 'text.primary',
+                fontSize: { xs: '1.05rem', sm: '1.25rem', md: '1.5rem' },
+                lineHeight: 1.3,
+                overflowWrap: 'anywhere'
+              }}
+            >
               {isReturningUser 
                 ? (
                   <>
@@ -156,9 +172,11 @@ const LoginSuccessful = () => {
               cursor: 'pointer',
               overflow: 'hidden',
               transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: hovered === section.id ? 'scale(1.02)' : 'scale(1)',
+              minHeight: { xs: '50dvh', md: '100dvh' },
+              transform: !isMobile && hovered === section.id ? 'scale(1.02)' : 'scale(1)',
               zIndex: 1,
-              borderRight: index === 0 ? '4px solid rgba(255, 255, 255, 0.3)' : 'none',
+              borderRight: { xs: 'none', md: index === 0 ? '4px solid rgba(255, 255, 255, 0.3)' : 'none' },
+              borderBottom: { xs: index === 0 ? '3px solid rgba(255, 255, 255, 0.28)' : 'none', md: 'none' },
               '&::before': {
                 content: '""',
                 position: 'absolute',
@@ -171,7 +189,7 @@ const LoginSuccessful = () => {
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: hovered === section.id ? 'scale(1.1)' : 'scale(1)',
+                transform: !isMobile && hovered === section.id ? 'scale(1.1)' : 'scale(1)',
                 zIndex: 0
               },
             }}
@@ -187,10 +205,10 @@ const LoginSuccessful = () => {
                 justifyContent: 'center',
                 alignItems: 'center',
                 color: 'white',
-                px: 4,
+                px: { xs: 1.5, sm: 2.5, md: 4 },
                 textAlign: 'center',
                 transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: hovered === section.id ? 'translateY(-10px)' : 'translateY(0)'
+                transform: !isMobile && hovered === section.id ? 'translateY(-10px)' : 'translateY(0)'
               }}
             >
               <Typography
@@ -198,15 +216,19 @@ const LoginSuccessful = () => {
                 component="h2"
                 sx={{
                   fontWeight: 700,
-                  mb: 2,
+                  mb: { xs: 1.25, sm: 1.5, md: 2 },
                   textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
-                  fontSize: { xs: '2rem', md: '3rem', lg: '4rem' },
+                  fontSize: section.id === 'knowledge-paths'
+                    ? { xs: '1.1rem', sm: '2rem', md: '3rem', lg: '4rem' }
+                    : { xs: '1.35rem', sm: '2rem', md: '3rem', lg: '4rem' },
+                  lineHeight: 1.2,
                   bgcolor: 'rgba(255, 255, 255, 0.05)',
                   backdropFilter: 'blur(10px)',
-                  px: 3,
-                  py: 1.5,
+                  px: { xs: 1.25, sm: 2.25, md: 3 },
+                  py: { xs: 0.75, sm: 1.2, md: 1.5 },
                   borderRadius: 2,
-                  display: 'inline-block'
+                  display: 'inline-block',
+                  maxWidth: { xs: '95%', sm: '90%' }
                 }}
               >
                 {section.title}
@@ -214,14 +236,15 @@ const LoginSuccessful = () => {
               <Typography
                 variant="h6"
                 sx={{
-                  opacity: hovered === section.id ? 1 : 0.9,
+                  opacity: !isMobile && hovered === section.id ? 1 : 0.95,
                   textShadow: '1px 1px 4px rgba(0, 0, 0, 0.5)',
-                  fontSize: { xs: '1rem', md: '1.25rem' },
-                  maxWidth: '400px',
+                  fontSize: { xs: '0.9rem', sm: '1rem', md: '1.25rem' },
+                  lineHeight: 1.35,
+                  maxWidth: { xs: 230, sm: 320, md: 400 },
                   bgcolor: 'rgba(0, 0, 0, 0.4)',
                   backdropFilter: 'blur(10px)',
-                  px: 2,
-                  py: 1,
+                  px: { xs: 1.25, sm: 1.75, md: 2 },
+                  py: { xs: 0.7, sm: 0.9, md: 1 },
                   borderRadius: 2,
                   display: 'inline-block',
                   color: 'white'

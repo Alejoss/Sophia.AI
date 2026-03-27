@@ -108,7 +108,7 @@ const AppContent = () => {
               <Route path="collections/:collectionId/edit" element={<CollectionEditContent />} />
               <Route path="create_topic" element={<ProtectedRoute><TopicCreationForm /></ProtectedRoute>} />
               <Route path="topics/:topicId/edit" element={<ProtectedRoute><TopicEdit /></ProtectedRoute>} />
-              <Route path="topics" element={<ProtectedRoute><TopicList /></ProtectedRoute>} />
+              <Route path="topics" element={<TopicList />} />
               <Route path="topics/:topicId/add-content" element={<ProtectedRoute><TopicAddContent /></ProtectedRoute>} />
               <Route path="topics/:topicId/edit-content" element={<ProtectedRoute><TopicEditContent /></ProtectedRoute>} />
               <Route path="topics/:topicId" element={<ProtectedRoute><TopicDetail /></ProtectedRoute>} />
@@ -118,12 +118,12 @@ const AppContent = () => {
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />
-              <Route path=":contentId/edit" element={<ContentProfileEdit />} />
-              <Route path=":contentId/source-edit" element={<ContentSourceEdit />} />
+              <Route path=":contentId/edit" element={<ProtectedRoute><ContentProfileEdit /></ProtectedRoute>} />
+              <Route path=":contentId/source-edit" element={<ProtectedRoute><ContentSourceEdit /></ProtectedRoute>} />
               <Route path="library_upload_content" element={<LibraryUploadContent />} />
             </Route>
             <Route path="knowledge_path">
-              <Route path="" element={<ProtectedRoute><KnowledgePathList /></ProtectedRoute>} />
+              <Route path="" element={<KnowledgePathList />} />
               <Route path=":pathId" element={<ProtectedRoute><KnowledgePathDetail /></ProtectedRoute>} />
               <Route path="create" element={<ProtectedRoute><KnowledgePathCreationForm /></ProtectedRoute>} />
               <Route path=":pathId/edit" element={<ProtectedRoute><KnowledgePathEdit /></ProtectedRoute>} />
@@ -158,13 +158,13 @@ const AppContent = () => {
 
           {/* Unified Profile pages with full-width layout */}
           <Route element={<ProfilePageLayout />}>
-            <Route path="profiles/my_profile" element={<Profile />} />
-            <Route path="profiles/my_profile/edit" element={<EditProfile />} />
-            <Route path="profiles/user_profile/:profileId" element={<Profile />} />
-            <Route path="profiles/profile_certificates" element={<Certificates />} />
-            <Route path="profiles/certificate-requests" element={<CertificateRequests />} />
-            <Route path="profiles/my_events" element={<UserEvents />} />
-            <Route path="profiles/profile_bookmarks" element={<Bookmarks />} />
+            <Route path="profiles/my_profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="profiles/my_profile/edit" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+            <Route path="profiles/user_profile/:profileId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="profiles/profile_certificates" element={<ProtectedRoute><Certificates /></ProtectedRoute>} />
+            <Route path="profiles/certificate-requests" element={<ProtectedRoute><CertificateRequests /></ProtectedRoute>} />
+            <Route path="profiles/my_events" element={<ProtectedRoute><UserEvents /></ProtectedRoute>} />
+            <Route path="profiles/profile_bookmarks" element={<ProtectedRoute><Bookmarks /></ProtectedRoute>} />
           </Route>
           </Routes>
         </AuthProvider>

@@ -9,6 +9,7 @@ const NewsletterSubscribe = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const heroBoxBg = isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.77)';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,24 +41,41 @@ const NewsletterSubscribe = () => {
   return (
     <Box
       sx={{
+        position: 'relative',
         minHeight: '100vh',
-        bgcolor: 'background.default',
+        backgroundImage: "url('/images/unirme_background.jpg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         py: { xs: 4, md: 6 },
       }}
     >
-      <Container maxWidth="sm">
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.35)',
+          zIndex: 1,
+        }}
+      />
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
         <Box
           sx={{
+            mx: 'auto',
+            maxWidth: 720,
             borderRadius: 2,
             border: '1px solid',
             borderColor: 'divider',
-            bgcolor: 'background.paper',
+            bgcolor: heroBoxBg,
             boxShadow: 2,
-            px: { xs: 3, md: 4 },
-            py: { xs: 3, md: 4 },
+            px: { xs: 2, md: 4 },
+            py: { xs: 2.5, md: 3 },
           }}
         >
           <Typography
@@ -70,7 +88,7 @@ const NewsletterSubscribe = () => {
               fontSize: { xs: '1.7rem', md: '2rem' },
             }}
           >
-            Suscríbete a la newsletter
+            Únete a la comunidad
           </Typography>
 
           <Typography
@@ -82,8 +100,10 @@ const NewsletterSubscribe = () => {
               lineHeight: 1.6,
             }}
           >
-            Déjanos tu email y te avisaremos cuando lancemos nuevos contenidos, formaciones y
-            novedades de Academia Blockchain.
+            Déjanos tu email y te mantendremos al tanto del avance del proyecto, las novedades de
+            Academia Blockchain y documentales clave. También podrás sumarte a investigaciones de
+            código abierto, conectar con una comunidad de estudio y compartir, junto a nosotros, la
+            construcción de esta plataforma revolucionaria.
           </Typography>
 
           <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

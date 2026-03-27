@@ -93,7 +93,9 @@ const KnowledgePathEdit = () => {
   const statusChips = useMemo(() => {
     const chips = [];
     chips.push(
-      isVisible ? { label: "Público", color: "success", icon: <VisibilityIcon fontSize="small" /> } : { label: "Privado", color: "default", icon: <VisibilityOffIcon fontSize="small" /> }
+      isVisible
+        ? { label: "Público", color: "success", icon: <VisibilityIcon fontSize="small" /> }
+        : { label: "Privado", color: "error", icon: <VisibilityOffIcon fontSize="small" /> }
     );
     return chips;
   }, [isVisible, canBePublic]);
@@ -487,7 +489,23 @@ const KnowledgePathEdit = () => {
             )}
             <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
               {statusChips.map((c) => (
-                <Chip key={c.label} icon={c.icon} label={c.label} color={c.color} size="small" variant={c.color === "default" ? "outlined" : "filled"} />
+                <Chip
+                  key={c.label}
+                  icon={c.icon}
+                  label={c.label}
+                  color={c.color}
+                  size="small"
+                  variant={c.label === "Privado" ? "outlined" : (c.color === "default" ? "outlined" : "filled")}
+                  sx={
+                    c.label === "Privado"
+                      ? {
+                          color: "error.main",
+                          borderColor: "error.main",
+                          "& .MuiChip-icon": { color: "error.main" },
+                        }
+                      : undefined
+                  }
+                />
               ))}
               <Typography variant="caption" color="text.secondary">
                 {knowledgePath?.author ? `Autor: ${knowledgePath.author}` : ""}

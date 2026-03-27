@@ -218,6 +218,8 @@ const createSchema = () => yup.object({
   }),
   title: yup.string().max(255, 'El título no debe exceder 255 caracteres'),
   author: yup.string().max(255, 'El autor no debe exceder 255 caracteres'),
+  has_spanish_subtitles: yup.boolean(),
+  has_spanish_dubbing: yup.boolean(),
   is_producer: yup.boolean(),
   is_visible: yup.boolean(),
   isUrlMode: yup.boolean()
@@ -263,6 +265,8 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     defaultValues: {
       title: initialData?.title || '',
       author: initialData?.author || '',
+      has_spanish_subtitles: initialData?.has_spanish_subtitles || false,
+      has_spanish_dubbing: initialData?.has_spanish_dubbing || false,
       is_producer: false,
       is_visible: true,
       isUrlMode: initialIsUrlMode,
@@ -323,6 +327,8 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       setValue('author', initialData.author || '');
       setValue('media_type', initialData.media_type || '');
       setValue('url', initialData.url || '');
+      setValue('has_spanish_subtitles', initialData.has_spanish_subtitles || false);
+      setValue('has_spanish_dubbing', initialData.has_spanish_dubbing || false);
       
       console.log('Form values set:', {
         title: initialData.title || '',
@@ -464,6 +470,8 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
               media_type: mediaType,
               title: data.title || '',
               author: data.author || '',
+              has_spanish_subtitles: data.has_spanish_subtitles ?? false,
+              has_spanish_dubbing: data.has_spanish_dubbing ?? false,
               personalNote: '',
               is_visible: true,
               is_producer: false
@@ -502,7 +510,9 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             media_type: data.media_type,
             original_title: data.title || '',
             original_author: data.author || '',
-            url: data.url
+            url: data.url,
+            has_spanish_subtitles: data.has_spanish_subtitles ?? false,
+            has_spanish_dubbing: data.has_spanish_dubbing ?? false
           };
           
           console.log('Update data being sent to API:', updateData);
@@ -533,6 +543,8 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
           formData.append('is_visible', 'true');
           formData.append('title', data.title || '');
           formData.append('author', data.author || '');
+          formData.append('has_spanish_subtitles', String(data.has_spanish_subtitles ?? false));
+          formData.append('has_spanish_dubbing', String(data.has_spanish_dubbing ?? false));
           if (previewData) {
             formData.append('og_description', previewData.description || '');
             formData.append('og_image', previewData.image || '');
@@ -554,6 +566,8 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
               media_type: mediaType,
               title: data.title || '',
               author: data.author || '',
+              has_spanish_subtitles: data.has_spanish_subtitles ?? false,
+              has_spanish_dubbing: data.has_spanish_dubbing ?? false,
               personalNote: data.personalNote,
               is_visible: data.is_visible ?? true,
               is_producer: data.is_producer ?? false
@@ -614,17 +628,23 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
     const currentAuthor = watch('author');
     const currentUrl = watch('url');
     const currentMediaType = watch('media_type');
+    const currentHasSpanishSubtitles = watch('has_spanish_subtitles');
+    const currentHasSpanishDubbing = watch('has_spanish_dubbing');
     
     console.log('Values to preserve:', {
       currentTitle,
       currentAuthor,
       currentUrl,
-      currentMediaType
+      currentMediaType,
+      currentHasSpanishSubtitles,
+      currentHasSpanishDubbing
     });
     
     reset({
       title: currentTitle || '',
       author: currentAuthor || '',
+      has_spanish_subtitles: !!currentHasSpanishSubtitles,
+      has_spanish_dubbing: !!currentHasSpanishDubbing,
       is_producer: false,
       is_visible: true,
       isUrlMode: newMode,
@@ -958,6 +978,35 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
             </FormControl>
           </>
         )}
+
+        <Box sx={{ mb: 3 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={watch('has_spanish_subtitles')}
+                onChange={(e) => {
+                  setValue('has_spanish_subtitles', e.target.checked);
+                  setHasSavedSuccessfully(false);
+                }}
+                {...register('has_spanish_subtitles')}
+              />
+            }
+            label="Tiene subtítulos en español"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={watch('has_spanish_dubbing')}
+                onChange={(e) => {
+                  setValue('has_spanish_dubbing', e.target.checked);
+                  setHasSavedSuccessfully(false);
+                }}
+                {...register('has_spanish_dubbing')}
+              />
+            }
+            label="Está doblado al español"
+          />
+        </Box>
 
         {/* Producer and Visibility Options - Only for File Upload */}
         {!isUrlMode && (

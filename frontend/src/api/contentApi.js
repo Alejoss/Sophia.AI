@@ -119,7 +119,9 @@ const contentApi = {
                 author: metadata.author,
                 personalNote: metadata.personalNote,
                 is_visible: metadata.is_visible,
-                is_producer: metadata.is_producer
+                is_producer: metadata.is_producer,
+                has_spanish_subtitles: metadata.has_spanish_subtitles,
+                has_spanish_dubbing: metadata.has_spanish_dubbing
             });
             await contentApi.uploadFileToS3(file, presignData.upload_url, onProgress);
             const result = await contentApi.uploadContentConfirm(presignData.key, {
@@ -129,6 +131,8 @@ const contentApi = {
                 personalNote: metadata.personalNote,
                 is_visible: metadata.is_visible,
                 is_producer: metadata.is_producer,
+                has_spanish_subtitles: metadata.has_spanish_subtitles,
+                has_spanish_dubbing: metadata.has_spanish_dubbing,
                 file_size: file.size
             });
             console.log('[S3 upload] Flow complete, content_id:', result?.content_id);
@@ -144,6 +148,8 @@ const contentApi = {
                 formData.append('personalNote', metadata.personalNote || '');
                 formData.append('is_visible', String(metadata.is_visible ?? true));
                 formData.append('is_producer', String(metadata.is_producer ?? false));
+                formData.append('has_spanish_subtitles', String(metadata.has_spanish_subtitles ?? false));
+                formData.append('has_spanish_dubbing', String(metadata.has_spanish_dubbing ?? false));
                 const fallbackResult = await contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
                 console.log('[S3 upload] FormData fallback OK, content_id:', fallbackResult?.content_id);
                 return fallbackResult;
@@ -718,6 +724,57 @@ const contentApi = {
         }
     },
 
+    // File Suggestions API methods (URL -> optional file attachment)
+    createFileSuggestion: async (contentId, formData) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/file-suggestions/`,
+                formData
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error creating file suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    listFileSuggestions: async (contentId) => {
+        try {
+            const response = await axiosInstance.get(
+                `/content/content/${contentId}/file-suggestions/list/`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error listing file suggestions:', error.response || error);
+            throw error;
+        }
+    },
+
+    acceptFileSuggestion: async (suggestionId) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/file-suggestions/${suggestionId}/accept/`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error accepting file suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    rejectFileSuggestion: async (suggestionId, rejectionReason = '') => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/file-suggestions/${suggestionId}/reject/`,
+                { rejection_reason: rejectionReason }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error rejecting file suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
     createContentProfile: async (contentId, profileData) => {
         try {
             const response = await axiosInstance.post(`/content/content-profiles/`, {
@@ -770,9 +827,20 @@ const contentApi = {
                 throw new Error('Error al obtener los datos de la URL');
             }
 
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('text/html')) {
-                throw new Error('La URL debe apuntar a una página web');
+            const contentType = (response.headers.get('content-type') || '').toLowerCase();
+            if (contentType.includes('application/pdf')) {
+                const parsedUrl = new URL(url);
+                const fileName = decodeURIComponent(parsedUrl.pathname.split('/').pop() || 'Documento PDF');
+                return {
+                    title: fileName,
+                    description: 'Documento PDF',
+                    type: 'document',
+                    siteName: parsedUrl.hostname
+                };
+            }
+
+            if (!contentType.includes('text/html')) {
+                throw new Error('La URL debe apuntar a una página web o PDF');
             }
 
             const html = await response.text();

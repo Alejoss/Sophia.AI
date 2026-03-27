@@ -17,6 +17,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
 from votes.models import VoteCount, Vote
 from profiles.models import UserNodeCompletion
+import json
 import logging
 from utils.logging_utils import knowledge_paths_logger, log_error, log_business_event, log_performance_metric
 
@@ -56,10 +57,11 @@ class KnowledgePathCreateView(APIView):
                 
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             else:
-                knowledge_paths_logger.warning("Knowledge path creation failed - validation errors", extra={
-                    'user_id': request.user.id,
-                    'errors': serializer.errors,
-                })
+                knowledge_paths_logger.warning(
+                    "Knowledge path creation failed user_id=%s validation_errors=%s",
+                    request.user.id,
+                    json.dumps(serializer.errors, default=str),
+                )
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             log_error(e, "Error creating knowledge path", request.user.id, {
@@ -107,16 +109,27 @@ class KnowledgePathListView(APIView):
                     )
                 }
             
-            # Get knowledge paths and annotate with vote count, ordered by creation date (newest first)
-            # Only show visible paths to everyone - hidden paths should stay hidden even to authors
-            knowledge_paths = KnowledgePath.objects.select_related('author').filter(
-                is_visible=True
-            ).order_by('-created_at')
+            # Get knowledge paths and annotate with vote count.
+            # Only show visible paths to everyone - hidden paths should stay hidden even to authors.
+            #
+            # NOTE: We sort in Python by `_vote_count` (computed from VoteCount) before paginating,
+            # so the "top voted" items appear first.
+            knowledge_paths = list(
+                KnowledgePath.objects.select_related('author').filter(
+                    is_visible=True
+                ).order_by('-created_at')
+            )
             
             # Add vote data to each knowledge path
             for path in knowledge_paths:
                 path._vote_count = vote_counts.get(path.id, 0)
                 path._user_vote = user_votes.get(path.id, 0)
+
+            # Sort by vote count (descending). Tie-break with creation date (newest first).
+            knowledge_paths.sort(
+                key=lambda p: (p._vote_count or 0, p.created_at),
+                reverse=True
+            )
             
             # Initialize paginator
             paginator = self.pagination_class()
@@ -426,11 +439,12 @@ class KnowledgePathDetailView(APIView):
                 
                 return Response(serializer.data)
             else:
-                knowledge_paths_logger.warning("Knowledge path update failed - validation errors", extra={
-                    'user_id': request.user.id,
-                    'knowledge_path_id': pk,
-                    'errors': serializer.errors,
-                })
+                knowledge_paths_logger.warning(
+                    "Knowledge path update failed user_id=%s knowledge_path_id=%s validation_errors=%s",
+                    request.user.id,
+                    pk,
+                    json.dumps(serializer.errors, default=str),
+                )
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             log_error(e, "Error updating knowledge path", request.user.id, {

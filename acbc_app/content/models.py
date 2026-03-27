@@ -42,6 +42,8 @@ class Content(models.Model):
     original_title = models.CharField(max_length=255, blank=True, null=True)  # The original title when first uploaded
     original_author = models.CharField(max_length=255, blank=True, null=True)  # Original creator/author
     url = models.URLField(max_length=2000, blank=True, null=True)  # For URL-based content
+    has_spanish_subtitles = models.BooleanField(default=False)
+    has_spanish_dubbing = models.BooleanField(default=False)
     
     # Content classification
     topics = models.ManyToManyField('Topic', related_name='contents', blank=True)
@@ -113,6 +115,17 @@ class Content(models.Model):
         return self.profiles.exclude(user=self.uploaded_by).count()
 
 
+def content_profile_thumbnail_upload_path(instance, filename):
+    """S3 path for user-owned thumbnails.
+
+    Example: content_profile_thumbnails/<content_id>/<user_id>/<uuid>_<filename>
+    """
+    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    content_id = instance.content_id or 0
+    user_id = instance.user_id or 0
+    return f"content_profile_thumbnails/{content_id}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
+
+
 class ContentProfile(models.Model):
     """
     Represents a user's personalized view/version of a content.
@@ -128,6 +141,15 @@ class ContentProfile(models.Model):
     personal_note = models.TextField(blank=True, null=True)
     is_visible = models.BooleanField(default=True)  # Controls whether this content appears in search results
     is_producer = models.BooleanField(default=False)  # Indicates whether this user is the producer of the content
+
+    # Editable thumbnail for this user's view of the content.
+    # If not set, the app falls back to the content's og_image/favicons.
+    thumbnail = models.ImageField(
+        upload_to=content_profile_thumbnail_upload_path,
+        null=True,
+        blank=True,
+        max_length=255
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -156,6 +178,14 @@ def content_file_upload_path(instance, filename):
     media_slug = 'document' if media_type == 'TEXT' else media_type.lower()
     user_id = instance.content.uploaded_by_id or 0
     return f"content/{media_slug}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
+
+
+def file_suggestion_upload_path(instance, filename):
+    """S3/local path for file suggestions tied to a content."""
+    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    content_id = instance.content_id or 0
+    user_id = instance.suggested_by_id or 0
+    return f"content_suggestions/files/{content_id}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
 
 
 class FileDetails(models.Model):
@@ -328,6 +358,41 @@ class ContentSuggestion(models.Model):
     
     def __str__(self):
         return f"{self.suggested_by.username} suggested {self.content.original_title} for {self.topic.title} - {self.status}"
+
+
+class FileSuggestion(models.Model):
+    """User-proposed file attachment for URL-based content."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('REJECTED', 'Rejected'),
+    ]
+
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='file_suggestions')
+    suggested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='file_suggestions')
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_file_suggestions'
+    )
+
+    file = models.FileField(upload_to=file_suggestion_upload_path)
+    file_size = models.PositiveBigIntegerField(blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['content', 'status']),
+            models.Index(fields=['suggested_by', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.suggested_by.username} file suggestion for content {self.content_id} - {self.status}"
 
 
 class Publication(models.Model):    

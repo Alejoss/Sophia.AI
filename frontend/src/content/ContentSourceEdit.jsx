@@ -67,6 +67,7 @@ const ContentSourceEdit = () => {
 
     // Check if content can be modified
     const canModify = modificationCheck.can_modify;
+    const canSuggestFile = !!content?.can_suggest_file;
 
     return (
         <Box sx={{ maxWidth: 1400, margin: '0 auto', padding: 2, pt: 12 }}>
@@ -136,6 +137,15 @@ const ContentSourceEdit = () => {
                         >
                             Subir nuevo contenido
                         </Button>
+                        {canSuggestFile && (
+                            <Button
+                                variant="outlined"
+                                sx={{ mt: 1, ml: 1 }}
+                                onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
+                            >
+                                Sugerir archivo
+                            </Button>
+                        )}
                     </Alert>
                     
                     {/* Show content preview */}
@@ -189,6 +199,8 @@ const ContentSourceEdit = () => {
                                         media_type: content.media_type || '',
                                         title: content.original_title || '',
                                         author: content.original_author || '',
+                                        has_spanish_subtitles: content.has_spanish_subtitles || false,
+                                        has_spanish_dubbing: content.has_spanish_dubbing || false,
                                     }}
                                     isEditMode={true}
                                     contentId={contentId}

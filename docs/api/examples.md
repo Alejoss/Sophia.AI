@@ -7,7 +7,7 @@ This document provides practical examples of using the Sophia.AI Academia Blockc
 ### Register a New User
 
 ```javascript
-const response = await fetch('http://localhost:8000/api/rest-auth/registration/', {
+const response = await fetch('http://localhost:8000/api/profiles/register/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -15,20 +15,20 @@ const response = await fetch('http://localhost:8000/api/rest-auth/registration/'
   body: JSON.stringify({
     username: 'johndoe',
     email: 'john@example.com',
-    password1: 'securepassword123',
-    password2: 'securepassword123'
+    password: 'securepassword123'
   }),
   credentials: 'include'
 });
 
 const data = await response.json();
-// Tokens are stored in cookies automatically
+// data.access_token is returned in body
+// refresh token is stored in HTTP-only cookie
 ```
 
 ### Login
 
 ```javascript
-const response = await fetch('http://localhost:8000/api/rest-auth/login/', {
+const response = await fetch('http://localhost:8000/api/profiles/login/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -41,10 +41,22 @@ const response = await fetch('http://localhost:8000/api/rest-auth/login/', {
 });
 ```
 
+### Refresh Access Token
+
+```javascript
+const refreshResponse = await fetch('http://localhost:8000/api/profiles/refresh_token/', {
+  method: 'POST',
+  credentials: 'include'
+});
+
+const refreshData = await refreshResponse.json();
+const accessToken = refreshData.access_token;
+```
+
 ### Get Current User Profile
 
 ```javascript
-const response = await fetch('http://localhost:8000/api/profiles/me/', {
+const response = await fetch('http://localhost:8000/api/profiles/user_profile/', {
   headers: {
     'Authorization': 'Bearer <access_token>'
   },
@@ -231,11 +243,12 @@ api.interceptors.response.use(
   response => response,
   async error => {
     if (error.response?.status === 401) {
-      const refreshToken = getRefreshToken();
-      const response = await axios.post('http://localhost:8000/api/rest-auth/token/refresh/', {
-        refresh: refreshToken
-      });
-      setAccessToken(response.data.access);
+      const response = await axios.post(
+        'http://localhost:8000/api/profiles/refresh_token/',
+        {},
+        { withCredentials: true }
+      );
+      setAccessToken(response.data.access_token);
       // Retry original request
       return api.request(error.config);
     }
@@ -257,7 +270,7 @@ const newContent = await api.post('/content/', {
 });
 
 // Update profile
-const updatedProfile = await api.patch('/profiles/me/', {
+const updatedProfile = await api.patch('/profiles/user_profile/', {
   interests: 'Blockchain, AI'
 });
 ```
