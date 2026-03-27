@@ -113,6 +113,7 @@ class NewsletterSubscriptionApiView(APIView):
     Expects JSON body: {"email": "<email>"}
     """
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         email = (request.data.get("email") or "").strip().lower()
