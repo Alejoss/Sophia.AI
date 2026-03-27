@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -1287,6 +1287,11 @@ class NodeDetailView(APIView):
 # Topic Views
 class TopicView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get(self, request):
         topics = Topic.objects.all()

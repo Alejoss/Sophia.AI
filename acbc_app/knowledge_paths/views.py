@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import KnowledgePath, Node
@@ -78,6 +78,7 @@ class KnowledgePathPagination(PageNumberPagination):
     max_page_size = 100
 
 class KnowledgePathListView(APIView):
+    permission_classes = [AllowAny]
     pagination_class = KnowledgePathPagination
 
     def get(self, request):

@@ -53,6 +53,7 @@ axiosInstance.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    const accessToken = localStorage.getItem('access_token');
 
     // Don't retry if:
     // 1. It's not a 401 error
@@ -61,6 +62,7 @@ axiosInstance.interceptors.response.use(
     // 4. The request is for the logout endpoint
     // 5. The request is for the check_auth endpoint (to avoid infinite loops)
     if (error.response?.status !== 401 || 
+        !accessToken ||
         originalRequest._retry || 
         originalRequest.url === '/profiles/refresh_token/' ||
         originalRequest.url === '/profiles/logout/' ||
