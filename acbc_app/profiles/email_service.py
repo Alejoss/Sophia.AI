@@ -39,7 +39,7 @@ class EmailService:
     - Configuration validation (Postmark token when enabled)
     - Email address validation
     - HTML and plain text support
-    - Optional Postmark tags via PostmarkEmailMessage when available
+    - Optional Postmark tags via PostmarkEmailMultiAlternatives when available
     """
 
     @staticmethod
@@ -139,41 +139,34 @@ class EmailService:
         from_address = EmailService._build_from_address(from_email, from_name)
 
         try:
-            # Use PostmarkEmailMessage for tags when available and tags requested
-            if tags:
-                try:
-                    from postmarker.django import PostmarkEmailMessage
-                    msg = PostmarkEmailMessage(
-                        subject=subject,
-                        body=text_message,
-                        from_email=from_address,
-                        to=[receiver_email],
-                        tag=tags[0] if tags else None,
-                    )
-                    if html_message:
-                        msg.attach_alternative(html_message, "text/html")
-                    msg.send(fail_silently=False)
-                except ImportError:
-                    # Fallback to standard backend without tags
-                    msg = EmailMultiAlternatives(
-                        subject=subject,
-                        body=text_message,
-                        from_email=from_address,
-                        to=[receiver_email],
-                    )
-                    if html_message:
-                        msg.attach_alternative(html_message, "text/html")
-                    msg.send(fail_silently=False)
-            else:
+            # Build a multi-alternative message so HTML bodies work consistently.
+            # If Postmarker is available, use its class to support Postmark fields (e.g. tags).
+            try:
+                from postmarker.django import PostmarkEmailMultiAlternatives
+                msg = PostmarkEmailMultiAlternatives(
+                    subject=subject,
+                    body=text_message,
+                    from_email=from_address,
+                    to=[receiver_email],
+                )
+                if tags:
+                    # Keep compatibility across postmarker versions
+                    if hasattr(msg, "tag"):
+                        msg.tag = tags[0]
+                    elif hasattr(msg, "tags"):
+                        msg.tags = tags
+            except ImportError:
+                # Fallback to Django standard class (tags ignored)
                 msg = EmailMultiAlternatives(
                     subject=subject,
                     body=text_message,
                     from_email=from_address,
                     to=[receiver_email],
                 )
-                if html_message:
-                    msg.attach_alternative(html_message, "text/html")
-                msg.send(fail_silently=False)
+
+            if html_message:
+                msg.attach_alternative(html_message, "text/html")
+            msg.send(fail_silently=False)
 
             logger.info("Email sent successfully to %s", receiver_email)
             return True

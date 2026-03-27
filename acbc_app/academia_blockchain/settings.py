@@ -586,7 +586,7 @@ POSTMARK = {
     "VERBOSITY": int(os.getenv("POSTMARK_VERBOSITY", "0")),
 }
 
-EMAIL_FROM = os.getenv('EMAIL_FROM', 'academiablockchain@no-reply.com')
+EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@academiablockchain.com')
 EMAIL_FROM_NAME = 'Academia Blockchain'
 # Django default from address (used by send_mail and Postmark backend)
 DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>"
