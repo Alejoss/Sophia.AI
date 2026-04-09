@@ -112,7 +112,7 @@ const TelegramNotSupportedMessage = () => (
         Esta app no está disponible en el navegador de Telegram
       </h1>
       <p style={{ margin: 0, lineHeight: 1.5 }}>
-        Para continuar, abre este enlace en tu navegador externo (Safari, Chrome u otro).
+        Por favor, ábrela en tu navegador externo (Safari, Chrome u otro).
       </p>
     </section>
   </main>
