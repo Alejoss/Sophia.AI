@@ -191,7 +191,12 @@ def file_suggestion_upload_path(instance, filename):
 class FileDetails(models.Model):
     """Handles file storage and content analysis"""
     content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='file_details')
-    file = models.FileField(upload_to=content_file_upload_path, blank=True, null=True)  # Optional for URL content
+    file = models.FileField(
+        upload_to=content_file_upload_path,
+        blank=True,
+        null=True,
+        max_length=512,
+    )  # Optional for URL content; path includes S3 key (uuid + long filename)
     file_size = models.PositiveBigIntegerField(blank=True, null=True)  # BigInteger for files > 2GB
     
     # Text analysis (for text-based content)
@@ -374,7 +379,7 @@ class FileSuggestion(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_file_suggestions'
     )
 
-    file = models.FileField(upload_to=file_suggestion_upload_path)
+    file = models.FileField(upload_to=file_suggestion_upload_path, max_length=512)
     file_size = models.PositiveBigIntegerField(blank=True, null=True)
     message = models.TextField(blank=True, null=True)
     rejection_reason = models.TextField(blank=True, null=True)
