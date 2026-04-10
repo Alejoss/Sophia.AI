@@ -191,7 +191,12 @@ def file_suggestion_upload_path(instance, filename):
 class FileDetails(models.Model):
     """Handles file storage and content analysis"""
     content = models.OneToOneField(Content, on_delete=models.CASCADE, related_name='file_details')
-    file = models.FileField(upload_to=content_file_upload_path, blank=True, null=True)  # Optional for URL content
+    file = models.FileField(
+        upload_to=content_file_upload_path,
+        blank=True,
+        null=True,
+        max_length=512,
+    )  # Optional for URL content; S3 keys exceed Django's default 100 chars
     file_size = models.PositiveBigIntegerField(blank=True, null=True)  # BigInteger for files > 2GB
     
     # Text analysis (for text-based content)
