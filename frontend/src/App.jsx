@@ -73,6 +73,51 @@ const ContentIdRedirect = () => {
   return <Navigate to={`/content/${contentId}/library`} replace />;
 };
 
+const isTelegramInAppBrowser = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const ua = navigator.userAgent || '';
+  return Boolean(
+    window.TelegramWebview ||
+    window.TelegramWebviewProxy ||
+    window.TelegramWebviewProxyProto ||
+    /Telegram/i.test(ua)
+  );
+};
+
+const TelegramNotSupportedMessage = () => (
+  <main
+    style={{
+      minHeight: '70vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px',
+    }}
+  >
+    <section
+      style={{
+        maxWidth: '640px',
+        width: '100%',
+        border: '1px solid #d9d9d9',
+        borderRadius: '12px',
+        padding: '24px',
+        background: '#fff',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+      }}
+    >
+      <h1 style={{ marginTop: 0, marginBottom: '12px' }}>
+        Esta app no está disponible en el navegador de Telegram
+      </h1>
+      <p style={{ margin: 0, lineHeight: 1.5 }}>
+        Por favor, ábrela en tu navegador externo (Safari, Chrome u otro).
+      </p>
+    </section>
+  </main>
+);
+
 const AppContent = () => {
   const { theme } = useThemeMode();
   
@@ -83,7 +128,10 @@ const AppContent = () => {
         <AuthProvider>
           <Routes>
           <Route element={<MainLayout />}>
-            <Route path="/" element={<Home />} />
+            <Route
+              path="/"
+              element={isTelegramInAppBrowser() ? <TelegramNotSupportedMessage /> : <Home />}
+            />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
