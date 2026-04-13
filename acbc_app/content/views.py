@@ -2494,7 +2494,7 @@ class URLPreviewView(APIView):
             try:
                 response.raise_for_status()
             except requests.exceptions.HTTPError as e:
-                logger.error(
+                logger.warning(
                     f"URL preview HTTP error: {str(e)}",
                     extra={
                         'user_id': user_id,
