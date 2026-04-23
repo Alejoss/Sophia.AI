@@ -96,6 +96,11 @@ chmod +x scripts/setup-ssl.sh
 ./scripts/setup-ssl.sh yourdomain.com [email@example.com]
 ```
 
+**Domain coverage behavior:**
+- If you pass an apex domain (e.g. `yourdomain.com`), the certificate includes both `yourdomain.com` and `www.yourdomain.com`.
+- If you pass a `www` domain (e.g. `www.yourdomain.com`), the certificate also includes the apex `yourdomain.com`.
+- If you pass a subdomain (e.g. `api.yourdomain.com`), only that hostname is included.
+
 **What it does:**
 - Installs Certbot if needed
 - Generates SSL certificate for your domain
