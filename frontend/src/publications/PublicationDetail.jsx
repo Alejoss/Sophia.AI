@@ -6,9 +6,14 @@ import {
     Button, 
     Divider,
     CircularProgress,
-    Paper
+    Paper,
+    Fab,
+    Snackbar,
+    Alert,
+    Tooltip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import ShareIcon from '@mui/icons-material/Share';
 import { formatDate } from '../utils/dateUtils';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
@@ -26,6 +31,11 @@ const PublicationDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isNavigating, setIsNavigating] = useState(false);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success',
+    });
     const { publicationId } = useParams();
     const navigate = useNavigate();
     const { authState } = useAuth();
@@ -57,6 +67,26 @@ const PublicationDetail = () => {
         }
         setIsNavigating(true);
         navigate(`/messages/thread/${profile.user.id}`);
+    };
+
+    const showSnackbar = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = (_, reason) => {
+        if (reason === 'clickaway') return;
+        setSnackbar((prev) => ({ ...prev, open: false }));
+    };
+
+    const handleSharePublication = async () => {
+        const shareUrl = `${window.location.origin}/publications/${publicationId}`;
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showSnackbar('URL copiada al portapapeles', 'success');
+        } catch (err) {
+            console.error('Failed to copy publication URL:', err);
+            showSnackbar('No se pudo copiar la URL', 'error');
+        }
     };
 
     const handleAddToLibrarySuccess = () => {
@@ -167,6 +197,38 @@ const PublicationDetail = () => {
                     {publication.text_content}
                 </Typography>
             </Paper>
+
+            <Tooltip title="Compartir publicación" placement="left">
+                <Fab
+                    color="primary"
+                    aria-label="compartir publicación"
+                    onClick={handleSharePublication}
+                    sx={{
+                        position: 'fixed',
+                        right: 24,
+                        bottom: 24,
+                        zIndex: (theme) => theme.zIndex.speedDial,
+                    }}
+                >
+                    <ShareIcon />
+                </Fab>
+            </Tooltip>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2500}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };
