@@ -522,8 +522,10 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_EMAIL_SUBJECT_PREFIX = 'Academia Blockchain - '
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # 15 minutes
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),    # 30 days
+    # Short-lived access token; session length is governed by the refresh cookie + lifetime below.
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    # Refresh cookie max_age matches this; users stay signed in until logout or expiry (~1 month).
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',

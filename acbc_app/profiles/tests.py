@@ -463,6 +463,21 @@ class AuthenticationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('acbc_refresh_token', response.cookies)
 
+    def test_login_sets_refresh_cookie_max_age(self):
+        """Refresh cookie must use max_age so the browser keeps it across restarts (not a session cookie)."""
+        cache.delete('login_attempts_127.0.0.1')
+        url = reverse('profiles:login')
+        response = self.client.post(
+            url,
+            {'username': self.user_data['username'], 'password': self.user_data['password']},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        cookie = response.cookies.get(settings.SIMPLE_JWT['REFRESH_COOKIE'])
+        self.assertIsNotNone(cookie)
+        expected = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+        self.assertEqual(int(cookie.get('max-age')), expected)
+
     def test_check_auth_unauthenticated(self):
         """Test authentication check for unauthenticated user."""
         url = reverse('profiles:check_auth')
