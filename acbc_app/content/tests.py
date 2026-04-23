@@ -728,6 +728,77 @@ class ContentAPITests(APITestCase):
         content_count = Content.objects.filter(url=url).count()
         self.assertEqual(content_count, 2)
 
+
+class UserLibraryWithDetailsAPITests(APITestCase):
+    """Tests for paginated GET /api/content/user-content-with-details/."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='libraryowner',
+            email='library@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.url = reverse('content:user-content-with-details')
+
+    def test_pagination_shape_and_page_size(self):
+        for i in range(15):
+            c = Content.objects.create(
+                uploaded_by=self.user,
+                media_type='IMAGE',
+                original_title=f'Img {i}',
+            )
+            ContentProfile.objects.create(
+                content=c,
+                user=self.user,
+                title=f'Title {i}',
+            )
+        r = self.client.get(self.url, {'page': 1, 'page_size': 5})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 15)
+        self.assertEqual(r.data['current_page'], 1)
+        self.assertEqual(r.data['total_pages'], 3)
+        self.assertEqual(len(r.data['results']), 5)
+
+        r2 = self.client.get(self.url, {'page': 2, 'page_size': 5})
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.data['current_page'], 2)
+        self.assertEqual(len(r2.data['results']), 5)
+
+    def test_media_type_filter(self):
+        c_img = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='IMAGE',
+            original_title='A',
+        )
+        c_vid = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='B',
+        )
+        ContentProfile.objects.create(content=c_img, user=self.user, title='p1')
+        ContentProfile.objects.create(content=c_vid, user=self.user, title='p2')
+        r = self.client.get(self.url, {'media_type': 'VIDEO'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+        self.assertEqual(r.data['results'][0]['content']['media_type'], 'VIDEO')
+
+    def test_search_query(self):
+        c = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='UniqueOriginalXYZ',
+        )
+        ContentProfile.objects.create(
+            content=c,
+            user=self.user,
+            title='Other',
+        )
+        r = self.client.get(self.url, {'search': 'UniqueOriginalXYZ'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+
+
 class LibraryAPITests(APITestCase):
     """Test suite for Library API endpoints"""
     

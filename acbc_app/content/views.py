@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -931,34 +932,64 @@ class UserContentListView(APIView):
             )
 
 
+class UserLibraryPagination(PageNumberPagination):
+    """Paginated user library list (aligned with search API shape for the frontend)."""
+    page_size = 12
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.page.paginator.count,
+            'current_page': self.page.number,
+            'total_pages': self.page.paginator.num_pages,
+            'results': data,
+        })
+
+
 class UserContentWithDetailsView(APIView):
-    """API view to retrieve all content profiles owned by a user with file details for card mode display."""
+    """Paginated list of the current user's content profiles with file details for library display."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            content_profiles = ContentProfile.objects.filter(user=request.user)\
-                .select_related('content', 'content__file_details')\
-                .order_by('-created_at')
-            
-            # Serialize each profile individually to handle errors gracefully
+            queryset = ContentProfile.objects.filter(user=request.user).select_related(
+                'content', 'content__file_details'
+            ).order_by('-created_at')
+
+            media_type = (request.query_params.get('media_type') or 'ALL').upper()
+            if media_type != 'ALL':
+                queryset = queryset.filter(content__media_type=media_type)
+
+            search = (request.query_params.get('search') or '').strip()
+            if search:
+                queryset = queryset.filter(
+                    Q(title__icontains=search)
+                    | Q(author__icontains=search)
+                    | Q(personal_note__icontains=search)
+                    | Q(content__original_title__icontains=search)
+                    | Q(content__media_type__icontains=search)
+                )
+
+            paginator = UserLibraryPagination()
+            page = paginator.paginate_queryset(queryset, request)
+
             response_data = []
-            for profile in content_profiles:
+            for profile in page:
                 try:
                     serializer = ContentProfileSerializer(
-                        profile, 
-                        context={'request': request}
+                        profile,
+                        context={'request': request},
                     )
                     response_data.append(serializer.data)
-                except Exception as e:
-                    # Skip this profile instead of failing the entire request
+                except Exception:
                     continue
-            
-            return Response(response_data, status=status.HTTP_200_OK)
-        except Exception as e:
+
+            return paginator.get_paginated_response(response_data)
+        except Exception:
             return Response(
-                {'error': 'Ocurrio un error al obtener el contenido'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'error': 'Ocurrio un error al obtener el contenido'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
