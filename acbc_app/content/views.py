@@ -1284,6 +1284,27 @@ class NodeDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def get_topic_content_profile_for_display(content, request, topic):
+    """
+    Pick a ContentProfile to represent this content in a topic context.
+    Prefer the topic creator's profile, then the current user's, then any profile.
+    """
+    try:
+        return ContentProfile.objects.get(content=content, user=topic.creator)
+    except ContentProfile.DoesNotExist:
+        pass
+    try:
+        return ContentProfile.objects.get(content=content, user=request.user)
+    except ContentProfile.DoesNotExist:
+        pass
+    return (
+        ContentProfile.objects.filter(content=content)
+        .select_related("content")
+        .order_by("id")
+        .first()
+    )
+
+
 # Topic Views
 class TopicView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1315,20 +1336,7 @@ class TopicDetailView(APIView):
         Get the appropriate ContentProfile based on context.
         For topics, we want the topic creator's profile for the content.
         """
-        try:
-            # Try to get the topic creator's profile for this content
-            return ContentProfile.objects.get(content=content, user=topic.creator)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Fallback: try to get logged user's profile
-        try:
-            return ContentProfile.objects.get(content=content, user=request.user)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Final fallback: return None (serializer will use original content data)
-        return None
+        return get_topic_content_profile_for_display(content, request, topic)
 
     def get(self, request, pk):
         topic = get_object_or_404(
@@ -1443,37 +1451,54 @@ class TopicContentSimpleView(APIView):
 
     def get(self, request, pk):
         topic = get_object_or_404(
-            Topic.objects.prefetch_related('contents'),
-            pk=pk
+            Topic.objects.prefetch_related("contents", "contents__profiles"),
+            pk=pk,
         )
 
-        # Get all content profiles for the user that are in this topic
-        content_profiles = ContentProfile.objects.filter(
-            content__in=topic.contents.all(),
-            user=request.user
-        ).select_related('content').order_by('title')
-        
-        # Serialize each profile individually to handle errors gracefully
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {
+                    "error": "No tiene permiso para ver el listado de contenido de este tema."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # One row per Content in the topic; pick a display profile (creator, then
+        # current user, then any) so moderators see items added by others.
+        profiles = []
+        for content in topic.contents.all():
+            profile = get_topic_content_profile_for_display(
+                content, request, topic
+            )
+            if profile is not None:
+                profiles.append(profile)
+
+        profiles.sort(
+            key=lambda p: (p.title or p.content.original_title or "").lower()
+        )
+
         response_data = []
-        for profile in content_profiles:
+        for profile in profiles:
             try:
                 serializer = SimpleContentProfileSerializer(
-                    profile, 
-                    context={'request': request}
+                    profile,
+                    context={"request": request},
                 )
                 response_data.append(serializer.data)
-            except Exception as e:
-                # Skip this profile instead of failing the entire request
+            except Exception:
                 continue
 
-        return Response({
-            'topic': {
-                'id': topic.id,
-                'title': topic.title,
-                'description': topic.description
+        return Response(
+            {
+                "topic": {
+                    "id": topic.id,
+                    "title": topic.title,
+                    "description": topic.description,
+                },
+                "contents": response_data,
             },
-            'contents': response_data
-        }, status=status.HTTP_200_OK)
+            status=status.HTTP_200_OK,
+        )
 
 
 class TopicBasicView(APIView):

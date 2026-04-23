@@ -802,6 +802,57 @@ class TopicAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Test Topic')
 
+    def test_topic_content_simple_lists_all_topic_content_for_creator(self):
+        """Creator sees every content item in the topic, not only their own profiles."""
+        other = User.objects.create_user(
+            username="othermod",
+            email="other@example.com",
+            password="pass12345",
+        )
+        self.topic.moderators.add(other)
+
+        content_mine = Content.objects.create(
+            uploaded_by=self.user,
+            media_type="TEXT",
+            original_title="Mine",
+        )
+        ContentProfile.objects.create(
+            content=content_mine,
+            user=self.user,
+            title="Mine profile",
+        )
+
+        content_other = Content.objects.create(
+            uploaded_by=other,
+            media_type="TEXT",
+            original_title="Other",
+        )
+        ContentProfile.objects.create(
+            content=content_other,
+            user=other,
+            title="Other profile",
+        )
+
+        self.topic.contents.add(content_mine, content_other)
+
+        url = reverse("content:topic-content-simple", args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        content_ids = {row["content"]["id"] for row in response.data["contents"]}
+        self.assertSetEqual(content_ids, {content_mine.id, content_other.id})
+
+    def test_topic_content_simple_forbidden_for_non_moderator(self):
+        outsider = User.objects.create_user(
+            username="outsider",
+            email="out@example.com",
+            password="pass12345",
+        )
+        url = reverse("content:topic-content-simple", args=[self.topic.id])
+        self.client.force_authenticate(user=outsider)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class PublicationAPITests(APITestCase):
     """Test suite for Publication API endpoints"""
     
