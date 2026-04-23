@@ -94,3 +94,18 @@ def get_top_voted_contents(topic, media_type, limit=None):
         'limit_applied': limit is not None,
     })
     return result
+
+
+def get_topic_contents_ordered_for_public_view(topic):
+    """
+    Same ordering as TopicDetailView: by media type buckets (IMAGE, TEXT, AUDIO,
+    VIDEO), each bucket sorted by vote count for this topic. Any content not
+    covered (unexpected media_type) is appended by id for stability.
+    """
+    ordered = []
+    for media_type in ("IMAGE", "TEXT", "AUDIO", "VIDEO"):
+        ordered.extend(get_top_voted_contents(topic, media_type))
+    seen = {c.id for c in ordered}
+    extras = [c for c in topic.contents.all() if c.id not in seen]
+    extras.sort(key=lambda c: c.id)
+    return ordered + extras
