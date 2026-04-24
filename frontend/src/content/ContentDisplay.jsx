@@ -14,6 +14,8 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { useNavigate, Link } from "react-router-dom";
 import { resolveMediaUrl } from "../utils/fileUtils";
@@ -55,6 +57,11 @@ const ContentDisplay = ({
 }) => {
   const [renderError, setRenderError] = useState(null);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const navigate = useNavigate();
 
   if (!content) {
@@ -147,6 +154,30 @@ const ContentDisplay = ({
       default:
         return <DescriptionIcon {...iconProps} />;
     }
+  };
+
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCopyUrl = async (valueToCopy) => {
+    if (!valueToCopy) {
+      showSnackbar("No hay URL para copiar", "warning");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(valueToCopy);
+      showSnackbar("URL copiada al portapapeles", "success");
+    } catch (error) {
+      console.error("Failed to copy URL:", error);
+      showSnackbar("No se pudo copiar la URL", "error");
+    }
+  };
+
+  const handleCloseSnackbar = (_, reason) => {
+    if (reason === "clickaway") return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   const renderContentByType = () => {
@@ -573,9 +604,7 @@ const ContentDisplay = ({
                       size="small"
                       variant="text"
                       onClick={() =>
-                        navigator.clipboard.writeText(
-                          resolveMediaUrl(fileDetails.url ?? fileDetails.file)
-                        )
+                        handleCopyUrl(resolveMediaUrl(fileDetails.url ?? fileDetails.file))
                       }
                     >
                       Copiar URL
@@ -599,7 +628,7 @@ const ContentDisplay = ({
                     <Button
                       size="small"
                       variant="text"
-                      onClick={() => navigator.clipboard.writeText(url)}
+                      onClick={() => handleCopyUrl(url)}
                     >
                       Copiar URL
                     </Button>
@@ -1737,7 +1766,26 @@ const ContentDisplay = ({
   };
 
   try {
-    return renderContent();
+    return (
+      <>
+        {renderContent()}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={2500}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </>
+    );
   } catch (error) {
     console.error("Fatal error in ContentDisplay:", error);
     return (
