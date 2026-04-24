@@ -1715,18 +1715,18 @@ class EmailServiceTests(TestCase):
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('profiles.email_service.EmailMultiAlternatives')
+    @patch('postmarker.django.PostmarkEmailMultiAlternatives')
     def test_send_email_success(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
         """Test successful email sending via Django backend (Postmark when enabled)"""
         mock_is_enabled.return_value = True
         mock_ema_instance = mock_ema_class.return_value
-        
+
         result = EmailService.send_email(
             receiver_email='test@example.com',
             subject='Test Subject',
             text_message='Test message'
         )
-        
+
         self.assertTrue(result)
         mock_ema_instance.send.assert_called_once_with(fail_silently=False)
     
@@ -1746,12 +1746,12 @@ class EmailServiceTests(TestCase):
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('profiles.email_service.EmailMultiAlternatives')
+    @patch('postmarker.django.PostmarkEmailMultiAlternatives')
     def test_send_email_send_failure(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
         """Test email sending when backend send raises"""
         mock_is_enabled.return_value = True
         mock_ema_class.return_value.send.side_effect = Exception("Backend error")
-        
+
         with self.assertRaises(EmailServiceError):
             EmailService.send_email(
                 receiver_email='test@example.com',
