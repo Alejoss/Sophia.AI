@@ -121,15 +121,6 @@ const TopicEditContent = () => {
         // Filter out content that's already in this topic
         // Now topics are serialized as IDs, so we can directly compare them
         const isInTopic = content.content.topics?.some(topicIdInArray => topicIdInArray === parseInt(topicId));
-        
-        console.log('TopicEditContent filtering content:', {
-            contentId: content.id,
-            contentTitle: content.title,
-            topicId: topicId,
-            isInTopic,
-            topics: content.content.topics,
-            contentStructure: JSON.stringify(content, null, 2)
-        });
         return !isInTopic;
     };
 

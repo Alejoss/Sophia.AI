@@ -51,7 +51,7 @@ from knowledge_paths.serializers import (
     NodeSerializer
 )
 from .serializers import PublicationSerializer
-from content.utils import get_top_voted_contents
+from content.utils import get_top_voted_contents, get_topic_contents_ordered_for_public_view
 from bs4 import BeautifulSoup
 import requests
 import re
@@ -1284,6 +1284,46 @@ class NodeDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def get_topic_content_profile_for_display(
+    content, request, topic, prefetched_profiles=None
+):
+    """
+    Pick a ContentProfile to represent this content in a topic context.
+    Prefer the topic creator's profile, then the current user's, then lowest id.
+
+    If prefetched_profiles is passed (list from content.profiles.all()), no DB
+    queries are run for profile lookup.
+    """
+    if prefetched_profiles is not None:
+        profiles = prefetched_profiles
+        if not profiles:
+            return None
+        creator_id = topic.creator_id
+        uid = request.user.id
+        for p in profiles:
+            if creator_id and p.user_id == creator_id:
+                return p
+        for p in profiles:
+            if p.user_id == uid:
+                return p
+        return min(profiles, key=lambda p: p.id)
+
+    try:
+        return ContentProfile.objects.get(content=content, user=topic.creator)
+    except ContentProfile.DoesNotExist:
+        pass
+    try:
+        return ContentProfile.objects.get(content=content, user=request.user)
+    except ContentProfile.DoesNotExist:
+        pass
+    return (
+        ContentProfile.objects.filter(content=content)
+        .select_related("content")
+        .order_by("id")
+        .first()
+    )
+
+
 # Topic Views
 class TopicView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1310,25 +1350,16 @@ class TopicDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    def get_content_profile(self, content, request, topic):
+    def get_content_profile(
+        self, content, request, topic, prefetched_profiles=None
+    ):
         """
         Get the appropriate ContentProfile based on context.
         For topics, we want the topic creator's profile for the content.
         """
-        try:
-            # Try to get the topic creator's profile for this content
-            return ContentProfile.objects.get(content=content, user=topic.creator)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Fallback: try to get logged user's profile
-        try:
-            return ContentProfile.objects.get(content=content, user=request.user)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Final fallback: return None (serializer will use original content data)
-        return None
+        return get_topic_content_profile_for_display(
+            content, request, topic, prefetched_profiles=prefetched_profiles
+        )
 
     def get(self, request, pk):
         topic = get_object_or_404(
@@ -1348,14 +1379,22 @@ class TopicDetailView(APIView):
         # Prefetch file_details for the ordered contents
         content_ids = [c.id for c in ordered_contents]
         contents_prefetched = {
-            c.id: c for c in Content.objects.filter(id__in=content_ids).prefetch_related('file_details')
+            c.id: c
+            for c in Content.objects.filter(id__in=content_ids).prefetch_related(
+                "file_details", "profiles"
+            )
         }
         ordered_contents = [contents_prefetched[cid] for cid in content_ids if cid in contents_prefetched]
 
         # Get the appropriate profile for each content
         contents_with_profiles = []
         for content in ordered_contents:
-            selected_profile = self.get_content_profile(content, request, topic)
+            selected_profile = self.get_content_profile(
+                content,
+                request,
+                topic,
+                prefetched_profiles=list(content.profiles.all()),
+            )
             contents_with_profiles.append({
                 'content': content,
                 'selected_profile': selected_profile
@@ -1442,38 +1481,67 @@ class TopicContentSimpleView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        topic = get_object_or_404(
-            Topic.objects.prefetch_related('contents'),
-            pk=pk
-        )
+        topic = get_object_or_404(Topic.objects.prefetch_related("contents"), pk=pk)
 
-        # Get all content profiles for the user that are in this topic
-        content_profiles = ContentProfile.objects.filter(
-            content__in=topic.contents.all(),
-            user=request.user
-        ).select_related('content').order_by('title')
-        
-        # Serialize each profile individually to handle errors gracefully
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {
+                    "error": "No tiene permiso para ver el listado de contenido de este tema."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Same ordering as the public topic view (vote buckets), then one query
+        # batch for profiles — avoids N+1 selects from per-content profile lookup.
+        ordered_contents = get_topic_contents_ordered_for_public_view(topic)
+        content_ids = [c.id for c in ordered_contents]
+        contents_by_id = (
+            {
+                c.id: c
+                for c in Content.objects.filter(id__in=content_ids).prefetch_related(
+                    "profiles"
+                )
+            }
+            if content_ids
+            else {}
+        )
+        ordered_loaded = [
+            contents_by_id[cid] for cid in content_ids if cid in contents_by_id
+        ]
+
+        profiles = []
+        for content in ordered_loaded:
+            profile = get_topic_content_profile_for_display(
+                content,
+                request,
+                topic,
+                prefetched_profiles=list(content.profiles.all()),
+            )
+            if profile is not None:
+                profiles.append(profile)
+
         response_data = []
-        for profile in content_profiles:
+        for profile in profiles:
             try:
                 serializer = SimpleContentProfileSerializer(
-                    profile, 
-                    context={'request': request}
+                    profile,
+                    context={"request": request},
                 )
                 response_data.append(serializer.data)
-            except Exception as e:
-                # Skip this profile instead of failing the entire request
+            except Exception:
                 continue
 
-        return Response({
-            'topic': {
-                'id': topic.id,
-                'title': topic.title,
-                'description': topic.description
+        return Response(
+            {
+                "topic": {
+                    "id": topic.id,
+                    "title": topic.title,
+                    "description": topic.description,
+                },
+                "contents": response_data,
             },
-            'contents': response_data
-        }, status=status.HTTP_200_OK)
+            status=status.HTTP_200_OK,
+        )
 
 
 class TopicBasicView(APIView):
