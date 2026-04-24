@@ -14,9 +14,21 @@ const contentApi = {
         }
     },
 
-    getUserContentWithDetails: async () => {
+    getUserContentWithDetails: async (params = {}) => {
         try {
-            const response = await axiosInstance.get('/content/user-content-with-details/');
+            const query = {
+                page: params.page ?? 1,
+                page_size: params.page_size ?? 12,
+            };
+            if (params.media_type && params.media_type !== 'ALL') {
+                query.media_type = params.media_type;
+            }
+            if (params.search) {
+                query.search = params.search;
+            }
+            const response = await axiosInstance.get('/content/user-content-with-details/', {
+                params: query,
+            });
             return response.data;
         } catch (error) {
             console.error('Error fetching user content with details:', error);
