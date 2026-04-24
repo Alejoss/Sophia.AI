@@ -849,6 +849,8 @@ class GoogleLoginView(SocialLoginView):
     """
     Handles Google OAuth authentication and JWT token generation.
     """
+    permission_classes = [AllowAny]
+    authentication_classes = []
     adapter_class = GoogleOAuth2Adapter
     client_class = OAuth2Client
     callback_url = None
