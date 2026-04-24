@@ -1475,19 +1475,17 @@ class SuggestionCreateView(APIView):
                 'suggestion': suggestion,
                 'site_url': site_url,
             }
-            
-            # Send email using template to the primary admin email only
-            admin_email = getattr(settings, 'ADMIN_EMAIL', 'alejandro@academiablockchain.com')
-            EmailService.send_template_email(
-                receiver_email=admin_email,
+
+            EmailService.send_to_admins(
                 subject=subject,
                 template_name='suggestion_notification',
                 context=context,
-                tags=['suggestion', 'notification', 'admin']
+                tags=['suggestion', 'notification', 'admin'],
             )
-            
+
             logger.info(
-                f"Suggestion notification email sent successfully to primary admin: {admin_email}"
+                "Suggestion notification email dispatched to administrators for suggestion id=%s",
+                suggestion.id,
             )
                 
         except EmailServiceError as e:
