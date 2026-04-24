@@ -99,7 +99,7 @@ def search_topics(query):
     logger.debug(f"Searching topics for query: '{query}'")
     
     try:
-        topic_query = Q(title__icontains=query) | Q(description__icontains=query)
+        topic_query = (Q(title__icontains=query) | Q(description__icontains=query)) & Q(is_visible=True)
         topics = Topic.objects.filter(topic_query).only(
             'id', 'title', 'description', 'created_at'
         ).order_by('-created_at')
@@ -131,7 +131,7 @@ def search_knowledge_paths(query):
     logger.debug(f"Searching knowledge paths for query: '{query}'")
     
     try:
-        path_query = Q(title__icontains=query) | Q(description__icontains=query)
+        path_query = (Q(title__icontains=query) | Q(description__icontains=query)) & Q(is_visible=True)
         paths = KnowledgePath.objects.filter(path_query).only(
             'id', 'title', 'description', 'created_at'
         ).order_by('-created_at')

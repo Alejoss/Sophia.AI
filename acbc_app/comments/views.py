@@ -12,6 +12,7 @@ from utils.notification_utils import notify_comment_reply, notify_knowledge_path
 
 from comments.managers import CommentManager
 from content.models import Topic, Content
+from content.utils import get_topic_for_public_or_privileged
 from comments.models import Comment
 from comments.serializers import CommentSerializer, KnowledgePathCommentSerializer, ContentTopicCommentSerializer, \
     TopicCommentSerializer, CommentCreateSerializer
@@ -257,7 +258,7 @@ class TopicCommentsView(APIView):
                 'topic_id': pk,
             })
             
-            topic = get_object_or_404(Topic, pk=pk)
+            topic = get_topic_for_public_or_privileged(request, pk)
             topic_type = ContentType.objects.get_for_model(Topic)
             
             # Get comments that:
@@ -300,7 +301,7 @@ class TopicCommentsView(APIView):
                 'body_length': len(request.data.get('body', '')),
             })
             
-            topic = get_object_or_404(Topic, pk=pk)
+            topic = get_topic_for_public_or_privileged(request, pk)
             topic_type = ContentType.objects.get_for_model(Topic)
             
             comment_data = {
@@ -362,7 +363,7 @@ class ContentTopicCommentsView(BaseCommentView):
         return ContentTopicCommentSerializer
 
     def get_queryset(self, topic_pk, content_pk):
-        topic = get_object_or_404(Topic, pk=topic_pk)
+        topic = get_topic_for_public_or_privileged(self.request, topic_pk)
         content = get_object_or_404(topic.contents, pk=content_pk)
         return Comment.objects.filter(
             content_type=ContentType.objects.get_for_model(Content),
@@ -373,7 +374,7 @@ class ContentTopicCommentsView(BaseCommentView):
         ).select_related('author')
 
     def save_serializer(self, serializer, topic_pk, content_pk):
-        topic = get_object_or_404(Topic, pk=topic_pk)
+        topic = get_topic_for_public_or_privileged(self.request, topic_pk)
         content = get_object_or_404(topic.contents, pk=content_pk)
         comment = serializer.save(
             object_id=content.id,

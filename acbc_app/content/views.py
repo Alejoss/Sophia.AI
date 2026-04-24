@@ -9,6 +9,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
 from django.conf import settings
+from django.http import Http404
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from django.apps import apps
@@ -27,7 +28,18 @@ from utils.notification_utils import (
     notify_topic_moderator_invitation_declined,
     notify_topic_moderator_removed,
 )
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion, FileSuggestion
+from content.models import (
+    Library,
+    Collection,
+    Content,
+    Topic,
+    ContentProfile,
+    FileDetails,
+    Publication,
+    TopicModeratorInvitation,
+    ContentSuggestion,
+    FileSuggestion,
+)
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
 from content.serializers import (
@@ -52,7 +64,12 @@ from knowledge_paths.serializers import (
     NodeSerializer
 )
 from .serializers import PublicationSerializer
-from content.utils import get_top_voted_contents, get_topic_contents_ordered_for_public_view
+from content.utils import (
+    get_top_voted_contents,
+    get_topic_contents_ordered_for_public_view,
+    get_topic_for_public_or_privileged,
+    user_can_access_non_public_topic,
+)
 from bs4 import BeautifulSoup
 import requests
 import re
@@ -1365,7 +1382,18 @@ class TopicView(APIView):
         return [permission() for permission in self.permission_classes]
 
     def get(self, request):
-        topics = Topic.objects.all()
+        if request.user.is_authenticated:
+            topics = (
+                Topic.objects.filter(
+                    models.Q(is_visible=True)
+                    | models.Q(creator=request.user)
+                    | models.Q(moderators=request.user)
+                )
+                .distinct()
+                .order_by("-created_at")
+            )
+        else:
+            topics = Topic.objects.filter(is_visible=True).order_by("-created_at")
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -1397,10 +1425,13 @@ class TopicDetailView(APIView):
             Topic.objects.prefetch_related(
                 'contents',
                 'contents__file_details',
-                'contents__profiles'
+                'contents__profiles',
+                'moderators',
             ),
             pk=pk
         )
+        if not topic.is_visible and not user_can_access_non_public_topic(topic, request.user):
+            raise Http404()
 
         # Get contents ordered by vote count per media type (same order as "ver todos")
         ordered_contents = []
@@ -1442,7 +1473,7 @@ class TopicDetailView(APIView):
 
     def patch(self, request, pk):
         logger.info("Topic PATCH topic_id=%s", pk)
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
 
         if not topic.is_moderator_or_creator(request.user):
             logger.warning("Topic PATCH forbidden topic_id=%s", pk)
@@ -1451,11 +1482,16 @@ class TopicDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        is_creator = topic.creator_id == request.user.id
+
         try:
             data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
         except Exception as e:
             logger.exception("Topic PATCH copy request.data failed: %s", e)
             return Response({"error": "Error procesando la peticion."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not is_creator and "is_visible" in data:
+            data.pop("is_visible", None)
 
         has_image = "topic_image" in request.FILES
         logger.info("Topic PATCH topic_id=%s has_image=%s", pk, has_image)
@@ -1492,7 +1528,7 @@ class TopicDetailView(APIView):
 
     def delete(self, request, pk):
         logger.info("Topic DELETE topic_id=%s user=%s", pk, request.user.username)
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
 
         if topic.creator != request.user:
             logger.warning("Topic DELETE forbidden topic_id=%s user=%s (only creator can delete)", pk, request.user.username)
@@ -1513,6 +1549,8 @@ class TopicContentSimpleView(APIView):
 
     def get(self, request, pk):
         topic = get_object_or_404(Topic.objects.prefetch_related("contents"), pk=pk)
+        if not topic.is_visible and not user_can_access_non_public_topic(topic, request.user):
+            raise Http404()
 
         if not topic.is_moderator_or_creator(request.user):
             return Response(
@@ -1579,7 +1617,7 @@ class TopicBasicView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         serializer = TopicBasicSerializer(topic)
         return Response(serializer.data)
 
@@ -1588,7 +1626,7 @@ class TopicEditContentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Check if user is creator or moderator
         if not topic.is_moderator_or_creator(request.user):
@@ -1610,7 +1648,8 @@ class TopicEditContentView(APIView):
             contents = [profile.content for profile in content_profiles]
             
             topic.contents.add(*contents)
-            
+            topic.ensure_visibility_consistency()
+
             return Response(
                 {'message': 'Content added successfully'}, 
                 status=status.HTTP_200_OK
@@ -1622,7 +1661,7 @@ class TopicEditContentView(APIView):
             )
 
     def patch(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Check if user is creator or moderator
         if not topic.is_moderator_or_creator(request.user):
@@ -1636,6 +1675,7 @@ class TopicEditContentView(APIView):
         try:
             contents = Content.objects.filter(id__in=content_ids)
             topic.contents.remove(*contents)
+            topic.ensure_visibility_consistency()
             return Response(
                 {'message': 'Content removed successfully'}, 
                 status=status.HTTP_200_OK
@@ -1653,7 +1693,7 @@ class TopicModeratorsView(APIView):
 
     def post(self, request, pk):
         """Add moderators to a topic. Only the creator can add moderators."""
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Check if user is the creator
         if topic.creator != request.user:
@@ -1697,7 +1737,7 @@ class TopicModeratorsView(APIView):
 
     def delete(self, request, pk):
         """Remove moderators from a topic. Only the creator can remove moderators."""
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Check if user is the creator
         if topic.creator != request.user:
@@ -1775,7 +1815,7 @@ class TopicModeratorInviteView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Check if user is the creator
         if topic.creator != request.user:
@@ -1870,7 +1910,7 @@ class TopicModeratorInvitationsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Creator can see all invitations, invited users can see their own
         if topic.creator == request.user:
@@ -1896,7 +1936,7 @@ class TopicModeratorAcceptView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, pk, invitation_id):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         invitation = get_object_or_404(TopicModeratorInvitation, pk=invitation_id, topic=topic)
         
         # Check if user is the invited user
@@ -1947,7 +1987,7 @@ class TopicModeratorDeclineView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, pk, invitation_id):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         invitation = get_object_or_404(TopicModeratorInvitation, pk=invitation_id, topic=topic)
         
         # Check if user is the invited user
@@ -2054,7 +2094,7 @@ class TopicContentMediaTypeView(APIView):
         return None
 
     def get(self, request, pk, media_type):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         media_type = media_type.upper()
         content_type = ContentType.objects.get_for_model(Content)
         vote_count_subquery = Subquery(
@@ -2988,7 +3028,7 @@ class TopicContentSuggestionCreateView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         content_id = request.data.get('content_id')
         message = request.data.get('message', '')
@@ -3201,7 +3241,7 @@ class TopicContentSuggestionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         
         # Get filter parameters
         status_filter = request.query_params.get('status', None)
@@ -3244,7 +3284,7 @@ class TopicContentSuggestionAcceptView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk, suggestion_id):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
         
         # Check if user is moderator or creator
@@ -3271,7 +3311,8 @@ class TopicContentSuggestionAcceptView(APIView):
             # Add content to topic if not duplicate
             if not suggestion.is_duplicate:
                 topic.contents.add(suggestion.content)
-            
+            topic.ensure_visibility_consistency()
+
             # Send notification to suggester
             try:
                 from utils.notification_utils import notify_content_suggestion_accepted
@@ -3301,7 +3342,7 @@ class TopicContentSuggestionRejectView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk, suggestion_id):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
         
         # Check if user is moderator or creator
@@ -3392,7 +3433,7 @@ class TopicContentSuggestionDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk, suggestion_id):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic = get_topic_for_public_or_privileged(request, pk)
         suggestion = get_object_or_404(ContentSuggestion, pk=suggestion_id, topic=topic)
         
         # Only the user who created the suggestion can delete it

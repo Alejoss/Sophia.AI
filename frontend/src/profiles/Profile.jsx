@@ -410,6 +410,7 @@ const Profile = () => {
                     <TopicsByUser 
                         userId={profile?.user?.id} 
                         userName={profile?.user?.username || 'User'}
+                        isOwnProfile={isOwnProfile}
                     />
                 );
             case 'events':

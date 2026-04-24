@@ -923,6 +923,83 @@ class TopicAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_topic_list_anonymous_only_includes_visible_topics(self):
+        Topic.objects.create(
+            title="Hidden List Topic",
+            description="x",
+            creator=self.user,
+            is_visible=False,
+        )
+        visible = Topic.objects.create(
+            title="Visible List Topic",
+            description="y",
+            creator=self.user,
+            is_visible=True,
+        )
+        self.client.force_authenticate(user=None)
+        url = reverse("content:topics")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {t["id"] for t in response.data}
+        self.assertIn(visible.id, ids)
+        self.assertNotIn(self.topic.id, ids)
+
+    def test_topic_detail_non_visible_returns_404_for_outsider(self):
+        hidden = Topic.objects.create(
+            title="Secret",
+            description="z",
+            creator=self.user,
+            is_visible=False,
+        )
+        outsider = User.objects.create_user(
+            username="outsider2",
+            email="out2@example.com",
+            password="pass12345",
+        )
+        self.client.force_authenticate(user=outsider)
+        url = reverse("content:topic-detail", args=[hidden.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_topic_creator_cannot_set_visible_without_three_contents(self):
+        url = reverse("content:topic-detail", args=[self.topic.id])
+        response = self.client.patch(url, {"is_visible": True}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_topic_creator_can_set_visible_with_three_contents(self):
+        for i in range(3):
+            c = Content.objects.create(
+                uploaded_by=self.user,
+                media_type="TEXT",
+                original_title=f"C{i}",
+            )
+            self.topic.contents.add(c)
+        url = reverse("content:topic-detail", args=[self.topic.id])
+        response = self.client.patch(url, {"is_visible": True}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("is_visible"))
+        self.topic.refresh_from_db()
+        self.assertTrue(self.topic.is_visible)
+
+    def test_topic_remove_content_forces_not_visible_below_threshold(self):
+        contents = []
+        for i in range(3):
+            c = Content.objects.create(
+                uploaded_by=self.user,
+                media_type="TEXT",
+                original_title=f"R{i}",
+            )
+            contents.append(c)
+            self.topic.contents.add(c)
+        self.topic.is_visible = True
+        self.topic.save(update_fields=["is_visible"])
+
+        url = reverse("content:topic-edit-content", args=[self.topic.id])
+        response = self.client.patch(url, {"content_ids": [contents[0].id]}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.topic.refresh_from_db()
+        self.assertFalse(self.topic.is_visible)
+
 
 class PublicationAPITests(APITestCase):
     """Test suite for Publication API endpoints"""

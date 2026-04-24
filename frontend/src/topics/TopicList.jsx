@@ -10,8 +10,11 @@ import {
     CardActionArea,
     Button,
     Alert,
-    CircularProgress 
+    CircularProgress,
+    Chip,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 import { isAuthenticated } from '../context/localStorageUtils';
@@ -94,9 +97,17 @@ const TopicList = () => {
                                     }}
                                 />
                                 <CardContent>
-                                    <Typography variant="h6" gutterBottom color="text.primary">
-                                        {topic.title}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                        <Typography variant="h6" color="text.primary">
+                                            {topic.title}
+                                        </Typography>
+                                        {isAuthenticated() && topic.is_visible === false && (
+                                            <Chip size="small" icon={<VisibilityOffIcon />} label="No público" variant="outlined" />
+                                        )}
+                                        {isAuthenticated() && topic.is_visible === true && (
+                                            <Chip size="small" icon={<VisibilityIcon />} label="Público" color="success" variant="outlined" />
+                                        )}
+                                    </Box>
                                     {topic.description && (
                                         <Typography variant="body2" color="text.secondary" noWrap>
                                             {topic.description}

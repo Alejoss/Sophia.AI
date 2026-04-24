@@ -13,6 +13,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControlLabel,
+  Switch,
+  Tooltip,
+  Stack,
+  AlertTitle,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -20,6 +25,9 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SaveIcon from "@mui/icons-material/Save";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
 import TopicModerators from "./TopicModerators";
@@ -38,15 +46,22 @@ const TopicEdit = () => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
+    is_visible: false,
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeletingTopic, setIsDeletingTopic] = useState(false);
+
+  const contentCount = topic?.contents?.length ?? 0;
+  const canBePublic =
+    Boolean(topic?.can_be_visible) && contentCount >= 3;
 
   const isFormDirty =
     topic &&
     (formData.title !== (topic.title || "") ||
-      formData.description !== (topic.description || ""));
+      formData.description !== (topic.description || "") ||
+      Boolean(formData.is_visible) !== Boolean(topic.is_visible));
 
   const creatorId = topic ? (typeof topic.creator === "object" ? topic.creator?.id : topic.creator) : null;
   const userId = user?.id;
@@ -65,6 +80,7 @@ const TopicEdit = () => {
         setFormData({
           title: data.title || "",
           description: data.description || "",
+          is_visible: Boolean(data.is_visible),
         });
         setLoading(false);
       } catch (err) {
@@ -117,13 +133,30 @@ const TopicEdit = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
     try {
-      const updatedTopic = await contentApi.updateTopic(topicId, formData);
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+      };
+      if (isCreator) {
+        payload.is_visible = Boolean(formData.is_visible);
+      }
+      const updatedTopic = await contentApi.updateTopic(topicId, payload);
       setTopic(updatedTopic);
+      setFormData((prev) => ({
+        ...prev,
+        is_visible: Boolean(updatedTopic.is_visible),
+      }));
       setError(null);
       navigate(`/content/topics/${topicId}`);
     } catch (err) {
-      setError("Error al actualizar los detalles del tema");
+      const msg =
+        err?.response?.data?.is_visible?.[0] ||
+        err?.response?.data?.is_visible ||
+        err?.response?.data?.detail ||
+        err?.response?.data?.error;
+      setSaveError(msg || "Error al actualizar los detalles del tema");
     } finally {
       setSaving(false);
     }
@@ -243,6 +276,75 @@ const TopicEdit = () => {
         {/* Topic Title and Description Form */}
         <Box>
             <form id="topic-edit-form" onSubmit={handleSubmit}>
+              {saveError && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>
+                  {saveError}
+                </Alert>
+              )}
+              {isCreator && !canBePublic && (
+                <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ borderRadius: 2, mb: 2 }}>
+                  <AlertTitle sx={{ fontWeight: 700 }}>Aún no puedes marcarlo como público</AlertTitle>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    Para que el tema sea público en listados y búsqueda necesitas <strong>al menos 3 contenidos</strong> en el tema.
+                    Actualmente hay <strong>{contentCount}</strong>.
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    Ir a editar contenido
+                  </Button>
+                </Alert>
+              )}
+
+              {isCreator && (
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, flexWrap: "wrap" }}>
+                  <Chip
+                    size="small"
+                    icon={formData.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                    label={formData.is_visible ? "Público" : "No público"}
+                    color={formData.is_visible ? "success" : "default"}
+                    variant={formData.is_visible ? "filled" : "outlined"}
+                  />
+                  <Tooltip
+                    title={
+                      !canBePublic && !formData.is_visible
+                        ? "Necesitas al menos 3 contenidos en el tema para hacerlo público."
+                        : ""
+                    }
+                    disableHoverListener={canBePublic || formData.is_visible}
+                  >
+                    <span>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={Boolean(formData.is_visible)}
+                            disabled={!canBePublic && !formData.is_visible}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, is_visible: e.target.checked }))
+                            }
+                          />
+                        }
+                        label={
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            {formData.is_visible ? (
+                              <VisibilityIcon fontSize="small" />
+                            ) : (
+                              <VisibilityOffIcon fontSize="small" />
+                            )}
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              Visible en listados y búsqueda
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                    </span>
+                  </Tooltip>
+                </Stack>
+              )}
+
               <TextField
                 fullWidth
                 label="Título"

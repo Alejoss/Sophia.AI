@@ -11,6 +11,7 @@ import logging
 
 from comments.models import Comment
 from content.models import Topic, Content, Publication, ContentSuggestion
+from content.utils import get_topic_for_public_or_privileged
 from knowledge_paths.models import KnowledgePath
 from votes.models import Vote, VoteCount
 from utils.notification_utils import notify_content_upvote, notify_knowledge_path_upvote
@@ -393,7 +394,7 @@ class ContentVoteView(BaseGetVoteView):
             })
             
             content = get_object_or_404(Content, pk=content_pk)
-            topic = get_object_or_404(Topic, pk=topic_pk)
+            topic = get_topic_for_public_or_privileged(request, topic_pk)
             action = request.data.get('action')
             
             logger.debug(f"Content found: {content.id} - {content.original_title}")
@@ -465,7 +466,7 @@ class ContentVoteView(BaseGetVoteView):
         """Get vote information for content within a topic."""
         try:
             content = get_object_or_404(Content, pk=content_pk)
-            topic = get_object_or_404(Topic, pk=topic_pk)
+            topic = get_topic_for_public_or_privileged(request, topic_pk)
             
             logger.debug("Retrieving vote info for content", extra={
                 'user_id': request.user.id if request.user.is_authenticated else None,

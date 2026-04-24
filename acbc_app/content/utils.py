@@ -1,7 +1,9 @@
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 import logging
-from content.models import Content
+from content.models import Content, Topic, TopicModeratorInvitation
 from votes.models import VoteCount
 
 # Get logger for content utils
@@ -109,3 +111,24 @@ def get_topic_contents_ordered_for_public_view(topic):
     extras = [c for c in topic.contents.all() if c.id not in seen]
     extras.sort(key=lambda c: c.id)
     return ordered + extras
+
+
+def user_can_access_non_public_topic(topic, user):
+    """Creator, moderators, and users with a pending moderator invite can open a non-public topic."""
+    if not user.is_authenticated:
+        return False
+    if topic.creator_id == user.id:
+        return True
+    if topic.moderators.filter(pk=user.pk).exists():
+        return True
+    return TopicModeratorInvitation.objects.filter(
+        topic=topic, invited_user=user, status="PENDING"
+    ).exists()
+
+
+def get_topic_for_public_or_privileged(request, pk):
+    """404 for users who may not load a non-public topic (direct URL)."""
+    topic = get_object_or_404(Topic, pk=pk)
+    if not topic.is_visible and not user_can_access_non_public_topic(topic, request.user):
+        raise Http404()
+    return topic

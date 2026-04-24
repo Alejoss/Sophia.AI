@@ -264,9 +264,23 @@ class Topic(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     moderators = models.ManyToManyField(User, related_name='moderated_topics')
     related_topics = models.ManyToManyField('self', blank=True, related_name='related_to', symmetrical=False)
+    is_visible = models.BooleanField(
+        default=False,
+        help_text="Whether this topic appears in public listings and search. Hidden topics remain accessible by direct link to creator and moderators.",
+    )
 
     def __str__(self):
         return self.title
+
+    def can_be_visible(self):
+        """At least three content items are required to mark the topic as public."""
+        return self.contents.count() >= 3
+
+    def ensure_visibility_consistency(self):
+        """If the topic no longer has enough content, force it to stay non-public."""
+        if not self.can_be_visible() and self.is_visible:
+            self.is_visible = False
+            self.save(update_fields=['is_visible'])
 
     def is_moderator_or_creator(self, user):
         return user == self.creator or user in self.moderators.all()

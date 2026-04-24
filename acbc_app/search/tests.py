@@ -17,13 +17,21 @@ class SearchAPITests(APITestCase):
         # Invisible profile (should not appear)
         self.profile3 = ContentProfile.objects.create(content=self.content2, title="Hidden", author="Bob", is_visible=False)
 
-        # Create Topics
-        self.topic1 = Topic.objects.create(title="Smart Contracts", description="All about smart contracts")
-        self.topic2 = Topic.objects.create(title="Consensus", description="Consensus mechanisms")
+        # Create Topics (only visible topics appear in search)
+        self.topic1 = Topic.objects.create(
+            title="Smart Contracts", description="All about smart contracts", is_visible=True
+        )
+        self.topic2 = Topic.objects.create(
+            title="Consensus", description="Consensus mechanisms", is_visible=True
+        )
 
-        # Create Knowledge Paths
-        self.kp1 = KnowledgePath.objects.create(title="Intro to Blockchain", description="Start here")
-        self.kp2 = KnowledgePath.objects.create(title="Advanced Blockchain", description="Deep dive")
+        # Create Knowledge Paths (only visible paths appear in search)
+        self.kp1 = KnowledgePath.objects.create(
+            title="Intro to Blockchain", description="Start here", is_visible=True
+        )
+        self.kp2 = KnowledgePath.objects.create(
+            title="Advanced Blockchain", description="Deep dive", is_visible=True
+        )
 
     def test_search_content(self):
         url = reverse('search:search')
@@ -70,7 +78,7 @@ class SearchAPITests(APITestCase):
         url = reverse('search:search')
         # Create extra topics to force pagination
         for i in range(15):
-            Topic.objects.create(title=f"Extra Topic {i}", description="Extra")
+            Topic.objects.create(title=f"Extra Topic {i}", description="Extra", is_visible=True)
         response = self.client.get(url, {'q': 'Extra', 'type': 'topics', 'page_size': 10})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 10)

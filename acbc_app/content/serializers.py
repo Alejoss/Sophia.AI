@@ -246,6 +246,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image = serializers.ImageField(max_length=None, allow_empty_file=True, required=False)
     creator_username = serializers.CharField(source='creator.username', read_only=True)
+    can_be_visible = serializers.SerializerMethodField()
     title = serializers.CharField(
         max_length=200,
         required=True,
@@ -261,8 +262,30 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Topic
-        fields = ['id', 'title', 'description', 'creator', 'creator_username', 'topic_image', 'topic_image_focal_x', 'topic_image_focal_y']
-        read_only_fields = ['creator']
+        fields = [
+            'id', 'title', 'description', 'creator', 'creator_username', 'topic_image',
+            'topic_image_focal_x', 'topic_image_focal_y', 'is_visible', 'can_be_visible',
+        ]
+        read_only_fields = ['creator', 'can_be_visible']
+
+    def get_can_be_visible(self, obj):
+        return obj.can_be_visible()
+
+    def validate_is_visible(self, value):
+        if value is True:
+            if self.instance is None:
+                raise serializers.ValidationError(
+                    'Los temas nuevos empiezan como no públicos; puedes marcarlos públicos al editarlos.'
+                )
+            if not self.instance.can_be_visible():
+                raise serializers.ValidationError(
+                    'Los temas necesitan al menos 3 contenidos para ser públicos.'
+                )
+        return value
+
+    def create(self, validated_data):
+        validated_data['is_visible'] = False
+        return super().create(validated_data)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)

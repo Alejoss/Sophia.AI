@@ -19,6 +19,8 @@ import {
   Alert
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import MailIcon from '@mui/icons-material/Mail';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -359,9 +361,17 @@ const TopicsUser = () => {
                         }}
                       />
                       <CardContent>
-                        <Typography variant="h6" gutterBottom color="text.primary">
-                          {topic.title}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                          <Typography variant="h6" color="text.primary">
+                            {topic.title}
+                          </Typography>
+                          {topic.is_visible === false && (
+                            <Chip size="small" icon={<VisibilityOffIcon />} label="No público" variant="outlined" />
+                          )}
+                          {topic.is_visible === true && (
+                            <Chip size="small" icon={<VisibilityIcon />} label="Público" color="success" variant="outlined" />
+                          )}
+                        </Box>
                         {topic.description && (
                           <Typography variant="body2" color="text.secondary" noWrap>
                             {topic.description}
@@ -423,9 +433,17 @@ const TopicsUser = () => {
                         }}
                       />
                       <CardContent>
-                        <Typography variant="h6" gutterBottom color="text.primary">
-                          {topic.title}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                          <Typography variant="h6" color="text.primary">
+                            {topic.title}
+                          </Typography>
+                          {topic.is_visible === false && (
+                            <Chip size="small" icon={<VisibilityOffIcon />} label="No público" variant="outlined" />
+                          )}
+                          {topic.is_visible === true && (
+                            <Chip size="small" icon={<VisibilityIcon />} label="Público" color="success" variant="outlined" />
+                          )}
+                        </Box>
                         {topic.description && (
                           <Typography variant="body2" color="text.secondary" noWrap>
                             {topic.description}

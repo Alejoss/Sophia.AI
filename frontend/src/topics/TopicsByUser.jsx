@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, Box, Typography } from '@mui/material';
+import { Avatar, Box, Typography, Chip } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import contentApi from '../api/contentApi';
 import { MEDIA_BASE_URL } from '../api/config';
 
-const TopicsByUser = ({ userId, userName }) => {
+const TopicsByUser = ({ userId, userName, isOwnProfile = false }) => {
   const navigate = useNavigate();
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,10 +18,13 @@ const TopicsByUser = ({ userId, userName }) => {
         // For now, fetch all topics and filter by creator
         // In the future, we might want a specific endpoint for this
         const allTopics = await contentApi.getTopics();
-        const userTopics = Array.isArray(allTopics) 
-          ? allTopics.filter(topic => 
-              topic.creator != null && userId != null && String(topic.creator) === String(userId)
-            )
+        const userTopics = Array.isArray(allTopics)
+          ? allTopics.filter((topic) => {
+              if (topic.creator == null || userId == null) return false;
+              if (String(topic.creator) !== String(userId)) return false;
+              if (!isOwnProfile && topic.is_visible === false) return false;
+              return true;
+            })
           : [];
         setTopics(userTopics);
       } catch (err) {
@@ -33,7 +38,7 @@ const TopicsByUser = ({ userId, userName }) => {
     if (userId) {
       fetchTopics();
     }
-  }, [userId]);
+  }, [userId, isOwnProfile]);
 
   const getTopicImageUrl = (topic) => {
     if (topic.topic_image) {
@@ -102,21 +107,47 @@ const TopicsByUser = ({ userId, userName }) => {
                 
                 <div className="flex-1 min-w-0">
                   {/* Title Section */}
-                  <Typography
-                    variant="h6"
+                  <Box
                     sx={{
-                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      flexWrap: 'wrap',
                       mb: 1,
-                      cursor: 'pointer',
-                      '&:hover': { color: 'primary.main' }
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/content/topics/${topic.id}`);
                     }}
                   >
-                    {topic.title}
-                  </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/content/topics/${topic.id}`);
+                      }}
+                    >
+                      {topic.title}
+                    </Typography>
+                    {isOwnProfile && topic.is_visible === false && (
+                      <Chip
+                        size="small"
+                        icon={<VisibilityOffIcon />}
+                        label="No público"
+                        variant="outlined"
+                      />
+                    )}
+                    {isOwnProfile && topic.is_visible === true && (
+                      <Chip
+                        size="small"
+                        icon={<VisibilityIcon />}
+                        label="Público"
+                        color="success"
+                        variant="outlined"
+                      />
+                    )}
+                  </Box>
 
                   {/* Description */}
                   {topic.description && (
