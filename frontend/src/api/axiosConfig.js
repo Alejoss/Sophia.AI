@@ -60,13 +60,12 @@ axiosInstance.interceptors.response.use(
     // 2. The request has already been retried
     // 3. The request is for the refresh token endpoint
     // 4. The request is for the logout endpoint
-    // 5. The request is for the check_auth endpoint (to avoid infinite loops)
+    // 5. (check_auth is not excluded: a stale Bearer must refresh so startup auth can recover.)
     if (error.response?.status !== 401 || 
         !accessToken ||
         originalRequest._retry || 
         originalRequest.url === '/profiles/refresh_token/' ||
-        originalRequest.url === '/profiles/logout/' ||
-        originalRequest.url === '/profiles/check_auth/') {
+        originalRequest.url === '/profiles/logout/') {
       return Promise.reject(error);
     }
 

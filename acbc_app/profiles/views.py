@@ -47,6 +47,25 @@ from django.db.models import Count
 logger = logging.getLogger(__name__)
 
 
+def set_refresh_token_cookie(response, refresh_token: str) -> None:
+    """
+    Persist the refresh token in a browser cookie with max_age aligned to SIMPLE_JWT.
+
+    Without max_age, browsers treat the cookie as a session cookie and drop it when
+    the browser closes, which makes logins feel short-lived despite a long JWT lifetime.
+    """
+    max_age = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+    response.set_cookie(
+        settings.SIMPLE_JWT['REFRESH_COOKIE'],
+        refresh_token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+        samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
+        path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+    )
+
+
 class NewsletterSubscriptionForm(forms.Form):
     email = forms.EmailField(
         label="Email",
@@ -609,15 +628,7 @@ class LoginView(APIView):
 
                 response = Response(response_data)
 
-                # Set refresh token in HTTP-only cookie
-                response.set_cookie(
-                    settings.SIMPLE_JWT['REFRESH_COOKIE'],
-                    refresh_token,
-                    httponly=True,
-                    secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                    samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-                    path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
-                )
+                set_refresh_token_cookie(response, refresh_token)
 
                 return response
             except Exception as e:
@@ -749,15 +760,7 @@ class RegisterView(APIView):
 
                 response = Response(response_data, status=status.HTTP_201_CREATED)
 
-                # Set refresh token in HTTP-only cookie (same as login endpoint)
-                response.set_cookie(
-                    settings.SIMPLE_JWT['REFRESH_COOKIE'],
-                    refresh_token,
-                    httponly=True,
-                    secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                    samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-                    path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
-                )
+                set_refresh_token_cookie(response, refresh_token)
                 # TODO: Implement email activation sending here if needed
                 return response
             except Exception as e:
@@ -821,14 +824,7 @@ class RefreshTokenView(APIView):
                         refresh.blacklist()
                     except Exception:
                         logger.debug("Refresh token blacklist skipped (blacklist app may be disabled)")
-                response.set_cookie(
-                    settings.SIMPLE_JWT['REFRESH_COOKIE'],
-                    str(new_refresh),
-                    httponly=True,
-                    secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                    samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-                    path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
-                )
+                set_refresh_token_cookie(response, str(new_refresh))
             return response
 
         except TokenError as e:
@@ -1052,15 +1048,7 @@ class GoogleLoginView(SocialLoginView):
 
             response = Response(response_data)
 
-            # Set refresh token in HTTP-only cookie
-            response.set_cookie(
-                settings.SIMPLE_JWT['REFRESH_COOKIE'],
-                refresh_token,
-                httponly=True,
-                secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-                path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
-            )
+            set_refresh_token_cookie(response, refresh_token)
             logger.info(f"Successfully completed Google login process for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             return response
         except Exception as e:

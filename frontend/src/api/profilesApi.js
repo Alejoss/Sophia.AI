@@ -12,12 +12,26 @@ const checkAuth = async () => {
     }
 
     const response = await axiosInstance.get('/profiles/check_auth/');
-    
+
     if (response.status === 200) {
-      return response.data.is_authenticated === true;
+      if (response.data.is_authenticated === true) {
+        return true;
+      }
+      // Access token missing/expired but HTTP-only refresh cookie still present: mint a new access token.
+      if (response.data.reason === 'refresh_token_present_requires_refresh') {
+        const refreshResponse = await axiosInstance.post('/profiles/refresh_token/');
+        const { access_token } = refreshResponse.data;
+        if (access_token) {
+          localStorage.setItem('access_token', access_token);
+          axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        }
+        const retry = await axiosInstance.get('/profiles/check_auth/');
+        return retry.status === 200 && retry.data.is_authenticated === true;
+      }
+      return false;
     }
     return false;
-  } catch(error) {
+  } catch (error) {
     return false;
   }
 };
