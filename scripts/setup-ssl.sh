@@ -14,15 +14,36 @@ echo "🔒 Setting up SSL with Let's Encrypt..."
 
 if [ -z "$1" ]; then
     echo "Usage: ./scripts/setup-ssl.sh <your-domain.com> [email]"
-    echo "Example: ./scripts/setup-ssl.sh academia.example.com admin@example.com"
+    echo "Example: ./scripts/setup-ssl.sh academiablockchain.com admin@academiablockchain.com"
     exit 1
 fi
 
 DOMAIN=$1
 EMAIL=${2:-"admin@${DOMAIN}"}
+DOT_COUNT=$(awk -F'.' '{print NF-1}' <<< "$DOMAIN")
+
+# Build certificate SANs:
+# - If apex domain is provided (example.com), include www.example.com automatically.
+# - If www domain is provided, include the apex domain too.
+DOMAINS=("$DOMAIN")
+if [[ "$DOMAIN" == www.* ]]; then
+    APEX_DOMAIN="${DOMAIN#www.}"
+    DOMAINS+=("$APEX_DOMAIN")
+elif [ "$DOT_COUNT" -eq 1 ]; then
+    DOMAINS+=("www.$DOMAIN")
+fi
+
+# Deduplicate in case values overlap
+UNIQUE_DOMAINS=()
+for d in "${DOMAINS[@]}"; do
+    if [[ ! " ${UNIQUE_DOMAINS[*]} " =~ " $d " ]]; then
+        UNIQUE_DOMAINS+=("$d")
+    fi
+done
 
 echo "Domain: $DOMAIN"
 echo "Email: $EMAIL"
+echo "Certificate domains (SAN): ${UNIQUE_DOMAINS[*]}"
 echo "Certificate: Let's Encrypt (free, from https://letsencrypt.org)"
 
 if ! command -v certbot &> /dev/null; then
@@ -35,8 +56,13 @@ echo "Stopping nginx briefly for certificate issuance..."
 docker compose -f docker-compose.prod.yml stop nginx 2>/dev/null || true
 
 echo "Obtaining certificate (certbot standalone)..."
+CERTBOT_DOMAIN_ARGS=()
+for d in "${UNIQUE_DOMAINS[@]}"; do
+    CERTBOT_DOMAIN_ARGS+=("-d" "$d")
+done
+
 sudo certbot certonly --standalone \
-    -d "$DOMAIN" \
+    "${CERTBOT_DOMAIN_ARGS[@]}" \
     --email "$EMAIL" \
     --agree-tos \
     --non-interactive

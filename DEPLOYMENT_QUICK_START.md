@@ -72,6 +72,7 @@
    ```bash
    # 1) Set ALLOWED_HOSTS in acbc_app/.env (yourdomain.com,www.yourdomain.com,...)
    # 2) Get certificate and generate SSL config (gitignored)
+   #    If you pass your apex domain, it also includes www automatically.
    ./scripts/setup-ssl.sh yourdomain.com
    # 3) One rebuild
    ./scripts/deploy.sh
@@ -155,6 +156,7 @@ To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
 **4. HTTPS (recommended)**
 
 - Certificates are from **Let's Encrypt** (free; https://letsencrypt.org). The script **does not change any tracked file**: it generates **nginx/nginx-ssl.conf** (gitignored) on the server.
+- The certificate includes SANs for the hostname passed plus related apex/`www` variant (e.g., passing `yourdomain.com` includes `www.yourdomain.com`; passing `www.yourdomain.com` includes `yourdomain.com`).
 - After DNS points to the droplet, set **ALLOWED_HOSTS** in `acbc_app/.env`, then run setup-ssl, then deploy once (one rebuild):
 
   ```bash
