@@ -56,6 +56,7 @@ import PublicationCreationForm from './publications/PublicationCreationForm';
 import PublicationEditForm from './publications/PublicationEditForm';
 import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
+import CommunityBubble from './generalComponents/CommunityBubble.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -217,6 +218,7 @@ const AppContent = () => {
           </Routes>
         </AuthProvider>
       </Router>
+      <CommunityBubble />
     </MuiThemeProvider>
   );
 };
