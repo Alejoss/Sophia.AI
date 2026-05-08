@@ -32,7 +32,11 @@ const CollectionAddContent = () => {
 
     const filterContent = (content) => {
         // Filter out content that's already in this collection
-        const isInCollection = content.collection?.id === parseInt(collectionId);
+        const contentCollectionId =
+            content?.collection && typeof content.collection === 'object'
+                ? content.collection.id
+                : content?.collection;
+        const isInCollection = contentCollectionId === parseInt(collectionId, 10);
         console.log('CollectionAddContent filtering content:', {
             contentId: content.id,
             contentTitle: content.title,

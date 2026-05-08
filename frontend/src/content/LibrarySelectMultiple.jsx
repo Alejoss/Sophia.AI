@@ -40,6 +40,14 @@ const LibrarySelectMultiple = ({
     contextName = "",
     compact = false
 }) => {
+    const getCollectionId = (item) => {
+        const rawCollection = item?.collection;
+        if (rawCollection && typeof rawCollection === 'object') {
+            return rawCollection.id ?? null;
+        }
+        return rawCollection ?? null;
+    };
+
     const [userContent, setUserContent] = useState([]);
     const [selectedContentProfiles, setSelectedContentProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -104,14 +112,12 @@ const LibrarySelectMultiple = ({
         // Apply collection filter
         if (selectedCollectionId !== null) {
             const collectionIdNum = typeof selectedCollectionId === 'string' 
-                ? parseInt(selectedCollectionId) 
+                ? parseInt(selectedCollectionId, 10) 
                 : selectedCollectionId;
             
             filtered = filtered.filter(item => {
-                // Check if content is in the selected collection
-                // Content has a collection field that is the collection ID
-                return item.collection === collectionIdNum || 
-                       item.collection === selectedCollectionId;
+                const itemCollectionId = getCollectionId(item);
+                return itemCollectionId === collectionIdNum || itemCollectionId === selectedCollectionId;
             });
         }
 

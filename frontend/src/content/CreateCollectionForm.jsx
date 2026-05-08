@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, Paper } from '@mui/material';
+import { Box, Typography, TextField, Button, Paper, FormControlLabel, Switch } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import contentApi from '../api/contentApi';
@@ -12,19 +12,24 @@ const schema = yup.object().shape({
         .required('El nombre de la colección es requerido')
         .min(3, 'El nombre de la colección debe tener al menos 3 caracteres')
         .max(100, 'El nombre de la colección no debe exceder 100 caracteres'),
+    is_public: yup.boolean().default(false),
 });
 
 const CreateCollectionForm = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
-    const { register, handleSubmit, formState: { errors } } = useForm({
-        resolver: yupResolver(schema)
+    const { register, handleSubmit, control, formState: { errors } } = useForm({
+        resolver: yupResolver(schema),
+        defaultValues: { name: '', is_public: false },
     });
 
     const onSubmit = async (data) => {
         setIsSubmitting(true);
         try {
-            await contentApi.createCollection(data);
+            await contentApi.createCollection({
+                name: data.name,
+                is_public: !!data.is_public,
+            });
             navigate('/content/collections');
         } catch (error) {
             console.error('Failed to create collection:', error);
@@ -48,7 +53,34 @@ const CreateCollectionForm = () => {
                         {...register('name')}
                         error={!!errors.name}
                         helperText={errors.name?.message}
-                        sx={{ mb: 3 }}
+                        sx={{ mb: 2 }}
+                    />
+
+                    <Controller
+                        name="is_public"
+                        control={control}
+                        render={({ field }) => (
+                            <FormControlLabel
+                                sx={{ mb: 2, display: 'flex', alignItems: 'flex-start' }}
+                                control={
+                                    <Switch
+                                        checked={!!field.value}
+                                        onChange={(_, v) => field.onChange(v)}
+                                        color="primary"
+                                    />
+                                }
+                                label={
+                                    <Box>
+                                        <Typography variant="body2" component="span" display="block">
+                                            Colección pública
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                            Aparecerá en la sección de colecciones públicas de la biblioteca (solo ítems marcados como visibles en búsqueda).
+                                        </Typography>
+                                    </Box>
+                                }
+                            />
+                        )}
                     />
 
                     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -73,4 +105,4 @@ const CreateCollectionForm = () => {
     );
 };
 
-export default CreateCollectionForm; 
+export default CreateCollectionForm;

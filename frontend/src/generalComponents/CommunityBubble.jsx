@@ -3,24 +3,41 @@ import {
   Box,
   Collapse,
   IconButton,
+  Link as MuiLink,
   Paper,
   Typography,
   useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { useThemeMode } from '../context/ThemeContext.jsx';
 
-const BUBBLE_TEXT = `Academia Blockchain es un proyecto comunitario. Puedes sugerir contenido para temas.
-
+/** Resto del mensaje tras la frase con enlace al inicio. */
+const BUBBLE_REST = `Puedes sugerir contenido.
 Crear caminos del conocimiento.
 Crear Temas.
 Compartir tu Biblioteca.`;
 
+const isBubbleRoute = (pathname) => {
+  if (pathname === '/search' || pathname.startsWith('/content/search/')) {
+    return true;
+  }
+  if (pathname === '/content/topics' || pathname.startsWith('/content/topics/')) {
+    return true;
+  }
+  if (pathname === '/knowledge_path' || pathname.startsWith('/knowledge_path/')) {
+    return true;
+  }
+  return false;
+};
+
 const CommunityBubble = () => {
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const theme = useTheme();
   const { mode } = useThemeMode();
+  const visible = isBubbleRoute(pathname);
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
@@ -29,6 +46,10 @@ const CommunityBubble = () => {
   const close = useCallback(() => {
     setOpen(false);
   }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -42,6 +63,10 @@ const CommunityBubble = () => {
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <Box
@@ -84,14 +109,29 @@ const CommunityBubble = () => {
             <CloseIcon fontSize="small" />
           </IconButton>
           <Typography
+            component="div"
             variant="body2"
             sx={{
-              whiteSpace: 'pre-line',
               lineHeight: 1.6,
               color: 'text.primary',
             }}
           >
-            {BUBBLE_TEXT}
+            <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
+              Recuerda que Academia Blockchain es un{' '}
+              <MuiLink
+                component={RouterLink}
+                to="/"
+                underline="hover"
+                color="primary"
+                onClick={close}
+              >
+                proyecto comunitario
+              </MuiLink>
+              .
+            </Box>
+            <Box component="span" sx={{ whiteSpace: 'pre-line' }}>
+              {BUBBLE_REST}
+            </Box>
           </Typography>
         </Paper>
       </Collapse>

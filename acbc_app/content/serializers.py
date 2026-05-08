@@ -230,17 +230,40 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
 
 class CollectionSerializer(serializers.ModelSerializer):
     library_name = serializers.CharField(source='library.name', read_only=True)
+    owner_id = serializers.IntegerField(source='library.user.id', read_only=True)
+    owner_username = serializers.CharField(source='library.user.username', read_only=True)
     content_count = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Collection
-        fields = ['id', 'name', 'library', 'library_name', 'content_count']
+        fields = [
+            'id', 'name', 'library', 'library_name', 'is_public',
+            'content_count', 'owner_id', 'owner_username', 'is_owner',
+        ]
         extra_kwargs = {
             'library': {'write_only': True}
         }
 
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.library.user_id == request.user.id
+
     def get_content_count(self, obj):
         return ContentProfile.objects.filter(collection=obj).count()
+
+
+class PublicCollectionSummarySerializer(serializers.ModelSerializer):
+    """List entry for discoverable public collections (library home)."""
+    owner_id = serializers.IntegerField(source='library.user.id', read_only=True)
+    owner_username = serializers.CharField(source='library.user.username', read_only=True)
+    visible_item_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Collection
+        fields = ['id', 'name', 'owner_id', 'owner_username', 'visible_item_count']
 
 
 class TopicBasicSerializer(serializers.ModelSerializer):
@@ -446,15 +469,26 @@ class SimpleContentSerializer(serializers.ModelSerializer):
     Only includes the absolute minimum data needed for basic display with icons.
     """
     url = serializers.SerializerMethodField()
-    
+    file_details = serializers.SerializerMethodField()
+
     class Meta:
         model = Content
         fields = [
             'id', 'media_type', 'original_title', 'url',
             'has_spanish_subtitles', 'has_spanish_dubbing',
-            'uploaded_by'
+            'uploaded_by', 'file_details',
         ]
-    
+
+    def get_file_details(self, obj):
+        if not self.context.get('collection_detail'):
+            return None
+        try:
+            if hasattr(obj, 'file_details') and obj.file_details:
+                return FileDetailsSerializer(obj.file_details, context=self.context).data
+        except Exception as e:
+            print(f"Error getting file_details in SimpleContentSerializer for content {obj.id}: {str(e)}")
+        return None
+
     def get_url(self, obj):
         """Get URL for icon determination only"""
         try:
@@ -470,11 +504,12 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
     Returns minimal data structure that matches what ContentDisplay expects.
     """
     content = SimpleContentSerializer(read_only=True)
-    
+    user = serializers.IntegerField(source='user_id', read_only=True)
+
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'content']
-        
+        fields = ['id', 'title', 'author', 'personal_note', 'content', 'user']
+
     def to_representation(self, instance):
         try:
             data = super().to_representation(instance)
@@ -489,6 +524,8 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
                 'id': instance.id,
                 'title': getattr(instance, 'title', 'Untitled'),
                 'author': getattr(instance, 'author', ''),
+                'personal_note': getattr(instance, 'personal_note', None),
+                'user': getattr(instance, 'user_id', None),
                 'content': {
                     'id': getattr(instance.content, 'id', None) if instance.content else None,
                     'media_type': getattr(instance.content, 'media_type', 'TEXT') if instance.content else 'TEXT',

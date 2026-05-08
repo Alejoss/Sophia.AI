@@ -59,6 +59,49 @@
   background-color: #0056b3;
 }
 
+.search-collections-section {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.search-collections-section h2 {
+  text-align: center;
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.search-collections-subtitle {
+  text-align: center;
+  margin: 0 0 1.5rem;
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.search-collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.search-collections-hint {
+  text-align: center;
+  margin: 0;
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+}
+
+.search-collections-hint a {
+  color: #007bff;
+}
+
 .search-filters {
   display: flex;
   gap: 2rem;

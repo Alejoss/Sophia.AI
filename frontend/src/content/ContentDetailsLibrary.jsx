@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Card, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
+import { Card, Typography, Box, Button, Alert } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
@@ -8,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 import ContentReferences from './ContentReferences';
 import ContentDisplay from './ContentDisplay';
 import AddToLibraryModal from '../components/AddToLibraryModal';
+import FileSuggestionUploadDialog from './FileSuggestionUploadDialog';
 
 // ContentDisplay Mode: "detailed" - Full content detail view in library context
 const ContentDetailsLibrary = () => {
@@ -17,8 +18,6 @@ const ContentDetailsLibrary = () => {
     const [references, setReferences] = useState(null);
     const [fileSuggestions, setFileSuggestions] = useState([]);
     const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
-    const [suggestionFile, setSuggestionFile] = useState(null);
-    const [suggestionMessage, setSuggestionMessage] = useState('');
     const [suggestionError, setSuggestionError] = useState('');
     const [suggestionSuccess, setSuggestionSuccess] = useState('');
     const { contentId } = useParams();
@@ -105,29 +104,6 @@ const ContentDetailsLibrary = () => {
         setContent(updatedContent);
     };
 
-    const handleSubmitFileSuggestion = async () => {
-        setSuggestionError('');
-        setSuggestionSuccess('');
-        if (!suggestionFile) {
-            setSuggestionError('Debes seleccionar un archivo.');
-            return;
-        }
-
-        try {
-            const formData = new FormData();
-            formData.append('file', suggestionFile);
-            formData.append('message', suggestionMessage || '');
-            await contentApi.createFileSuggestion(contentId, formData);
-            setSuggestionSuccess('Sugerencia enviada correctamente.');
-            setSuggestionFile(null);
-            setSuggestionMessage('');
-            setSuggestDialogOpen(false);
-            await refreshFileSuggestions();
-        } catch (err) {
-            setSuggestionError(err?.response?.data?.error || 'No se pudo enviar la sugerencia.');
-        }
-    };
-
     const handleAcceptSuggestion = async (suggestionId) => {
         try {
             await contentApi.acceptFileSuggestion(suggestionId);
@@ -199,7 +175,10 @@ const ContentDetailsLibrary = () => {
                     variant="detailed"
                     showAuthor={true}
                     showSuggestFileButton={canSuggestFile}
-                    onSuggestFile={() => setSuggestDialogOpen(true)}
+                    onSuggestFile={() => {
+                        setSuggestionError('');
+                        setSuggestDialogOpen(true);
+                    }}
                 />
 
                 <Typography
@@ -273,41 +252,16 @@ const ContentDetailsLibrary = () => {
                 )}
             </Card>
 
-            <Dialog open={suggestDialogOpen} onClose={() => setSuggestDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Sugerir archivo</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Sube un archivo que corresponda a este contenido con URL.
-                    </Typography>
-                    <Button variant="outlined" component="label" sx={{ mb: 2 }}>
-                        Seleccionar archivo
-                        <input
-                            type="file"
-                            hidden
-                            onChange={(e) => setSuggestionFile(e.target.files?.[0] || null)}
-                        />
-                    </Button>
-                    {suggestionFile && (
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                            Archivo seleccionado: {suggestionFile.name}
-                        </Typography>
-                    )}
-                    <TextField
-                        label="Mensaje (opcional)"
-                        fullWidth
-                        multiline
-                        rows={3}
-                        value={suggestionMessage}
-                        onChange={(e) => setSuggestionMessage(e.target.value)}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setSuggestDialogOpen(false)}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleSubmitFileSuggestion}>
-                        Enviar sugerencia
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FileSuggestionUploadDialog
+                open={suggestDialogOpen}
+                onClose={() => setSuggestDialogOpen(false)}
+                contentId={contentId}
+                onSuccess={async () => {
+                    setSuggestionSuccess('Sugerencia enviada correctamente.');
+                    setSuggestionError('');
+                    await refreshFileSuggestions();
+                }}
+            />
         </Box>
     );
 };

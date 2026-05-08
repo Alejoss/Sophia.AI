@@ -41,6 +41,14 @@ const LibrarySelectSingle = ({
   compact = false,
   isLoading = false,
 }) => {
+  const getCollectionId = (item) => {
+    const rawCollection = item?.collection;
+    if (rawCollection && typeof rawCollection === 'object') {
+      return rawCollection.id ?? null;
+    }
+    return rawCollection ?? null;
+  };
+
   const [userContent, setUserContent] = useState([]);
   const [selectedContentProfile, setSelectedContentProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,9 +111,13 @@ const LibrarySelectSingle = ({
           ? parseInt(selectedCollectionId, 10)
           : selectedCollectionId;
       filtered = filtered.filter(
-        (item) =>
-          item.collection === collectionIdNum ||
-          item.collection === selectedCollectionId
+        (item) => {
+          const itemCollectionId = getCollectionId(item);
+          return (
+            itemCollectionId === collectionIdNum ||
+            itemCollectionId === selectedCollectionId
+          );
+        }
       );
     }
 

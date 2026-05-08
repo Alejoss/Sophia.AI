@@ -828,13 +828,19 @@ class RefreshTokenView(APIView):
             return response
 
         except TokenError as e:
-            logger.error(f"Token refresh failed with token error: {str(e)}", exc_info=True)
+            logger.warning(
+                "Token refresh failed with token error (expected)",
+                extra={'detail': str(e)},
+            )
             return Response(
                 {'error': 'Token de actualización inválido'},
                 status=status.HTTP_403_FORBIDDEN
             )
         except Exception as e:
-            logger.error(f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+            logger.warning(
+                f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}",
+                exc_info=True,
+            )
             return Response(
                 {'error': 'Token de actualización inválido'},
                 status=status.HTTP_403_FORBIDDEN
@@ -857,7 +863,10 @@ class GoogleLoginView(SocialLoginView):
         # Check for access token
         id_token = request.data.get('access_token')
         if not id_token:
-            logger.error(f"No access token provided in request for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+            logger.warning(
+                "Google login: no access token in request",
+                extra={'path': request.path},
+            )
             return Response(
                 {'error': 'No se proporcionó token de acceso'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -895,7 +904,10 @@ class GoogleLoginView(SocialLoginView):
                     break
             
             if not public_key:
-                logger.error(f"No matching public key found for token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                logger.warning(
+                    "Google login: no matching public key for token kid",
+                    extra={'path': request.path},
+                )
                 return Response(
                     {'error': 'No se encontró una clave pública coincidente para el token'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -932,20 +944,32 @@ class GoogleLoginView(SocialLoginView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except jwt.InvalidTokenError as e:
-                logger.error(f"Invalid token error for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+                logger.warning(
+                    f"Google login: invalid ID token: {str(e)}",
+                    extra={'path': request.path},
+                    exc_info=True,
+                )
                 return Response(
                     {'error': f'Token de ID inválido: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except Exception as e:
-                logger.error(f"Unexpected error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+                logger.warning(
+                    f"Google login: unexpected error during JWT decode: {str(e)}",
+                    extra={'path': request.path},
+                    exc_info=True,
+                )
                 return Response(
                     {'error': 'Error al verificar el token'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
         except Exception as e:
-            logger.error(f"Error during token verification for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+            logger.warning(
+                f"Google login: error during token verification: {str(e)}",
+                extra={'path': request.path},
+                exc_info=True,
+            )
             return Response(
                 {'error': 'Error al verificar el token'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -965,7 +989,10 @@ class GoogleLoginView(SocialLoginView):
             # Create new user
             email = decoded_token.get('email')
             if not email:
-                logger.error(f"No email provided in Google token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                logger.warning(
+                    "Google login: no email in token for new social account",
+                    extra={'path': request.path},
+                )
                 return Response(
                     {'error': 'Correo electrónico no proporcionado por Google'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -1026,11 +1053,25 @@ class GoogleLoginView(SocialLoginView):
                     )
                     logger.info(f"Successfully saved profile picture for user {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 else:
-                    logger.error(f"Failed to download profile picture. Status code: {picture_response.status_code} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                    logger.warning(
+                        "Google login: profile picture download non-200 (optional)",
+                        extra={
+                            'status_code': picture_response.status_code,
+                            'user_id': user.id,
+                        },
+                    )
         except requests.RequestException as e:
-            logger.error(f"Request error while downloading profile picture for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+            logger.warning(
+                f"Google login: request error downloading profile picture: {str(e)}",
+                extra={'user_id': user.id},
+                exc_info=True,
+            )
         except Exception as e:
-            logger.error(f"Error processing profile picture for user {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}", exc_info=True)
+            logger.warning(
+                f"Google login: error processing profile picture for user {user.username}: {str(e)}",
+                extra={'user_id': user.id},
+                exc_info=True,
+            )
             # Continue with login process even if picture fails
 
         try:

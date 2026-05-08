@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import '../styles/home.css';
 import { 
@@ -27,14 +27,12 @@ import {
   Hub as HubIcon,
 } from "@mui/icons-material";
 import { AuthContext } from "../context/AuthContext.jsx";
-import { getUserFromLocalStorage } from "../context/localStorageUtils.js";
 
 const GITHUB_URL = "https://github.com/Alejoss/Sophia.AI";
 
 const Home = () => {
   const navigate = useNavigate();
   const { authState, authInitialized } = React.useContext(AuthContext);
-  const storedUser = getUserFromLocalStorage();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
@@ -42,15 +40,6 @@ const Home = () => {
   // Hero/content box background: light glass in light mode, dark glass in dark mode for text contrast
   const heroBoxBg = isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.77)';
   const isAuthenticated = authState?.isAuthenticated ?? false;
-
-  useEffect(() => {
-    if (!authInitialized) return;
-    // If there is evidence of a past login (stored user but not authenticated), redirect to login
-    if (!isAuthenticated && storedUser) {
-      navigate("/profiles/login");
-      return;
-    }
-  }, [authInitialized, isAuthenticated, storedUser, navigate]);
 
   // Authenticated home: project info, collaborative, open source, blockchain status, GitHub
   if (authInitialized && isAuthenticated) {

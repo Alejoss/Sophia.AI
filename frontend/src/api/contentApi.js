@@ -72,7 +72,11 @@ const contentApi = {
     },
 
     // Upload file directly to S3 with optional progress (XHR for progress)
-    uploadFileToS3: async (file, uploadUrl, onProgress) => {
+    uploadFileToS3: async (file, uploadPayload, onProgress) => {
+        if (uploadPayload?.upload_mode === 'multipart') {
+            return contentApi.uploadFileToS3Multipart(file, uploadPayload, onProgress);
+        }
+        const uploadUrl = typeof uploadPayload === 'string' ? uploadPayload : uploadPayload?.upload_url;
         const urlHost = uploadUrl ? new URL(uploadUrl).host : '(no URL)';
         console.log('[S3 upload] PUT to S3 starting, host:', urlHost, 'size:', file?.size);
         return new Promise((resolve, reject) => {
@@ -100,6 +104,67 @@ const contentApi = {
             };
             xhr.send(file);
         });
+    },
+
+    uploadFileToS3Multipart: async (file, uploadPayload, onProgress) => {
+        const partUrls = uploadPayload?.part_urls || [];
+        const partSize = uploadPayload?.part_size || (64 * 1024 * 1024);
+        const totalSize = file?.size || 0;
+        if (!partUrls.length) {
+            throw new Error('Multipart upload inválido: no hay partes para subir');
+        }
+
+        let uploadedBytes = 0;
+        const parts = [];
+        const uploadPart = (partUrl, blob, partNumber) =>
+            new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', partUrl);
+                xhr.withCredentials = false;
+                let lastLoaded = 0;
+                if (onProgress && xhr.upload) {
+                    xhr.upload.onprogress = (e) => {
+                        if (!e.lengthComputable) return;
+                        const delta = e.loaded - lastLoaded;
+                        lastLoaded = e.loaded;
+                        uploadedBytes += Math.max(0, delta);
+                        onProgress({ loaded: Math.min(uploadedBytes, totalSize), total: totalSize });
+                    };
+                }
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        const etag = xhr.getResponseHeader('ETag');
+                        if (!etag) {
+                            reject(new Error(`S3 multipart upload failed: missing ETag for part ${partNumber}`));
+                            return;
+                        }
+                        resolve({ part_number: partNumber, etag });
+                    } else {
+                        reject(new Error(`S3 multipart upload failed: ${xhr.status} ${xhr.statusText}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('S3 multipart upload failed'));
+                xhr.send(blob);
+            });
+
+        for (const part of partUrls) {
+            const partNumber = Number(part.part_number);
+            if (!partNumber || !part.upload_url) {
+                throw new Error('Multipart upload inválido: parte incompleta');
+            }
+            const start = (partNumber - 1) * partSize;
+            const end = Math.min(start + partSize, totalSize);
+            const chunk = file.slice(start, end);
+            const uploadedPart = await uploadPart(part.upload_url, chunk, partNumber);
+            uploadedBytes = end;
+            if (onProgress) onProgress({ loaded: uploadedBytes, total: totalSize });
+            parts.push(uploadedPart);
+        }
+
+        return {
+            upload_id: uploadPayload.upload_id,
+            parts: parts.sort((a, b) => a.part_number - b.part_number),
+        };
     },
 
     // Confirm: after S3 upload, create Content/ContentProfile/FileDetails
@@ -135,7 +200,11 @@ const contentApi = {
                 has_spanish_subtitles: metadata.has_spanish_subtitles,
                 has_spanish_dubbing: metadata.has_spanish_dubbing
             });
-            await contentApi.uploadFileToS3(file, presignData.upload_url, onProgress);
+            const uploadMetadata = await contentApi.uploadFileToS3(
+                file,
+                presignData.upload_mode ? presignData : presignData.upload_url,
+                onProgress
+            );
             const result = await contentApi.uploadContentConfirm(presignData.key, {
                 media_type: metadata.media_type,
                 title: metadata.title,
@@ -145,7 +214,8 @@ const contentApi = {
                 is_producer: metadata.is_producer,
                 has_spanish_subtitles: metadata.has_spanish_subtitles,
                 has_spanish_dubbing: metadata.has_spanish_dubbing,
-                file_size: file.size
+                file_size: file.size,
+                ...(uploadMetadata || {})
             });
             console.log('[S3 upload] Flow complete, content_id:', result?.content_id);
             return result;
@@ -227,6 +297,26 @@ const contentApi = {
         }
     },
 
+    /**
+     * Paginated public collections (is_public + at least one visible item).
+     * @param {{ page?: number, page_size?: number, search?: string }} params
+     */
+    getPublicCollections: async (params = {}) => {
+        try {
+            const searchParams = new URLSearchParams();
+            if (params.page != null) searchParams.set('page', String(params.page));
+            if (params.page_size != null) searchParams.set('page_size', String(params.page_size));
+            if (params.search) searchParams.set('search', params.search.trim());
+            const qs = searchParams.toString();
+            const url = qs ? `/content/collections/public/?${qs}` : '/content/collections/public/';
+            const response = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching public collections:', error);
+            throw error;
+        }
+    },
+
     createCollection: async (collectionData) => {
         try {
             const response = await axiosInstance.post('/content/collections/', collectionData);
@@ -304,9 +394,9 @@ const contentApi = {
         }
     },
 
-    getTopicDetails: async (topicId) => {
+    getTopicDetails: async (topicId, params = {}) => {
         try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/`);
+            const response = await axiosInstance.get(`/content/topics/${topicId}/`, { params });
             return response.data;
         } catch (error) {
             console.error('Error fetching topic details:', error);
@@ -376,9 +466,14 @@ const contentApi = {
         }
     },
 
-    getTopicContentByType: async (topicId, mediaType) => {
+    getTopicContentByType: async (topicId, mediaType, params = {}) => {
         try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/content/${mediaType}/`);
+            const response = await axiosInstance.get(`/content/topics/${topicId}/content/${mediaType}/`, {
+                params: {
+                    page: params.page,
+                    page_size: params.page_size,
+                },
+            });
             return response.data;
         } catch (error) {
             console.error('Error fetching topic content by type:', error);
@@ -737,16 +832,97 @@ const contentApi = {
     },
 
     // File Suggestions API methods (URL -> optional file attachment)
-    createFileSuggestion: async (contentId, formData) => {
+    createFileSuggestion: async (contentId, formData, options = {}) => {
         try {
             const response = await axiosInstance.post(
                 `/content/content/${contentId}/file-suggestions/`,
-                formData
+                formData,
+                {
+                    timeout: options.timeout ?? 30000,
+                    onUploadProgress: options.onUploadProgress,
+                }
             );
             return response.data;
         } catch (error) {
             console.error('Error creating file suggestion:', error.response || error);
             throw error;
+        }
+    },
+
+    /** Presign for large file suggestions (direct S3 PUT, no multipart timeout through Django). */
+    fileSuggestionPresign: async (contentId, metadata) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/file-suggestions/presign/`,
+                metadata,
+                {
+                    timeout: 60000,
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error presigning file suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    /** After S3 PUT, register the FileSuggestion row (small JSON request). */
+    fileSuggestionConfirm: async (contentId, payload) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/file-suggestions/confirm/`,
+                payload,
+                {
+                    timeout: 120000,
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error confirming file suggestion:', error.response || error);
+            throw error;
+        }
+    },
+
+    /**
+     * Large-friendly flow: presign -> PUT to S3 (XHR progress) -> confirm.
+     * If S3 is not configured (503), falls back to multipart POST with no timeout.
+     */
+    uploadFileSuggestionViaS3: async (contentId, file, message = '', onProgress) => {
+        try {
+            const presignData = await contentApi.fileSuggestionPresign(contentId, {
+                filename: file.name,
+                file_size: file.size,
+                content_type: file.type || 'application/octet-stream',
+            });
+            const uploadMetadata = await contentApi.uploadFileToS3(
+                file,
+                presignData.upload_mode ? presignData : presignData.upload_url,
+                onProgress
+            );
+            return await contentApi.fileSuggestionConfirm(contentId, {
+                key: presignData.key,
+                file_size: file.size,
+                message: message || '',
+                ...(uploadMetadata || {}),
+            });
+        } catch (err) {
+            if (err.response?.status === 503) {
+                console.warn('[File suggestion] S3 unavailable, using multipart fallback');
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('message', message || '');
+                return await contentApi.createFileSuggestion(contentId, formData, {
+                    timeout: 0,
+                    onUploadProgress: onProgress
+                        ? (e) => {
+                              if (e.total) onProgress({ loaded: e.loaded, total: e.total });
+                          }
+                        : undefined,
+                });
+            }
+            throw err;
         }
     },
 

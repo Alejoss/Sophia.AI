@@ -14,8 +14,8 @@ from rest_framework.decorators import action
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
-from django.db import models
-from django.db.models import Q, OuterRef, Subquery
+from django.db import models, IntegrityError
+from django.db.models import Q, OuterRef, Subquery, Count
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
@@ -33,6 +33,7 @@ from votes.models import VoteCount
 from content.serializers import (
     LibrarySerializer,
     CollectionSerializer,
+    PublicCollectionSummarySerializer,
     ContentSerializer,
     ContentWithSelectedProfileSerializer,
     TopicBasicSerializer,
@@ -57,8 +58,10 @@ from bs4 import BeautifulSoup
 import requests
 import re
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
+from math import ceil
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+from utils.logging_utils import log_error
 import time
 import uuid
 import boto3
@@ -617,9 +620,71 @@ class UploadContentView(APIView):
             )
 
 
-# Max size for direct presigned PUT (5 GB)
-UPLOAD_CONTENT_MAX_SIZE = 5 * 1024 * 1024 * 1024
+# S3 limits: single PUT up to 5 GB, multipart up to 5 TB.
+S3_SINGLE_PUT_MAX_SIZE = 5 * 1024 * 1024 * 1024
+UPLOAD_CONTENT_MAX_SIZE = 5 * 1024 * 1024 * 1024 * 1024
+S3_MULTIPART_MIN_PART_SIZE = 5 * 1024 * 1024
+S3_MULTIPART_DEFAULT_PART_SIZE = 64 * 1024 * 1024
+S3_MULTIPART_MAX_PARTS = 10000
 VALID_MEDIA_TYPES = ['VIDEO', 'AUDIO', 'TEXT', 'IMAGE']
+
+
+def _compute_multipart_part_size(file_size):
+    dynamic_part_size = ceil(file_size / S3_MULTIPART_MAX_PARTS)
+    return max(S3_MULTIPART_MIN_PART_SIZE, S3_MULTIPART_DEFAULT_PART_SIZE, dynamic_part_size)
+
+
+def _build_s3_upload_plan(s3_client, bucket, key, content_type, file_size, expires_in):
+    if file_size <= S3_SINGLE_PUT_MAX_SIZE:
+        upload_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'ContentType': content_type,
+                'ACL': 'public-read',
+            },
+            ExpiresIn=expires_in
+        )
+        return {
+            'upload_mode': 'single',
+            'upload_url': upload_url,
+            'key': key,
+            'expires_in': expires_in,
+        }
+
+    part_size = _compute_multipart_part_size(file_size)
+    total_parts = ceil(file_size / part_size)
+    multipart_resp = s3_client.create_multipart_upload(
+        Bucket=bucket,
+        Key=key,
+        ACL='public-read',
+        ContentType=content_type,
+    )
+    upload_id = multipart_resp['UploadId']
+    part_urls = []
+    for part_number in range(1, total_parts + 1):
+        part_url = s3_client.generate_presigned_url(
+            'upload_part',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'UploadId': upload_id,
+                'PartNumber': part_number,
+            },
+            ExpiresIn=expires_in
+        )
+        part_urls.append({'part_number': part_number, 'upload_url': part_url})
+
+    return {
+        'upload_mode': 'multipart',
+        'key': key,
+        'upload_id': upload_id,
+        'part_size': part_size,
+        'total_parts': total_parts,
+        'part_urls': part_urls,
+        'expires_in': expires_in,
+    }
 
 
 class UploadContentPresignView(APIView):
@@ -658,7 +723,7 @@ class UploadContentPresignView(APIView):
             return Response({'error': 'file_size debe ser un numero'}, status=status.HTTP_400_BAD_REQUEST)
         if file_size <= 0 or file_size > UPLOAD_CONTENT_MAX_SIZE:
             return Response(
-                {'error': 'El tamano del archivo debe estar entre 1 byte y 5 GB'},
+                {'error': 'El tamano del archivo debe estar entre 1 byte y 5 TB'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         # Sanitize filename for key (keep extension). Structure: content/{media_type}/{user_id}/{uuid}_{name}
@@ -686,15 +751,13 @@ class UploadContentPresignView(APIView):
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
-            upload_url = s3_client.generate_presigned_url(
-                'put_object',
-                Params={
-                    'Bucket': bucket,
-                    'Key': key,
-                    'ContentType': content_type,
-                    'ACL': 'public-read',
-                },
-                ExpiresIn=expires_in
+            upload_plan = _build_s3_upload_plan(
+                s3_client=s3_client,
+                bucket=bucket,
+                key=key,
+                content_type=content_type,
+                file_size=file_size,
+                expires_in=expires_in
             )
         except Exception as e:
             logger.exception("S3 presign: boto3 failed: %s", e)
@@ -706,11 +769,7 @@ class UploadContentPresignView(APIView):
             "S3 presign: success",
             extra={'user_id': request.user.id, 's3_key': key, 'bucket': bucket}
         )
-        return Response({
-            'upload_url': upload_url,
-            'key': key,
-            'expires_in': expires_in
-        }, status=status.HTTP_200_OK)
+        return Response(upload_plan, status=status.HTTP_200_OK)
 
 
 class UploadContentConfirmView(APIView):
@@ -743,6 +802,8 @@ class UploadContentConfirmView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         key = request.data.get('key')
+        upload_id = request.data.get('upload_id')
+        multipart_parts = request.data.get('parts')
         if not key or not isinstance(key, str) or not key.strip():
             return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
         key = key.strip()
@@ -795,6 +856,31 @@ class UploadContentConfirmView(APIView):
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
+            if upload_id:
+                if not isinstance(upload_id, str) or not upload_id.strip():
+                    return Response({'error': 'upload_id invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                if not isinstance(multipart_parts, list) or not multipart_parts:
+                    return Response({'error': 'Se requieren parts para completar multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
+                normalized_parts = []
+                for part in multipart_parts:
+                    if not isinstance(part, dict):
+                        return Response({'error': 'parts invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    etag = part.get('etag')
+                    part_number = part.get('part_number')
+                    if etag is None or part_number is None:
+                        return Response({'error': 'Cada part requiere etag y part_number'}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        part_number = int(part_number)
+                    except (TypeError, ValueError):
+                        return Response({'error': 'part_number invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    normalized_parts.append({'ETag': str(etag), 'PartNumber': part_number})
+                normalized_parts.sort(key=lambda p: p['PartNumber'])
+                s3_client.complete_multipart_upload(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id.strip(),
+                    MultipartUpload={'Parts': normalized_parts}
+                )
             s3_client.head_object(Bucket=bucket, Key=key)
         except Exception as e:
             logger.warning(
@@ -947,11 +1033,32 @@ class UserLibraryPagination(PageNumberPagination):
         })
 
 
+class TopicContentMediaTypePagination(PageNumberPagination):
+    """Pagination for topic media-type listings (used by carousel lazy loading)."""
+    page_size = 12
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.page.paginator.count,
+            'current_page': self.page.number,
+            'total_pages': self.page.paginator.num_pages,
+            'has_next': self.page.has_next(),
+            'has_previous': self.page.has_previous(),
+            # Keep both keys for compatibility with existing frontend consumers.
+            'results': data,
+            'contents': data,
+        })
+
+
 class UserContentWithDetailsView(APIView):
     """Paginated list of the current user's content profiles with file details for library display."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user_id = request.user.id
+        username = request.user.username
         try:
             queryset = ContentProfile.objects.filter(user=request.user).select_related(
                 'content', 'content__file_details'
@@ -982,11 +1089,29 @@ class UserContentWithDetailsView(APIView):
                         context={'request': request},
                     )
                     response_data.append(serializer.data)
-                except Exception:
+                except Exception as e:
+                    logger.warning(
+                        "Failed to serialize content profile (card mode)",
+                        extra={
+                            'user_id': user_id,
+                            'username': username,
+                            'profile_id': profile.id,
+                            'content_id': profile.content_id,
+                            'error': str(e),
+                        },
+                        exc_info=True,
+                    )
                     continue
 
             return paginator.get_paginated_response(response_data)
-        except Exception:
+        except Exception as e:
+            log_error(
+                e,
+                context='UserContentWithDetailsView.get',
+                user_id=user_id,
+                extra={'username': username},
+                logger_instance=logger,
+            )
             return Response(
                 {'error': 'Ocurrio un error al obtener el contenido'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1017,8 +1142,17 @@ class UserContentByIdView(APIView):
                     )
                     response_data.append(serializer.data)
                 except Exception as e:
-                    # Skip this profile instead of failing the entire request
-                    continue
+                    logger.warning(
+                        "Failed to serialize content profile (by user id)",
+                        extra={
+                            'requesting_user_id': request.user.id,
+                            'target_user_id': user_id,
+                            'profile_id': profile.id,
+                            'content_id': profile.content_id,
+                            'error': str(e),
+                        },
+                        exc_info=True,
+                    )
             
             return Response(response_data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
@@ -1027,6 +1161,13 @@ class UserContentByIdView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            log_error(
+                e,
+                context='UserContentByIdView.get',
+                user_id=request.user.id,
+                extra={'target_user_id': user_id},
+                logger_instance=logger,
+            )
             return Response(
                 {'error': 'Ocurrio un error al obtener el contenido'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1060,8 +1201,12 @@ class UserCollectionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        collections = Collection.objects.filter(library__user=request.user)
-        serializer = CollectionSerializer(collections, many=True)
+        collections = Collection.objects.filter(library__user=request.user).select_related(
+            'library__user'
+        )
+        serializer = CollectionSerializer(
+            collections, many=True, context={'request': request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -1073,11 +1218,43 @@ class UserCollectionsView(APIView):
         collection_data = request.data.copy()
         collection_data['library'] = library.id
         
-        serializer = CollectionSerializer(data=collection_data)
+        serializer = CollectionSerializer(
+            data=collection_data, context={'request': request}
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PublicCollectionsView(APIView):
+    """
+    Paginated list of collections marked public by any user.
+    Only includes collections with at least one visible content profile.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = (
+            Collection.objects.filter(is_public=True)
+            .select_related('library__user')
+            .annotate(
+                visible_item_count=Count(
+                    'contentprofile',
+                    filter=Q(contentprofile__is_visible=True),
+                )
+            )
+            .filter(visible_item_count__gt=0)
+            .order_by('-id')
+        )
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+
+        paginator = UserLibraryPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = PublicCollectionSummarySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class CollectionDetailView(APIView):
@@ -1086,20 +1263,42 @@ class CollectionDetailView(APIView):
 
     def get(self, request, collection_id):
         collection = get_object_or_404(
-            Collection, 
-            id=collection_id, 
-            library__user=request.user
+            Collection.objects.select_related('library__user'),
+            id=collection_id,
         )
-        serializer = CollectionSerializer(collection)
+        is_owner = collection.library.user_id == request.user.id
+        if not is_owner and not collection.is_public:
+            return Response(
+                {'error': 'Colección no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = CollectionSerializer(
+            collection, context={'request': request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, collection_id):
         collection = get_object_or_404(
-            Collection, 
-            id=collection_id, 
-            library__user=request.user
+            Collection,
+            id=collection_id,
+            library__user=request.user,
         )
-        serializer = CollectionSerializer(collection, data=request.data, partial=True)
+        payload = {}
+        if 'name' in request.data:
+            payload['name'] = request.data['name']
+        if 'is_public' in request.data:
+            payload['is_public'] = bool(request.data['is_public'])
+        if not payload:
+            return Response(
+                {'error': 'No hay campos para actualizar'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = CollectionSerializer(
+            collection,
+            data=payload,
+            partial=True,
+            context={'request': request},
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1112,17 +1311,29 @@ class CollectionContentView(APIView):
 
     def get(self, request, collection_id):
         collection = get_object_or_404(
-            Collection, 
-            id=collection_id, 
-            library__user=request.user
+            Collection.objects.select_related('library__user'),
+            id=collection_id,
         )
-        
-        content_profiles = ContentProfile.objects.filter(
-            collection=collection
-        ).select_related('content')\
+        is_owner = collection.library.user_id == request.user.id
+        if not is_owner and not collection.is_public:
+            return Response(
+                {'error': 'Colección no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        content_profiles = (
+            ContentProfile.objects.filter(collection=collection)
+            .select_related('content', 'content__file_details')
             .order_by('title')
-        
-        serializer = SimpleContentProfileSerializer(content_profiles, many=True)
+        )
+        if not is_owner:
+            content_profiles = content_profiles.filter(is_visible=True)
+
+        serializer = SimpleContentProfileSerializer(
+            content_profiles,
+            many=True,
+            context={'request': request, 'collection_detail': True},
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, collection_id):
@@ -1402,34 +1613,41 @@ class TopicDetailView(APIView):
             pk=pk
         )
 
-        # Get contents ordered by vote count per media type (same order as "ver todos")
+        include_contents = request.query_params.get('include_contents', 'true').lower() not in (
+            '0', 'false', 'no'
+        )
+
         ordered_contents = []
-        for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
-            ordered_contents.extend(get_top_voted_contents(topic, media_type))
-
-        # Prefetch file_details for the ordered contents
-        content_ids = [c.id for c in ordered_contents]
-        contents_prefetched = {
-            c.id: c
-            for c in Content.objects.filter(id__in=content_ids).prefetch_related(
-                "file_details", "profiles"
-            )
-        }
-        ordered_contents = [contents_prefetched[cid] for cid in content_ids if cid in contents_prefetched]
-
-        # Get the appropriate profile for each content
         contents_with_profiles = []
-        for content in ordered_contents:
-            selected_profile = self.get_content_profile(
-                content,
-                request,
-                topic,
-                prefetched_profiles=list(content.profiles.all()),
-            )
-            contents_with_profiles.append({
-                'content': content,
-                'selected_profile': selected_profile
-            })
+        if include_contents:
+            # Get contents ordered by vote count per media type (same order as "ver todos")
+            for media_type in ['IMAGE', 'TEXT', 'AUDIO', 'VIDEO']:
+                ordered_contents.extend(get_top_voted_contents(topic, media_type))
+
+            # Prefetch file_details for the ordered contents
+            content_ids = [c.id for c in ordered_contents]
+            contents_prefetched = {
+                c.id: c
+                for c in Content.objects.filter(id__in=content_ids).prefetch_related(
+                    "file_details", "profiles"
+                )
+            }
+            ordered_contents = [
+                contents_prefetched[cid] for cid in content_ids if cid in contents_prefetched
+            ]
+
+            # Get the appropriate profile for each content
+            for content in ordered_contents:
+                selected_profile = self.get_content_profile(
+                    content,
+                    request,
+                    topic,
+                    prefetched_profiles=list(content.profiles.all()),
+                )
+                contents_with_profiles.append({
+                    'content': content,
+                    'selected_profile': selected_profile
+                })
 
         serializer = TopicDetailSerializer(topic, context={
             'request': request,
@@ -1559,7 +1777,18 @@ class TopicContentSimpleView(APIView):
                     context={"request": request},
                 )
                 response_data.append(serializer.data)
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "Failed to serialize content profile in topic simple view",
+                    extra={
+                        'user_id': request.user.id,
+                        'topic_id': pk,
+                        'profile_id': profile.id,
+                        'content_id': profile.content_id,
+                        'error': str(e),
+                    },
+                    exc_info=True,
+                )
                 continue
 
         return Response(
@@ -1615,10 +1844,44 @@ class TopicEditContentView(APIView):
                 {'message': 'Content added successfully'}, 
                 status=status.HTTP_200_OK
             )
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(
+                "Topic content add validation error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
             return Response(
-                {'error': f'Error al agregar contenido: {str(e)}'}, 
+                {'error': f'Error al agregar contenido: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Topic content add bad input",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {'error': f'Error al agregar contenido: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except IntegrityError as e:
+            logger.warning(
+                "Topic content add integrity error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {'error': 'No se pudo agregar el contenido al tema.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            log_error(
+                e,
+                context='TopicEditContentView.post',
+                user_id=request.user.id,
+                extra={'topic_id': pk},
+                logger_instance=logger,
+            )
+            return Response(
+                {'error': 'Ocurrio un error al agregar contenido al tema.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def patch(self, request, pk):
@@ -1640,10 +1903,35 @@ class TopicEditContentView(APIView):
                 {'message': 'Content removed successfully'}, 
                 status=status.HTTP_200_OK
             )
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(
+                "Topic content remove validation error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
             return Response(
-                {'error': f'Error al eliminar contenido: {str(e)}'}, 
+                {'error': f'Error al eliminar contenido: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Topic content remove bad input",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {'error': f'Error al eliminar contenido: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            log_error(
+                e,
+                context='TopicEditContentView.patch',
+                user_id=request.user.id,
+                extra={'topic_id': pk},
+                logger_instance=logger,
+            )
+            return Response(
+                {'error': 'Ocurrio un error al eliminar contenido del tema.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -1689,10 +1977,44 @@ class TopicModeratorsView(APIView):
             serializer = TopicDetailSerializer(topic, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
             
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(
+                "Topic moderators add validation error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
             return Response(
                 {"error": f"Error al agregar moderadores: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Topic moderators add bad input",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {"error": f"Error al agregar moderadores: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except IntegrityError as e:
+            logger.warning(
+                "Topic moderators add integrity error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {"error": "No se pudo agregar moderadores."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            log_error(
+                e,
+                context='TopicModeratorsView.post',
+                user_id=request.user.id,
+                extra={'topic_id': pk},
+                logger_instance=logger,
+            )
+            return Response(
+                {"error": "Ocurrio un error al agregar moderadores."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def delete(self, request, pk):
@@ -1748,10 +2070,44 @@ class TopicModeratorsView(APIView):
             serializer = TopicDetailSerializer(topic, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
             
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(
+                "Topic moderators remove validation error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
             return Response(
                 {"error": f"Error al eliminar moderadores: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Topic moderators remove bad input",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {"error": f"Error al eliminar moderadores: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except IntegrityError as e:
+            logger.warning(
+                "Topic moderators remove integrity error",
+                extra={'topic_id': pk, 'user_id': request.user.id, 'detail': str(e)},
+            )
+            return Response(
+                {"error": "No se pudo eliminar moderadores."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            log_error(
+                e,
+                context='TopicModeratorsView.delete',
+                user_id=request.user.id,
+                extra={'topic_id': pk},
+                logger_instance=logger,
+            )
+            return Response(
+                {"error": "Ocurrio un error al eliminar moderadores."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -2077,22 +2433,31 @@ class TopicContentMediaTypeView(APIView):
                 'selected_profile': selected_profile
             })
 
+        paginator = TopicContentMediaTypePagination()
+        page = paginator.paginate_queryset(contents_with_profiles, request)
+        paged_contents = page if page is not None else contents_with_profiles
+
         serializer = ContentWithSelectedProfileSerializer(
-            [item['content'] for item in contents_with_profiles], 
+            [item['content'] for item in paged_contents],
             many=True,
             context={
-                'request': request, 
+                'request': request,
                 'topic': topic,
-                'selected_profiles': {item['content'].id: item['selected_profile'] for item in contents_with_profiles}
+                'selected_profiles': {
+                    item['content'].id: item['selected_profile']
+                    for item in paged_contents
+                }
             }
         )
-        
+
+        if page is not None:
+            response = paginator.get_paginated_response(serializer.data)
+            response.data['topic'] = {'id': topic.id, 'title': topic.title}
+            return response
+
         return Response({
-            'topic': {
-                'id': topic.id,
-                'title': topic.title
-            },
-            'contents': serializer.data
+            'topic': {'id': topic.id, 'title': topic.title},
+            'contents': serializer.data,
         })
 
 
@@ -2423,8 +2788,11 @@ class URLPreviewView(APIView):
             response = requests.head(default_favicon)
             if response.status_code == 200:
                 return default_favicon
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "Favicon head request failed (optional)",
+                extra={'base_url': base_url, 'default_favicon': default_favicon, 'error': str(e)},
+            )
         
         return None
 
@@ -2461,8 +2829,11 @@ class URLPreviewView(APIView):
                     'siteName': "YouTube",
                     'type': 'VIDEO'
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "YouTube oEmbed fetch failed (optional)",
+                extra={'video_id': video_id, 'error': str(e)},
+            )
         return None
 
     def post(self, request):
@@ -2765,7 +3136,7 @@ class URLPreviewView(APIView):
             )
             return Response(
                 {'error': 'Error al obtener datos de la URL'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -2808,8 +3179,11 @@ def normalize_youtube_url(url):
             return clean_url
         
         return url
-    except Exception:
-        # If parsing fails, return the original URL
+    except Exception as e:
+        logger.debug(
+            "normalize_youtube_url parse failed; returning original",
+            extra={'url': url, 'error': str(e)},
+        )
         return url
 
 
@@ -3047,6 +3421,204 @@ class TopicContentSuggestionCreateView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+def _file_suggestion_eligibility_error_response(user, content):
+    """Return a DRF Response if the user cannot create a file suggestion, else None."""
+    if content.uploaded_by_id == user.id:
+        return Response(
+            {"error": "No puede sugerir archivo para su propio contenido."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    if not content.url:
+        return Response(
+            {"error": "Solo se permite sugerir archivo para contenidos con URL."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    fd = FileDetails.objects.filter(content=content).first()
+    has_file = bool(fd and fd.file)
+    if has_file:
+        return Response(
+            {"error": "Este contenido ya tiene un archivo asociado."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if FileSuggestion.objects.filter(
+        content=content,
+        suggested_by=user,
+        status='PENDING'
+    ).exists():
+        return Response(
+            {"error": "Ya tiene una sugerencia pendiente para este contenido."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    return None
+
+
+def _file_suggestion_expected_key_prefix(content_id, user_id):
+    return f"content_suggestions/files/{content_id}/{user_id}/"
+
+
+class FileSuggestionPresignView(APIView):
+    """Presigned PUT URL for direct S3 upload of a file suggestion (large files)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        err = _file_suggestion_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
+
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
+            logger.warning("File suggestion presign: S3 not configured, returning 503")
+            return Response(
+                {'error': 'S3 no esta configurado para subida directa'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        filename = request.data.get('filename')
+        file_size = request.data.get('file_size')
+        content_type = request.data.get('content_type') or 'application/octet-stream'
+        if not filename or file_size is None:
+            return Response(
+                {'error': 'Se requieren filename y file_size'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            file_size = int(file_size)
+        except (TypeError, ValueError):
+            return Response({'error': 'file_size debe ser un numero'}, status=status.HTTP_400_BAD_REQUEST)
+        if file_size <= 0 or file_size > UPLOAD_CONTENT_MAX_SIZE:
+            return Response(
+                {'error': 'El tamano del archivo debe estar entre 1 byte y 5 TB'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        key = (
+            f"{_file_suggestion_expected_key_prefix(content.id, request.user.id)}"
+            f"{uuid.uuid4().hex}_{safe_name}"
+        )
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
+        expires_in = 3600
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=region,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+            upload_plan = _build_s3_upload_plan(
+                s3_client=s3_client,
+                bucket=bucket,
+                key=key,
+                content_type=content_type,
+                file_size=file_size,
+                expires_in=expires_in
+            )
+        except Exception as e:
+            logger.exception("File suggestion presign: boto3 failed: %s", e)
+            return Response(
+                {'error': 'No se pudo generar la URL de subida', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        return Response(upload_plan, status=status.HTTP_200_OK)
+
+
+class FileSuggestionConfirmView(APIView):
+    """After client uploaded to S3, create FileSuggestion row pointing at the key."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        err = _file_suggestion_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
+
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None):
+            return Response(
+                {'error': 'S3 no esta configurado'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        key = request.data.get('key')
+        upload_id = request.data.get('upload_id')
+        multipart_parts = request.data.get('parts')
+        if not key or not isinstance(key, str) or not key.strip():
+            return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
+        key = key.strip()
+        if '..' in key or key.startswith('/'):
+            return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        expected = _file_suggestion_expected_key_prefix(content.id, request.user.id)
+        if not key.startswith(expected):
+            return Response({'error': 'key no corresponde a este contenido o usuario'}, status=status.HTTP_400_BAD_REQUEST)
+
+        message = request.data.get('message', '') or ''
+        file_size = request.data.get('file_size')
+        try:
+            file_size = int(file_size) if file_size is not None else None
+        except (TypeError, ValueError):
+            file_size = None
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2'),
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+            if upload_id:
+                if not isinstance(upload_id, str) or not upload_id.strip():
+                    return Response({'error': 'upload_id invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                if not isinstance(multipart_parts, list) or not multipart_parts:
+                    return Response({'error': 'Se requieren parts para completar multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
+                normalized_parts = []
+                for part in multipart_parts:
+                    if not isinstance(part, dict):
+                        return Response({'error': 'parts invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    etag = part.get('etag')
+                    part_number = part.get('part_number')
+                    if etag is None or part_number is None:
+                        return Response({'error': 'Cada part requiere etag y part_number'}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        part_number = int(part_number)
+                    except (TypeError, ValueError):
+                        return Response({'error': 'part_number invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    normalized_parts.append({'ETag': str(etag), 'PartNumber': part_number})
+                normalized_parts.sort(key=lambda p: p['PartNumber'])
+                s3_client.complete_multipart_upload(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id.strip(),
+                    MultipartUpload={'Parts': normalized_parts}
+                )
+            s3_client.head_object(Bucket=bucket, Key=key)
+        except Exception as e:
+            logger.warning(
+                "File suggestion confirm: head_object failed",
+                extra={'s3_key': key, 'bucket': bucket, 'error': str(e)}
+            )
+            return Response(
+                {'error': 'El archivo no se encontro en el almacenamiento. Sube primero con la URL de subida.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        suggestion = FileSuggestion.objects.create(
+            content=content,
+            suggested_by=request.user,
+            file_size=file_size,
+            message=message,
+            status='PENDING'
+        )
+        FileSuggestion.objects.filter(pk=suggestion.pk).update(file=key)
+        suggestion.refresh_from_db()
+
+        serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
 class FileSuggestionCreateView(APIView):
     """Create a file suggestion for URL-based content."""
     permission_classes = [IsAuthenticated]
@@ -3063,35 +3635,9 @@ class FileSuggestionCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if content.uploaded_by_id == request.user.id:
-            return Response(
-                {"error": "No puede sugerir archivo para su propio contenido."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        if not content.url:
-            return Response(
-                {"error": "Solo se permite sugerir archivo para contenidos con URL."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        has_file = hasattr(content, 'file_details') and content.file_details and bool(content.file_details.file)
-        if has_file:
-            return Response(
-                {"error": "Este contenido ya tiene un archivo asociado."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        existing_pending = FileSuggestion.objects.filter(
-            content=content,
-            suggested_by=request.user,
-            status='PENDING'
-        ).exists()
-        if existing_pending:
-            return Response(
-                {"error": "Ya tiene una sugerencia pendiente para este contenido."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        err = _file_suggestion_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
 
         suggestion = FileSuggestion.objects.create(
             content=content,

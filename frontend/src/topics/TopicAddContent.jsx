@@ -87,7 +87,7 @@ const TopicAddContent = () => {
     };
 
     const filterContent = (content) => {
-        const isInTopic = content.content.topics?.some(
+        const isInTopic = content?.content?.topics?.some(
             (tid) => tid === parseInt(topicId, 10)
         );
         return !isInTopic;

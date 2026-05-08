@@ -16,7 +16,9 @@ import {
     Chip,
     Link as MuiLink,
     Divider,
-    TextField
+    TextField,
+    FormControlLabel,
+    Switch,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -38,37 +40,37 @@ const CollectionEditContent = () => {
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [savingName, setSavingName] = useState(false);
+    const [savingPrivacy, setSavingPrivacy] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
     const [showAddContent, setShowAddContent] = useState(false);
 
     useEffect(() => {
         const fetchCollectionData = async () => {
-            console.log('Fetching collection data for ID:', collectionId);
             try {
-                // Fetch collection info and content in parallel
                 const [collectionInfo, contentData] = await Promise.all([
                     contentApi.getCollection(collectionId),
                     contentApi.getCollectionContent(collectionId)
                 ]);
-                console.log('Collection info fetched:', collectionInfo);
-                console.log('Collection content fetched:', contentData);
+
+                if (collectionInfo.is_owner === false) {
+                    navigate(`/content/collections/${collectionId}`, { replace: true });
+                    setLoading(false);
+                    return;
+                }
 
                 setCollectionName(collectionInfo.name || '');
+                setIsPublic(!!collectionInfo.is_public);
                 setCollectionData(contentData || []);
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching collection data:', err);
-                console.error('Error details:', {
-                    message: err.message,
-                    response: err.response,
-                    stack: err.stack
-                });
                 setError('Error al obtener los datos de la colección');
                 setLoading(false);
             }
         };
 
         fetchCollectionData();
-    }, [collectionId]);
+    }, [collectionId, navigate]);
 
     const handleContentRemove = async (contentProfileId) => {
         console.log('Removing content profile:', contentProfileId);
@@ -138,6 +140,21 @@ const CollectionEditContent = () => {
             console.error('Error updating collection name:', err);
             setError('Error al actualizar el nombre de la colección');
             setSavingName(false);
+        }
+    };
+
+    const handleTogglePublic = async (event) => {
+        const next = event.target.checked;
+        try {
+            setSavingPrivacy(true);
+            setError(null);
+            const updated = await contentApi.updateCollection(collectionId, { is_public: next });
+            setIsPublic(!!updated.is_public);
+        } catch (err) {
+            console.error('Error updating collection visibility:', err);
+            setError('No se pudo actualizar la visibilidad de la colección');
+        } finally {
+            setSavingPrivacy(false);
         }
     };
 
@@ -248,6 +265,29 @@ const CollectionEditContent = () => {
                     >
                         Agregar contenido de tu biblioteca
                     </Button>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={isPublic}
+                                onChange={handleTogglePublic}
+                                disabled={savingPrivacy}
+                                color="primary"
+                            />
+                        }
+                        label={
+                            <Box>
+                                <Typography variant="body2" component="span" display="block">
+                                    Colección pública
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    Visible en la biblioteca para otros usuarios (solo ítems con visibilidad en búsqueda).
+                                </Typography>
+                            </Box>
+                        }
+                    />
                 </Box>
 
                 <Divider sx={{ my: 3 }} />

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, Box, CircularProgress } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
 
@@ -9,7 +8,6 @@ const RecentUserContent = () => {
   const [recentContent, setRecentContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchRecentContent = async () => {
@@ -30,7 +28,7 @@ const RecentUserContent = () => {
   }, []);
 
   const handleContentClick = (contentId) => {
-    navigate(`/content/${contentId}/library?context=library`);
+    window.open(`/content/${contentId}/library?context=library`, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {

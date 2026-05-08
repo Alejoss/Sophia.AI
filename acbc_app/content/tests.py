@@ -6,11 +6,13 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from content.models import (
     Library, Collection, Content, ContentProfile, 
-    FileDetails, Topic, Publication, TopicModeratorInvitation, FileSuggestion
+    FileDetails, Topic, Publication, TopicModeratorInvitation, FileSuggestion, ContentSuggestion
 )
+from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
 import json
 import os
+from unittest.mock import patch, Mock
 
 class ContentModelTests(TestCase):
     """Test suite for Content model"""
@@ -837,6 +839,147 @@ class LibraryAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
+    def test_library_list_endpoint(self):
+        """Test listing all libraries."""
+        other_user = User.objects.create_user(
+            username='otherlibuser',
+            email='otherlib@example.com',
+            password='testpass123'
+        )
+        Library.objects.create(user=other_user, name='Other Library')
+        url = reverse('content:library_list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_library_detail_endpoint(self):
+        """Test retrieving a library by ID."""
+        url = reverse('content:library_detail', args=[self.library.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.library.id)
+        self.assertEqual(response.data['name'], 'Test Library')
+
+
+class PublicCollectionsAPITests(APITestCase):
+    """Public collection discovery and read-only access for other users."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='owner',
+            email='owner@example.com',
+            password='pass12345',
+        )
+        self.viewer = User.objects.create_user(
+            username='viewer',
+            email='viewer@example.com',
+            password='pass12345',
+        )
+        self.library = Library.objects.create(user=self.owner, name='Owner Library')
+        self.collection = Collection.objects.create(
+            library=self.library,
+            name='Public Shelf',
+            is_public=True,
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.owner,
+            media_type='TEXT',
+            original_title='Doc A',
+        )
+        self.profile_visible = ContentProfile.objects.create(
+            content=self.content,
+            user=self.owner,
+            collection=self.collection,
+            title='Visible item',
+            is_visible=True,
+        )
+        self.profile_hidden = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Doc B',
+            ),
+            user=self.owner,
+            collection=self.collection,
+            title='Hidden item',
+            is_visible=False,
+        )
+
+    def test_public_list_includes_collection_with_visible_items(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:public-collections')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        row = response.data['results'][0]
+        self.assertEqual(row['name'], 'Public Shelf')
+        self.assertEqual(row['owner_username'], 'owner')
+        self.assertEqual(row['visible_item_count'], 1)
+
+    def test_public_list_excludes_empty_public_collections(self):
+        empty_coll = Collection.objects.create(
+            library=self.library,
+            name='Empty public',
+            is_public=True,
+        )
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:public-collections')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {r['id'] for r in response.data['results']}
+        self.assertIn(self.collection.id, ids)
+        self.assertNotIn(empty_coll.id, ids)
+
+    def test_viewer_gets_public_collection_detail(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Public Shelf')
+        self.assertFalse(response.data['is_owner'])
+        self.assertTrue(response.data['is_public'])
+
+    def test_viewer_collection_content_only_visible(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:collection-content', args=[self.collection.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in response.data}
+        self.assertIn(self.profile_visible.id, ids)
+        self.assertNotIn(self.profile_hidden.id, ids)
+
+    def test_owner_sees_all_profiles_in_collection_content(self):
+        self.client.force_authenticate(user=self.owner)
+        url = reverse('content:collection-content', args=[self.collection.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in response.data}
+        self.assertSetEqual(ids, {self.profile_visible.id, self.profile_hidden.id})
+
+    def test_private_collection_not_visible_to_viewer(self):
+        self.collection.is_public = False
+        self.collection.save(update_fields=['is_public'])
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_viewer_cannot_patch_collection(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.patch(url, {'name': 'Hacked'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_owner_can_toggle_is_public(self):
+        self.client.force_authenticate(user=self.owner)
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.patch(url, {'is_public': False}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_public'])
+        self.collection.refresh_from_db()
+        self.assertFalse(self.collection.is_public)
+
+
 class TopicAPITests(APITestCase):
     """Test suite for Topic API endpoints"""
     
@@ -872,6 +1015,21 @@ class TopicAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Test Topic')
+
+    def test_get_topic_basic(self):
+        """Test retrieving topic basic info."""
+        url = reverse('content:topic-basic', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.topic.id)
+        self.assertEqual(response.data['title'], 'Test Topic')
+
+    def test_get_topic_basic_requires_authentication(self):
+        """Test unauthenticated users cannot access topic basic info."""
+        self.client.force_authenticate(user=None)
+        url = reverse('content:topic-basic', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_topic_content_simple_lists_all_topic_content_for_creator(self):
         """Creator sees every content item in the topic, not only their own profiles."""
@@ -1018,76 +1176,43 @@ class ContentProfileAPITest(APITestCase):
         # Make sure no profile exists
         ContentProfile.objects.filter(content=self.content, user=self.user).delete()
 
-        # Debug Django settings
-        from django.conf import settings
-        print("\nDEBUG - Django settings:")
-        print(f"DEBUG - ROOT_URLCONF: {settings.ROOT_URLCONF}")
-        print(f"DEBUG - INSTALLED_APPS: {settings.INSTALLED_APPS}")
-        
-        # Debug URL patterns
-        from django.urls import get_resolver
-        resolver = get_resolver(None)
-        print("\nDEBUG - URL patterns:")
-        for pattern_list in list(resolver.url_patterns)[:5]:  # Limit to first 5 for brevity
-            if hasattr(pattern_list, 'pattern'):
-                print(f"DEBUG - Pattern: {pattern_list.pattern}")
-            if hasattr(pattern_list, 'app_name'):
-                print(f"DEBUG - App name: {pattern_list.app_name}")
-            if hasattr(pattern_list, 'namespace'):
-                print(f"DEBUG - Namespace: {pattern_list.namespace}")
-                
-        # Print actual content-profile-create URL
-        try:
-            url = reverse('content:content-profile-create')
-            print(f"DEBUG - content-profile-create URL: {url}")
-        except Exception as e:
-            print(f"DEBUG - Error resolving URL: {str(e)}")
-
-    def test_frontend_simulation(self):
-        """Test that simulates exactly what the frontend is doing"""
-        # Clean up any existing profiles to ensure test reliability
-        ContentProfile.objects.filter(content=self.content, user=self.user).delete()
-        
-        # 1. Create form data exactly like the component does
-        form_data = {
+    def test_create_content_profile_success(self):
+        """Create a content profile using the real API endpoint."""
+        url = reverse('content:content-profile-create')
+        payload = {
+            'content': self.content.id,
             'title': self.content.original_title,
             'author': self.content.original_author,
-            'personalNote': ''
+            'personalNote': 'nota personal',
+            'isVisible': True,
+            'isProducer': False,
         }
-        
-        # 2. Try the direct URL that we know works from our frontend
-        url = '/content/content-profiles/'  # This is the URL our frontend calls
-        
-        api_data = {
-            'content': self.content.id,
-            **form_data  # Spread the form data in
-        }
-        
-        print(f"\nDEBUG frontend_simulation - Using URL: {url}")
-        print(f"DEBUG frontend_simulation - Request data: {api_data}")
-        
-        # Skip this test if we're still trying to figure out the correct URL
-        try:
-            # 3. Use a fresh client to avoid any test isolation issues
-            client = APIClient()
-            client.force_authenticate(user=self.user)
-            
-            response = client.post(url, api_data, format='json')
-            
-            print(f"DEBUG - Response status: {response.status_code}")
-            
-            # Handle different response types
-            if hasattr(response, 'data'):
-                print(f"DEBUG - Response data: {response.data}")
-            else:
-                print(f"DEBUG - Response content: {response.content.decode()}")
-            
-            # Skip assertions for now until we get the URL right
-            print("DEBUG - Skipping assertions until we get the correct URL")
-        except Exception as e:
-            print(f"DEBUG - Error during test: {str(e)}")
-            # We won't fail the test yet since we're still figuring things out
-            print("DEBUG - Skipping test until we get the correct URL")
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = ContentProfile.objects.get(content=self.content, user=self.user)
+        self.assertEqual(created.title, self.content.original_title)
+        self.assertEqual(created.author, self.content.original_author)
+        self.assertEqual(created.personal_note, 'nota personal')
+
+    def test_create_content_profile_duplicate_rejected(self):
+        """Cannot create duplicate profile for same content and user."""
+        ContentProfile.objects.create(
+            content=self.content,
+            user=self.user,
+            title='Existing'
+        )
+        url = reverse('content:content-profile-create')
+        payload = {'content': self.content.id}
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Ya tiene un perfil para este contenido', response.data['error'])
+
+    def test_create_content_profile_requires_content_id(self):
+        """Content ID is required to create profile."""
+        url = reverse('content:content-profile-create')
+        response = self.client.post(url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ID de contenido es requerido', response.data['error'])
 
 
 class ContentSourceEditTests(APITestCase):
@@ -1190,6 +1315,177 @@ class ContentSourceEditTests(APITestCase):
         check_url = f'/api/content/content_modification_check/{self.modifiable_content.id}/'
         response = self.client.get(check_url)
         
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class UserContentByIdAndRecentAPITests(APITestCase):
+    """Coverage for user-content-by-id and recent-user-content endpoints."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='owner',
+            email='owner@example.com',
+            password='testpass123'
+        )
+        self.viewer = User.objects.create_user(
+            username='viewer',
+            email='viewer@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.viewer)
+
+    def test_user_content_by_id_success(self):
+        content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='By Id Content'
+        )
+        ContentProfile.objects.create(
+            content=content,
+            user=self.user,
+            title='By Id Profile'
+        )
+        url = reverse('content:user-content-by-id', args=[self.user.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], 'By Id Profile')
+
+    def test_user_content_by_id_not_found(self):
+        url = reverse('content:user-content-by-id', args=[99999])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('no encontrado', response.data['error'].lower())
+
+    def test_user_content_by_id_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:user-content-by-id', args=[self.user.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_recent_user_content_returns_latest_four(self):
+        self.client.force_authenticate(user=self.user)
+        for i in range(6):
+            content = Content.objects.create(
+                uploaded_by=self.user,
+                media_type='TEXT',
+                original_title=f'Recent {i}'
+            )
+            ContentProfile.objects.create(
+                content=content,
+                user=self.user,
+                title=f'Profile {i}'
+            )
+        url = reverse('content:recent-user-content')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 4)
+
+    def test_recent_user_content_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:recent-user-content')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class AuxiliaryEndpointsAPITests(APITestCase):
+    """Coverage for user search, content references, and URL preview."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='auxuser',
+            email='auxuser@example.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='alicehelper',
+            email='alice@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.user)
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='References Source'
+        )
+        profile = ContentProfile.objects.create(
+            content=self.content,
+            user=self.user,
+            title='Profile for publication'
+        )
+        Publication.objects.create(
+            user=self.user,
+            content_profile=profile,
+            text_content='Publication for references',
+            status='PUBLISHED'
+        )
+
+    def test_user_search_returns_matches(self):
+        url = reverse('content:user-search')
+        response = self.client.get(url, {'q': 'alice'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['username'], 'alicehelper')
+
+    def test_user_search_returns_empty_without_query(self):
+        url = reverse('content:user-search')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {'results': []})
+
+    def test_user_search_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:user-search')
+        response = self.client.get(url, {'q': 'alice'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_content_references_success(self):
+        url = reverse('content:content-references', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('knowledge_paths', response.data)
+        self.assertIn('topics', response.data)
+        self.assertIn('publications', response.data)
+        self.assertEqual(len(response.data['publications']), 1)
+
+    def test_content_references_not_found(self):
+        url = reverse('content:content-references', args=[99999])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('Contenido no encontrado', response.data['error'])
+
+    def test_content_references_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:content-references', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_preview_url_requires_url_field(self):
+        url = reverse('content:preview-url')
+        response = self.client.post(url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('URL es requerida', response.data['error'])
+
+    @patch('content.views.requests.head')
+    @patch('content.views.requests.get')
+    def test_preview_url_success_html(self, mock_get, mock_head):
+        mock_get.return_value = Mock(
+            status_code=200,
+            headers={'content-type': 'text/html'},
+            text='<html><head><title>Sample Page</title></head><body>ok</body></html>',
+            raise_for_status=Mock(),
+        )
+        mock_head.return_value = Mock(status_code=404)
+        url = reverse('content:preview-url')
+        response = self.client.post(url, {'url': 'https://example.com'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], 'Sample Page')
+        self.assertEqual(response.data['type'], 'website')
+
+    def test_preview_url_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:preview-url')
+        response = self.client.post(url, {'url': 'https://example.com'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -1694,3 +1990,491 @@ class FileSuggestionAPITests(APITestCase):
         returned_ids = {item['id'] for item in uploader_response.data}
         self.assertIn(own.id, returned_ids)
         self.assertIn(other.id, returned_ids)
+
+    def test_reject_file_suggestion_only_uploader(self):
+        suggestion = FileSuggestion.objects.create(
+            content=self.content,
+            suggested_by=self.suggester,
+            file=SimpleUploadedFile('reject.pdf', b'pdf-content', content_type='application/pdf'),
+            file_size=11,
+            status='PENDING'
+        )
+        url = reverse('content:file-suggestion-reject', args=[suggestion.id])
+
+        self.client.force_authenticate(user=self.other_user)
+        forbidden_response = self.client.post(url, {'rejection_reason': 'not allowed'}, format='json')
+        self.assertEqual(forbidden_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.uploader)
+        ok_response = self.client.post(url, {'rejection_reason': 'invalid file'}, format='json')
+        self.assertEqual(ok_response.status_code, status.HTTP_200_OK)
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'REJECTED')
+        self.assertEqual(suggestion.rejection_reason, 'invalid file')
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    def test_file_suggestion_confirm_rejects_wrong_key_prefix(self):
+        """Confirm must reject keys outside the expected path (no S3 call for bad prefix)."""
+        self.client.force_authenticate(user=self.suggester)
+        url = reverse('content:file-suggestion-confirm', args=[self.content.id])
+        response = self.client.post(
+            url,
+            {'key': 'content/document/1/wrong.pdf', 'file_size': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(FileSuggestion.objects.count(), 0)
+
+
+class UploadDirectS3APITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='directupload',
+            email='directupload@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.user)
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    @patch('content.views._build_s3_upload_plan')
+    @patch('content.views.boto3.client')
+    def test_upload_content_presign_success(self, mock_boto_client, mock_build_plan):
+        mock_boto_client.return_value = Mock()
+        mock_build_plan.return_value = {
+            'key': 'content/document/1/abc_test.pdf',
+            'upload_url': 'https://example.com/upload',
+            'method': 'PUT',
+        }
+        url = reverse('content:upload_content_presign')
+        payload = {
+            'filename': 'test.pdf',
+            'file_size': 123,
+            'content_type': 'application/pdf',
+            'media_type': 'TEXT',
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('key', response.data)
+        self.assertIn('upload_url', response.data)
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    def test_upload_content_presign_invalid_media_type(self):
+        url = reverse('content:upload_content_presign')
+        payload = {'filename': 'test.pdf', 'file_size': 100, 'media_type': 'INVALID'}
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('media_type invalido', response.data['error'])
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    @patch('content.views.boto3.client')
+    def test_upload_content_confirm_success(self, mock_boto_client):
+        s3_client = Mock()
+        s3_client.head_object.return_value = {}
+        mock_boto_client.return_value = s3_client
+
+        url = reverse('content:upload_content_confirm')
+        payload = {
+            'key': f'content/document/{self.user.id}/abc_test.pdf',
+            'media_type': 'TEXT',
+            'title': 'Uploaded Title',
+            'author': 'Uploaded Author',
+            'file_size': 123,
+            'is_visible': True,
+            'is_producer': False,
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Content.objects.count(), 1)
+        self.assertEqual(ContentProfile.objects.count(), 1)
+        self.assertEqual(FileDetails.objects.count(), 1)
+        created_content = Content.objects.first()
+        self.assertEqual(created_content.original_title, 'Uploaded Title')
+
+    def test_upload_content_confirm_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:upload_content_confirm')
+        response = self.client.post(url, {'key': 'content/document/1/file.pdf'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class KnowledgePathAndTopicMediaTypeAPITests(APITestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username='kpauthor',
+            email='kpauthor@example.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='kpother',
+            email='kpother@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.author)
+
+    def test_knowledge_path_list_and_create(self):
+        KnowledgePath.objects.create(title='Path One', author=self.author)
+        url = reverse('content:knowledge_path_list')
+        list_response = self.client.get(url)
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]['title'], 'Path One')
+
+        create_response = self.client.post(
+            url,
+            {'title': 'Path Two', 'description': 'Second path'},
+            format='json'
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(KnowledgePath.objects.count(), 2)
+        created = KnowledgePath.objects.get(title='Path Two')
+        self.assertEqual(created.author, self.author)
+
+    def test_knowledge_path_detail_read_open_but_write_restricted(self):
+        kp = KnowledgePath.objects.create(title='Private Path', author=self.author)
+        url = reverse('content:knowledge_path_detail', args=[kp.id])
+        ok_response = self.client.get(url)
+        self.assertEqual(ok_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(ok_response.data['title'], 'Private Path')
+
+        self.client.force_authenticate(user=self.other_user)
+        readable_response = self.client.get(url)
+        self.assertEqual(readable_response.status_code, status.HTTP_200_OK)
+        forbidden_update = self.client.put(url, {'title': 'Hacked Title'}, format='json')
+        self.assertEqual(forbidden_update.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_knowledge_path_nodes_create_and_node_update_delete(self):
+        kp = KnowledgePath.objects.create(title='Nodes Path', author=self.author)
+        content = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='TEXT',
+            original_title='Node Content'
+        )
+        profile = ContentProfile.objects.create(content=content, user=self.author, title='Node Profile')
+        nodes_url = reverse('content:knowledge_path_nodes', args=[kp.id])
+        create_response = self.client.post(
+            nodes_url,
+            {
+                'title': 'Start Node',
+                'description': 'First node',
+                'media_type': 'TEXT',
+                'content_profile': profile.id
+            },
+            format='json'
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        node_id = create_response.data['id']
+
+        node_url = reverse('content:node_detail', args=[node_id])
+        update_response = self.client.put(node_url, {'title': 'Updated Node'}, format='json')
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data['title'], 'Updated Node')
+
+        self.client.force_authenticate(user=self.other_user)
+        forbidden_update = self.client.put(node_url, {'title': 'Hack Node'}, format='json')
+        self.assertEqual(forbidden_update.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.author)
+        delete_response = self.client.delete(node_url)
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Node.objects.filter(id=node_id).exists())
+
+    def test_topic_content_media_type_returns_filtered_content(self):
+        topic = Topic.objects.create(
+            title='Media Topic',
+            description='Media filter tests',
+            creator=self.author
+        )
+        video_content = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='VIDEO',
+            original_title='Video Content'
+        )
+        text_content = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='TEXT',
+            original_title='Text Content'
+        )
+        ContentProfile.objects.create(content=video_content, user=self.author, title='Video Profile')
+        ContentProfile.objects.create(content=text_content, user=self.author, title='Text Profile')
+        topic.contents.add(video_content, text_content)
+
+        url = reverse('content:topic-content-media-type', args=[topic.id, 'video'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['media_type'], 'VIDEO')
+
+
+class TopicContentSuggestionsAPITests(APITestCase):
+    def setUp(self):
+        self.creator = User.objects.create_user(
+            username='topiccreator',
+            email='topiccreator@example.com',
+            password='testpass123'
+        )
+        self.moderator = User.objects.create_user(
+            username='topicmoderator',
+            email='topicmoderator@example.com',
+            password='testpass123'
+        )
+        self.suggester = User.objects.create_user(
+            username='topicsuggester',
+            email='topicsuggester@example.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='topicother',
+            email='topicother@example.com',
+            password='testpass123'
+        )
+        self.topic = Topic.objects.create(
+            title='Suggestion Topic',
+            description='Topic for suggestion tests',
+            creator=self.creator
+        )
+        self.topic.moderators.add(self.moderator)
+        self.content = Content.objects.create(
+            uploaded_by=self.suggester,
+            media_type='TEXT',
+            original_title='Suggested Content'
+        )
+        ContentProfile.objects.create(
+            content=self.content,
+            user=self.suggester,
+            title='Suggester Profile'
+        )
+
+    def test_create_list_and_filter_topic_suggestions(self):
+        self.client.force_authenticate(user=self.suggester)
+        create_url = reverse('content:topic-content-suggestion-create', args=[self.topic.id])
+        create_response = self.client.post(
+            create_url,
+            {'content_id': self.content.id, 'message': 'Useful for this topic'},
+            format='json'
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+
+        list_url = reverse('content:topic-content-suggestions', args=[self.topic.id])
+        list_response = self.client.get(list_url, {'status': 'PENDING'})
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]['status'], 'PENDING')
+
+        duplicate_response = self.client.post(
+            create_url,
+            {'content_id': self.content.id, 'message': 'Duplicate suggestion'},
+            format='json'
+        )
+        self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_accept_and_reject_permissions_and_rules(self):
+        suggestion = ContentSuggestion.objects.create(
+            topic=self.topic,
+            content=self.content,
+            suggested_by=self.suggester,
+            status='PENDING'
+        )
+        accept_url = reverse('content:topic-content-suggestion-accept', args=[self.topic.id, suggestion.id])
+        reject_url = reverse('content:topic-content-suggestion-reject', args=[self.topic.id, suggestion.id])
+
+        self.client.force_authenticate(user=self.other_user)
+        forbidden_accept = self.client.post(accept_url, format='json')
+        self.assertEqual(forbidden_accept.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.moderator)
+        accepted = self.client.post(accept_url, format='json')
+        self.assertEqual(accepted.status_code, status.HTTP_200_OK)
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'ACCEPTED')
+        self.assertIn(self.content, self.topic.contents.all())
+
+        already_processed = self.client.post(reject_url, {'rejection_reason': 'late'}, format='json')
+        self.assertEqual(already_processed.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reject_requires_reason(self):
+        suggestion = ContentSuggestion.objects.create(
+            topic=self.topic,
+            content=self.content,
+            suggested_by=self.suggester,
+            status='PENDING'
+        )
+        reject_url = reverse('content:topic-content-suggestion-reject', args=[self.topic.id, suggestion.id])
+        self.client.force_authenticate(user=self.creator)
+        missing_reason = self.client.post(reject_url, {'rejection_reason': '   '}, format='json')
+        self.assertEqual(missing_reason.status_code, status.HTTP_400_BAD_REQUEST)
+
+        ok = self.client.post(reject_url, {'rejection_reason': 'Not relevant'}, format='json')
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'REJECTED')
+        self.assertEqual(suggestion.rejection_reason, 'Not relevant')
+
+    def test_user_content_suggestions_filter_and_delete_permissions(self):
+        suggestion = ContentSuggestion.objects.create(
+            topic=self.topic,
+            content=self.content,
+            suggested_by=self.suggester,
+            status='PENDING'
+        )
+        own_url = reverse('content:user-content-suggestions')
+        self.client.force_authenticate(user=self.suggester)
+        own_response = self.client.get(own_url, {'status': 'PENDING', 'topic_id': self.topic.id})
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(own_response.data), 1)
+        self.assertEqual(own_response.data[0]['id'], suggestion.id)
+
+        delete_url = reverse('content:topic-content-suggestion-delete', args=[self.topic.id, suggestion.id])
+        self.client.force_authenticate(user=self.other_user)
+        forbidden = self.client.delete(delete_url)
+        self.assertEqual(forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.suggester)
+        deleted = self.client.delete(delete_url)
+        self.assertEqual(deleted.status_code, status.HTTP_200_OK)
+        self.assertFalse(ContentSuggestion.objects.filter(id=suggestion.id).exists())
+
+
+class AdditionalEndpointCoverageAPITests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='endpointowner',
+            email='endpointowner@example.com',
+            password='testpass123'
+        )
+        self.other = User.objects.create_user(
+            username='endpointother',
+            email='endpointother@example.com',
+            password='testpass123'
+        )
+        self.client.force_authenticate(user=self.owner)
+        self.topic = Topic.objects.create(
+            title='Topic Edit',
+            description='Topic edit tests',
+            creator=self.owner
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.owner,
+            media_type='TEXT',
+            original_title='Profile Content'
+        )
+        self.profile = ContentProfile.objects.create(
+            content=self.content,
+            user=self.owner,
+            title='Owner Profile'
+        )
+
+    def test_content_profile_detail_success_and_not_found(self):
+        url = reverse('content:content-profile-detail', args=[self.profile.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.profile.id)
+
+        not_found = self.client.get(reverse('content:content-profile-detail', args=[99999]))
+        self.assertEqual(not_found.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_topic_edit_content_permissions_and_success(self):
+        url = reverse('content:topic-edit-content', args=[self.topic.id])
+        payload = {'content_profile_ids': [self.profile.id]}
+
+        self.client.force_authenticate(user=self.other)
+        forbidden = self.client.post(url, payload, format='json')
+        self.assertEqual(forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.owner)
+        ok = self.client.post(url, payload, format='json')
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        self.assertIn(self.content, self.topic.contents.all())
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    @patch('content.views._build_s3_upload_plan')
+    @patch('content.views.boto3.client')
+    def test_file_suggestion_presign_success(self, mock_boto_client, mock_build_plan):
+        suggestion_content = Content.objects.create(
+            uploaded_by=self.owner,
+            media_type='TEXT',
+            original_title='Needs File',
+            url='https://example.com/resource'
+        )
+        FileDetails.objects.create(content=suggestion_content)
+        self.client.force_authenticate(user=self.other)
+        mock_boto_client.return_value = Mock()
+        mock_build_plan.return_value = {
+            'key': f'content_suggestions/files/{suggestion_content.id}/{self.other.id}/abc_file.pdf',
+            'upload_url': 'https://example.com/presigned',
+            'method': 'PUT',
+        }
+        url = reverse('content:file-suggestion-presign', args=[suggestion_content.id])
+        response = self.client.post(
+            url,
+            {'filename': 'file.pdf', 'file_size': 50, 'content_type': 'application/pdf'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('key', response.data)
+        self.assertIn('upload_url', response.data)
+
+    def test_file_suggestion_presign_requires_authentication(self):
+        suggestion_content = Content.objects.create(
+            uploaded_by=self.owner,
+            media_type='TEXT',
+            original_title='Needs File',
+            url='https://example.com/resource'
+        )
+        FileDetails.objects.create(content=suggestion_content)
+        self.client.force_authenticate(user=None)
+        url = reverse('content:file-suggestion-presign', args=[suggestion_content.id])
+        response = self.client.post(url, {'filename': 'file.pdf', 'file_size': 50}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_publications_endpoint_returns_published_only(self):
+        own_pub = Publication.objects.create(
+            user=self.owner,
+            content_profile=self.profile,
+            text_content='Visible publication',
+            status='PUBLISHED',
+            deleted=False
+        )
+        Publication.objects.create(
+            user=self.owner,
+            content_profile=self.profile,
+            text_content='Draft publication',
+            status='DRAFT',
+            deleted=False
+        )
+        Publication.objects.create(
+            user=self.owner,
+            content_profile=self.profile,
+            text_content='Deleted publication',
+            status='PUBLISHED',
+            deleted=True
+        )
+        url = reverse('content:user-publications', args=[self.owner.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], own_pub.id)

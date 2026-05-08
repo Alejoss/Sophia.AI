@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Box, Typography, Card, CardContent, Button, IconButton } from '@mui/material';
+import { Box, Typography, Card, CardContent, Button, IconButton, Chip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import contentApi from '../api/contentApi';
@@ -75,9 +75,14 @@ const CollectionsUser = () => {
                             onClick={() => navigate(`/content/collections/${collection.id}`)}
                         >
                             <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    {collection.name}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                    <Typography variant="h6">
+                                        {collection.name}
+                                    </Typography>
+                                    {collection.is_public && (
+                                        <Chip label="Pública" size="small" color="secondary" variant="outlined" />
+                                    )}
+                                </Box>
                                 <Typography color="text.secondary">
                                     {collection.content_count} {collection.content_count === 1 ? 'elemento' : 'elementos'}
                                 </Typography>

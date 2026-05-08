@@ -178,7 +178,8 @@ def log_business_event(event_type: str, user_id: int = None, object_id: int = No
 
 
 def log_error(error: Exception, context: str = None, user_id: int = None,
-              extra: Optional[Dict[str, Any]] = None):
+              extra: Optional[Dict[str, Any]] = None,
+              logger_instance: Optional[logging.Logger] = None):
     """
     Log errors with context using Django standard logging.
     This will work seamlessly with Sentry when configured.
@@ -188,6 +189,7 @@ def log_error(error: Exception, context: str = None, user_id: int = None,
         context: Context where the error occurred
         user_id: User ID (optional)
         extra: Additional data to log
+        logger_instance: Optional logger (defaults to api_logger) so events keep the right logger name
     """
     if extra is None:
         extra = {}
@@ -199,8 +201,9 @@ def log_error(error: Exception, context: str = None, user_id: int = None,
         'user_id': user_id,
     })
     
+    log = logger_instance if logger_instance is not None else api_logger
     # Use error level which will be captured by Sentry
-    api_logger.error(f"Error in {context}: {str(error)}", extra=extra, exc_info=True)
+    log.error(f"Error in {context}: {str(error)}", extra=extra, exc_info=True)
 
 
 def log_performance_metric(metric_name: str, value: float, unit: str = None,

@@ -217,8 +217,8 @@ const AppContent = () => {
           </Route>
           </Routes>
         </AuthProvider>
+        <CommunityBubble />
       </Router>
-      <CommunityBubble />
     </MuiThemeProvider>
   );
 };

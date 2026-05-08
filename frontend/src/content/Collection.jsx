@@ -11,22 +11,22 @@ const Collection = () => {
     const navigate = useNavigate();
     const [content, setContent] = useState([]);
     const [collectionName, setCollectionName] = useState('');
+    const [isOwner, setIsOwner] = useState(false);
+    const [ownerUsername, setOwnerUsername] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchCollectionData = async () => {
             try {
-                console.log('Fetching collection data for ID:', collectionId);
-                // Fetch collection info and content in parallel
                 const [collectionInfo, contentData] = await Promise.all([
                     contentApi.getCollection(collectionId),
                     contentApi.getCollectionContent(collectionId)
                 ]);
-                console.log('Received collection info:', collectionInfo);
-                console.log('Received collection content:', contentData);
-                
+
                 setCollectionName(collectionInfo.name || 'Colección sin título');
+                setIsOwner(!!collectionInfo.is_owner);
+                setOwnerUsername(collectionInfo.owner_username || '');
                 setContent(contentData || []);
                 setLoading(false);
             } catch (err) {
@@ -42,22 +42,43 @@ const Collection = () => {
     if (loading) return <Typography>Cargando contenido de la colección...</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
 
+    const handleBack = () => {
+        navigate(-1);
+    };
+
     return (
         <Box sx={{ pt: 12, px: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <IconButton onClick={() => navigate('/content/collections')} sx={{ mr: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+                <IconButton onClick={handleBack} sx={{ mr: 2 }}>
                     <ArrowBackIcon />
                 </IconButton>
-                <Typography variant="h1" sx={{ flexGrow: 1, fontSize: '2.5rem' }}>
-                    {collectionName}
-                </Typography>
-                <Button 
-                    variant="contained" 
-                    color="primary"
-                    onClick={() => navigate(`/content/collections/${collectionId}/edit`)}
-                >
-                    Editar contenido
-                </Button>
+                <Box sx={{ flexGrow: 1, minWidth: 200 }}>
+                    <Typography variant="h1" sx={{ fontSize: '2.5rem' }}>
+                        {collectionName}
+                    </Typography>
+                    {!isOwner && ownerUsername && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            Colección de {ownerUsername}
+                        </Typography>
+                    )}
+                </Box>
+                {isOwner ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => navigate(`/content/collections/${collectionId}/edit`)}
+                    >
+                        Editar contenido
+                    </Button>
+                ) : (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => navigate('/content/collections')}
+                    >
+                        Mis colecciones
+                    </Button>
+                )}
             </Box>
 
             <Box display="grid" gridTemplateColumns="repeat(12, 1fr)" gap={3}>

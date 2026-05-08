@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Box, Button, Typography } from '@mui/material';
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Box, Button, Typography, Card, CardContent, CardActionArea } from '@mui/material';
 import generalApi from '../api/generalApi';
+import contentApi from '../api/contentApi';
+import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from '../content/ContentDisplay';
 import '/src/styles/search.css';
 
@@ -19,7 +21,45 @@ const MainSearch = () => {
     totalPages: 1,
     totalResults: 0
   });
+  const [publicCollections, setPublicCollections] = useState([]);
+  const [publicLoading, setPublicLoading] = useState(false);
+  const [publicError, setPublicError] = useState(null);
   const navigate = useNavigate();
+  const { authState } = useContext(AuthContext);
+  const isAuthenticated = authState.isAuthenticated;
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPublicCollections([]);
+      setPublicLoading(false);
+      setPublicError(null);
+      return;
+    }
+    let cancelled = false;
+    const loadPublic = async () => {
+      setPublicLoading(true);
+      setPublicError(null);
+      try {
+        const data = await contentApi.getPublicCollections({ page: 1, page_size: 12 });
+        if (!cancelled) {
+          setPublicCollections(Array.isArray(data?.results) ? data.results : []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPublicError(
+            err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones'
+          );
+          setPublicCollections([]);
+        }
+      } finally {
+        if (!cancelled) setPublicLoading(false);
+      }
+    };
+    loadPublic();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const handleSearch = async (e, page = 1) => {
     e.preventDefault();
@@ -193,6 +233,56 @@ const MainSearch = () => {
         </div>
       </form>
 
+      <section className="search-collections-section" aria-labelledby="search-collections-heading">
+        <h2 id="search-collections-heading">Colecciones</h2>
+        <p className="search-collections-subtitle">
+          Colecciones públicas de la comunidad (solo se listan ítems visibles en búsqueda).
+        </p>
+        {!isAuthenticated && (
+          <p className="search-collections-hint">
+            <Link to="/profiles/login">Inicia sesión</Link> para ver colecciones públicas.
+          </p>
+        )}
+        {isAuthenticated && publicLoading && (
+          <p className="search-collections-hint">Cargando colecciones…</p>
+        )}
+        {isAuthenticated && publicError && !publicLoading && (
+          <p className="search-collections-hint" style={{ color: '#c62828' }}>{publicError}</p>
+        )}
+        {isAuthenticated && !publicLoading && !publicError && publicCollections.length === 0 && (
+          <p className="search-collections-hint">Aún no hay colecciones públicas con contenido visible.</p>
+        )}
+        {isAuthenticated && !publicLoading && publicCollections.length > 0 && (
+          <div className="search-collections-grid">
+            {publicCollections.map((c) => (
+              <Card
+                key={c.id}
+                variant="outlined"
+                sx={{
+                  bgcolor: 'background.paper',
+                  borderColor: 'divider',
+                }}
+              >
+                <CardActionArea onClick={() => navigate(`/content/collections/${c.id}`)}>
+                  <CardContent sx={{ py: 2 }}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom component="div">
+                      {c.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Por {c.owner_username}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                      {c.visible_item_count}{' '}
+                      {c.visible_item_count === 1 ? 'elemento visible' : 'elementos visibles'}
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
       {isLoading ? (
         <div className="loading">Cargando resultados...</div>
       ) : (
@@ -268,4 +358,4 @@ const MainSearch = () => {
   );
 };
 
-export default MainSearch; 
+export default MainSearch;

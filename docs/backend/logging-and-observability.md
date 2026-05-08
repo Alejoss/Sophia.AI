@@ -25,6 +25,7 @@
 - **Backend**: Set `SENTRY_DSN` in `acbc_app/.env`. Optional: `SENTRY_TRACES_SAMPLE_RATE` (default 0.1), `SENTRY_PROFILES_SAMPLE_RATE` (default 0.0).
 - **Frontend**: Set `VITE_SENTRY_DSN` in `frontend/.env` for beta/production. Rebuild after changing.
 - **PII**: `send_default_pii=True` in backend; Replay on frontend uses `maskAllText: true`, `blockAllMedia: true`.
+- **Policy**: See [sentry-and-logging-policy.md](./sentry-and-logging-policy.md) for log levels vs 4xx/5xx and the manual verification checklist.
 
 ## Recommendations
 
