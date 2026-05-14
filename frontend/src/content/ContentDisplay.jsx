@@ -64,14 +64,16 @@ const ContentDisplay = ({
   });
   const navigate = useNavigate();
 
+  // Must run before any early return (Rules of Hooks)
+  useEffect(() => {
+    if (content?.id != null) {
+      setImageLoadError(false);
+    }
+  }, [content?.id]);
+
   if (!content) {
     return null;
   }
-
-  // Reset image load error when content changes
-  useEffect(() => {
-    setImageLoadError(false);
-  }, [content.id]);
 
   // Get appropriate data from either content or content_profile
   const profile = content.selected_profile || content;
