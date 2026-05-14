@@ -210,7 +210,9 @@ const CollectionEditContent = () => {
             <Paper sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
                     <IconButton 
-                        onClick={() => navigate(`/content/collections/${collectionId}`)}
+                        onClick={() =>
+                            navigate(`/content/collections/${collectionId}`, { replace: true })
+                        }
                         sx={{ mr: 1 }}
                     >
                         <ArrowBackIcon />

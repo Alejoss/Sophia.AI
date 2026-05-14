@@ -178,9 +178,15 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_target(self, obj):
         if obj.target:
+            target = obj.target
+            title = None
+            if hasattr(target, 'title') and getattr(target, 'title', None):
+                title = target.title
+            elif hasattr(target, 'original_title'):
+                title = getattr(target, 'original_title', None) or None
             return {
-                'id': obj.target.id,
-                'title': obj.target.title if hasattr(obj.target, 'title') else None
+                'id': target.id,
+                'title': title,
             }
         return None
 
@@ -219,6 +225,12 @@ class NotificationSerializer(serializers.ModelSerializer):
             # For content suggestions
             if obj.verb in ['sugirió contenido para', 'aceptó tu sugerencia de contenido para', 
                            'rechazó tu sugerencia de contenido para'] and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
+            # File suggestion for URL content (target is Content)
+            if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
+                if hasattr(obj.target, 'original_title'):
+                    return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
                 
             return None
@@ -287,6 +299,10 @@ class NotificationSerializer(serializers.ModelSerializer):
                            'rechazó tu sugerencia de contenido para'] and obj.target:
                 # Link to topic detail page or topic edit page for moderators
                 return f'/content/topics/{obj.target.id}' if hasattr(obj.target, 'id') else None
+
+            # Pending file suggestions list lives on the library content view
+            if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
+                return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
                 
             return None
         except Exception as e:

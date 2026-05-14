@@ -299,7 +299,8 @@ const contentApi = {
 
     /**
      * Paginated public collections (is_public + at least one visible item).
-     * @param {{ page?: number, page_size?: number, search?: string }} params
+     * @param {{ page?: number, page_size?: number, search?: string, owner?: number }} params
+     * @param {number} [params.owner] - filter by library owner's user id
      */
     getPublicCollections: async (params = {}) => {
         try {
@@ -307,6 +308,9 @@ const contentApi = {
             if (params.page != null) searchParams.set('page', String(params.page));
             if (params.page_size != null) searchParams.set('page_size', String(params.page_size));
             if (params.search) searchParams.set('search', params.search.trim());
+            if (params.owner != null && params.owner !== '') {
+                searchParams.set('owner', String(params.owner));
+            }
             const qs = searchParams.toString();
             const url = qs ? `/content/collections/public/?${qs}` : '/content/collections/public/';
             const response = await axiosInstance.get(url);
@@ -885,6 +889,59 @@ const contentApi = {
         }
     },
 
+    /** Presign for original uploader to attach a file (no FileSuggestion). */
+    ownerAttachPresign: async (contentId, metadata) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/owner-attach/presign/`,
+                metadata,
+                {
+                    timeout: 60000,
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error presigning owner attach:', error.response || error);
+            throw error;
+        }
+    },
+
+    /** After S3 PUT, persist key on FileDetails (uploader only). */
+    ownerAttachConfirm: async (contentId, payload) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/owner-attach/confirm/`,
+                payload,
+                {
+                    timeout: 120000,
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error confirming owner attach:', error.response || error);
+            throw error;
+        }
+    },
+
+    createOwnerContentFileAttach: async (contentId, formData, options = {}) => {
+        try {
+            const response = await axiosInstance.post(
+                `/content/content/${contentId}/owner-attach/`,
+                formData,
+                {
+                    timeout: options.timeout ?? 30000,
+                    onUploadProgress: options.onUploadProgress,
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error attaching owner file:', error.response || error);
+            throw error;
+        }
+    },
+
     /**
      * Large-friendly flow: presign -> PUT to S3 (XHR progress) -> confirm.
      * If S3 is not configured (503), falls back to multipart POST with no timeout.
@@ -914,6 +971,44 @@ const contentApi = {
                 formData.append('file', file);
                 formData.append('message', message || '');
                 return await contentApi.createFileSuggestion(contentId, formData, {
+                    timeout: 0,
+                    onUploadProgress: onProgress
+                        ? (e) => {
+                              if (e.total) onProgress({ loaded: e.loaded, total: e.total });
+                          }
+                        : undefined,
+                });
+            }
+            throw err;
+        }
+    },
+
+    /**
+     * Same as uploadFileSuggestionViaS3 but for the original uploader (no FileSuggestion, no message).
+     */
+    uploadOwnerContentFileViaS3: async (contentId, file, onProgress) => {
+        try {
+            const presignData = await contentApi.ownerAttachPresign(contentId, {
+                filename: file.name,
+                file_size: file.size,
+                content_type: file.type || 'application/octet-stream',
+            });
+            const uploadMetadata = await contentApi.uploadFileToS3(
+                file,
+                presignData.upload_mode ? presignData : presignData.upload_url,
+                onProgress
+            );
+            return await contentApi.ownerAttachConfirm(contentId, {
+                key: presignData.key,
+                file_size: file.size,
+                ...(uploadMetadata || {}),
+            });
+        } catch (err) {
+            if (err.response?.status === 503) {
+                console.warn('[Owner attach] S3 unavailable, using multipart fallback');
+                const formData = new FormData();
+                formData.append('file', file);
+                return await contentApi.createOwnerContentFileAttach(contentId, formData, {
                     timeout: 0,
                     onUploadProgress: onProgress
                         ? (e) => {

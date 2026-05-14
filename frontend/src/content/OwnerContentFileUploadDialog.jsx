@@ -6,7 +6,6 @@ import {
     DialogActions,
     Button,
     Typography,
-    TextField,
     Alert,
     LinearProgress,
     Box,
@@ -15,33 +14,31 @@ import contentApi from '../api/contentApi';
 import { formatFileSize } from '../utils/fileUtils';
 
 /**
- * Modal to suggest a file for URL-only content: S3 presign + PUT + confirm (same idea as UploadContentForm),
- * with multipart fallback when S3 is not configured (no default 30s cap on that path).
+ * Modal for the original uploader to attach a downloadable file to URL-only content.
+ * Uses owner-attach endpoints (FileDetails only, no FileSuggestion / no message field).
  */
-const FileSuggestionUploadDialog = ({
+const OwnerContentFileUploadDialog = ({
     open,
     onClose,
     contentId,
     onSuccess,
-    dialogTitle = 'Tienes el archivo correspondiente',
-    submitLabel = 'Sugerir archivo',
+    dialogTitle = 'Subir archivo',
+    submitLabel = 'Adjuntar archivo',
     introText = (
         <>
-            Academia Blockchain es un proyecto colaborativo. Reconocemos lo importante que es poder descargarnos
-            archivos y guardarlos localmente. 
+            Para archivos grandes, la subida puede ir directo al almacenamiento con barra de progreso.
+            Si el servidor no usa S3, se usará subida clásica sin límite de tiempo de 30 s.
         </>
     ),
 }) => {
-    const [suggestionFile, setSuggestionFile] = useState(null);
-    const [suggestionMessage, setSuggestionMessage] = useState('');
+    const [file, setFile] = useState(null);
     const [error, setError] = useState('');
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
 
     useEffect(() => {
         if (!open) {
-            setSuggestionFile(null);
-            setSuggestionMessage('');
+            setFile(null);
             setError('');
             setUploading(false);
             setUploadProgress(null);
@@ -50,37 +47,31 @@ const FileSuggestionUploadDialog = ({
 
     const handleSubmit = async () => {
         setError('');
-        if (!suggestionFile) {
+        if (!file) {
             setError('Debes seleccionar un archivo.');
             return;
         }
 
         setUploading(true);
-        // null = fase presign/confirm (barra indeterminada); número = progreso del PUT a S3
         setUploadProgress(null);
         try {
-            await contentApi.uploadFileSuggestionViaS3(
-                contentId,
-                suggestionFile,
-                suggestionMessage,
-                (e) => {
-                    if (e.total) {
-                        setUploadProgress(Math.round((e.loaded / e.total) * 100));
-                    }
+            await contentApi.uploadOwnerContentFileViaS3(contentId, file, (e) => {
+                if (e.total) {
+                    setUploadProgress(Math.round((e.loaded / e.total) * 100));
                 }
-            );
+            });
             onSuccess?.();
             onClose();
         } catch (err) {
             const raw = err?.response?.data?.error;
-            let msg = err?.message || 'No se pudo enviar la sugerencia.';
+            let msg = err?.message || 'No se pudo adjuntar el archivo.';
             if (typeof raw === 'string') {
                 msg = raw;
             } else if (raw != null && typeof raw === 'object') {
                 try {
                     msg = JSON.stringify(raw);
                 } catch {
-                    msg = 'No se pudo enviar la sugerencia.';
+                    msg = 'No se pudo adjuntar el archivo.';
                 }
             } else if (raw != null) {
                 msg = String(raw);
@@ -128,26 +119,13 @@ const FileSuggestionUploadDialog = ({
 
                 <Button variant="outlined" component="label" sx={{ mb: 2 }} disabled={uploading}>
                     Seleccionar archivo
-                    <input
-                        type="file"
-                        hidden
-                        onChange={(e) => setSuggestionFile(e.target.files?.[0] || null)}
-                    />
+                    <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
                 </Button>
-                {suggestionFile && (
+                {file && (
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                        Archivo: {suggestionFile.name} ({formatFileSize(suggestionFile.size)})
+                        Archivo: {file.name} ({formatFileSize(file.size)})
                     </Typography>
                 )}
-                <TextField
-                    label="Mensaje (opcional)"
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={suggestionMessage}
-                    onChange={(e) => setSuggestionMessage(e.target.value)}
-                    disabled={uploading}
-                />
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={uploading}>
@@ -161,4 +139,4 @@ const FileSuggestionUploadDialog = ({
     );
 };
 
-export default FileSuggestionUploadDialog;
+export default OwnerContentFileUploadDialog;

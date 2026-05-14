@@ -2,8 +2,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
+from django.core.files.storage import default_storage
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from notifications.models import Notification
 from content.models import (
     Library, Collection, Content, ContentProfile, 
     FileDetails, Topic, Publication, TopicModeratorInvitation, FileSuggestion, ContentSuggestion
@@ -916,6 +918,25 @@ class PublicCollectionsAPITests(APITestCase):
         self.assertEqual(row['owner_username'], 'owner')
         self.assertEqual(row['visible_item_count'], 1)
 
+    def test_public_list_filter_by_owner(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:public-collections')
+        response = self.client.get(url, {'owner': self.owner.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], self.collection.id)
+
+        empty = self.client.get(url, {'owner': self.viewer.id})
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data['count'], 0)
+        self.assertEqual(empty.data['results'], [])
+
+    def test_public_list_filter_by_owner_invalid_returns_400(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:public-collections')
+        response = self.client.get(url, {'owner': 'not-an-int'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_public_list_excludes_empty_public_collections(self):
         empty_coll = Collection.objects.create(
             library=self.library,
@@ -1274,7 +1295,7 @@ class ContentSourceEditTests(APITestCase):
         self.assertTrue(response.data['can_modify'])
         self.assertEqual(response.data['other_users_count'], 0)
         
-        # Test the content detail endpoint (used by ContentSourceEdit)
+        # Test the content detail endpoint (library context)
         detail_url = f'/api/content/content_details/{self.modifiable_content.id}/?context=library&id={self.user.id}'
         response = self.client.get(detail_url)
         
@@ -1929,13 +1950,40 @@ class FileSuggestionAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(FileSuggestion.objects.count(), 1)
         self.assertEqual(FileSuggestion.objects.first().status, 'PENDING')
+        notif = Notification.objects.filter(
+            recipient=self.uploader,
+            verb='sugirió un archivo para tu contenido',
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertEqual(int(notif.actor_object_id), self.suggester.id)
+        self.assertEqual(int(notif.target_object_id), self.content.id)
 
-    def test_create_file_suggestion_forbidden_for_uploader(self):
+    def test_create_file_suggestion_by_uploader_forbidden(self):
+        """File suggestions are third-party only; uploader uses owner-attach instead."""
         self.client.force_authenticate(user=self.uploader)
         url = reverse('content:file-suggestion-create', args=[self.content.id])
         upload = SimpleUploadedFile('notes.pdf', b'pdf-content', content_type='application/pdf')
         response = self.client.post(url, {'file': upload}, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(FileSuggestion.objects.count(), 0)
+
+    def test_owner_attach_multipart_success(self):
+        self.client.force_authenticate(user=self.uploader)
+        url = reverse('content:content-owner-attach', args=[self.content.id])
+        upload = SimpleUploadedFile('owner.pdf', b'owner-bytes', content_type='application/pdf')
+        response = self.client.post(url, {'file': upload}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(FileSuggestion.objects.count(), 0)
+        self.file_details.refresh_from_db()
+        self.assertTrue(bool(self.file_details.file))
+
+    def test_owner_attach_non_uploader_forbidden(self):
+        self.client.force_authenticate(user=self.suggester)
+        url = reverse('content:content-owner-attach', args=[self.content.id])
+        upload = SimpleUploadedFile('hijack.pdf', b'x', content_type='application/pdf')
+        response = self.client.post(url, {'file': upload}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(FileSuggestion.objects.count(), 0)
 
     def test_accept_file_suggestion_only_uploader(self):
         suggestion = FileSuggestion.objects.create(
@@ -1999,6 +2047,8 @@ class FileSuggestionAPITests(APITestCase):
             file_size=11,
             status='PENDING'
         )
+        storage_path = suggestion.file.name
+        self.assertTrue(default_storage.exists(storage_path))
         url = reverse('content:file-suggestion-reject', args=[suggestion.id])
 
         self.client.force_authenticate(user=self.other_user)
@@ -2011,6 +2061,8 @@ class FileSuggestionAPITests(APITestCase):
         suggestion.refresh_from_db()
         self.assertEqual(suggestion.status, 'REJECTED')
         self.assertEqual(suggestion.rejection_reason, 'invalid file')
+        self.assertFalse(suggestion.file)
+        self.assertFalse(default_storage.exists(storage_path))
 
     @override_settings(
         AWS_ACCESS_KEY_ID='test',
@@ -2029,6 +2081,24 @@ class FileSuggestionAPITests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(FileSuggestion.objects.count(), 0)
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    def test_owner_attach_confirm_rejects_wrong_key_prefix(self):
+        self.client.force_authenticate(user=self.uploader)
+        url = reverse('content:content-owner-attach-confirm', args=[self.content.id])
+        response = self.client.post(
+            url,
+            {'key': 'content_suggestions/files/1/wrong.pdf', 'file_size': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.file_details.refresh_from_db()
+        self.assertFalse(bool(self.file_details.file))
 
 
 class UploadDirectS3APITests(APITestCase):

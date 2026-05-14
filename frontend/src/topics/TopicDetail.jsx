@@ -28,6 +28,9 @@ import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
 import { Badge } from '@mui/material';
 
+/** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
+const TOPIC_IMAGE_PAGE_SIZE = 3;
+
 function getGalleryImageSrc(content) {
     const contentData = content.content || content;
     const fileDetails = contentData.file_details;
@@ -349,7 +352,7 @@ const TopicDetail = () => {
         try {
             const [topicData, imageData, videoData, audioData, textData] = await Promise.all([
                 contentApi.getTopicDetails(topicId, { include_contents: false }),
-                fetchContentByTypePage('image', 1, 3),
+                fetchContentByTypePage('image', 1, TOPIC_IMAGE_PAGE_SIZE),
                 fetchContentByTypePage('video', 1, 3),
                 fetchContentByTypePage('audio', 1, 3),
                 fetchContentByTypePage('text', 1, 3),
@@ -357,7 +360,7 @@ const TopicDetail = () => {
 
             setTopic(topicData);
             setContentByType({
-                image: imageData.contents || [],
+                image: imageData.contents || imageData.results || [],
                 video: videoData.contents || [],
                 audio: audioData.contents || [],
                 text: textData.contents || [],
@@ -424,8 +427,8 @@ const TopicDetail = () => {
         const nextPage = imagePageInfo.currentPage + 1;
         setImagePageInfo((prev) => ({ ...prev, loading: true }));
         try {
-            const response = await fetchContentByTypePage('image', nextPage, 6);
-            const newImages = response.contents || [];
+            const response = await fetchContentByTypePage('image', nextPage, TOPIC_IMAGE_PAGE_SIZE);
+            const newImages = response.contents || response.results || [];
             if (newImages.length > 0) {
                 setContentByType((prev) => ({
                     ...prev,
@@ -459,8 +462,8 @@ const TopicDetail = () => {
         setImagePageInfo((prev) => ({ ...prev, loading: true }));
         try {
             while (hasNext) {
-                const response = await fetchContentByTypePage('image', currentPage + 1, 6);
-                const newImages = response.contents || [];
+                const response = await fetchContentByTypePage('image', currentPage + 1, TOPIC_IMAGE_PAGE_SIZE);
+                const newImages = response.contents || response.results || [];
                 if (newImages.length > 0) {
                     setContentByType((prev) => ({
                         ...prev,

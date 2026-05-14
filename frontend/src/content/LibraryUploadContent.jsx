@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Grid, Paper, Container, Typography, Box } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Grid, Paper, Container, Typography, Box, Button, Stack } from '@mui/material';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import UploadContentForm from './UploadContentForm';
 import RecentUserContent from './RecentUserContent';
 
 const LibraryUploadContent = () => {
+  const navigate = useNavigate();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleContentUploaded = (contentProfile) => {
@@ -14,9 +17,19 @@ const LibraryUploadContent = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Subir contenido
-        </Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h4" sx={{ mb: 0 }}>
+            Subir contenido
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<FolderOpenIcon />}
+            onClick={() => navigate('/content/library_upload_folder')}
+            sx={{ textTransform: 'none', alignSelf: { xs: 'stretch', sm: 'center' } }}
+          >
+            Subir carpeta
+          </Button>
+        </Stack>
         <Typography variant="body1" color="text.secondary">
           Sube nuevo contenido y visualiza tus subidas recientes
         </Typography>

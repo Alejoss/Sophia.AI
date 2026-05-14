@@ -37,34 +37,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-
-const getMediaType = (file) => {
-  if (!file || !file.type) return null;
-  
-  // Check the MIME type
-  if (file.type.startsWith('image/')) return 'IMAGE';
-  if (file.type.startsWith('video/')) return 'VIDEO';
-  if (file.type.startsWith('audio/')) return 'AUDIO';
-  if (file.type === 'application/pdf' ||
-      file.type === 'application/msword' ||
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return 'TEXT';
-  }
-  
-  // Check file extension as fallback
-  const extension = file.name.split('.').pop().toLowerCase();
-  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-  const videoExts = ['mp4', 'webm', 'avi', 'mov'];
-  const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
-  const textExts = ['txt', 'pdf', 'doc', 'docx', 'rtf'];
-  
-  if (imageExts.includes(extension)) return 'IMAGE';
-  if (videoExts.includes(extension)) return 'VIDEO';
-  if (audioExts.includes(extension)) return 'AUDIO';
-  if (textExts.includes(extension)) return 'TEXT';
-  
-  return null;
-};
+import { getMediaType } from './mediaTypeFromFile';
 
 // URL Preview Component
 const URLPreview = ({ previewData, isLoading, error }) => {

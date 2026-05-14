@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -9,10 +9,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Typography,
   Divider,
   Paper,
-  Badge,
   Chip
 } from '@mui/material';
 import {
@@ -119,6 +117,12 @@ export const getProfileMenuConfig = (isOwnProfile = false, unreadNotificationsCo
   return createMenuConfig(items, 'Secciones del perfil', true);
 };
 
+const sharedCollectionsLabel = (count) => {
+  if (count == null) return 'Colecciones compartidas';
+  if (count === 1) return '1 Colección compartida';
+  return `${count} Colecciones compartidas`;
+};
+
 const ProfileVerticalNavigation = ({ 
   isOwnProfile = false, 
   userId = null,
@@ -126,8 +130,12 @@ const ProfileVerticalNavigation = ({
   onSectionChange = () => {},
   onSuggestionClick = () => {},
   unreadNotificationsCount = 0,
+  /** Total public collections when viewing another user's profile; drives sidebar button text. */
+  sharedCollectionsCount = null,
   sx = {} 
 }) => {
+  const navigate = useNavigate();
+
   const handleSectionClick = (section) => {
     onSectionChange(null, section);
   };
@@ -167,17 +175,30 @@ const ProfileVerticalNavigation = ({
             Mi Biblioteca
           </Button>
         ) : (
-          <Typography
-            variant="h6"
-            component="h2"
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={() => {
+              onSectionChange(null, 'shared-collections');
+              if (userId != null) {
+                navigate(`/profiles/user_profile/${userId}?section=shared-collections`);
+              }
+            }}
             sx={{
               mb: 2,
-              color: 'text.primary',
+              py: 1.25,
               fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '0.95rem',
+              lineHeight: 1.25,
+              whiteSpace: 'normal',
+              ...(activeSection === 'shared-collections' && {
+                boxShadow: 6,
+              }),
             }}
           >
-            Perfil
-          </Typography>
+            {sharedCollectionsLabel(sharedCollectionsCount)}
+          </Button>
         )}
 
         <Divider sx={{ mb: 2 }} />

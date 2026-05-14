@@ -16,6 +16,8 @@ import {
     Switch,
     Checkbox,
     Grid,
+    Alert,
+    CircularProgress,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { formatDate } from '../utils/dateUtils';
@@ -23,6 +25,7 @@ import { resolveMediaUrl } from '../utils/fileUtils';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from './ContentDisplay';
+import OwnerContentFileUploadDialog from './OwnerContentFileUploadDialog';
 
 const ContentProfileEdit = () => {
     const { contentId } = useParams();
@@ -39,6 +42,14 @@ const ContentProfileEdit = () => {
     const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [error, setError] = useState('');
+    const [attachFileDialogOpen, setAttachFileDialogOpen] = useState(false);
+    const [attachFileSuccess, setAttachFileSuccess] = useState('');
+    const [editUrlDialogOpen, setEditUrlDialogOpen] = useState(false);
+    const [urlDraft, setUrlDraft] = useState('');
+    const [urlDialogCheckLoading, setUrlDialogCheckLoading] = useState(false);
+    const [urlDialogSaveLoading, setUrlDialogSaveLoading] = useState(false);
+    const [urlDialogError, setUrlDialogError] = useState('');
+    const [urlSaveBlocked, setUrlSaveBlocked] = useState(false);
     const { authState } = useContext(AuthContext);
 
     useEffect(() => {
@@ -76,6 +87,69 @@ const ContentProfileEdit = () => {
         };
         fetchContent();
     }, [contentId, authState?.user?.id]);
+
+    const reloadContent = async () => {
+        const data = await contentApi.getContentDetails(contentId, 'library', authState?.user?.id);
+        setContent(data);
+        const profile = data.selected_profile;
+        setThumbnailPreviewUrl(
+            profile?.thumbnail || data.file_details?.og_image || null
+        );
+        return data;
+    };
+
+    const openEditUrlDialog = async () => {
+        if (!content?.url) return;
+        setUrlDraft(content.url);
+        setUrlDialogError('');
+        setUrlSaveBlocked(false);
+        setEditUrlDialogOpen(true);
+        setUrlDialogCheckLoading(true);
+        try {
+            const check = await contentApi.checkContentModification(contentId);
+            if (!check?.can_modify) {
+                setUrlSaveBlocked(true);
+                setUrlDialogError(
+                    check?.message ||
+                        'No se puede cambiar la URL porque otros usuarios tienen este contenido en su biblioteca.'
+                );
+            }
+        } catch (err) {
+            setUrlSaveBlocked(true);
+            setUrlDialogError(
+                err.response?.data?.error ||
+                    err.message ||
+                    'No se pudo comprobar si se permite cambiar la URL.'
+            );
+        } finally {
+            setUrlDialogCheckLoading(false);
+        }
+    };
+
+    const handleSaveContentUrl = async () => {
+        const trimmed = (urlDraft || '').trim();
+        if (!trimmed) {
+            setUrlDialogError('La URL no puede estar vacía.');
+            return;
+        }
+        setUrlDialogSaveLoading(true);
+        setUrlDialogError('');
+        try {
+            await contentApi.updateContent(contentId, { url: trimmed });
+            await reloadContent();
+            setEditUrlDialogOpen(false);
+            setAttachFileSuccess('URL del contenido actualizada correctamente.');
+        } catch (err) {
+            const msg =
+                err.response?.data?.error ||
+                (typeof err.response?.data === 'string' ? err.response.data : null) ||
+                err.message ||
+                'No se pudo guardar la URL.';
+            setUrlDialogError(typeof msg === 'string' ? msg : 'No se pudo guardar la URL.');
+        } finally {
+            setUrlDialogSaveLoading(false);
+        }
+    };
 
     const handleChange = (e) => {
         setFormData({
@@ -129,31 +203,22 @@ const ContentProfileEdit = () => {
 
     if (!content) return <div>Cargando...</div>;
 
+    const hasAttachedFile = !!(content.has_file_available || content.file_details?.file);
+    const canAttachFileAsOwner = !!(content.is_original_uploader && content.url && !hasAttachedFile);
+
     return (
         <Box sx={{ maxWidth: 1400, margin: '0 auto', padding: 2, pt: 12 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" gutterBottom>
                     Editar perfil de contenido
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    {content?.can_suggest_file && (
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`)}
-                        >
-                            Sugerir archivo
-                        </Button>
-                    )}
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => navigate(`/content/${contentId}/source-edit`)}
-                    >
-                        Editar fuente del contenido
-                    </Button>
-                </Box>
             </Box>
+
+            {attachFileSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setAttachFileSuccess('')}>
+                    {attachFileSuccess}
+                </Alert>
+            )}
 
             {error && (
                 <Typography color="error" sx={{ mb: 2 }}>
@@ -250,31 +315,98 @@ const ContentProfileEdit = () => {
                             </Typography>
                         </Box>
 
-                        {/* Download Button */}
-                        {content.file_details && (
+                        {/* Archivo relacionado: título según exista archivo; acciones en la misma fila */}
+                        {(content.file_details || content?.can_suggest_file || canAttachFileAsOwner) && (
+                            <Box sx={{ mb: 3 }}>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 1,
+                                        flexWrap: 'wrap',
+                                        mb: hasAttachedFile && content.file_details ? 1 : 0,
+                                    }}
+                                >
+                                    <Typography variant="subtitle2" component="div" sx={{ m: 0 }}>
+                                        {hasAttachedFile
+                                            ? 'Detalles del archivo:'
+                                            : 'No hay archivo relacionado'}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                        {canAttachFileAsOwner && (
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={() => {
+                                                    setAttachFileSuccess('');
+                                                    setAttachFileDialogOpen(true);
+                                                }}
+                                            >
+                                                Subir archivo
+                                            </Button>
+                                        )}
+                                        {content?.can_suggest_file && (
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() =>
+                                                    navigate(
+                                                        `/content/${contentId}/library?context=library&id=${authState?.user?.id}`
+                                                    )
+                                                }
+                                            >
+                                                Sugerir archivo
+                                            </Button>
+                                        )}
+                                    </Box>
+                                </Box>
+                                {content.file_details && hasAttachedFile && (
+                                    <>
+                                        <Typography variant="body2">
+                                            Tamaño:{' '}
+                                            {content.file_details.file_size != null
+                                                ? `${(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB`
+                                                : '—'}
+                                        </Typography>
+                                        {(() => {
+                                            const downloadUrl = resolveMediaUrl(
+                                                content.url ?? content.file_details?.url ?? content.file_details?.file
+                                            );
+                                            return downloadUrl && content.file_details.file ? (
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<DownloadIcon />}
+                                                    href={downloadUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    Descargar archivo
+                                                </Button>
+                                            ) : null;
+                                        })()}
+                                    </>
+                                )}
+                            </Box>
+                        )}
+
+                        {content.url && content.is_original_uploader && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                    Detalles del archivo:
+                                    URL del contenido (fuente compartida)
                                 </Typography>
-                                <Typography variant="body2">
-                                    Tamaño: {(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ wordBreak: 'break-all', mb: 1 }}
+                                >
+                                    {content.url}
                                 </Typography>
-                                {(() => {
-                                    const downloadUrl = resolveMediaUrl(content.url ?? content.file_details?.url ?? content.file_details?.file);
-                                    return downloadUrl && content.file_details.file ? (
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<DownloadIcon />}
-                                            href={downloadUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            download
-                                            sx={{ mt: 1 }}
-                                        >
-                                            Descargar archivo
-                                        </Button>
-                                    ) : null;
-                                })()}
+                                <Button variant="outlined" size="small" onClick={openEditUrlDialog}>
+                                    Cambiar URL
+                                </Button>
                             </Box>
                         )}
 
@@ -399,6 +531,84 @@ const ContentProfileEdit = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Dialog
+                open={editUrlDialogOpen}
+                onClose={() =>
+                    !urlDialogSaveLoading && !urlDialogCheckLoading && setEditUrlDialogOpen(false)
+                }
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Cambiar URL del contenido</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        La URL vive en el registro del contenido (no en tu perfil de biblioteca). Si otras
+                        personas usan el mismo ítem, el cambio las afecta. Por favor, asegúrate que la url no esté rota.
+                    </Typography>
+                    {urlDialogCheckLoading && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                            <CircularProgress size={32} />
+                        </Box>
+                    )}
+                    {!urlDialogCheckLoading && (
+                        <>
+                            {urlDialogError && (
+                                <Alert severity="error" sx={{ mb: 2 }}>
+                                    {urlDialogError}
+                                </Alert>
+                            )}
+                            <TextField
+                                fullWidth
+                                label="URL"
+                                value={urlDraft}
+                                onChange={(e) => setUrlDraft(e.target.value)}
+                                margin="normal"
+                                multiline
+                                minRows={2}
+                                disabled={urlSaveBlocked || urlDialogSaveLoading}
+                            />
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setEditUrlDialogOpen(false)}
+                        disabled={urlDialogSaveLoading}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveContentUrl}
+                        disabled={
+                            urlDialogSaveLoading ||
+                            urlDialogCheckLoading ||
+                            urlSaveBlocked
+                        }
+                    >
+                        {urlDialogSaveLoading ? 'Guardando…' : 'Guardar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <OwnerContentFileUploadDialog
+                open={attachFileDialogOpen}
+                onClose={() => setAttachFileDialogOpen(false)}
+                contentId={contentId}
+                dialogTitle="Subir archivo correspondiente"
+                submitLabel="Adjuntar archivo"
+                introText="Este contenido tiene URL pero aún no tiene archivo descargable. Al adjuntar un archivo, quedará vinculado a este ítem."
+                onSuccess={async () => {
+                    setAttachFileSuccess('Archivo adjuntado correctamente.');
+                    setAttachFileDialogOpen(false);
+                    try {
+                        await reloadContent();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }}
+            />
         </Box>
     );
 };

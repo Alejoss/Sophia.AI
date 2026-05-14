@@ -234,9 +234,9 @@ const MainSearch = () => {
       </form>
 
       <section className="search-collections-section" aria-labelledby="search-collections-heading">
-        <h2 id="search-collections-heading">Colecciones</h2>
+        <h2 id="search-collections-heading">Biblioteca Compartida</h2>
         <p className="search-collections-subtitle">
-          Colecciones públicas de la comunidad (solo se listan ítems visibles en búsqueda).
+          Colecciones públicas de la comunidad
         </p>
         {!isAuthenticated && (
           <p className="search-collections-hint">

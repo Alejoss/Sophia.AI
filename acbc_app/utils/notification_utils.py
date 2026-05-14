@@ -4,7 +4,13 @@ Utility functions for handling notifications across the application.
 from django.contrib.contenttypes.models import ContentType
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath
-from content.models import ContentProfile, TopicModeratorInvitation, Topic, ContentSuggestion
+from content.models import (
+    ContentProfile,
+    ContentSuggestion,
+    FileSuggestion,
+    Topic,
+    TopicModeratorInvitation,
+)
 import traceback
 import logging
 
@@ -1835,4 +1841,89 @@ def notify_content_suggestion_rejected(suggestion):
         logger.error(f"Error creating content suggestion rejected notification: {str(e)}", extra={
             'suggestion_id': suggestion.id if suggestion else None,
             'topic_id': suggestion.topic.id if suggestion else None,
-        }, exc_info=True) 
+        }, exc_info=True)
+
+
+def notify_file_suggestion_created(file_suggestion):
+    """
+    Notify the content owner that a third party suggested a file for their URL-only content.
+
+    Uses target=Content so NotificationSerializer can build a link to the library content view
+    where pending file suggestions are shown.
+
+    Args:
+        file_suggestion: FileSuggestion instance (already saved, with suggested_by and content set).
+    """
+    logger.info("Creating file suggestion notification", extra={
+        'file_suggestion_id': file_suggestion.id,
+        'content_id': file_suggestion.content_id,
+        'suggested_by_id': file_suggestion.suggested_by_id,
+    })
+
+    try:
+        content = file_suggestion.content
+        owner = content.uploaded_by
+        suggester = file_suggestion.suggested_by
+
+        if not owner:
+            logger.info("Content has no owner - skipping file suggestion notification", extra={
+                'content_id': content.id,
+                'file_suggestion_id': file_suggestion.id,
+            })
+            return
+
+        if owner.id == suggester.id:
+            logger.info("Suggester is owner - skipping file suggestion notification", extra={
+                'content_id': content.id,
+                'file_suggestion_id': file_suggestion.id,
+            })
+            return
+
+        suggested_by_ct = ContentType.objects.get_for_model(suggester)
+        content_ct = ContentType.objects.get_for_model(content)
+        file_suggestion_ct = ContentType.objects.get_for_model(file_suggestion)
+
+        existing = Notification.objects.filter(
+            recipient=owner,
+            actor_content_type=suggested_by_ct,
+            actor_object_id=suggester.id,
+            verb='sugirió un archivo para tu contenido',
+            target_content_type=content_ct,
+            target_object_id=content.id,
+            action_object_content_type=file_suggestion_ct,
+            action_object_object_id=file_suggestion.id,
+        )
+        if existing.exists():
+            logger.info("File suggestion notification already exists - skipping", extra={
+                'file_suggestion_id': file_suggestion.id,
+                'owner_id': owner.id,
+            })
+            return
+
+        title = (content.original_title or "").strip() or f"contenido #{content.id}"
+        description = f'{suggester.username} sugirió un archivo para "{title}"'
+        if file_suggestion.message:
+            description += f': {file_suggestion.message[:100]}'
+
+        notification = Notification.objects.create(
+            recipient=owner,
+            actor_content_type=suggested_by_ct,
+            actor_object_id=suggester.id,
+            verb='sugirió un archivo para tu contenido',
+            action_object_content_type=file_suggestion_ct,
+            action_object_object_id=file_suggestion.id,
+            target_content_type=content_ct,
+            target_object_id=content.id,
+            description=description,
+        )
+        logger.info("File suggestion notification created successfully", extra={
+            'notification_id': notification.id,
+            'file_suggestion_id': file_suggestion.id,
+            'recipient_id': owner.id,
+        })
+    except Exception as e:
+        logger.error(
+            f"Error creating file suggestion notification: {str(e)}",
+            extra={'file_suggestion_id': getattr(file_suggestion, 'id', None)},
+            exc_info=True,
+        )

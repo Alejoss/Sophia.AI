@@ -17,6 +17,8 @@ import FavoriteCryptos from './FavoriteCryptos';
 import FeaturedBadgeSelector from '../gamification/FeaturedBadgeSelector';
 import BadgeList from '../gamification/BadgeList';
 import SuggestionModal from './SuggestionModal';
+import ProfileSharedCollections from './ProfileSharedCollections';
+import contentApi from '../api/contentApi';
 import { useBadges } from '../gamification/useBadges';
 import { 
     Box, 
@@ -200,6 +202,8 @@ const Profile = () => {
     const [isNavigating, setIsNavigating] = useState(false);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
+    /** Total public collections for another user's profile (sidebar button label). */
+    const [sharedCollectionsCount, setSharedCollectionsCount] = useState(null);
     
     // Determine if this is the user's own profile
     const isOwnProfile = !profileId || (currentUser && profile && currentUser.id === profile.user?.id);
@@ -258,6 +262,37 @@ const Profile = () => {
     }, [profileId]);
 
     useEffect(() => {
+        if (isOwnProfile || !profile?.user?.id) {
+            setSharedCollectionsCount(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await contentApi.getPublicCollections({
+                    owner: profile.user.id,
+                    page: 1,
+                    page_size: 1,
+                });
+                if (cancelled) return;
+                const n =
+                    typeof data?.count === 'number'
+                        ? data.count
+                        : Array.isArray(data?.results)
+                          ? data.results.length
+                          : 0;
+                setSharedCollectionsCount(n);
+            } catch (err) {
+                console.error('Error fetching shared collections count:', err);
+                if (!cancelled) setSharedCollectionsCount(0);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOwnProfile, profile?.user?.id]);
+
+    useEffect(() => {
         if (isOwnProfile) {
             fetchUnreadNotificationsCount();
         }
@@ -267,9 +302,10 @@ const Profile = () => {
     useEffect(() => {
         const urlParams = new URLSearchParams(location.search);
         const sectionParam = urlParams.get('section');
-        
-        if (sectionParam && isOwnProfile) {
-            // Map URL parameter to section name
+
+        if (!sectionParam) return;
+
+        if (isOwnProfile) {
             const sectionMap = {
                 'knowledge-paths': 'knowledge-paths',
                 'topics': 'topics',
@@ -280,12 +316,13 @@ const Profile = () => {
                 'cryptos': 'cryptos',
                 'badges': 'badges',
                 'notifications': 'notifications',
-                'security': 'security'
+                'security': 'security',
             };
-            
             if (sectionMap[sectionParam]) {
                 setActiveSection(sectionMap[sectionParam]);
             }
+        } else if (sectionParam === 'shared-collections') {
+            setActiveSection('shared-collections');
         }
     }, [location.search, isOwnProfile]);
 
@@ -359,6 +396,20 @@ const Profile = () => {
                     <Box>
                         <PublicationList isOwnProfile={isOwnProfile} userId={profile?.user?.id} />
                     </Box>
+                );
+            case 'shared-collections':
+                if (isOwnProfile) {
+                    return (
+                        <Typography variant="body1" color="text.secondary">
+                            Las colecciones compartidas de otros usuarios se muestran al visitar su perfil.
+                        </Typography>
+                    );
+                }
+                return (
+                    <ProfileSharedCollections
+                        userId={profile?.user?.id}
+                        ownerUsername={profile?.user?.username}
+                    />
                 );
             case 'notifications':
                 if (isOwnProfile) {
@@ -516,6 +567,7 @@ const Profile = () => {
                             onSectionChange={handleSectionChange}
                             onSuggestionClick={handleSuggestionClick}
                             unreadNotificationsCount={unreadNotificationsCount}
+                            sharedCollectionsCount={sharedCollectionsCount}
                         />
                     </Box>
                 </Box>

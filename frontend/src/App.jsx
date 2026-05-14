@@ -22,8 +22,8 @@ import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
 import Register from './profiles/Register.jsx';
 import Welcome from './profiles/Welcome.jsx';
-import UploadContentForm from './content/UploadContentForm.jsx';
 import LibraryUploadContent from './content/LibraryUploadContent.jsx';
+import LibraryFolderUpload from './content/LibraryFolderUpload.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
 import CollectionsUser from './content/CollectionsUser.jsx';
 import CreateCollectionForm from './content/CreateCollectionForm.jsx';
@@ -41,7 +41,6 @@ import TopicDetail from './topics/TopicDetail';
 import TopicContentMediaType from './topics/TopicContentMediaType';
 import TopicContentSuggestionsPage from './topics/TopicContentSuggestionsPage';
 import ContentProfileEdit from './content/ContentProfileEdit.jsx';
-import ContentSourceEdit from './content/ContentSourceEdit.jsx';
 import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 import KnowledgePathList from './knowledgePaths/KnowledgePathList';
@@ -168,8 +167,8 @@ const AppContent = () => {
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />
               <Route path=":contentId/edit" element={<ProtectedRoute><ContentProfileEdit /></ProtectedRoute>} />
-              <Route path=":contentId/source-edit" element={<ProtectedRoute><ContentSourceEdit /></ProtectedRoute>} />
               <Route path="library_upload_content" element={<LibraryUploadContent />} />
+              <Route path="library_upload_folder" element={<LibraryFolderUpload />} />
             </Route>
             <Route path="knowledge_path">
               <Route path="" element={<KnowledgePathList />} />

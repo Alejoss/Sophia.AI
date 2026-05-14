@@ -43,6 +43,10 @@ const Collection = () => {
     if (error) return <Typography color="error">{error}</Typography>;
 
     const handleBack = () => {
+        if (isOwner) {
+            navigate('/content/collections');
+            return;
+        }
         navigate(-1);
     };
 
@@ -68,7 +72,7 @@ const Collection = () => {
                         color="primary"
                         onClick={() => navigate(`/content/collections/${collectionId}/edit`)}
                     >
-                        Editar contenido
+                        Editar Colección
                     </Button>
                 ) : (
                     <Button

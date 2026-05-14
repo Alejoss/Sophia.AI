@@ -211,7 +211,9 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
                 'is_visible': profile.is_visible,
                 'is_producer': profile.is_producer,
                 'user': profile.user.id,
-                'user_username': profile.user.username
+                'user_username': profile.user.username,
+                'created_at': profile.created_at.isoformat() if profile.created_at else None,
+                'updated_at': profile.updated_at.isoformat() if profile.updated_at else None,
             }
         
         # Fallback to original content data
@@ -550,8 +552,8 @@ class PreviewContentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Content
         fields = [
-            'id', 'media_type', 'file_details', 'original_title', 
-            'original_author', 'uploaded_by', 'url',
+            'id', 'media_type', 'file_details', 'original_title',
+            'original_author', 'uploaded_by', 'url', 'created_at',
             'has_spanish_subtitles', 'has_spanish_dubbing',
             'favicon', 'has_file_available', 'is_original_uploader', 'can_suggest_file'
         ]
@@ -651,7 +653,7 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'content']
+        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'content', 'created_at', 'updated_at']
         
     def to_representation(self, instance):
         try:
@@ -682,6 +684,11 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
                     'original_title': getattr(instance.content, 'original_title', 'Untitled') if instance.content else 'Untitled',
                     'original_author': getattr(instance.content, 'original_author', '') if instance.content else '',
                     'url': getattr(instance.content, 'url', None) if instance.content else None,
+                    'created_at': (
+                        instance.content.created_at.isoformat()
+                        if instance.content and getattr(instance.content, 'created_at', None)
+                        else None
+                    ),
                     'file_details': None,  # Will be populated by PreviewContentSerializer if available
                     'favicon': None  # Will be populated by PreviewContentSerializer if available
                 }

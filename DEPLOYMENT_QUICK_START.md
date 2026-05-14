@@ -31,7 +31,7 @@
 2. **Build and deploy (recommended):**
   ```bash
    cd /opt/acbc-app
-   git pull
+   git pull origin main
    ./scripts/deploy.sh
   ```
    The script reads DB credentials from `acbc_app/.env`, frees port 80 if host nginx/apache is using it, then builds and starts the stack.

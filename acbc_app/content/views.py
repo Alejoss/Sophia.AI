@@ -1231,6 +1231,10 @@ class PublicCollectionsView(APIView):
     """
     Paginated list of collections marked public by any user.
     Only includes collections with at least one visible content profile.
+
+    Query params:
+    - search: filter by collection name (icontains)
+    - owner: user id of the library owner (only their public collections with visible items)
     """
     permission_classes = [IsAuthenticated]
 
@@ -1250,6 +1254,19 @@ class PublicCollectionsView(APIView):
         search = (request.query_params.get('search') or '').strip()
         if search:
             qs = qs.filter(name__icontains=search)
+
+        owner_raw = (request.query_params.get('owner') or '').strip()
+        if owner_raw:
+            try:
+                owner_id = int(owner_raw)
+                if owner_id < 1:
+                    raise ValueError
+                qs = qs.filter(library__user_id=owner_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'Parámetro owner inválido'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         paginator = UserLibraryPagination()
         page = paginator.paginate_queryset(qs, request)
@@ -3421,12 +3438,26 @@ class TopicContentSuggestionCreateView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+def _apply_accepted_file_suggestion(suggestion, reviewer):
+    """Attach suggested file to the Content's FileDetails and mark the suggestion ACCEPTED."""
+    content = suggestion.content
+    file_details, _created = FileDetails.objects.get_or_create(content=content)
+    file_details.file = suggestion.file
+    file_details.file_size = suggestion.file_size
+    file_details.save()
+    suggestion.status = 'ACCEPTED'
+    suggestion.reviewed_by = reviewer
+    suggestion.reviewed_at = timezone.now()
+    suggestion.rejection_reason = None
+    suggestion.save()
+
+
 def _file_suggestion_eligibility_error_response(user, content):
     """Return a DRF Response if the user cannot create a file suggestion, else None."""
     if content.uploaded_by_id == user.id:
         return Response(
             {"error": "No puede sugerir archivo para su propio contenido."},
-            status=status.HTTP_403_FORBIDDEN
+            status=status.HTTP_403_FORBIDDEN,
         )
     if not content.url:
         return Response(
@@ -3454,6 +3485,241 @@ def _file_suggestion_eligibility_error_response(user, content):
 
 def _file_suggestion_expected_key_prefix(content_id, user_id):
     return f"content_suggestions/files/{content_id}/{user_id}/"
+
+
+def _delete_file_suggestion_storage(suggestion):
+    """Remove the suggested file from storage (S3 or local). Does not save the model."""
+    f = suggestion.file
+    if not f:
+        return
+    path = getattr(f, 'name', None) or ''
+    if not path:
+        return
+    try:
+        f.delete(save=False)
+    except Exception as e:
+        logger.warning(
+            'Failed to delete file suggestion blob from storage',
+            extra={
+                'file_suggestion_id': suggestion.id,
+                'path': path,
+                'error': str(e),
+            },
+        )
+
+
+def _owner_attach_expected_key_prefix(content_id, user_id):
+    return f"content_owner_attach/{content_id}/{user_id}/"
+
+
+def _owner_attach_eligibility_error_response(user, content):
+    """Uploader-only: attach file to URL-only content without FileSuggestion."""
+    if content.uploaded_by_id != user.id:
+        return Response(
+            {"error": "Solo el autor original puede adjuntar un archivo directamente."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if not content.url:
+        return Response(
+            {"error": "Solo aplica a contenidos con URL."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    fd = FileDetails.objects.filter(content=content).first()
+    if fd and fd.file:
+        return Response(
+            {"error": "Este contenido ya tiene un archivo asociado."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not content.can_be_modified_by(user):
+        other_users_count = content.get_other_user_profiles_count()
+        return Response(
+            {
+                "error": (
+                    f"No se puede adjuntar archivo porque {other_users_count} otro(s) usuario(s) "
+                    f"lo han agregado a sus bibliotecas"
+                    if other_users_count > 0
+                    else "No se puede adjuntar archivo a este contenido"
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+class ContentOwnerAttachPresignView(APIView):
+    """Presigned PUT for original uploader to attach a file (no FileSuggestion)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        err = _owner_attach_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
+
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
+            return Response(
+                {'error': 'S3 no esta configurado para subida directa'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        filename = request.data.get('filename')
+        file_size = request.data.get('file_size')
+        content_type = request.data.get('content_type') or 'application/octet-stream'
+        if not filename or file_size is None:
+            return Response(
+                {'error': 'Se requieren filename y file_size'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            file_size = int(file_size)
+        except (TypeError, ValueError):
+            return Response({'error': 'file_size debe ser un numero'}, status=status.HTTP_400_BAD_REQUEST)
+        if file_size <= 0 or file_size > UPLOAD_CONTENT_MAX_SIZE:
+            return Response(
+                {'error': 'El tamano del archivo debe estar entre 1 byte y 5 TB'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        key = f"{_owner_attach_expected_key_prefix(content.id, request.user.id)}{uuid.uuid4().hex}_{safe_name}"
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
+        expires_in = 3600
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=region,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
+            upload_plan = _build_s3_upload_plan(
+                s3_client=s3_client,
+                bucket=bucket,
+                key=key,
+                content_type=content_type,
+                file_size=file_size,
+                expires_in=expires_in,
+            )
+        except Exception as e:
+            logger.exception("Owner attach presign: boto3 failed: %s", e)
+            return Response(
+                {'error': 'No se pudo generar la URL de subida', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(upload_plan, status=status.HTTP_200_OK)
+
+
+class ContentOwnerAttachConfirmView(APIView):
+    """After S3 PUT: persist file key on FileDetails (uploader only, no FileSuggestion)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        err = _owner_attach_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
+
+        if not getattr(settings, 'AWS_ACCESS_KEY_ID', None):
+            return Response(
+                {'error': 'S3 no esta configurado'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        key = request.data.get('key')
+        upload_id = request.data.get('upload_id')
+        multipart_parts = request.data.get('parts')
+        if not key or not isinstance(key, str) or not key.strip():
+            return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
+        key = key.strip()
+        if '..' in key or key.startswith('/'):
+            return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        expected = _owner_attach_expected_key_prefix(content.id, request.user.id)
+        if not key.startswith(expected):
+            return Response({'error': 'key no corresponde a este contenido o usuario'}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_size = request.data.get('file_size')
+        try:
+            file_size = int(file_size) if file_size is not None else None
+        except (TypeError, ValueError):
+            file_size = None
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2'),
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
+            if upload_id:
+                if not isinstance(upload_id, str) or not upload_id.strip():
+                    return Response({'error': 'upload_id invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                if not isinstance(multipart_parts, list) or not multipart_parts:
+                    return Response({'error': 'Se requieren parts para completar multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
+                normalized_parts = []
+                for part in multipart_parts:
+                    if not isinstance(part, dict):
+                        return Response({'error': 'parts invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    etag = part.get('etag')
+                    part_number = part.get('part_number')
+                    if etag is None or part_number is None:
+                        return Response({'error': 'Cada part requiere etag y part_number'}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        part_number = int(part_number)
+                    except (TypeError, ValueError):
+                        return Response({'error': 'part_number invalido'}, status=status.HTTP_400_BAD_REQUEST)
+                    normalized_parts.append({'ETag': str(etag), 'PartNumber': part_number})
+                normalized_parts.sort(key=lambda p: p['PartNumber'])
+                s3_client.complete_multipart_upload(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id.strip(),
+                    MultipartUpload={'Parts': normalized_parts},
+                )
+            s3_client.head_object(Bucket=bucket, Key=key)
+        except Exception as e:
+            logger.warning(
+                "Owner attach confirm: head_object failed",
+                extra={'s3_key': key, 'bucket': bucket, 'error': str(e)},
+            )
+            return Response(
+                {'error': 'El archivo no se encontro en el almacenamiento. Sube primero con la URL de subida.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_details, _created = FileDetails.objects.get_or_create(content=content)
+        FileDetails.objects.filter(pk=file_details.pk).update(file=key, file_size=file_size)
+        file_details.refresh_from_db()
+
+        serializer = ContentSerializer(content, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ContentOwnerAttachView(APIView):
+    """Multipart attach file for original uploader (no S3 / no FileSuggestion)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        content = get_object_or_404(Content, pk=pk)
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "Debe adjuntar un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+
+        err = _owner_attach_eligibility_error_response(request.user, content)
+        if err is not None:
+            return err
+
+        file_details, _created = FileDetails.objects.get_or_create(content=content)
+        file_details.file = file_obj
+        file_details.file_size = getattr(file_obj, 'size', None)
+        file_details.save()
+
+        serializer = ContentSerializer(content, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class FileSuggestionPresignView(APIView):
@@ -3616,6 +3882,16 @@ class FileSuggestionConfirmView(APIView):
         suggestion.refresh_from_db()
 
         serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        try:
+            from utils.notification_utils import notify_file_suggestion_created
+
+            notify_file_suggestion_created(suggestion)
+        except Exception:
+            logger.error(
+                "Error sending file suggestion notification",
+                extra={"suggestion_id": suggestion.id, "content_id": content.id},
+                exc_info=True,
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -3649,6 +3925,16 @@ class FileSuggestionCreateView(APIView):
         )
 
         serializer = FileSuggestionSerializer(suggestion, context={'request': request})
+        try:
+            from utils.notification_utils import notify_file_suggestion_created
+
+            notify_file_suggestion_created(suggestion)
+        except Exception:
+            logger.error(
+                "Error sending file suggestion notification",
+                extra={"suggestion_id": suggestion.id, "content_id": content.id},
+                exc_info=True,
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -3695,16 +3981,7 @@ class FileSuggestionAcceptView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        file_details, _created = FileDetails.objects.get_or_create(content=content)
-        file_details.file = suggestion.file
-        file_details.file_size = suggestion.file_size
-        file_details.save()
-
-        suggestion.status = 'ACCEPTED'
-        suggestion.reviewed_by = request.user
-        suggestion.reviewed_at = timezone.now()
-        suggestion.rejection_reason = None
-        suggestion.save()
+        _apply_accepted_file_suggestion(suggestion, request.user)
 
         serializer = FileSuggestionSerializer(suggestion, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -3732,10 +4009,12 @@ class FileSuggestionRejectView(APIView):
             )
 
         rejection_reason = request.data.get('rejection_reason', '')
+        _delete_file_suggestion_storage(suggestion)
         suggestion.status = 'REJECTED'
         suggestion.reviewed_by = request.user
         suggestion.reviewed_at = timezone.now()
         suggestion.rejection_reason = rejection_reason
+        suggestion.file = None
         suggestion.save()
 
         serializer = FileSuggestionSerializer(suggestion, context={'request': request})

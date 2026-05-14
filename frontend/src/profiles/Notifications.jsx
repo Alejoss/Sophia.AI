@@ -89,6 +89,8 @@ const Notifications = ({
       return notification.description || `${notification.actor} aceptó tu sugerencia de contenido`;
     } else if (notification.verb === 'rechazó tu sugerencia de contenido para') {
       return notification.description || `${notification.actor} rechazó tu sugerencia de contenido`;
+    } else if (notification.verb === 'sugirió un archivo para tu contenido') {
+      return notification.description || `${notification.actor} sugirió un archivo para tu contenido`;
     }
     // Fallback: use description if available, otherwise construct a message
     if (notification.description) {

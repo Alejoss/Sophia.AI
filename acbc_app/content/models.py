@@ -383,7 +383,7 @@ class FileSuggestion(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_file_suggestions'
     )
 
-    file = models.FileField(upload_to=file_suggestion_upload_path)
+    file = models.FileField(upload_to=file_suggestion_upload_path, blank=True, null=True)
     file_size = models.PositiveBigIntegerField(blank=True, null=True)
     message = models.TextField(blank=True, null=True)
     rejection_reason = models.TextField(blank=True, null=True)
