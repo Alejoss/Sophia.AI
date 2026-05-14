@@ -79,11 +79,12 @@ const ContentDisplay = ({
   const author = profile.author || content.original_author;
 
   // For preview mode, expect the PreviewContentProfileSerializer structure
-  // which has a nested 'content' field
+  // which has a nested 'content' field. Merge file_details from root when API flattens them.
   const contentData = content.content || content;
   const mediaType = contentData.media_type || "";
-  const fileDetails = contentData.file_details;
-  const url = contentData.url || fileDetails?.url;
+  const fileDetails = content.file_details || contentData.file_details;
+  /** External page URL (YouTube, etc.). Never use file_details.url here — the API sets that to the storage file URL. */
+  const contentExternalUrl = content.url ?? contentData?.url ?? null;
   const favicon = contentData.favicon;
   const downloadableFileUrl = fileDetails?.file
     ? resolveMediaUrl(fileDetails.url ?? fileDetails.file)
@@ -91,7 +92,9 @@ const ContentDisplay = ({
   const selectedProfileThumbnail = content?.selected_profile?.thumbnail;
   const previewProfileThumbnail = content?.thumbnail;
   const customThumbnail = selectedProfileThumbnail || previewProfileThumbnail;
-  const hasFileAvailable = Boolean(contentData?.has_file_available || fileDetails?.file);
+  const hasFileAvailable = Boolean(
+    fileDetails?.file || content?.has_file_available || contentData?.has_file_available
+  );
 
   // Debug logging for preview mode (moved after variable declarations)
   if (variant === "preview") {
@@ -116,13 +119,111 @@ const ContentDisplay = ({
     }
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return null;
+    try {
+      return new Date(dateString).toLocaleString();
+    } catch (error) {
+      console.error("Error formatting datetime:", error);
+      return null;
+    }
+  };
+
+  /** Friendly site name for "Copiar URL - YouTube" style labels (from full or partial URL). */
+  const getSourceSiteLabel = (urlString) => {
+    if (!urlString || typeof urlString !== "string") return "Origen";
+    const trimmed = urlString.trim();
+    if (!trimmed) return "Origen";
+    try {
+      const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+      const hostname = new URL(href).hostname.replace(/^www\./i, "").toLowerCase();
+      const map = {
+        "youtube.com": "YouTube",
+        "youtu.be": "YouTube",
+        "m.youtube.com": "YouTube",
+        "vimeo.com": "Vimeo",
+        "player.vimeo.com": "Vimeo",
+        "dailymotion.com": "Dailymotion",
+        "dai.ly": "Dailymotion",
+        "facebook.com": "Facebook",
+        "fb.watch": "Facebook",
+        "instagram.com": "Instagram",
+        "twitter.com": "X",
+        "x.com": "X",
+        "soundcloud.com": "SoundCloud",
+        "spotify.com": "Spotify",
+        "open.spotify.com": "Spotify",
+        "archive.org": "Internet Archive",
+        "drive.google.com": "Google Drive",
+        "docs.google.com": "Google Docs",
+        "twitch.tv": "Twitch",
+        "tiktok.com": "TikTok",
+      };
+      if (map[hostname]) return map[hostname];
+      const parts = hostname.split(".").filter(Boolean);
+      const base = parts.length >= 2 ? parts[parts.length - 2] : parts[0] || hostname;
+      if (!base) return "Origen";
+      return base.charAt(0).toUpperCase() + base.slice(1);
+    } catch {
+      return "Origen";
+    }
+  };
+
+  const getCopyUrlTarget = () => {
+    const external = contentExternalUrl && String(contentExternalUrl).trim();
+    if (external) return resolveMediaUrl(external);
+    if (fileDetails?.file) {
+      return resolveMediaUrl(fileDetails.file);
+    }
+    return null;
+  };
+
+  const renderMediaTypeRow = () => {
+    const mt = (contentData.media_type || "").toUpperCase();
+    const labels = {
+      VIDEO: "Video",
+      AUDIO: "Audio",
+      IMAGE: "Imagen",
+      TEXT: "Texto",
+    };
+    const label = labels[mt] || (mt ? mt.charAt(0) + mt.slice(1).toLowerCase() : "Contenido");
+    const iconSx = { fontSize: 28, color: "primary.main", opacity: 0.9 };
+    let icon = <DescriptionIcon sx={iconSx} />;
+    if (mt === "VIDEO") icon = <VideocamIcon sx={iconSx} />;
+    else if (mt === "AUDIO") icon = <AudiotrackIcon sx={iconSx} />;
+    else if (mt === "IMAGE") icon = <ImageIcon sx={iconSx} />;
+    else if (mt === "TEXT")
+      icon = contentExternalUrl ? <LinkIcon sx={iconSx} /> : <ArticleIcon sx={iconSx} />;
+
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          py: 0.75,
+          px: 1,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+          width: "fit-content",
+          maxWidth: "100%",
+        }}
+      >
+        {icon}
+        <Typography variant="body2" fontWeight={600} color="text.primary">
+          {label}
+        </Typography>
+      </Box>
+    );
+  };
+
   const getFileUrlFromContent = () => {
     try {
-      if (url) return resolveMediaUrl(url);
-      if (fileDetails) {
-        const v = fileDetails.url ?? fileDetails.file;
-        return resolveMediaUrl(v);
+      if (fileDetails?.file) {
+        return resolveMediaUrl(fileDetails.url ?? fileDetails.file);
       }
+      const external = contentExternalUrl && String(contentExternalUrl).trim();
+      if (external) return resolveMediaUrl(external);
       return null;
     } catch (error) {
       console.error("Error getting file URL:", error);
@@ -197,17 +298,11 @@ const ContentDisplay = ({
 
     // Function to handle content clicks
     const handleContentClick = () => {
-      if (fileUrl) {
-        // Open file in new tab
-        window.open(fileUrl, "_blank");
-      } else if (url) {
-        // Open URL in new tab
-        window.open(url, "_blank");
-      }
+      if (fileUrl) window.open(fileUrl, "_blank");
     };
 
     // Check if content is clickable
-    const isClickable = fileUrl || url;
+    const isClickable = Boolean(fileUrl);
 
     switch (mediaTypeUpper) {
       case "IMAGE": {
@@ -470,7 +565,8 @@ const ContentDisplay = ({
               {contentData.file_details.extracted_text}
             </Box>
           );
-        } else if (url) {
+        } else if (contentExternalUrl && String(contentExternalUrl).trim()) {
+          const resolvedExternal = resolveMediaUrl(contentExternalUrl);
           return (
             <Box
               sx={{
@@ -489,22 +585,22 @@ const ContentDisplay = ({
                   bgcolor: "grey.100",
                 },
               }}
-              onClick={handleContentClick}
+              onClick={() => window.open(resolvedExternal, "_blank")}
               title="Haz clic para abrir la URL en una nueva pestaña"
             >
               <Typography variant="body1" color="text.primary">
                 Contenido URL:{" "}
-                <a 
-                  href={url} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  style={{ 
+                <a
+                  href={resolvedExternal}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
                     color: "primary.main",
-                    textDecoration: "none"
+                    textDecoration: "none",
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {url}
+                  {contentExternalUrl}
                 </a>
               </Typography>
             </Box>
@@ -576,71 +672,59 @@ const ContentDisplay = ({
               >
                 Información del archivo
               </Typography>
-              <Stack spacing={1}>
+              <Stack spacing={1.5}>
+                {renderMediaTypeRow()}
+
+                {!hasFileAvailable && (
+                  <Typography variant="body2" color="text.secondary">
+                    {contentExternalUrl && String(contentExternalUrl).trim()
+                      ? "No hay archivo descargable relacionado; solo enlace externo."
+                      : "No hay archivo relacionado."}
+                  </Typography>
+                )}
+
                 {fileDetails?.file && (
                   <Box
                     sx={{
-                      display: {
-                        xs: "block", // mobile (default)
-                        md: "flex", // from md and up
-                      },
+                      display: "flex",
+                      flexWrap: "wrap",
                       alignItems: "center",
                       gap: 1,
                     }}
                   >
                     <StorageIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">Archivo:</Typography>
+                    <Typography variant="body2" color="text.primary">
+                      Archivo:
+                    </Typography>
                     <Button
                       size="small"
                       variant="outlined"
                       onClick={() =>
                         window.open(resolveMediaUrl(fileDetails.url ?? fileDetails.file), "_blank")
                       }
-                      sx={{ ml: 1 }}
                     >
                       Descargar archivo
                     </Button>
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={() =>
-                        handleCopyUrl(resolveMediaUrl(fileDetails.url ?? fileDetails.file))
-                      }
-                    >
-                      Copiar URL
-                    </Button>
                   </Box>
                 )}
 
-                {/* Only show URL for URL-based content (when there's no file) */}
-                {url && !fileDetails?.file && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <LinkIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">URL:</Typography>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => window.open(url, "_blank")}
-                      sx={{ ml: 1 }}
-                    >
-                      Abrir URL
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={() => handleCopyUrl(url)}
-                    >
-                      Copiar URL
-                    </Button>
-                  </Box>
-                )}
-
-                {fileDetails?.file_size && (
+                {hasFileAvailable && fileDetails?.file_size != null && Number.isFinite(Number(fileDetails.file_size)) && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <StorageIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
                       Tamaño del archivo:{" "}
-                      {(fileDetails.file_size / (1024 * 1024)).toFixed(2)} MB
+                      {Number(fileDetails.file_size) === 0
+                        ? "0 bytes"
+                        : formatFileSize(Number(fileDetails.file_size))}
+                    </Typography>
+                  </Box>
+                )}
+
+                {profile?.created_at && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CalendarTodayIcon fontSize="small" color="action" />
+                    <Typography variant="body2" color="text.primary">
+                      Perfil creado el: {formatDateTime(profile.created_at)}
                     </Typography>
                   </Box>
                 )}
@@ -654,6 +738,32 @@ const ContentDisplay = ({
                     </Typography>
                   </Box>
                 )}
+
+                {(() => {
+                  const copyTarget = getCopyUrlTarget();
+                  if (!copyTarget) return null;
+                  const site = getSourceSiteLabel(copyTarget);
+                  return (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <LinkIcon fontSize="small" color="action" />
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => handleCopyUrl(copyTarget)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        {`Copiar URL - ${site}`}
+                      </Button>
+                    </Box>
+                  );
+                })()}
               </Stack>
             </Box>
 
@@ -696,26 +806,6 @@ const ContentDisplay = ({
                   )}
                 </Box>
               </Box>
-            )}
-
-            {/* Creation Date */}
-            {contentData.created_at && (
-              <Tooltip title="Creado el" arrow>
-                <Box 
-                  sx={{ 
-                    display: "inline-flex", 
-                    alignItems: "center", 
-                    gap: 1,
-                    cursor: "help",
-                    width: "fit-content"
-                  }}
-                >
-                  <CalendarTodayIcon fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.primary">
-                    {formatDate(contentData.created_at)}
-                  </Typography>
-                </Box>
-              </Tooltip>
             )}
 
             {/* Vote Information */}
@@ -765,71 +855,6 @@ const ContentDisplay = ({
           </Box>
         </Box>
       );
-    }
-    return null;
-  };
-
-  const renderOpenGraphSection = () => {
-    if (variant === "detailed" && fileDetails) {
-      const hasOGData =
-        fileDetails.og_description ||
-        fileDetails.og_image ||
-        fileDetails.og_site_name ||
-        fileDetails.og_type;
-
-      if (hasOGData) {
-        return (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom color="text.secondary">
-              Información del sitio web
-            </Typography>
-            <Stack spacing={2}>
-              {fileDetails.og_type && (
-                <Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Tipo:
-                  </Typography>
-                  <Typography variant="body1" color="text.primary">{fileDetails.og_type}</Typography>
-                </Box>
-              )}
-
-              {fileDetails.og_site_name && (
-                <Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Sitio:
-                  </Typography>
-                  <Typography variant="body1" color="text.primary">
-                    {fileDetails.og_site_name}
-                  </Typography>
-                </Box>
-              )}
-
-              {fileDetails.og_description && (
-                <Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Descripción:
-                  </Typography>
-                  <Typography variant="body1" color="text.primary">
-                    {fileDetails.og_description}
-                  </Typography>
-                </Box>
-              )}
-            </Stack>
-          </Box>
-        );
-      }
     }
     return null;
   };
@@ -972,12 +997,10 @@ const ContentDisplay = ({
                   return;
                 }
 
-                // Handle different content types
-                if (url) {
-                  // URL-based content - open the URL
-                  window.open(url, "_blank");
+                // Prefer canonical content URL; otherwise open stored file
+                if (contentExternalUrl && String(contentExternalUrl).trim()) {
+                  window.open(resolveMediaUrl(contentExternalUrl), "_blank");
                 } else if (fileDetails?.file) {
-                  // File-based content - open the file
                   const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
                   if (fileUrl) {
                     window.open(fileUrl, "_blank");
@@ -985,7 +1008,7 @@ const ContentDisplay = ({
                 }
               }}
               title={
-                url
+                contentExternalUrl && String(contentExternalUrl).trim()
                   ? "Haz clic para abrir el enlace en una nueva pestaña"
                   : fileDetails?.file
                   ? "Haz clic para abrir el archivo en una nueva pestaña"
@@ -1281,11 +1304,21 @@ const ContentDisplay = ({
                     />
                   )}
 
-                  {/* URL Indicator */}
-                  {url && (
+                  {/* URL Indicator (external link only, not storage file URL) */}
+                  {contentExternalUrl && (
                     <Chip
                       icon={<LinkIcon />}
                       label="URL"
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                    />
+                  )}
+
+                  {hasFileAvailable && (
+                    <Chip
+                      icon={<StorageIcon />}
+                      label="Archivo Disponible"
                       size="small"
                       variant="outlined"
                       color="info"
@@ -1363,9 +1396,9 @@ const ContentDisplay = ({
               return;
             }
 
-            // Fallback: open file or URL in new tab
-            if (url) {
-              window.open(url, "_blank");
+            // Prefer canonical content URL; otherwise open stored file
+            if (contentExternalUrl && String(contentExternalUrl).trim()) {
+              window.open(resolveMediaUrl(contentExternalUrl), "_blank");
             } else if (fileDetails?.file || fileDetails?.url) {
               const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
               if (fileUrl) {
@@ -1390,7 +1423,7 @@ const ContentDisplay = ({
               }}
               onClick={handleCardClick}
               title={
-                url
+                contentExternalUrl && String(contentExternalUrl).trim()
                   ? "Haz clic para abrir el enlace en una nueva pestaña"
                   : fileDetails?.file
                   ? "Haz clic para abrir el archivo en una nueva pestaña"
@@ -1709,9 +1742,6 @@ const ContentDisplay = ({
 
               {/* Metadata Section */}
               {renderMetadataSection()}
-
-              {/* Open Graph Section */}
-              {renderOpenGraphSection()}
 
               {showActions && (
                 <Box sx={{ mt: 2, display: "flex", gap: 1, flexWrap: "wrap" }}>
