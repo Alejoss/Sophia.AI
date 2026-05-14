@@ -59,6 +59,9 @@ cover/
 
 # Django stuff:
 *.log
+# Rotated logs (e.g. foo.log.1) are not matched by *.log
+acbc_app/logs/
+
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
