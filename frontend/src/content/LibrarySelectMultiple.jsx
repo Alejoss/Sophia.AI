@@ -27,6 +27,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import contentApi from '../api/contentApi';
+import { formatDate } from '../utils/dateUtils';
 
 const LibrarySelectMultiple = ({ 
     onCancel, 
@@ -146,6 +147,16 @@ const LibrarySelectMultiple = ({
                 } else if (sortField === 'author') {
                     aValue = (a.author || 'Desconocido').toLowerCase();
                     bValue = (b.author || 'Desconocido').toLowerCase();
+                } else if (sortField === 'created_at') {
+                    aValue = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    bValue = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    if (aValue < bValue) {
+                        return sortDirection === 'asc' ? -1 : 1;
+                    }
+                    if (aValue > bValue) {
+                        return sortDirection === 'asc' ? 1 : -1;
+                    }
+                    return 0;
                 } else {
                     return 0;
                 }
@@ -297,6 +308,7 @@ const LibrarySelectMultiple = ({
                             </MenuItem>
                             <MenuItem value="title">Título</MenuItem>
                             <MenuItem value="author">Autor</MenuItem>
+                            <MenuItem value="created_at">Fecha de subida</MenuItem>
                         </Select>
                     </FormControl>
 
@@ -358,6 +370,7 @@ const LibrarySelectMultiple = ({
                                 <TableCell>Título</TableCell>
                                 <TableCell>Tipo</TableCell>
                                 <TableCell>Autor</TableCell>
+                                <TableCell>Fecha de subida</TableCell>
                                 <TableCell>Ver</TableCell>
                             </TableRow>
                         </TableHead>
@@ -385,6 +398,9 @@ const LibrarySelectMultiple = ({
                                         />
                                     </TableCell>
                                     <TableCell>{content.author || 'Desconocido'}</TableCell>
+                                    <TableCell>
+                                        {content.created_at ? formatDate(content.created_at) : '—'}
+                                    </TableCell>
                                     <TableCell 
                                         onClick={(e) => e.stopPropagation()} // Prevent row click from triggering
                                     >
@@ -411,7 +427,7 @@ const LibrarySelectMultiple = ({
                             ))}
                             {filteredContent.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center">
+                                    <TableCell colSpan={6} align="center">
                                         {searchQuery || selectedCollectionId !== null 
                                             ? 'No se encontró contenido con los filtros aplicados' 
                                             : 'No hay contenido disponible'}

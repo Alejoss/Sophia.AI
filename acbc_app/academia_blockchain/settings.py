@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'votes',
     'knowledge_paths',
     'gamification',
+    'payments',
     'search',
     'user_messages',
     'corsheaders',
@@ -675,6 +676,16 @@ if ENVIRONMENT == "PRODUCTION":
     # Use WhiteNoise's compressed storage (without manifest to avoid missing file errors)
     # CompressedStaticFilesStorage compresses files but doesn't require manifest
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# NOWPayments (BCH, XMR) — https://nowpayments.io
+NOWPAYMENTS_API_KEY = os.getenv('NOWPAYMENTS_API_KEY', '')
+NOWPAYMENTS_IPN_SECRET = os.getenv('NOWPAYMENTS_IPN_SECRET', '')
+NOWPAYMENTS_API_URL = os.getenv(
+    'NOWPAYMENTS_API_URL',
+    'https://api-sandbox.nowpayments.io/v1' if ENVIRONMENT != 'PRODUCTION' else 'https://api.nowpayments.io/v1',
+)
+ACADEMIA_PUBLIC_URL = os.getenv('ACADEMIA_PUBLIC_URL', 'http://localhost:8000')
+FRONTEND_PUBLIC_URL = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5173')
 
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry

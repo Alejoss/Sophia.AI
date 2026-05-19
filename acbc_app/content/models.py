@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 
+from content.s3_key_utils import sanitize_filename_for_s3_key
+
 
 class Library(models.Model):
     #  Represents a collection of content items grouped by a specific user.
@@ -124,7 +126,7 @@ def content_profile_thumbnail_upload_path(instance, filename):
 
     Example: content_profile_thumbnails/<content_id>/<user_id>/<uuid>_<filename>
     """
-    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    safe_name = sanitize_filename_for_s3_key(filename)
     content_id = instance.content_id or 0
     user_id = instance.user_id or 0
     return f"content_profile_thumbnails/{content_id}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
@@ -177,7 +179,7 @@ class ContentProfile(models.Model):
 
 def content_file_upload_path(instance, filename):
     """S3 path: content/{media_type}/{user_id}/{uuid}_{filename}. Same structure as presign flow."""
-    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    safe_name = sanitize_filename_for_s3_key(filename)
     media_type = getattr(instance.content, 'media_type', 'TEXT')
     media_slug = 'document' if media_type == 'TEXT' else media_type.lower()
     user_id = instance.content.uploaded_by_id or 0
@@ -186,7 +188,7 @@ def content_file_upload_path(instance, filename):
 
 def file_suggestion_upload_path(instance, filename):
     """S3/local path for file suggestions tied to a content."""
-    safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+    safe_name = sanitize_filename_for_s3_key(filename)
     content_id = instance.content_id or 0
     user_id = instance.suggested_by_id or 0
     return f"content_suggestions/files/{content_id}/{user_id}/{uuid.uuid4().hex}_{safe_name}"

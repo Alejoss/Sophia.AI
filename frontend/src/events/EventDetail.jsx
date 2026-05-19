@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
+import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import { AuthContext } from '../context/AuthContext';
+import CryptoPaymentModal from './CryptoPaymentModal';
 import '../styles/events.css';
 
 const EventDetail = () => {
@@ -16,6 +18,14 @@ const EventDetail = () => {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
   const [userRegistration, setUserRegistration] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
+
+  useEffect(() => {
+    getPaymentGatewayStatus()
+      .then((data) => setCryptoPaymentsEnabled(!!data.enabled))
+      .catch(() => setCryptoPaymentsEnabled(false));
+  }, []);
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -115,15 +125,28 @@ const EventDetail = () => {
     try {
       setRegistrationLoading(true);
       setError(null);
-      await registerForEvent(eventId);
+      const registration = await registerForEvent(eventId);
       setIsRegistered(true);
+      setUserRegistration(registration);
       setShowRegistrationModal(false);
+      if (
+        event?.reference_price > 0 &&
+        cryptoPaymentsEnabled &&
+        registration?.payment_status !== 'PAID'
+      ) {
+        setShowPaymentModal(true);
+      }
     } catch (err) {
       const errorMessage = err.error || err.detail || 'Error al registrarse en el evento';
       setError(errorMessage);
     } finally {
       setRegistrationLoading(false);
     }
+  };
+
+  const handlePaymentComplete = () => {
+    setUserRegistration((prev) => (prev ? { ...prev, payment_status: 'PAID' } : prev));
+    setShowPaymentModal(false);
   };
 
   const cancelRegistrationModal = () => {
@@ -408,6 +431,21 @@ const EventDetail = () => {
               Contactar al Creador
             </button>
           )}
+
+          {!isEventCreator() &&
+            authState.isAuthenticated &&
+            isRegistered &&
+            event.reference_price > 0 &&
+            cryptoPaymentsEnabled &&
+            userRegistration?.payment_status !== 'PAID' && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowPaymentModal(true)}
+              >
+                Pagar con BCH / XMR
+              </button>
+            )}
         </div>
       </div>
 
@@ -477,7 +515,14 @@ const EventDetail = () => {
         </div>
       )}
 
-
+      <CryptoPaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        registrationId={userRegistration?.id}
+        eventTitle={event?.title}
+        priceUsd={event?.reference_price}
+        onPaymentComplete={handlePaymentComplete}
+      />
     </div>
   );
 };

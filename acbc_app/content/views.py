@@ -54,6 +54,7 @@ from knowledge_paths.serializers import (
 )
 from .serializers import PublicationSerializer
 from content.utils import get_top_voted_contents, get_topic_contents_ordered_for_public_view
+from content.s3_key_utils import is_unsafe_s3_key, sanitize_filename_for_s3_key
 from bs4 import BeautifulSoup
 import requests
 import re
@@ -727,7 +728,7 @@ class UploadContentPresignView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         # Sanitize filename for key (keep extension). Structure: content/{media_type}/{user_id}/{uuid}_{name}
-        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        safe_name = sanitize_filename_for_s3_key(filename)
         media_slug = 'document' if media_type == 'TEXT' else media_type.lower()
         key = f"content/{media_slug}/{request.user.id}/{uuid.uuid4().hex}_{safe_name}"
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
@@ -807,8 +808,7 @@ class UploadContentConfirmView(APIView):
         if not key or not isinstance(key, str) or not key.strip():
             return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
         key = key.strip()
-        # Prevent path traversal
-        if '..' in key or key.startswith('/'):
+        if is_unsafe_s3_key(key):
             return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         logger.info(
@@ -3581,7 +3581,7 @@ class ContentOwnerAttachPresignView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        safe_name = sanitize_filename_for_s3_key(filename)
         key = f"{_owner_attach_expected_key_prefix(content.id, request.user.id)}{uuid.uuid4().hex}_{safe_name}"
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
@@ -3633,7 +3633,7 @@ class ContentOwnerAttachConfirmView(APIView):
         if not key or not isinstance(key, str) or not key.strip():
             return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
         key = key.strip()
-        if '..' in key or key.startswith('/'):
+        if is_unsafe_s3_key(key):
             return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
 
         expected = _owner_attach_expected_key_prefix(content.id, request.user.id)
@@ -3758,7 +3758,7 @@ class FileSuggestionPresignView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        safe_name = os.path.basename(filename).replace(' ', '_')[:200]
+        safe_name = sanitize_filename_for_s3_key(filename)
         key = (
             f"{_file_suggestion_expected_key_prefix(content.id, request.user.id)}"
             f"{uuid.uuid4().hex}_{safe_name}"
@@ -3813,7 +3813,7 @@ class FileSuggestionConfirmView(APIView):
         if not key or not isinstance(key, str) or not key.strip():
             return Response({'error': 'Se requiere key'}, status=status.HTTP_400_BAD_REQUEST)
         key = key.strip()
-        if '..' in key or key.startswith('/'):
+        if is_unsafe_s3_key(key):
             return Response({'error': 'key invalido'}, status=status.HTTP_400_BAD_REQUEST)
 
         expected = _file_suggestion_expected_key_prefix(content.id, request.user.id)

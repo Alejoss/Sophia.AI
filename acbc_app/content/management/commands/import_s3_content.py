@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from content.models import Library, Collection, Content, ContentProfile, FileDetails
+from content.s3_key_utils import is_unsafe_s3_key
 
 # Hardcoded for one-time use
 USER_ID = 2
@@ -102,7 +103,7 @@ class Command(BaseCommand):
         validated = []
         for key in keys:
             key = key.strip()
-            if '..' in key or key.startswith('/'):
+            if is_unsafe_s3_key(key):
                 continue
             try:
                 head = s3_client.head_object(Bucket=bucket, Key=key)

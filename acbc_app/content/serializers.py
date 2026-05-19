@@ -510,7 +510,7 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'content', 'user']
+        fields = ['id', 'title', 'author', 'personal_note', 'content', 'user', 'created_at']
 
     def to_representation(self, instance):
         try:
@@ -528,6 +528,11 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
                 'author': getattr(instance, 'author', ''),
                 'personal_note': getattr(instance, 'personal_note', None),
                 'user': getattr(instance, 'user_id', None),
+                'created_at': (
+                    instance.created_at.isoformat()
+                    if getattr(instance, 'created_at', None)
+                    else None
+                ),
                 'content': {
                     'id': getattr(instance.content, 'id', None) if instance.content else None,
                     'media_type': getattr(instance.content, 'media_type', 'TEXT') if instance.content else 'TEXT',

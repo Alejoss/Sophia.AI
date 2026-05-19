@@ -336,6 +336,8 @@ class ContentAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+        self.assertIn('created_at', response.data[0])
+        self.assertIsNotNone(response.data[0]['created_at'])
 
     def test_update_content_profile(self):
         """Test updating a content profile"""
@@ -2185,6 +2187,61 @@ class UploadDirectS3APITests(APITestCase):
         url = reverse('content:upload_content_confirm')
         response = self.client.post(url, {'key': 'content/document/1/file.pdf'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    @patch('content.views.boto3.client')
+    def test_upload_content_confirm_accepts_double_dot_in_filename_segment(self, mock_boto_client):
+        """Keys like uuid_Noticias..mp4 must not be rejected (only path segments .. are unsafe)."""
+        s3_client = Mock()
+        s3_client.head_object.return_value = {}
+        mock_boto_client.return_value = s3_client
+
+        url = reverse('content:upload_content_confirm')
+        key = f'content/video/{self.user.id}/abc_Noticias..mp4'
+        response = self.client.post(
+            url,
+            {'key': key, 'media_type': 'VIDEO', 'file_size': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID='test',
+        AWS_SECRET_ACCESS_KEY='test',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_S3_REGION_NAME='us-west-2',
+    )
+    def test_upload_content_confirm_rejects_path_traversal_key(self):
+        url = reverse('content:upload_content_confirm')
+        response = self.client.post(
+            url,
+            {'key': f'content/video/{self.user.id}/../other.mp4', 'media_type': 'VIDEO', 'file_size': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'key invalido')
+
+
+class S3KeyUtilsTests(TestCase):
+    def test_sanitize_strips_trailing_dot_before_extension(self):
+        from content.s3_key_utils import sanitize_filename_for_s3_key
+
+        name = sanitize_filename_for_s3_key(
+            'Agricultura - Guerra - Espectáculo. Perspectivas del mundo actual. Directo de Noticias..mp4'
+        )
+        self.assertTrue(name.endswith('.mp4'))
+        self.assertNotIn('..mp4', name)
+
+    def test_is_unsafe_rejects_traversal_segment_not_filename_dots(self):
+        from content.s3_key_utils import is_unsafe_s3_key
+
+        self.assertFalse(is_unsafe_s3_key('content/video/2/uuid_Noticias..mp4'))
+        self.assertTrue(is_unsafe_s3_key('content/video/2/../secret.mp4'))
 
 
 class KnowledgePathAndTopicMediaTypeAPITests(APITestCase):

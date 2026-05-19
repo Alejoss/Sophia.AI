@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/certificates/', include('certificates.urls')),
     path('api/bookmarks/', include('bookmarks.urls')),
     path('api/gamification/', include('gamification.urls')),
+    path('api/payments/', include('payments.urls')),
     
     # dj-rest-auth URLs
     path('api/rest-auth/', include('dj_rest_auth.urls')),
