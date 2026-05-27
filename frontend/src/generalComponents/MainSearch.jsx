@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Box, Button, Typography, Card, CardContent, CardActionArea } from '@mui/material';
+import {
+  Box,
+  Button,
+  Typography,
+  Card,
+  CardContent,
+  CardActionArea,
+  Container,
+  TextField,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  CircularProgress,
+  Alert,
+  Stack,
+  Link as MuiLink,
+} from '@mui/material';
 import generalApi from '../api/generalApi';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from '../content/ContentDisplay';
-import '/src/styles/search.css';
 
 // Import icons for different result types
 import TopicIcon from '@mui/icons-material/Label';
@@ -118,9 +133,9 @@ const MainSearch = () => {
   // Get icon for result type
   const getResultTypeIcon = (type) => {
     if (type === 'topic') {
-      return <TopicIcon className="result-type-icon" />;
+      return <TopicIcon sx={{ fontSize: 18 }} />;
     } else if (type === 'knowledge_path') {
-      return <KnowledgePathIcon className="result-type-icon" />;
+      return <KnowledgePathIcon sx={{ fontSize: 18 }} />;
     } else {
       return null; // ContentDisplay will handle content icons
     }
@@ -131,129 +146,111 @@ const MainSearch = () => {
     if (result.type === 'content') {
       // Use ContentDisplay for content results
       return (
-        <li key={result.id} className="result-item">
+        <Box component="li" key={result.id} sx={{ listStyle: 'none' }}>
           <ContentDisplay
             content={result}
             variant="simple"
             onClick={() => handleResultClick(result)}
             showActions={false}
           />
-        </li>
+        </Box>
       );
     } else {
       // Render topics and knowledge paths with the original format
       return (
-        <li 
+        <Paper
+          component="li"
           key={result.id} 
-          className="result-item"
+          variant="outlined"
           onClick={() => handleResultClick(result)}
+          sx={{ listStyle: 'none', p: 2, cursor: 'pointer', '&:hover': { boxShadow: 2 } }}
         >
-          <div className="result-item-header">
-            <div className="result-type-badge">
+          <Box sx={{ mb: 1 }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}>
               {getResultTypeIcon(result.type)}
-              <span className="result-type-text">
+              <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
                 {result.type}
-              </span>
-            </div>
-          </div>
+              </Typography>
+            </Box>
+          </Box>
           
-          <h3 className="result-title">{result.title}</h3>
+          <Typography variant="h6" sx={{ mb: 0.5 }}>{result.title}</Typography>
           
           {result.description && (
-            <p className="result-description">{result.description}</p>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              {result.description}
+            </Typography>
           )}
           
-          <div className="result-footer">
-            <button className="view-details-button">Ver Detalles</button>
-          </div>
-        </li>
+          <Button size="small" variant="outlined">Ver Detalles</Button>
+        </Paper>
       );
     }
   };
 
   return (
-    <div className="search-container">
-      <h1>Buscar</h1>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
+        Buscar
+      </Typography>
       
-      <form onSubmit={(e) => handleSearch(e, 1)} className="search-form">
-        <div className="search-input-container">
-          <input
-            type="text"
+      <Box component="form" onSubmit={(e) => handleSearch(e, 1)} sx={{ mb: 3 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar contenido, temas, caminos de conocimiento o personas..."
-            className="search-input"
+            fullWidth
           />
-          <button type="submit" className="search-button">
+          <Button type="submit" variant="contained">
             Buscar
-          </button>
-        </div>
+          </Button>
+        </Stack>
         
-        <div className="search-filters">
-          <label>
-            <input
-              type="radio"
-              name="searchType"
-              value="all"
-              checked={searchType === 'all'}
-              onChange={(e) => setSearchType(e.target.value)}
-            />
-            Todo
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="searchType"
-              value="content"
-              checked={searchType === 'content'}
-              onChange={(e) => setSearchType(e.target.value)}
-            />
-            Contenido
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="searchType"
-              value="topics"
-              checked={searchType === 'topics'}
-              onChange={(e) => setSearchType(e.target.value)}
-            />
-            Temas
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="searchType"
-              value="knowledge_paths"
-              checked={searchType === 'knowledge_paths'}
-              onChange={(e) => setSearchType(e.target.value)}
-            />
-            Caminos de Conocimiento
-          </label>
-        </div>
-      </form>
+        <RadioGroup
+          row
+          name="searchType"
+          value={searchType}
+          onChange={(e) => setSearchType(e.target.value)}
+          sx={{ mt: 1 }}
+        >
+          <FormControlLabel value="all" control={<Radio size="small" />} label="Todo" />
+          <FormControlLabel value="content" control={<Radio size="small" />} label="Contenido" />
+          <FormControlLabel value="topics" control={<Radio size="small" />} label="Temas" />
+          <FormControlLabel value="knowledge_paths" control={<Radio size="small" />} label="Caminos de Conocimiento" />
+        </RadioGroup>
+      </Box>
 
-      <section className="search-collections-section" aria-labelledby="search-collections-heading">
-        <h2 id="search-collections-heading">Biblioteca Compartida</h2>
-        <p className="search-collections-subtitle">
+      <Box component="section" aria-labelledby="search-collections-heading" sx={{ mb: 3 }}>
+        <Typography id="search-collections-heading" variant="h6">
+          Biblioteca Compartida
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
           Colecciones públicas de la comunidad
-        </p>
+        </Typography>
         {!isAuthenticated && (
-          <p className="search-collections-hint">
-            <Link to="/profiles/login">Inicia sesión</Link> para ver colecciones públicas.
-          </p>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <MuiLink component={Link} to="/profiles/login" underline="hover">Inicia sesión</MuiLink> para ver colecciones públicas.
+          </Typography>
         )}
         {isAuthenticated && publicLoading && (
-          <p className="search-collections-hint">Cargando colecciones…</p>
+          <Typography variant="body2" sx={{ mt: 1 }}>Cargando colecciones…</Typography>
         )}
         {isAuthenticated && publicError && !publicLoading && (
-          <p className="search-collections-hint" style={{ color: '#c62828' }}>{publicError}</p>
+          <Alert severity="error" sx={{ mt: 1 }}>{publicError}</Alert>
         )}
         {isAuthenticated && !publicLoading && !publicError && publicCollections.length === 0 && (
-          <p className="search-collections-hint">Aún no hay colecciones públicas con contenido visible.</p>
+          <Typography variant="body2" sx={{ mt: 1 }}>Aún no hay colecciones públicas con contenido visible.</Typography>
         )}
         {isAuthenticated && !publicLoading && publicCollections.length > 0 && (
-          <div className="search-collections-grid">
+          <Box
+            sx={{
+              mt: 1.5,
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+            }}
+          >
             {publicCollections.map((c) => (
               <Card
                 key={c.id}
@@ -279,22 +276,29 @@ const MainSearch = () => {
                 </CardActionArea>
               </Card>
             ))}
-          </div>
+          </Box>
         )}
-      </section>
+      </Box>
 
       {isLoading ? (
-        <div className="loading">Cargando resultados...</div>
+        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+          <Stack alignItems="center" spacing={1.5}>
+            <CircularProgress size={28} />
+            <Typography variant="body2" color="text.secondary">
+              Cargando resultados...
+            </Typography>
+          </Stack>
+        </Box>
       ) : (
-        <div className="search-results">
+        <Box>
           {searchResults.length > 0 ? (
             <>
-              <div className="results-summary">
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 Mostrando {searchResults.length} de {pagination.totalResults} resultados
-              </div>
-              <ul className="results-list">
+              </Typography>
+              <Stack component="ul" spacing={2} sx={{ pl: 0, m: 0 }}>
                 {searchResults.map(renderResultItem)}
-              </ul>
+              </Stack>
               
               {/* Pagination controls */}
               {pagination.totalPages > 1 && (
@@ -350,11 +354,15 @@ const MainSearch = () => {
               )}
             </>
           ) : (
-            searchQuery && <p className="no-results">No se encontraron resultados para "{searchQuery}"</p>
+            searchQuery && (
+              <Alert severity="info">
+                No se encontraron resultados para "{searchQuery}"
+              </Alert>
+            )
           )}
-        </div>
+        </Box>
       )}
-    </div>
+    </Container>
   );
 };
 

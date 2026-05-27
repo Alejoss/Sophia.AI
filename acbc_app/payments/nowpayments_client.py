@@ -72,7 +72,11 @@ class NOWPaymentsClient:
         )
 
     def create_payment(self, *, price_amount, price_currency, pay_currency, order_id,
-                       order_description, ipn_callback_url, success_url=None, cancel_url=None):
+                       order_description, ipn_callback_url):
+        """
+        POST /v1/payment — see NOWPayments API docs.
+        success_url / cancel_url belong to POST /v1/invoice, not /payment.
+        """
         body = {
             'price_amount': price_amount,
             'price_currency': price_currency,
@@ -81,19 +85,28 @@ class NOWPaymentsClient:
             'order_description': order_description,
             'ipn_callback_url': ipn_callback_url,
         }
-        if success_url:
-            body['success_url'] = success_url
-        if cancel_url:
-            body['cancel_url'] = cancel_url
         return self._request('POST', '/payment', json=body)
 
     def get_payment_status(self, payment_id):
         return self._request('GET', f'/payment/{payment_id}')
 
+    @staticmethod
+    def sort_params(obj):
+        """Recursively sort dict keys (required for IPN HMAC per NOWPayments docs)."""
+        if isinstance(obj, dict):
+            return {key: NOWPaymentsClient.sort_params(obj[key]) for key in sorted(obj.keys())}
+        if isinstance(obj, list):
+            return [NOWPaymentsClient.sort_params(item) for item in obj]
+        return obj
+
     def verify_ipn_signature(self, body: dict, signature: str) -> bool:
         if not self.ipn_secret or not signature:
             return False
-        sorted_body = json.dumps(body, separators=(',', ':'), sort_keys=True)
+        sorted_body = json.dumps(
+            self.sort_params(body),
+            separators=(',', ':'),
+            ensure_ascii=True,
+        )
         digest = hmac.new(
             self.ipn_secret.encode('utf-8'),
             sorted_body.encode('utf-8'),

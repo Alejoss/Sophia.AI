@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
+  Container,
   Chip, 
   Tabs, 
   Tab, 
@@ -16,7 +17,10 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  Alert
+  Alert,
+  CircularProgress,
+  Stack,
+  Paper,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
@@ -269,7 +273,7 @@ const TopicsUser = () => {
                        suggestionsError;
 
   return (
-    <div className="container mx-auto p-4">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
         <Typography
           variant="h4"
@@ -285,12 +289,14 @@ const TopicsUser = () => {
         >
           Temas
         </Typography>
-        <Link 
+        <Button
+          component={Link}
           to="/content/create_topic"
-          className="bg-blue-500 hover:bg-blue-700 !text-white !no-underline font-bold py-2 px-4 rounded transition-colors"
+          variant="contained"
+          color="primary"
         >
           Crear Nuevo Tema
-        </Link>
+        </Button>
       </Box>
 
       {/* Tabs */}
@@ -321,7 +327,9 @@ const TopicsUser = () => {
 
       {/* Loading State */}
       {isLoading && (
-        <div className="text-center py-8">Cargando...</div>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress size={28} />
+        </Box>
       )}
 
       {/* Error State */}
@@ -455,12 +463,16 @@ const TopicsUser = () => {
 
       {/* Invitations Tab */}
       {activeTab === 2 && !invitationsLoading && !invitationsError && (
-        <div>
+        <Box>
           {invitations.length === 0 ? (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">No tienes invitaciones pendientes</h3>
-              <p className="text-gray-500 mb-6">Las invitaciones para ser moderador de temas aparecerán aquí.</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1.5 }}>
+                No tienes invitaciones pendientes
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Las invitaciones para ser moderador de temas aparecerán aquí.
+              </Typography>
+            </Box>
           ) : (
             <List>
               {invitations.map((invitation) => (
@@ -526,23 +538,32 @@ const TopicsUser = () => {
               ))}
             </List>
           )}
-        </div>
+        </Box>
       )}
 
       {/* Content Suggestions Tab */}
       {activeTab === 3 && !suggestionsLoading && !suggestionsError && (
-        <div>
+        <Box>
           {suggestions.length === 0 ? (
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-600 mb-4">No tienes sugerencias de contenido</h3>
-              <p className="text-gray-500 mb-6">Las sugerencias de contenido que hagas para temas aparecerán aquí.</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1.5 }}>
+                No tienes sugerencias de contenido
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Las sugerencias de contenido que hagas para temas aparecerán aquí.
+              </Typography>
+            </Box>
           ) : (
-            <div className="grid gap-4">
+            <Stack spacing={2}>
               {suggestions.map((suggestion) => (
-                <div
+                <Paper
                   key={suggestion.id}
-                  className="p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow"
+                  variant="outlined"
+                  sx={{
+                    p: 3,
+                    transition: 'box-shadow 0.2s ease',
+                    '&:hover': { boxShadow: 2 },
+                  }}
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                     <Box sx={{ flexGrow: 1 }}>
@@ -612,13 +633,13 @@ const TopicsUser = () => {
                       {suggestion.reviewed_by && ` por ${suggestion.reviewed_by.username}`}
                     </Typography>
                   )}
-                </div>
+                </Paper>
               ))}
-            </div>
+            </Stack>
           )}
-        </div>
+        </Box>
       )}
-    </div>
+    </Container>
   );
 };
 

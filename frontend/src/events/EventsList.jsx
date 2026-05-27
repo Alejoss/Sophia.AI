@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchEvents } from '../api/eventsApi';
-import '../styles/events.css';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Container,
+  Stack,
+  Typography,
+} from '@mui/material';
 
 const EventsList = () => {
   const [events, setEvents] = useState([]);
@@ -61,7 +74,7 @@ const EventsList = () => {
       'google_meet': 'Google Meet',
       'jitsi': 'Jitsi',
       'microsoft_teams': 'Microsoft Teams',
-      'other': 'Other',
+      'other': 'Otra',
       'telegram': 'Telegram',
       'tox': 'Tox',
       'twitch': 'Twitch',
@@ -72,130 +85,125 @@ const EventsList = () => {
 
   if (loading) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Eventos</h2>
-          <div className="loading-spinner">Cargando eventos...</div>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={1.5} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <CircularProgress size={28} />
+          <Typography variant="body2" color="text.secondary">Cargando eventos...</Typography>
+        </Stack>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Eventos</h2>
-          <div className="error-message">{error}</div>
-          <button onClick={loadEvents} className="btn btn-primary">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Alert severity="error">{error}</Alert>
+          <Button onClick={loadEvents} variant="contained">
             Intentar de nuevo
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="events-list-container">
-      <div className="events-header">
-        <h2>Eventos</h2>
-        <div className="events-header-actions">
-          <Link to="/events/create" className="btn btn-primary">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          Eventos
+        </Typography>
+        <Button component={Link} to="/events/create" variant="contained">
             Crear Evento
-          </Link>
-        </div>
-      </div>
+        </Button>
+      </Box>
 
       {events.length === 0 ? (
-        <div className="text-center">
-          <p>No se encontraron eventos.</p>
-          <Link to="/events/create" className="btn btn-primary">
+        <Stack spacing={2} alignItems="center" sx={{ py: 4 }}>
+          <Typography color="text.secondary">No se encontraron eventos.</Typography>
+          <Button component={Link} to="/events/create" variant="contained">
             Crear tu Primer Evento
-          </Link>
-        </div>
+          </Button>
+        </Stack>
       ) : (
-        <div className="events-grid">
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2.5,
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+          }}
+        >
           {events.map((event) => (
-            <div key={event.id} className="event-card">
-              {event.image && (
-                <div className="event-image-container">
-                  <img 
-                    src={event.image} 
-                    alt={event.title} 
-                    className="event-image"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'block';
-                    }}
-                  />
-                  <div className="event-image-placeholder" style={{ display: 'none' }}>
-                    <div className="placeholder-content">
-                      <span>📅</span>
-                      <p>{event.title}</p>
-                    </div>
-                  </div>
-                </div>
+            <Card key={event.id} variant="outlined">
+              {event.image ? (
+                <CardMedia component="img" height="180" image={event.image} alt={event.title || 'Evento'} />
+              ) : (
+                <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover' }}>
+                  <Typography variant="h5">📅</Typography>
+                </Box>
               )}
-              <div className="event-header">
-                <h3>{event.title || 'Evento sin título'}</h3>
-                <span className={`event-type ${event.event_type?.toLowerCase() || 'unknown'}`}>
-                  {getEventTypeLabel(event.event_type)}
-                </span>
-              </div>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1, mb: 1.5 }}>
+                  <Typography variant="h6">{event.title || 'Evento sin título'}</Typography>
+                  <Chip
+                    size="small"
+                    label={getEventTypeLabel(event.event_type)}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Box>
               
-              <div className="event-details">
-                <p className="event-description">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                   {event.description 
                     ? (event.description.length > 150 
                         ? `${event.description.substring(0, 150)}...` 
                         : event.description)
                     : 'No hay descripción disponible'}
-                </p>
+                </Typography>
                 
-                <div className="event-meta">
-                  <div className="event-info">
+                <Stack spacing={0.6}>
+                  <Typography variant="body2">
                     <strong>Anfitrión:</strong> {event.owner?.username || 'Desconocido'}
-                  </div>
+                  </Typography>
                   
                   {event.platform && (
-                    <div className="event-info">
+                    <Typography variant="body2">
                       <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
                       {event.platform === 'other' && event.other_platform && (
                         <span> ({event.other_platform})</span>
                       )}
-                    </div>
+                    </Typography>
                   )}
                   
                   {event.reference_price > 0 && (
-                    <div className="event-info">
+                    <Typography variant="body2">
                       <strong>Precio:</strong> ${event.reference_price}
-                    </div>
+                    </Typography>
                   )}
                   
-                  <div className="event-info">
+                  <Typography variant="body2">
                     <strong>Inicio:</strong> {formatDate(event.date_start)}
-                  </div>
+                  </Typography>
                   
                   {event.date_end && (
-                    <div className="event-info">
+                    <Typography variant="body2">
                       <strong>Fin:</strong> {formatDate(event.date_end)}
-                    </div>
+                    </Typography>
                   )}
-                  
-
-                </div>
-              </div>
-              
-              <div className="event-actions">
-                <Link to={`/events/${event.id}`} className="btn btn-secondary">
+                </Stack>
+              </CardContent>
+              <CardActions>
+                <Button component={Link} to={`/events/${event.id}`} variant="outlined" size="small">
                   Ver Detalles
-                </Link>
-              </div>
-            </div>
+                </Button>
+              </CardActions>
+            </Card>
           ))}
-        </div>
+        </Box>
       )}
-    </div>
+    </Container>
   );
 };
 

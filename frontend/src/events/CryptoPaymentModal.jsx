@@ -1,5 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  Link,
+  Radio,
+  RadioGroup,
+  Stack,
+  Typography,
+} from '@mui/material';
+import {
   createRegistrationPayment,
   getPaymentStatus,
 } from '../api/paymentsApi';
@@ -80,70 +94,63 @@ const CryptoPaymentModal = ({
     }
   };
 
-  if (!open) return null;
-
   const statusLabel = STATUS_LABELS[payment?.payment_status] || payment?.payment_status;
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="presentation">
-            <div className="modal-content crypto-payment-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Pagar con criptomoneda</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">×</button>
-        </div>
-        <div className="modal-body">
-          {error && <p className="error-message">{error}</p>}
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Pagar con criptomoneda</DialogTitle>
+      <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
           {!payment ? (
-            <>
-              <p>Evento: <strong>{eventTitle}</strong> — ${priceUsd} USD</p>
-              <p>Elige la moneda con la que deseas pagar:</p>
-              <div className="crypto-currency-picker">
-                <label>
-                  <input type="radio" name="payCurrency" value="bch" checked={payCurrency === 'bch'} onChange={() => setPayCurrency('bch')} />
-                  Bitcoin Cash (BCH)
-                </label>
-                <label>
-                  <input type="radio" name="payCurrency" value="xmr" checked={payCurrency === 'xmr'} onChange={() => setPayCurrency('xmr')} />
-                  Monero (XMR)
-                </label>
-              </div>
-            </>
+            <Stack spacing={1.2}>
+              <Typography>Evento: <strong>{eventTitle}</strong> — ${priceUsd} USD</Typography>
+              <Typography variant="body2">Elige la moneda con la que deseas pagar:</Typography>
+              <RadioGroup
+                name="payCurrency"
+                value={payCurrency}
+                onChange={(e) => setPayCurrency(e.target.value)}
+              >
+                <FormControlLabel value="bch" control={<Radio />} label="Bitcoin Cash (BCH)" />
+                <FormControlLabel value="xmr" control={<Radio />} label="Monero (XMR)" />
+              </RadioGroup>
+            </Stack>
           ) : (
-                        <div className="payment-details">
-              <p><strong>Estado:</strong> {statusLabel}</p>
-              <p><strong>Moneda:</strong> {payment.pay_currency_display}</p>
-              <p><strong>Monto a enviar:</strong> {payment.pay_amount} {payment.pay_currency?.toUpperCase()}</p>
-              <p className="pay-address"><strong>Dirección:</strong> {payment.pay_address}</p>
-              <button type="button" className="btn btn-outline" onClick={copyAddress}>
+            <Stack spacing={1.1}>
+              <Typography variant="body2"><strong>Estado:</strong> {statusLabel}</Typography>
+              <Typography variant="body2"><strong>Moneda:</strong> {payment.pay_currency_display}</Typography>
+              <Typography variant="body2"><strong>Monto a enviar:</strong> {payment.pay_amount} {payment.pay_currency?.toUpperCase()}</Typography>
+              <Typography variant="body2"><strong>Dirección:</strong> {payment.pay_address}</Typography>
+              <Button type="button" variant="outlined" onClick={copyAddress}>
                 {copied ? 'Copiado' : 'Copiar dirección'}
-              </button>
+              </Button>
               {payment.invoice_url && (
-                <p><a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">Abrir factura NOWPayments</a></p>
+                <Link href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
+                  Abrir factura NOWPayments
+                </Link>
               )}
               {payment.is_paid && (
-                <p className="payment-success">Pago recibido. Gracias.</p>
+                <Alert severity="success">Pago recibido. Gracias.</Alert>
               )}
-            </div>
+            </Stack>
           )}
-        </div>
-                <div className="modal-footer">
+      </DialogContent>
+      <DialogActions>
           {!payment ? (
             <>
-              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+              <Button type="button" onClick={onClose} disabled={loading}>
                 Cerrar
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleCreatePayment} disabled={loading}>
+              </Button>
+              <Button type="button" variant="contained" onClick={handleCreatePayment} disabled={loading}>
                 {loading ? 'Generando pago...' : 'Continuar'}
-              </button>
+              </Button>
             </>
           ) : (
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <Button type="button" onClick={onClose}>
               {payment.is_paid ? 'Cerrar' : 'Pagar después'}
-            </button>
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+      </DialogActions>
+    </Dialog>
   );
 };
 

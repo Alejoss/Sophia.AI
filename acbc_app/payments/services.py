@@ -7,12 +7,18 @@ from django.db import transaction
 from events.models import EventRegistration
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
+from payments.handlers import on_crypto_payment_completed
 from utils.notification_utils import notify_payment_accepted
 
 logger = logging.getLogger(__name__)
 
 ALLOWED_PAY_CURRENCIES = {'bch', 'xmr'}
+# finished = funds in merchant wallet; confirmed = on-chain confirmed (docs allow both)
 TERMINAL_SUCCESS = {'finished', 'confirmed'}
+
+
+def _extract_pay_address(payload: dict) -> str:
+    return payload.get('pay_address') or payload.get('payment_address') or ''
 
 
 def _public_base_url():
@@ -29,8 +35,9 @@ def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> 
     crypto_payment.payment_status = status
     if payload.get('pay_amount') is not None:
         crypto_payment.pay_amount = payload.get('pay_amount')
-    if payload.get('pay_address'):
-        crypto_payment.pay_address = payload.get('pay_address')
+    pay_address = _extract_pay_address(payload)
+    if pay_address:
+        crypto_payment.pay_address = pay_address
     if payload.get('actually_paid') is not None:
         crypto_payment.actually_paid = payload.get('actually_paid')
     crypto_payment.provider_payload = payload
@@ -38,13 +45,23 @@ def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> 
 
     if status in TERMINAL_SUCCESS:
         registration = crypto_payment.registration
-        if registration.payment_status != 'PAID':
+        was_unpaid = registration.payment_status != 'PAID'
+        if was_unpaid:
             registration.payment_status = 'PAID'
             registration.save(update_fields=['payment_status'])
             try:
                 notify_payment_accepted(registration)
             except Exception as exc:
                 logger.error('Payment notification failed for registration %s: %s', registration.id, exc)
+            try:
+                on_crypto_payment_completed(crypto_payment, registration)
+            except Exception as exc:
+                logger.error(
+                    'on_crypto_payment_completed failed for registration %s: %s',
+                    registration.id,
+                    exc,
+                    exc_info=True,
+                )
 
     return crypto_payment
 
@@ -89,9 +106,6 @@ def create_event_registration_payment(*, registration: EventRegistration, pay_cu
 
     order_id = f'evt-reg-{registration.id}-{uuid.uuid4().hex[:12]}'
     ipn_url = f'{_public_base_url()}/api/payments/ipn/'
-    success_url = f'{_frontend_base_url()}/events/{event.id}?payment=success'
-    cancel_url = f'{_frontend_base_url()}/events/{event.id}?payment=cancelled'
-
     payload = client.create_payment(
         price_amount=float(event.reference_price),
         price_currency='usd',
@@ -99,8 +113,6 @@ def create_event_registration_payment(*, registration: EventRegistration, pay_cu
         order_id=order_id,
         order_description=f'Registro: {event.title}',
         ipn_callback_url=ipn_url,
-        success_url=success_url,
-        cancel_url=cancel_url,
     )
 
     crypto_payment = CryptoPayment.objects.create(
@@ -111,9 +123,9 @@ def create_event_registration_payment(*, registration: EventRegistration, pay_cu
         price_amount=float(event.reference_price),
         price_currency='usd',
         pay_amount=payload.get('pay_amount'),
-        pay_address=payload.get('pay_address', ''),
+        pay_address=_extract_pay_address(payload),
         payment_status=payload.get('payment_status', 'waiting'),
-        invoice_url=payload.get('invoice_url', '') or payload.get('payment_url', '') or '',
+        invoice_url='',
         provider_payload=payload,
     )
     return crypto_payment

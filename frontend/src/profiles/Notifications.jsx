@@ -2,8 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ApiIcon from '@mui/icons-material/Api';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { Tooltip, Typography, Box } from '@mui/material';
-import '../styles/notifications.css';
+import { Tooltip, Typography, Box, Container, Button, CircularProgress, Alert, Paper, Stack, IconButton, Link as MuiLink } from '@mui/material';
 
 const Notifications = ({
   notifications = [],
@@ -100,7 +99,7 @@ const Notifications = ({
   };
 
   return (
-    <div className="notifications-container">
+    <Container maxWidth="md" sx={{ py: 3 }}>
       <Box sx={{ mb: 3 }}>
         <Typography
           variant="h4"
@@ -117,99 +116,97 @@ const Notifications = ({
           Notificaciones
         </Typography>
       </Box>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '10px 0' }}>
-        <button 
-          className="mark-all-read-button"
-          onClick={onMarkAllAsRead}
-        >
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="outlined" onClick={onMarkAllAsRead}>
           Marcar todas como leídas
-        </button>
-      </div>
+        </Button>
+      </Box>
       {loading ? (
-        <div className="loading-spinner">Cargando notificaciones...</div>
+        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+          <Stack alignItems="center" spacing={1.5}>
+            <CircularProgress size={28} />
+            <Typography variant="body2" color="text.secondary">
+              Cargando notificaciones...
+            </Typography>
+          </Stack>
+        </Box>
       ) : error ? (
-        <div className="error-message">{error}</div>
+        <Alert severity="error">{error}</Alert>
       ) : notifications.length === 0 ? (
-        <div className="empty-state">
-          <p>No se encontraron notificaciones</p>
-        </div>
+        <Alert severity="info">No se encontraron notificaciones</Alert>
       ) : (
-        <div className="notifications-list">
+        <Stack spacing={2}>
           {notifications.map((notification) => {
             console.log('Notification:', notification);
             return (
-              <div key={notification.id} className={`notification-item ${notification.unread ? 'unread' : ''}`}>
-                <div className="notification-content">
-                  <div className="notification-header">
-                    <p className="notification-text">
+              <Paper
+                key={notification.id}
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderColor: notification.unread ? 'primary.light' : 'divider',
+                  bgcolor: notification.unread ? 'action.hover' : 'background.paper',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {notification.actor && notification.actor_id ? (
-                        <Link to={`/profiles/user_profile/${notification.actor_id}`} className="notification-actor-link">
+                        <MuiLink component={Link} to={`/profiles/user_profile/${notification.actor_id}`} underline="hover">
                           {notification.actor}
-                        </Link>
+                        </MuiLink>
                       ) : (
                         notification.actor
                       )}
-                    </p>
-                    <span className="notification-timestamp">
-                      {new Date(notification.timestamp).toLocaleString()}
-                    </span>
-                  </div>
-                  <br />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div className="notification-description">
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(notification.timestamp).toLocaleString()}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
                       {getNotificationDescription(notification)}
-                    </div>
+                      </Typography>
                     {notification.target_url && (
-                      <Link 
-                        to={notification.target_url} 
-                        className="notification-view-link"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          color: '#666',
-                          textDecoration: 'none',
-                          marginLeft: '16px',
-                          marginTop: '0'
-                        }}
+                      <MuiLink
+                        component={Link}
+                        to={notification.target_url}
+                        underline="none"
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', ml: 1 }}
                       >
-                        <ApiIcon style={{ fontSize: '20px' }} />
-                      </Link>
+                        <ApiIcon sx={{ fontSize: 20 }} />
+                      </MuiLink>
                     )}
-                  </div>
-                </div>
-                <div className="notification-actions">
+                    </Box>
+                  </Box>
+
                   {notification.unread && (
                     <Tooltip title="Marcar como leída" arrow>
-                      <button 
-                        className="mark-all-read-button"
+                      <IconButton
+                        color="primary"
                         onClick={() => onMarkAsRead(notification.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '8px'
-                        }}
                       >
-                        <CheckCircleIcon style={{ fontSize: '20px', color: 'white' }} />
-                      </button>
+                        <CheckCircleIcon sx={{ fontSize: 20 }} />
+                      </IconButton>
                     </Tooltip>
                   )}
-                </div>
-              </div>
+                </Box>
+              </Paper>
             );
           })}
-        </div>
+        </Stack>
       )}
-      <div style={{ 
-        textAlign: 'center', 
-        marginTop: '20px', 
-        fontSize: '0.8rem', 
-        color: '#666',
-        fontStyle: 'italic'
-      }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ textAlign: 'center', display: 'block', mt: 2.5, fontStyle: 'italic' }}
+      >
         Las notificaciones leídas se eliminan después de 30 días
-      </div>
-    </div>
+      </Typography>
+    </Container>
   );
 };
 

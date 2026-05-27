@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createEvent } from '../api/eventsApi';
-import '../styles/events.css';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -19,34 +34,6 @@ const EVENT_TYPES = [
   { value: 'LIVE_CERTIFICATION', label: 'Certificación en Vivo' },
   { value: 'LIVE_MASTER_CLASS', label: 'Clase Magistral en Vivo' },
 ];
-
-// Helper function to format datetime for input
-const formatDateTimeForInput = (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
-
-// Helper function to get current datetime in local format
-const getCurrentDateTimeLocal = () => {
-  const now = new Date();
-  // Add 1 hour to current time to avoid immediate past
-  now.setHours(now.getHours() + 1);
-  return formatDateTimeForInput(now);
-};
-
-// Helper function to get tomorrow's date for minimum start date
-const getTomorrowDateTimeLocal = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0); // Set to 9 AM tomorrow
-  return formatDateTimeForInput(tomorrow);
-};
 
 const EventCreate = () => {
   const navigate = useNavigate();
@@ -217,172 +204,187 @@ const EventCreate = () => {
   };
 
   return (
-    <div className="event-create-container">
-      <h2>Crear Nuevo Evento</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Título: *</label>
-          <input 
-            name="title" 
-            value={form.title} 
-            onChange={handleChange} 
-            className={errors.title ? 'error' : ''}
-            placeholder="Ingrese el título del evento"
-          />
-          {errors.title && <span className="error-message">{errors.title}</span>}
-        </div>
-        
-        <div className="form-group">
-          <label>Descripción: *</label>
-          <textarea 
-            name="description" 
-            value={form.description} 
-            onChange={handleChange}
-            className={errors.description ? 'error' : ''}
-            placeholder="Describa su evento..."
-          />
-          {errors.description && <span className="error-message">{errors.description}</span>}
-        </div>
-        
-        <div className="form-group">
-          <label>Imagen del Evento:</label>
-          <div className="image-upload-container">
-            <input 
-              type="file" 
-              accept="image/*"
-              onChange={handleImageChange}
-              className="image-input"
-              id="event-image"
-            />
-            <label htmlFor="event-image" className="image-upload-label">
-              {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
-            </label>
-            {imagePreview && (
-              <div className="image-preview-container">
-                <img src={imagePreview} alt="Preview" className="image-preview" />
-                <button type="button" onClick={removeImage} className="remove-image-btn">
-                  Eliminar
-                </button>
-              </div>
-            )}
-          </div>
-          {errors.image && <span className="error-message">{errors.image}</span>}
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tipo de Evento: *</label>
-            <select 
-              name="event_type" 
-              value={form.event_type} 
-              onChange={handleChange}
-              className={errors.event_type ? 'error' : ''}
-            >
-              <option value="">Seleccionar tipo</option>
-              {EVENT_TYPES.map((et) => (
-                <option key={et.value} value={et.value}>{et.label}</option>
-              ))}
-            </select>
-            {errors.event_type && <span className="error-message">{errors.event_type}</span>}
-          </div>
-          
-          <div className="form-group">
-            <label>Plataforma: *</label>
-            <select 
-              name="platform" 
-              value={form.platform} 
-              onChange={handleChange}
-              className={errors.platform ? 'error' : ''}
-            >
-              <option value="">Seleccionar plataforma</option>
-              {PLATFORM_CHOICES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-            {errors.platform && <span className="error-message">{errors.platform}</span>}
-          </div>
-        </div>
-        
-        {form.platform === 'other' && (
-          <div className="form-group">
-            <label>Otra Plataforma: *</label>
-            <input 
-              name="other_platform" 
-              value={form.other_platform} 
-              onChange={handleChange}
-              className={errors.other_platform ? 'error' : ''}
-              placeholder="Ingrese el nombre de la plataforma"
-            />
-            {errors.other_platform && <span className="error-message">{errors.other_platform}</span>}
-          </div>
-        )}
-        
-        <div className="form-group">
-          <label>Precio de Referencia (USD):</label>
-          <input 
-            name="reference_price" 
-            type="text" 
-            value={form.reference_price} 
-            onChange={handleChange}
-            placeholder="0.00"
-          />
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label>Fecha/Hora de Inicio:</label>
-            <input 
-              name="date_start" 
-              type="datetime-local" 
-              value={form.date_start} 
-              onChange={handleChange}
-              step="900"
-              className={errors.date_start ? 'error' : ''}
-              placeholder="Seleccionar fecha y hora de inicio"
-            />
-            {errors.date_start && <span className="error-message">{errors.date_start}</span>}
-            <small style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Haga clic en el icono del calendario para seleccionar fecha y hora
-            </small>
-          </div>
-          
-          <div className="form-group">
-            <label>Fecha/Hora de Fin:</label>
-            <input 
-              name="date_end" 
-              type="datetime-local" 
-              value={form.date_end} 
-              onChange={handleChange}
-              step="900"
-              className={errors.date_end ? 'error' : ''}
-              placeholder="Seleccionar fecha y hora de fin"
-            />
-            {errors.date_end && <span className="error-message">{errors.date_end}</span>}
-            <small style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Haga clic en el icono del calendario para seleccionar fecha y hora
-            </small>
-          </div>
-        </div>
-        
-        <div className="form-group">
-          <label>Descripción del Horario:</label>
-          <textarea 
-            name="schedule_description" 
-            value={form.schedule_description} 
-            onChange={handleChange}
-            placeholder="ej., Todos los martes durante 5 semanas"
-            rows="3"
-          />
-        </div>
-        
-        <button type="submit" disabled={loading}>
-          {loading ? 'Creando...' : 'Crear Evento'}
-        </button>
-      </form>
-      
-      {success && <div className="success-message">{success}</div>}
-      {error && <div className="error-message">{error}</div>}
-    </div>
+    <Container maxWidth="md" sx={{ py: 3 }}>
+      <Typography variant="h4" sx={{ fontWeight: 600, mb: 2.5 }}>
+        Crear Nuevo Evento
+      </Typography>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Box component="form" onSubmit={handleSubmit}>
+            <Stack spacing={2.5}>
+              <TextField
+                name="title"
+                label="Título *"
+                value={form.title}
+                onChange={handleChange}
+                error={Boolean(errors.title)}
+                helperText={errors.title || ''}
+                placeholder="Ingrese el título del evento"
+                fullWidth
+              />
+
+              <TextField
+                name="description"
+                label="Descripción *"
+                value={form.description}
+                onChange={handleChange}
+                error={Boolean(errors.description)}
+                helperText={errors.description || ''}
+                placeholder="Describa su evento..."
+                multiline
+                minRows={3}
+                fullWidth
+              />
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Imagen del Evento
+                </Typography>
+                <Button component="label" variant="outlined">
+                  {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
+                  <input type="file" accept="image/*" hidden onChange={handleImageChange} />
+                </Button>
+                {imagePreview && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Box
+                      component="img"
+                      src={imagePreview}
+                      alt="Preview"
+                      sx={{ maxWidth: '100%', width: 280, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Button type="button" onClick={removeImage} color="error" size="small">
+                        Eliminar
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+                {errors.image && (
+                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                    {errors.image}
+                  </Typography>
+                )}
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth error={Boolean(errors.event_type)}>
+                    <InputLabel>Tipo de Evento *</InputLabel>
+                    <Select
+                      name="event_type"
+                      value={form.event_type}
+                      label="Tipo de Evento *"
+                      onChange={handleChange}
+                    >
+                      <MenuItem value="">Seleccionar tipo</MenuItem>
+                      {EVENT_TYPES.map((et) => (
+                        <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {errors.event_type && (
+                    <Typography variant="caption" color="error">{errors.event_type}</Typography>
+                  )}
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth error={Boolean(errors.platform)}>
+                    <InputLabel>Plataforma *</InputLabel>
+                    <Select
+                      name="platform"
+                      value={form.platform}
+                      label="Plataforma *"
+                      onChange={handleChange}
+                    >
+                      <MenuItem value="">Seleccionar plataforma</MenuItem>
+                      {PLATFORM_CHOICES.map((p) => (
+                        <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {errors.platform && (
+                    <Typography variant="caption" color="error">{errors.platform}</Typography>
+                  )}
+                </Grid>
+              </Grid>
+
+              {form.platform === 'other' && (
+                <TextField
+                  name="other_platform"
+                  label="Otra Plataforma *"
+                  value={form.other_platform}
+                  onChange={handleChange}
+                  error={Boolean(errors.other_platform)}
+                  helperText={errors.other_platform || ''}
+                  placeholder="Ingrese el nombre de la plataforma"
+                  fullWidth
+                />
+              )}
+
+              <TextField
+                name="reference_price"
+                label="Precio de Referencia (USD)"
+                type="number"
+                value={form.reference_price}
+                onChange={handleChange}
+                placeholder="0.00"
+                fullWidth
+              />
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    name="date_start"
+                    label="Fecha/Hora de Inicio"
+                    type="datetime-local"
+                    value={form.date_start}
+                    onChange={handleChange}
+                    error={Boolean(errors.date_start)}
+                    helperText={errors.date_start || 'Seleccione fecha y hora de inicio'}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ step: 900 }}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    name="date_end"
+                    label="Fecha/Hora de Fin"
+                    type="datetime-local"
+                    value={form.date_end}
+                    onChange={handleChange}
+                    error={Boolean(errors.date_end)}
+                    helperText={errors.date_end || 'Seleccione fecha y hora de fin'}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ step: 900 }}
+                    fullWidth
+                  />
+                </Grid>
+              </Grid>
+
+              <TextField
+                name="schedule_description"
+                label="Descripción del Horario"
+                value={form.schedule_description}
+                onChange={handleChange}
+                placeholder="ej., Todos los martes durante 5 semanas"
+                multiline
+                minRows={3}
+                fullWidth
+              />
+
+              <Button type="submit" variant="contained" disabled={loading}>
+                {loading ? 'Creando...' : 'Crear Evento'}
+              </Button>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+    </Container>
   );
 };
 

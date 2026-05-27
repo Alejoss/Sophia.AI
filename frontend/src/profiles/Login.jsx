@@ -12,7 +12,21 @@ import {
 import SocialLogin from "../components/SocialLogin";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import '../styles/login.css';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Divider,
+  IconButton,
+  InputAdornment,
+  Link as MuiLink,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 /**
  * Regular Login Component
@@ -133,100 +147,114 @@ const Login = () => {
   // Restoring session after wrong redirect (e.g. refresh on protected route)
   if (isRestoringSession) {
     return (
-      <div className="login-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <div className="login-form-card" style={{ textAlign: 'center' }}>
-          <p>Restaurando sesión...</p>
-        </div>
-      </div>
+      <Box sx={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress size={28} />
+          <Typography>Restaurando sesión...</Typography>
+        </Stack>
+      </Box>
     );
   }
 
   // Already authenticated (backend says so); show message only when not restoring
   if (backendAuthStatus) {
     return (
-      <div>
-        <p>
+      <Container maxWidth="sm" sx={{ py: 4 }}>
+        <Alert severity="info">
           Ya has iniciado sesión como {username}, ¿deseas
-          <Link to="/profiles/logout"> cerrar sesión?</Link>
-        </p>
-      </div>
+          <MuiLink component={Link} to="/profiles/logout" underline="hover" sx={{ ml: 0.5 }}>
+            cerrar sesión
+          </MuiLink>
+          ?
+        </Alert>
+      </Container>
     );
   }
 
   // Not authenticated: show login form
   return (
-      <div className="login-container">
-        <div className="login-wrapper">
-          <div className="login-image-section">
-            <img src={loginImage} className="login-image" alt="Login illustration" />
-          </div>
-          <div className="login-form-section">
-            <div className="login-form-card">
-              <h2 className="heading-2 text-center">Iniciar sesión</h2>
-              <form onSubmit={handleSubmit}>
-                <div className="mb-5">
-                  <label className="form-label" htmlFor="username">
-                    Usuario o correo electrónico:
-                  </label>
-                  <input
-                    type="text"
-                    id="username"
-                    className="form-control"
-                    placeholder="Ingresa tu usuario o correo electrónico"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                  />
-                </div>
-                <div className="mb-5">
-                  <label htmlFor="password" className="form-label">
-                    Contraseña:
-                  </label>
-                  <div className="password-input-wrapper">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      id="password"
-                      className="form-control"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle-btn"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    >
-                      {showPassword ? (
-                        <VisibilityOffIcon fontSize="small" />
-                      ) : (
-                        <VisibilityIcon fontSize="small" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                {error && <div className="error-message">{error}</div>}
-                <button type="submit" className="btn-primary">
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          alignItems: "stretch",
+          borderRadius: 2,
+          overflow: "hidden",
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box
+          sx={{
+            display: { xs: "none", md: "block" },
+            minHeight: 460,
+            backgroundImage: `url(${loginImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+
+        <Box sx={{ p: { xs: 3, md: 4 }, display: "flex", alignItems: "center" }}>
+          <Paper elevation={0} sx={{ width: "100%" }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, textAlign: "center" }}>
+              Iniciar sesión
+            </Typography>
+
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                <TextField
+                  label="Usuario o correo electrónico"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  fullWidth
+                  autoComplete="username"
+                />
+                <TextField
+                  label="Contraseña"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  fullWidth
+                  autoComplete="current-password"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {error && <Alert severity="error">{error}</Alert>}
+
+                <Button type="submit" variant="contained" size="large">
                   Iniciar sesión
-                </button>
-              </form>
+                </Button>
+              </Stack>
+            </Box>
 
-              <div className="social-login-section">
-                <div className="divider">
-                  <span>O continúa con</span>
-                </div>
-                <SocialLogin />
-              </div>
+            <Divider sx={{ my: 3 }}>O continúa con</Divider>
+            <SocialLogin />
 
-              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-                <span>¿No tienes cuenta? </span>
-                <Link to="/profiles/register" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                  Regístrate
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+            <Typography variant="body2" sx={{ textAlign: "center", mt: 3 }}>
+              ¿No tienes cuenta?{" "}
+              <MuiLink component={Link} to="/profiles/register" underline="hover">
+                Regístrate
+              </MuiLink>
+            </Typography>
+          </Paper>
+        </Box>
+      </Box>
+    </Container>
+  );
 };
 
 export default Login;

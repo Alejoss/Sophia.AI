@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Box, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Container,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
 import { 
   getUserEventRegistrations, 
   getUserCreatedEvents,
-  getUserEventRegistrationsById,
   getUserCreatedEventsById
 } from '../api/eventsApi';
-import '../styles/events.css';
 
 const UserEvents = ({ isOwnProfile = false, userId = null }) => {
   const [registrations, setRegistrations] = useState([]);
@@ -97,31 +110,32 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
 
   if (loading) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Eventos</h2>
-          <div className="loading-spinner">Cargando eventos...</div>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={1.5} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <CircularProgress size={28} />
+          <Typography variant="body2" color="text.secondary">Cargando eventos...</Typography>
+        </Stack>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Eventos</h2>
-          <div className="error-message">{error}</div>
-          <button onClick={() => window.location.reload()} className="btn btn-primary">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Alert severity="error">{error}</Alert>
+          <Button onClick={() => window.location.reload()} variant="contained">
             Intentar de nuevo
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="events-list-container">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: 2, mb: 4 }}>
         <Typography
           variant="h4"
@@ -137,27 +151,24 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         >
           {isOwnProfile ? 'Mis eventos' : 'Eventos'}
         </Typography>
-        <Link to="/events" className="btn btn-secondary">
+        <Button component={Link} to="/events" variant="outlined" color="inherit">
           Explorar todos los eventos
-        </Link>
+        </Button>
       </Box>
 
       {/* Tab Navigation - Show registrations tab only for owners */}
       {isOwnProfile ? (
-        <div className="events-tabs">
-          <button 
-            className={`tab-button ${activeTab === 'registrations' ? 'active' : ''}`}
-            onClick={() => setActiveTab('registrations')}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, value) => setActiveTab(value)}
+            variant="scrollable"
+            scrollButtons="auto"
           >
-            Eventos en los que estoy registrado ({registrations.length})
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'created' ? 'active' : ''}`}
-            onClick={() => setActiveTab('created')}
-          >
-            Eventos que he creado ({createdEvents.length})
-          </button>
-        </div>
+            <Tab value="registrations" label={`Eventos en los que estoy registrado (${registrations.length})`} />
+            <Tab value="created" label={`Eventos que he creado (${createdEvents.length})`} />
+          </Tabs>
+        </Box>
       ) : (
         // For visitors, show created events directly without tabs
         <Box sx={{ mb: 3 }}>
@@ -176,146 +187,119 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
 
       {/* Registrations Tab - Only for owners */}
       {isOwnProfile && activeTab === 'registrations' && (
-        <div className="tab-content">
+        <Box>
           {registrations.length === 0 ? (
-            <div className="text-center">
-              <p className='mb-5'>Aún no estás registrado en ningún evento.</p>
-              <Link to="/events" className="btn btn-primary">
+            <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
+              <Typography color="text.secondary">Aún no estás registrado en ningún evento.</Typography>
+              <Button component={Link} to="/events" variant="contained">
                 Explorar eventos
-              </Link>
-            </div>
+              </Button>
+            </Stack>
           ) : (
-            <div className="events-grid">
+            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
               {registrations.map((registration) => (
-                <div key={registration.id} className="event-card">
-                  <div className="event-header">
-                    <h3>{registration.event_title || 'Evento sin título'}</h3>
-                    <div className="registration-status">
-                      <span className={`registration-badge ${registration.registration_status.toLowerCase()}`}>
-                        {getRegistrationStatusLabel(registration.registration_status)}
-                      </span>
-                      <span className={`payment-badge ${registration.payment_status.toLowerCase()}`}>
-                        {getPaymentStatusLabel(registration.payment_status)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="event-details">
-                    <div className="event-meta">
-                      <div className="event-info">
-                        <strong>Fecha del evento:</strong> {formatDate(registration.event_date)}
-                      </div>
-                      <div className="event-info">
-                        <strong>Registrado:</strong> {formatDate(registration.registered_at)}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="event-actions">
-                    <Link to={`/events/${registration.event}`} className="btn btn-secondary">
+                <Card key={registration.id} variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1.5, mb: 1 }}>
+                      <Typography variant="h6">{registration.event_title || 'Evento sin título'}</Typography>
+                      <Stack direction="row" spacing={0.8}>
+                        <Chip size="small" label={getRegistrationStatusLabel(registration.registration_status)} color="primary" variant="outlined" />
+                        <Chip size="small" label={getPaymentStatusLabel(registration.payment_status)} color="success" variant="outlined" />
+                      </Stack>
+                    </Box>
+                    <Typography variant="body2"><strong>Fecha del evento:</strong> {formatDate(registration.event_date)}</Typography>
+                    <Typography variant="body2"><strong>Registrado:</strong> {formatDate(registration.registered_at)}</Typography>
+                  </CardContent>
+                  <CardActions>
+                    <Button component={Link} to={`/events/${registration.event}`} variant="outlined" size="small">
                       Ver evento
-                    </Link>
-                  </div>
-                </div>
+                    </Button>
+                  </CardActions>
+                </Card>
               ))}
-            </div>
+            </Box>
           )}
-        </div>
+        </Box>
       )}
 
       {/* Created Events Tab - For both owners and visitors */}
       {(isOwnProfile && activeTab === 'created') || !isOwnProfile ? (
-        <div className="tab-content">
+        <Box>
           {createdEvents.length === 0 ? (
-            <div className="text-center">
-              <p>{isOwnProfile ? 'Aún no has creado ningún evento.' : 'No se encontraron eventos creados.'}</p>
+            <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
+              <Typography color="text.secondary">
+                {isOwnProfile ? 'Aún no has creado ningún evento.' : 'No se encontraron eventos creados.'}
+              </Typography>
               {isOwnProfile && (
-                <Link to="/events/create" className="btn btn-primary">
+                <Button component={Link} to="/events/create" variant="contained">
                   Crear tu primer evento
-                </Link>
+                </Button>
               )}
-            </div>
+            </Stack>
           ) : (
-            <div className="events-grid">
+            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' } }}>
               {createdEvents.map((event) => (
-                <div key={event.id} className="event-card">
-                  {event.image && (
-                    <div className="event-image-container">
-                      <img 
-                        src={event.image} 
-                        alt={event.title} 
-                        className="event-image"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'block';
-                        }}
-                      />
-                      <div className="event-image-placeholder" style={{ display: 'none' }}>
-                        <div className="placeholder-content">
-                          <span>📅</span>
-                          <p>{event.title}</p>
-                        </div>
-                      </div>
-                    </div>
+                <Card key={event.id} variant="outlined">
+                  {event.image ? (
+                    <CardMedia component="img" height="170" image={event.image} alt={event.title || 'Evento'} />
+                  ) : (
+                    <Box sx={{ height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover' }}>
+                      <Typography variant="h5">📅</Typography>
+                    </Box>
                   )}
-                  <div className="event-header">
-                    <h3>{event.title || 'Evento sin título'}</h3>
-                    <span className={`event-type ${event.event_type?.toLowerCase() || 'unknown'}`}>
-                      {getEventTypeLabel(event.event_type)}
-                    </span>
-                  </div>
-                  
-                  <div className="event-details">
-                    <p className="event-description">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1, mb: 1 }}>
+                      <Typography variant="h6">{event.title || 'Evento sin título'}</Typography>
+                      <Chip size="small" variant="outlined" color="primary" label={getEventTypeLabel(event.event_type)} />
+                    </Box>
+
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       {event.description 
                         ? (event.description.length > 150 
                             ? `${event.description.substring(0, 150)}...` 
                             : event.description)
                         : 'No hay descripción disponible'}
-                    </p>
-                    
-                    <div className="event-meta">
-                      <div className="event-info">
+                    </Typography>
+
+                    <Stack spacing={0.6}>
+                      <Typography variant="body2">
                         <strong>Inicio:</strong> {formatDate(event.date_start)}
-                      </div>
-                      
+                      </Typography>
                       {event.date_end && (
-                        <div className="event-info">
+                        <Typography variant="body2">
                           <strong>Fin:</strong> {formatDate(event.date_end)}
-                        </div>
+                        </Typography>
                       )}
-                      
                       {event.reference_price > 0 && (
-                        <div className="event-info">
+                        <Typography variant="body2">
                           <strong>Precio:</strong> ${event.reference_price}
-                        </div>
+                        </Typography>
                       )}
-                    </div>
-                  </div>
-                  
-                  <div className="event-actions">
-                    <Link to={`/events/${event.id}`} className="btn btn-secondary">
+                    </Stack>
+                  </CardContent>
+                  <CardActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+                    <Button component={Link} to={`/events/${event.id}`} variant="outlined" size="small">
                       Ver detalles
-                    </Link>
+                    </Button>
                     {isOwnProfile && (
                       <>
-                        <Link to={`/events/${event.id}/edit`} className="btn btn-primary">
+                        <Button component={Link} to={`/events/${event.id}/edit`} variant="contained" size="small">
                           Editar
-                        </Link>
-                        <Link to={`/events/${event.id}/manage`} className="btn btn-outline">
+                        </Button>
+                        <Button component={Link} to={`/events/${event.id}/manage`} variant="outlined" color="inherit" size="small">
                           Gestionar
-                        </Link>
+                        </Button>
                       </>
                     )}
-                  </div>
-                </div>
+                  </CardActions>
+                </Card>
               ))}
-            </div>
+            </Box>
           )}
-        </div>
+        </Box>
       ) : null}
-    </div>
+    </Container>
   );
 };
 
-export default UserEvents; 
+export default UserEvents;

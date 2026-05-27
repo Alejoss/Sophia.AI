@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import certificatesApi from '../api/certificatesApi';
 import { AuthContext } from '../context/AuthContext';
 import {
+  Container,
   Card,
   CardContent,
   Typography,
@@ -16,7 +17,8 @@ import {
   Alert,
   Box,
   Chip,
-  Divider
+  Stack,
+  Link as MuiLink,
 } from '@mui/material';
 
 const CertificateRequests = () => {
@@ -137,30 +139,39 @@ const CertificateRequests = () => {
       });
 
       return (
-        <Card key={request.id} className="mb-4">
+        <Card key={request.id} sx={{ mb: 2 }}>
           <CardContent>
-            <div className="flex justify-between items-start">
-              <div>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 240 }}>
                 <Typography variant="h6" color="text.primary">
                   {request.knowledge_path_title}
                 </Typography>
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="text.secondary">
                   {isTeacherView ? (
                     <>
                       Solicitado por:{' '}
-                      <Link 
+                      <MuiLink
+                        component={Link}
                         to={`/profiles/user_profile/${request.requester_id}`}
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                        underline="hover"
                       >
                         {request.requester}
-                      </Link>
+                      </MuiLink>
                     </>
                   ) : (
                     `Solicitado el: ${new Date(request.request_date).toLocaleDateString()}`
                   )}
                 </Typography>
                 {!isTeacherView && (
-                  <Typography variant="body2" color="textSecondary">
+                  <Typography variant="body2" color="text.secondary">
                     Autor: {request.knowledge_path_author}
                   </Typography>
                 )}
@@ -168,18 +179,18 @@ const CertificateRequests = () => {
                   label={request.status}
                   color={getStatusColor(request.status)}
                   size="small"
-                  className="mt-2"
+                  sx={{ mt: 1 }}
                 />
                 {request.notes && 
                  ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
                   (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
-                  <Typography variant="body2" className="mt-2">
+                  <Typography variant="body2" sx={{ mt: 1 }}>
                     Notas: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
                   </Typography>
                 )}
-              </div>
+              </Box>
 
-              <div className="flex gap-2">
+              <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
                 {request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username && (
                   <>
                     <Button
@@ -216,11 +227,11 @@ const CertificateRequests = () => {
                     Cancelar
                   </Button>
                 )}
-              </div>
-            </div>
+              </Stack>
+            </Box>
 
             {request.rejection_reason && (
-              <Typography variant="body2" color="error" className="mt-2">
+              <Typography variant="body2" color="error" sx={{ mt: 1 }}>
                 Motivo del rechazo: {request.rejection_reason}
               </Typography>
             )}
@@ -255,64 +266,52 @@ const CertificateRequests = () => {
   const studentRequests = requests.filter(req => req.requester === authState.user?.username);
 
   return (
-    <div className="container mx-auto p-4">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography 
         variant="h4" 
         gutterBottom 
         color="text.primary"
-        sx={{
-          fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-          fontWeight: 400,
-          fontSize: "24px"
-        }}
+        sx={{ fontWeight: 600 }}
       >
         Solicitudes de certificados
       </Typography>
 
       {requests.length === 0 ? (
-        <Typography variant="body1" color="textSecondary">
+        <Typography variant="body1" color="text.secondary">
           No se encontraron solicitudes de certificados.
         </Typography>
       ) : (
-        <div className="space-y-8">
+        <Stack spacing={4}>
           {/* Teacher View */}
           {teacherRequests.length > 0 && (
-            <div>
+            <Box>
               <Typography 
                 variant="h5" 
                 gutterBottom 
                 color="text.primary"
-                sx={{
-                  fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-                  fontWeight: 400,
-                  fontSize: "20px"
-                }}
+                sx={{ fontWeight: 600 }}
               >
                 Solicitudes para revisar
               </Typography>
               {renderRequests(teacherRequests, true)}
-            </div>
+            </Box>
           )}
 
           {/* Student View */}
           {studentRequests.length > 0 && (
-            <div>
+            <Box>
               <Typography 
                 variant="h5" 
                 gutterBottom 
                 color="text.primary"
-                sx={{
-                  fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-                  fontWeight: 400,
-                  fontSize: "20px"
-                }}
+                sx={{ fontWeight: 600 }}
               >
                 Mis solicitudes
               </Typography>
               {renderRequests(studentRequests, false)}
-            </div>
+            </Box>
           )}
-        </div>
+        </Stack>
       )}
 
       {/* Approve Dialog */}
@@ -383,7 +382,7 @@ const CertificateRequests = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Container>
   );
 };
 

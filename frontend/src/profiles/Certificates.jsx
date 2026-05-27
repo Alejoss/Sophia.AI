@@ -18,6 +18,8 @@ import {
   TextField,
   Tabs,
   Tab,
+  Stack,
+  Link as MuiLink,
 } from "@mui/material";
 
 const Certificates = ({ isOwnProfile = false, userId = null }) => {
@@ -167,7 +169,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (certificate.event_title) {
       return certificate.event_title;
     } else {
-      return "Certificate";
+      return "Certificado";
     }
   };
 
@@ -187,7 +189,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (request.event_title) {
       return request.event_title;
     } else {
-      return "Certificate Request";
+      return "Solicitud de certificado";
     }
   };
 
@@ -238,7 +240,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       {/* Tab Content */}
       <Box>
         {(activeTab === "certificates" || !isOwnProfile) && (
-          <div className="certificates">
+          <Box>
             {certificatesLoading ? (
               <Box
                 display="flex"
@@ -251,25 +253,33 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             ) : error ? (
               <Alert severity="error">{error}</Alert>
             ) : certificates.length === 0 ? (
-              <Typography variant="body1" color="textSecondary">
+              <Typography variant="body1" color="text.secondary">
                 {isOwnProfile
                   ? "Aún no has obtenido ningún certificado. ¡Completa caminos de conocimiento o asiste a eventos para obtener certificados!"
                   : "No se encontraron certificados."}
               </Typography>
             ) : (
-              <div className="grid gap-4">
+              <Stack spacing={2}>
                 {certificates.map((certificate) => (
-                  <Card key={certificate.id} className="mb-4">
+                  <Card key={certificate.id}>
                     <CardContent>
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: 2,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 240 }}>
                           <Typography variant="h6" color="text.primary">
                             {getCertificateTitle(certificate)}
                           </Typography>
-                          <Typography variant="body2" color="textSecondary">
+                          <Typography variant="body2" color="text.secondary">
                             Tipo: {getCertificateType(certificate)}
                           </Typography>
-                          <Typography variant="body2" color="textSecondary">
+                          <Typography variant="body2" color="text.secondary">
                             Emitido el:{" "}
                             {new Date(
                               certificate.issued_on
@@ -280,10 +290,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                               label="En Blockchain"
                               color="success"
                               size="small"
-                              className="mt-2"
+                              sx={{ mt: 1 }}
                             />
                           )}
-                        </div>
+                        </Box>
                         {(certificate.download_url || certificate.certificate_file_url) && (
                           <Button
                             variant="contained"
@@ -295,16 +305,16 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             Descargar
                           </Button>
                         )}
-                      </div>
+                      </Box>
                     </CardContent>
                   </Card>
                 ))}
-              </div>
+              </Stack>
             )}
-          </div>
+          </Box>
         )}
         {isOwnProfile && activeTab === "requests" && (
-          <div className="requests">
+          <Box>
             {requestsLoading ? (
               <Box
                 display="flex"
@@ -318,7 +328,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
               <Alert severity="error">{error}</Alert>
             ) : requests.length === 0 ? (
               <Box textAlign="center" py={4}>
-                <Typography variant="h6" color="textSecondary" gutterBottom>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
                   ¿Tienes algo que enseñar? Crea un Camino de Conocimiento o un Evento
                   y emite certificados
                 </Typography>
@@ -356,22 +366,18 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 </Box>
               </Box>
             ) : (
-              <div className="space-y-8">
+              <Stack spacing={4}>
                 {/* Teacher View */}
                 {requests.filter(
                   (req) =>
                     req.knowledge_path_author === authState.user?.username
                 ).length > 0 && (
-                  <div>
+                  <Box>
                     <Typography 
                       variant="h5" 
                       gutterBottom 
                       color="text.primary"
-                      sx={{
-                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-                        fontWeight: 400,
-                        fontSize: "20px"
-                      }}
+                      sx={{ fontWeight: 600 }}
                     >
                       Solicitudes para revisar
                     </Typography>
@@ -381,46 +387,55 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                           req.knowledge_path_author === authState.user?.username
                       )
                     ).map((request) => (
-                      <Card key={request.id} className="mb-4">
+                      <Card key={request.id} sx={{ mb: 2 }}>
                         <CardContent>
-                          <div className="flex justify-between items-start">
-                            <div>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 2,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Box sx={{ flex: 1, minWidth: 240 }}>
                               <Typography variant="h6">
                                 {getRequestTitle(request)}
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Solicitado por:{" "}
-                                <Link
+                                <MuiLink
+                                  component={Link}
                                   to={`/profiles/user_profile/${request.requester_id}`}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  underline="hover"
                                 >
                                   {request.requester}
-                                </Link>
+                                </MuiLink>
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
-                                Type: {getRequestType(request)}
+                              <Typography variant="body2" color="text.secondary">
+                                Tipo: {getRequestType(request)}
                               </Typography>
                               <Chip
                                 label={request.status}
                                 color={getStatusColor(request.status)}
                                 size="small"
-                                className="mt-2"
+                                sx={{ mt: 1 }}
                               />
                               {request.notes &&
                                 ((typeof request.notes === "object" &&
                                   Object.keys(request.notes).length > 0) ||
                                   (typeof request.notes === "string" &&
                                     request.notes.trim() !== "")) && (
-                                  <Typography variant="body2" className="mt-2">
-                                    Notes:{" "}
+                                  <Typography variant="body2" sx={{ mt: 1 }}>
+                                    Notas:{" "}
                                     {typeof request.notes === "object"
                                       ? JSON.stringify(request.notes)
                                       : request.notes}
                                   </Typography>
                                 )}
-                            </div>
+                            </Box>
 
-                            <div className="flex gap-2">
+                            <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
                               {request.status === "PENDING" && (
                                 <>
                                   <Button
@@ -448,14 +463,14 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                   Aceptar solicitud
                                 </Button>
                               )}
-                            </div>
-                          </div>
+                            </Stack>
+                          </Box>
 
                           {request.rejection_reason && (
                             <Typography
                               variant="body2"
                               color="error"
-                              className="mt-2"
+                              sx={{ mt: 1 }}
                             >
                               Rejection reason: {request.rejection_reason}
                             </Typography>
@@ -463,23 +478,19 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
+                  </Box>
                 )}
 
                 {/* Student View */}
                 {requests.filter(
                   (req) => req.requester === authState.user?.username
                 ).length > 0 && (
-                  <div>
+                  <Box>
                     <Typography 
                       variant="h5" 
                       gutterBottom 
                       color="text.primary"
-                      sx={{
-                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-                        fontWeight: 400,
-                        fontSize: "20px"
-                      }}
+                      sx={{ fontWeight: 600 }}
                     >
                       Mis solicitudes
                     </Typography>
@@ -488,54 +499,63 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                         (req) => req.requester === authState.user?.username
                       )
                     ).map((request) => (
-                      <Card key={request.id} className="mb-4">
+                      <Card key={request.id} sx={{ mb: 2 }}>
                         <CardContent>
-                          <div className="flex justify-between items-start">
-                            <div>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 2,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Box sx={{ flex: 1, minWidth: 240 }}>
                               <Typography variant="h6" color="text.primary">
                                 {getRequestTitle(request)}
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Solicitado el:{" "}
                                 {new Date(
                                   request.request_date
                                 ).toLocaleDateString()}
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Autor:{" "}
-                                <Link
+                                <MuiLink
+                                  component={Link}
                                   to={`/profiles/user_profile/${
                                     request.knowledge_path_author_id ||
                                     request.event_owner_id
                                   }`}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  underline="hover"
                                 >
                                   {request.knowledge_path_author ||
                                     request.event_owner}
-                                </Link>
+                                </MuiLink>
                               </Typography>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Tipo: {getRequestType(request)}
                               </Typography>
                               <Chip
                                 label={request.status}
                                 color={getStatusColor(request.status)}
                                 size="small"
-                                className="mt-2"
+                                sx={{ mt: 1 }}
                               />
                               {request.notes &&
                                 ((typeof request.notes === "object" &&
                                   Object.keys(request.notes).length > 0) ||
                                   (typeof request.notes === "string" &&
                                     request.notes.trim() !== "")) && (
-                                  <Typography variant="body2" className="mt-2">
+                                  <Typography variant="body2" sx={{ mt: 1 }}>
                                     Notas:{" "}
                                     {typeof request.notes === "object"
                                       ? JSON.stringify(request.notes)
                                       : request.notes}
                                   </Typography>
                                 )}
-                            </div>
+                            </Box>
                             {request.status === "PENDING" && (
                               <Button
                                 variant="outlined"
@@ -545,12 +565,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 Cancelar
                               </Button>
                             )}
-                          </div>
+                          </Box>
                           {request.rejection_reason && (
                             <Typography
                               variant="body2"
                               color="error"
-                              className="mt-2"
+                              sx={{ mt: 1 }}
                             >
                               Motivo del rechazo: {request.rejection_reason}
                             </Typography>
@@ -558,11 +578,11 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
+                  </Box>
                 )}
-              </div>
+              </Stack>
             )}
-          </div>
+          </Box>
         )}
       </Box>
 

@@ -6,6 +6,7 @@ from payments.models import CryptoPayment
 class CryptoPaymentSerializer(serializers.ModelSerializer):
     pay_currency_display = serializers.SerializerMethodField()
     is_paid = serializers.BooleanField(read_only=True)
+    payin_extra_id = serializers.SerializerMethodField()
 
     class Meta:
         model = CryptoPayment
@@ -19,6 +20,7 @@ class CryptoPaymentSerializer(serializers.ModelSerializer):
             'price_currency',
             'pay_amount',
             'pay_address',
+            'payin_extra_id',
             'payment_status',
             'invoice_url',
             'actually_paid',
@@ -30,3 +32,7 @@ class CryptoPaymentSerializer(serializers.ModelSerializer):
 
     def get_pay_currency_display(self, obj):
         return dict(CryptoPayment.PAY_CURRENCIES).get(obj.pay_currency, obj.pay_currency.upper())
+
+    def get_payin_extra_id(self, obj):
+        payload = obj.provider_payload or {}
+        return payload.get('payin_extra_id') or payload.get('payment_extra_ids')

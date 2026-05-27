@@ -4,7 +4,7 @@ import knowledgePathsApi from '../api/knowledgePathsApi';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
-import { Box, Typography, Alert, Chip, CircularProgress, Button, Stack, Paper, Container } from '@mui/material';
+import { Box, Typography, Alert, Chip, CircularProgress, Button, Stack, Paper, Container, Link as MuiLink } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
@@ -136,8 +136,20 @@ const NodeDetail = () => {
   console.log('🧩 Before render - loading:', loading, 'error:', error, 'node exists:', !!node);
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh"><CircularProgress /></Box>;
-  if (error) return <Box className="container mx-auto p-4 text-red-600">{error}</Box>;
-  if (!node) return <Box className="container mx-auto p-4">Nodo no encontrado</Box>;
+  if (error) {
+    return (
+      <Container maxWidth="md" sx={{ py: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+  if (!node) {
+    return (
+      <Container maxWidth="md" sx={{ py: 3 }}>
+        <Alert severity="warning">Nodo no encontrado</Alert>
+      </Container>
+    );
+  }
 
   console.log('🧩 Ready to render with node:', {
     id: node.id, 
@@ -162,13 +174,15 @@ const NodeDetail = () => {
       <Box sx={{ maxWidth: 672, mx: 'auto' }}>
         {/* Breadcrumb Navigation */}
         <Typography variant="body2" sx={{ mb: 2 }}>
-          <Link
+          <MuiLink
+            component={Link}
             to={`/knowledge_path/${pathId}`}
-            style={{ color: 'inherit', textDecoration: 'none' }}
-            className="text-blue-500 hover:text-blue-700"
+            underline="hover"
+            color="primary"
+            sx={{ fontWeight: 500 }}
           >
             {knowledgePath?.title}
-          </Link>
+          </MuiLink>
           <Typography component="span" sx={{ mx: 1 }}>›</Typography>
           <Typography component="span" color="text.secondary">{node.title}</Typography>
         </Typography>

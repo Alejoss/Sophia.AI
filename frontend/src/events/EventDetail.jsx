@@ -4,7 +4,23 @@ import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEvent
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import { AuthContext } from '../context/AuthContext';
 import CryptoPaymentModal from './CryptoPaymentModal';
-import '../styles/events.css';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Link as MuiLink,
+  Stack,
+  Typography,
+} from '@mui/material';
 
 const EventDetail = () => {
   const { eventId } = useParams();
@@ -20,6 +36,7 @@ const EventDetail = () => {
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     getPaymentGatewayStatus()
@@ -62,6 +79,10 @@ const EventDetail = () => {
 
     loadEvent();
   }, [eventId, authState.isAuthenticated, authState.user]);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [event?.image]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Por determinar';
@@ -214,222 +235,215 @@ const EventDetail = () => {
 
   if (loading) {
     return (
-      <div className="event-detail-container">
-        <div className="text-center">
-          <h2>Detalles del Evento</h2>
-          <p>Cargando evento...</p>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={1.5} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
+            Detalles del Evento
+          </Typography>
+          <Typography color="text.secondary">Cargando evento...</Typography>
+        </Stack>
+      </Container>
     );
   }
 
-  if (error) {
+  if (error && !event) {
     return (
-      <div className="event-detail-container">
-        <div className="text-center">
-          <h2>Detalles del Evento</h2>
-          <p style={{ color: 'red' }}>{error}</p>
-          <Link to="/events" className="btn btn-primary">Volver a Eventos</Link>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
+            Detalles del Evento
+          </Typography>
+          <Alert severity="error">{error}</Alert>
+          <Button component={Link} to="/events" variant="contained">
+            Volver a Eventos
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   if (!event) {
     return (
-      <div className="event-detail-container">
-        <div className="text-center">
-          <h2>Detalles del Evento</h2>
-          <p>Evento no encontrado.</p>
-          <Link to="/events" className="btn btn-primary">Volver a Eventos</Link>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
+            Detalles del Evento
+          </Typography>
+          <Alert severity="warning">Evento no encontrado.</Alert>
+          <Button component={Link} to="/events" variant="contained">
+            Volver a Eventos
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="event-detail-container">
-      <div className="event-detail-header">
-        <Link to="/events" className="btn btn-secondary">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={1.5} sx={{ mb: 2.5 }}>
+        <Button component={Link} to="/events" variant="outlined" color="inherit">
           ← Volver a Eventos
-        </Link>
-        <h1>{event.title}</h1>
-        <span className={`event-type-badge ${event.event_type.toLowerCase()}`}>
-          {getEventTypeLabel(event.event_type)}
-        </span>
-      </div>
+        </Button>
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          {event.title}
+        </Typography>
+        <Chip
+          color="primary"
+          variant="outlined"
+          label={getEventTypeLabel(event.event_type)}
+        />
+      </Stack>
 
-      <div className="event-detail-content">
-        <div className="event-main-info">
-          {event.image ? (
-            <div className="event-detail-image-container">
-              <img 
-                src={event.image} 
-                alt={event.title} 
-                className="event-detail-image"
-                onLoad={() => console.log('Event image loaded successfully:', event.image)}
-                onError={(e) => {
-                  console.error('Failed to load event image:', event.image);
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'block';
-                }}
+      <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' } }}>
+        <Card variant="outlined">
+          <CardContent>
+            {event.image && !imageError ? (
+              <Box
+                component="img"
+                src={event.image}
+                alt={event.title}
+                onError={() => setImageError(true)}
+                sx={{ width: '100%', maxHeight: 320, objectFit: 'cover', borderRadius: 1, mb: 2 }}
               />
-              <div className="event-detail-image-placeholder" style={{ display: 'none' }}>
-                <div className="placeholder-content">
-                  <span>📅</span>
-                  <h3>{event.title}</h3>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="event-detail-image-container">
-              <div className="event-detail-image-placeholder">
-                <div className="placeholder-content">
-                  <span>📅</span>
-                  <h3>{event.title}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="event-description">
-            <h3>Descripción</h3>
-            <p>{event.description}</p>
-          </div>
+            ) : (
+              <Box sx={{ height: 220, borderRadius: 1, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+                <Typography variant="h5">📅 {event.title}</Typography>
+              </Box>
+            )}
 
-          <div className="event-meta-grid">
-            <div className="event-meta-item">
-              <strong>Host:</strong>
-              <span>
-                <Link to={`/profiles/user_profile/${event.owner.id}`} className="host-link">
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              Descripción
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              {event.description}
+            </Typography>
+
+            <Stack spacing={1}>
+              <Typography variant="body2">
+                <strong>Anfitrión:</strong>{' '}
+                <MuiLink component={Link} to={`/profiles/user_profile/${event.owner.id}`} underline="hover">
                   {event.owner.username}
-                </Link>
-              </span>
-            </div>
+                </MuiLink>
+              </Typography>
 
-            {event.platform && (
-              <div className="event-meta-item">
-                <strong>Plataforma:</strong>
-                <span>
-                  {getPlatformLabel(event.platform)}
-                  {event.platform === 'other' && event.other_platform && (
-                    <span> ({event.other_platform})</span>
-                  )}
-                </span>
-              </div>
-            )}
+              {event.platform && (
+                <Typography variant="body2">
+                  <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
+                  {event.platform === 'other' && event.other_platform && ` (${event.other_platform})`}
+                </Typography>
+              )}
 
-            <div className="event-meta-item">
-              <strong>Creado:</strong>
-              <span>{formatDate(event.date_created)}</span>
-            </div>
+              <Typography variant="body2">
+                <strong>Creado:</strong> {formatDate(event.date_created)}
+              </Typography>
 
-            {event.reference_price > 0 && (
-              <div className="event-meta-item">
-                <strong>Precio:</strong>
-                <span>${event.reference_price}</span>
-                {event.owner_accepted_cryptos && event.owner_accepted_cryptos.length > 0 && (
-                  <div className="crypto-payment-methods">
-                    <div className="crypto-thumbnails">
+              {event.reference_price > 0 && (
+                <Box>
+                  <Typography variant="body2">
+                    <strong>Precio:</strong> ${event.reference_price}
+                  </Typography>
+                  {event.owner_accepted_cryptos && event.owner_accepted_cryptos.length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
                       {event.owner_accepted_cryptos.map((acceptedCrypto) => (
-                        <div key={acceptedCrypto.id} className="crypto-thumbnail" title={`${acceptedCrypto.crypto.name} (${acceptedCrypto.crypto.code})`}>
-                          {acceptedCrypto.crypto.thumbnail ? (
-                            <img 
-                              src={acceptedCrypto.crypto.thumbnail} 
-                              alt={acceptedCrypto.crypto.name}
-                              className="crypto-icon"
-                            />
-                          ) : (
-                            <div className="crypto-icon-placeholder">
-                              {acceptedCrypto.crypto.code}
-                            </div>
-                          )}
-                        </div>
+                        <Chip
+                          key={acceptedCrypto.id}
+                          label={acceptedCrypto.crypto.code}
+                          size="small"
+                          variant="outlined"
+                        />
                       ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    </Stack>
+                  )}
+                </Box>
+              )}
+
+              <Typography variant="body2">
+                <strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}
+              </Typography>
+
+              {event.date_end && (
+                <Typography variant="body2">
+                  <strong>Fecha de Fin:</strong> {formatDate(event.date_end)}
+                </Typography>
+              )}
+
+              {event.date_recorded && (
+                <Typography variant="body2">
+                  <strong>Fecha Grabada:</strong> {formatDate(event.date_recorded)}
+                </Typography>
+              )}
+
+              {event.schedule_description && (
+                <Typography variant="body2">
+                  <strong>Horario:</strong> {event.schedule_description}
+                </Typography>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Card variant="outlined">
+          <CardContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 1.5 }}>
+                {error}
+              </Alert>
             )}
-
-            <div className="event-meta-item">
-              <strong>Fecha de Inicio:</strong>
-              <span>{formatDate(event.date_start)}</span>
-            </div>
-
-            {event.date_end && (
-              <div className="event-meta-item">
-                <strong>Fecha de Fin:</strong>
-                <span>{formatDate(event.date_end)}</span>
-              </div>
-            )}
-
-            {event.date_recorded && (
-              <div className="event-meta-item">
-                <strong>Fecha Grabada:</strong>
-                <span>{formatDate(event.date_recorded)}</span>
-              </div>
-            )}
-
-            {event.schedule_description && (
-              <div className="event-meta-item">
-                <strong>Horario:</strong>
-                <span>{event.schedule_description}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="event-actions">
+            <Typography variant="h6" sx={{ mb: 1.5 }}>
+              Acciones
+            </Typography>
+            <Stack spacing={1.2}>
           {isEventCreator() && (
             <>
-              <Link to={`/events/${eventId}/edit`} className="btn btn-primary">
+              <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">
                 Editar Evento
-              </Link>
-              <Link to={`/events/${eventId}/manage`} className="btn btn-secondary">
+              </Button>
+              <Button component={Link} to={`/events/${eventId}/manage`} variant="outlined">
                 Gestionar Evento
-              </Link>
+              </Button>
             </>
           )}
           
           {!isEventCreator() && authState.isAuthenticated && (
             <>
               {!isRegistered ? (
-                <button 
+                <Button
                   onClick={handleRegister}
                   disabled={registrationLoading || isEventStarted()}
-                  className={`btn ${isEventStarted() ? 'btn-disabled' : 'btn-primary'}`}
                   title={isEventStarted() ? 'El evento ya ha comenzado' : ''}
+                  variant="contained"
                 >
                   {registrationLoading ? 'Registrando...' : isEventStarted() ? 'Evento Iniciado' : 'Unirse al Evento'}
-                </button>
+                </Button>
               ) : (
-                <button 
+                <Button
                   onClick={handleCancelRegistration}
                   disabled={registrationLoading || (userRegistration && userRegistration.payment_status === 'PAID')}
-                  className={`btn ${userRegistration && userRegistration.payment_status === 'PAID' ? 'btn-disabled' : 'btn-danger'}`}
                   title={userRegistration && userRegistration.payment_status === 'PAID' ? 'No se puede cancelar después de que el pago sea aceptado' : ''}
+                  variant="contained"
+                  color={userRegistration && userRegistration.payment_status === 'PAID' ? 'inherit' : 'error'}
                 >
                   {registrationLoading ? 'Cancelando...' : 
                    userRegistration && userRegistration.payment_status === 'PAID' ? 'Pago Aceptado' : 'Cancelar Registro'}
-                </button>
+                </Button>
               )}
             </>
           )}
           
           {!authState.isAuthenticated && (
-            <Link to="/profiles/login" className="btn btn-primary">
+            <Button component={Link} to="/profiles/login" variant="contained">
               Iniciar Sesión para Unirse al Evento
-            </Link>
+            </Button>
           )}
           
-          <button className="btn btn-outline" onClick={handleShareEvent}>
+          <Button variant="outlined" color="inherit" onClick={handleShareEvent}>
             {shareButtonText}
-          </button>
+          </Button>
           
           {!isEventCreator() && authState.isAuthenticated && isRegistered && (
-            <button className="btn btn-info" onClick={handleContactCreator}>
+            <Button variant="outlined" onClick={handleContactCreator}>
               Contactar al Creador
-            </button>
+            </Button>
           )}
 
           {!isEventCreator() &&
@@ -438,82 +452,49 @@ const EventDetail = () => {
             event.reference_price > 0 &&
             cryptoPaymentsEnabled &&
             userRegistration?.payment_status !== 'PAID' && (
-              <button
+              <Button
                 type="button"
-                className="btn btn-primary"
+                variant="contained"
                 onClick={() => setShowPaymentModal(true)}
               >
                 Pagar con BCH / XMR
-              </button>
+              </Button>
             )}
-        </div>
-      </div>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Registration Confirmation Modal */}
-      {showRegistrationModal && (
-        <div className="modal-overlay" onClick={cancelRegistrationModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Confirmar Registro en el Evento</h3>
-              <button 
-                className="modal-close"
-                onClick={cancelRegistrationModal}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="registration-notification">
-                <div className="notification-icon">📧</div>
-                <h4>Confirmación de Registro</h4>
-                <p>
-                  Estás a punto de registrarte en <strong>{event.title}</strong>.
-                </p>
-                <p>
-                  <strong>Importante:</strong> El creador del evento se pondrá en contacto contigo 
-                  para proporcionarte más detalles sobre cómo unirte al evento.
-                </p>
-                <p>
-                  <strong>Revisa tu bandeja de entrada de Academia Blockchain y tu correo electrónico</strong> para 
-                  recibir comunicación del creador del evento.
-                </p>
-                <div className="event-summary">
-                  <div className="summary-item">
-                    <strong>Evento:</strong> {event.title}
-                  </div>
-                  <div className="summary-item">
-                    <strong>Anfitrión:</strong> {event.owner.username}
-                  </div>
-                  <div className="summary-item">
-                    <strong>Fecha:</strong> {formatDate(event.date_start)}
-                  </div>
-                  {event.reference_price > 0 && (
-                    <div className="summary-item">
-                      <strong>Precio:</strong> ${event.reference_price}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button 
-                className="btn btn-secondary"
-                onClick={cancelRegistrationModal}
-                disabled={registrationLoading}
-              >
-                Cancelar
-              </button>
-              <button 
-                className="btn btn-primary"
-                onClick={confirmRegistration}
-                disabled={registrationLoading}
-              >
-                {registrationLoading ? 'Registrando...' : 'Confirmar Registro'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={showRegistrationModal} onClose={cancelRegistrationModal} maxWidth="sm" fullWidth>
+        <DialogTitle>Confirmar Registro en el Evento</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            <Typography>Estás a punto de registrarte en <strong>{event.title}</strong>.</Typography>
+            <Typography variant="body2">
+              <strong>Importante:</strong> El creador del evento se pondrá en contacto contigo para proporcionarte más detalles sobre cómo unirte al evento.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Revisa tu bandeja de entrada de Academia Blockchain y tu correo electrónico</strong> para recibir comunicación del creador del evento.
+            </Typography>
+            <Divider />
+            <Typography variant="body2"><strong>Evento:</strong> {event.title}</Typography>
+            <Typography variant="body2"><strong>Anfitrión:</strong> {event.owner.username}</Typography>
+            <Typography variant="body2"><strong>Fecha:</strong> {formatDate(event.date_start)}</Typography>
+            {event.reference_price > 0 && (
+              <Typography variant="body2"><strong>Precio:</strong> ${event.reference_price}</Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelRegistrationModal} disabled={registrationLoading}>
+            Cancelar
+          </Button>
+          <Button onClick={confirmRegistration} disabled={registrationLoading} variant="contained">
+            {registrationLoading ? 'Registrando...' : 'Confirmar Registro'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <CryptoPaymentModal
         open={showPaymentModal}
@@ -523,7 +504,7 @@ const EventDetail = () => {
         priceUsd={event?.reference_price}
         onPaymentComplete={handlePaymentComplete}
       />
-    </div>
+    </Container>
   );
 };
 

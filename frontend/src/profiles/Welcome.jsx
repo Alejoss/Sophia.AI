@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { setUserInLocalStorage, setAuthenticationStatus, clearUserFromLocalStorage, clearAuthenticationStatus } from '../context/localStorageUtils.js';
 import { checkAuth } from '../api/profilesApi.js';
-import '../styles/Welcome.css'; // We can create this for styling
+import { Alert, Box, Button, Container, Paper, Stack, Typography } from '@mui/material';
 
 const Welcome = () => {
   const location = useLocation();
@@ -28,7 +28,7 @@ const Welcome = () => {
             isAuthenticated: true,
             user: userDataFromState,
           });
-          setMessage(`Welcome, ${userDataFromState.username}! Your account is active and you are now logged in.`);
+          setMessage(`¡Bienvenido, ${userDataFromState.username}! Tu cuenta está activa y ya has iniciado sesión.`);
           setIsVerified(true);
         } else if (backendAuthenticated && !userDataFromState && authState.isAuthenticated) {
           // This case might happen if user refreshes /welcome or navigates directly with a valid cookie
@@ -78,21 +78,36 @@ const Welcome = () => {
   }, [location.state, setAuthState, navigate, authState.isAuthenticated, authState.user]);
 
   return (
-    <div className="welcome-container">
-      <h2>¡Bienvenido!</h2>
-      <p className={`status-message ${isVerified ? 'success' : 'error'}`}>{message}</p>
+    <Container maxWidth="sm" sx={{ py: 4 }}>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack spacing={2}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            ¡Bienvenido!
+          </Typography>
+          <Alert severity={isVerified ? 'success' : 'error'}>
+            {message}
+          </Alert>
+
       {isVerified && authState.user && (
-        <div className="welcome-actions">
-          <p>¿Qué te gustaría hacer ahora?</p>
-          <Link to="/profiles/my_profile" className="welcome-link">Ver tu perfil</Link>
-        </div>
+        <Box>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>
+            ¿Qué te gustaría hacer ahora?
+          </Typography>
+          <Button component={Link} to="/profiles/my_profile" variant="contained">
+            Ver tu perfil
+          </Button>
+        </Box>
       )}
       {!isVerified && (
-        <div className="welcome-actions">
-            <Link to="/profiles/login" className="welcome-link">Ir a iniciar sesión</Link>
-        </div>
+        <Box>
+          <Button component={Link} to="/profiles/login" variant="outlined">
+            Ir a iniciar sesión
+          </Button>
+        </Box>
       )}
-    </div>
+        </Stack>
+      </Paper>
+    </Container>
   );
 };
 

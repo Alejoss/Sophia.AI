@@ -2,8 +2,18 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { apiRegister } from '../api/profilesApi';
-import '../styles/Register.css';
 import SocialLogin from '../components/SocialLogin';
+import {
+  Alert,
+  Box,
+  Button,
+  Container,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -265,124 +275,107 @@ const Register = () => {
   };
 
   return (
-    <div className="register-container">
-      <form onSubmit={handleSubmit} className="register-form">
-        <h2>Crear cuenta</h2>
-        {serverError && (
-          <div className="server-error-message" role="alert">
-            <strong>Error:</strong> {serverError}
-          </div>
-        )}
-        
-        <div className="form-group">
-          <label htmlFor="username">Nombre de usuario</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onKeyDown={(e) => {
-              // Prevent @ symbol from being typed in username field
-              if (e.key === '@') {
-                e.preventDefault();
-              }
-            }}
-            className={errors.username ? 'input-error' : ''}
-            aria-invalid={errors.username ? "true" : "false"}
-            aria-describedby={errors.username ? "username-error" : null}
-          />
-          {errors.username && (
-            <div id="username-error" className="error-message" role="alert">
-              {errors.username}
-            </div>
-          )}
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="email">Correo electrónico</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={errors.email ? 'input-error' : ''}
-            aria-invalid={errors.email ? "true" : "false"}
-            aria-describedby={errors.email ? "email-error" : null}
-          />
-          {errors.email && (
-            <div id="email-error" className="error-message" role="alert">
-              {errors.email}
-            </div>
-          )}
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="password">Contraseña</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={errors.password ? 'input-error' : ''}
-            aria-invalid={errors.password ? "true" : "false"}
-            aria-describedby={errors.password ? "password-error" : null}
-          />
-          {errors.password && (
-            <div id="password-error" className="error-message" role="alert">
-              {Array.isArray(errors.password) ? (
-                <ul className="error-list">
-                  {errors.password.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              ) : (
-                errors.password
-              )}
-            </div>
-          )}
-          {!errors.password && touched.password && formData.password && validatePassword(formData.password).length === 0 && (
-            <div className="help-text success-text">
-              ✓ La contraseña cumple con todos los requisitos de seguridad.
-            </div>
-          )}
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="confirmPassword">Confirmar contraseña</label>
-          <input
-            type="password"
-            id="confirmPassword"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={errors.confirmPassword ? 'input-error' : ''}
-            aria-invalid={errors.confirmPassword ? "true" : "false"}
-            aria-describedby={errors.confirmPassword ? "confirmPassword-error" : null}
-          />
-          {errors.confirmPassword && (
-            <div id="confirmPassword-error" className="error-message" role="alert">
-              {errors.confirmPassword}
-            </div>
-          )}
-        </div>
-        
-        <button type="submit" className="submit-button" disabled={isSubmitting}>
-          {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
-        </button>
-      </form>
+    <Container maxWidth="sm" sx={{ py: { xs: 2, md: 4 } }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 } }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+          Crear cuenta
+        </Typography>
 
-      <div className="social-login-section">
-        <p>O continúa con</p>
+        {serverError && (
+          <Alert severity="error" sx={{ mb: 2 }} role="alert">
+            {serverError}
+          </Alert>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <TextField
+              id="username"
+              name="username"
+              label="Nombre de usuario"
+              value={formData.username}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              onKeyDown={(e) => {
+                if (e.key === '@') {
+                  e.preventDefault();
+                }
+              }}
+              error={Boolean(errors.username)}
+              helperText={errors.username || ''}
+              fullWidth
+            />
+
+            <TextField
+              id="email"
+              name="email"
+              label="Correo electrónico"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(errors.email)}
+              helperText={errors.email || ''}
+              fullWidth
+            />
+
+            <TextField
+              id="password"
+              name="password"
+              label="Contraseña"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(errors.password)}
+              helperText={
+                Array.isArray(errors.password) ? (
+                  <Box component="span">
+                    {errors.password.map((err, index) => (
+                      <Box key={index} component="span" sx={{ display: 'block' }}>
+                        {err}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  errors.password || ''
+                )
+              }
+              fullWidth
+            />
+
+            {!errors.password &&
+              touched.password &&
+              formData.password &&
+              validatePassword(formData.password).length === 0 && (
+                <Alert severity="success">
+                  La contrasena cumple con todos los requisitos de seguridad.
+                </Alert>
+              )}
+
+            <TextField
+              id="confirmPassword"
+              name="confirmPassword"
+              label="Confirmar contraseña"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(errors.confirmPassword)}
+              helperText={errors.confirmPassword || ''}
+              fullWidth
+            />
+
+            <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
+              {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
+            </Button>
+          </Stack>
+        </Box>
+
+        <Divider sx={{ my: 3 }}>O continúa con</Divider>
         <SocialLogin />
-      </div>
-    </div>
+      </Paper>
+    </Container>
   );
 };
 

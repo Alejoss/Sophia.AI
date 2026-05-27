@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, Box, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Avatar, Box, Typography, Paper, Alert, CircularProgress } from '@mui/material';
 import contentApi from '../api/contentApi';
 import { MEDIA_BASE_URL } from '../api/config';
 
@@ -46,13 +46,17 @@ const TopicsByUser = ({ userId, userName }) => {
 
   if (loading) {
     return (
-      <div className="text-center py-8">Cargando...</div>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress size={28} />
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <div className="text-red-500 text-center py-8">{error}</div>
+      <Alert severity="error" sx={{ mt: 2 }}>
+        {error}
+      </Alert>
     );
   }
 
@@ -75,17 +79,36 @@ const TopicsByUser = ({ userId, userName }) => {
         </Typography>
       </Box>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 3,
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: 'repeat(2, minmax(0, 1fr))',
+            xl: 'repeat(3, minmax(0, 1fr))',
+          },
+        }}
+      >
         {topics.map((topic) => {
           const imageUrl = getTopicImageUrl(topic);
           return (
-            <div 
+            <Paper
               key={topic.id}
-              className="block p-6 bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow min-h-[200px] cursor-pointer"
+              variant="outlined"
               onClick={() => navigate(`/content/topics/${topic.id}`)}
+              sx={{
+                p: 3,
+                minHeight: 200,
+                cursor: 'pointer',
+                transition: 'box-shadow 0.2s ease',
+                '&:hover': {
+                  boxShadow: 3,
+                },
+              }}
             >
               {/* Image and Title Section */}
-              <div className="flex items-start mb-4">
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2, gap: 2 }}>
                 <Avatar 
                   src={imageUrl || undefined}
                   alt={topic.title}
@@ -100,7 +123,7 @@ const TopicsByUser = ({ userId, userName }) => {
                   {topic.title.charAt(0).toUpperCase()}
                 </Avatar>
                 
-                <div className="flex-1 min-w-0">
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   {/* Title Section */}
                   <Typography
                     variant="h6"
@@ -120,19 +143,35 @@ const TopicsByUser = ({ userId, userName }) => {
 
                   {/* Description */}
                   {topic.description && (
-                    <p className="text-gray-600 mb-3 line-clamp-3">{topic.description}</p>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 1.5,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {topic.description}
+                    </Typography>
                   )}
-                </div>
-              </div>
+                </Box>
+              </Box>
 
               {/* Date */}
-              <div className="flex justify-between items-center text-sm text-gray-500">
-                <span>{topic.created_at ? new Date(topic.created_at).toLocaleDateString() : ''}</span>
-              </div>
-            </div>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="caption" color="text.secondary">
+                  {topic.created_at
+                    ? new Date(topic.created_at).toLocaleDateString()
+                    : ''}
+                </Typography>
+              </Box>
+            </Paper>
           );
         })}
-      </div>
+      </Box>
 
       {/* No Topics Message */}
       {topics.length === 0 && (

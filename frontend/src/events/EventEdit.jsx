@@ -1,7 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchEventById, updateEvent, deleteEvent } from '../api/eventsApi';
-import '../styles/events.css';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -36,7 +56,6 @@ const EventEdit = () => {
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [currentImage, setCurrentImage] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -71,7 +90,6 @@ const EventEdit = () => {
         });
 
         if (eventData.image) {
-          setCurrentImage(eventData.image);
           setImagePreview(eventData.image);
         }
       } catch (err) {
@@ -163,7 +181,6 @@ const EventEdit = () => {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setCurrentImage(null);
     setErrors(prev => ({ ...prev, image: '' }));
   };
 
@@ -238,243 +255,241 @@ const EventEdit = () => {
 
   if (fetchLoading) {
     return (
-      <div className="event-create-container">
-        <div className="text-center">
-          <h2>Editar Evento</h2>
-          <div className="loading-spinner">Cargando evento...</div>
-        </div>
-      </div>
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Stack spacing={1.5} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Editar Evento</Typography>
+          <Typography color="text.secondary">Cargando evento...</Typography>
+        </Stack>
+      </Container>
     );
   }
 
   if (error && !form.title) {
     return (
-      <div className="event-create-container">
-        <div className="text-center">
-          <h2>Editar Evento</h2>
-          <div className="error-message">{error}</div>
-          <button onClick={() => navigate('/events')} className="btn btn-primary">
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Editar Evento</Typography>
+          <Alert severity="error">{error}</Alert>
+          <Button onClick={() => navigate('/events')} variant="contained">
             Volver a Eventos
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="event-create-container">
-      <h2>Editar Evento</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Título: *</label>
-          <input 
-            name="title" 
-            value={form.title} 
-            onChange={handleChange} 
-            className={errors.title ? 'error' : ''}
-            placeholder="Ingrese el título del evento"
-          />
-          {errors.title && <span className="error-message">{errors.title}</span>}
-        </div>
-        
-        <div className="form-group">
-          <label>Descripción: *</label>
-          <textarea 
-            name="description" 
-            value={form.description} 
-            onChange={handleChange}
-            className={errors.description ? 'error' : ''}
-            placeholder="Describa su evento..."
-          />
-          {errors.description && <span className="error-message">{errors.description}</span>}
-        </div>
-        
-        <div className="form-group">
-          <label>Imagen del Evento:</label>
-          <div className="image-upload-container">
-            <input 
-              type="file" 
-              accept="image/*"
-              onChange={handleImageChange}
-              className="image-input"
-              id="event-image"
-            />
-            <label htmlFor="event-image" className="image-upload-label">
-              {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
-            </label>
-            {imagePreview && (
-              <div className="image-preview-container">
-                <img src={imagePreview} alt="Preview" className="image-preview" />
-                <button type="button" onClick={removeImage} className="remove-image-btn">
-                  Eliminar
-                </button>
-              </div>
-            )}
-          </div>
-          {errors.image && <span className="error-message">{errors.image}</span>}
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tipo de Evento: *</label>
-            <select 
-              name="event_type" 
-              value={form.event_type} 
-              onChange={handleChange}
-              className={errors.event_type ? 'error' : ''}
-            >
-              <option value="">Seleccionar tipo</option>
-              {EVENT_TYPES.map((et) => (
-                <option key={et.value} value={et.value}>{et.label}</option>
-              ))}
-            </select>
-            {errors.event_type && <span className="error-message">{errors.event_type}</span>}
-          </div>
-          
-          <div className="form-group">
-            <label>Plataforma: *</label>
-            <select 
-              name="platform" 
-              value={form.platform} 
-              onChange={handleChange}
-              className={errors.platform ? 'error' : ''}
-            >
-              <option value="">Seleccionar plataforma</option>
-              {PLATFORM_CHOICES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-            {errors.platform && <span className="error-message">{errors.platform}</span>}
-          </div>
-        </div>
-        
-        {form.platform === 'other' && (
-          <div className="form-group">
-            <label>Otra Plataforma: *</label>
-            <input 
-              name="other_platform" 
-              value={form.other_platform} 
-              onChange={handleChange}
-              className={errors.other_platform ? 'error' : ''}
-              placeholder="Ingrese el nombre de la plataforma"
-            />
-            {errors.other_platform && <span className="error-message">{errors.other_platform}</span>}
-          </div>
-        )}
-        
-        <div className="form-group">
-          <label>Precio de Referencia (USD):</label>
-          <input 
-            name="reference_price" 
-            type="text" 
-            value={form.reference_price} 
-            onChange={handleChange}
-            placeholder="0.00"
-          />
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label>Fecha/Hora de Inicio:</label>
-            <input 
-              name="date_start" 
-              type="datetime-local" 
-              value={form.date_start} 
-              onChange={handleChange} 
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>Fecha/Hora de Fin:</label>
-            <input 
-              name="date_end" 
-              type="datetime-local" 
-              value={form.date_end} 
-              onChange={handleChange}
-              className={errors.date_end ? 'error' : ''}
-            />
-            {errors.date_end && <span className="error-message">{errors.date_end}</span>}
-          </div>
-        </div>
-        
-        <div className="form-group">
-          <label>Descripción del Horario:</label>
-          <textarea 
-            name="schedule_description" 
-            value={form.schedule_description} 
-            onChange={handleChange}
-            placeholder="ej., Todos los martes durante 5 semanas"
-            rows="3"
-          />
-        </div>
-        
-        <div className="form-actions">
-          <button type="button" onClick={() => navigate(`/events/${eventId}`)} className="btn btn-secondary">
-            Cancelar
-          </button>
-          <button type="submit" disabled={loading}>
-            {loading ? 'Actualizando...' : 'Actualizar Evento'}
-          </button>
-        </div>
-      </form>
+    <Container maxWidth="md" sx={{ py: 3 }}>
+      <Typography variant="h4" sx={{ fontWeight: 600, mb: 2.5 }}>
+        Editar Evento
+      </Typography>
 
-      <div className="danger-zone">
-        <h3>Zona de peligro</h3>
-        <p>Si eliminas este evento se borrarán también todas las inscripciones y no podrás recuperarlos.</p>
-        <button
-          type="button"
-          className="btn btn-danger"
-          onClick={() => setDeleteDialogOpen(true)}
-        >
+      <Card variant="outlined">
+        <CardContent>
+          <Box component="form" onSubmit={handleSubmit}>
+            <Stack spacing={2.5}>
+              <TextField
+                name="title"
+                label="Título *"
+                value={form.title}
+                onChange={handleChange}
+                error={Boolean(errors.title)}
+                helperText={errors.title || ''}
+                placeholder="Ingrese el título del evento"
+                fullWidth
+              />
+
+              <TextField
+                name="description"
+                label="Descripción *"
+                value={form.description}
+                onChange={handleChange}
+                error={Boolean(errors.description)}
+                helperText={errors.description || ''}
+                placeholder="Describa su evento..."
+                multiline
+                minRows={3}
+                fullWidth
+              />
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Imagen del Evento
+                </Typography>
+                <Button component="label" variant="outlined">
+                  {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
+                  <input type="file" accept="image/*" hidden onChange={handleImageChange} />
+                </Button>
+                {imagePreview && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Box
+                      component="img"
+                      src={imagePreview}
+                      alt="Preview"
+                      sx={{ maxWidth: '100%', width: 280, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+                    />
+                    <Box sx={{ mt: 1 }}>
+                      <Button type="button" onClick={removeImage} color="error" size="small">
+                        Eliminar
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+                {errors.image && (
+                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                    {errors.image}
+                  </Typography>
+                )}
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth error={Boolean(errors.event_type)}>
+                    <InputLabel>Tipo de Evento *</InputLabel>
+                    <Select
+                      name="event_type"
+                      value={form.event_type}
+                      label="Tipo de Evento *"
+                      onChange={handleChange}
+                    >
+                      <MenuItem value="">Seleccionar tipo</MenuItem>
+                      {EVENT_TYPES.map((et) => (
+                        <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {errors.event_type && (
+                    <Typography variant="caption" color="error">{errors.event_type}</Typography>
+                  )}
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth error={Boolean(errors.platform)}>
+                    <InputLabel>Plataforma *</InputLabel>
+                    <Select
+                      name="platform"
+                      value={form.platform}
+                      label="Plataforma *"
+                      onChange={handleChange}
+                    >
+                      <MenuItem value="">Seleccionar plataforma</MenuItem>
+                      {PLATFORM_CHOICES.map((p) => (
+                        <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {errors.platform && (
+                    <Typography variant="caption" color="error">{errors.platform}</Typography>
+                  )}
+                </Grid>
+              </Grid>
+
+              {form.platform === 'other' && (
+                <TextField
+                  name="other_platform"
+                  label="Otra Plataforma *"
+                  value={form.other_platform}
+                  onChange={handleChange}
+                  error={Boolean(errors.other_platform)}
+                  helperText={errors.other_platform || ''}
+                  placeholder="Ingrese el nombre de la plataforma"
+                  fullWidth
+                />
+              )}
+
+              <TextField
+                name="reference_price"
+                label="Precio de Referencia (USD)"
+                type="number"
+                value={form.reference_price}
+                onChange={handleChange}
+                placeholder="0.00"
+                fullWidth
+              />
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    name="date_start"
+                    label="Fecha/Hora de Inicio"
+                    type="datetime-local"
+                    value={form.date_start}
+                    onChange={handleChange}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    name="date_end"
+                    label="Fecha/Hora de Fin"
+                    type="datetime-local"
+                    value={form.date_end}
+                    onChange={handleChange}
+                    error={Boolean(errors.date_end)}
+                    helperText={errors.date_end || ''}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </Grid>
+              </Grid>
+
+              <TextField
+                name="schedule_description"
+                label="Descripción del Horario"
+                value={form.schedule_description}
+                onChange={handleChange}
+                placeholder="ej., Todos los martes durante 5 semanas"
+                multiline
+                minRows={3}
+                fullWidth
+              />
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <Button type="button" onClick={() => navigate(`/events/${eventId}`)} variant="outlined" color="inherit">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={loading} variant="contained">
+                  {loading ? 'Actualizando...' : 'Actualizar Evento'}
+                </Button>
+              </Stack>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Paper variant="outlined" sx={{ mt: 2.5, p: 2.5, borderColor: 'error.light' }}>
+        <Typography variant="h6" color="error" sx={{ mb: 1 }}>
+          Zona de peligro
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Si eliminas este evento se borrarán también todas las inscripciones y no podrás recuperarlos.
+        </Typography>
+        <Button type="button" color="error" variant="outlined" onClick={() => setDeleteDialogOpen(true)}>
           Eliminar evento
-        </button>
-      </div>
+        </Button>
+      </Paper>
 
-      {deleteDialogOpen && (
-        <div className="modal-overlay" onClick={() => !isDeletingEvent && setDeleteDialogOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Eliminar evento</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => !isDeletingEvent && setDeleteDialogOpen(false)}
-                disabled={isDeletingEvent}
-                aria-label="Cerrar"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <p>
-                ¿Seguro que deseas eliminar <strong>{form.title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setDeleteDialogOpen(false)}
-                disabled={isDeletingEvent}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={handleDeleteEvent}
-                disabled={isDeletingEvent}
-              >
-                {isDeletingEvent ? 'Eliminando...' : 'Eliminar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={deleteDialogOpen} onClose={() => !isDeletingEvent && setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Eliminar evento</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            ¿Seguro que deseas eliminar <strong>{form.title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingEvent}>
+            Cancelar
+          </Button>
+          <Button onClick={handleDeleteEvent} disabled={isDeletingEvent} color="error" variant="contained">
+            {isDeletingEvent ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      {success && <div className="success-message">{success}</div>}
-      {error && <div className="error-message">{error}</div>}
-    </div>
+      {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+    </Container>
   );
 };
 

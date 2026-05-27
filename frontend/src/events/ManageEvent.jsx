@@ -10,9 +10,19 @@ import {
   TextField,
   Button,
   Alert,
-  Snackbar
+  Snackbar,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
 } from '@mui/material';
-import '../styles/events.css';
 
 const ManageEvent = () => {
   const { eventId } = useParams();
@@ -238,187 +248,177 @@ const ManageEvent = () => {
 
   if (loading) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Gestionar Evento</h2>
-          <div className="loading-spinner">Cargando datos del evento...</div>
-        </div>
-      </div>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={1.5} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
+          <CircularProgress size={28} />
+          <Typography variant="body2" color="text.secondary">Cargando datos del evento...</Typography>
+        </Stack>
+      </Container>
     );
   }
 
-  if (error) {
+  if (error && !event) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Gestionar Evento</h2>
-          <div className="error-message">{error}</div>
-          <Link to="/events" className="btn btn-primary">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
+          <Alert severity="error">{error}</Alert>
+          <Button component={Link} to="/events" variant="contained">
             Volver a Eventos
-          </Link>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   if (!event) {
     return (
-      <div className="events-list-container">
-        <div className="text-center">
-          <h2>Gestionar Evento</h2>
-          <p>Evento no encontrado.</p>
-          <Link to="/events" className="btn btn-primary">
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
+          <Alert severity="warning">Evento no encontrado.</Alert>
+          <Button component={Link} to="/events" variant="contained">
             Volver a Eventos
-          </Link>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Container>
     );
   }
 
   return (
-    <div className="events-list-container">
-      <div className="events-header">
-        <h2>Gestionar Evento: {event.title}</h2>
-        <div className="events-header-actions">
-          <Link to={`/events/${eventId}`} className="btn btn-secondary">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          Gestionar Evento: {event.title}
+        </Typography>
+        <Stack direction="row" spacing={1.2} sx={{ flexWrap: 'wrap' }}>
+          <Button component={Link} to={`/events/${eventId}`} variant="outlined" color="inherit">
             Ver Evento
-          </Link>
-          <Link to={`/events/${eventId}/edit`} className="btn btn-primary">
+          </Button>
+          <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">
             Editar Evento
-          </Link>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Box>
 
       {/* Event Summary */}
-      <div className="event-summary-card">
-        <div className="event-summary-header">
-          <h3>Resumen del Evento</h3>
-        </div>
-        <div className="event-summary-content">
-          <div className="summary-grid">
-            <div className="summary-item">
-              <strong>Tipo de Evento:</strong>
-              <span>{event.event_type}</span>
-            </div>
-            <div className="summary-item">
-              <strong>Fecha de Inicio:</strong>
-              <span>{formatDate(event.date_start)}</span>
-            </div>
-            <div className="summary-item">
-              <strong>Fecha de Fin:</strong>
-              <span>{formatDate(event.date_end)}</span>
-            </div>
-            <div className="summary-item">
-              <strong>Plataforma:</strong>
-              <span>{event.platform || 'No especificado'}</span>
-            </div>
-            <div className="summary-item">
-              <strong>Precio:</strong>
-              <span>{event.reference_price > 0 ? `$${event.reference_price}` : 'Gratis'}</span>
-            </div>
-            <div className="summary-item">
-              <strong>Participantes:</strong>
-              <span>{participants.length}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 1.5 }}>
+            Resumen del Evento
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 1.2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
+            <Typography variant="body2"><strong>Tipo de Evento:</strong> {event.event_type}</Typography>
+            <Typography variant="body2"><strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}</Typography>
+            <Typography variant="body2"><strong>Fecha de Fin:</strong> {formatDate(event.date_end)}</Typography>
+            <Typography variant="body2"><strong>Plataforma:</strong> {event.platform || 'No especificado'}</Typography>
+            <Typography variant="body2"><strong>Precio:</strong> {event.reference_price > 0 ? `$${event.reference_price}` : 'Gratis'}</Typography>
+            <Typography variant="body2"><strong>Participantes:</strong> {participants.length}</Typography>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Tab Navigation */}
-      <div className="events-tabs">
-        <button 
-          className={`tab-button ${activeTab === 'participants' ? 'active' : ''}`}
-          onClick={() => setActiveTab('participants')}
-        >
-          Participantes ({participants.length})
-        </button>
-      </div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)}>
+          <Tab value="participants" label={`Participantes (${participants.length})`} />
+        </Tabs>
+      </Box>
 
       {/* Tab Content */}
-      <div className="tab-content">
+      <Box>
         {activeTab === 'participants' && (
-          <div>
+          <Box>
             {participants.length === 0 ? (
-              <div className="text-center">
-                <p>Aún no hay participantes registrados.</p>
-              </div>
+              <Alert severity="info">Aún no hay participantes registrados.</Alert>
             ) : (
-              <div className="participants-list">
+              <Stack spacing={1.5}>
                 {participants.map((registration) => (
-                  <div key={registration.id} className="participant-item">
-                    <div className="participant-info">
-                      <div className="participant-main">
-                        <strong>{registration.user.username}</strong>
-                        <span className="participant-email">{registration.user_email}</span>
-                      </div>
-                      <div className="participant-status">
-                        <span className={`registration-badge ${registration.registration_status.toLowerCase()}`}>
-                          {getRegistrationStatusLabel(registration.registration_status)}
-                        </span>
-                        <span className={`payment-badge ${registration.payment_status.toLowerCase()}`}>
-                          {getPaymentStatusLabel(registration.payment_status)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="participant-actions">
-                      <div className="participant-date">
-                        Registrado: {formatDate(registration.registered_at)}
-                      </div>
-                      <div className="participant-buttons">
-                        <button 
-                          className="btn btn-primary message-btn"
+                  <Paper key={registration.id} variant="outlined" sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {registration.user.username}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {registration.user_email}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Registrado: {formatDate(registration.registered_at)}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={0.8} sx={{ alignSelf: 'flex-start' }}>
+                        <Chip size="small" variant="outlined" color="primary" label={getRegistrationStatusLabel(registration.registration_status)} />
+                        <Chip size="small" variant="outlined" color="success" label={getPaymentStatusLabel(registration.payment_status)} />
+                      </Stack>
+                    </Box>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          size="small"
                           onClick={() => handleMessageUser(registration.user.id)}
                         >
                           Enviar Mensaje
-                        </button>
+                        </Button>
                         
                         {/* Only show actions for registered participants */}
                         {registration.registration_status === 'REGISTERED' && (
                           <>
                             {/* Accept Payment - only for paid events with pending payment */}
                             {event.reference_price > 0 && registration.payment_status === 'PENDING' && (
-                              <button 
-                                className="btn btn-success action-btn"
+                              <Button
+                                variant="contained"
+                                color="success"
+                                size="small"
                                 onClick={() => openPaymentConfirmationDialog(registration)}
                                 disabled={updatingStatus === registration.id}
                               >
                                 {updatingStatus === registration.id ? 'Actualizando...' : 'Aceptar Pago'}
-                              </button>
+                              </Button>
                             )}
                             
                             {/* Send Certificate - after event end date and payment accepted (or free event) */}
                             {canSendCertificate(registration) && (
-                              <button 
-                                className={`btn ${hasCertificate(registration) ? 'btn-secondary' : 'btn-info'} action-btn`}
+                              <Button
+                                variant={hasCertificate(registration) ? 'outlined' : 'contained'}
+                                color={hasCertificate(registration) ? 'inherit' : 'primary'}
+                                size="small"
                                 onClick={() => hasCertificate(registration) ? null : openCertificateDialog(registration)}
                                 disabled={updatingStatus === registration.id || hasCertificate(registration)}
                               >
                                 {updatingStatus === registration.id ? 'Enviando...' : 
                                  hasCertificate(registration) ? 'Certificado Enviado' : 'Enviar Certificado'}
-                              </button>
+                              </Button>
                             )}
                             
                             {/* Cancel Registration - only show if event hasn't ended */}
                             {!hasEventEnded() && (
-                              <button 
-                                className="btn btn-danger action-btn"
+                              <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
                                 onClick={() => handleStatusUpdate(registration.id, 'cancel_registration')}
                                 disabled={updatingStatus === registration.id}
                               >
                                 {updatingStatus === registration.id ? 'Cancelando...' : 'Cancelar Registro'}
-                              </button>
+                              </Button>
                             )}
                           </>
                         )}
-                      </div>
-                    </div>
-                  </div>
+                    </Stack>
+                  </Paper>
                 ))}
-              </div>
+              </Stack>
             )}
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       {/* Certificate Generation Dialog */}
       <Dialog 
@@ -429,8 +429,8 @@ const ManageEvent = () => {
       >
         <DialogTitle>Enviar Certificado</DialogTitle>
         <DialogContent>
-          <div style={{ marginTop: '16px' }}>
-            <Alert severity="info" style={{ marginBottom: '16px' }}>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mb: 2 }}>
               <strong>Nota:</strong> Cualquier mensaje que agregue a continuación será visible para el estudiante en su certificado.
             </Alert>
             <TextField
@@ -443,7 +443,7 @@ const ManageEvent = () => {
               onChange={(e) => setCertificateNote(e.target.value)}
               variant="outlined"
             />
-          </div>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertificateDialogOpen(false)}>
@@ -468,20 +468,20 @@ const ManageEvent = () => {
       >
         <DialogTitle>Confirmar Aceptación de Pago</DialogTitle>
         <DialogContent>
-          <div style={{ marginTop: '16px' }}>
-            <Alert severity="warning" style={{ marginBottom: '16px' }}>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
               <strong>Importante:</strong> Esta acción marcará el pago como aceptado y no se puede deshacer.
             </Alert>
             {selectedPaymentRegistration && (
-              <div style={{ marginBottom: '16px' }}>
-                <p><strong>Usuario:</strong> {selectedPaymentRegistration.user.username}</p>
-                <p><strong>Correo:</strong> {selectedPaymentRegistration.user_email}</p>
-                <p><strong>Evento:</strong> {event.title}</p>
-                <p><strong>Cantidad:</strong> ${event.reference_price}</p>
-              </div>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2"><strong>Usuario:</strong> {selectedPaymentRegistration.user.username}</Typography>
+                <Typography variant="body2"><strong>Correo:</strong> {selectedPaymentRegistration.user_email}</Typography>
+                <Typography variant="body2"><strong>Evento:</strong> {event.title}</Typography>
+                <Typography variant="body2"><strong>Cantidad:</strong> ${event.reference_price}</Typography>
+              </Box>
             )}
-            <p>¿Está seguro de que desea aceptar este pago?</p>
-          </div>
+            <Typography variant="body2">¿Está seguro de que desea aceptar este pago?</Typography>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPaymentConfirmationDialog(false)}>
@@ -508,7 +508,7 @@ const ManageEvent = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </div>
+    </Container>
   );
 };
 

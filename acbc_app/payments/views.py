@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import status
@@ -118,14 +119,23 @@ class NOWPaymentsIPNView(APIView):
 
     def post(self, request):
         try:
-            body = request.data if hasattr(request, 'data') and request.data else json.loads(request.body)
-        except (json.JSONDecodeError, TypeError):
+            raw = request.body.decode('utf-8') if request.body else ''
+            body = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
             return Response({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
 
         signature = request.headers.get('x-nowpayments-sig', '')
         client = NOWPaymentsClient()
 
-        if client.ipn_secret and not client.verify_ipn_signature(body, signature):
+        if getattr(settings, 'ENVIRONMENT', '') == 'PRODUCTION' and not client.ipn_secret:
+            logger.error('NOWPayments IPN rejected: IPN secret not configured in production')
+            return Response({'error': 'IPN not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        if not client.ipn_secret:
+            logger.warning('NOWPayments IPN accepted without signature verification (dev only)')
+        elif not signature:
+            return Response({'error': 'Missing signature'}, status=status.HTTP_403_FORBIDDEN)
+        elif not client.verify_ipn_signature(body, signature):
             logger.warning('NOWPayments IPN signature mismatch for order %s', body.get('order_id'))
             return Response({'error': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
