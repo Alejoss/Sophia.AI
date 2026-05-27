@@ -446,16 +446,7 @@ const ContentDisplay = ({
               width: "100%",
               maxWidth: "800px",
               mx: "auto",
-              cursor: isClickable ? "pointer" : "default",
-              "&:hover": isClickable
-                ? {
-                    boxShadow: 2,
-                    borderRadius: 0.5,
-                  }
-                : {},
             }}
-            onClick={isClickable ? handleContentClick : undefined}
-            title={isClickable ? "Haz clic para abrir el video en una nueva pestaña" : undefined}
           >
             <video controls style={{ width: "100%" }} src={fileUrl}>
               Tu navegador no admite la etiqueta de video.
@@ -522,16 +513,7 @@ const ContentDisplay = ({
               width: "100%",
               maxWidth: "600px",
               mx: "auto",
-              cursor: isClickable ? "pointer" : "default",
-              "&:hover": isClickable
-                ? {
-                    boxShadow: 2,
-                    borderRadius: 0.5,
-                  }
-                : {},
             }}
-            onClick={isClickable ? handleContentClick : undefined}
-            title={isClickable ? "Haz clic para abrir el audio en una nueva pestaña" : undefined}
           >
             <audio controls style={{ width: "100%" }} src={fileUrl}>
               Tu navegador no admite la etiqueta de audio.
