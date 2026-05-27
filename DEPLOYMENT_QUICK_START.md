@@ -28,18 +28,30 @@
    **First-time on this server?** Run once so `git pull` is not blocked by script permissions:
    (The server should not have local commits; this makes Git ignore executable-bit changes from `chmod +x`.)
    **If `./scripts/deploy.sh` says "Permission denied" after a pull:** Git stores scripts as non-executable (100644), so each pull resets permissions. Either run `chmod +x scripts/deploy.sh scripts/setup-nginx.sh acbc_app/entrypoint.sh` after each pull, or fix it once in the repo (see [Scripts README](scripts/README.md#fix-permissions-permanently-in-the-repo)).
-2. **Build and deploy (recommended):**
+2. **Pull prebuilt images and deploy (recommended):**
   ```bash
    cd /opt/acbc-app
    git pull origin main
    ./scripts/deploy.sh
   ```
-   The script reads DB credentials from `acbc_app/.env`, frees port 80 if host nginx/apache is using it, then builds and starts the stack.
-   It now uses Docker build cache by default (faster) and runs in non-interactive mode (no "press Enter" prompt).
+   The script reads DB credentials from `acbc_app/.env`, detects `GHCR_IMAGE_PREFIX` from the GitHub remote, pulls prebuilt images from GHCR, frees port 80 if host nginx/apache is using it, then starts the stack.
+   It runs in non-interactive mode (no "press Enter" prompt).
+   If GHCR images are private, log in on the server once with a token that has `read:packages`:
+  ```bash
+   echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+  ```
    **Fast path for lighter changes (less downtime):**
-   This runs deployment with `--skip-down` and cached build.
-   **Clean rebuild only when needed (slow):**
-   **Or build and run manually** (from **project root** only, e.g. `cd /opt/acbc-app` then):
+   This runs deployment with `--skip-down` and still pulls prebuilt GHCR images.
+  ```bash
+   ./scripts/deploy-light.sh
+  ```
+   **Manual/local build only when needed (slow):**
+   Use this when you intentionally want the server to build instead of pulling from GHCR:
+  ```bash
+   ./scripts/deploy.sh --build-local
+   ./scripts/deploy.sh --build-local --no-cache   # clean rebuild
+  ```
+   See [Deploy con imágenes preconstruidas en GHCR](docs/deployment/ghcr-image-deploy.md) for the full image/tag and manual build workflow.
 3. **Point a custom domain (Namecheap + app config):**
   See [Custom domain (Namecheap + Digital Ocean)](#custom-domain-namecheap--digital-ocean) below.
 4. **Set up SSL (after DNS is configured):**
@@ -147,8 +159,11 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml down
 # Backup database
 ./scripts/backup-db.sh
 
-# Update application
-git pull && ./scripts/deploy.sh
+# Update application by pulling prebuilt GHCR images
+git pull origin main && ./scripts/deploy.sh
+
+# Intentional server-side rebuild, only when needed
+./scripts/deploy.sh --build-local
 ```
 
 ### Health Checks
@@ -169,12 +184,13 @@ git pull && ./scripts/deploy.sh
 ### Important Files
 
 - Production compose: `docker-compose.prod.yml`
+- Manual build override: `docker-compose.build.yml` (only used by `./scripts/deploy.sh --build-local`)
 - Backend env: `acbc_app/.env` (main configuration)
-- Root `.env`: Optional (e.g. for `VITE_`*); deploy script uses `acbc_app/.env` and creates `.env.compose` for Docker Compose substitution
+- Root `.env`: Optional (e.g. `IMAGE_TAG`, `GHCR_IMAGE_PREFIX`, or `VITE_`* for manual local builds); deploy script uses `acbc_app/.env` and creates `.env.compose` for Docker Compose substitution
 - Frontend env: `frontend/.env`
 - Nginx config: `nginx/nginx.conf` (HTTP); after SSL, deploy uses `nginx/nginx-ssl.conf` (generated, gitignored)
 
-**Note**: `./scripts/deploy.sh` builds `.env.compose` from `acbc_app/.env` (DB_NAME, DB_USER, DB_PASSWORD) so you only maintain `acbc_app/.env`. It also stops host nginx/apache if port 80 is in use so the container nginx can bind.
+**Note**: `./scripts/deploy.sh` builds `.env.compose` from `acbc_app/.env` (DB_NAME, DB_USER, DB_PASSWORD) and image metadata (`GHCR_IMAGE_PREFIX`, `IMAGE_TAG`). It also stops host nginx/apache if port 80 is in use so the container nginx can bind.
 
 ### Troubleshooting
 

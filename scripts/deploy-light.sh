@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Lightweight deployment for small/regular updates.
-# Uses build cache and avoids full shutdown to reduce deploy time.
+# Pulls prebuilt GHCR images and avoids full shutdown to reduce deploy time.
 
 set -e
 
@@ -10,7 +10,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "⚡ Starting lightweight deployment..."
-echo "This mode uses Docker build cache and skips full 'down'."
-echo "For a clean rebuild, use: ./scripts/deploy.sh --no-cache"
+echo "This mode pulls prebuilt GHCR images and skips full 'down'."
+echo "For an intentional local rebuild, use: ./scripts/deploy.sh --build-local"
 
 "$SCRIPT_DIR/deploy.sh" --skip-down "$@"

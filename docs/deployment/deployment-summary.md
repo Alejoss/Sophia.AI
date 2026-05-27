@@ -50,7 +50,7 @@ DB_HOST=postgres
 DB_PORT=5432
 ```
 
-### Frontend (root `.env`) - CRÍTICAS
+### Frontend (GitHub Actions variables) - CRÍTICAS
 
 ```bash
 VITE_API_URL=http://<tu-ip>/api
@@ -96,15 +96,12 @@ git config --global core.fileMode false
 
 # 2. Configurar .env
 nano acbc_app/.env   # Backend (ver environment-variables.md)
-nano .env            # Frontend: VITE_API_URL, VITE_GOOGLE_OAUTH_CLIENT_ID
+nano .env            # Opcional: IMAGE_TAG/GHCR_IMAGE_PREFIX; VITE_* solo si harás --build-local
 
-# 3. Construir y levantar (producción)
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
+# 3. Pull de imágenes GHCR y levantar (producción)
+./scripts/deploy.sh
 
-# 4. Migraciones y setup
-docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
-docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+# 4. Crear superusuario si hace falta
 docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 
 # 5. Nginx: si usas Nginx en host (no el contenedor)
@@ -112,15 +109,14 @@ sudo bash scripts/setup-nginx.sh
 ```
 
 **Nota**: En producción se usa **`docker-compose.prod.yml`** (incl. Nginx contenedor). No uses `docker-compose.override.yml` en el servidor.
+El deploy normal usa imágenes preconstruidas de GHCR. Para un build manual/local usa `./scripts/deploy.sh --build-local` (ver [Deploy con imágenes preconstruidas en GHCR](ghcr-image-deploy.md)).
 
 ### Actualizaciones (en el servidor)
 
 ```bash
 cd /opt/acbc-app   # o tu DEPLOY_PATH
 git pull origin main
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
-docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+./scripts/deploy.sh
 ```
 
 ## 🔍 Verificaciones

@@ -3,7 +3,8 @@
 ## Overview
 
 - **Tests**: On every push to `main` and on PRs. PostgreSQL service, Django tests, coverage, `manage.py check --deploy`.
-- **Deploy**: Only on push to `main`, after tests pass. SSH to server, pull, build, up, migrate, collectstatic, health checks.
+- **Images**: Only on push to `main` or manual dispatch, after tests pass. Build backend/frontend/nginx images and publish them to GHCR.
+- **Deploy**: Server deploys pull prebuilt GHCR images, run `up`, migrate, collectstatic, health checks.
 
 ## GitHub Actions ([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))
 
@@ -14,25 +15,32 @@
 - `pip install -r acbc_app/requirements.txt`; `manage.py migrate`; `manage.py test`; `coverage`; `manage.py check --deploy`.
 - Runs from repo root; Django via `acbc_app/`.
 
-### Deploy job
+### Publish images job
 
-- **Secrets**: `HOST`, `USERNAME`, `SSH_PRIVATE_KEY`, `PORT` (optional). Optionally `DEPLOY_PATH` (default `~/Sophia.AI`).
-- **Steps** (on server):
-  1. `cd $DEPLOY_PATH` (or `~/Sophia.AI`).
-  2. `git pull`.
-  3. `docker compose -f docker-compose.prod.yml build --no-cache` and `up -d --force-recreate`.
-  4. `docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput`.
-  5. `docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput`.
-  6. Health check: `curl -sf http://localhost/health/` (backend). Optional: `curl http://localhost/health`.
-  7. If host nginx is present: `nginx -t` and `nginx -s reload`.
+- Uses `GITHUB_TOKEN` with `packages: write` to publish to `ghcr.io`.
+- Image prefix: `ghcr.io/<owner>/<repo>`.
+- Images:
+  - `ghcr.io/<owner>/<repo>-backend:main`
+  - `ghcr.io/<owner>/<repo>-frontend:main`
+  - `ghcr.io/<owner>/<repo>-nginx:main`
+- Also publishes `sha-<commit-sha>` tags.
+- Frontend build args come from GitHub Repository variables:
+  - `VITE_API_URL`
+  - `VITE_GOOGLE_OAUTH_CLIENT_ID`
 
 Secrets are not printed in logs.
 
 ## Scripts
 
-- **deploy.sh**: Uses `docker-compose -f docker-compose.prod.yml`, validations, migrate, collectstatic, health checks. For manual production deploys.
+- **deploy.sh**: Uses `docker-compose.prod.yml`, pulls GHCR images by default, validates config, runs migrate/collectstatic, health checks. For manual server-side builds, run `./scripts/deploy.sh --build-local`.
 - **backup-db.sh** / **restore-db.sh**: Use same project root and `docker-compose.prod.yml`; same `DB_NAME`/`DB_USER` as production.
 
 ## Deployment path
 
-- CI deploy uses `secrets.DEPLOY_PATH` if set, otherwise `~/Sophia.AI`. Document your actual path (e.g. `/opt/acbc-app` or `~/Sophia.AI`) and set `DEPLOY_PATH` in GitHub secrets if it differs.
+On the server, use the actual project path (for example `/opt/acbc-app`):
+
+```bash
+cd /opt/acbc-app
+git pull origin main
+./scripts/deploy.sh
+```
