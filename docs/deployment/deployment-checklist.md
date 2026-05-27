@@ -74,12 +74,14 @@ AWS_ACCESS_KEY_ID=<opcional>
 AWS_SECRET_ACCESS_KEY=<opcional>
 ```
 
-### Variables de Entorno (Frontend - root `.env`)
+### Variables de Entorno (Frontend - GitHub Actions)
 
 ```bash
 VITE_API_URL=http://<tu-ip>/api  # O https://<tu-dominio>/api si tienes SSL
 VITE_GOOGLE_OAUTH_CLIENT_ID=<tu-client-id>
 ```
+
+Configúralas como **Repository variables** en GitHub para que el workflow publique la imagen frontend en GHCR. Solo necesitas ponerlas en el root `.env` del servidor si vas a ejecutar `./scripts/deploy.sh --build-local`.
 
 ## 🔧 Pasos de Deployment
 
@@ -115,21 +117,25 @@ cd /opt/acbc-app
 sudo nano acbc_app/.env
 # Agregar todas las variables críticas
 
-# Frontend .env (en root del proyecto)
+# Root .env opcional
 sudo nano .env
-# Agregar VITE_API_URL y VITE_GOOGLE_OAUTH_CLIENT_ID
+# Agregar IMAGE_TAG/GHCR_IMAGE_PREFIX si quieres fijarlos.
+# Agregar VITE_API_URL y VITE_GOOGLE_OAUTH_CLIENT_ID solo para --build-local.
 ```
 
-### 3. Construir y Levantar Contenedores
+### 3. Pull de Imágenes GHCR y Levantar Contenedores
 
-**Producción**: Usa `docker-compose.prod.yml`. **Local**: Usa `docker-compose.yml` (opcionalmente `docker-compose.override.yml`).
+**Producción**: Usa `docker-compose.prod.yml` con imágenes preconstruidas en GHCR. **Local**: Usa `docker-compose.yml` (opcionalmente `docker-compose.override.yml`).
 
 ```bash
 cd /opt/acbc-app   # o ~/Sophia.AI, según tu DEPLOY_PATH
 
-# Producción: construir y levantar
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
+# Producción: pull GHCR + up + migraciones + collectstatic + health checks
+./scripts/deploy.sh
+
+# Build manual/local en el servidor solo cuando sea necesario
+./scripts/deploy.sh --build-local
+./scripts/deploy.sh --build-local --no-cache
 
 # Verificar que están corriendo
 docker compose -f docker-compose.prod.yml ps
@@ -241,13 +247,11 @@ cd /opt/acbc-app   # o tu DEPLOY_PATH
 
 git pull origin main
 
-# Reconstruir si hay cambios en Dockerfiles o requirements
-docker compose -f docker-compose.prod.yml build --no-cache
-docker compose -f docker-compose.prod.yml up -d --force-recreate
+# Deploy normal: pull de imágenes GHCR + up + migraciones + collectstatic
+./scripts/deploy.sh
 
-# Migraciones y static
-docker compose -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
-docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+# Reconstrucción local limpia solo si necesitas construir en el servidor
+./scripts/deploy.sh --build-local --no-cache
 ```
 
 ### Backups

@@ -70,17 +70,21 @@ VITE_API_URL=http://159.65.69.165/api
 
 **Nota:** Usa la IP de tu servidor o tu dominio si lo tienes.
 
-### 4. Reconstruir Frontend
+### 4. Publicar/Desplegar Frontend
 
-**Importante:** Solo necesitas reconstruir el frontend porque cambiaste `VITE_API_URL`. El backend NO necesita reiniciarse.
+**Importante:** `VITE_API_URL` se inyecta en tiempo de build. En deploy normal, actualiza la GitHub Repository variable `VITE_API_URL`, espera a que GitHub Actions publique la nueva imagen frontend en GHCR y despliega:
 
 ```bash
 cd /opt/acbc-app
-docker compose build frontend
-docker compose up -d frontend
+git pull origin main
+./scripts/deploy.sh
 ```
 
-**¿Por qué reconstruir el frontend?** Porque `VITE_API_URL` se inyecta en tiempo de build. Al cambiar la URL, necesitas reconstruir la imagen para que el cambio se refleje.
+Si necesitas construir en el servidor de forma manual/local:
+
+```bash
+./scripts/deploy.sh --build-local
+```
 
 ### 5. Verificar
 
@@ -178,15 +182,15 @@ sudo tail -f /var/log/nginx/error.log
 
 ### Frontend no puede conectar con backend
 
-- Verifica que `VITE_API_URL` esté actualizado en `.env`
-- Reconstruye el frontend: `docker compose build frontend`
+- Verifica que `VITE_API_URL` esté actualizado en GitHub Repository variables (deploy normal) o en `.env` (solo `--build-local`)
+- Despliega la nueva imagen GHCR: `./scripts/deploy.sh`
 - Verifica que la URL sea accesible: `curl http://159.65.69.165/api/health/`
 
 ## Próximos Pasos
 
 1. ✅ Configurar Nginx (completado)
-2. 🔄 Actualizar `VITE_API_URL` en `.env`
-3. 🔄 Reconstruir frontend
+2. 🔄 Actualizar `VITE_API_URL` en GitHub Repository variables
+3. 🔄 Publicar imagen GHCR y desplegar con `./scripts/deploy.sh`
 4. 🔄 Cerrar puerto 8000 del firewall
 5. ⏭️ (Opcional) Configurar dominio y SSL
 

@@ -217,10 +217,14 @@ ALLOWED_HOSTS=tudominio.com,www.tudominio.com,159.65.69.165
 ```
 
 ```bash
-# Reconstruir frontend con nueva URL
+# Publicar/desplegar frontend con nueva URL
 cd /opt/acbc-app
-docker compose build frontend
-docker compose up -d frontend
+# Deploy normal: actualiza VITE_API_URL en GitHub Repository variables,
+# espera la imagen GHCR y despliega:
+./scripts/deploy.sh
+
+# Build manual/local si necesitas construir en el servidor:
+# ./scripts/deploy.sh --build-local
 
 # Reiniciar backend para cargar nuevos ALLOWED_HOSTS
 docker compose restart backend
@@ -345,4 +349,4 @@ tail -f /var/log/nginx/error.log
 3. Instalar y configurar Nginx
 4. Configurar SSL con Let's Encrypt
 5. Actualizar variables de entorno
-6. Reconstruir frontend con nueva URL
+6. Publicar imagen frontend GHCR y desplegar con nueva URL

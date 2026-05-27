@@ -1,8 +1,6 @@
 services:
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-nginx:${IMAGE_TAG:-main}
     container_name: acbc_nginx_prod
     ports:
       - "80:80"
@@ -26,9 +24,7 @@ services:
           memory: 64M
 
   backend:
-    build:
-      context: ./acbc_app
-      dockerfile: backend.Dockerfile
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG:-main}
     container_name: acbc_backend_prod
     # No volume mounts in production - code is baked into image
     volumes:
@@ -63,12 +59,7 @@ services:
       start_period: 40s
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: frontend.prod.Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-}
-        VITE_GOOGLE_OAUTH_CLIENT_ID: ${VITE_GOOGLE_OAUTH_CLIENT_ID:-}
+    image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG:-main}
     container_name: acbc_frontend_prod
     # No volume mounts in production - static files are baked into image
     # Don't expose port directly - accessed via nginx

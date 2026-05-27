@@ -41,7 +41,7 @@ cd /opt/acbc-app
 Uses `--env-file .env.compose` if present (same as deploy).
 
 ### `deploy.sh`
-Main deployment script that builds and deploys the application.
+Main production deployment script. By default it pulls prebuilt images from GHCR and deploys them.
 
 **Usage:**
 ```bash
@@ -51,27 +51,40 @@ chmod +x scripts/deploy.sh
 
 **Common options:**
 ```bash
-# Fast default (uses build cache)
+# Default: pull prebuilt GHCR images
 ./scripts/deploy.sh
 
-# Clean rebuild (slower)
-./scripts/deploy.sh --no-cache
+# Intentional server-side build instead of GHCR pull
+./scripts/deploy.sh --build-local
+
+# Clean local rebuild (slower)
+./scripts/deploy.sh --build-local --no-cache
 
 # Skip full stop/start (lighter deploy)
 ./scripts/deploy.sh --skip-down
 
-# Skip image build
-./scripts/deploy.sh --skip-build
+# Skip GHCR pull and use already-present local images
+./scripts/deploy.sh --skip-pull
 ```
 
 **What it does:**
 - Validates environment configuration
 - Stops existing containers
-- Builds Docker images
+- Pulls prebuilt GHCR images, unless `--build-local` is used
 - Starts services
 - Runs database migrations
 - Collects static files
 - Performs health checks
+
+Image names use:
+
+```text
+${GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG:-main}
+${GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG:-main}
+${GHCR_IMAGE_PREFIX}-nginx:${IMAGE_TAG:-main}
+```
+
+`GHCR_IMAGE_PREFIX` is detected from the GitHub remote, or can be set in the shell/root `.env`.
 
 ### `deploy-light.sh`
 Lightweight wrapper for faster deploys with less downtime.
@@ -84,7 +97,7 @@ chmod +x scripts/deploy-light.sh
 
 **What it does:**
 - Runs `deploy.sh --skip-down`
-- Uses Docker build cache (default behavior of `deploy.sh`)
+- Pulls prebuilt GHCR images
 - Keeps migrations, collectstatic, and health checks
 
 ### `setup-ssl.sh`
