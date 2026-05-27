@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Production Deployment Script for Digital Ocean
-# This script builds and deploys the application to production
+# This script pulls prebuilt GHCR images and deploys the application to production.
 
 set -e  # Exit on any error
 

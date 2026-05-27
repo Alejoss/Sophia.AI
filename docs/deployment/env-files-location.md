@@ -5,7 +5,7 @@
 Necesitas **2 ubicaciones** para las variables de entorno:
 
 1. **`/opt/acbc-app/acbc_app/.env`** - Variables del backend
-2. **Variables VITE_*** - Para el frontend (build time)
+2. **Variables VITE_*** - Para el frontend (build time en GitHub Actions; root `.env` solo para build manual/local)
 
 ---
 
@@ -58,9 +58,20 @@ cat acbc_app/.env
 
 ## 2. Frontend: Variables VITE_* (Build Time)
 
-El frontend necesita variables `VITE_*` **en tiempo de build**. Tienes 2 opciones:
+El frontend necesita variables `VITE_*` **en tiempo de build**.
 
-### Opción A: Archivo `.env` en la raíz (RECOMENDADO)
+### Deploy normal: GitHub Actions (RECOMENDADO)
+
+Configura estas **Repository variables** en GitHub:
+
+```env
+VITE_API_URL=https://tu-dominio.com/api
+VITE_GOOGLE_OAUTH_CLIENT_ID=tu-google-oauth-client-id.apps.googleusercontent.com
+```
+
+GitHub Actions las usa para publicar la imagen frontend en GHCR. El servidor no necesita estas variables para el deploy normal.
+
+### Build manual/local: Archivo `.env` en la raíz
 
 **Ubicación:** `/opt/acbc-app/.env` (en la raíz, junto a `docker-compose.yml`)
 
@@ -72,9 +83,8 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=tu-google-oauth-client-id.apps.googleusercontent.com
 ```
 
 **Ventajas:**
-- Todo en un lugar
-- Docker Compose las lee automáticamente
-- Fácil de mantener
+- Útil cuando ejecutas `./scripts/deploy.sh --build-local`
+- Docker Compose las lee durante el build manual
 
 **Verificar:**
 ```bash
@@ -83,14 +93,14 @@ ls -la .env
 cat .env
 ```
 
-### Opción B: Variables de entorno del sistema
+### Build manual/local: Variables de entorno del sistema
 
-**Antes de hacer `docker compose build`:**
+**Antes de hacer `./scripts/deploy.sh --build-local`:**
 
 ```bash
 export VITE_API_URL=http://159.65.69.165:8000/api
 export VITE_GOOGLE_OAUTH_CLIENT_ID=tu-client-id
-docker compose build frontend
+./scripts/deploy.sh --build-local
 ```
 
 **Desventajas:**
@@ -103,8 +113,9 @@ docker compose build frontend
 
 ```
 /opt/acbc-app/
-├── docker-compose.yml          # ✅ En git
-├── .env                         # ❌ NO en git (variables VITE_*)
+├── docker-compose.prod.yml      # ✅ En git (usa imágenes GHCR)
+├── docker-compose.build.yml     # ✅ En git (solo para --build-local)
+├── .env                         # ❌ NO en git (opcional: IMAGE_TAG/GHCR_IMAGE_PREFIX/VITE_* para --build-local)
 ├── acbc_app/
 │   ├── .env                     # ❌ NO en git (variables backend)
 │   ├── backend.Dockerfile       # ✅ En git
@@ -126,13 +137,15 @@ nano acbc_app/.env
 # Pegar contenido del backend
 ```
 
-### 2. Crear `.env` en la raíz (para VITE_*)
+### 2. Crear `.env` en la raíz (opcional)
 ```bash
 cd /opt/acbc-app
 nano .env
 # Pegar:
-# VITE_API_URL=http://159.65.69.165:8000/api
-# VITE_GOOGLE_OAUTH_CLIENT_ID=tu-client-id
+# IMAGE_TAG=main
+# GHCR_IMAGE_PREFIX=ghcr.io/<owner>/<repo>
+# VITE_API_URL=http://159.65.69.165:8000/api               # solo --build-local
+# VITE_GOOGLE_OAUTH_CLIENT_ID=tu-client-id                 # solo --build-local
 ```
 
 ### 3. Verificar permisos
@@ -141,11 +154,11 @@ chmod 600 acbc_app/.env
 chmod 600 .env
 ```
 
-### 4. Verificar que Docker Compose las lee
+### 4. Verificar variables del deploy normal
 ```bash
 cd /opt/acbc-app
-docker compose config | grep VITE_API_URL
-# Debe mostrar: VITE_API_URL: http://159.65.69.165:8000/api
+./scripts/deploy.sh --help
+# Para config completa usa Docker Compose con .env.compose generado por deploy.sh
 ```
 
 ---
@@ -157,8 +170,8 @@ docker compose config | grep VITE_API_URL
 cd /opt/acbc-app
 cat acbc_app/.env | grep -E "ENVIRONMENT|DEBUG|ALLOWED_HOSTS|DB_PASSWORD"
 
-# 2. Verificar .env de la raíz (VITE_*)
-cat .env | grep VITE_
+# 2. Verificar .env de la raíz si usas overrides
+cat .env | grep -E "IMAGE_TAG|GHCR_IMAGE_PREFIX|VITE_"
 
 # 3. Verificar que docker-compose las lee
 docker compose config | grep -A 5 "VITE_API_URL"
@@ -172,10 +185,11 @@ docker compose config | grep -A 5 "VITE_API_URL"
 2. **`VITE_API_URL`** debe apuntar al backend accesible desde el navegador
    - Si accedes por IP: `http://159.65.69.165:8000/api`
    - Si tienes dominio: `https://api.tudominio.com/api`
-3. **Después de cambiar `.env`**, reconstruir frontend:
+3. **Después de cambiar `VITE_*`**:
+   - Deploy normal: actualiza la GitHub Repository variable, deja que el workflow publique una nueva imagen y ejecuta `./scripts/deploy.sh`.
+   - Build manual/local:
    ```bash
-   docker compose build frontend
-   docker compose up -d frontend
+   ./scripts/deploy.sh --build-local
    ```
 
 ---
@@ -183,8 +197,8 @@ docker compose config | grep -A 5 "VITE_API_URL"
 ## Troubleshooting
 
 ### Error: "VITE_API_URL is not defined"
-- Verificar que `.env` en la raíz tenga `VITE_API_URL`
-- Reconstruir: `docker compose build frontend`
+- Deploy normal: verificar que `VITE_API_URL` esté en GitHub Repository variables y que exista una imagen GHCR publicada después del cambio.
+- Build manual/local: verificar que `.env` en la raíz tenga `VITE_API_URL` y ejecutar `./scripts/deploy.sh --build-local`.
 
 ### Error: "ALLOWED_HOSTS must be set"
 - Verificar que `acbc_app/.env` tenga `ALLOWED_HOSTS=159.65.69.165`

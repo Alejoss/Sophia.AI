@@ -2,6 +2,8 @@
 
 ## Resumen Rápido
 
+> Producción ahora usa imágenes preconstruidas en GHCR. En deploy normal no ejecutes `docker compose build`; actualiza `main`, deja que GitHub Actions publique las imágenes y corre `./scripts/deploy.sh`. Usa `./scripts/deploy.sh --build-local` solo si intencionalmente quieres construir en el servidor.
+
 | Cambio | ¿Parar contenedores? | ¿Reconstruir? | ¿Reiniciar? |
 |--------|---------------------|---------------|-------------|
 | Configuración de Nginx (sistema) | ❌ No | ❌ No | ❌ No |
@@ -44,11 +46,13 @@ sudo ./scripts/setup-nginx.sh
 # Editar .env
 nano acbc_app/.env
 
-# Reiniciar contenedor para cargar nuevas variables
+# Reiniciar contenedor para cargar nuevas variables backend
 docker compose restart backend
-# O si cambiaste VITE_API_URL:
-docker compose build frontend
-docker compose up -d frontend
+
+# Si cambiaste VITE_API_URL en deploy normal:
+# 1. Actualiza la GitHub Repository variable VITE_API_URL
+# 2. Espera a que GitHub Actions publique la nueva imagen frontend
+./scripts/deploy.sh
 ```
 
 **Razón:** Los contenedores necesitan reiniciarse para leer las nuevas variables de entorno.
@@ -63,20 +67,14 @@ docker compose up -d frontend
 ```bash
 git pull origin main
 
-# Backend
-docker compose build backend
-docker compose up -d backend
+# Deploy normal: pull de imágenes GHCR y up
+./scripts/deploy.sh
 
-# Frontend
-docker compose build frontend
-docker compose up -d frontend
-
-# O ambos
-docker compose build
-docker compose up -d
+# Build manual/local en el servidor solo si lo necesitas
+./scripts/deploy.sh --build-local
 ```
 
-**Razón:** El código está dentro de la imagen Docker. Necesitas reconstruir la imagen para incluir los cambios.
+**Razón:** El código está dentro de la imagen Docker. En producción, GitHub Actions reconstruye y publica la imagen; el servidor la descarga.
 
 ---
 
@@ -88,13 +86,11 @@ docker compose up -d
 ```bash
 git pull origin main
 
-# Backend (si cambió requirements.txt)
-docker compose build backend
-docker compose up -d backend
+# Deploy normal: GitHub Actions reconstruye y publica; el servidor descarga
+./scripts/deploy.sh
 
-# Frontend (si cambió package.json)
-docker compose build frontend
-docker compose up -d frontend
+# Build manual/local en el servidor solo si lo necesitas
+./scripts/deploy.sh --build-local
 ```
 
 **Razón:** Las dependencias se instalan durante el build. Necesitas reconstruir.
@@ -113,9 +109,11 @@ git pull origin main
 docker compose down
 docker compose up -d
 
-# Si cambias Dockerfiles también
-docker compose build
-docker compose up -d
+# Si cambias Dockerfiles también, deploy normal:
+./scripts/deploy.sh
+
+# Build manual/local en el servidor solo si lo necesitas:
+./scripts/deploy.sh --build-local
 ```
 
 **Razón:** Docker Compose necesita recrear los contenedores con la nueva configuración.
@@ -140,13 +138,11 @@ git pull origin main
 # 2. Configurar Nginx (NO afecta contenedores)
 sudo ./scripts/setup-nginx.sh
 
-# 3. Actualizar VITE_API_URL en .env
-nano .env
+# 3. Actualizar VITE_API_URL en GitHub Repository variables
 # Cambiar a: VITE_API_URL=http://159.65.69.165/api
 
-# 4. Reconstruir frontend (porque cambió VITE_API_URL)
-docker compose build frontend
-docker compose up -d frontend
+# 4. Esperar nueva imagen GHCR y desplegar
+./scripts/deploy.sh
 
 # 5. Verificar
 curl http://159.65.69.165/api/health/
@@ -171,10 +167,9 @@ docker compose logs -f
 docker compose restart [service]
 ```
 
-### Reconstruir y reiniciar
+### Reconstruir y reiniciar manualmente
 ```bash
-docker compose build [service]
-docker compose up -d [service]
+./scripts/deploy.sh --build-local
 ```
 
 ### Parar todo
@@ -193,6 +188,6 @@ docker compose down -v
 
 **Si el cambio está:**
 - **Fuera de Docker** (sistema, Nginx, scripts) → NO parar contenedores
-- **Dentro de Docker** (código, dependencias, Dockerfiles) → SÍ reconstruir/reiniciar
+- **Dentro de Docker** (código, dependencias, Dockerfiles) → GitHub Actions reconstruye; el servidor hace pull con `./scripts/deploy.sh`
 
 **Para este caso específico (Nginx):** NO necesitas parar nada. Solo ejecutar el script y actualizar variables.

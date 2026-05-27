@@ -141,6 +141,14 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Validate frontend build variables
+      env:
+        VITE_API_URL: ${{ vars.VITE_API_URL }}
+        VITE_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
+      run: |
+        test -n "$VITE_API_URL" || (echo "Missing GitHub Repository variable: VITE_API_URL" && exit 1)
+        test -n "$VITE_GOOGLE_OAUTH_CLIENT_ID" || (echo "Missing GitHub Repository variable: VITE_GOOGLE_OAUTH_CLIENT_ID" && exit 1)
+
     - name: Backend image metadata
       id: meta-backend
       uses: docker/metadata-action@v5
