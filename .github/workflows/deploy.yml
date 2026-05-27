@@ -1,11 +1,10 @@
-name: Test and Deploy to Server
+name: CI
 
 on:
   push:
-    branches: [ main ]  # Trigger on push to main branch
+    branches: [ main ]
   pull_request:
-    branches: [ main ]  # Also run tests on PRs
-  # Optionally trigger manually
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -114,49 +113,3 @@ jobs:
         cd acbc_app
         python manage.py check --deploy
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: test  # Only run deploy if tests pass
-    if: github.ref == 'refs/heads/main'  # Only deploy on main branch
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Deploy to server
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: ${{ secrets.PORT || 22 }}
-        script: |
-          set -e
-          # Project dir: use DEPLOY_PATH secret or default ~/Sophia.AI
-          cd ${{ secrets.DEPLOY_PATH || '~/Sophia.AI' }}
-
-          echo "Pulling latest changes..."
-          git pull
-
-          echo "Building and starting Docker Compose (production)..."
-          docker compose -f docker-compose.prod.yml build --no-cache
-          docker compose -f docker-compose.prod.yml up -d --force-recreate
-
-          echo "Running migrations..."
-          docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
-
-          echo "Collecting static files..."
-          docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
-
-          echo "Verifying health..."
-          curl -sf http://localhost/health/ > /dev/null || { docker compose -f docker-compose.prod.yml logs backend; exit 1; }
-          curl -sf http://localhost/health > /dev/null || true
-
-          if command -v nginx > /dev/null 2>&1; then
-            echo "Testing nginx configuration..."
-            sudo nginx -t
-            echo "Reloading nginx..."
-            sudo nginx -s reload
-          fi
-
-          echo "Deployment completed successfully!"
