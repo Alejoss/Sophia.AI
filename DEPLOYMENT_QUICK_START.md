@@ -40,11 +40,7 @@
   ```bash
    echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
   ```
-   **Fast path for lighter changes (less downtime):**
-   This runs deployment with `--skip-down` and still pulls prebuilt GHCR images.
-  ```bash
-   ./scripts/deploy-light.sh
-  ```
+   **Fast path (alias):** `./scripts/deploy-light.sh` is the same as `./scripts/deploy.sh` (pull GHCR, then rolling `up --force-recreate` without a full `down`). Use `--full-down` only if you need a full stop before start.
    **Manual/local build only when needed (slow):**
    Use this when you intentionally want the server to build instead of pulling from GHCR:
   ```bash

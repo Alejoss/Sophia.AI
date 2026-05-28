@@ -1,7 +1,8 @@
 // src/api/axiosConfig.ts
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL;
+// Relative /api avoids cross-origin when users open www vs apex (same nginx serves both).
+const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 // Create a single axios instance with basic configuration
 const axiosInstance = axios.create({

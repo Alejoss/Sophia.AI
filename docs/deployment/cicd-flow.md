@@ -2,53 +2,85 @@
 
 ## Overview
 
-- **Tests**: On every push to `main` and on PRs. PostgreSQL service, Django tests, coverage, `manage.py check --deploy`.
-- **Frontend check**: On every push to `main` and on PRs. `npm ci` (validates `package.json` vs `package-lock.json`) and `npm run build` in `frontend/`.
-- **Images**: Only on push to `main` or manual dispatch, after tests and frontend check pass. Build backend/frontend/nginx images and publish them to GHCR.
-- **Deploy**: Server deploys pull prebuilt GHCR images, run `up`, migrate, collectstatic, health checks.
+| Stage | When it runs | What it does |
+|-------|----------------|--------------|
+| **Detect changes** | Every push/PR to `main` | Decides which components changed (backend, frontend, nginx, CI config). |
+| **Backend tests** | Backend, compose, deploy script, or CI workflow changed | Django tests + `check --deploy`. |
+| **Frontend check** | Frontend, compose, deploy script, or CI workflow changed | `npm ci` + `npm run build`. |
+| **Publish images** | Push to `main` or manual dispatch only | Builds/pushes only the images for components that changed. |
+| **Deploy** | Manual on server | `git pull` + `./scripts/deploy.sh` (pull GHCR + rolling recreate). |
 
 ## GitHub Actions ([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))
 
-### Frontend check job
+### Concurrency
 
-- Node **18**.
-- `cd frontend && npm ci` — fails if `package-lock.json` is out of sync with `package.json`.
-- `npm run build` with `VITE_API_URL` and `VITE_GOOGLE_OAUTH_CLIENT_ID` from GitHub Repository variables, or CI fallbacks if unset.
-- Runs on PRs and on `main`; blocks image publish when it fails.
+- One active run per branch; newer pushes cancel older in-progress runs.
 
-### Test job
+### Detect changes
 
-- Python **3.12** (matches backend Dockerfile).
-- PostgreSQL 15 service; Django uses `DB_HOST=localhost`, `DB_NAME`, `POSTGRES_*`.
-- `pip install -r acbc_app/requirements.txt`; `manage.py migrate`; `manage.py test`; `coverage`; `manage.py check --deploy`.
-- Runs from repo root; Django via `acbc_app/`.
+Uses [dorny/paths-filter](https://github.com/dorny/paths-filter) to map paths to components:
 
-### Publish images job
+- **backend**: `acbc_app/**`, `docker-compose*.yml`, `scripts/deploy.sh`
+- **frontend**: `frontend/**`, `docker-compose*.yml`, `scripts/deploy.sh`
+- **nginx**: `nginx/**`, `docker-compose*.yml`, `scripts/deploy.sh`
+- **ci**: `.github/workflows/**` (triggers all checks and all image publishes)
 
-- Uses `GITHUB_TOKEN` with `packages: write` to publish to `ghcr.io`.
-- Image prefix: `ghcr.io/<owner>/<repo>`.
-- Images:
-  - `ghcr.io/<owner>/<repo>-backend:main`
-  - `ghcr.io/<owner>/<repo>-frontend:main`
-  - `ghcr.io/<owner>/<repo>-nginx:main`
-- Also publishes `sha-<commit-sha>` tags.
-- Frontend build args come from GitHub Repository variables:
-  - `VITE_API_URL`
-  - `VITE_GOOGLE_OAUTH_CLIENT_ID`
+Docs-only changes (for example `*.md` outside those paths) skip tests and image builds.
 
-Secrets are not printed in logs.
+**Manual dispatch** (`workflow_dispatch`) builds and validates all components.
 
-## Scripts
+### Backend tests
 
-- **deploy.sh**: Uses `docker-compose.prod.yml`, pulls GHCR images by default, validates config, runs migrate/collectstatic, health checks. For manual server-side builds, run `./scripts/deploy.sh --build-local`.
-- **backup-db.sh** / **restore-db.sh**: Use same project root and `docker-compose.prod.yml`; same `DB_NAME`/`DB_USER` as production.
+- Python **3.12**, PostgreSQL 15 service.
+- Runs only when backend-related paths (or CI workflow) changed.
+- Timeout: 30 minutes.
+
+### Frontend check
+
+- Node **18**, `npm ci` then `npm run build`.
+- Runs only when frontend-related paths (or CI workflow) changed.
+- `VITE_*` from GitHub Repository variables, with CI fallbacks for the build step.
+- Timeout: 20 minutes.
+
+### Publish images (GHCR)
+
+- **Not run on pull requests** (validation only on PRs).
+- **Split into three jobs** (`publish-backend`, `publish-frontend`, `publish-nginx`) that run in parallel when their component changed.
+- Each job has `packages: write` only where needed; workflow default is `contents: read`.
+- Tags: `main` and `sha-<full-commit-sha>`.
+- Frontend publish requires `VITE_API_URL` and `VITE_GOOGLE_OAUTH_CLIENT_ID` repository variables.
+- Docker Buildx cache: `type=gha` per component.
+
+Skipped jobs (for example tests when only nginx changed) do not block publish jobs.
+
+## Server deploy ([scripts/deploy.sh](../../scripts/deploy.sh))
+
+Default flow (safer for uptime):
+
+1. Validate `acbc_app/.env`
+2. Prepare `.env.compose` (DB creds, `GHCR_IMAGE_PREFIX`, `IMAGE_TAG`, `NGINX_CONF` if SSL config exists)
+3. **Pull** images from GHCR (or `--build-local` to build on server)
+4. **`docker compose up -d --force-recreate`** (rolling recreate; stack stays up during pull)
+5. Migrate, collectstatic, health checks
+
+Use `--full-down` only when you need a full `docker compose down` before `up` (more downtime).
 
 ## Deployment path
-
-On the server, use the actual project path (for example `/opt/acbc-app`):
 
 ```bash
 cd /opt/acbc-app
 git pull origin main
 ./scripts/deploy.sh
+```
+
+Optional: pin a specific image tag:
+
+```bash
+IMAGE_TAG=sha-<commit-sha> ./scripts/deploy.sh
+```
+
+If GHCR packages are private:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
 ```

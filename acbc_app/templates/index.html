@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estamos en mantenimiento</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+
+    .maintenance-page {
+      min-height: 100vh;
+      padding: 0 0 2.5rem;
+    }
+
+    .maintenance-image-wrapper {
+      position: relative;
+      width: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .maintenance-image {
+      width: 100%;
+      height: auto;
+      max-height: 65vh;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+
+    .maintenance-image-overlay {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .maintenance-image-overlay h1 {
+      margin: 0;
+      color: #ffffff;
+      font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+      font-weight: 700;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      line-height: 1.3;
+    }
+
+    .maintenance-message-wrapper {
+      margin-top: 2rem;
+      padding: 0 1rem;
+    }
+
+    .maintenance-message-box {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.1rem 1.2rem;
+      border-radius: 12px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.77);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .maintenance-message-box h2 {
+      margin: 0 0 0.85rem;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 600;
+      line-height: 1.2;
+      color: #1f2937;
+    }
+
+    .maintenance-message-box p {
+      margin: 0;
+      max-width: 800px;
+      margin-inline: auto;
+      font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+      line-height: 1.6;
+      color: #4b5563;
+    }
+
+    @media (min-width: 768px) {
+      .maintenance-image {
+        max-height: 72vh;
+      }
+
+      .maintenance-message-wrapper {
+        margin-top: 2.5rem;
+      }
+
+      .maintenance-message-box {
+        padding: 1.5rem 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="maintenance-page">
+    <section class="maintenance-image-wrapper">
+      <img
+        src="./maintenance_page.png"
+        alt="Página en mantenimiento"
+        class="maintenance-image"
+      >
+      <div class="maintenance-image-overlay">
+        <h1>Estamos en mantenimiento ... pronto volveremos!</h1>
+      </div>
+    </section>
+
+    <section class="maintenance-message-wrapper">
+      <div class="maintenance-message-box">
+        <h2>El Conocimiento es Poder</h2>
+        <p>
+          Aprende desde la autonomía. Explora temas creados por la comunidad y
+          construye tu propia red de aprendizaje.
+        </p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

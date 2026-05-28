@@ -8,6 +8,7 @@ import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/Home.jsx';
+import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
@@ -127,6 +128,7 @@ const AppContent = () => {
       <Router>
         <AuthProvider>
           <Routes>
+          <Route path="mantenimiento" element={<Maintenance />} />
           <Route element={<MainLayout />}>
             <Route
               path="/"

@@ -13,4 +13,4 @@ echo "⚡ Starting lightweight deployment..."
 echo "This mode pulls prebuilt GHCR images and skips full 'down'."
 echo "For an intentional local rebuild, use: ./scripts/deploy.sh --build-local"
 
-"$SCRIPT_DIR/deploy.sh" --skip-down "$@"
+"$SCRIPT_DIR/deploy.sh" "$@"

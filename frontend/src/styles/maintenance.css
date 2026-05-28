@@ -1,0 +1,56 @@
+/* Maintenance page styles */
+
+.maintenance-page {
+  min-height: 100vh;
+  background: var(--mui-palette-background-default, transparent);
+  padding: 0 0 2.5rem;
+}
+
+.maintenance-image-wrapper {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.maintenance-image {
+  width: 100%;
+  height: auto;
+  max-height: 65vh;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.maintenance-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.maintenance-image-overlay h1 {
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+}
+
+.maintenance-message-wrapper {
+  margin-top: 2rem;
+}
+
+@media (min-width: 768px) {
+  .maintenance-image {
+    max-height: 72vh;
+  }
+
+  .maintenance-message-wrapper {
+    margin-top: 2.5rem;
+  }
+}

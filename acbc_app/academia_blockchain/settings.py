@@ -111,6 +111,24 @@ if ENVIRONMENT == "PRODUCTION":
     CORS_ALLOW_ALL_ORIGINS = False
     extra = os.getenv("CORS_ALLOWED_ORIGINS", "")
     CORS_ALLOWED_ORIGINS = _CORS_ORIGINS + [x.strip() for x in extra.split(",") if x.strip()]
+    for public_url in (os.getenv("FRONTEND_PUBLIC_URL"), os.getenv("ACADEMIA_PUBLIC_URL")):
+        if not public_url:
+            continue
+        base = public_url.strip().rstrip("/")
+        if not base.startswith(("http://", "https://")):
+            base = f"https://{base}"
+        for origin in (base,):
+            if origin not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(origin)
+            # Also allow www <-> apex counterpart (common DNS setup).
+            if "://www." in origin:
+                alt = origin.replace("://www.", "://", 1)
+            elif "://" in origin:
+                alt = origin.replace("://", "://www.", 1)
+            else:
+                alt = None
+            if alt and alt not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(alt)
     CORS_ALLOWED_ORIGIN_REGEXES = []  # No regex in production; use CORS_ALLOWED_ORIGINS only.
 else:
     CORS_ALLOW_ALL_ORIGINS = False

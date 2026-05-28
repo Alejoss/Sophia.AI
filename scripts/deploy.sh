@@ -20,7 +20,8 @@ Options:
   --no-cache               Build local Docker images without cache (requires --build-local)
   --skip-pull              Skip pulling GHCR images before starting services
   --skip-build             Deprecated no-op; deploy no longer builds by default
-  --skip-down              Do not run 'docker compose down' before deployment
+  --skip-down              Deprecated: default is rolling recreate without full down
+  --full-down              Stop all containers (docker compose down) before starting
   --allow-non-production   Allow deploy when ENVIRONMENT is not PRODUCTION
   -h, --help               Show this help
 EOF
@@ -29,7 +30,7 @@ EOF
 NO_CACHE_BUILD=false
 LOCAL_BUILD=false
 SKIP_PULL=false
-SKIP_DOWN=false
+FULL_DOWN=false
 ALLOW_NON_PRODUCTION=false
 
 for arg in "$@"; do
@@ -40,7 +41,10 @@ for arg in "$@"; do
         --skip-build)
             echo "--skip-build is deprecated; production deploys no longer build by default."
             ;;
-        --skip-down) SKIP_DOWN=true ;;
+        --skip-down)
+            echo "--skip-down is deprecated; rolling recreate is already the default."
+            ;;
+        --full-down) FULL_DOWN=true ;;
         --allow-non-production) ALLOW_NON_PRODUCTION=true ;;
         -h|--help)
             usage
@@ -187,15 +191,6 @@ fi
 PROD_COMPOSE_FILES=(-f docker-compose.prod.yml)
 BUILD_COMPOSE_FILES=(-f docker-compose.prod.yml -f docker-compose.build.yml)
 
-if [ "$SKIP_DOWN" = true ]; then
-    echo -e "${YELLOW}⏭️  Skipping full shutdown (--skip-down)${NC}"
-else
-    # Stop existing containers first (frees port 80 if our nginx container was using it)
-    echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" down || true
-    sleep 2
-fi
-
 # If port 80 is still in use (e.g. host nginx/apache), stop it so our container can bind
 if command -v ss >/dev/null 2>&1; then
   if ss -tlnp 2>/dev/null | grep -q ':80 '; then
@@ -221,8 +216,7 @@ elif command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-# Pull prebuilt images from GHCR by default. Use --build-local only when intentionally
-# rebuilding on the server (for example, while testing a Dockerfile change before merge).
+# Pull or build images before stopping the stack (avoids downtime if pull/build fails).
 if [ "$LOCAL_BUILD" = true ]; then
   echo -e "${YELLOW}🔨 Building Docker images locally...${NC}"
   if [ ! -f "docker-compose.build.yml" ]; then
@@ -252,9 +246,19 @@ else
   fi
 fi
 
-# Start services
+if [ "$FULL_DOWN" = true ]; then
+    echo -e "${YELLOW}📦 Stopping existing containers (--full-down)...${NC}"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" down || true
+    sleep 2
+fi
+
+# Start or recreate services with the pulled/built images (default: rolling recreate).
 echo -e "${YELLOW}🚀 Starting services...${NC}"
-docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d
+if [ "$FULL_DOWN" = true ]; then
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d
+else
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d --force-recreate --remove-orphans
+fi
 
 # Wait for services to be healthy
 echo -e "${YELLOW}⏳ Waiting for services to be healthy...${NC}"

@@ -60,8 +60,8 @@ chmod +x scripts/deploy.sh
 # Clean local rebuild (slower)
 ./scripts/deploy.sh --build-local --no-cache
 
-# Skip full stop/start (lighter deploy)
-./scripts/deploy.sh --skip-down
+# Full shutdown before up (more downtime; default is rolling recreate)
+./scripts/deploy.sh --full-down
 
 # Skip GHCR pull and use already-present local images
 ./scripts/deploy.sh --skip-pull
@@ -96,7 +96,7 @@ chmod +x scripts/deploy-light.sh
 ```
 
 **What it does:**
-- Runs `deploy.sh --skip-down`
+- Runs `deploy.sh` (rolling recreate; same as default deploy)
 - Pulls prebuilt GHCR images
 - Keeps migrations, collectstatic, and health checks
 
