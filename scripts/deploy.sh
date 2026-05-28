@@ -191,26 +191,37 @@ fi
 PROD_COMPOSE_FILES=(-f docker-compose.prod.yml)
 BUILD_COMPOSE_FILES=(-f docker-compose.prod.yml -f docker-compose.build.yml)
 
-# If port 80 is still in use (e.g. host nginx/apache), stop it so our container can bind
-if command -v ss >/dev/null 2>&1; then
-  if ss -tlnp 2>/dev/null | grep -q ':80 '; then
-    echo -e "${YELLOW}🔓 Port 80 in use; stopping host nginx/apache so container can bind...${NC}"
-    (sudo systemctl stop nginx 2>/dev/null || systemctl stop nginx 2>/dev/null || true)
-    (sudo systemctl stop apache2 2>/dev/null || systemctl stop apache2 2>/dev/null || true)
-    sleep 2
-    if ss -tlnp 2>/dev/null | grep -q ':80 '; then
-      echo -e "${RED}❌ Port 80 still in use. Stop the process using it (e.g. sudo systemctl stop nginx) and re-run.${NC}"
-      exit 1
-    fi
+# Port 80 must be free for host nginx/apache, or already owned by this Docker stack (rolling recreate).
+port_80_in_use() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -q ':80 '
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i :80 -t >/dev/null 2>&1
+  else
+    return 1
   fi
-elif command -v lsof >/dev/null 2>&1; then
-  if lsof -i :80 -t >/dev/null 2>&1; then
-    echo -e "${YELLOW}🔓 Port 80 in use; stopping host nginx/apache so container can bind...${NC}"
+}
+
+port_80_used_by_docker() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep ':80 ' | grep -qE 'docker|docker-proxy'
+  else
+    docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep -qE 'acbc_nginx|:80->'
+  fi
+}
+
+if port_80_in_use; then
+  if port_80_used_by_docker; then
+    echo -e "${YELLOW}ℹ️  Port 80 is in use by Docker (existing stack); continuing rolling deploy.${NC}"
+  else
+    echo -e "${YELLOW}🔓 Port 80 in use by host service; stopping nginx/apache so container can bind...${NC}"
     (sudo systemctl stop nginx 2>/dev/null || systemctl stop nginx 2>/dev/null || true)
     (sudo systemctl stop apache2 2>/dev/null || systemctl stop apache2 2>/dev/null || true)
     sleep 2
-    if lsof -i :80 -t >/dev/null 2>&1; then
-      echo -e "${RED}❌ Port 80 still in use. Stop the process using it and re-run.${NC}"
+    if port_80_in_use && ! port_80_used_by_docker; then
+      echo -e "${RED}❌ Port 80 still in use by a non-Docker process.${NC}"
+      echo "Inspect with: ss -tlnp | grep ':80'"
+      echo "Stop it (e.g. sudo systemctl stop nginx) or free the port, then re-run."
       exit 1
     fi
   fi

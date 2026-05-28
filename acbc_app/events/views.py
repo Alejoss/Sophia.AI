@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.http import Http404
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 class EventList(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
     
     def get(self, request, format=None):
         logger.info(f"Event list requested by user {request.user.username if request.user.is_authenticated else 'anonymous'}")
