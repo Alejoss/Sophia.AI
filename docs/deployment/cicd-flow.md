@@ -3,10 +3,18 @@
 ## Overview
 
 - **Tests**: On every push to `main` and on PRs. PostgreSQL service, Django tests, coverage, `manage.py check --deploy`.
-- **Images**: Only on push to `main` or manual dispatch, after tests pass. Build backend/frontend/nginx images and publish them to GHCR.
+- **Frontend check**: On every push to `main` and on PRs. `npm ci` (validates `package.json` vs `package-lock.json`) and `npm run build` in `frontend/`.
+- **Images**: Only on push to `main` or manual dispatch, after tests and frontend check pass. Build backend/frontend/nginx images and publish them to GHCR.
 - **Deploy**: Server deploys pull prebuilt GHCR images, run `up`, migrate, collectstatic, health checks.
 
 ## GitHub Actions ([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))
+
+### Frontend check job
+
+- Node **18**.
+- `cd frontend && npm ci` — fails if `package-lock.json` is out of sync with `package.json`.
+- `npm run build` with `VITE_API_URL` and `VITE_GOOGLE_OAUTH_CLIENT_ID` from GitHub Repository variables, or CI fallbacks if unset.
+- Runs on PRs and on `main`; blocks image publish when it fails.
 
 ### Test job
 
