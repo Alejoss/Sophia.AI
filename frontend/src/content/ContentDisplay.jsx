@@ -88,9 +88,6 @@ const ContentDisplay = ({
   /** External page URL (YouTube, etc.). Never use file_details.url here — the API sets that to the storage file URL. */
   const contentExternalUrl = content.url ?? contentData?.url ?? null;
   const favicon = contentData.favicon;
-  const downloadableFileUrl = fileDetails?.file
-    ? resolveMediaUrl(fileDetails.url ?? fileDetails.file)
-    : null;
   const selectedProfileThumbnail = content?.selected_profile?.thumbnail;
   const previewProfileThumbnail = content?.thumbnail;
   const customThumbnail = selectedProfileThumbnail || previewProfileThumbnail;
@@ -1586,20 +1583,6 @@ const ContentDisplay = ({
                     />
                   )}
                 </Box>
-                {downloadableFileUrl && (
-                  <Box sx={{ mt: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(downloadableFileUrl, "_blank");
-                      }}
-                    >
-                      Descargar archivo
-                    </Button>
-                  </Box>
-                )}
                 {contentData.vote_count !== undefined && topicId && (
                   <Box sx={{ display: "flex", alignItems: "center", mt: 2 }} onClick={(e) => e.stopPropagation()}>
                     <VoteComponent

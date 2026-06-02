@@ -252,6 +252,11 @@ def topic_image_path(instance, filename):
     # Create a new filename using the topic id and extension
     return f'topic_images/{instance.id}/topic_image.{ext}'
 
+
+def topic_image_thumbnail_path(instance, filename):
+    # Downsized cover used in topic listings. Always WebP, keyed by topic id.
+    return f'topic_images/{instance.id}/topic_image_thumb.webp'
+
 class Topic(models.Model):
     # Represents a subject under which multiple contents and discussions can be grouped.
 
@@ -263,6 +268,13 @@ class Topic(models.Model):
         null=True,
         blank=True,
         max_length=255
+    )
+    topic_image_thumbnail = models.ImageField(
+        upload_to=topic_image_thumbnail_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="Auto-generated downsized cover used in topic listings."
     )
     topic_image_focal_x = models.FloatField(default=0.5, blank=True)
     topic_image_focal_y = models.FloatField(default=0.5, blank=True)

@@ -69,6 +69,7 @@ from knowledge_paths.serializers import (
 )
 from .serializers import PublicationSerializer
 from content.utils import get_top_voted_contents, get_topic_contents_ordered_for_public_view
+from content.image_utils import generate_topic_thumbnail, delete_topic_thumbnail
 from content.s3_key_utils import is_unsafe_s3_key, sanitize_filename_for_s3_key
 from bs4 import BeautifulSoup
 import requests
@@ -1615,7 +1616,10 @@ class TopicView(APIView):
     def post(self, request):
         serializer = TopicBasicSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save(creator=request.user)
+            topic = serializer.save(creator=request.user)
+            # Best-effort; missing/unreadable cover only logs a warning, never fails the request.
+            if topic.topic_image:
+                generate_topic_thumbnail(topic)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1716,6 +1720,8 @@ class TopicDetailView(APIView):
                 if os.path.exists(old_image_path):
                     os.remove(old_image_path)
                 topic.topic_image.delete(save=False)
+            # Drop the stale thumbnail; it gets regenerated after save.
+            delete_topic_thumbnail(topic, save=False)
             data["topic_image"] = request.FILES["topic_image"]
 
         serializer = TopicDetailSerializer(
@@ -1730,7 +1736,10 @@ class TopicDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            serializer.save()
+            saved_topic = serializer.save()
+            # Best-effort; thumbnail failure must not roll back a successful topic save.
+            if has_image:
+                generate_topic_thumbnail(saved_topic)
             logger.info("Topic PATCH saved topic_id=%s", pk)
             return Response(serializer.data)
         except Exception as e:
@@ -3543,23 +3552,37 @@ class ContentUpdateView(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
-            # Validate URL if provided
-            if 'url' in request.data and request.data['url']:
-                logger.debug("Validating URL", extra={
-                    'url': request.data['url'],
-                })
-                validator = URLValidator()
-                try:
-                    validator(request.data['url'])
-                    logger.debug("URL validation passed")
-                except ValidationError:
-                    logger.warning("URL validation failed", extra={
-                        'url': request.data['url'],
+            # Validate URL updates (including clearing when a file is attached)
+            if 'url' in request.data:
+                incoming_url = request.data.get('url')
+                if incoming_url is None or incoming_url == '':
+                    fd = FileDetails.objects.filter(content=content).first()
+                    has_file = bool(fd and fd.file)
+                    if not has_file:
+                        return Response(
+                            {
+                                'error': (
+                                    'No se puede eliminar la URL sin un archivo adjunto.'
+                                )
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                else:
+                    logger.debug("Validating URL", extra={
+                        'url': incoming_url,
                     })
-                    return Response(
-                        {'error': 'Formato de URL invalido'}, 
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    validator = URLValidator()
+                    try:
+                        validator(incoming_url)
+                        logger.debug("URL validation passed")
+                    except ValidationError:
+                        logger.warning("URL validation failed", extra={
+                            'url': incoming_url,
+                        })
+                        return Response(
+                            {'error': 'Formato de URL invalido'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
             
             # Update the content
             logger.debug("Updating content", extra={

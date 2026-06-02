@@ -84,7 +84,8 @@ const TopicList = () => {
                                 <CardMedia
                                     component="img"
                                     height="140"
-                                    image={topic.topic_image || `https://picsum.photos/800/400?random=${topic.id}`}
+                                    loading="lazy"
+                                    image={topic.topic_image_thumbnail || topic.topic_image || `https://picsum.photos/800/400?random=${topic.id}`}
                                     alt={topic.title}
                                     sx={{
                                         objectFit: 'cover',

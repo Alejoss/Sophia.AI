@@ -462,6 +462,57 @@ class ContentAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Formato de URL invalido', response.data['error'])
 
+    def test_clear_content_url_when_file_attached(self):
+        """Original uploader can clear URL once a downloadable file exists."""
+        url_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='URL and file',
+            url='https://example.com/article',
+        )
+        ContentProfile.objects.create(
+            content=url_content,
+            user=self.user,
+            title='Profile',
+        )
+        fd = FileDetails.objects.create(content=url_content)
+        fd.file.save(
+            'article.pdf',
+            SimpleUploadedFile('article.pdf', b'pdf-bytes', content_type='application/pdf'),
+            save=True,
+        )
+
+        update_url = f'/api/content/content_update/{url_content.id}/'
+        response = self.client.put(update_url, {'url': None}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        url_content.refresh_from_db()
+        fd.refresh_from_db()
+        self.assertIsNone(url_content.url)
+        self.assertTrue(bool(fd.file))
+
+    def test_clear_content_url_without_file_rejected(self):
+        """Cannot clear URL on URL-only content (would leave no source)."""
+        url_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='URL only',
+            url='https://example.com/article',
+        )
+        ContentProfile.objects.create(
+            content=url_content,
+            user=self.user,
+            title='Profile',
+        )
+
+        update_url = f'/api/content/content_update/{url_content.id}/'
+        response = self.client.put(update_url, {'url': ''}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('No se puede eliminar la URL', response.data['error'])
+
+        url_content.refresh_from_db()
+        self.assertEqual(url_content.url, 'https://example.com/article')
+
     def test_update_content_not_owner(self):
         """Test that non-owners cannot update content"""
         other_user = User.objects.create_user(

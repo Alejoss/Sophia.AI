@@ -45,6 +45,7 @@ const ContentProfileEdit = () => {
     const [attachFileDialogOpen, setAttachFileDialogOpen] = useState(false);
     const [attachFileSuccess, setAttachFileSuccess] = useState('');
     const [editUrlDialogOpen, setEditUrlDialogOpen] = useState(false);
+    const [clearUrlDialogOpen, setClearUrlDialogOpen] = useState(false);
     const [urlDraft, setUrlDraft] = useState('');
     const [urlDialogCheckLoading, setUrlDialogCheckLoading] = useState(false);
     const [urlDialogSaveLoading, setUrlDialogSaveLoading] = useState(false);
@@ -98,12 +99,9 @@ const ContentProfileEdit = () => {
         return data;
     };
 
-    const openEditUrlDialog = async () => {
-        if (!content?.url) return;
-        setUrlDraft(content.url);
+    const runSourceModificationCheck = async () => {
         setUrlDialogError('');
         setUrlSaveBlocked(false);
-        setEditUrlDialogOpen(true);
         setUrlDialogCheckLoading(true);
         try {
             const check = await contentApi.checkContentModification(contentId);
@@ -111,18 +109,54 @@ const ContentProfileEdit = () => {
                 setUrlSaveBlocked(true);
                 setUrlDialogError(
                     check?.message ||
-                        'No se puede cambiar la URL porque otros usuarios tienen este contenido en su biblioteca.'
+                        'No se puede modificar la fuente porque otros usuarios tienen este contenido en su biblioteca.'
                 );
+                return false;
             }
+            return true;
         } catch (err) {
             setUrlSaveBlocked(true);
             setUrlDialogError(
                 err.response?.data?.error ||
                     err.message ||
-                    'No se pudo comprobar si se permite cambiar la URL.'
+                    'No se pudo comprobar si se permite modificar la fuente.'
             );
+            return false;
         } finally {
             setUrlDialogCheckLoading(false);
+        }
+    };
+
+    const openEditUrlDialog = async () => {
+        if (!content?.url) return;
+        setUrlDraft(content.url);
+        setEditUrlDialogOpen(true);
+        await runSourceModificationCheck();
+    };
+
+    const openClearUrlDialog = async () => {
+        if (!content?.url) return;
+        setClearUrlDialogOpen(true);
+        await runSourceModificationCheck();
+    };
+
+    const handleClearContentUrl = async () => {
+        setUrlDialogSaveLoading(true);
+        setUrlDialogError('');
+        try {
+            await contentApi.updateContent(contentId, { url: null });
+            await reloadContent();
+            setClearUrlDialogOpen(false);
+            setAttachFileSuccess('URL del contenido eliminada. El archivo adjunto se mantiene.');
+        } catch (err) {
+            const msg =
+                err.response?.data?.error ||
+                (typeof err.response?.data === 'string' ? err.response.data : null) ||
+                err.message ||
+                'No se pudo eliminar la URL.';
+            setUrlDialogError(typeof msg === 'string' ? msg : 'No se pudo eliminar la URL.');
+        } finally {
+            setUrlDialogSaveLoading(false);
         }
     };
 
@@ -404,9 +438,20 @@ const ContentProfileEdit = () => {
                                 >
                                     {content.url}
                                 </Typography>
-                                <Button variant="outlined" size="small" onClick={openEditUrlDialog}>
-                                    Cambiar URL
-                                </Button>
+                                {hasAttachedFile ? (
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color="warning"
+                                        onClick={openClearUrlDialog}
+                                    >
+                                        Borrar URL
+                                    </Button>
+                                ) : (
+                                    <Button variant="outlined" size="small" onClick={openEditUrlDialog}>
+                                        Cambiar URL
+                                    </Button>
+                                )}
                             </Box>
                         )}
 
@@ -528,6 +573,54 @@ const ContentProfileEdit = () => {
                     <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
                     <Button onClick={handleDelete} color="error">
                         Eliminar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={clearUrlDialogOpen}
+                onClose={() =>
+                    !urlDialogSaveLoading && !urlDialogCheckLoading && setClearUrlDialogOpen(false)
+                }
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Borrar URL del contenido</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Se quitará el enlace externo del registro compartido. El archivo adjunto
+                        seguirá disponible para descarga. Si otras personas usan este ítem, el
+                        cambio las afecta.
+                    </Typography>
+                    {urlDialogCheckLoading && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                            <CircularProgress size={32} />
+                        </Box>
+                    )}
+                    {!urlDialogCheckLoading && urlDialogError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {urlDialogError}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setClearUrlDialogOpen(false)}
+                        disabled={urlDialogSaveLoading}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={handleClearContentUrl}
+                        disabled={
+                            urlDialogSaveLoading ||
+                            urlDialogCheckLoading ||
+                            urlSaveBlocked
+                        }
+                    >
+                        {urlDialogSaveLoading ? 'Eliminando…' : 'Borrar URL'}
                     </Button>
                 </DialogActions>
             </Dialog>

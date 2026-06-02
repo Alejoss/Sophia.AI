@@ -36,10 +36,11 @@ const TopicsByUser = ({ userId, userName }) => {
   }, [userId]);
 
   const getTopicImageUrl = (topic) => {
-    if (topic.topic_image) {
-      return topic.topic_image.startsWith('http') 
-        ? topic.topic_image 
-        : `${MEDIA_BASE_URL}${topic.topic_image}`;
+    const image = topic.topic_image_thumbnail || topic.topic_image;
+    if (image) {
+      return image.startsWith('http')
+        ? image
+        : `${MEDIA_BASE_URL}${image}`;
     }
     return null;
   };

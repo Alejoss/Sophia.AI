@@ -298,9 +298,11 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image_focal_x = serializers.FloatField(required=False, min_value=0, max_value=1)
     topic_image_focal_y = serializers.FloatField(required=False, min_value=0, max_value=1)
 
+    topic_image_thumbnail = serializers.ImageField(read_only=True, required=False)
+
     class Meta:
         model = Topic
-        fields = ['id', 'title', 'description', 'creator', 'creator_username', 'topic_image', 'topic_image_focal_x', 'topic_image_focal_y']
+        fields = ['id', 'title', 'description', 'creator', 'creator_username', 'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y']
         read_only_fields = ['creator']
 
     def to_representation(self, instance):
@@ -312,6 +314,17 @@ class TopicBasicSerializer(serializers.ModelSerializer):
                 ret['topic_image'] = f"{url}{sep}t={int(instance.updated_at.timestamp())}"
             else:
                 ret['topic_image'] = url
+        # Downsized cover for listings; falls back to None so the client can
+        # use topic_image when no thumbnail exists yet.
+        if instance.topic_image_thumbnail:
+            turl = build_media_url(instance.topic_image_thumbnail, self.context.get('request'))
+            if turl and getattr(instance, 'updated_at', None):
+                sep = '&' if '?' in turl else '?'
+                ret['topic_image_thumbnail'] = f"{turl}{sep}t={int(instance.updated_at.timestamp())}"
+            else:
+                ret['topic_image_thumbnail'] = turl
+        else:
+            ret['topic_image_thumbnail'] = None
         return ret
 
     def validate_title(self, value):
