@@ -59,7 +59,7 @@ const TopicTimeline = ({ topicId, canEdit }) => {
       setLoadingContents(true);
       const data = await contentApi.getTopicDetailsSimple(topicId);
       setAvailableContents(data.contents || []);
-    } catch (err) {
+    } catch {
       setAvailableContents([]);
     } finally {
       setLoadingContents(false);

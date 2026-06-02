@@ -351,6 +351,15 @@ const TopicDetail = () => {
         });
     }, [topicId]);
 
+    const fetchPendingSuggestionsCount = useCallback(async () => {
+        try {
+            const suggestions = await contentApi.getTopicContentSuggestions(topicId, { status: 'PENDING' });
+            setPendingSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
+        } catch {
+            // ignore
+        }
+    }, [topicId]);
+
     const refreshTopicPageData = useCallback(async () => {
         setLoading(true);
         try {
@@ -399,25 +408,16 @@ const TopicDetail = () => {
                 fetchPendingSuggestionsCount();
             }
             setError(null);
-        } catch (err) {
+        } catch {
             setError('Error al cargar los detalles del tema');
         } finally {
             setLoading(false);
         }
-    }, [topicId, fetchContentByTypePage, isAuthenticated, user?.id]);
+    }, [topicId, fetchContentByTypePage, fetchPendingSuggestionsCount, isAuthenticated, user?.id]);
 
     useEffect(() => {
         refreshTopicPageData();
     }, [refreshTopicPageData]);
-
-    const fetchPendingSuggestionsCount = async () => {
-        try {
-            const suggestions = await contentApi.getTopicContentSuggestions(topicId, { status: 'PENDING' });
-            setPendingSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
-        } catch (err) {
-            // ignore
-        }
-    };
 
     const handleSuggestionSuccess = () => {
         fetchPendingSuggestionsCount();
