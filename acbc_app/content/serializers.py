@@ -2,7 +2,21 @@ from django.db.models import Max, Value, Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion, FileSuggestion
+from content.models import (
+    Library,
+    Collection,
+    Content,
+    Topic,
+    TopicTimeline,
+    TopicTimelineEntry,
+    TopicTimelineEntryContent,
+    ContentProfile,
+    FileDetails,
+    Publication,
+    TopicModeratorInvitation,
+    ContentSuggestion,
+    FileSuggestion,
+)
 from content.utils import build_media_url
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
@@ -332,6 +346,155 @@ class TopicDetailSerializer(TopicBasicSerializer):
     def to_representation(self, instance):
         self.context['user'] = self.context.get('user')
         return super().to_representation(instance)
+
+
+class TopicTimelineEntryContentSerializer(serializers.ModelSerializer):
+    content = ContentWithSelectedProfileSerializer(read_only=True)
+    content_id = serializers.PrimaryKeyRelatedField(
+        queryset=Content.objects.all(),
+        source='content',
+        write_only=True,
+    )
+
+    class Meta:
+        model = TopicTimelineEntryContent
+        fields = ['id', 'content', 'content_id', 'order', 'role', 'caption']
+
+
+class TopicTimelineEntrySerializer(serializers.ModelSerializer):
+    contents = TopicTimelineEntryContentSerializer(
+        source='entry_contents',
+        many=True,
+        required=False,
+    )
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    updated_by_username = serializers.CharField(source='updated_by.username', read_only=True)
+
+    class Meta:
+        model = TopicTimelineEntry
+        fields = [
+            'id',
+            'title',
+            'description',
+            'display_date',
+            'start_date',
+            'end_date',
+            'order',
+            'contents',
+            'created_by',
+            'created_by_username',
+            'updated_by',
+            'updated_by_username',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'created_by',
+            'created_by_username',
+            'updated_by',
+            'updated_by_username',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate(self, attrs):
+        start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({
+                'end_date': 'La fecha final no puede ser anterior a la fecha inicial.'
+            })
+
+        entry_contents = attrs.get('entry_contents')
+        if entry_contents is not None:
+            topic = self.context.get('topic')
+            if topic is None:
+                timeline = self.context.get('timeline') or getattr(self.instance, 'timeline', None)
+                topic = timeline.topic if timeline else None
+            if topic is None:
+                raise serializers.ValidationError('No se pudo validar el tema de la timeline.')
+
+            seen_content_ids = set()
+            invalid_content_ids = []
+            duplicate_content_ids = []
+            topic_content_ids = set(topic.contents.values_list('id', flat=True))
+            for item in entry_contents:
+                content = item.get('content')
+                if content is None:
+                    continue
+                if content.id in seen_content_ids:
+                    duplicate_content_ids.append(content.id)
+                seen_content_ids.add(content.id)
+                if content.id not in topic_content_ids:
+                    invalid_content_ids.append(content.id)
+
+            if duplicate_content_ids:
+                raise serializers.ValidationError({
+                    'contents': 'No se puede adjuntar el mismo contenido mas de una vez a la misma entrada.'
+                })
+            if invalid_content_ids:
+                raise serializers.ValidationError({
+                    'contents': 'Solo se pueden adjuntar contenidos que ya pertenecen al tema.'
+                })
+
+        title = attrs.get('title')
+        if title is not None and not title.strip():
+            raise serializers.ValidationError({'title': 'El titulo no puede estar vacio.'})
+        return attrs
+
+    def _sync_contents(self, entry, entry_contents):
+        if entry_contents is None:
+            return
+
+        entry.entry_contents.all().delete()
+        links = []
+        for index, item in enumerate(entry_contents):
+            content = item['content']
+            links.append(TopicTimelineEntryContent(
+                entry=entry,
+                content=content,
+                order=item.get('order', index),
+                role=item.get('role') or 'REFERENCE',
+                caption=item.get('caption') or '',
+            ))
+        if links:
+            TopicTimelineEntryContent.objects.bulk_create(links)
+
+    def create(self, validated_data):
+        entry_contents = validated_data.pop('entry_contents', None)
+        timeline = self.context['timeline']
+        request = self.context.get('request')
+        if 'order' not in validated_data:
+            max_order = timeline.entries.aggregate(Max('order'))['order__max']
+            validated_data['order'] = (max_order or 0) + 1
+        entry = TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            created_by=request.user if request and request.user.is_authenticated else None,
+            updated_by=request.user if request and request.user.is_authenticated else None,
+            **validated_data,
+        )
+        self._sync_contents(entry, entry_contents)
+        return entry
+
+    def update(self, instance, validated_data):
+        entry_contents = validated_data.pop('entry_contents', None)
+        request = self.context.get('request')
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if request and request.user.is_authenticated:
+            instance.updated_by = request.user
+        instance.save()
+        self._sync_contents(instance, entry_contents)
+        return instance
+
+
+class TopicTimelineSerializer(serializers.ModelSerializer):
+    entries = TopicTimelineEntrySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = TopicTimeline
+        fields = ['id', 'topic', 'title', 'description', 'entries', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['topic', 'created_by', 'created_at', 'updated_at']
 
 
 class TopicContentSerializer(serializers.ModelSerializer):

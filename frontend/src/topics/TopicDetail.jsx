@@ -9,6 +9,8 @@ import {
     Dialog,
     IconButton,
     useMediaQuery,
+    Tabs,
+    Tab,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
@@ -27,6 +29,7 @@ import ContentDisplay from '../content/ContentDisplay';
 import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
 import { Badge } from '@mui/material';
+import TopicTimeline from './timeline/TopicTimeline';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
 const TOPIC_IMAGE_PAGE_SIZE = 3;
@@ -333,6 +336,7 @@ const TopicDetail = () => {
     const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
     const [contentCounts, setContentCounts] = useState({});
+    const [activeTab, setActiveTab] = useState('content');
     const [imagePageInfo, setImagePageInfo] = useState({
         currentPage: 0,
         totalPages: 0,
@@ -772,47 +776,69 @@ const TopicDetail = () => {
                 )}
             </Box>
 
-            {/* Content sections: imágenes en galería; video/audio en tarjetas; textos en lista */}
-            {renderContentSection('image', contentByType.image, {
-                sectionTitle: 'Imágenes',
-                itemsWord: 'imágenes',
-                seeAllPrefix: 'todas las',
-                layout: 'imageGallery',
-                onImageGalleryOpen: (idx) => {
-                    setImageLightboxIndex(idx);
-                    setImageLightboxOpen(true);
-                    preloadRemainingImagesForCarousel();
-                },
-            })}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, value) => setActiveTab(value)}
+                    variant="scrollable"
+                    allowScrollButtonsMobile
+                >
+                    <Tab value="content" label="Contenido" />
+                    <Tab value="timeline" label="Linea de tiempo" />
+                    <Tab value="comments" label="Comentarios" />
+                </Tabs>
+            </Box>
 
-            <TopicImageLightbox
-                open={imageLightboxOpen}
-                onClose={() => setImageLightboxOpen(false)}
-                items={contentByType.image || []}
-                index={imageLightboxIndex}
-                onIndexChange={setImageLightboxIndex}
-                topicId={topicId}
-                navigate={navigate}
-                hasNextPage={imagePageInfo.hasNext}
-                onRequestNextPage={loadMoreImages}
-                isLoadingNextPage={imagePageInfo.loading}
-            />
-            {renderContentSection('video', contentByType.video)}
-            {renderContentSection('audio', contentByType.audio)}
-            {renderContentSection('text', contentByType.text, {
-                sectionTitle: 'Textos',
-                itemsWord: 'textos',
-                layout: 'textList',
-            })}
+            {activeTab === 'content' && (
+                <>
+                    {/* Content sections: imágenes en galería; video/audio en tarjetas; textos en lista */}
+                    {renderContentSection('image', contentByType.image, {
+                        sectionTitle: 'Imágenes',
+                        itemsWord: 'imágenes',
+                        seeAllPrefix: 'todas las',
+                        layout: 'imageGallery',
+                        onImageGalleryOpen: (idx) => {
+                            setImageLightboxIndex(idx);
+                            setImageLightboxOpen(true);
+                            preloadRemainingImagesForCarousel();
+                        },
+                    })}
 
-            {(Object.values(contentCounts).reduce((acc, n) => acc + (n || 0), 0) === 0) && (
-                <Typography variant="body1" color="text.secondary" align="center">
-                    Aún no se ha agregado contenido a este tema.
-                </Typography>
+                    <TopicImageLightbox
+                        open={imageLightboxOpen}
+                        onClose={() => setImageLightboxOpen(false)}
+                        items={contentByType.image || []}
+                        index={imageLightboxIndex}
+                        onIndexChange={setImageLightboxIndex}
+                        topicId={topicId}
+                        navigate={navigate}
+                        hasNextPage={imagePageInfo.hasNext}
+                        onRequestNextPage={loadMoreImages}
+                        isLoadingNextPage={imagePageInfo.loading}
+                    />
+                    {renderContentSection('video', contentByType.video)}
+                    {renderContentSection('audio', contentByType.audio)}
+                    {renderContentSection('text', contentByType.text, {
+                        sectionTitle: 'Textos',
+                        itemsWord: 'textos',
+                        layout: 'textList',
+                    })}
+
+                    {(Object.values(contentCounts).reduce((acc, n) => acc + (n || 0), 0) === 0) && (
+                        <Typography variant="body1" color="text.secondary" align="center">
+                            Aún no se ha agregado contenido a este tema.
+                        </Typography>
+                    )}
+                </>
             )}
 
-            {/* Add CommentSection */}
-            <CommentSection topicId={topicId} />
+            {activeTab === 'timeline' && (
+                <TopicTimeline topicId={topicId} canEdit={isCreator || isModerator} />
+            )}
+
+            {activeTab === 'comments' && (
+                <CommentSection topicId={topicId} />
+            )}
 
             {/* Content Suggestion Modal */}
             <ContentSuggestionModal

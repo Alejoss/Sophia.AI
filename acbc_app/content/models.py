@@ -278,6 +278,71 @@ class Topic(models.Model):
         return user == self.creator or user in self.moderators.all()
 
 
+class TopicTimeline(models.Model):
+    # Editorial timeline attached to a topic. Entries carry the narrative; dates are optional.
+    topic = models.OneToOneField(Topic, on_delete=models.CASCADE, related_name='timeline')
+    title = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_topic_timelines')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title or f"Timeline for {self.topic.title}"
+
+
+class TopicTimelineEntry(models.Model):
+    timeline = models.ForeignKey(TopicTimeline, on_delete=models.CASCADE, related_name='entries')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    display_date = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Optional human-friendly label such as 'Before Bitcoin' or '1990s'.",
+    )
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_topic_timeline_entries')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_topic_timeline_entries')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'start_date', 'created_at']
+        indexes = [
+            models.Index(fields=['timeline', 'order'], name='content_tl_entry_order_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.timeline.topic.title}: {self.title}"
+
+
+class TopicTimelineEntryContent(models.Model):
+    ROLE_CHOICES = [
+        ('PRIMARY', 'Primary'),
+        ('REFERENCE', 'Reference'),
+        ('EXAMPLE', 'Example'),
+        ('OPTIONAL', 'Optional'),
+    ]
+
+    entry = models.ForeignKey(TopicTimelineEntry, on_delete=models.CASCADE, related_name='entry_contents')
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='timeline_entry_links')
+    order = models.PositiveIntegerField(default=0)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='REFERENCE')
+    caption = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        unique_together = [['entry', 'content']]
+        indexes = [
+            models.Index(fields=['entry', 'order'], name='content_tl_entry_content_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.entry.title} -> {self.content}"
+
+
 class ModerationLog(models.Model):
     # Tracks moderation actions like deletions or reports performed by moderators on content.
 

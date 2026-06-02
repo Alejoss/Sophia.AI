@@ -8,7 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from notifications.models import Notification
 from content.models import (
     Library, Collection, Content, ContentProfile, 
-    FileDetails, Topic, Publication, TopicModeratorInvitation, FileSuggestion, ContentSuggestion
+    FileDetails, Topic, TopicTimeline, TopicTimelineEntry, Publication,
+    TopicModeratorInvitation, FileSuggestion, ContentSuggestion
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -1103,6 +1104,88 @@ class TopicAPITests(APITestCase):
         self.client.force_authenticate(user=outsider)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_topic_timeline_create_list_and_attach_multiple_contents(self):
+        content_video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type="VIDEO",
+            original_title="Intro Video",
+        )
+        content_text = Content.objects.create(
+            uploaded_by=self.user,
+            media_type="TEXT",
+            original_title="Reading",
+        )
+        ContentProfile.objects.create(content=content_video, user=self.user, title="Video profile")
+        ContentProfile.objects.create(content=content_text, user=self.user, title="Text profile")
+        self.topic.contents.add(content_video, content_text)
+
+        url = reverse("content:topic-timeline", args=[self.topic.id])
+        payload = {
+            "title": "Antecedentes",
+            "description": "Contexto inicial",
+            "display_date": "Antes de Bitcoin",
+            "contents": [
+                {"content_id": content_video.id, "role": "PRIMARY", "order": 1},
+                {"content_id": content_text.id, "role": "REFERENCE", "order": 2},
+            ],
+        }
+        create_response = self.client.post(url, payload, format="json")
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["title"], "Antecedentes")
+        self.assertEqual(len(create_response.data["contents"]), 2)
+
+        list_response = self.client.get(url)
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data["entries"]), 1)
+        self.assertEqual(list_response.data["entries"][0]["contents"][0]["content"]["id"], content_video.id)
+
+    def test_topic_timeline_rejects_non_topic_content(self):
+        outside_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type="TEXT",
+            original_title="Outside",
+        )
+        url = reverse("content:topic-timeline", args=[self.topic.id])
+        response = self.client.post(
+            url,
+            {
+                "title": "Invalid entry",
+                "contents": [{"content_id": outside_content.id, "role": "PRIMARY", "order": 1}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_topic_timeline_permissions_and_reorder(self):
+        moderator = User.objects.create_user(
+            username="timelinemod",
+            email="timelinemod@example.com",
+            password="pass12345",
+        )
+        outsider = User.objects.create_user(
+            username="timelineoutsider",
+            email="timelineoutsider@example.com",
+            password="pass12345",
+        )
+        self.topic.moderators.add(moderator)
+        timeline = TopicTimeline.objects.create(topic=self.topic, created_by=self.user)
+        first = TopicTimelineEntry.objects.create(timeline=timeline, title="First", order=1, created_by=self.user)
+        second = TopicTimelineEntry.objects.create(timeline=timeline, title="Second", order=2, created_by=self.user)
+
+        create_url = reverse("content:topic-timeline", args=[self.topic.id])
+        self.client.force_authenticate(user=outsider)
+        forbidden = self.client.post(create_url, {"title": "Nope"}, format="json")
+        self.assertEqual(forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+        reorder_url = reverse("content:topic-timeline-reorder", args=[self.topic.id])
+        self.client.force_authenticate(user=moderator)
+        reordered = self.client.post(reorder_url, {"entry_ids": [second.id, first.id]}, format="json")
+        self.assertEqual(reordered.status_code, status.HTTP_200_OK)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(second.order, 1)
+        self.assertEqual(first.order, 2)
 
 
 class PublicationAPITests(APITestCase):
