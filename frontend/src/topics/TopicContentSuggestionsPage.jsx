@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     Box,
     Typography,
@@ -8,7 +8,8 @@ import {
     Chip,
     Card,
     CardContent,
-    Button
+    Button,
+    Link
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -17,6 +18,8 @@ import PendingIcon from '@mui/icons-material/Pending';
 import contentApi from '../api/contentApi';
 import VoteComponent from '../votes/VoteComponent';
 import { useAuth } from '../context/AuthContext';
+import { getContentOpenInNewTabUrl } from '../utils/fileUtils';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 const TopicContentSuggestionsPage = () => {
     const { topicId } = useParams();
@@ -138,25 +141,37 @@ const TopicContentSuggestionsPage = () => {
                             <CardContent>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                                     <Box sx={{ flexGrow: 1 }}>
-                                        <Typography 
-                                            variant="h6" 
-                                            gutterBottom
-                                            component={Link}
-                                            to={suggestion.content_profile?.id 
-                                                ? `/content/search/${suggestion.content?.id}?profile=${suggestion.content_profile.id}`
-                                                : `/content/search/${suggestion.content?.id}`
+                                        {(() => {
+                                            const viewUrl = getContentOpenInNewTabUrl(suggestion.content);
+                                            const title = suggestion.content?.original_title || 'Sin título';
+                                            if (!viewUrl) {
+                                                return (
+                                                    <Typography variant="h6" gutterBottom>
+                                                        {title}
+                                                    </Typography>
+                                                );
                                             }
-                                            sx={{ 
-                                                textDecoration: 'none',
-                                                color: 'primary.main',
-                                                '&:hover': {
-                                                    textDecoration: 'underline'
-                                                },
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {suggestion.content?.original_title || 'Sin título'}
-                                        </Typography>
+                                            return (
+                                                <Link
+                                                    href={viewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    variant="h6"
+                                                    gutterBottom
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        textDecoration: 'none',
+                                                        color: 'primary.main',
+                                                        '&:hover': { textDecoration: 'underline' },
+                                                    }}
+                                                >
+                                                    {title}
+                                                    <OpenInNewIcon sx={{ fontSize: 18 }} aria-hidden />
+                                                </Link>
+                                            );
+                                        })()}
                                         <Typography variant="body2" color="text.secondary">
                                             Sugerido por <strong>{suggestion.suggested_by?.username || 'Usuario desconocido'}</strong>
                                         </Typography>

@@ -18,6 +18,21 @@ export function resolveMediaUrl(value) {
 export const getFileUrl = resolveMediaUrl;
 
 /**
+ * URL to open content in a new browser tab: external page URL when present,
+ * otherwise the stored file URL (uploaded PDF, video file, etc.).
+ */
+export function getContentOpenInNewTabUrl(content) {
+  if (!content) return null;
+  const external = content.url && String(content.url).trim();
+  if (external) return resolveMediaUrl(external);
+  const fileDetails = content.file_details;
+  if (fileDetails?.file || content.has_file_available) {
+    return resolveMediaUrl(fileDetails?.url ?? fileDetails?.file);
+  }
+  return null;
+}
+
+/**
  * Formats file size in bytes to human readable format
  * @param {number} bytes - File size in bytes
  * @returns {string} - Formatted file size (e.g., "1.5 MB", "2.3 GB")

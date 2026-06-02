@@ -23,12 +23,15 @@ import {
     DialogContent,
     DialogActions,
     IconButton,
-    Tooltip
+    Tooltip,
+    Link
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
+import { getContentOpenInNewTabUrl } from '../utils/fileUtils';
 
 const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
     const [suggestions, setSuggestions] = useState([]);
@@ -228,9 +231,37 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                             {filteredSuggestions.map((suggestion) => (
                                 <TableRow key={suggestion.id}>
                                     <TableCell>
-                                        <Typography variant="body2" fontWeight="medium">
-                                            {suggestion.content?.original_title || 'Sin título'}
-                                        </Typography>
+                                        {(() => {
+                                            const viewUrl = getContentOpenInNewTabUrl(suggestion.content);
+                                            const title = suggestion.content?.original_title || 'Sin título';
+                                            if (!viewUrl) {
+                                                return (
+                                                    <Typography variant="body2" fontWeight="medium">
+                                                        {title}
+                                                    </Typography>
+                                                );
+                                            }
+                                            return (
+                                                <Link
+                                                    href={viewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    variant="body2"
+                                                    fontWeight="medium"
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        maxWidth: '100%',
+                                                    }}
+                                                >
+                                                    <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {title}
+                                                    </Box>
+                                                    <OpenInNewIcon sx={{ fontSize: 14, flexShrink: 0 }} aria-hidden />
+                                                </Link>
+                                            );
+                                        })()}
                                         {suggestion.is_duplicate && (
                                             <Chip 
                                                 label="Duplicada" 
