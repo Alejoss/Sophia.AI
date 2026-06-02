@@ -14,7 +14,7 @@ from rest_framework.decorators import action
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.db.models import Q, OuterRef, Subquery, Count
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -27,7 +27,20 @@ from utils.notification_utils import (
     notify_topic_moderator_invitation_declined,
     notify_topic_moderator_removed,
 )
-from content.models import Library, Collection, Content, Topic, ContentProfile, FileDetails, Publication, TopicModeratorInvitation, ContentSuggestion, FileSuggestion
+from content.models import (
+    Library,
+    Collection,
+    Content,
+    Topic,
+    TopicTimeline,
+    TopicTimelineEntry,
+    ContentProfile,
+    FileDetails,
+    Publication,
+    TopicModeratorInvitation,
+    ContentSuggestion,
+    FileSuggestion,
+)
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
 from content.serializers import (
@@ -46,7 +59,9 @@ from content.serializers import (
     PublicationBasicSerializer,
     TopicModeratorInvitationSerializer,
     ContentSuggestionSerializer,
-    FileSuggestionSerializer
+    FileSuggestionSerializer,
+    TopicTimelineSerializer,
+    TopicTimelineEntrySerializer,
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
@@ -1819,6 +1834,226 @@ class TopicContentSimpleView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class TopicTimelineView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def get_timeline_queryset(self):
+        return TopicTimeline.objects.select_related(
+            'topic',
+            'created_by',
+        ).prefetch_related(
+            'entries',
+            'entries__created_by',
+            'entries__updated_by',
+            'entries__entry_contents',
+            'entries__entry_contents__content',
+            'entries__entry_contents__content__file_details',
+            'entries__entry_contents__content__profiles',
+        )
+
+    def get_selected_profiles(self, timeline, request):
+        selected_profiles = {}
+        for entry in timeline.entries.all():
+            for link in entry.entry_contents.all():
+                content = link.content
+                selected_profiles[content.id] = get_topic_content_profile_for_display(
+                    content,
+                    request,
+                    timeline.topic,
+                    prefetched_profiles=list(content.profiles.all()),
+                )
+        return selected_profiles
+
+    def serialize_timeline(self, timeline, request):
+        return TopicTimelineSerializer(
+            timeline,
+            context={
+                'request': request,
+                'topic': timeline.topic,
+                'selected_profiles': self.get_selected_profiles(timeline, request),
+            },
+        ).data
+
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        timeline = self.get_timeline_queryset().filter(topic=topic).first()
+        if timeline is None:
+            return Response(
+                {
+                    'id': None,
+                    'topic': topic.id,
+                    'title': '',
+                    'description': '',
+                    'entries': [],
+                    'created_by': None,
+                    'created_at': None,
+                    'updated_at': None,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(self.serialize_timeline(timeline, request), status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'No tiene permiso para editar la linea de tiempo de este tema.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        timeline, _ = TopicTimeline.objects.get_or_create(
+            topic=topic,
+            defaults={
+                'title': topic.title,
+                'created_by': request.user,
+            },
+        )
+        serializer = TopicTimelineEntrySerializer(
+            data=request.data,
+            context={
+                'request': request,
+                'topic': topic,
+                'timeline': timeline,
+            },
+        )
+        if serializer.is_valid():
+            entry = serializer.save()
+            timeline = self.get_timeline_queryset().get(pk=timeline.pk)
+            response_serializer = TopicTimelineEntrySerializer(
+                entry,
+                context={
+                    'request': request,
+                    'topic': topic,
+                    'timeline': timeline,
+                    'selected_profiles': self.get_selected_profiles(timeline, request),
+                },
+            )
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TopicTimelineEntryDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def get_entry(self, topic_id, entry_id):
+        return get_object_or_404(
+            TopicTimelineEntry.objects.select_related(
+                'timeline',
+                'timeline__topic',
+                'created_by',
+                'updated_by',
+            ).prefetch_related(
+                'entry_contents',
+                'entry_contents__content',
+                'entry_contents__content__file_details',
+                'entry_contents__content__profiles',
+            ),
+            pk=entry_id,
+            timeline__topic_id=topic_id,
+        )
+
+    def get_selected_profiles(self, entry, request):
+        selected_profiles = {}
+        topic = entry.timeline.topic
+        for link in entry.entry_contents.all():
+            content = link.content
+            selected_profiles[content.id] = get_topic_content_profile_for_display(
+                content,
+                request,
+                topic,
+                prefetched_profiles=list(content.profiles.all()),
+            )
+        return selected_profiles
+
+    def patch(self, request, pk, entry_id):
+        entry = self.get_entry(pk, entry_id)
+        topic = entry.timeline.topic
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'No tiene permiso para editar la linea de tiempo de este tema.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = TopicTimelineEntrySerializer(
+            entry,
+            data=request.data,
+            partial=True,
+            context={
+                'request': request,
+                'topic': topic,
+                'timeline': entry.timeline,
+            },
+        )
+        if serializer.is_valid():
+            updated_entry = serializer.save()
+            updated_entry = self.get_entry(pk, updated_entry.pk)
+            response_serializer = TopicTimelineEntrySerializer(
+                updated_entry,
+                context={
+                    'request': request,
+                    'topic': topic,
+                    'timeline': updated_entry.timeline,
+                    'selected_profiles': self.get_selected_profiles(updated_entry, request),
+                },
+            )
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, entry_id):
+        entry = self.get_entry(pk, entry_id)
+        topic = entry.timeline.topic
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'No tiene permiso para editar la linea de tiempo de este tema.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        entry.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TopicTimelineReorderView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'No tiene permiso para editar la linea de tiempo de este tema.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        timeline = TopicTimeline.objects.filter(topic=topic).first()
+        if timeline is None:
+            return Response({'error': 'La linea de tiempo no existe.'}, status=status.HTTP_404_NOT_FOUND)
+
+        entry_ids = request.data.get('entry_ids', [])
+        if not isinstance(entry_ids, list) or not entry_ids:
+            return Response(
+                {'entry_ids': 'Debe enviar una lista de entradas en el nuevo orden.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_ids = set(timeline.entries.values_list('id', flat=True))
+        requested_ids = set(entry_ids)
+        if current_ids != requested_ids:
+            return Response(
+                {'entry_ids': 'La lista debe incluir exactamente todas las entradas de la linea de tiempo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            for index, entry_id in enumerate(entry_ids, start=1):
+                TopicTimelineEntry.objects.filter(
+                    id=entry_id,
+                    timeline=timeline,
+                ).update(order=index, updated_by=request.user)
+
+        return Response({'message': 'Timeline reordered successfully'}, status=status.HTTP_200_OK)
 
 
 class TopicBasicView(APIView):

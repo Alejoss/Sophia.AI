@@ -485,6 +485,58 @@ const contentApi = {
         }
     },
 
+    getTopicTimeline: async (topicId) => {
+        try {
+            const response = await axiosInstance.get(`/content/topics/${topicId}/timeline/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching topic timeline:', error);
+            throw error;
+        }
+    },
+
+    createTopicTimelineEntry: async (topicId, entryData) => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/`, entryData);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating topic timeline entry:', error.response || error);
+            throw error;
+        }
+    },
+
+    updateTopicTimelineEntry: async (topicId, entryId, entryData) => {
+        try {
+            const response = await axiosInstance.patch(`/content/topics/${topicId}/timeline/${entryId}/`, entryData);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating topic timeline entry:', error.response || error);
+            throw error;
+        }
+    },
+
+    deleteTopicTimelineEntry: async (topicId, entryId) => {
+        try {
+            const response = await axiosInstance.delete(`/content/topics/${topicId}/timeline/${entryId}/`);
+            return response.data;
+        } catch (error) {
+            console.error('Error deleting topic timeline entry:', error.response || error);
+            throw error;
+        }
+    },
+
+    reorderTopicTimeline: async (topicId, entryIds) => {
+        try {
+            const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/reorder/`, {
+                entry_ids: entryIds,
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error reordering topic timeline:', error.response || error);
+            throw error;
+        }
+    },
+
     getTopicBasicDetails: async (topicId) => {
         try {
             const response = await axiosInstance.get(`/content/topics/${topicId}/basic/`);
