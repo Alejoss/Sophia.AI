@@ -119,6 +119,22 @@ git pull origin main
 ./scripts/deploy.sh
 ```
 
+### Comandos Django puntuales (producción)
+
+Patrón general (desde la raíz del proyecto, tras un deploy):
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py <comando>
+```
+
+**Miniaturas de temas** (adaptar portadas al listado):
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py generate_topic_thumbnails
+```
+
+Opciones: `--topic-id=<id>`, `--force`. Detalle en [DEPLOYMENT_QUICK_START.md](../../DEPLOYMENT_QUICK_START.md).
+
 ## 🔍 Verificaciones
 
 ```bash

@@ -162,6 +162,33 @@ git pull origin main && ./scripts/deploy.sh
 ./scripts/deploy.sh --build-local
 ```
 
+**Django management commands (production):**
+
+Run from the project root after `./scripts/deploy.sh` (`.env.compose` is created by the deploy script). Use the same pattern as local dev, but with `docker compose`, `docker-compose.prod.yml`, and `--env-file .env.compose`:
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py <command>
+```
+
+**Topic listing thumbnails** — backfill `topic_image_thumbnail` from existing cover images (`topic_image`). Run once after deploying code that adds thumbnails, or with `--force` to regenerate all:
+
+```bash
+# All topics with a cover image (skips topics that already have a thumbnail)
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py generate_topic_thumbnails
+
+# One topic only
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py generate_topic_thumbnails --topic-id=3
+
+# Regenerate even when a thumbnail already exists
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py generate_topic_thumbnails --force
+```
+
+Local equivalent (dev stack):
+
+```bash
+docker-compose exec backend python manage.py generate_topic_thumbnails
+```
+
 ### Health Checks
 
 **Script (on server):**

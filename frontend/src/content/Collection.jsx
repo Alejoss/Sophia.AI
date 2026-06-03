@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, Chip, IconButton, Button } from '@mui/material';
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -9,6 +9,7 @@ import { resolveMediaUrl } from '../utils/fileUtils';
 const Collection = () => {
     const { collectionId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [content, setContent] = useState([]);
     const [collectionName, setCollectionName] = useState('');
     const [isOwner, setIsOwner] = useState(false);
@@ -43,6 +44,11 @@ const Collection = () => {
     if (error) return <Typography color="error">{error}</Typography>;
 
     const handleBack = () => {
+        const returnTo = location.state?.from;
+        if (returnTo) {
+            navigate(returnTo);
+            return;
+        }
         if (isOwner) {
             navigate('/content/collections');
             return;
@@ -70,7 +76,7 @@ const Collection = () => {
                     <Button
                         variant="contained"
                         color="primary"
-                        onClick={() => navigate(`/content/collections/${collectionId}/edit`)}
+                        onClick={() => navigate(`/content/collections/${collectionId}/edit`, { state: location.state })}
                     >
                         Editar Colección
                     </Button>

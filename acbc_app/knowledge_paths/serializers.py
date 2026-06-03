@@ -3,6 +3,7 @@ from .models import KnowledgePath, Node
 from django.contrib.auth.models import User
 from content.models import FileDetails, ContentProfile
 from content.utils import build_media_url
+from content.image_utils import validate_cover_image_size
 from profiles.models import UserNodeCompletion
 from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
 from quizzes.serializers import QuizSerializer
@@ -124,6 +125,14 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Los caminos de conocimiento necesitan al menos dos nodos para ser visibles"
             )
+        return value
+
+    def validate_image(self, value):
+        if value:
+            try:
+                validate_cover_image_size(value)
+            except ValueError as e:
+                raise serializers.ValidationError(str(e)) from e
         return value
 
     def create(self, validated_data):

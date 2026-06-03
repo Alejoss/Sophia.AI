@@ -134,6 +134,18 @@ docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
 ```
 
+### Topic listing thumbnails (optional)
+
+Generate downsized `topic_image_thumbnail` files for topics that already have a cover image (`topic_image`). Useful after adding the thumbnail feature or to backfill existing topics:
+
+```bash
+docker-compose exec backend python manage.py generate_topic_thumbnails
+docker-compose exec backend python manage.py generate_topic_thumbnails --topic-id=3
+docker-compose exec backend python manage.py generate_topic_thumbnails --force
+```
+
+On the production server, use `docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend ...` — see [DEPLOYMENT_QUICK_START.md](../../DEPLOYMENT_QUICK_START.md) (section *Django management commands*).
+
 ## Step 6: Setup Google OAuth (Optional)
 
 Set up Google OAuth for social login functionality:

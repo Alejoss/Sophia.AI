@@ -72,7 +72,7 @@ const CollectionsUser = () => {
                     <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={collection.id}>
                         <Card 
                             sx={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/content/collections/${collection.id}`)}
+                            onClick={() => navigate(`/content/collections/${collection.id}`, { state: { from: '/content/library_user' } })}
                         >
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1 }}>

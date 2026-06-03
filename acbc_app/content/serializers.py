@@ -18,6 +18,7 @@ from content.models import (
     FileSuggestion,
 )
 from content.utils import build_media_url
+from content.image_utils import validate_cover_image_size
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
 
@@ -331,6 +332,14 @@ class TopicBasicSerializer(serializers.ModelSerializer):
         if len(value.strip()) == 0:
             raise serializers.ValidationError("El título no puede estar vacío o contener solo espacios en blanco.")
         return value.strip()
+
+    def validate_topic_image(self, value):
+        if value:
+            try:
+                validate_cover_image_size(value)
+            except ValueError as e:
+                raise serializers.ValidationError(str(e)) from e
+        return value
 
 
 class TopicDetailSerializer(TopicBasicSerializer):

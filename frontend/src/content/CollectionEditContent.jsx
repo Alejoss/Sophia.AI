@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
@@ -32,6 +32,7 @@ import LibrarySelectMultiple from './LibrarySelectMultiple';
 const CollectionEditContent = () => {
     const { collectionId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [collectionData, setCollectionData] = useState(null);
     const [collectionName, setCollectionName] = useState('');
     const [editingName, setEditingName] = useState(false);
@@ -53,7 +54,7 @@ const CollectionEditContent = () => {
                 ]);
 
                 if (collectionInfo.is_owner === false) {
-                    navigate(`/content/collections/${collectionId}`, { replace: true });
+                    navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state });
                     setLoading(false);
                     return;
                 }
@@ -211,7 +212,7 @@ const CollectionEditContent = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
                     <IconButton 
                         onClick={() =>
-                            navigate(`/content/collections/${collectionId}`, { replace: true })
+                            navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state })
                         }
                         sx={{ mr: 1 }}
                     >

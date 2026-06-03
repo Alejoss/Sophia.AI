@@ -12,6 +12,9 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
+/** Max cover image size for topics and knowledge paths (must match backend). */
+const MAX_COVER_IMAGE_BYTES = 3 * 1024 * 1024;
+
 /**
  * Reusable modal for image upload with focal point selection.
  * @param {string} entityLabel - Label for the entity (e.g. "tema", "camino de conocimiento")
@@ -37,15 +40,14 @@ const ImageUploadModal = ({
   const hasExistingImage = Boolean(existingImageUrl);
 
   const validateFile = (file) => {
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
     const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
 
     if (!allowedTypes.includes(file.type)) {
       return "El archivo debe ser una imagen (JPEG, PNG o GIF)";
     }
 
-    if (file.size > maxSize) {
-      return "El tamaño del archivo debe ser menor a 2MB";
+    if (file.size > MAX_COVER_IMAGE_BYTES) {
+      return "El tamaño del archivo debe ser menor a 3 MB";
     }
 
     return null;
@@ -189,7 +191,7 @@ const ImageUploadModal = ({
                 <ListItemIcon>
                   <CheckCircleIcon color="disabled" />
                 </ListItemIcon>
-                <ListItemText primary="Tamaño máximo: 2MB" />
+                <ListItemText primary="Tamaño máximo: 3 MB" />
               </ListItem>
               <ListItem>
                 <ListItemIcon>

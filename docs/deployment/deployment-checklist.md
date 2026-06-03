@@ -152,6 +152,9 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 
 # Colectar static files
 docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+
+# Miniaturas de portada para listados de temas (backfill; ver DEPLOYMENT_QUICK_START.md)
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py generate_topic_thumbnails
 ```
 
 ### 5. Configurar Nginx

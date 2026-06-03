@@ -260,7 +260,7 @@ const MainSearch = () => {
                   borderColor: 'divider',
                 }}
               >
-                <CardActionArea onClick={() => navigate(`/content/collections/${c.id}`)}>
+                <CardActionArea onClick={() => navigate(`/content/collections/${c.id}`, { state: { from: '/search' } })}>
                   <CardContent sx={{ py: 2 }}>
                     <Typography variant="subtitle1" fontWeight={600} gutterBottom component="div">
                       {c.name}

@@ -16,6 +16,15 @@ TOPIC_THUMB_MAX_HEIGHT = 320
 TOPIC_THUMB_QUALITY = 80
 TOPIC_THUMB_FILENAME = 'topic_image_thumb.webp'
 
+# Cover uploads (topic + knowledge path); keep in sync with ImageUploadModal.jsx
+COVER_IMAGE_MAX_BYTES = 3 * 1024 * 1024
+
+
+def validate_cover_image_size(uploaded_file):
+    """Raise ValueError if the uploaded cover exceeds COVER_IMAGE_MAX_BYTES."""
+    if uploaded_file and getattr(uploaded_file, 'size', 0) > COVER_IMAGE_MAX_BYTES:
+        raise ValueError('La imagen no debe superar 3 MB.')
+
 
 def _s3_public_domain():
     """Public bucket host for reading media (works in dev when DB points at S3 keys)."""
