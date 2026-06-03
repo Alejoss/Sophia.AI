@@ -21,6 +21,7 @@ from events.serializers import (EventSerializer,
                                 EventRegistrationSerializer,
                                 EventRegistrationListSerializer)
 from utils.notification_utils import notify_event_registration, notify_payment_accepted, notify_certificate_sent
+from payments.services import is_payments_gateway_configured
 
 logger = logging.getLogger(__name__)
 
@@ -663,6 +664,16 @@ class EventParticipantStatusView(APIView):
             logger.info(f"Processing participant status update - Event ID: {event_id}, Registration ID: {registration_id}, Action: {action}, Participant User ID: {registration.user.id}")
             
             if action == 'accept_payment':
+                if event.reference_price and event.reference_price > 0 and is_payments_gateway_configured():
+                    return Response(
+                        {
+                            'error': (
+                                'Los pagos de este evento se confirman automáticamente '
+                                'por la pasarela de criptomonedas.'
+                            ),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 registration.payment_status = 'PAID'
                 registration.save()
                 

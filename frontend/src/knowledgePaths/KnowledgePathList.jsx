@@ -168,11 +168,12 @@ const KnowledgePathList = () => {
                 }}
               >
                 {/* Cover Image */}
-                {path.image ? (
+                {(path.image_preview || path.image) ? (
                   <CardMedia
                     component="img"
                     height="140"
-                    image={path.image}
+                    loading="lazy"
+                    image={path.image_preview || path.image}
                     alt={path.title}
                     sx={{
                       objectFit: 'cover',

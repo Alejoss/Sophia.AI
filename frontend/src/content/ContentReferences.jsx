@@ -32,7 +32,7 @@ const ContentReferences = ({ references }) => {
                                 }}
                             >
                                 <Avatar 
-                                    src={path.image} 
+                                    src={path.image_preview || path.image} 
                                     alt={path.title}
                                     sx={{ 
                                         width: 40, 

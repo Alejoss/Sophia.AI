@@ -89,8 +89,15 @@ const ContentDisplay = ({
   const contentExternalUrl = content.url ?? contentData?.url ?? null;
   const favicon = contentData.favicon;
   const selectedProfileThumbnail = content?.selected_profile?.thumbnail;
+  const selectedProfileThumbnailPreview = content?.selected_profile?.thumbnail_preview;
   const previewProfileThumbnail = content?.thumbnail;
+  const previewProfileThumbnailPreview = content?.thumbnail_preview;
   const customThumbnail = selectedProfileThumbnail || previewProfileThumbnail;
+  /** Downsized WebP when available; falls back to full custom thumbnail or OG. */
+  const customThumbnailForDisplay =
+    selectedProfileThumbnailPreview ||
+    previewProfileThumbnailPreview ||
+    customThumbnail;
   const hasFileAvailable = Boolean(
     fileDetails?.file || content?.has_file_available || contentData?.has_file_available
   );
@@ -305,7 +312,7 @@ const ContentDisplay = ({
 
     switch (mediaTypeUpper) {
       case "IMAGE": {
-        const thumbUrl = customThumbnail || fileUrl;
+        const thumbUrl = customThumbnailForDisplay || fileUrl;
         if (!thumbUrl) {
           console.warn("No file URL found for image content:", contentData);
           return (
@@ -385,7 +392,7 @@ const ContentDisplay = ({
       }
       case "VIDEO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl = customThumbnail || fileDetails?.og_image;
+          const thumbUrl = customThumbnailForDisplay || fileDetails?.og_image;
           if (thumbUrl) {
             return (
               <Box
@@ -452,7 +459,7 @@ const ContentDisplay = ({
         );
       case "AUDIO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl = customThumbnail || fileDetails?.og_image;
+          const thumbUrl = customThumbnailForDisplay || fileDetails?.og_image;
           if (thumbUrl) {
             return (
               <Box
@@ -1067,11 +1074,12 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   // 0. Check for user-defined thumbnail (ContentProfile)
-                  if (customThumbnail && !imageLoadError) {
+                  if (customThumbnailForDisplay && !imageLoadError) {
                     return (
                       <img
-                        src={customThumbnail}
+                        src={customThumbnailForDisplay}
                         alt="Content thumbnail"
+                        loading="lazy"
                         style={{
                           width: "100%",
                           height: "100%",
@@ -1433,11 +1441,12 @@ const ContentDisplay = ({
                   const hasImageFile = isImage && fileDetails?.file;
 
                   // 0. Check for user-defined thumbnail (ContentProfile)
-                  if (customThumbnail && !imageLoadError) {
+                  if (customThumbnailForDisplay && !imageLoadError) {
                     return (
                       <img
-                        src={customThumbnail}
+                        src={customThumbnailForDisplay}
                         alt="Content thumbnail"
+                        loading="lazy"
                         style={{
                           width: "100%",
                           height: "100%",

@@ -132,6 +132,13 @@ def content_profile_thumbnail_upload_path(instance, filename):
     return f"content_profile_thumbnails/{content_id}/{user_id}/{uuid.uuid4().hex}_{safe_name}"
 
 
+def content_profile_thumbnail_preview_path(instance, filename):
+    """Downsized WebP for lists/cards (ContentDisplay, topic content grids)."""
+    content_id = instance.content_id or 0
+    user_id = instance.user_id or 0
+    return f"content_profile_thumbnails/{content_id}/{user_id}/preview.webp"
+
+
 class ContentProfile(models.Model):
     """
     Represents a user's personalized view/version of a content.
@@ -156,7 +163,14 @@ class ContentProfile(models.Model):
         blank=True,
         max_length=255
     )
-    
+    thumbnail_preview = models.ImageField(
+        upload_to=content_profile_thumbnail_preview_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="Auto-generated downsized thumbnail for list/card views.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

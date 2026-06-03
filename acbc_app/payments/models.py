@@ -49,4 +49,5 @@ class CryptoPayment(models.Model):
 
     @property
     def is_paid(self):
-        return self.payment_status in ('finished', 'confirmed')
+        """True when NOWPayments reports finished (funds in merchant wallet)."""
+        return self.payment_status == 'finished'

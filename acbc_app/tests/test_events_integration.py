@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -7,6 +7,7 @@ from tests.factories.events import EventFactory, EventRegistrationFactory
 from tests.factories.users import UserFactory
 
 
+@override_settings(NOWPAYMENTS_API_KEY='')
 class EventLifecycleIntegrationTest(TestCase):
     """Integration tests for complete event lifecycle."""
 

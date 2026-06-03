@@ -331,6 +331,13 @@ const ContentProfileEdit = () => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
 
+                                        const maxBytes = 3 * 1024 * 1024;
+                                        if (file.size > maxBytes) {
+                                            setError('La miniatura no debe superar 3 MB.');
+                                            e.target.value = '';
+                                            return;
+                                        }
+
                                         // Revoke previous blob preview (if any) to avoid memory leaks.
                                         setThumbnailFile(file);
                                         if (
@@ -429,7 +436,7 @@ const ContentProfileEdit = () => {
                         {content.url && content.is_original_uploader && (
                             <Box sx={{ mb: 3 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                    URL del contenido (fuente compartida)
+                                    URL del contenido
                                 </Typography>
                                 <Typography
                                     variant="body2"

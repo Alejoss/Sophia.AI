@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -321,6 +321,7 @@ class UserCreatedEventsAPITest(TestCase):
         self.assertNotIn(self.other_event.title, [e['title'] for e in response.data])
 
 
+@override_settings(NOWPAYMENTS_API_KEY='')
 class EventParticipantStatusAPITest(TestCase):
     """Test cases for EventParticipantStatus API endpoint."""
 

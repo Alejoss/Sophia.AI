@@ -1,7 +1,7 @@
 import logging
 import uuid
+from decimal import Decimal
 
-from django.conf import settings
 from django.db import transaction
 
 from events.models import EventRegistration
@@ -13,8 +13,10 @@ from utils.notification_utils import notify_payment_accepted
 logger = logging.getLogger(__name__)
 
 ALLOWED_PAY_CURRENCIES = {'bch', 'xmr'}
-# finished = funds in merchant wallet; confirmed = on-chain confirmed (docs allow both)
-TERMINAL_SUCCESS = {'finished', 'confirmed'}
+# NOWPayments: only "finished" means funds reached the merchant wallet (safe to fulfill).
+# "confirmed" is on-chain only — proceed only if you validate actually_paid vs pay_amount.
+REGISTRATION_PAID_STATUS = 'finished'
+OPEN_PAYMENT_STATUSES = ('waiting', 'confirming', 'confirmed', 'sending', 'partially_paid')
 
 
 def _extract_pay_address(payload: dict) -> str:
@@ -22,11 +24,60 @@ def _extract_pay_address(payload: dict) -> str:
 
 
 def _public_base_url():
+    from django.conf import settings
     return getattr(settings, 'ACADEMIA_PUBLIC_URL', 'http://localhost:8000').rstrip('/')
 
 
-def _frontend_base_url():
-    return getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
+def is_payments_gateway_configured() -> bool:
+    return NOWPaymentsClient().configured
+
+
+def _should_mark_registration_paid(status: str, payload: dict, crypto_payment: CryptoPayment) -> bool:
+    if status != REGISTRATION_PAID_STATUS:
+        return False
+    pay_amount = crypto_payment.pay_amount
+    if pay_amount is None:
+        pay_amount = payload.get('pay_amount')
+    actually_paid = payload.get('actually_paid')
+    if actually_paid is None:
+        actually_paid = crypto_payment.actually_paid
+    if pay_amount is not None and actually_paid is not None:
+        try:
+            return Decimal(str(actually_paid)) >= Decimal(str(pay_amount))
+        except Exception:
+            logger.warning(
+                'Could not compare actually_paid vs pay_amount for order %s',
+                crypto_payment.order_id,
+            )
+    return True
+
+
+def _mark_registration_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    with transaction.atomic():
+        registration = EventRegistration.objects.select_for_update().get(
+            pk=crypto_payment.registration_id
+        )
+        if registration.payment_status == 'PAID':
+            return
+        registration.payment_status = 'PAID'
+        registration.save(update_fields=['payment_status'])
+
+    registration = EventRegistration.objects.select_related('event', 'event__owner', 'user').get(
+        pk=crypto_payment.registration_id
+    )
+    try:
+        notify_payment_accepted(registration)
+    except Exception as exc:
+        logger.error('Payment notification failed for registration %s: %s', registration.id, exc)
+    try:
+        on_crypto_payment_completed(crypto_payment, registration)
+    except Exception as exc:
+        logger.error(
+            'on_crypto_payment_completed failed for registration %s: %s',
+            registration.id,
+            exc,
+            exc_info=True,
+        )
 
 
 def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> CryptoPayment:
@@ -43,30 +94,12 @@ def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> 
     crypto_payment.provider_payload = payload
     crypto_payment.save()
 
-    if status in TERMINAL_SUCCESS:
-        registration = crypto_payment.registration
-        was_unpaid = registration.payment_status != 'PAID'
-        if was_unpaid:
-            registration.payment_status = 'PAID'
-            registration.save(update_fields=['payment_status'])
-            try:
-                notify_payment_accepted(registration)
-            except Exception as exc:
-                logger.error('Payment notification failed for registration %s: %s', registration.id, exc)
-            try:
-                on_crypto_payment_completed(crypto_payment, registration)
-            except Exception as exc:
-                logger.error(
-                    'on_crypto_payment_completed failed for registration %s: %s',
-                    registration.id,
-                    exc,
-                    exc_info=True,
-                )
+    if _should_mark_registration_paid(status, payload, crypto_payment):
+        _mark_registration_paid_if_needed(crypto_payment)
 
     return crypto_payment
 
 
-@transaction.atomic
 def create_event_registration_payment(*, registration: EventRegistration, pay_currency: str, user) -> CryptoPayment:
     if registration.user_id != user.id:
         raise PermissionError('Solo el participante puede iniciar el pago.')
@@ -87,12 +120,11 @@ def create_event_registration_payment(*, registration: EventRegistration, pay_cu
     if not client.configured:
         raise NOWPaymentsError('La pasarela de pagos no está configurada en el servidor.')
 
-    # Reuse open payment for same currency if still waiting
     existing = (
         CryptoPayment.objects.filter(
             registration=registration,
             pay_currency=pay_currency,
-            payment_status__in=('waiting', 'confirming', 'confirmed', 'sending', 'partially_paid'),
+            payment_status__in=OPEN_PAYMENT_STATUSES,
         )
         .order_by('-created_at')
         .first()
@@ -115,17 +147,18 @@ def create_event_registration_payment(*, registration: EventRegistration, pay_cu
         ipn_callback_url=ipn_url,
     )
 
-    crypto_payment = CryptoPayment.objects.create(
-        registration=registration,
-        order_id=order_id,
-        nowpayments_payment_id=payload.get('payment_id'),
-        pay_currency=pay_currency,
-        price_amount=float(event.reference_price),
-        price_currency='usd',
-        pay_amount=payload.get('pay_amount'),
-        pay_address=_extract_pay_address(payload),
-        payment_status=payload.get('payment_status', 'waiting'),
-        invoice_url='',
-        provider_payload=payload,
-    )
+    with transaction.atomic():
+        crypto_payment = CryptoPayment.objects.create(
+            registration=registration,
+            order_id=order_id,
+            nowpayments_payment_id=payload.get('payment_id'),
+            pay_currency=pay_currency,
+            price_amount=float(event.reference_price),
+            price_currency='usd',
+            pay_amount=payload.get('pay_amount'),
+            pay_address=_extract_pay_address(payload),
+            payment_status=payload.get('payment_status', 'waiting'),
+            invoice_url='',
+            provider_payload=payload,
+        )
     return crypto_payment

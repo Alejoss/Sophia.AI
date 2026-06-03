@@ -18,9 +18,28 @@ from content.models import (
     FileSuggestion,
 )
 from content.utils import build_media_url
-from content.image_utils import validate_cover_image_size
+from content.image_utils import (
+    validate_cover_image_size,
+    validate_content_profile_thumbnail_size,
+    generate_content_profile_thumbnail_preview,
+    delete_content_profile_thumbnail_preview,
+)
 from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
+
+
+def _content_profile_thumbnail_urls(profile, request):
+    """Absolute URLs for full custom thumbnail and listing-sized preview."""
+    thumb = build_media_url(profile.thumbnail, request) if profile.thumbnail else None
+    preview = (
+        build_media_url(profile.thumbnail_preview, request)
+        if profile.thumbnail_preview
+        else None
+    )
+    if preview and getattr(profile, 'updated_at', None):
+        sep = '&' if '?' in preview else '?'
+        preview = f"{preview}{sep}t={int(profile.updated_at.timestamp())}"
+    return thumb, preview
 
 
 class LibrarySerializer(serializers.ModelSerializer):
@@ -184,21 +203,45 @@ class ContentProfileSerializer(serializers.ModelSerializer):
     is_producer = serializers.BooleanField(default=False)
     user = UserSerializer(read_only=True)
     thumbnail = serializers.ImageField(required=False, allow_null=True)
+    thumbnail_preview = serializers.ImageField(read_only=True, required=False)
+
+    def validate_thumbnail(self, value):
+        if value:
+            try:
+                validate_content_profile_thumbnail_size(value)
+            except ValueError as e:
+                raise serializers.ValidationError(str(e)) from e
+        return value
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        if instance.thumbnail:
+            generate_content_profile_thumbnail_preview(instance)
+        return instance
+
+    def update(self, instance, validated_data):
+        thumbnail_updated = 'thumbnail' in validated_data
+        instance = super().update(instance, validated_data)
+        if thumbnail_updated:
+            delete_content_profile_thumbnail_preview(instance, save=False)
+            if instance.thumbnail:
+                generate_content_profile_thumbnail_preview(instance)
+        return instance
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-
-        # Ensure we always return an absolute URL for the thumbnail.
         request = self.context.get('request')
-        data['thumbnail'] = (
-            build_media_url(instance.thumbnail, request) if instance.thumbnail else None
-        )
-
+        thumb, preview = _content_profile_thumbnail_urls(instance, request)
+        data['thumbnail'] = thumb
+        data['thumbnail_preview'] = preview
         return data
 
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'is_visible', 'is_producer', 'collection', 'collection_name', 'content', 'user']
+        fields = [
+            'id', 'title', 'author', 'personal_note', 'thumbnail', 'thumbnail_preview',
+            'is_visible', 'is_producer', 'collection', 'collection_name', 'content', 'user',
+        ]
 
 
 class ContentWithSelectedProfileSerializer(ContentSerializer):
@@ -217,12 +260,14 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
             profile = self.context['selected_profiles'].get(content.id)
         
         if profile:
+            thumb, preview = _content_profile_thumbnail_urls(profile, request)
             return {
                 'id': profile.id,
                 'title': profile.title or content.original_title,
                 'author': profile.author or content.original_author,
                 'personal_note': profile.personal_note,
-                'thumbnail': build_media_url(profile.thumbnail, request) if profile.thumbnail else None,
+                'thumbnail': thumb,
+                'thumbnail_preview': preview,
                 'is_visible': profile.is_visible,
                 'is_producer': profile.is_producer,
                 'user': profile.user.id,
@@ -238,6 +283,7 @@ class ContentWithSelectedProfileSerializer(ContentSerializer):
             'author': content.original_author,
             'personal_note': None,
             'thumbnail': None,
+            'thumbnail_preview': None,
             'is_visible': True,
             'is_producer': False,
             'user': content.uploaded_by.id if content.uploaded_by else None,
@@ -840,20 +886,23 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
     """
     content = PreviewContentSerializer(read_only=True)
     thumbnail = serializers.ImageField(required=False, allow_null=True)
-    
+    thumbnail_preview = serializers.ImageField(read_only=True, required=False)
+
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'thumbnail', 'content', 'created_at', 'updated_at']
-        
+        fields = [
+            'id', 'title', 'author', 'personal_note', 'thumbnail', 'thumbnail_preview',
+            'content', 'created_at', 'updated_at',
+        ]
+
     def to_representation(self, instance):
         try:
             data = super().to_representation(instance)
 
-            # Ensure we always return an absolute URL for the thumbnail.
             request = self.context.get('request')
-            data['thumbnail'] = (
-                build_media_url(instance.thumbnail, request) if instance.thumbnail else None
-            )
+            thumb, preview = _content_profile_thumbnail_urls(instance, request)
+            data['thumbnail'] = thumb
+            data['thumbnail_preview'] = preview
 
             # Ensure title falls back to original_title if not set
             if not data['title'] and data['content'] and data['content']['original_title']:
@@ -868,6 +917,7 @@ class PreviewContentProfileSerializer(serializers.ModelSerializer):
                 'author': getattr(instance, 'author', ''),
                 'personal_note': getattr(instance, 'personal_note', ''),
                 'thumbnail': None,
+                'thumbnail_preview': None,
                 'content': {
                     'id': getattr(instance.content, 'id', None) if instance.content else None,
                     'media_type': getattr(instance.content, 'media_type', 'TEXT') if instance.content else 'TEXT',

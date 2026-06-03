@@ -27,6 +27,11 @@ def upload_knowledge_path_image(instance, filename):
         return f"knowledge_path_images/temp_{safe_filename}"
 
 
+def knowledge_path_image_preview_path(instance, filename):
+    """Downsized WebP for knowledge path list cards."""
+    return f"knowledge_path_images/path_{instance.id}_preview.webp"
+
+
 class KnowledgePath(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
@@ -39,6 +44,13 @@ class KnowledgePath(models.Model):
         blank=True,
         max_length=255,  # Increase max length to handle longer filenames
         help_text="Cover image for the knowledge path"
+    )
+    image_preview = models.ImageField(
+        upload_to=knowledge_path_image_preview_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="Auto-generated downsized cover for list/card views.",
     )
     image_focal_x = models.FloatField(default=0.5, blank=True)
     image_focal_y = models.FloatField(default=0.5, blank=True)
@@ -115,9 +127,10 @@ class KnowledgePath(models.Model):
         self.refresh_from_db()
 
     def delete(self, *args, **kwargs):
-        # Delete the image file when the knowledge path is deleted
+        if self.image_preview:
+            self.image_preview.delete(save=False)
         if self.image:
-            self.image.delete()
+            self.image.delete(save=False)
         super().delete(*args, **kwargs)
 
 

@@ -36,11 +36,17 @@ const EventDetail = () => {
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
+  const [gatewayCurrencies, setGatewayCurrencies] = useState(['bch', 'xmr']);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     getPaymentGatewayStatus()
-      .then((data) => setCryptoPaymentsEnabled(!!data.enabled))
+      .then((data) => {
+        setCryptoPaymentsEnabled(!!data.enabled);
+        if (Array.isArray(data.currencies) && data.currencies.length > 0) {
+          setGatewayCurrencies(data.currencies);
+        }
+      })
       .catch(() => setCryptoPaymentsEnabled(false));
   }, []);
 
@@ -502,6 +508,7 @@ const EventDetail = () => {
         registrationId={userRegistration?.id}
         eventTitle={event?.title}
         priceUsd={event?.reference_price}
+        supportedCurrencies={gatewayCurrencies}
         onPaymentComplete={handlePaymentComplete}
       />
     </Container>

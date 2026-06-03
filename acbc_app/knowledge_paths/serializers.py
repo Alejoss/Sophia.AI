@@ -3,10 +3,25 @@ from .models import KnowledgePath, Node
 from django.contrib.auth.models import User
 from content.models import FileDetails, ContentProfile
 from content.utils import build_media_url
-from content.image_utils import validate_cover_image_size
+from content.image_utils import (
+    validate_cover_image_size,
+    generate_knowledge_path_image_preview,
+    delete_knowledge_path_image_preview,
+)
 from profiles.models import UserNodeCompletion
 from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
 from quizzes.serializers import QuizSerializer
+
+
+def _knowledge_path_image_urls(path, request):
+    image = build_media_url(path.image, request) if path.image else None
+    preview = (
+        build_media_url(path.image_preview, request) if path.image_preview else None
+    )
+    if preview and getattr(path, 'updated_at', None):
+        sep = '&' if '?' in preview else '?'
+        preview = f"{preview}{sep}t={int(path.updated_at.timestamp())}"
+    return image, preview
 
 
 class FileDetailsSerializer(serializers.ModelSerializer):
@@ -56,13 +71,15 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
         fields = [
-            'id', 'title', 'author', 'author_id', 'description', 'created_at', 
-            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible'
+            'id', 'title', 'author', 'author_id', 'description', 'created_at',
+            'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image',
+            'image_preview', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
         ]
 
     def get_can_be_visible(self, obj):
@@ -93,9 +110,12 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
         return obj.get_user_vote(request.user)
     
     def get_image(self, obj):
-        if obj.image:
-            return build_media_url(obj.image, self.context.get('request'))
-        return None
+        image, _preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return image
+
+    def get_image_preview(self, obj):
+        _image, preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return preview
 
 
 class KnowledgePathCreateSerializer(serializers.ModelSerializer):
@@ -107,17 +127,14 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'created_at', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible']
-        read_only_fields = ['author', 'created_at']
+        fields = [
+            'id', 'title', 'description', 'author', 'created_at', 'image', 'image_preview',
+            'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
+        ]
+        read_only_fields = ['author', 'created_at', 'image_preview']
 
     def get_can_be_visible(self, obj):
         return obj.can_be_visible()
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if instance.image:
-            data['image'] = build_media_url(instance.image, self.context.get('request'))
-        return data
 
     def validate_is_visible(self, value):
         """Validate that knowledge path can be made visible"""
@@ -138,12 +155,16 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Override create to ensure visibility is False for new knowledge paths"""
         validated_data['is_visible'] = False  # New knowledge paths start as not visible
-        return super().create(validated_data)
-    
+        instance = super().create(validated_data)
+        instance.refresh_from_db()
+        if instance.image:
+            generate_knowledge_path_image_preview(instance)
+        return instance
+
     def update(self, instance, validated_data):
-        # Handle image upload specifically
-        if 'image' in validated_data:
-            # Delete old image if it exists
+        image_updated = 'image' in validated_data
+        if image_updated:
+            delete_knowledge_path_image_preview(instance, save=False)
             if instance.image:
                 instance.image.delete(save=False)
             instance.image = validated_data['image']
@@ -168,36 +189,58 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
             instance.is_visible = new_visibility
         
         instance.save()
-        
+
+        if image_updated and instance.image:
+            generate_knowledge_path_image_preview(instance)
+
         return instance
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        image, preview = _knowledge_path_image_urls(instance, request)
+        data['image'] = image
+        data['image_preview'] = preview
+        return data
 
 
 class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    
+    image_preview = serializers.SerializerMethodField()
+
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'image', 'image_focal_x', 'image_focal_y']
-    
+        fields = ['id', 'title', 'image', 'image_preview', 'image_focal_x', 'image_focal_y']
+
     def get_image(self, obj):
-        if obj.image:
-            return build_media_url(obj.image, self.context.get('request'))
-        return None
+        image, _preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return image
+
+    def get_image_preview(self, obj):
+        _image, preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return preview
 
 
 class KnowledgePathEngagedSerializer(serializers.ModelSerializer):
     author = serializers.CharField(source='author.username', read_only=True)
     author_id = serializers.IntegerField(source='author.id', read_only=True)
     image = serializers.SerializerMethodField()
+    image_preview = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'author_id', 'created_at', 'image', 'image_focal_x', 'image_focal_y']
+        fields = [
+            'id', 'title', 'description', 'author', 'author_id', 'created_at',
+            'image', 'image_preview', 'image_focal_x', 'image_focal_y',
+        ]
 
     def get_image(self, obj):
-        if obj.image:
-            return build_media_url(obj.image, self.context.get('request'))
-        return None
+        image, _preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return image
+
+    def get_image_preview(self, obj):
+        _image, preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return preview
 
 
 class KnowledgePathListSerializer(serializers.ModelSerializer):
@@ -206,12 +249,16 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
     vote_count = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'description', 'author', 'author_id', 
-                 'created_at', 'vote_count', 'user_vote', 'image', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible']
+        fields = [
+            'id', 'title', 'description', 'author', 'author_id', 'created_at',
+            'vote_count', 'user_vote', 'image', 'image_preview',
+            'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
+        ]
 
     def get_can_be_visible(self, obj):
         return obj.can_be_visible()
@@ -226,9 +273,12 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
         return getattr(obj, '_user_vote', 0)
     
     def get_image(self, obj):
-        if obj.image:
-            return build_media_url(obj.image, self.context.get('request'))
-        return None
+        image, _preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return image
+
+    def get_image_preview(self, obj):
+        _image, preview = _knowledge_path_image_urls(obj, self.context.get('request'))
+        return preview
 
 
 # Add a new serializer for reordering

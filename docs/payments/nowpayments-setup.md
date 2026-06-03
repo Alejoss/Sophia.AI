@@ -38,7 +38,7 @@ FRONTEND_PUBLIC_URL=http://localhost:5173
 3. La respuesta incluye `payment_id`, `pay_address`, `pay_amount`, `payment_status` (inicialmente `waiting`).
 4. El usuario envía cripto a `pay_address`.
 5. NOWPayments envía IPN (POST) a `/api/payments/ipn/` en cada cambio de estado.
-6. Cuando el estado es `finished` o `confirmed`, el backend marca el registro como `PAID` y ejecuta `on_crypto_payment_completed`.
+6. Cuando el estado es `finished` (fondos en la wallet del comercio), el backend marca el registro como `PAID` y ejecuta `on_crypto_payment_completed`. El estado `confirmed` solo indica confirmación on-chain; no se usa para marcar el registro como pagado.
 
 Estados relevantes: `waiting` → `confirming` → `confirmed` → `sending` → `finished` (también `failed`, `expired`, `partially_paid`, `refunded`).
 

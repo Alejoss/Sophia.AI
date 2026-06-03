@@ -35,4 +35,10 @@ class CryptoPaymentSerializer(serializers.ModelSerializer):
 
     def get_payin_extra_id(self, obj):
         payload = obj.provider_payload or {}
-        return payload.get('payin_extra_id') or payload.get('payment_extra_ids')
+        extra = payload.get('payin_extra_id') or payload.get('payment_extra_id')
+        if extra:
+            return extra
+        payment_extra_ids = payload.get('payment_extra_ids')
+        if isinstance(payment_extra_ids, list) and payment_extra_ids:
+            return payment_extra_ids[0]
+        return payment_extra_ids

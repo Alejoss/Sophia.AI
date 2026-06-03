@@ -37,7 +37,11 @@ const TOPIC_IMAGE_PAGE_SIZE = 3;
 function getGalleryImageSrc(content) {
     const contentData = content.content || content;
     const fileDetails = contentData.file_details;
-    const customThumb = content.selected_profile?.thumbnail || content.thumbnail;
+    const customThumb =
+        content.selected_profile?.thumbnail_preview ||
+        content.thumbnail_preview ||
+        content.selected_profile?.thumbnail ||
+        content.thumbnail;
     if (customThumb) {
         const resolved = resolveMediaUrl(customThumb);
         return resolved || customThumb;

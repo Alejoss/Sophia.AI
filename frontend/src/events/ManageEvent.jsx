@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchEventById, getEventParticipants, updateParticipantStatus } from '../api/eventsApi';
+import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import certificatesApi from '../api/certificatesApi';
 import {
   Dialog,
@@ -38,6 +39,13 @@ const ManageEvent = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [paymentConfirmationDialog, setPaymentConfirmationDialog] = useState(false);
   const [selectedPaymentRegistration, setSelectedPaymentRegistration] = useState(null);
+  const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
+
+  useEffect(() => {
+    getPaymentGatewayStatus()
+      .then((data) => setCryptoPaymentsEnabled(!!data.enabled))
+      .catch(() => setCryptoPaymentsEnabled(false));
+  }, []);
 
   useEffect(() => {
     loadEventData();
@@ -371,7 +379,9 @@ const ManageEvent = () => {
                         {registration.registration_status === 'REGISTERED' && (
                           <>
                             {/* Accept Payment - only for paid events with pending payment */}
-                            {event.reference_price > 0 && registration.payment_status === 'PENDING' && (
+                            {event.reference_price > 0 &&
+                              registration.payment_status === 'PENDING' &&
+                              !cryptoPaymentsEnabled && (
                               <Button
                                 variant="contained"
                                 color="success"
