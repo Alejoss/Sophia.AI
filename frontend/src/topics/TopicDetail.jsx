@@ -337,6 +337,7 @@ const TopicDetail = () => {
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
     const [contentCounts, setContentCounts] = useState({});
     const [activeTab, setActiveTab] = useState('content');
+    const [timelineEntryCount, setTimelineEntryCount] = useState(0);
     const [imagePageInfo, setImagePageInfo] = useState({
         currentPage: 0,
         totalPages: 0,
@@ -363,12 +364,13 @@ const TopicDetail = () => {
     const refreshTopicPageData = useCallback(async () => {
         setLoading(true);
         try {
-            const [topicData, imageData, videoData, audioData, textData] = await Promise.all([
+            const [topicData, imageData, videoData, audioData, textData, timelineData] = await Promise.all([
                 contentApi.getTopicDetails(topicId, { include_contents: false }),
                 fetchContentByTypePage('image', 1, TOPIC_IMAGE_PAGE_SIZE),
                 fetchContentByTypePage('video', 1, 3),
                 fetchContentByTypePage('audio', 1, 3),
                 fetchContentByTypePage('text', 1, 3),
+                contentApi.getTopicTimeline(topicId).catch(() => ({ entries: [] })),
             ]);
 
             setTopic(topicData);
@@ -384,6 +386,7 @@ const TopicDetail = () => {
                 audio: audioData.count ?? (audioData.contents || []).length,
                 text: textData.count ?? (textData.contents || []).length,
             });
+            setTimelineEntryCount((timelineData.entries || []).length);
             setImagePageInfo({
                 currentPage: imageData.current_page ?? 1,
                 totalPages: imageData.total_pages ?? 1,
@@ -423,6 +426,18 @@ const TopicDetail = () => {
         fetchPendingSuggestionsCount();
         refreshTopicPageData();
     };
+
+    const creatorId = topic ? (typeof topic.creator === 'object' ? topic.creator.id : topic.creator) : null;
+    const userId = user?.id;
+    const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
+    const canEditTimeline = isCreator || isModerator;
+    const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
+
+    useEffect(() => {
+        if (activeTab === 'timeline' && !showTimelineTab) {
+            setActiveTab('content');
+        }
+    }, [activeTab, showTimelineTab]);
 
     const loadMoreImages = useCallback(async () => {
         if (imagePageInfo.loading || !imagePageInfo.hasNext) {
@@ -724,10 +739,6 @@ const TopicDetail = () => {
     if (error) return <Typography color="error">{error}</Typography>;
     if (!topic) return <Typography>Tema no encontrado</Typography>;
 
-    const creatorId = typeof topic.creator === 'object' ? topic.creator.id : topic.creator;
-    const userId = user?.id;
-    const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
-
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
             <TopicHeader 
@@ -738,7 +749,7 @@ const TopicDetail = () => {
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                 {/* Dueño y moderadores: Editar Contenido. Resto de usuarios autenticados: Sugerir Contenido */}
-                {(isCreator || isModerator) ? (
+                {canEditTimeline ? (
                     <Button
                         variant="contained"
                         startIcon={<EditIcon />}
@@ -784,7 +795,7 @@ const TopicDetail = () => {
                     allowScrollButtonsMobile
                 >
                     <Tab value="content" label="Contenido" />
-                    <Tab value="timeline" label="Linea de tiempo" />
+                    {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
                     <Tab value="comments" label="Comentarios" />
                 </Tabs>
             </Box>
@@ -833,7 +844,7 @@ const TopicDetail = () => {
             )}
 
             {activeTab === 'timeline' && (
-                <TopicTimeline topicId={topicId} canEdit={isCreator || isModerator} />
+                <TopicTimeline topicId={topicId} canEdit={canEditTimeline} />
             )}
 
             {activeTab === 'comments' && (
