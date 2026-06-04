@@ -155,7 +155,7 @@ awk -v q="'" '
     print "DB_USER=" (length(dbuser) ? dbuser : "postgres")
     print "DB_PASSWORD=" q dbpass q
   }
-' acbc_app/.env > "$COMPOSE_ENV_FILE"
+' acbc_app/.env > "${COMPOSE_ENV_FILE}.db"
 
 if ! GHCR_IMAGE_PREFIX="$(detect_ghcr_image_prefix)"; then
     echo -e "${RED}❌ Error: GHCR_IMAGE_PREFIX could not be detected from git remote.${NC}"
@@ -171,13 +171,16 @@ if [ -f "nginx/nginx-ssl.conf" ]; then
     export NGINX_CONF=./nginx/nginx-ssl.conf
 fi
 
+# Write compose env in one shot (avoids duplicate GHCR_IMAGE_PREFIX/IMAGE_TAG from past deploys)
 {
+    cat "${COMPOSE_ENV_FILE}.db"
     echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX"
     echo "IMAGE_TAG=$IMAGE_TAG"
     if [ -n "${NGINX_CONF:-}" ]; then
         echo "NGINX_CONF=$NGINX_CONF"
     fi
-} >> "$COMPOSE_ENV_FILE"
+} > "$COMPOSE_ENV_FILE"
+rm -f "${COMPOSE_ENV_FILE}.db"
 
 echo -e "${YELLOW}🐳 Using images: ${GHCR_IMAGE_PREFIX}-{backend,frontend,nginx}:${IMAGE_TAG}${NC}"
 if [ -n "${NGINX_CONF:-}" ]; then
@@ -235,6 +238,9 @@ if [ "$LOCAL_BUILD" = true ]; then
     exit 1
   fi
 
+  export BUILD_SHA="$(git rev-parse HEAD 2>/dev/null || echo local)"
+  echo -e "${YELLOW}   BUILD_SHA=${BUILD_SHA}${NC}"
+
   BUILD_FLAGS=""
   if [ "$NO_CACHE_BUILD" = true ]; then
     BUILD_FLAGS="--no-cache"
@@ -252,8 +258,11 @@ else
   if [ "$SKIP_PULL" = true ]; then
     echo -e "${YELLOW}⏭️  Skipping image pull (--skip-pull)${NC}"
   else
-    echo -e "${YELLOW}📥 Pulling prebuilt images from GHCR...${NC}"
+    echo -e "${YELLOW}📥 Pulling prebuilt images from GHCR (backend tag: ${IMAGE_TAG})...${NC}"
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" pull
+    BACKEND_IMAGE="${GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG}"
+    echo -e "${YELLOW}   Backend image: ${BACKEND_IMAGE}${NC}"
+    docker image inspect "$BACKEND_IMAGE" --format '   Created: {{.Created}}  Id: {{.Id}}' 2>/dev/null || true
   fi
 fi
 
@@ -293,6 +302,26 @@ if curl -f http://localhost/health/ > /dev/null 2>&1; then
 else
     echo -e "${RED}❌ Backend health check failed${NC}"
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" logs backend
+    exit 1
+fi
+
+# Verify backend container includes expected application code (GHCR :main can be stale)
+echo -e "${YELLOW}🔎 Verifying backend image contents...${NC}"
+BACKEND_BUILD_SHA="$(docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend cat /app/.build_sha 2>/dev/null | tr -d '\r' || true)"
+LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+if docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend test -f /app/content/views_youtube_migration.py 2>/dev/null; then
+    echo -e "${GREEN}✅ Backend image contains current app code (youtube migration module present)${NC}"
+    if [ -n "$BACKEND_BUILD_SHA" ] && [ -n "$LOCAL_GIT_SHA" ]; then
+        echo -e "${GREEN}   Image BUILD_SHA=${BACKEND_BUILD_SHA}  git HEAD=${LOCAL_GIT_SHA}${NC}"
+        if [ "$BACKEND_BUILD_SHA" != "$LOCAL_GIT_SHA" ]; then
+            echo -e "${YELLOW}   ⚠️  Image SHA differs from git HEAD. If you expect latest code, run: ./scripts/deploy.sh --build-local${NC}"
+        fi
+    fi
+else
+    echo -e "${RED}❌ Backend container is missing code from this git checkout (stale GHCR image).${NC}"
+    echo -e "${RED}   Running container image: $(docker inspect acbc_backend_prod --format '{{.Config.Image}}' 2>/dev/null || echo unknown)${NC}"
+    echo -e "${RED}   Fix: ./scripts/deploy.sh --build-local   (builds from /opt/acbc-app, not GHCR)${NC}"
+    echo -e "${RED}   Or set IMAGE_TAG to the commit SHA published by GitHub Actions, then redeploy.${NC}"
     exit 1
 fi
 

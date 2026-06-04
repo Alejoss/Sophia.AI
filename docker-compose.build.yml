@@ -8,6 +8,8 @@ services:
     build:
       context: ./acbc_app
       dockerfile: backend.Dockerfile
+      args:
+        BUILD_SHA: ${BUILD_SHA:-local}
 
   frontend:
     build:
