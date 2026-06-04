@@ -62,6 +62,7 @@ from .views import (
     FileSuggestionAcceptView,
     FileSuggestionRejectView
 )
+from .views_youtube_migration import YouTubeMigrationManifestView
 
 app_name = "content"
 
@@ -130,4 +131,9 @@ urlpatterns = [
     path('recent-user-content/', RecentUserContentView.as_view(), name='recent-user-content'),
     path('references/<int:pk>/', ContentReferencesView.as_view(), name='content-references'),
     path('preview-url/', URLPreviewView.as_view(), name='preview-url'),
+    path(
+        'youtube-migration-manifest/',
+        YouTubeMigrationManifestView.as_view(),
+        name='youtube-migration-manifest',
+    ),
 ]
