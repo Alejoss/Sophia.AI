@@ -190,10 +190,8 @@ if [ -n "${NGINX_CONF:-}" ]; then
     echo -e "${YELLOW}🔐 Using nginx config: ${NGINX_CONF}${NC}"
 fi
 
+# Only .env.compose for variable substitution (root .env may contain unescaped $ in secrets).
 COMPOSE_ENV_ARGS=(--env-file "$COMPOSE_ENV_FILE")
-if [ -f ".env" ]; then
-    COMPOSE_ENV_ARGS+=(--env-file .env)
-fi
 PROD_COMPOSE_FILES=(-f docker-compose.prod.yml)
 BUILD_COMPOSE_FILES=(-f docker-compose.prod.yml -f docker-compose.build.yml)
 
@@ -216,21 +214,17 @@ port_80_used_by_docker() {
   fi
 }
 
-if port_80_in_use; then
-  if port_80_used_by_docker; then
-    echo -e "${YELLOW}ℹ️  Port 80 is in use by Docker (existing stack); continuing rolling deploy.${NC}"
-  else
-    echo -e "${YELLOW}🔓 Port 80 in use by host service; stopping nginx/apache so container can bind...${NC}"
-    (sudo systemctl stop nginx 2>/dev/null || systemctl stop nginx 2>/dev/null || true)
-    (sudo systemctl stop apache2 2>/dev/null || systemctl stop apache2 2>/dev/null || true)
-    sleep 2
-    if port_80_in_use && ! port_80_used_by_docker; then
-      echo -e "${RED}❌ Port 80 still in use by a non-Docker process.${NC}"
-      echo "Inspect with: ss -tlnp | grep ':80'"
-      echo "Stop it (e.g. sudo systemctl stop nginx) or free the port, then re-run."
-      exit 1
-    fi
-  fi
+# Host nginx/apache must not bind :80/:443 — Docker nginx publishes those ports.
+echo -e "${YELLOW}🔓 Ensuring host nginx/apache are stopped (Docker nginx needs ports 80/443)...${NC}"
+(systemctl stop nginx 2>/dev/null || true)
+(systemctl disable nginx 2>/dev/null || true)
+(systemctl stop apache2 2>/dev/null || true)
+sleep 2
+
+if port_80_in_use && ! port_80_used_by_docker; then
+  echo -e "${RED}❌ Port 80 still in use by a non-Docker process.${NC}"
+  echo "Inspect with: ss -tlnp | grep ':80'"
+  exit 1
 fi
 
 # Pull or build images before stopping the stack (avoids downtime if pull/build fails).
@@ -305,12 +299,22 @@ docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backe
 echo -e "${YELLOW}🏥 Checking service health...${NC}"
 sleep 5
 
+# Nginx must publish port 80 on the host
+if ! docker port acbc_nginx_prod 80 >/dev/null 2>&1; then
+    echo -e "${RED}❌ Docker nginx is not listening on host port 80.${NC}"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" ps nginx || true
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" logs --tail=40 nginx || true
+    echo -e "${RED}   Fix: systemctl stop nginx && docker compose ... up -d${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Nginx published on $(docker port acbc_nginx_prod 80 | head -n 1)${NC}"
+
 # Check backend health
 if curl -f http://localhost/health/ > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Backend health check passed${NC}"
 else
     echo -e "${RED}❌ Backend health check failed${NC}"
-    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" logs backend
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" logs --tail=40 nginx backend
     exit 1
 fi
 
