@@ -136,12 +136,24 @@ class EventRegistrationSerializerTest(TestCase):
         self.assertEqual(registration.registration_status, 'REGISTERED')
         self.assertEqual(registration.payment_status, 'PENDING')
 
+    def test_registration_serializer_reactivate_after_cancel(self):
+        """Test re-registration reactivates a cancelled row."""
+        EventRegistration.objects.create(
+            user=self.user,
+            event=self.event,
+            registration_status='CANCELLED',
+        )
+        data = {'event': self.event.id}
+        serializer = EventRegistrationSerializer(data=data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid())
+        registration = serializer.save()
+        self.assertEqual(registration.registration_status, 'REGISTERED')
+        self.assertEqual(EventRegistration.objects.filter(user=self.user, event=self.event).count(), 1)
+
     def test_registration_serializer_duplicate_registration(self):
         """Test that duplicate registration is prevented."""
-        # Create first registration
         EventRegistration.objects.create(user=self.user, event=self.event)
-        
-        # Try to create duplicate
+
         data = {'event': self.event.id}
         serializer = EventRegistrationSerializer(data=data, context={'request': self.request})
         self.assertFalse(serializer.is_valid())

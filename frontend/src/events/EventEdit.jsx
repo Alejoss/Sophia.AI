@@ -22,6 +22,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import EventDateTimeField from './EventDateTimeField';
+import { formatDateTimeForInput } from '../utils/dateUtils';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -70,13 +72,6 @@ const EventEdit = () => {
         setFetchLoading(true);
         const eventData = await fetchEventById(eventId);
         
-        // Format dates for datetime-local inputs
-        const formatDateForInput = (dateString) => {
-          if (!dateString) return '';
-          const date = new Date(dateString);
-          return date.toISOString().slice(0, 16);
-        };
-
         setForm({
           title: eventData.title || '',
           description: eventData.description || '',
@@ -84,8 +79,8 @@ const EventEdit = () => {
           platform: eventData.platform || '',
           other_platform: eventData.other_platform || '',
           reference_price: eventData.reference_price ? eventData.reference_price.toString() : '',
-          date_start: formatDateForInput(eventData.date_start),
-          date_end: formatDateForInput(eventData.date_end),
+          date_start: formatDateTimeForInput(eventData.date_start),
+          date_end: formatDateTimeForInput(eventData.date_end),
           schedule_description: eventData.schedule_description || '',
         });
 
@@ -146,6 +141,13 @@ const EventEdit = () => {
     }));
 
     // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleDateTimeChange = (name) => (value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -409,27 +411,18 @@ const EventEdit = () => {
 
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    name="date_start"
+                  <EventDateTimeField
                     label="Fecha/Hora de Inicio"
-                    type="datetime-local"
                     value={form.date_start}
-                    onChange={handleChange}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
+                    onChange={handleDateTimeChange('date_start')}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    name="date_end"
+                  <EventDateTimeField
                     label="Fecha/Hora de Fin"
-                    type="datetime-local"
                     value={form.date_end}
-                    onChange={handleChange}
-                    error={Boolean(errors.date_end)}
-                    helperText={errors.date_end || ''}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
+                    onChange={handleDateTimeChange('date_end')}
+                    error={errors.date_end}
                   />
                 </Grid>
               </Grid>

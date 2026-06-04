@@ -215,16 +215,27 @@ class EventRegistrationAPITest(TestCase):
 
     def test_cancel_registration_success(self):
         """Test DELETE request to cancel registration."""
-        # First register
         registration = EventRegistration.objects.create(user=self.user, event=self.event)
-        
+
         response = self.client.delete(self.url)
-        
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(EventRegistration.objects.filter(
-            user=self.user, 
-            event=self.event
-        ).exists())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        registration.refresh_from_db()
+        self.assertEqual(registration.registration_status, 'CANCELLED')
+
+    def test_reregister_after_cancel(self):
+        """Test user can register again after cancelling."""
+        EventRegistration.objects.create(
+            user=self.user,
+            event=self.event,
+            registration_status='CANCELLED',
+        )
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        registration = EventRegistration.objects.get(user=self.user, event=self.event)
+        self.assertEqual(registration.registration_status, 'REGISTERED')
 
     def test_cancel_nonexistent_registration(self):
         """Test canceling non-existent registration."""

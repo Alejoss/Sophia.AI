@@ -77,8 +77,8 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
   };
 
   const handleAddCrypto = async () => {
-    if (!selectedCrypto || !address.trim()) {
-      setSubmitError('Por favor selecciona una criptomoneda e ingresa una dirección');
+    if (!selectedCrypto) {
+      setSubmitError('Por favor selecciona una criptomoneda');
       return;
     }
 
@@ -86,7 +86,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       setSubmitting(true);
       setSubmitError('');
       
-      await addAcceptedCrypto(selectedCrypto, address.trim());
+      await addAcceptedCrypto(selectedCrypto, address.trim() || '');
       
       // Reset form and close modal
       setSelectedCrypto('');
@@ -253,7 +253,13 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
                           color="text.secondary" 
                           sx={{ wordBreak: 'break-all', mt: 1 }}
                         >
-                          <strong>Dirección:</strong> {acceptedCrypto.address}
+                          {acceptedCrypto.address ? (
+                            <>
+                              <strong>Dirección:</strong> {acceptedCrypto.address}
+                            </>
+                          ) : (
+                            <>Pago en línea vía plataforma (sin dirección propia)</>
+                          )}
                         </Typography>
                       )
                     }
@@ -307,10 +313,11 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
             <TextField
               fullWidth
-              label="Dirección de billetera"
+              label="Dirección de billetera (opcional)"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Ingresa tu dirección de billetera"
+              helperText="Opcional. Si no indicas una, los pagos en línea usarán una dirección generada por la plataforma."
               sx={{ mb: 2 }}
             />
 
@@ -328,7 +335,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
           <Button 
             onClick={handleAddCrypto} 
             variant="contained" 
-            disabled={submitting || !selectedCrypto || !address.trim()}
+            disabled={submitting || !selectedCrypto}
           >
             {submitting ? <CircularProgress size={20} /> : 'Agregar'}
           </Button>

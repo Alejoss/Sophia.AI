@@ -533,27 +533,42 @@ class EventRegistrationView(APIView):
             )
     
     def delete(self, request, event_id, format=None):
-        """Cancel event registration"""
+        """Cancel event registration (soft cancel — keeps history and payment records)."""
         logger.info(f"Event registration cancellation attempt - Event ID: {event_id}, User: {request.user.username}")
-        
+
         try:
             registration = EventRegistration.objects.get(
-                event_id=event_id, 
-                user=request.user
+                event_id=event_id,
+                user=request.user,
+                registration_status='REGISTERED',
             )
-            registration.delete()
-            
-            logger.info(f"Event registration cancelled successfully - Event ID: {event_id}, User: {request.user.username}, Registration ID: {registration.id}")
-            return Response(status=status.HTTP_204_NO_CONTENT)
         except EventRegistration.DoesNotExist:
-            logger.warning(f"Event registration cancellation failed - registration not found - Event ID: {event_id}, User: {request.user.username}")
-            return Response({'error': 'Registration not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error cancelling event registration {event_id} for user {request.user.username}: {str(e)}", exc_info=True)
-            return Response(
-                {'error': 'An error occurred while cancelling the registration'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            logger.warning(
+                'Event registration cancellation failed - registration not found - Event ID: %s, User: %s',
+                event_id,
+                request.user.username,
             )
+            return Response({'error': 'No tienes un registro activo para este evento.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if registration.payment_status == 'PAID':
+            return Response(
+                {'error': 'No se puede cancelar el registro después de que el pago haya sido completado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        registration_id = registration.id
+        registration.registration_status = 'CANCELLED'
+        registration.payment_status = 'PENDING'
+        registration.save(update_fields=['registration_status', 'payment_status'])
+
+        logger.info(
+            'Event registration cancelled successfully - Event ID: %s, User: %s, Registration ID: %s',
+            event_id,
+            request.user.username,
+            registration_id,
+        )
+        serializer = EventRegistrationListSerializer(registration)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class EventParticipantsView(APIView):

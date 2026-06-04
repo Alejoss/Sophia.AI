@@ -1,33 +1,57 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Box,
   Button,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
+  Divider,
+  IconButton,
+  LinearProgress,
+  Paper,
   Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CurrencyBitcoinIcon from '@mui/icons-material/CurrencyBitcoin';
 import {
   createRegistrationPayment,
   getPaymentStatus,
   listRegistrationPayments,
 } from '../api/paymentsApi';
+import EventPaymentMethods from './EventPaymentMethods';
+import PayableCurrencyPicker from './PayableCurrencyPicker';
 
 const STATUS_LABELS = {
   waiting: 'Esperando pago',
   confirming: 'Confirmando en la red',
   confirmed: 'Confirmado en la red',
-  sending: 'Enviando a la wallet del comercio',
+  sending: 'Procesando',
   partially_paid: 'Pago parcial',
   finished: 'Pago completado',
   failed: 'Pago fallido',
   refunded: 'Reembolsado',
   expired: 'Expirado',
+};
+
+const STATUS_COLORS = {
+  waiting: 'warning',
+  confirming: 'info',
+  confirmed: 'info',
+  sending: 'info',
+  partially_paid: 'warning',
+  finished: 'success',
+  failed: 'error',
+  expired: 'default',
+  refunded: 'default',
 };
 
 const OPEN_PAYMENT_STATUSES = new Set([
@@ -38,11 +62,6 @@ const OPEN_PAYMENT_STATUSES = new Set([
   'partially_paid',
 ]);
 
-const CURRENCY_LABELS = {
-  bch: 'Bitcoin Cash (BCH)',
-  xmr: 'Monero (XMR)',
-};
-
 const DEFAULT_CURRENCIES = ['bch', 'xmr'];
 
 const formatApiError = (err, fallback) => {
@@ -52,6 +71,24 @@ const formatApiError = (err, fallback) => {
   return fallback;
 };
 
+const CopyField = ({ label, value, onCopy, copied }) => (
+  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+      {label}
+    </Typography>
+    <Stack direction="row" alignItems="center" spacing={1}>
+      <Typography variant="body2" sx={{ wordBreak: 'break-all', flex: 1, fontFamily: 'monospace' }}>
+        {value}
+      </Typography>
+      <Tooltip title={copied ? 'Copiado' : 'Copiar'}>
+        <IconButton size="small" onClick={onCopy} aria-label={`Copiar ${label}`}>
+          <ContentCopyIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  </Paper>
+);
+
 const CryptoPaymentModal = ({
   open,
   onClose,
@@ -59,6 +96,11 @@ const CryptoPaymentModal = ({
   eventTitle,
   priceUsd,
   supportedCurrencies = DEFAULT_CURRENCIES,
+  ownerAcceptedCryptos = [],
+  gatewayCurrencies = [],
+  cryptoPaymentsEnabled = true,
+  initialPayCurrency,
+  autoCreatePayment = false,
   onPaymentComplete,
 }) => {
   const currencies = useMemo(
@@ -70,8 +112,10 @@ const CryptoPaymentModal = ({
   const [loading, setLoading] = useState(false);
   const [resuming, setResuming] = useState(false);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedExtra, setCopiedExtra] = useState(false);
+
+  const activeStep = payment?.is_paid ? 2 : payment ? 1 : 0;
 
   const refreshPayment = useCallback(async (paymentId) => {
     const data = await getPaymentStatus(paymentId);
@@ -86,37 +130,67 @@ const CryptoPaymentModal = ({
     if (!open) {
       setPayment(null);
       setError(null);
-      setCopied(false);
+      setCopiedAddress(false);
       setCopiedExtra(false);
       setResuming(false);
     }
   }, [open]);
 
   useEffect(() => {
+    if (!open || !initialPayCurrency) return;
+    if (currencies.includes(initialPayCurrency)) {
+      setPayCurrency(initialPayCurrency);
+    }
+  }, [open, initialPayCurrency, currencies]);
+
+  useEffect(() => {
     if (!open || !registrationId) return undefined;
 
     let cancelled = false;
-    const loadOpenPayment = async () => {
+    const initCheckout = async () => {
+      const selectedCurrency = (
+        initialPayCurrency && currencies.includes(initialPayCurrency)
+          ? initialPayCurrency
+          : currencies[0] || 'bch'
+      );
+
       try {
         setResuming(true);
         const payments = await listRegistrationPayments(registrationId);
+        if (cancelled) return;
+
         const openPayment = payments.find((p) => OPEN_PAYMENT_STATUSES.has(p.payment_status));
-        if (cancelled || !openPayment) return;
-        setPayCurrency(openPayment.pay_currency || currencies[0]);
-        const data = await refreshPayment(openPayment.id);
-        if (!cancelled) setPayment(data);
-      } catch {
-        // No open payment or list failed — user can create a new one
+        if (openPayment) {
+          setPayCurrency(openPayment.pay_currency || currencies[0]);
+          const data = await refreshPayment(openPayment.id);
+          if (!cancelled) setPayment(data);
+          return;
+        }
+
+        if (autoCreatePayment && selectedCurrency) {
+          setPayCurrency(selectedCurrency);
+          setLoading(true);
+          setError(null);
+          const data = await createRegistrationPayment(registrationId, selectedCurrency);
+          if (!cancelled) setPayment(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(formatApiError(err, 'No se pudo crear el pago'));
+        }
       } finally {
-        if (!cancelled) setResuming(false);
+        if (!cancelled) {
+          setLoading(false);
+          setResuming(false);
+        }
       }
     };
 
-    loadOpenPayment();
+    initCheckout();
     return () => {
       cancelled = true;
     };
-  }, [open, registrationId, refreshPayment, currencies]);
+  }, [open, registrationId, autoCreatePayment, initialPayCurrency, refreshPayment, currencies]);
 
   useEffect(() => {
     if (!open || !payment?.id || payment.is_paid) return undefined;
@@ -156,109 +230,155 @@ const CryptoPaymentModal = ({
   };
 
   const statusLabel = STATUS_LABELS[payment?.payment_status] || payment?.payment_status;
+  const statusColor = STATUS_COLORS[payment?.payment_status] || 'default';
   const showPaymentStep = Boolean(payment);
   const busy = loading || resuming;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Pagar con criptomoneda</DialogTitle>
-      <DialogContent>
-        {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          background: (theme) =>
+            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+          color: 'primary.contrastText',
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <CurrencyBitcoinIcon />
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Pago del evento
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              {eventTitle}
+            </Typography>
+          </Box>
+        </Stack>
+        <Typography variant="h4" fontWeight={800} sx={{ mt: 2 }}>
+          ${priceUsd} <Typography component="span" variant="body1">USD</Typography>
+        </Typography>
+      </Box>
+
+      <DialogContent sx={{ pt: 2.5 }}>
+        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
+          <Step><StepLabel>Moneda</StepLabel></Step>
+          <Step><StepLabel>Enviar</StepLabel></Step>
+          <Step><StepLabel>Confirmado</StepLabel></Step>
+        </Stepper>
+
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
         {resuming && !payment && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Buscando un pago en curso...
-          </Typography>
-        )}
-        {!showPaymentStep ? (
-          <Stack spacing={1.2}>
-            <Typography>
-              Evento: <strong>{eventTitle}</strong> — ${priceUsd} USD
+          <Stack alignItems="center" spacing={1} sx={{ py: 2 }}>
+            <CircularProgress size={28} />
+            <Typography variant="body2" color="text.secondary">
+              {autoCreatePayment ? 'Generando dirección de pago...' : 'Buscando un pago en curso...'}
             </Typography>
-            <Typography variant="body2">Elige la moneda con la que deseas pagar:</Typography>
-            <RadioGroup
-              name="payCurrency"
-              value={payCurrency}
-              onChange={(e) => setPayCurrency(e.target.value)}
-            >
-              {currencies.map((code) => (
-                <FormControlLabel
-                  key={code}
-                  value={code}
-                  control={<Radio />}
-                  label={CURRENCY_LABELS[code] || code.toUpperCase()}
-                />
-              ))}
-            </RadioGroup>
           </Stack>
-        ) : (
-          <Stack spacing={1.1}>
-            <Typography variant="body2"><strong>Estado:</strong> {statusLabel}</Typography>
-            <Typography variant="body2">
-              <strong>Moneda:</strong> {payment.pay_currency_display}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Monto a enviar:</strong> {payment.pay_amount}{' '}
-              {payment.pay_currency?.toUpperCase()}
-            </Typography>
-            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-              <strong>Dirección:</strong> {payment.pay_address}
-            </Typography>
-            <Button type="button" variant="outlined" onClick={() => copyText(payment.pay_address, setCopied)}>
-              {copied ? 'Copiado' : 'Copiar dirección'}
-            </Button>
-            {payment.payin_extra_id && (
-              <>
-                <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                  <strong>Memo / Payment ID (obligatorio en XMR):</strong> {payment.payin_extra_id}
-                </Typography>
-                <Button
-                  type="button"
-                  variant="outlined"
-                  onClick={() => copyText(String(payment.payin_extra_id), setCopiedExtra)}
-                >
-                  {copiedExtra ? 'Copiado' : 'Copiar memo'}
-                </Button>
-              </>
+        )}
+
+        {!showPaymentStep && !resuming && (
+          <Stack spacing={2}>
+            <EventPaymentMethods
+              ownerAcceptedCryptos={ownerAcceptedCryptos}
+              gatewayCurrencies={gatewayCurrencies.length ? gatewayCurrencies : supportedCurrencies}
+              cryptoPaymentsEnabled={cryptoPaymentsEnabled}
+              compact
+            />
+            <PayableCurrencyPicker
+              currencies={currencies}
+              selectedCurrency={payCurrency}
+              onSelect={setPayCurrency}
+              ownerAcceptedCryptos={ownerAcceptedCryptos}
+            />
+          </Stack>
+        )}
+
+        {showPaymentStep && (
+          <Stack spacing={2}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="subtitle2" color="text.secondary">
+                Estado del pago
+              </Typography>
+              <Chip label={statusLabel} color={statusColor} size="small" />
+            </Stack>
+
+            {!payment.is_paid && payment.payment_status === 'waiting' && (
+              <LinearProgress />
             )}
+
+            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'action.hover' }}>
+              <Typography variant="caption" color="text.secondary">
+                Monto exacto a enviar
+              </Typography>
+              <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                {payment.pay_amount}{' '}
+                <Typography component="span" variant="body1">
+                  {payment.pay_currency?.toUpperCase()}
+                </Typography>
+              </Typography>
+            </Paper>
+
+            <CopyField
+              label="Dirección de pago"
+              value={payment.pay_address}
+              copied={copiedAddress}
+              onCopy={() => copyText(payment.pay_address, setCopiedAddress)}
+            />
+
+            {payment.payin_extra_id && (
+              <CopyField
+                label="Memo / Payment ID (obligatorio en XMR)"
+                value={String(payment.payin_extra_id)}
+                copied={copiedExtra}
+                onCopy={() => copyText(String(payment.payin_extra_id), setCopiedExtra)}
+              />
+            )}
+
             {payment.payment_status === 'partially_paid' && (
               <Alert severity="warning">
-                El monto recibido es menor al requerido. Envía el resto a la misma dirección o crea un nuevo pago.
+                El monto recibido es insuficiente. Envía el resto a la misma dirección.
               </Alert>
             )}
             {payment.payment_status === 'expired' && (
               <Alert severity="warning">
-                Este pago expiró (ventana de 24 h). Cierra y genera un nuevo pago.
+                Este pago expiró. Cierra y genera uno nuevo.
               </Alert>
             )}
             {payment.payment_status === 'confirmed' && !payment.is_paid && (
               <Alert severity="info">
-                Pago confirmado en la red. Esperando que NOWPayments finalice el proceso.
+                Pago detectado en la red. Esperando confirmación final...
               </Alert>
             )}
             {payment.is_paid && (
-              <Alert severity="success">Pago recibido. Gracias.</Alert>
+              <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
+                ¡Pago completado! Tu inscripción está confirmada.
+              </Alert>
             )}
+
+            <Divider />
+            <Typography variant="caption" color="text.secondary">
+              El estado se actualiza automáticamente cada pocos segundos tras enviar la transacción.
+            </Typography>
           </Stack>
         )}
       </DialogContent>
-      <DialogActions>
+
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
         {!showPaymentStep ? (
           <>
-            <Button type="button" onClick={onClose} disabled={busy}>
+            <Button onClick={onClose} disabled={busy} color="inherit">
               Cerrar
             </Button>
-            <Button
-              type="button"
-              variant="contained"
-              onClick={handleCreatePayment}
-              disabled={busy || !registrationId}
-            >
-              {busy ? 'Cargando...' : 'Continuar'}
+            <Button variant="contained" onClick={handleCreatePayment} disabled={busy || !registrationId || currencies.length === 0}>
+              {busy ? 'Cargando...' : 'Generar dirección de pago'}
             </Button>
           </>
         ) : (
-          <Button type="button" onClick={onClose}>
-            {payment.is_paid ? 'Cerrar' : 'Pagar después'}
+          <Button onClick={onClose} variant={payment.is_paid ? 'contained' : 'outlined'} fullWidth>
+            {payment.is_paid ? 'Listo' : 'Pagar más tarde'}
           </Button>
         )}
       </DialogActions>

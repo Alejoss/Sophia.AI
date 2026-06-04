@@ -138,13 +138,10 @@ class EventLifecycleIntegrationTest(TestCase):
         
         # Cancel registration
         cancel_response = self.client.delete(f'/api/events/{event.id}/register/')
-        self.assertEqual(cancel_response.status_code, status.HTTP_204_NO_CONTENT)
-        
-        # Verify registration is removed
-        self.assertFalse(EventRegistration.objects.filter(
-            user=self.participant1,
-            event=event
-        ).exists())
+        self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+
+        registration = EventRegistration.objects.get(user=self.participant1, event=event)
+        self.assertEqual(registration.registration_status, 'CANCELLED')
 
     def test_event_validation_edge_cases(self):
         """Test various validation edge cases."""

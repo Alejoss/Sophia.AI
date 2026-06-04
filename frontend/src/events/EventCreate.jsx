@@ -17,6 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import EventDateTimeField from './EventDateTimeField';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -110,6 +111,13 @@ const EventCreate = () => {
     }));
 
     // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleDateTimeChange = (name) => (value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -334,31 +342,21 @@ const EventCreate = () => {
 
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    name="date_start"
+                  <EventDateTimeField
                     label="Fecha/Hora de Inicio"
-                    type="datetime-local"
                     value={form.date_start}
-                    onChange={handleChange}
-                    error={Boolean(errors.date_start)}
-                    helperText={errors.date_start || 'Seleccione fecha y hora de inicio'}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ step: 900 }}
-                    fullWidth
+                    onChange={handleDateTimeChange('date_start')}
+                    error={errors.date_start}
+                    dateHelperText="Seleccione la fecha de inicio"
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    name="date_end"
+                  <EventDateTimeField
                     label="Fecha/Hora de Fin"
-                    type="datetime-local"
                     value={form.date_end}
-                    onChange={handleChange}
-                    error={Boolean(errors.date_end)}
-                    helperText={errors.date_end || 'Seleccione fecha y hora de fin'}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ step: 900 }}
-                    fullWidth
+                    onChange={handleDateTimeChange('date_end')}
+                    error={errors.date_end}
+                    dateHelperText="Seleccione la fecha de fin"
                   />
                 </Grid>
               </Grid>

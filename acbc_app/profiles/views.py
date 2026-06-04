@@ -1365,12 +1365,12 @@ class UserAcceptedCryptosView(APIView):
         
         try:
             crypto_id = request.data.get('crypto_id')
-            address = request.data.get('address')
+            address = (request.data.get('address') or '').strip()
             
-            if not crypto_id or not address:
+            if not crypto_id:
                 logger.warning(f"Invalid data for adding accepted cryptocurrency for user {request.user.username}")
                 return Response(
-                    {'error': 'Se requieren tanto crypto_id como address'},
+                    {'error': 'Se requiere crypto_id'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

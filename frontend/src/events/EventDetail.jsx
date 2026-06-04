@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import { AuthContext } from '../context/AuthContext';
 import CryptoPaymentModal from './CryptoPaymentModal';
+import EventRegistrationModal from './EventRegistrationModal';
+import EventPaymentMethods from './EventPaymentMethods';
+import { getCheckoutCurrencyCodes } from './eventPaymentUtils';
 import {
   Alert,
   Box,
@@ -18,9 +21,20 @@ import {
   DialogTitle,
   Divider,
   Link as MuiLink,
+  Paper,
   Stack,
   Typography,
 } from '@mui/material';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+
+const PAYMENT_LABELS = {
+  PENDING: 'Pago pendiente',
+  PAID: 'Pago completado',
+  REFUNDED: 'Reembolsado',
+};
 
 const EventDetail = () => {
   const { eventId } = useParams();
@@ -29,52 +43,65 @@ const EventDetail = () => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationLoading, setRegistrationLoading] = useState(false);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingPayCurrency, setPendingPayCurrency] = useState(null);
+  const [autoCreatePayment, setAutoCreatePayment] = useState(false);
   const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
   const [gatewayCurrencies, setGatewayCurrencies] = useState(['bch', 'xmr']);
   const [imageError, setImageError] = useState(false);
 
-  useEffect(() => {
-    getPaymentGatewayStatus()
-      .then((data) => {
-        setCryptoPaymentsEnabled(!!data.enabled);
-        if (Array.isArray(data.currencies) && data.currencies.length > 0) {
-          setGatewayCurrencies(data.currencies);
-        }
-      })
-      .catch(() => setCryptoPaymentsEnabled(false));
+  const loadRegistrationState = useCallback(async () => {
+    if (!authState.isAuthenticated) {
+      setIsRegistered(false);
+      setUserRegistration(null);
+      return;
+    }
+    try {
+      const userRegistrations = await getUserEventRegistrations();
+      const activeRegistration = userRegistrations.find(
+        (reg) => reg.event === parseInt(eventId, 10) && reg.registration_status === 'REGISTERED',
+      );
+      setIsRegistered(!!activeRegistration);
+      setUserRegistration(activeRegistration || null);
+    } catch {
+      setIsRegistered(false);
+      setUserRegistration(null);
+    }
+  }, [authState.isAuthenticated, eventId]);
+
+  const refreshGatewayStatus = useCallback(async () => {
+    try {
+      const data = await getPaymentGatewayStatus();
+      setCryptoPaymentsEnabled(!!data.enabled);
+      if (Array.isArray(data.currencies) && data.currencies.length > 0) {
+        setGatewayCurrencies(data.currencies);
+      }
+    } catch {
+      setCryptoPaymentsEnabled(false);
+    }
   }, []);
+
+  useEffect(() => {
+    refreshGatewayStatus();
+  }, [refreshGatewayStatus]);
 
   useEffect(() => {
     const loadEvent = async () => {
       try {
         setLoading(true);
         const data = await fetchEventById(eventId);
-        console.log('Event data loaded:', data); // Debug log
         setEvent(data);
-        
-        // Check if user is registered for this event
         if (authState.isAuthenticated && data.owner.id !== authState.user?.id) {
-          try {
-            // Try to get user's registrations to check if they're registered for this event
-            const userRegistrations = await getUserEventRegistrations();
-            const userRegistration = userRegistrations.find(
-              reg => reg.event === parseInt(eventId)
-            );
-            setIsRegistered(!!userRegistration);
-            setUserRegistration(userRegistration || null);
-          } catch (err) {
-            // If there's an error, assume not registered
-            setIsRegistered(false);
-            setUserRegistration(null);
-          }
+          await loadRegistrationState();
         }
-
       } catch (err) {
         setError('Error al cargar el evento. Por favor, inténtelo de nuevo.');
         console.error('Error loading event:', err);
@@ -84,7 +111,7 @@ const EventDetail = () => {
     };
 
     loadEvent();
-  }, [eventId, authState.isAuthenticated, authState.user]);
+  }, [eventId, authState.isAuthenticated, authState.user, loadRegistrationState]);
 
   useEffect(() => {
     setImageError(false);
@@ -92,110 +119,115 @@ const EventDetail = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Por determinar';
-      return new Date(dateString).toLocaleDateString('es-ES', {
+    return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
   const getEventTypeLabel = (eventType) => {
     const typeMap = {
-      'LIVE_COURSE': 'Curso en Vivo',
-      'LIVE_CERTIFICATION': 'Certificación en Vivo',
-      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
+      LIVE_COURSE: 'Curso en Vivo',
+      LIVE_CERTIFICATION: 'Certificación en Vivo',
+      LIVE_MASTER_CLASS: 'Clase Magistral en Vivo',
     };
     return typeMap[eventType] || eventType;
   };
 
   const getPlatformLabel = (platform) => {
     const platformMap = {
-      'google_meet': 'Google Meet',
-      'jitsi': 'Jitsi',
-      'microsoft_teams': 'Microsoft Teams',
-      'other': 'Otra',
-      'telegram': 'Telegram',
-      'tox': 'Tox',
-      'twitch': 'Twitch',
-      'zoom': 'Zoom'
+      google_meet: 'Google Meet',
+      jitsi: 'Jitsi',
+      microsoft_teams: 'Microsoft Teams',
+      other: 'Otra',
+      telegram: 'Telegram',
+      tox: 'Tox',
+      twitch: 'Twitch',
+      zoom: 'Zoom',
     };
     return platformMap[platform] || platform;
   };
 
-  const isEventCreator = () => {
-    return authState.isAuthenticated && event?.owner?.id === authState.user?.id;
-  };
+  const isEventCreator = () =>
+    authState.isAuthenticated && event?.owner?.id === authState.user?.id;
 
   const isEventStarted = () => {
     if (!event?.date_start) return false;
     return new Date(event.date_start) < new Date();
   };
 
+  const isPaidEvent = event?.reference_price > 0;
+  const checkoutCurrencies = getCheckoutCurrencyCodes(gatewayCurrencies);
+  const needsPayment =
+    isPaidEvent &&
+    userRegistration?.payment_status !== 'PAID';
+
   const handleRegister = async () => {
+    setActionError(null);
+    setActionSuccess(null);
     if (!authState.isAuthenticated) {
-      setError('Por favor, inicie sesión para registrarse en eventos');
+      setActionError('Por favor, inicie sesión para registrarse en eventos');
       return;
     }
-
     if (isEventStarted()) {
-      setError('No se puede registrar en eventos que ya han comenzado');
+      setActionError('No se puede registrar en eventos que ya han comenzado');
       return;
     }
-
-    // Show confirmation modal first
+    await refreshGatewayStatus();
     setShowRegistrationModal(true);
   };
 
   const confirmRegistration = async () => {
     try {
       setRegistrationLoading(true);
-      setError(null);
+      setActionError(null);
       const registration = await registerForEvent(eventId);
       setIsRegistered(true);
       setUserRegistration(registration);
       setShowRegistrationModal(false);
-      if (
-        event?.reference_price > 0 &&
-        cryptoPaymentsEnabled &&
-        registration?.payment_status !== 'PAID'
-      ) {
+      if (isPaidEvent && registration?.payment_status !== 'PAID') {
+        setActionSuccess(null);
+        setPendingPayCurrency(null);
+        setAutoCreatePayment(false);
         setShowPaymentModal(true);
+      } else {
+        setActionSuccess('¡Inscripción confirmada!');
       }
     } catch (err) {
       const errorMessage = err.error || err.detail || 'Error al registrarse en el evento';
-      setError(errorMessage);
+      setActionError(errorMessage);
     } finally {
       setRegistrationLoading(false);
     }
   };
 
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setAutoCreatePayment(false);
+    setPendingPayCurrency(null);
+  };
+
   const handlePaymentComplete = () => {
     setUserRegistration((prev) => (prev ? { ...prev, payment_status: 'PAID' } : prev));
     setShowPaymentModal(false);
-  };
-
-  const cancelRegistrationModal = () => {
-    setShowRegistrationModal(false);
+    setActionSuccess('¡Pago completado! Tu lugar está confirmado.');
   };
 
   const handleCancelRegistration = async () => {
-    // Check if payment has been accepted
-    if (userRegistration && userRegistration.payment_status === 'PAID') {
-      setError('No se puede cancelar el registro después de que el pago haya sido aceptado');
-      return;
-    }
-
     try {
       setRegistrationLoading(true);
-      setError(null);
+      setActionError(null);
       await cancelEventRegistration(eventId);
       setIsRegistered(false);
       setUserRegistration(null);
+      setShowCancelDialog(false);
+      setActionSuccess('Inscripción cancelada correctamente.');
     } catch (err) {
-      const errorMessage = err.error || err.detail || 'Error al cancelar el registro';
-      setError(errorMessage);
+      const errorMessage = err.error || err.detail || 'Error al cancelar la inscripción';
+      setActionError(errorMessage);
     } finally {
       setRegistrationLoading(false);
     }
@@ -205,17 +237,9 @@ const EventDetail = () => {
     try {
       const eventUrl = `${window.location.origin}/events/${eventId}`;
       await navigator.clipboard.writeText(eventUrl);
-      
-      // Update button text to show success
       setShareButtonText('¡URL Copiada!');
-      
-      // Reset button text after 2 seconds
-      setTimeout(() => {
-        setShareButtonText('Compartir Evento');
-      }, 2000);
-    } catch (err) {
-      console.error('Failed to copy URL:', err);
-      // Fallback for older browsers
+      setTimeout(() => setShareButtonText('Compartir Evento'), 2000);
+    } catch {
       const eventUrl = `${window.location.origin}/events/${eventId}`;
       const textArea = document.createElement('textarea');
       textArea.value = eventUrl;
@@ -223,11 +247,8 @@ const EventDetail = () => {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      
       setShareButtonText('¡URL Copiada!');
-      setTimeout(() => {
-        setShareButtonText('Compartir Evento');
-      }, 2000);
+      setTimeout(() => setShareButtonText('Compartir Evento'), 2000);
     }
   };
 
@@ -243,9 +264,7 @@ const EventDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Detalles del Evento
-          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>Detalles del Evento</Typography>
           <Typography color="text.secondary">Cargando evento...</Typography>
         </Stack>
       </Container>
@@ -256,13 +275,8 @@ const EventDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Detalles del Evento
-          </Typography>
           <Alert severity="error">{error}</Alert>
-          <Button component={Link} to="/events" variant="contained">
-            Volver a Eventos
-          </Button>
+          <Button component={Link} to="/events" variant="contained">Volver a Eventos</Button>
         </Stack>
       </Container>
     );
@@ -272,13 +286,8 @@ const EventDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Detalles del Evento
-          </Typography>
           <Alert severity="warning">Evento no encontrado.</Alert>
-          <Button component={Link} to="/events" variant="contained">
-            Volver a Eventos
-          </Button>
+          <Button component={Link} to="/events" variant="contained">Volver a Eventos</Button>
         </Stack>
       </Container>
     );
@@ -290,14 +299,8 @@ const EventDetail = () => {
         <Button component={Link} to="/events" variant="outlined" color="inherit">
           ← Volver a Eventos
         </Button>
-        <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          {event.title}
-        </Typography>
-        <Chip
-          color="primary"
-          variant="outlined"
-          label={getEventTypeLabel(event.event_type)}
-        />
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>{event.title}</Typography>
+        <Chip color="primary" variant="outlined" label={getEventTypeLabel(event.event_type)} />
       </Stack>
 
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' } }}>
@@ -313,202 +316,211 @@ const EventDetail = () => {
               />
             ) : (
               <Box sx={{ height: 220, borderRadius: 1, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-                <Typography variant="h5">📅 {event.title}</Typography>
+                <EventAvailableIcon sx={{ fontSize: 48, color: 'text.secondary', mr: 1 }} />
+                <Typography variant="h6" color="text.secondary">{event.title}</Typography>
               </Box>
             )}
 
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Descripción
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 2 }}>
-              {event.description}
-            </Typography>
+            <Typography variant="h6" sx={{ mb: 1 }}>Descripción</Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>{event.description}</Typography>
 
-            <Stack spacing={1}>
+            <Stack spacing={1.2}>
               <Typography variant="body2">
                 <strong>Anfitrión:</strong>{' '}
                 <MuiLink component={Link} to={`/profiles/user_profile/${event.owner.id}`} underline="hover">
                   {event.owner.username}
                 </MuiLink>
               </Typography>
-
               {event.platform && (
                 <Typography variant="body2">
                   <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
                   {event.platform === 'other' && event.other_platform && ` (${event.other_platform})`}
                 </Typography>
               )}
-
-              <Typography variant="body2">
-                <strong>Creado:</strong> {formatDate(event.date_created)}
-              </Typography>
-
-              {event.reference_price > 0 && (
-                <Box>
-                  <Typography variant="body2">
-                    <strong>Precio:</strong> ${event.reference_price}
-                  </Typography>
-                  {event.owner_accepted_cryptos && event.owner_accepted_cryptos.length > 0 && (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                      {event.owner_accepted_cryptos.map((acceptedCrypto) => (
-                        <Chip
-                          key={acceptedCrypto.id}
-                          label={acceptedCrypto.crypto.code}
-                          size="small"
-                          variant="outlined"
-                        />
-                      ))}
-                    </Stack>
-                  )}
-                </Box>
-              )}
-
-              <Typography variant="body2">
-                <strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}
-              </Typography>
-
+              <Typography variant="body2"><strong>Creado:</strong> {formatDate(event.date_created)}</Typography>
+              <Typography variant="body2"><strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}</Typography>
               {event.date_end && (
-                <Typography variant="body2">
-                  <strong>Fecha de Fin:</strong> {formatDate(event.date_end)}
-                </Typography>
+                <Typography variant="body2"><strong>Fecha de Fin:</strong> {formatDate(event.date_end)}</Typography>
               )}
-
-              {event.date_recorded && (
-                <Typography variant="body2">
-                  <strong>Fecha Grabada:</strong> {formatDate(event.date_recorded)}
-                </Typography>
-              )}
-
               {event.schedule_description && (
-                <Typography variant="body2">
-                  <strong>Horario:</strong> {event.schedule_description}
+                <Typography variant="body2"><strong>Horario:</strong> {event.schedule_description}</Typography>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Stack spacing={2}>
+          {/* Pricing card */}
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              borderColor: isPaidEvent ? 'primary.light' : 'divider',
+              bgcolor: isPaidEvent ? 'action.hover' : 'background.paper',
+            }}
+          >
+            <Typography variant="overline" color="text.secondary">Precio del evento</Typography>
+            {isPaidEvent ? (
+              <>
+                <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ mt: 0.5 }}>
+                  ${event.reference_price} USD
                 </Typography>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
-
-        <Card variant="outlined">
-          <CardContent>
-            {error && (
-              <Alert severity="error" sx={{ mb: 1.5 }}>
-                {error}
-              </Alert>
+                <EventPaymentMethods
+                  ownerAcceptedCryptos={event.owner_accepted_cryptos}
+                  gatewayCurrencies={gatewayCurrencies}
+                  cryptoPaymentsEnabled={cryptoPaymentsEnabled}
+                  compact
+                />
+              </>
+            ) : (
+              <Typography variant="h5" fontWeight={700} color="success.main" sx={{ mt: 0.5 }}>
+                Gratis
+              </Typography>
             )}
-            <Typography variant="h6" sx={{ mb: 1.5 }}>
-              Acciones
-            </Typography>
-            <Stack spacing={1.2}>
-          {isEventCreator() && (
-            <>
-              <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">
-                Editar Evento
-              </Button>
-              <Button component={Link} to={`/events/${eventId}/manage`} variant="outlined">
-                Gestionar Evento
-              </Button>
-            </>
-          )}
-          
-          {!isEventCreator() && authState.isAuthenticated && (
-            <>
-              {!isRegistered ? (
-                <Button
-                  onClick={handleRegister}
-                  disabled={registrationLoading || isEventStarted()}
-                  title={isEventStarted() ? 'El evento ya ha comenzado' : ''}
-                  variant="contained"
-                >
-                  {registrationLoading ? 'Registrando...' : isEventStarted() ? 'Evento Iniciado' : 'Unirse al Evento'}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleCancelRegistration}
-                  disabled={registrationLoading || (userRegistration && userRegistration.payment_status === 'PAID')}
-                  title={userRegistration && userRegistration.payment_status === 'PAID' ? 'No se puede cancelar después de que el pago sea aceptado' : ''}
-                  variant="contained"
-                  color={userRegistration && userRegistration.payment_status === 'PAID' ? 'inherit' : 'error'}
-                >
-                  {registrationLoading ? 'Cancelando...' : 
-                   userRegistration && userRegistration.payment_status === 'PAID' ? 'Pago Aceptado' : 'Cancelar Registro'}
-                </Button>
-              )}
-            </>
-          )}
-          
-          {!authState.isAuthenticated && (
-            <Button component={Link} to="/profiles/login" variant="contained">
-              Iniciar Sesión para Unirse al Evento
-            </Button>
-          )}
-          
-          <Button variant="outlined" color="inherit" onClick={handleShareEvent}>
-            {shareButtonText}
-          </Button>
-          
-          {!isEventCreator() && authState.isAuthenticated && isRegistered && (
-            <Button variant="outlined" onClick={handleContactCreator}>
-              Contactar al Creador
-            </Button>
-          )}
+          </Paper>
 
-          {!isEventCreator() &&
-            authState.isAuthenticated &&
-            isRegistered &&
-            event.reference_price > 0 &&
-            cryptoPaymentsEnabled &&
-            userRegistration?.payment_status !== 'PAID' && (
-              <Button
-                type="button"
-                variant="contained"
-                onClick={() => setShowPaymentModal(true)}
-              >
-                Pagar con BCH / XMR
-              </Button>
-            )}
-            </Stack>
-          </CardContent>
-        </Card>
+          {/* Actions card */}
+          <Card variant="outlined">
+            <CardContent>
+              {actionSuccess && <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setActionSuccess(null)}>{actionSuccess}</Alert>}
+              {actionError && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
+
+              {isRegistered && (
+                <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover' }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <CheckCircleIcon color="success" fontSize="small" />
+                    <Typography variant="subtitle2" fontWeight={700}>Estás inscrito</Typography>
+                  </Stack>
+                  {isPaidEvent && (
+                    <Chip
+                      size="small"
+                      icon={needsPayment ? <PendingActionsIcon /> : <CheckCircleIcon />}
+                      label={PAYMENT_LABELS[userRegistration?.payment_status] || userRegistration?.payment_status}
+                      color={userRegistration?.payment_status === 'PAID' ? 'success' : 'warning'}
+                      variant="outlined"
+                      sx={{ mb: needsPayment ? 1 : 0 }}
+                    />
+                  )}
+                  {needsPayment && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Completa el pago para confirmar tu lugar.
+                    </Typography>
+                  )}
+                </Paper>
+              )}
+
+              <Typography variant="h6" sx={{ mb: 1.5 }}>Acciones</Typography>
+              <Stack spacing={1.2}>
+                {isEventCreator() && (
+                  <>
+                    <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">Editar Evento</Button>
+                    <Button component={Link} to={`/events/${eventId}/manage`} variant="outlined">Gestionar Evento</Button>
+                  </>
+                )}
+
+                {!isEventCreator() && authState.isAuthenticated && (
+                  <>
+                    {!isRegistered ? (
+                      <Button
+                        onClick={handleRegister}
+                        disabled={registrationLoading || isEventStarted()}
+                        variant="contained"
+                        size="large"
+                      >
+                        {registrationLoading ? 'Procesando...' : isEventStarted() ? 'Evento iniciado' : 'Inscribirme al evento'}
+                      </Button>
+                    ) : (
+                      <>
+                        {needsPayment && (
+                          <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<PaymentsIcon />}
+                            onClick={() => {
+                              setAutoCreatePayment(false);
+                              setPendingPayCurrency(checkoutCurrencies[0]);
+                              setShowPaymentModal(true);
+                            }}
+                          >
+                            Completar pago
+                          </Button>
+                        )}
+                        <Button
+                          variant="outlined"
+                          color="inherit"
+                          onClick={handleContactCreator}
+                        >
+                          Contactar al anfitrión
+                        </Button>
+                        <Button
+                          onClick={() => setShowCancelDialog(true)}
+                          disabled={registrationLoading || userRegistration?.payment_status === 'PAID'}
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                        >
+                          Cancelar inscripción
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {!authState.isAuthenticated && (
+                  <Button component={Link} to="/profiles/login" variant="contained" size="large">
+                    Iniciar sesión para inscribirme
+                  </Button>
+                )}
+
+                <Button variant="outlined" color="inherit" onClick={handleShareEvent}>
+                  {shareButtonText}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
       </Box>
 
-      {/* Registration Confirmation Modal */}
-      <Dialog open={showRegistrationModal} onClose={cancelRegistrationModal} maxWidth="sm" fullWidth>
-        <DialogTitle>Confirmar Registro en el Evento</DialogTitle>
+      <EventRegistrationModal
+        open={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        onConfirm={confirmRegistration}
+        loading={registrationLoading}
+        event={event}
+        formatDate={formatDate}
+        ownerAcceptedCryptos={event?.owner_accepted_cryptos}
+      />
+
+      <Dialog open={showCancelDialog} onClose={() => !registrationLoading && setShowCancelDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>¿Cancelar inscripción?</DialogTitle>
         <DialogContent>
-          <Stack spacing={1.5}>
-            <Typography>Estás a punto de registrarte en <strong>{event.title}</strong>.</Typography>
-            <Typography variant="body2">
-              <strong>Importante:</strong> El creador del evento se pondrá en contacto contigo para proporcionarte más detalles sobre cómo unirte al evento.
-            </Typography>
-            <Typography variant="body2">
-              <strong>Revisa tu bandeja de entrada de Academia Blockchain y tu correo electrónico</strong> para recibir comunicación del creador del evento.
-            </Typography>
-            <Divider />
-            <Typography variant="body2"><strong>Evento:</strong> {event.title}</Typography>
-            <Typography variant="body2"><strong>Anfitrión:</strong> {event.owner.username}</Typography>
-            <Typography variant="body2"><strong>Fecha:</strong> {formatDate(event.date_start)}</Typography>
-            {event.reference_price > 0 && (
-              <Typography variant="body2"><strong>Precio:</strong> ${event.reference_price}</Typography>
-            )}
-          </Stack>
+          <Typography variant="body2">
+            Perderás tu lugar en <strong>{event.title}</strong>.
+            {needsPayment && ' Si ya iniciaste un pago, podrás volver a inscribirte más tarde.'}
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={cancelRegistrationModal} disabled={registrationLoading}>
-            Cancelar
+          <Button onClick={() => setShowCancelDialog(false)} disabled={registrationLoading}>
+            Volver
           </Button>
-          <Button onClick={confirmRegistration} disabled={registrationLoading} variant="contained">
-            {registrationLoading ? 'Registrando...' : 'Confirmar Registro'}
+          <Button onClick={handleCancelRegistration} disabled={registrationLoading} color="error" variant="contained">
+            {registrationLoading ? 'Cancelando...' : 'Sí, cancelar'}
           </Button>
         </DialogActions>
       </Dialog>
 
       <CryptoPaymentModal
         open={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        onClose={handleClosePaymentModal}
         registrationId={userRegistration?.id}
         eventTitle={event?.title}
         priceUsd={event?.reference_price}
-        supportedCurrencies={gatewayCurrencies}
+        supportedCurrencies={checkoutCurrencies}
+        ownerAcceptedCryptos={event?.owner_accepted_cryptos}
+        gatewayCurrencies={gatewayCurrencies}
+        cryptoPaymentsEnabled
+        initialPayCurrency={pendingPayCurrency}
+        autoCreatePayment={autoCreatePayment}
         onPaymentComplete={handlePaymentComplete}
       />
     </Container>

@@ -129,9 +129,11 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         if not user or not user.is_authenticated:
             raise serializers.ValidationError("El usuario debe estar autenticado")
         
-        # Check if user is already registered
-        if EventRegistration.objects.filter(user=user, event=event).exists():
+        existing = EventRegistration.objects.filter(user=user, event=event).first()
+        if existing and existing.registration_status == 'REGISTERED':
             raise serializers.ValidationError("El usuario ya está registrado para este evento")
+        if existing and existing.registration_status == 'CANCELLED':
+            data['_reactivate_registration'] = existing
         
         # Check if user is the event creator
         if user == event.owner:
@@ -144,8 +146,14 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        # Set the user from the request
+        reactivate = validated_data.pop('_reactivate_registration', None)
         validated_data['user'] = self.context.get('request').user
+        if reactivate:
+            reactivate.registration_status = 'REGISTERED'
+            reactivate.payment_status = 'PENDING'
+            reactivate.notes = ''
+            reactivate.save(update_fields=['registration_status', 'payment_status', 'notes'])
+            return reactivate
         return super().create(validated_data)
 
 
