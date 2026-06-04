@@ -2789,6 +2789,7 @@ class YouTubeMigrationManifestViewTests(TestCase):
             uploaded_by=self.user,
             media_type='VIDEO',
             original_title='Platform Title',
+            original_author='Test Channel',
             url='https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         )
         FileDetails.objects.create(content=self.content)
@@ -2798,9 +2799,7 @@ class YouTubeMigrationManifestViewTests(TestCase):
             title='Profile Title',
         )
 
-    @patch('content.youtube_migration_utils.fetch_youtube_channel_from_oembed')
-    def test_manifest_open_no_auth(self, mock_channel):
-        mock_channel.return_value = 'Test Channel'
+    def test_manifest_open_no_auth(self):
         url = f'/api/content/youtube-migration-manifest/?user_id={self.user.id}'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -2834,11 +2833,9 @@ class YouTubeMigrationManifestViewTests(TestCase):
         fd = self.content.file_details
         fd.file = 'content_owner_attach/1/1/video.mp4'
         fd.save()
-        with patch('content.youtube_migration_utils.fetch_youtube_channel_from_oembed') as mock_channel:
-            mock_channel.return_value = 'Ch'
-            response = self.client.get(
-                f'/api/content/youtube-migration-manifest/?user_id={self.user.id}'
-            )
+        response = self.client.get(
+            f'/api/content/youtube-migration-manifest/?user_id={self.user.id}'
+        )
         item = response.data['items'][0]
         self.assertTrue(item['has_file'])
         self.assertFalse(item['can_attach_file'])

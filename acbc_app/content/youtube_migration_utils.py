@@ -111,11 +111,18 @@ def resolve_youtube_channel(
     *,
     content_author: Optional[str] = None,
     profile_author: Optional[str] = None,
+    use_oembed: bool = False,
 ) -> str:
-    """Best-effort channel label for filenames."""
-    channel = fetch_youtube_channel_from_oembed(youtube_url)
-    if channel:
-        return channel
+    """
+    Best-effort channel label for filenames.
+
+    Default skips oEmbed (manifest must return fast). Use use_oembed=True only
+    for single-item tooling; bulk channel names come from the local download script.
+    """
+    if use_oembed:
+        channel = fetch_youtube_channel_from_oembed(youtube_url)
+        if channel:
+            return channel
     for candidate in (profile_author, content_author):
         if candidate and str(candidate).strip():
             return str(candidate).strip()

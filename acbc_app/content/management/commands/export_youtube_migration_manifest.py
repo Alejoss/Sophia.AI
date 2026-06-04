@@ -58,6 +58,7 @@ class Command(BaseCommand):
                 youtube_url,
                 content_author=content.original_author,
                 profile_author=profile.author,
+                use_oembed=False,
             )
             suggested_local_filename = build_migration_filename(
                 channel, display_title, content.id, ext='mp4'

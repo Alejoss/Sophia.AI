@@ -57,10 +57,12 @@ class YouTubeMigrationManifestView(APIView):
 
             can_attach, other_count = content_can_owner_attach_file(content, user)
             display_title = profile.title or content.original_title or 'video'
+            # No per-item oEmbed here (N URLs would block the worker for minutes).
             channel = resolve_youtube_channel(
                 youtube_url,
                 content_author=content.original_author,
                 profile_author=profile.author,
+                use_oembed=False,
             )
             suggested_local_filename = build_migration_filename(
                 channel, display_title, content.id, ext='mp4'
