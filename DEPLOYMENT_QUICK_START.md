@@ -41,12 +41,16 @@
    echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
   ```
    **Fast path (alias):** `./scripts/deploy-light.sh` is the same as `./scripts/deploy.sh` (pull GHCR, then rolling `up --force-recreate` without a full `down`). Use `--full-down` only if you need a full stop before start.
-   **Manual/local build only when needed (slow):**
-   Use this when you intentionally want the server to build instead of pulling from GHCR:
+   **Backend-only local build (API/Python changes; usually a few minutes):**
+  ```bash
+   ./scripts/deploy.sh --build-local-backend
+  ```
+   **Full local build (backend + frontend + nginx; can take 30–60+ minutes):**
   ```bash
    ./scripts/deploy.sh --build-local
    ./scripts/deploy.sh --build-local --no-cache   # clean rebuild
   ```
+   Do not use `--build-local` for small backend-only changes.
    See [Deploy con imágenes preconstruidas en GHCR](docs/deployment/ghcr-image-deploy.md) for the full image/tag and manual build workflow.
 3. **Point a custom domain (Namecheap + app config):**
   See [Custom domain (Namecheap + Digital Ocean)](#custom-domain-namecheap--digital-ocean) below.

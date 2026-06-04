@@ -16,8 +16,9 @@ usage() {
 Usage: ./scripts/deploy.sh [options]
 
 Options:
-  --build-local            Build Docker images on this server instead of pulling GHCR images
-  --no-cache               Build local Docker images without cache (requires --build-local)
+  --build-local-backend    Build only the backend image locally (fast; use for API/Python changes)
+  --build-local            Build ALL images locally (backend + frontend + nginx; slow)
+  --no-cache               Build local Docker images without cache (requires a --build-local* flag)
   --skip-pull              Skip pulling GHCR images before starting services
   --skip-build             Deprecated no-op; deploy no longer builds by default
   --skip-down              Deprecated: default is rolling recreate without full down
@@ -29,12 +30,14 @@ EOF
 
 NO_CACHE_BUILD=false
 LOCAL_BUILD=false
+LOCAL_BUILD_BACKEND_ONLY=false
 SKIP_PULL=false
 FULL_DOWN=false
 ALLOW_NON_PRODUCTION=false
 
 for arg in "$@"; do
     case "$arg" in
+        --build-local-backend) LOCAL_BUILD=true; LOCAL_BUILD_BACKEND_ONLY=true ;;
         --build-local) LOCAL_BUILD=true ;;
         --no-cache) NO_CACHE_BUILD=true ;;
         --skip-pull) SKIP_PULL=true ;;
@@ -232,24 +235,28 @@ fi
 
 # Pull or build images before stopping the stack (avoids downtime if pull/build fails).
 if [ "$LOCAL_BUILD" = true ]; then
-  echo -e "${YELLOW}🔨 Building Docker images locally...${NC}"
   if [ ! -f "docker-compose.build.yml" ]; then
-    echo -e "${RED}❌ docker-compose.build.yml not found; cannot run --build-local.${NC}"
+    echo -e "${RED}❌ docker-compose.build.yml not found; cannot run local build.${NC}"
     exit 1
   fi
 
   export BUILD_SHA="$(git rev-parse HEAD 2>/dev/null || echo local)"
-  echo -e "${YELLOW}   BUILD_SHA=${BUILD_SHA}${NC}"
 
   BUILD_FLAGS=""
   if [ "$NO_CACHE_BUILD" = true ]; then
     BUILD_FLAGS="--no-cache"
-    echo -e "${YELLOW}🧹 Using no-cache local build (slow but clean)${NC}"
-  else
-    echo -e "${YELLOW}⚡ Using local Docker build cache${NC}"
   fi
 
-  docker compose "${COMPOSE_ENV_ARGS[@]}" "${BUILD_COMPOSE_FILES[@]}" build $BUILD_FLAGS
+  if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
+    echo -e "${YELLOW}🔨 Building backend image only (frontend/nginx unchanged)...${NC}"
+    echo -e "${YELLOW}   BUILD_SHA=${BUILD_SHA}${NC}"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${BUILD_COMPOSE_FILES[@]}" build $BUILD_FLAGS backend
+  else
+    echo -e "${YELLOW}🔨 Building ALL images locally (this can take 30+ minutes)...${NC}"
+    echo -e "${YELLOW}   Tip: for API-only changes use --build-local-backend instead.${NC}"
+    echo -e "${YELLOW}   BUILD_SHA=${BUILD_SHA}${NC}"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${BUILD_COMPOSE_FILES[@]}" build $BUILD_FLAGS
+  fi
 else
   if [ "$NO_CACHE_BUILD" = true ]; then
     echo -e "${YELLOW}⚠️  Ignoring --no-cache because this deploy pulls prebuilt images. Use --build-local --no-cache for a local rebuild.${NC}"
@@ -274,7 +281,9 @@ fi
 
 # Start or recreate services with the pulled/built images (default: rolling recreate).
 echo -e "${YELLOW}🚀 Starting services...${NC}"
-if [ "$FULL_DOWN" = true ]; then
+if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d --no-deps --force-recreate backend
+elif [ "$FULL_DOWN" = true ]; then
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d
 else
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" up -d --force-recreate --remove-orphans
@@ -320,7 +329,7 @@ if docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T ba
 else
     echo -e "${RED}❌ Backend container is missing code from this git checkout (stale GHCR image).${NC}"
     echo -e "${RED}   Running container image: $(docker inspect acbc_backend_prod --format '{{.Config.Image}}' 2>/dev/null || echo unknown)${NC}"
-    echo -e "${RED}   Fix: ./scripts/deploy.sh --build-local   (builds from /opt/acbc-app, not GHCR)${NC}"
+    echo -e "${RED}   Fix: ./scripts/deploy.sh --build-local-backend   (backend only, ~few min)${NC}"
     echo -e "${RED}   Or set IMAGE_TAG to the commit SHA published by GitHub Actions, then redeploy.${NC}"
     exit 1
 fi
