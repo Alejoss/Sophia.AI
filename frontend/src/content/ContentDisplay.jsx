@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -39,7 +39,11 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import { formatFileSize } from "../utils/fileUtils";
 import VoteComponent from "../votes/VoteComponent";
-import { getDefaultMediaThumbnail } from "./defaultMediaThumbnails";
+import {
+  SequentialThumbnail,
+  buildListingThumbnailSources,
+  buildMediaPreviewThumbnailSources,
+} from "./ContentListingThumbnail";
 
 const ContentDisplay = ({
   content,
@@ -57,20 +61,12 @@ const ContentDisplay = ({
   onSuggestFile = null,
 }) => {
   const [renderError, setRenderError] = useState(null);
-  const [imageLoadError, setImageLoadError] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
   const navigate = useNavigate();
-
-  // Must run before any early return (Rules of Hooks)
-  useEffect(() => {
-    if (content?.id != null) {
-      setImageLoadError(false);
-    }
-  }, [content?.id]);
 
   if (!content) {
     return null;
@@ -393,11 +389,12 @@ const ContentDisplay = ({
       }
       case "VIDEO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl =
-            customThumbnailForDisplay ||
-            fileDetails?.og_image ||
-            getDefaultMediaThumbnail(mediaTypeUpper);
-          if (thumbUrl) {
+          const previewSources = buildMediaPreviewThumbnailSources({
+            customThumbnailForDisplay,
+            ogImage: fileDetails?.og_image,
+            mediaType: mediaTypeUpper,
+          });
+          if (previewSources.length > 0) {
             return (
               <Box
                 sx={{
@@ -413,18 +410,13 @@ const ContentDisplay = ({
                   borderColor: "divider",
                 }}
               >
-                <img
-                  src={thumbUrl}
-                  alt="Content thumbnail"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                  onError={(e) => {
-                    console.error("Thumbnail failed to load in detailed mode:", thumbUrl);
-                    e.target.style.display = "none";
-                  }}
+                <SequentialThumbnail
+                  sources={previewSources}
+                  fallback={
+                    <Typography color="text.secondary">
+                      Archivo de video no disponible
+                    </Typography>
+                  }
                 />
               </Box>
             );
@@ -463,11 +455,12 @@ const ContentDisplay = ({
         );
       case "AUDIO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl =
-            customThumbnailForDisplay ||
-            fileDetails?.og_image ||
-            getDefaultMediaThumbnail(mediaTypeUpper);
-          if (thumbUrl) {
+          const previewSources = buildMediaPreviewThumbnailSources({
+            customThumbnailForDisplay,
+            ogImage: fileDetails?.og_image,
+            mediaType: mediaTypeUpper,
+          });
+          if (previewSources.length > 0) {
             return (
               <Box
                 sx={{
@@ -483,18 +476,13 @@ const ContentDisplay = ({
                   borderColor: "divider",
                 }}
               >
-                <img
-                  src={thumbUrl}
-                  alt="Content thumbnail"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                  onError={(e) => {
-                    console.error("Thumbnail failed to load in detailed mode:", thumbUrl);
-                    e.target.style.display = "none";
-                  }}
+                <SequentialThumbnail
+                  sources={previewSources}
+                  fallback={
+                    <Typography color="text.secondary">
+                      Archivo de audio no disponible
+                    </Typography>
+                  }
                 />
               </Box>
             );
@@ -1072,106 +1060,21 @@ const ContentDisplay = ({
                   },
                 }}
               >
-                {(() => {
-                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image,
-                  // 4) favicon, 5) default audio/video art, 6) media type icon
-
-                  // 1. Check if content has a file that is an image
-                  const isImage =
-                    contentData.media_type?.toUpperCase() === "IMAGE";
-                  const hasImageFile = isImage && fileDetails?.file;
-
-                  // 0. Check for user-defined thumbnail (ContentProfile)
-                  if (customThumbnailForDisplay && !imageLoadError) {
-                    return (
-                      <img
-                        src={customThumbnailForDisplay}
-                        alt="Content thumbnail"
-                        loading="lazy"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  if (hasImageFile) {
-                    const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
-                    return (
-                      <img
-                        src={imageSrc}
-                        alt={title || "Content image"}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Open the image in new tab when clicked
-                          window.open(imageSrc, "_blank");
-                        }}
-                      />
-                    );
-                  }
-
-                  // 2. Check for Open Graph image
-                  if (fileDetails?.og_image && !imageLoadError) {
-                    return (
-                      <img
-                        src={fileDetails.og_image}
-                        alt="Website preview"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 3. Check for favicon
-                  if (favicon && !imageLoadError) {
-                    return (
-                      <img
-                        src={favicon}
-                        alt="Site favicon"
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          objectFit: "contain",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 4. Default thumbnail for audio/video uploads without a cover
-                  const defaultMediaThumbnail = getDefaultMediaThumbnail(contentData.media_type);
-                  if (defaultMediaThumbnail && !imageLoadError) {
-                    return (
-                      <img
-                        src={defaultMediaThumbnail}
-                        alt="Content thumbnail"
-                        loading="lazy"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 5. Fallback to media type icon
-                  return getMediaTypeIcon(contentData);
-                })()}
+                <SequentialThumbnail
+                  sources={buildListingThumbnailSources({
+                    customThumbnailForDisplay,
+                    hasImageFile:
+                      contentData.media_type?.toUpperCase() === "IMAGE" &&
+                      fileDetails?.file,
+                    fileDetails,
+                    favicon,
+                    mediaType: contentData.media_type,
+                    title,
+                    resolveMediaUrl,
+                  })}
+                  fallback={getMediaTypeIcon(contentData)}
+                  loading="lazy"
+                />
               </Box>
 
               {/* Content Information Section */}
@@ -1458,104 +1361,21 @@ const ContentDisplay = ({
                   bgcolor: "background.paper",
                 }}
               >
-                {(() => {
-                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image,
-                  // 4) favicon, 5) default audio/video art, 6) media type icon
-
-                  // 1. Check if content has a file that is an image
-                  const isImage =
-                    contentData.media_type?.toUpperCase() === "IMAGE";
-                  const hasImageFile = isImage && fileDetails?.file;
-
-                  // 0. Check for user-defined thumbnail (ContentProfile)
-                  if (customThumbnailForDisplay && !imageLoadError) {
-                    return (
-                      <img
-                        src={customThumbnailForDisplay}
-                        alt="Content thumbnail"
-                        loading="lazy"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  if (hasImageFile) {
-                    const imageSrc = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
-                    return (
-                      <img
-                        src={imageSrc}
-                        alt={title}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={(e) => {
-                          console.log("Image failed to load:", imageSrc);
-                          e.target.style.display = "none";
-                        }}
-                      />
-                    );
-                  }
-
-                  // 2. Check for Open Graph image
-                  if (fileDetails?.og_image && !imageLoadError) {
-                    return (
-                      <img
-                        src={fileDetails.og_image}
-                        alt="Website preview"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 3. Check for favicon
-                  if (favicon && !imageLoadError) {
-                    return (
-                      <img
-                        src={favicon}
-                        alt="Site favicon"
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          objectFit: "contain",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 4. Default thumbnail for audio/video uploads without a cover
-                  const defaultMediaThumbnail = getDefaultMediaThumbnail(contentData.media_type);
-                  if (defaultMediaThumbnail && !imageLoadError) {
-                    return (
-                      <img
-                        src={defaultMediaThumbnail}
-                        alt="Content thumbnail"
-                        loading="lazy"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                        onError={() => setImageLoadError(true)}
-                      />
-                    );
-                  }
-
-                  // 5. Fallback to media type icon
-                  return getMediaTypeIcon(contentData);
-                })()}
+                <SequentialThumbnail
+                  sources={buildListingThumbnailSources({
+                    customThumbnailForDisplay,
+                    hasImageFile:
+                      contentData.media_type?.toUpperCase() === "IMAGE" &&
+                      fileDetails?.file,
+                    fileDetails,
+                    favicon,
+                    mediaType: contentData.media_type,
+                    title,
+                    resolveMediaUrl,
+                  })}
+                  fallback={getMediaTypeIcon(contentData)}
+                  loading="lazy"
+                />
               </CardMedia>
               <CardContent sx={{ 
                 flexGrow: 1,
