@@ -39,6 +39,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import { formatFileSize } from "../utils/fileUtils";
 import VoteComponent from "../votes/VoteComponent";
+import { getDefaultMediaThumbnail } from "./defaultMediaThumbnails";
 
 const ContentDisplay = ({
   content,
@@ -392,7 +393,10 @@ const ContentDisplay = ({
       }
       case "VIDEO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl = customThumbnailForDisplay || fileDetails?.og_image;
+          const thumbUrl =
+            customThumbnailForDisplay ||
+            fileDetails?.og_image ||
+            getDefaultMediaThumbnail(mediaTypeUpper);
           if (thumbUrl) {
             return (
               <Box
@@ -459,7 +463,10 @@ const ContentDisplay = ({
         );
       case "AUDIO":
         if (!fileUrl || !fileDetails?.file) {
-          const thumbUrl = customThumbnailForDisplay || fileDetails?.og_image;
+          const thumbUrl =
+            customThumbnailForDisplay ||
+            fileDetails?.og_image ||
+            getDefaultMediaThumbnail(mediaTypeUpper);
           if (thumbUrl) {
             return (
               <Box
@@ -1066,7 +1073,8 @@ const ContentDisplay = ({
                 }}
               >
                 {(() => {
-                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image, 4) favicon, 5) media type icon
+                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image,
+                  // 4) favicon, 5) default audio/video art, 6) media type icon
 
                   // 1. Check if content has a file that is an image
                   const isImage =
@@ -1143,7 +1151,25 @@ const ContentDisplay = ({
                     );
                   }
 
-                  // 4. Fallback to media type icon
+                  // 4. Default thumbnail for audio/video uploads without a cover
+                  const defaultMediaThumbnail = getDefaultMediaThumbnail(contentData.media_type);
+                  if (defaultMediaThumbnail && !imageLoadError) {
+                    return (
+                      <img
+                        src={defaultMediaThumbnail}
+                        alt="Content thumbnail"
+                        loading="lazy"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={() => setImageLoadError(true)}
+                      />
+                    );
+                  }
+
+                  // 5. Fallback to media type icon
                   return getMediaTypeIcon(contentData);
                 })()}
               </Box>
@@ -1433,7 +1459,8 @@ const ContentDisplay = ({
                 }}
               >
                 {(() => {
-                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image, 4) favicon, 5) media type icon
+                  // Priority order: 1) custom thumbnail, 2) file image, 3) og_image,
+                  // 4) favicon, 5) default audio/video art, 6) media type icon
 
                   // 1. Check if content has a file that is an image
                   const isImage =
@@ -1508,7 +1535,25 @@ const ContentDisplay = ({
                     );
                   }
 
-                  // 4. Fallback to media type icon
+                  // 4. Default thumbnail for audio/video uploads without a cover
+                  const defaultMediaThumbnail = getDefaultMediaThumbnail(contentData.media_type);
+                  if (defaultMediaThumbnail && !imageLoadError) {
+                    return (
+                      <img
+                        src={defaultMediaThumbnail}
+                        alt="Content thumbnail"
+                        loading="lazy"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={() => setImageLoadError(true)}
+                      />
+                    );
+                  }
+
+                  // 5. Fallback to media type icon
                   return getMediaTypeIcon(contentData);
                 })()}
               </CardMedia>
