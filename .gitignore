@@ -162,7 +162,3 @@ docker-compose.override.yml
 acbc_app/youtube_downloads/
 acbc_app/youtube_migration/
 !acbc_app/youtube_migration/.gitkeep
-
-# Heavy source art for default media thumbnails (keep optimized .webp in frontend/public/images/)
-screenshot/*
-!screenshot/README.md

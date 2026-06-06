@@ -2,12 +2,12 @@
 """
 Optimize default audio/video content thumbnails for frontend list/card views.
 
-Source files (heavy PNG/JPG) live in screenshot/ at the repo root:
-  - audio_thumbnail_default.*
-  - video_thumbnail_default.*
+Place the full-size source art in frontend/public/images/:
+  - audio_thumbnail_default.png (or .jpg)
+  - video_thumbnail_default.png (or .jpg)
 
-Outputs lightweight WebP files to frontend/public/images/ using the same
-dimensions and quality as content/image_utils.py listing previews.
+Writes lightweight WebP siblings in the same folder, using the same dimensions
+and quality as content/image_utils.py listing previews.
 """
 
 from __future__ import annotations
@@ -19,8 +19,7 @@ from pathlib import Path
 from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIR = REPO_ROOT / "screenshot"
-OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "images"
+IMAGES_DIR = REPO_ROOT / "frontend" / "public" / "images"
 
 # Keep in sync with acbc_app/content/image_utils.py
 LISTING_THUMB_MAX_WIDTH = 480
@@ -32,12 +31,12 @@ ASSETS = (
     ("video_thumbnail_default", "video_thumbnail_default.webp"),
 )
 
-SOURCE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".PNG", ".JPG", ".JPEG", ".WEBP")
+SOURCE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG")
 
 
 def find_source(stem: str) -> Path | None:
     for ext in SOURCE_EXTENSIONS:
-        candidate = SOURCE_DIR / f"{stem}{ext}"
+        candidate = IMAGES_DIR / f"{stem}{ext}"
         if candidate.is_file():
             return candidate
     return None
@@ -66,8 +65,8 @@ def optimize_file(source: Path, destination: Path) -> tuple[int, int]:
 
 
 def main() -> int:
-    if not SOURCE_DIR.is_dir():
-        print(f"Source directory not found: {SOURCE_DIR}", file=sys.stderr)
+    if not IMAGES_DIR.is_dir():
+        print(f"Images directory not found: {IMAGES_DIR}", file=sys.stderr)
         return 1
 
     processed = 0
@@ -79,7 +78,7 @@ def main() -> int:
             missing.append(stem)
             continue
 
-        destination = OUTPUT_DIR / output_name
+        destination = IMAGES_DIR / output_name
         before, after = optimize_file(source, destination)
         reduction = 100 - (after * 100 // before) if before else 0
         print(
@@ -90,9 +89,7 @@ def main() -> int:
 
     if missing:
         print(
-            "\nMissing source files in screenshot/ (expected one of "
-            + ", ".join(f"{stem}{ext}" for stem in missing for ext in SOURCE_EXTENSIONS[:4])
-            + "): "
+            "\nMissing source files in frontend/public/images/ (expected PNG or JPG): "
             + ", ".join(missing),
             file=sys.stderr,
         )
@@ -100,7 +97,7 @@ def main() -> int:
     if processed == 0:
         return 1
 
-    print(f"\nDone. Generated {processed} optimized thumbnail(s) in {OUTPUT_DIR}.")
+    print(f"\nDone. Generated {processed} optimized thumbnail(s) in {IMAGES_DIR}.")
     return 0 if not missing else 1
 
 
