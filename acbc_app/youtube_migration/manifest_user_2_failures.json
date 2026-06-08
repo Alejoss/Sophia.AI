@@ -1,0 +1,32 @@
+{
+  "user_id": 2,
+  "username": "AlejandroVeintimilla",
+  "generated_at": "2026-06-07T12:15:43.447802+00:00",
+  "failure_count": 3,
+  "failures": [
+    {
+      "content_id": 1,
+      "title": "Ucronia 1 - Datos",
+      "youtube_url": "https://www.youtube.com/watch?v=wYF-ylwqQyc",
+      "youtube_channel": "Alejandro Veintimilla",
+      "download_status": "failed",
+      "download_error": "Extracting cookies from firefox\nExtracted 314 cookies from firefox\n[youtube] Extracting URL: https://www.youtube.com/watch?v=wYF-ylwqQyc\n[youtube] wYF-ylwqQyc: Downloading webpage\n[youtube] Sleeping 3.0 seconds ...\n[youtube] wYF-ylwqQyc: Downloading tv downgraded player API JSON\n[youtube] Sleeping 3.0 seconds ...\n[youtube] wYF-ylwqQyc: Downloading web creator client config\n[youtube] Sleeping 3.0 seconds ...\n[youtube] wYF-ylwqQyc: Downloading player 5cabb421-main\n[youtube] Sleeping 3.0 seconds ...\n[youtube] wYF-ylwqQyc: Downloading web creator player API JSON\nERROR: [youtube] wYF-ylwqQyc: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated."
+    },
+    {
+      "content_id": 73,
+      "title": "Conexiones de Sangre",
+      "youtube_url": "https://www.youtube.com/watch?v=mYzDP-s9uXc",
+      "youtube_channel": "El Búho y la Serpiente",
+      "download_status": "failed",
+      "download_error": "Extracting cookies from firefox\nExtracted 314 cookies from firefox\n[youtube] Extracting URL: https://www.youtube.com/watch?v=mYzDP-s9uXc\n[youtube] mYzDP-s9uXc: Downloading webpage\n[youtube] Sleeping 3.0 seconds ...\n[youtube] mYzDP-s9uXc: Downloading tv downgraded player API JSON\n[youtube] Sleeping 3.0 seconds ...\n[youtube] mYzDP-s9uXc: Downloading web creator client config\n[youtube] Sleeping 3.0 seconds ...\n[youtube] mYzDP-s9uXc: Downloading player 5cabb421-main\n[youtube] Sleeping 3.0 seconds ...\n[youtube] mYzDP-s9uXc: Downloading web creator player API JSON\nERROR: [youtube] mYzDP-s9uXc: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated."
+    },
+    {
+      "content_id": 74,
+      "title": "Jeffrey Epstein el CANÍBAL y su MAGIA NEGRA CABALISTA",
+      "youtube_url": "https://www.youtube.com/watch?v=5fYT3qUnlO8",
+      "youtube_channel": "El Búho y la Serpiente",
+      "download_status": "failed",
+      "download_error": "Extracting cookies from firefox\nExtracted 314 cookies from firefox\n[youtube] Extracting URL: https://www.youtube.com/watch?v=5fYT3qUnlO8\n[youtube] 5fYT3qUnlO8: Downloading webpage\n[youtube] Sleeping 3.0 seconds ...\n[youtube] 5fYT3qUnlO8: Downloading tv downgraded player API JSON\n[youtube] Sleeping 3.0 seconds ...\n[youtube] 5fYT3qUnlO8: Downloading web creator client config\n[youtube] Sleeping 3.0 seconds ...\n[youtube] 5fYT3qUnlO8: Downloading player 5cabb421-main\n[youtube] Sleeping 3.0 seconds ...\n[youtube] 5fYT3qUnlO8: Downloading web creator player API JSON\nERROR: [youtube] 5fYT3qUnlO8: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated."
+    }
+  ]
+}

@@ -1,0 +1,823 @@
+{
+  "generated_at": "2026-06-08T07:08:48.251689+00:00",
+  "source_manifest": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_migration\\manifest_user_2_downloaded.json",
+  "bucket": "academiablockchain",
+  "region": "us-west-2",
+  "summary": {
+    "skipped_existing": 1,
+    "uploaded": 80
+  },
+  "count": 81,
+  "items": [
+    {
+      "content_id": 45,
+      "upload_status": "skipped_existing",
+      "updated_at": "2026-06-07T15:06:45.211393+00:00",
+      "s3_key": "content_owner_attach/45/2/La_Eterna_Vigilancia_QUIÉN_MATÓ_a_BITCOIN_DOCUMENTAL_COMPLETO_en_ESPAÑOL_45.mp4",
+      "file_size": 501047773,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\La_Eterna_Vigilancia_QUIÉN_MATÓ_a_BITCOIN_DOCUMENTAL_COMPLETO_en_ESPAÑOL_45.mp4",
+      "youtube_channel": "La Eterna Vigilancia",
+      "uploaded_at": "2026-06-07T15:06:45.211393+00:00"
+    },
+    {
+      "content_id": 46,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:09:13.794000+00:00",
+      "s3_key": "content_owner_attach/46/2/Academia_Blockchain_Por_qué_Bitcoin_aparece_cuando_se_destapan_los_Epstein_Files_46.mp4",
+      "file_size": 163880706,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Academia_Blockchain_Por_qué_Bitcoin_aparece_cuando_se_destapan_los_Epstein_Files_46.mp4",
+      "youtube_channel": "Academia Blockchain",
+      "uploaded_at": "2026-06-07T15:09:13.794000+00:00"
+    },
+    {
+      "content_id": 47,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:17:33.056534+00:00",
+      "s3_key": "content_owner_attach/47/2/Academia_Blockchain_Conversación_con_Ian_de_LaEconomiaP2P_Qué_pasó_en_el_2017_CI_47.mp4",
+      "file_size": 583232819,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Academia_Blockchain_Conversación_con_Ian_de_LaEconomiaP2P_Qué_pasó_en_el_2017_CI_47.mp4",
+      "youtube_channel": "Academia Blockchain",
+      "uploaded_at": "2026-06-07T15:17:33.056534+00:00"
+    },
+    {
+      "content_id": 48,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:19:57.861567+00:00",
+      "s3_key": "content_owner_attach/48/2/Academia_Blockchain_Cambiaron_la_Historia_de_Bitcoin_Emails_de_Satoshi_Malmi_pat_48.mp4",
+      "file_size": 164346649,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Academia_Blockchain_Cambiaron_la_Historia_de_Bitcoin_Emails_de_Satoshi_Malmi_pat_48.mp4",
+      "youtube_channel": "Academia Blockchain",
+      "uploaded_at": "2026-06-07T15:19:57.861567+00:00"
+    },
+    {
+      "content_id": 49,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:23:39.209280+00:00",
+      "s3_key": "content_owner_attach/49/2/Academia_Blockchain_Rompe_la_Rueda_-_2017_HARD_FORK_de_BTC_Lightning_Network_EL_49.mp4",
+      "file_size": 245656989,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Academia_Blockchain_Rompe_la_Rueda_-_2017_HARD_FORK_de_BTC_Lightning_Network_EL_49.mp4",
+      "youtube_channel": "Academia Blockchain",
+      "uploaded_at": "2026-06-07T15:23:39.209280+00:00"
+    },
+    {
+      "content_id": 50,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:31:55.812400+00:00",
+      "s3_key": "content_owner_attach/50/2/Academia_Blockchain_LA_VERDAD_SOBRE_EL_TAMAÑO_DE_LOS_BLOQUES_EL_DESTINO_DE_BITCO_50.mp4",
+      "file_size": 545688609,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Academia_Blockchain_LA_VERDAD_SOBRE_EL_TAMAÑO_DE_LOS_BLOQUES_EL_DESTINO_DE_BITCO_50.mp4",
+      "youtube_channel": "Academia Blockchain",
+      "uploaded_at": "2026-06-07T15:31:55.812400+00:00"
+    },
+    {
+      "content_id": 51,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:37:37.344969+00:00",
+      "s3_key": "content_owner_attach/51/2/No_Hay_Almuerzo_Gratis_PETER_TODD_DEMOLIENDO_a_BTC_desde_DENTRO_EP_182_51.mp4",
+      "file_size": 395089455,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\No_Hay_Almuerzo_Gratis_PETER_TODD_DEMOLIENDO_a_BTC_desde_DENTRO_EP_182_51.mp4",
+      "youtube_channel": "No Hay Almuerzo Gratis",
+      "uploaded_at": "2026-06-07T15:37:37.344969+00:00"
+    },
+    {
+      "content_id": 53,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:40:29.617521+00:00",
+      "s3_key": "content_owner_attach/53/2/Alejandro_Veintimilla_El_Desarrollo_de_Bitcoin_Conversación_53.mp4",
+      "file_size": 193889690,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Alejandro_Veintimilla_El_Desarrollo_de_Bitcoin_Conversación_53.mp4",
+      "youtube_channel": "Alejandro Veintimilla",
+      "uploaded_at": "2026-06-07T15:40:29.617521+00:00"
+    },
+    {
+      "content_id": 61,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T15:43:10.923255+00:00",
+      "s3_key": "content_owner_attach/61/2/Alfre_Historia_Crypto_Cypherpunks_Bitcoin_-_COMPLETO_61.mp4",
+      "file_size": 169527537,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Alfre_Historia_Crypto_Cypherpunks_Bitcoin_-_COMPLETO_61.mp4",
+      "youtube_channel": "Alfre",
+      "uploaded_at": "2026-06-07T15:43:10.923255+00:00"
+    },
+    {
+      "content_id": 64,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:09:18.394470+00:00",
+      "s3_key": "content_owner_attach/64/2/avalBit_Quiénes_son_los_cypherpunks_y_de_donde_proviene_bitcoin_64.mp4",
+      "file_size": 1796328121,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\avalBit_Quiénes_son_los_cypherpunks_y_de_donde_proviene_bitcoin_64.mp4",
+      "youtube_channel": "avalBit",
+      "uploaded_at": "2026-06-07T16:09:18.394470+00:00"
+    },
+    {
+      "content_id": 75,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:19:07.674560+00:00",
+      "s3_key": "content_owner_attach/75/2/AwakePodcasts_The_Corbett_Report_-_Ep_304_Political_Pedophilia_75.mp4",
+      "file_size": 687168195,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\AwakePodcasts_The_Corbett_Report_-_Ep_304_Political_Pedophilia_75.mp4",
+      "youtube_channel": "AwakePodcasts",
+      "uploaded_at": "2026-06-07T16:19:07.674560+00:00"
+    },
+    {
+      "content_id": 90,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:21:23.094902+00:00",
+      "s3_key": "content_owner_attach/90/2/The_Art_Of_The_Terminal_EVERYTHING_Is_Backdoored_By_Default_90.mp4",
+      "file_size": 154888803,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Art_Of_The_Terminal_EVERYTHING_Is_Backdoored_By_Default_90.mp4",
+      "youtube_channel": "The Art Of The Terminal",
+      "uploaded_at": "2026-06-07T16:21:23.094902+00:00"
+    },
+    {
+      "content_id": 92,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:39:27.309777+00:00",
+      "s3_key": "content_owner_attach/92/2/corbettreport_False_Flags_The_Secret_History_of_Al_Qaeda_92.mp4",
+      "file_size": 1262420477,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\corbettreport_False_Flags_The_Secret_History_of_Al_Qaeda_92.mp4",
+      "youtube_channel": "corbettreport",
+      "uploaded_at": "2026-06-07T16:39:27.309777+00:00"
+    },
+    {
+      "content_id": 101,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:47:28.551787+00:00",
+      "s3_key": "content_owner_attach/101/2/Enrique_Sotomayor_Filosofía_del_derecho_Santo_Tomas_de_Aquino_y_la_arquitectur_101.mp4",
+      "file_size": 528914685,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Enrique_Sotomayor_Filosofía_del_derecho_Santo_Tomas_de_Aquino_y_la_arquitectur_101.mp4",
+      "youtube_channel": "Enrique Sotomayor",
+      "uploaded_at": "2026-06-07T16:47:28.551787+00:00"
+    },
+    {
+      "content_id": 102,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T16:48:45.837279+00:00",
+      "s3_key": "content_owner_attach/102/2/Radio_para_Abogados_Kelsen_y_la_Teoría_Pura_del_Derecho_12_Podcast_102.mp4",
+      "file_size": 83264570,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Radio_para_Abogados_Kelsen_y_la_Teoría_Pura_del_Derecho_12_Podcast_102.mp4",
+      "youtube_channel": "Radio para Abogados",
+      "uploaded_at": "2026-06-07T16:48:45.837279+00:00"
+    },
+    {
+      "content_id": 103,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T17:08:20.864885+00:00",
+      "s3_key": "content_owner_attach/103/2/Liberalístico_Las_LEYES_INJUSTAS_que_hundieron_Roma_103.mp4",
+      "file_size": 1329108528,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Liberalístico_Las_LEYES_INJUSTAS_que_hundieron_Roma_103.mp4",
+      "youtube_channel": "Liberalístico",
+      "uploaded_at": "2026-06-07T17:08:20.864885+00:00"
+    },
+    {
+      "content_id": 104,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T17:17:40.493482+00:00",
+      "s3_key": "content_owner_attach/104/2/El_Gentilhombre_El_DERECHO_NATURAL_y_la_tradición_LIBERAL_-_con_Gabriel_Zano_104.mp4",
+      "file_size": 649249761,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\El_Gentilhombre_El_DERECHO_NATURAL_y_la_tradición_LIBERAL_-_con_Gabriel_Zano_104.mp4",
+      "youtube_channel": "El Gentilhombre",
+      "uploaded_at": "2026-06-07T17:17:40.493482+00:00"
+    },
+    {
+      "content_id": 105,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T17:47:35.936998+00:00",
+      "s3_key": "content_owner_attach/105/2/NEWMEDIA_UFM_Teoría_de_la_ley_natural_Gabriel_Zanotti_105.mp4",
+      "file_size": 2039255983,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\NEWMEDIA_UFM_Teoría_de_la_ley_natural_Gabriel_Zanotti_105.mp4",
+      "youtube_channel": "NEWMEDIA UFM",
+      "uploaded_at": "2026-06-07T17:47:35.936998+00:00"
+    },
+    {
+      "content_id": 106,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T17:49:27.724815+00:00",
+      "s3_key": "content_owner_attach/106/2/Santiago_Sánchez-Migallón_5_Derecho_-_Iusnaturalismo_cosmológico_Los_estoicos_106.mp4",
+      "file_size": 127838440,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Santiago_Sánchez-Migallón_5_Derecho_-_Iusnaturalismo_cosmológico_Los_estoicos_106.mp4",
+      "youtube_channel": "Santiago Sánchez-Migallón",
+      "uploaded_at": "2026-06-07T17:49:27.724815+00:00"
+    },
+    {
+      "content_id": 107,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T17:50:49.987430+00:00",
+      "s3_key": "content_owner_attach/107/2/Santiago_Sánchez-Migallón_4_Derecho_La_Justicia_en_Aristóteles_107.mp4",
+      "file_size": 86171215,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Santiago_Sánchez-Migallón_4_Derecho_La_Justicia_en_Aristóteles_107.mp4",
+      "youtube_channel": "Santiago Sánchez-Migallón",
+      "uploaded_at": "2026-06-07T17:50:49.987430+00:00"
+    },
+    {
+      "content_id": 108,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T18:05:01.206124+00:00",
+      "s3_key": "content_owner_attach/108/2/Constituir_Derecho_Constitucional_Iusnaturalismo_y_positivismo_Una_introducción_para_leer_Dere_108.mp4",
+      "file_size": 984233581,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Constituir_Derecho_Constitucional_Iusnaturalismo_y_positivismo_Una_introducción_para_leer_Dere_108.mp4",
+      "youtube_channel": "Constituir Derecho Constitucional",
+      "uploaded_at": "2026-06-07T18:05:01.206124+00:00"
+    },
+    {
+      "content_id": 109,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T18:09:44.844341+00:00",
+      "s3_key": "content_owner_attach/109/2/corbettreport_The_Royal_Familys_Pedophile_Problem_109.mp4",
+      "file_size": 323166309,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\corbettreport_The_Royal_Familys_Pedophile_Problem_109.mp4",
+      "youtube_channel": "corbettreport",
+      "uploaded_at": "2026-06-07T18:09:44.844341+00:00"
+    },
+    {
+      "content_id": 110,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T18:27:36.363538+00:00",
+      "s3_key": "content_owner_attach/110/2/Truthstream_Media_The_Trust_Game_Episode_1_-_Crowns_and_Sovereigns_110.mp4",
+      "file_size": 1234943599,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_Episode_1_-_Crowns_and_Sovereigns_110.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T18:27:36.363538+00:00"
+    },
+    {
+      "content_id": 111,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T18:48:17.579860+00:00",
+      "s3_key": "content_owner_attach/111/2/Truthstream_Media_The_Trust_Game_Episode_2_-_Of_Renters_Lenders_and_Liberty_111.mp4",
+      "file_size": 1440132790,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_Episode_2_-_Of_Renters_Lenders_and_Liberty_111.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T18:48:17.579860+00:00"
+    },
+    {
+      "content_id": 112,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T19:09:47.094394+00:00",
+      "s3_key": "content_owner_attach/112/2/Truthstream_Media_The_Trust_Game_Episode_3_-_Separation_Conjunction_Fermentati_112.mp4",
+      "file_size": 1506927420,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_Episode_3_-_Separation_Conjunction_Fermentati_112.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T19:09:47.094394+00:00"
+    },
+    {
+      "content_id": 113,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T19:27:28.564928+00:00",
+      "s3_key": "content_owner_attach/113/2/Truthstream_Media_The_Trust_Game_Episode_4_-_Dr_Jekyll_Delivers_Mr_Fed_113.mp4",
+      "file_size": 1181605062,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_Episode_4_-_Dr_Jekyll_Delivers_Mr_Fed_113.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T19:27:28.564928+00:00"
+    },
+    {
+      "content_id": 114,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T19:42:46.239594+00:00",
+      "s3_key": "content_owner_attach/114/2/Truthstream_Media_The_Trust_Game_-_Episode_5_Who_Holds_the_Gold_Makes_the_Rule_114.mp4",
+      "file_size": 1068986248,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_5_Who_Holds_the_Gold_Makes_the_Rule_114.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T19:42:46.239594+00:00"
+    },
+    {
+      "content_id": 115,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T20:00:14.533549+00:00",
+      "s3_key": "content_owner_attach/115/2/Truthstream_Media_The_Trust_Game_-_Episode_6_One_World_or_None_115.mp4",
+      "file_size": 1221728173,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_6_One_World_or_None_115.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T20:00:14.533549+00:00"
+    },
+    {
+      "content_id": 116,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T20:12:32.242253+00:00",
+      "s3_key": "content_owner_attach/116/2/Truthstream_Media_The_Trust_Game_-_Episode_7_Voodoo_Volckernomics_the_Inflatio_116.mp4",
+      "file_size": 860211843,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_7_Voodoo_Volckernomics_the_Inflatio_116.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T20:12:32.242253+00:00"
+    },
+    {
+      "content_id": 117,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T20:22:48.762736+00:00",
+      "s3_key": "content_owner_attach/117/2/Truthstream_Media_The_Trust_Game_-_Episode_8_Gambling_with_Other_Peoples_Money_117.mp4",
+      "file_size": 715756197,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_8_Gambling_with_Other_Peoples_Money_117.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T20:22:48.762736+00:00"
+    },
+    {
+      "content_id": 118,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T20:33:36.455083+00:00",
+      "s3_key": "content_owner_attach/118/2/Truthstream_Media_The_Trust_Game_-_Episode_9_Global_Financial_Crisis_Reaction_118.mp4",
+      "file_size": 744878128,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_9_Global_Financial_Crisis_Reaction_118.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T20:33:36.455083+00:00"
+    },
+    {
+      "content_id": 119,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T20:48:36.569399+00:00",
+      "s3_key": "content_owner_attach/119/2/Truthstream_Media_The_Trust_Game_-_Episode_10_The_One_Ring_119.mp4",
+      "file_size": 1049190102,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Trust_Game_-_Episode_10_The_One_Ring_119.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T20:48:36.569399+00:00"
+    },
+    {
+      "content_id": 120,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:14:11.169493+00:00",
+      "s3_key": "content_owner_attach/120/2/Truthstream_Media_The_Minds_of_Men_Official_Documentary_by_Aaron_Melissa_Dykes_120.mp4",
+      "file_size": 1768467898,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Truthstream_Media_The_Minds_of_Men_Official_Documentary_by_Aaron_Melissa_Dykes_120.mp4",
+      "youtube_channel": "Truthstream Media",
+      "uploaded_at": "2026-06-07T21:14:11.169493+00:00"
+    },
+    {
+      "content_id": 121,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:24:51.759819+00:00",
+      "s3_key": "content_owner_attach/121/2/The_Conscious_Resistance_Who_Will_Find_What_The_Finders_Hide_Full_Documentary_121.mp4",
+      "file_size": 742839998,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_Who_Will_Find_What_The_Finders_Hide_Full_Documentary_121.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:24:51.759819+00:00"
+    },
+    {
+      "content_id": 126,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:27:32.677243+00:00",
+      "s3_key": "content_owner_attach/126/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_1_Big_Education_126.mp4",
+      "file_size": 180214629,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_1_Big_Education_126.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:27:32.677243+00:00"
+    },
+    {
+      "content_id": 127,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:32:49.909093+00:00",
+      "s3_key": "content_owner_attach/127/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_2_Establishment_Media_127.mp4",
+      "file_size": 353272919,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_2_Establishment_Media_127.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:32:49.909093+00:00"
+    },
+    {
+      "content_id": 128,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:37:46.748679+00:00",
+      "s3_key": "content_owner_attach/128/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_3-_Big_Tech_128.mp4",
+      "file_size": 338685730,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_3-_Big_Tech_128.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:37:46.748679+00:00"
+    },
+    {
+      "content_id": 129,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:41:41.823301+00:00",
+      "s3_key": "content_owner_attach/129/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_4_-_The_Hollywood_Military-Inte_129.mp4",
+      "file_size": 263289261,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_4_-_The_Hollywood_Military-Inte_129.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:41:41.823301+00:00"
+    },
+    {
+      "content_id": 130,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:47:23.899689+00:00",
+      "s3_key": "content_owner_attach/130/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_5_-_Big_Wireless_130.mp4",
+      "file_size": 388785132,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_5_-_Big_Wireless_130.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:47:23.899689+00:00"
+    },
+    {
+      "content_id": 131,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:53:35.865578+00:00",
+      "s3_key": "content_owner_attach/131/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_6-_The_Oilgarchy_131.mp4",
+      "file_size": 420483187,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_6-_The_Oilgarchy_131.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:53:35.865578+00:00"
+    },
+    {
+      "content_id": 132,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T21:58:44.689290+00:00",
+      "s3_key": "content_owner_attach/132/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_7_-_Big_Pharma_and_the_Medical_132.mp4",
+      "file_size": 348057979,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_7_-_Big_Pharma_and_the_Medical_132.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T21:58:44.689290+00:00"
+    },
+    {
+      "content_id": 133,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:06:06.782168+00:00",
+      "s3_key": "content_owner_attach/133/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_8_Food_as_a_Weapon_133.mp4",
+      "file_size": 513117053,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_8_Food_as_a_Weapon_133.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:06:06.782168+00:00"
+    },
+    {
+      "content_id": 134,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:12:04.841681+00:00",
+      "s3_key": "content_owner_attach/134/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_9_The_Prison-Industrial_Complex_134.mp4",
+      "file_size": 412523888,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_9_The_Prison-Industrial_Complex_134.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:12:04.841681+00:00"
+    },
+    {
+      "content_id": 135,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:22:29.419733+00:00",
+      "s3_key": "content_owner_attach/135/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_10_The_Foundations_and_the_Non-_135.mp4",
+      "file_size": 715726953,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_10_The_Foundations_and_the_Non-_135.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:22:29.419733+00:00"
+    },
+    {
+      "content_id": 136,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:30:37.133357+00:00",
+      "s3_key": "content_owner_attach/136/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_11_-_The_Banking_Cartel_The_Fut_136.mp4",
+      "file_size": 568228777,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_11_-_The_Banking_Cartel_The_Fut_136.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:30:37.133357+00:00"
+    },
+    {
+      "content_id": 137,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:43:59.519218+00:00",
+      "s3_key": "content_owner_attach/137/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_12_-_Crimes_of_the_Intelligence_137.mp4",
+      "file_size": 933161743,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_12_-_Crimes_of_the_Intelligence_137.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:43:59.519218+00:00"
+    },
+    {
+      "content_id": 138,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T22:53:06.541831+00:00",
+      "s3_key": "content_owner_attach/138/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_13_-_The_Technocratic_State_138.mp4",
+      "file_size": 638399511,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_13_-_The_Technocratic_State_138.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T22:53:06.541831+00:00"
+    },
+    {
+      "content_id": 139,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:00:53.749856+00:00",
+      "s3_key": "content_owner_attach/139/2/The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_14_-_The_False_Flag_Deception_139.mp4",
+      "file_size": 546547612,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Conscious_Resistance_The_Pyramid_of_Power_Chapter_14_-_The_False_Flag_Deception_139.mp4",
+      "youtube_channel": "The Conscious Resistance",
+      "uploaded_at": "2026-06-07T23:00:53.749856+00:00"
+    },
+    {
+      "content_id": 140,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:04:26.422930+00:00",
+      "s3_key": "content_owner_attach/140/2/Derrick_Broze_The_Pyramid_of_Power_Chapter_15_-_The_Pedo-Class_140.mp4",
+      "file_size": 243920702,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Derrick_Broze_The_Pyramid_of_Power_Chapter_15_-_The_Pedo-Class_140.mp4",
+      "youtube_channel": "Derrick Broze",
+      "uploaded_at": "2026-06-07T23:04:26.422930+00:00"
+    },
+    {
+      "content_id": 141,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:07:59.192374+00:00",
+      "s3_key": "content_owner_attach/141/2/Derrick_Broze_The_Pyramid_of_Power_Chapter_15_-_The_Pedo-Class_141.mp4",
+      "file_size": 243920702,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Derrick_Broze_The_Pyramid_of_Power_Chapter_15_-_The_Pedo-Class_141.mp4",
+      "youtube_channel": "Derrick Broze",
+      "uploaded_at": "2026-06-07T23:07:59.192374+00:00"
+    },
+    {
+      "content_id": 142,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:15:20.410175+00:00",
+      "s3_key": "content_owner_attach/142/2/Derrick_Broze_The_Pyramid_of_Power_Chapter_16_-_Religion_Secret_Societies_142.mp4",
+      "file_size": 510470787,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Derrick_Broze_The_Pyramid_of_Power_Chapter_16_-_Religion_Secret_Societies_142.mp4",
+      "youtube_channel": "Derrick Broze",
+      "uploaded_at": "2026-06-07T23:15:20.410175+00:00"
+    },
+    {
+      "content_id": 143,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:28:19.914300+00:00",
+      "s3_key": "content_owner_attach/143/2/Derrick_Broze_The_Pyramid_of_Power_Chapter_17_Volume_1_-_The_Top_of_The_Py_143.mp4",
+      "file_size": 911889826,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Derrick_Broze_The_Pyramid_of_Power_Chapter_17_Volume_1_-_The_Top_of_The_Py_143.mp4",
+      "youtube_channel": "Derrick Broze",
+      "uploaded_at": "2026-06-07T23:28:19.914300+00:00"
+    },
+    {
+      "content_id": 144,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:40:32.012320+00:00",
+      "s3_key": "content_owner_attach/144/2/Derrick_Broze_The_Pyramid_of_Power_Chapter_17_Volume_2_-_The_Top_of_The_Py_144.mp4",
+      "file_size": 857267569,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Derrick_Broze_The_Pyramid_of_Power_Chapter_17_Volume_2_-_The_Top_of_The_Py_144.mp4",
+      "youtube_channel": "Derrick Broze",
+      "uploaded_at": "2026-06-07T23:40:32.012320+00:00"
+    },
+    {
+      "content_id": 145,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-07T23:56:45.159483+00:00",
+      "s3_key": "content_owner_attach/145/2/Terapia_Liberal_HORAS_DECISIVAS_EL_MOMENTO_DE_LA_VERDAD_145.mp4",
+      "file_size": 1143074125,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Terapia_Liberal_HORAS_DECISIVAS_EL_MOMENTO_DE_LA_VERDAD_145.mp4",
+      "youtube_channel": "Terapia Liberal",
+      "uploaded_at": "2026-06-07T23:56:45.159483+00:00"
+    },
+    {
+      "content_id": 146,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T00:26:29.155910+00:00",
+      "s3_key": "content_owner_attach/146/2/Predictive_History_Game_Theory_13_Epsteins_World_146.mp4",
+      "file_size": 2093565510,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Predictive_History_Game_Theory_13_Epsteins_World_146.mp4",
+      "youtube_channel": "Predictive History",
+      "uploaded_at": "2026-06-08T00:26:29.155910+00:00"
+    },
+    {
+      "content_id": 147,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T00:42:28.335414+00:00",
+      "s3_key": "content_owner_attach/147/2/Nicolás_Martínez_Lage_Jeffrey_NADA_ES_LO_QUE_PARECE_-_Investigación_Exclusiva_al_E_147.mp4",
+      "file_size": 1125529025,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Nicolás_Martínez_Lage_Jeffrey_NADA_ES_LO_QUE_PARECE_-_Investigación_Exclusiva_al_E_147.mp4",
+      "youtube_channel": "Nicolás Martínez Lage",
+      "uploaded_at": "2026-06-08T00:42:28.335414+00:00"
+    },
+    {
+      "content_id": 151,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T00:47:31.551089+00:00",
+      "s3_key": "content_owner_attach/151/2/Press_For_Truth_Palantirs_Gotham_AI_SURVEILLANCE_SYSTEM_And_Peter_Thiels_4-P_151.mp4",
+      "file_size": 347733024,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Press_For_Truth_Palantirs_Gotham_AI_SURVEILLANCE_SYSTEM_And_Peter_Thiels_4-P_151.mp4",
+      "youtube_channel": "Press For Truth",
+      "uploaded_at": "2026-06-08T00:47:31.551089+00:00"
+    },
+    {
+      "content_id": 155,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T00:48:25.317460+00:00",
+      "s3_key": "content_owner_attach/155/2/Washington_Post_Podcasts_Inside_billionaire_Peter_Thiels_private_Antichrist_lectures_155.mp4",
+      "file_size": 52262693,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Washington_Post_Podcasts_Inside_billionaire_Peter_Thiels_private_Antichrist_lectures_155.mp4",
+      "youtube_channel": "Washington Post Podcasts",
+      "uploaded_at": "2026-06-08T00:48:25.317460+00:00"
+    },
+    {
+      "content_id": 157,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T01:15:26.620616+00:00",
+      "s3_key": "content_owner_attach/157/2/The_Theology_Pugcast_Peter_Thiel_and_the_Antichrist_The_Theology_Pugcast_Episode_157.mp4",
+      "file_size": 1903974290,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\The_Theology_Pugcast_Peter_Thiel_and_the_Antichrist_The_Theology_Pugcast_Episode_157.mp4",
+      "youtube_channel": "The Theology Pugcast",
+      "uploaded_at": "2026-06-08T01:15:26.620616+00:00"
+    },
+    {
+      "content_id": 158,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T02:51:57.611068+00:00",
+      "s3_key": "content_owner_attach/158/2/Get_To_The_Heart_Is_Transhumanism_Paving_the_Way_for_the_Antichrist_158.mp4",
+      "file_size": 6816275796,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Get_To_The_Heart_Is_Transhumanism_Paving_the_Way_for_the_Antichrist_158.mp4",
+      "youtube_channel": "Get To The Heart",
+      "uploaded_at": "2026-06-08T02:51:57.611068+00:00"
+    },
+    {
+      "content_id": 159,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T03:02:45.070705+00:00",
+      "s3_key": "content_owner_attach/159/2/Danny_Jones_Clips_I_Attended_Peter_Thiels_Antichrist_Lecture_-_What_He_Said_Ch_159.mp4",
+      "file_size": 755758379,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Danny_Jones_Clips_I_Attended_Peter_Thiels_Antichrist_Lecture_-_What_He_Said_Ch_159.mp4",
+      "youtube_channel": "Danny Jones Clips",
+      "uploaded_at": "2026-06-08T03:02:45.070705+00:00"
+    },
+    {
+      "content_id": 160,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T03:06:49.344421+00:00",
+      "s3_key": "content_owner_attach/160/2/Interesting_Times_with_Ross_Douthat_AI_Mars_and_Immortality_Are_We_Dreaming_Big_Enough_Interesti_160.mp4",
+      "file_size": 284497495,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Interesting_Times_with_Ross_Douthat_AI_Mars_and_Immortality_Are_We_Dreaming_Big_Enough_Interesti_160.mp4",
+      "youtube_channel": "Interesting Times with Ross Douthat",
+      "uploaded_at": "2026-06-08T03:06:49.344421+00:00"
+    },
+    {
+      "content_id": 161,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T03:19:01.328054+00:00",
+      "s3_key": "content_owner_attach/161/2/Eric_Weinstein_Peter_Thiel_on_The_Portal_Episode_001_An_Era_of_Stagnation_U_161.mp4",
+      "file_size": 851093950,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Eric_Weinstein_Peter_Thiel_on_The_Portal_Episode_001_An_Era_of_Stagnation_U_161.mp4",
+      "youtube_channel": "Eric Weinstein",
+      "uploaded_at": "2026-06-08T03:19:01.328054+00:00"
+    },
+    {
+      "content_id": 162,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T03:31:04.872383+00:00",
+      "s3_key": "content_owner_attach/162/2/Hoover_Institution_Peter_Thiel_on_The_Straussian_Moment_162.mp4",
+      "file_size": 844997147,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Hoover_Institution_Peter_Thiel_on_The_Straussian_Moment_162.mp4",
+      "youtube_channel": "Hoover Institution",
+      "uploaded_at": "2026-06-08T03:31:04.872383+00:00"
+    },
+    {
+      "content_id": 163,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T03:53:52.649354+00:00",
+      "s3_key": "content_owner_attach/163/2/Piers_Morgan_Uncensored_Left-Wing_Zombie_Establishment_Billionaire_Peter_Thiel_on_Tr_163.mp4",
+      "file_size": 1565273642,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Piers_Morgan_Uncensored_Left-Wing_Zombie_Establishment_Billionaire_Peter_Thiel_on_Tr_163.mp4",
+      "youtube_channel": "Piers Morgan Uncensored",
+      "uploaded_at": "2026-06-08T03:53:52.649354+00:00"
+    },
+    {
+      "content_id": 164,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T04:23:16.146125+00:00",
+      "s3_key": "content_owner_attach/164/2/Triggernometry_The_Real_Risk_is_Totalitarian_World_Government_-_Peter_Thiel_164.mp4",
+      "file_size": 2038019689,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Triggernometry_The_Real_Risk_is_Totalitarian_World_Government_-_Peter_Thiel_164.mp4",
+      "youtube_channel": "Triggernometry",
+      "uploaded_at": "2026-06-08T04:23:16.146125+00:00"
+    },
+    {
+      "content_id": 165,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:13:11.334272+00:00",
+      "s3_key": "content_owner_attach/165/2/Things_Hidden_PETER_THIEL_Antichrist_or_Techno_Savior_of_Humanity_Part_1_165.mp4",
+      "file_size": 3474054221,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Things_Hidden_PETER_THIEL_Antichrist_or_Techno_Savior_of_Humanity_Part_1_165.mp4",
+      "youtube_channel": "Things Hidden",
+      "uploaded_at": "2026-06-08T05:13:11.334272+00:00"
+    },
+    {
+      "content_id": 167,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:30:25.260647+00:00",
+      "s3_key": "content_owner_attach/167/2/La_Arcadia_FrankenSkies_el_documental_2017_Doblado_al_Español_167.mp4",
+      "file_size": 1211285512,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\La_Arcadia_FrankenSkies_el_documental_2017_Doblado_al_Español_167.mp4",
+      "youtube_channel": "La Arcadia  //",
+      "uploaded_at": "2026-06-08T05:30:25.260647+00:00"
+    },
+    {
+      "content_id": 168,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:33:49.146692+00:00",
+      "s3_key": "content_owner_attach/168/2/STOP_NWO_NOW_EL_GRAN_FRAUDE_DEL_CALENTAMIENTO_GLOBAL_The_Great_Global_War_168.mp4",
+      "file_size": 237580630,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\STOP_NWO_NOW_EL_GRAN_FRAUDE_DEL_CALENTAMIENTO_GLOBAL_The_Great_Global_War_168.mp4",
+      "youtube_channel": "STOP NWO NOW",
+      "uploaded_at": "2026-06-08T05:33:49.146692+00:00"
+    },
+    {
+      "content_id": 241,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:35:28.300703+00:00",
+      "s3_key": "content_owner_attach/241/2/Documentales_para_Profesor_de_Historia_Los_protocolos_de_los_sabios_de_Sión_241.mp4",
+      "file_size": 108111235,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Documentales_para_Profesor_de_Historia_Los_protocolos_de_los_sabios_de_Sión_241.mp4",
+      "youtube_channel": "Documentales para Profesor de Historia",
+      "uploaded_at": "2026-06-08T05:35:28.300703+00:00"
+    },
+    {
+      "content_id": 243,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:37:04.457490+00:00",
+      "s3_key": "content_owner_attach/243/2/Testimonios_En_Vida_LOS_PROTOCOLOS_DE_LOS_SABIOS_DE_SION_Adrián_Salbuchi_y_E_Rom_243.mp4",
+      "file_size": 106339039,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Testimonios_En_Vida_LOS_PROTOCOLOS_DE_LOS_SABIOS_DE_SION_Adrián_Salbuchi_y_E_Rom_243.mp4",
+      "youtube_channel": "Testimonios En Vida",
+      "uploaded_at": "2026-06-08T05:37:04.457490+00:00"
+    },
+    {
+      "content_id": 278,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:39:52.775295+00:00",
+      "s3_key": "content_owner_attach/278/2/Etienne_de_la_Boetie2_If_Houses_Burn_But_Trees_Do_Not_Is_It_Really_a_Forest_Fire_b_278.mp4",
+      "file_size": 194493260,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Etienne_de_la_Boetie2_If_Houses_Burn_But_Trees_Do_Not_Is_It_Really_a_Forest_Fire_b_278.mp4",
+      "youtube_channel": "Etienne de la Boetie2",
+      "uploaded_at": "2026-06-08T05:39:52.775295+00:00"
+    },
+    {
+      "content_id": 279,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T05:43:13.578442+00:00",
+      "s3_key": "content_owner_attach/279/2/La_Verdad_nos_hará_libres_LOS_INCENDIOS_MÁS_SELECTIVOS_Y_EXTRAÑOS_DE_LA_HISTORIA_279.mp4",
+      "file_size": 234124308,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\La_Verdad_nos_hará_libres_LOS_INCENDIOS_MÁS_SELECTIVOS_Y_EXTRAÑOS_DE_LA_HISTORIA_279.mp4",
+      "youtube_channel": "La Verdad nos hará libres",
+      "uploaded_at": "2026-06-08T05:43:13.578442+00:00"
+    },
+    {
+      "content_id": 283,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:00:01.632804+00:00",
+      "s3_key": "content_owner_attach/283/2/Plural-21_APEDREADOS_el_documental_primer_capítulo_NAUZET_MORGADE_1de3_283.mp4",
+      "file_size": 1179518508,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Plural-21_APEDREADOS_el_documental_primer_capítulo_NAUZET_MORGADE_1de3_283.mp4",
+      "youtube_channel": "Plural-21",
+      "uploaded_at": "2026-06-08T06:00:01.632804+00:00"
+    },
+    {
+      "content_id": 284,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:11:26.031335+00:00",
+      "s3_key": "content_owner_attach/284/2/Plural-21_APEDREADOS_el_documental_segundo_capítulo_NAUZET_MORGADE_2de_284.mp4",
+      "file_size": 802948499,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Plural-21_APEDREADOS_el_documental_segundo_capítulo_NAUZET_MORGADE_2de_284.mp4",
+      "youtube_channel": "Plural-21",
+      "uploaded_at": "2026-06-08T06:11:26.031335+00:00"
+    },
+    {
+      "content_id": 285,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:27:05.144868+00:00",
+      "s3_key": "content_owner_attach/285/2/Plural-21_APEDREADOS_el_documental_tercer_capítulo_NAUZET_MORGADE_3de3_285.mp4",
+      "file_size": 1092456710,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Plural-21_APEDREADOS_el_documental_tercer_capítulo_NAUZET_MORGADE_3de3_285.mp4",
+      "youtube_channel": "Plural-21",
+      "uploaded_at": "2026-06-08T06:27:05.144868+00:00"
+    },
+    {
+      "content_id": 322,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:36:46.164064+00:00",
+      "s3_key": "content_owner_attach/322/2/Liberalístico_El_TERRORISMO_SEMÁNTICO_detrás_del_DINERO_Por_qué_lo_llaman_322.mp4",
+      "file_size": 679102628,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Liberalístico_El_TERRORISMO_SEMÁNTICO_detrás_del_DINERO_Por_qué_lo_llaman_322.mp4",
+      "youtube_channel": "Liberalístico",
+      "uploaded_at": "2026-06-08T06:36:46.164064+00:00"
+    },
+    {
+      "content_id": 324,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:46:32.127991+00:00",
+      "s3_key": "content_owner_attach/324/2/Hillsdale_Praxis_Markets_verses_Government_in_Money_and_Banking_-_Dr_Lawrence_324.mp4",
+      "file_size": 682235524,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Hillsdale_Praxis_Markets_verses_Government_in_Money_and_Banking_-_Dr_Lawrence_324.mp4",
+      "youtube_channel": "Hillsdale Praxis",
+      "uploaded_at": "2026-06-08T06:46:32.127991+00:00"
+    },
+    {
+      "content_id": 325,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T06:51:55.889090+00:00",
+      "s3_key": "content_owner_attach/325/2/Independent_POV_Princes_of_the_Yen_The_Hidden_Power_of_Central_Banks_325.mp4",
+      "file_size": 356357685,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\Independent_POV_Princes_of_the_Yen_The_Hidden_Power_of_Central_Banks_325.mp4",
+      "youtube_channel": "Independent POV",
+      "uploaded_at": "2026-06-08T06:51:55.889090+00:00"
+    },
+    {
+      "content_id": 326,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T07:00:49.303749+00:00",
+      "s3_key": "content_owner_attach/326/2/corbettreport_Century_of_Enslavement_The_History_of_The_Federal_Reserve_326.mp4",
+      "file_size": 623465261,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\corbettreport_Century_of_Enslavement_The_History_of_The_Federal_Reserve_326.mp4",
+      "youtube_channel": "corbettreport",
+      "uploaded_at": "2026-06-08T07:00:49.303749+00:00"
+    },
+    {
+      "content_id": 327,
+      "upload_status": "uploaded",
+      "updated_at": "2026-06-08T07:08:48.251689+00:00",
+      "s3_key": "content_owner_attach/327/2/doctordude_The_Collapse_of_The_American_Dream_Explained_in_Animation_327.mp4",
+      "file_size": 559988678,
+      "local_path": "E:\\Sophia.AI Academia Blockchain\\acbc_app\\youtube_downloads\\doctordude_The_Collapse_of_The_American_Dream_Explained_in_Animation_327.mp4",
+      "youtube_channel": "doctordude",
+      "uploaded_at": "2026-06-08T07:08:48.251689+00:00"
+    }
+  ]
+}

@@ -158,7 +158,8 @@ node_modules
 # Docker Compose override (development only)
 docker-compose.override.yml
 
-# YouTube migration (local downloads + manifests; never commit videos)
+# YouTube migration (local downloads + logs; commit manifest JSON for server linking)
 acbc_app/youtube_downloads/
-acbc_app/youtube_migration/
+acbc_app/youtube_migration/*
 !acbc_app/youtube_migration/.gitkeep
+!acbc_app/youtube_migration/manifest_*.json
