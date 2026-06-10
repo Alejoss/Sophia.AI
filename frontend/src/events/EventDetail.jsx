@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
-import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import { AuthContext } from '../context/AuthContext';
 import CryptoPaymentModal from './CryptoPaymentModal';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
-import { getCheckoutCurrencyCodes } from './eventPaymentUtils';
 import {
   Alert,
   Box,
@@ -52,10 +50,6 @@ const EventDetail = () => {
   const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [pendingPayCurrency, setPendingPayCurrency] = useState(null);
-  const [autoCreatePayment, setAutoCreatePayment] = useState(false);
-  const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
-  const [gatewayCurrencies, setGatewayCurrencies] = useState(['bch', 'xmr']);
   const [imageError, setImageError] = useState(false);
 
   const loadRegistrationState = useCallback(async () => {
@@ -76,22 +70,6 @@ const EventDetail = () => {
       setUserRegistration(null);
     }
   }, [authState.isAuthenticated, eventId]);
-
-  const refreshGatewayStatus = useCallback(async () => {
-    try {
-      const data = await getPaymentGatewayStatus();
-      setCryptoPaymentsEnabled(!!data.enabled);
-      if (Array.isArray(data.currencies) && data.currencies.length > 0) {
-        setGatewayCurrencies(data.currencies);
-      }
-    } catch {
-      setCryptoPaymentsEnabled(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshGatewayStatus();
-  }, [refreshGatewayStatus]);
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -160,7 +138,6 @@ const EventDetail = () => {
   };
 
   const isPaidEvent = event?.reference_price > 0;
-  const checkoutCurrencies = getCheckoutCurrencyCodes(gatewayCurrencies);
   const needsPayment =
     isPaidEvent &&
     userRegistration?.payment_status !== 'PAID';
@@ -176,7 +153,6 @@ const EventDetail = () => {
       setActionError('No se puede registrar en eventos que ya han comenzado');
       return;
     }
-    await refreshGatewayStatus();
     setShowRegistrationModal(true);
   };
 
@@ -190,8 +166,6 @@ const EventDetail = () => {
       setShowRegistrationModal(false);
       if (isPaidEvent && registration?.payment_status !== 'PAID') {
         setActionSuccess(null);
-        setPendingPayCurrency(null);
-        setAutoCreatePayment(false);
         setShowPaymentModal(true);
       } else {
         setActionSuccess('¡Inscripción confirmada!');
@@ -206,8 +180,6 @@ const EventDetail = () => {
 
   const handleClosePaymentModal = () => {
     setShowPaymentModal(false);
-    setAutoCreatePayment(false);
-    setPendingPayCurrency(null);
   };
 
   const handlePaymentComplete = () => {
@@ -367,8 +339,6 @@ const EventDetail = () => {
                 </Typography>
                 <EventPaymentMethods
                   ownerAcceptedCryptos={event.owner_accepted_cryptos}
-                  gatewayCurrencies={gatewayCurrencies}
-                  cryptoPaymentsEnabled={cryptoPaymentsEnabled}
                   compact
                 />
               </>
@@ -436,11 +406,7 @@ const EventDetail = () => {
                             variant="contained"
                             size="large"
                             startIcon={<PaymentsIcon />}
-                            onClick={() => {
-                              setAutoCreatePayment(false);
-                              setPendingPayCurrency(checkoutCurrencies[0]);
-                              setShowPaymentModal(true);
-                            }}
+                            onClick={() => setShowPaymentModal(true)}
                           >
                             Completar pago
                           </Button>
@@ -515,12 +481,6 @@ const EventDetail = () => {
         registrationId={userRegistration?.id}
         eventTitle={event?.title}
         priceUsd={event?.reference_price}
-        supportedCurrencies={checkoutCurrencies}
-        ownerAcceptedCryptos={event?.owner_accepted_cryptos}
-        gatewayCurrencies={gatewayCurrencies}
-        cryptoPaymentsEnabled
-        initialPayCurrency={pendingPayCurrency}
-        autoCreatePayment={autoCreatePayment}
         onPaymentComplete={handlePaymentComplete}
       />
     </Container>

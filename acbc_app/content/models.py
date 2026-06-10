@@ -6,6 +6,7 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 
 from content.s3_key_utils import sanitize_filename_for_s3_key
+from content.transcript_utils import sync_transcript_derived_fields
 
 
 class Library(models.Model):
@@ -218,12 +219,7 @@ class FileDetails(models.Model):
         max_length=512,
     )  # Optional for URL content; S3 keys exceed Django's default 100 chars
     file_size = models.PositiveBigIntegerField(blank=True, null=True)  # BigInteger for files > 2GB
-    
-    # Text analysis (for text-based content)
-    extracted_text = models.TextField(blank=True, null=True)
-    text_length = models.PositiveIntegerField(blank=True, null=True)
-    text_hash = models.CharField(max_length=64, blank=True, null=True)
-    
+
     # Open Graph metadata (automatically extracted for URLs)
     og_description = models.TextField(blank=True, null=True)
     og_image = models.URLField(max_length=2000, blank=True, null=True)
@@ -248,6 +244,85 @@ class FileDetails(models.Model):
     def display_description(self):
         """Returns the Open Graph description if available"""
         return self.og_description
+
+
+class ContentTranscript(models.Model):
+    """
+    Canonical transcript for video or audio content.
+
+    Stores the three artifacts produced by the external worker pipeline:
+    parsed_plain → processed_plain → obsidian_markdown.
+    Optional source_subtitles (SRT/VTT) enables timed segments for the player.
+    """
+    FORMAT_CHOICES = [
+        ('SRT', 'SubRip (.srt)'),
+        ('VTT', 'WebVTT (.vtt)'),
+    ]
+
+    content = models.OneToOneField(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='transcript',
+    )
+    parsed_plain = models.TextField(
+        blank=True,
+        help_text='Post-SRT plain text before spaCy (worker: parsed_plain).',
+    )
+    processed_plain = models.TextField(
+        blank=True,
+        help_text='spaCy-cleaned plain text; primary source for hash and future RAG.',
+    )
+    obsidian_markdown = models.TextField(
+        blank=True,
+        help_text='Obsidian note: YAML frontmatter + processed body.',
+    )
+    obsidian_frontmatter = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Parsed YAML frontmatter from obsidian_markdown.',
+    )
+    source_subtitles = models.TextField(
+        blank=True,
+        help_text='Optional raw SRT/VTT in memory for timed segments (not required by worker).',
+    )
+    format = models.CharField(
+        max_length=3,
+        choices=FORMAT_CHOICES,
+        default='SRT',
+    )
+    segments = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Parsed cues from source_subtitles: index, start_ms, end_ms, text.',
+    )
+    text_length = models.PositiveIntegerField(blank=True, null=True)
+    text_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text='SHA-256 of normalized processed_plain (fallback: parsed_plain / Obsidian body).',
+    )
+    language = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text='ISO 639-1 language code, e.g. es or en.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['text_hash'], name='content_transcript_hash_idx'),
+            models.Index(fields=['language'], name='content_transcript_lang_idx'),
+        ]
+
+    def __str__(self):
+        title = self.content.original_title or self.content_id
+        return f"Transcript for {title}"
+
+    def save(self, *args, **kwargs):
+        sync_transcript_derived_fields(self)
+        super().save(*args, **kwargs)
 
 
 class BlockchainInteraction(models.Model):

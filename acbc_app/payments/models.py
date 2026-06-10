@@ -29,7 +29,7 @@ class CryptoPayment(models.Model):
     )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
-    pay_currency = models.CharField(max_length=10, choices=PAY_CURRENCIES)
+    pay_currency = models.CharField(max_length=16, blank=True, default='')
     price_amount = models.FloatField()
     price_currency = models.CharField(max_length=10, default='usd')
     pay_amount = models.DecimalField(max_digits=24, decimal_places=12, null=True, blank=True)
@@ -45,7 +45,8 @@ class CryptoPayment(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.order_id} ({self.pay_currency.upper()}) — {self.payment_status}'
+        label = self.pay_currency.upper() if self.pay_currency else 'NOWPayments'
+        return f'{self.order_id} ({label}) — {self.payment_status}'
 
     @property
     def is_paid(self):

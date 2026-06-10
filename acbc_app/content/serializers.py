@@ -16,6 +16,7 @@ from content.models import (
     TopicModeratorInvitation,
     ContentSuggestion,
     FileSuggestion,
+    ContentTranscript,
 )
 from content.utils import build_media_url
 from content.image_utils import (
@@ -1033,3 +1034,86 @@ class FileSuggestionSerializer(serializers.ModelSerializer):
 
     def get_file(self, obj):
         return build_media_url(obj.file, self.context.get('request')) if obj.file else None
+
+
+class ContentTranscriptIngestSerializer(serializers.Serializer):
+    parsed_plain = serializers.CharField(required=False, allow_blank=True, default='')
+    processed_plain = serializers.CharField(required=False, allow_blank=True, default='')
+    obsidian_markdown = serializers.CharField(required=False, allow_blank=True, default='')
+    source_subtitles = serializers.CharField(required=False, allow_blank=True, default='')
+    format = serializers.ChoiceField(choices=ContentTranscript.FORMAT_CHOICES, default='SRT')
+    language = serializers.CharField(max_length=10, required=False, allow_blank=True, default='')
+
+    def validate(self, attrs):
+        has_artifact = any(
+            (attrs.get(field) or '').strip()
+            for field in ('parsed_plain', 'processed_plain', 'obsidian_markdown')
+        )
+        if not has_artifact:
+            raise serializers.ValidationError(
+                'Debe enviar al menos uno de: parsed_plain, processed_plain, obsidian_markdown.'
+            )
+        return attrs
+
+
+class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
+    segment_count = serializers.SerializerMethodField()
+    has_parsed_plain = serializers.SerializerMethodField()
+    has_processed_plain = serializers.SerializerMethodField()
+    has_obsidian_markdown = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContentTranscript
+        fields = [
+            'format',
+            'language',
+            'text_length',
+            'text_hash',
+            'segment_count',
+            'has_parsed_plain',
+            'has_processed_plain',
+            'has_obsidian_markdown',
+            'obsidian_frontmatter',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_segment_count(self, obj):
+        return len(obj.segments or [])
+
+    def get_has_parsed_plain(self, obj):
+        return bool((obj.parsed_plain or '').strip())
+
+    def get_has_processed_plain(self, obj):
+        return bool((obj.processed_plain or '').strip())
+
+    def get_has_obsidian_markdown(self, obj):
+        return bool((obj.obsidian_markdown or '').strip())
+
+
+class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
+    has_file = serializers.SerializerMethodField()
+    file_key = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Content
+        fields = [
+            'id',
+            'media_type',
+            'original_title',
+            'original_author',
+            'url',
+            'has_file',
+            'file_key',
+            'created_at',
+        ]
+
+    def get_has_file(self, obj):
+        file_details = getattr(obj, 'file_details', None)
+        return bool(file_details and file_details.file)
+
+    def get_file_key(self, obj):
+        file_details = getattr(obj, 'file_details', None)
+        if not file_details or not file_details.file:
+            return None
+        return file_details.file.name

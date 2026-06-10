@@ -16,11 +16,9 @@ export const getPaymentGatewayStatus = async () => {
   }
 };
 
-export const createRegistrationPayment = async (registrationId, payCurrency) => {
+export const createRegistrationPayment = async (registrationId) => {
   try {
-    const response = await axiosInstance.post(`/payments/registration/${registrationId}/`, {
-      pay_currency: payCurrency,
-    });
+    const response = await axiosInstance.post(`/payments/registration/${registrationId}/`, {});
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo crear el pago');

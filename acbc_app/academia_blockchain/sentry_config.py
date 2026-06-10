@@ -54,9 +54,13 @@ def configure_sentry():
     if not dsn:
         return
 
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+    except ImportError:
+        logging.getLogger(__name__).warning('SENTRY_DSN is set but sentry_sdk is not installed; skipping Sentry.')
+        return
 
     sentry_logging = LoggingIntegration(
         level=logging.INFO,        # Capture info and above as breadcrumbs

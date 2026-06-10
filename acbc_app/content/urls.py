@@ -63,6 +63,10 @@ from .views import (
     FileSuggestionRejectView
 )
 from .views_youtube_migration import YouTubeMigrationManifestView
+from .views_transcript_ingest import (
+    ContentTranscriptIngestQueueView,
+    ContentTranscriptIngestDetailView,
+)
 
 app_name = "content"
 
@@ -135,5 +139,15 @@ urlpatterns = [
         'youtube-migration-manifest/',
         YouTubeMigrationManifestView.as_view(),
         name='youtube-migration-manifest',
+    ),
+    path(
+        'transcript-ingest/',
+        ContentTranscriptIngestQueueView.as_view(),
+        name='transcript-ingest-queue',
+    ),
+    path(
+        'transcript-ingest/<int:content_id>/',
+        ContentTranscriptIngestDetailView.as_view(),
+        name='transcript-ingest-detail',
     ),
 ]

@@ -31,6 +31,8 @@ class CryptoPaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_pay_currency_display(self, obj):
+        if not obj.pay_currency:
+            return 'NOWPayments'
         return dict(CryptoPayment.PAY_CURRENCIES).get(obj.pay_currency, obj.pay_currency.upper())
 
     def get_payin_extra_id(self, obj):

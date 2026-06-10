@@ -227,7 +227,12 @@ const NodeDetail = () => {
           {node.description && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="h6" sx={{ mb: 1 }}>Descripción del Nodo</Typography>
-              <Typography variant="body1">{node.description}</Typography>
+              <Typography
+                variant="body1"
+                sx={{ whiteSpace: 'pre-line', wordBreak: 'break-word', lineHeight: 1.8 }}
+              >
+                {String(node.description).replace(/<br\s*\/?>/gi, '\n')}
+              </Typography>
             </Box>
           )}
 

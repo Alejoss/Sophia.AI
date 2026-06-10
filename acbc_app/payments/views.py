@@ -42,9 +42,7 @@ class EventRegistrationPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, registration_id):
-        pay_currency = request.data.get('pay_currency', '').lower().strip()
-        if not pay_currency:
-            return Response({'error': 'pay_currency es requerido (bch o xmr).'}, status=status.HTTP_400_BAD_REQUEST)
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
 
         try:
             registration = EventRegistration.objects.select_related('event', 'user').get(pk=registration_id)

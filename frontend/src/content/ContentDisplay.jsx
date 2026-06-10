@@ -520,35 +520,7 @@ const ContentDisplay = ({
           </Box>
         );
       case "TEXT":
-        if (contentData.file_details?.extracted_text) {
-          return (
-            <Box
-              sx={{
-                width: "100%",
-                maxWidth: "800px",
-                mx: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                p: 2,
-                bgcolor: "grey.50",
-                borderRadius: 0.5,
-                border: "1px solid",
-                borderColor: "divider",
-                cursor: isClickable ? "pointer" : "default",
-                "&:hover": isClickable
-                  ? {
-                      boxShadow: 2,
-                      borderColor: "primary.main",
-                    }
-                  : {},
-              }}
-              onClick={isClickable ? handleContentClick : undefined}
-              title={isClickable ? "Haz clic para abrir el archivo en una nueva pestaña" : undefined}
-            >
-              {contentData.file_details.extracted_text}
-            </Box>
-          );
-        } else if (contentExternalUrl && String(contentExternalUrl).trim()) {
+        if (contentExternalUrl && String(contentExternalUrl).trim()) {
           const resolvedExternal = resolveMediaUrl(contentExternalUrl);
           return (
             <Box
@@ -708,16 +680,6 @@ const ContentDisplay = ({
                     <CalendarTodayIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
                       Perfil creado el: {formatDateTime(profile.created_at)}
-                    </Typography>
-                  </Box>
-                )}
-
-                {fileDetails?.text_length && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <DescriptionIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="text.primary">
-                      Longitud del texto: {fileDetails.text_length.toLocaleString()}{" "}
-                      caracteres
                     </Typography>
                   </Box>
                 )}

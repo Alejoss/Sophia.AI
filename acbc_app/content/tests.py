@@ -9,7 +9,7 @@ from notifications.models import Notification
 from content.models import (
     Library, Collection, Content, ContentProfile, 
     FileDetails, Topic, TopicTimeline, TopicTimelineEntry, Publication,
-    TopicModeratorInvitation, FileSuggestion, ContentSuggestion
+    TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -2839,3 +2839,322 @@ class YouTubeMigrationManifestViewTests(TestCase):
         item = response.data['items'][0]
         self.assertTrue(item['has_file'])
         self.assertFalse(item['can_attach_file'])
+
+
+class ContentTranscriptModelTests(TestCase):
+    SAMPLE_SRT = """1
+00:00:01,000 --> 00:00:04,000
+Hola, bienvenidos al podcast.
+
+2
+00:00:05,000 --> 00:00:08,000
+Hoy hablamos de blockchain.
+"""
+
+    SAMPLE_SRT_SHIFTED_TIMES = """1
+00:01:01,000 --> 00:01:04,000
+Hola, bienvenidos al podcast.
+
+2
+00:01:05,000 --> 00:01:08,000
+Hoy hablamos de blockchain.
+"""
+
+    SAMPLE_VTT = """WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+<i>Hola</i>, bienvenidos al podcast.
+"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='transcriptuser',
+            email='transcript@example.com',
+            password='testpass123',
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video con subtítulos',
+        )
+
+    def test_save_parses_optional_srt_segments(self):
+        from content.models import ContentTranscript
+
+        transcript = ContentTranscript.objects.create(
+            content=self.content,
+            parsed_plain='Hola, bienvenidos al podcast.\nHoy hablamos de blockchain.',
+            processed_plain='Hola, bienvenidos al podcast. Hoy hablamos de blockchain.',
+            source_subtitles=self.SAMPLE_SRT,
+            format='SRT',
+            language='es',
+        )
+
+        self.assertEqual(len(transcript.segments), 2)
+        self.assertEqual(transcript.segments[0]['start_ms'], 1000)
+        self.assertEqual(transcript.segments[0]['end_ms'], 4000)
+        self.assertEqual(
+            transcript.processed_plain,
+            'Hola, bienvenidos al podcast. Hoy hablamos de blockchain.',
+        )
+        self.assertIsNotNone(transcript.text_hash)
+        self.assertGreater(transcript.text_length, 0)
+
+    def test_text_hash_uses_processed_plain(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        processed = 'Hola, bienvenidos al podcast. Hoy hablamos de blockchain.'
+        transcript = ContentTranscript.objects.create(
+            content=self.content,
+            parsed_plain='Hola, bienvenidos al podcast.\nHoy hablamos de blockchain.',
+            processed_plain=processed,
+            language='es',
+        )
+
+        self.assertEqual(transcript.text_hash, compute_text_hash(processed))
+
+    def test_text_hash_ignores_timestamp_changes_when_srt_optional(self):
+        from content.models import ContentTranscript
+
+        processed = 'Hola, bienvenidos al podcast. Hoy hablamos de blockchain.'
+        first = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain=processed,
+            source_subtitles=self.SAMPLE_SRT,
+            format='SRT',
+        )
+
+        second_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Otro video',
+        )
+        second = ContentTranscript.objects.create(
+            content=second_content,
+            processed_plain=processed,
+            source_subtitles=self.SAMPLE_SRT_SHIFTED_TIMES,
+            format='SRT',
+        )
+
+        self.assertEqual(first.text_hash, second.text_hash)
+
+    def test_save_worker_artifacts_without_srt(self):
+        from content.models import ContentTranscript
+
+        obsidian = """---
+title: Demo
+language_code: es-419
+source_url: https://www.youtube.com/watch?v=demo
+---
+Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
+"""
+        transcript = ContentTranscript.objects.create(
+            content=self.content,
+            parsed_plain='Hola, bienvenidos al podcast.\nHoy hablamos de blockchain.',
+            processed_plain='Hola, bienvenidos al podcast. Hoy hablamos de blockchain.',
+            obsidian_markdown=obsidian,
+        )
+
+        self.assertEqual(transcript.segments, [])
+        self.assertEqual(transcript.language, 'es')
+        self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
+        self.assertIn('blockchain', transcript.processed_plain)
+
+    def test_save_parses_vtt_segments_when_optional_source_provided(self):
+        from content.models import ContentTranscript
+
+        transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Hola, bienvenidos al podcast.',
+            source_subtitles=self.SAMPLE_VTT,
+            format='VTT',
+        )
+
+        self.assertEqual(len(transcript.segments), 1)
+        self.assertEqual(transcript.segments[0]['text'], 'Hola, bienvenidos al podcast.')
+
+    def test_invalid_optional_subtitles_raise_validation_error(self):
+        from content.models import ContentTranscript
+        from django.core.exceptions import ValidationError
+
+        transcript = ContentTranscript(
+            content=self.content,
+            processed_plain='Texto válido.',
+            source_subtitles='esto no es un srt valido',
+            format='SRT',
+        )
+
+        with self.assertRaises(ValidationError):
+            transcript.save()
+
+    def test_missing_artifacts_raise_validation_error(self):
+        from content.models import ContentTranscript
+        from django.core.exceptions import ValidationError
+
+        transcript = ContentTranscript(content=self.content)
+
+        with self.assertRaises(ValidationError):
+            transcript.save()
+
+
+@override_settings(TRANSCRIPT_INGEST_API_KEY='test-ingest-key')
+class ContentTranscriptIngestAPITests(APITestCase):
+    PARSED_PLAIN = (
+        'Hola, bienvenidos al podcast.\n'
+        'Hoy hablamos de blockchain.'
+    )
+    PROCESSED_PLAIN = 'Hola, bienvenidos al podcast. Hoy hablamos de blockchain.'
+    OBSIDIAN_MARKDOWN = """---
+title: Demo
+language_code: es
+---
+Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
+"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {'HTTP_X_TRANSCRIPT_INGEST_KEY': 'test-ingest-key'}
+        self.user = User.objects.create_user(
+            username='ingestuser',
+            email='ingest@example.com',
+            password='testpass123',
+        )
+        self.video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video pendiente',
+            url='https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        )
+        FileDetails.objects.create(content=self.video)
+        self.audio = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='AUDIO',
+            original_title='Podcast pendiente',
+        )
+        FileDetails.objects.create(content=self.audio)
+
+    def test_queue_requires_api_key(self):
+        response = self.client.get('/api/content/transcript-ingest/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_queue_lists_pending_video_and_audio(self):
+        response = self.client.get('/api/content/transcript-ingest/', **self.auth_header)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        content_ids = {item['id'] for item in response.data['items']}
+        self.assertEqual(content_ids, {self.video.id, self.audio.id})
+
+    def test_put_creates_transcript(self):
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'parsed_plain': self.PARSED_PLAIN,
+                'processed_plain': self.PROCESSED_PLAIN,
+                'obsidian_markdown': self.OBSIDIAN_MARKDOWN,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['created'])
+        self.assertTrue(response.data['transcript']['has_processed_plain'])
+        self.assertTrue(response.data['transcript']['has_obsidian_markdown'])
+        self.assertEqual(response.data['transcript']['segment_count'], 0)
+        self.assertIsNotNone(response.data['transcript']['text_hash'])
+
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertEqual(transcript.language, 'es')
+        self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
+
+    def test_put_accepts_optional_source_subtitles_for_segments(self):
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'parsed_plain': self.PARSED_PLAIN,
+                'processed_plain': self.PROCESSED_PLAIN,
+                'source_subtitles': ContentTranscriptModelTests.SAMPLE_SRT,
+                'format': 'SRT',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['transcript']['segment_count'], 2)
+
+    def test_put_updates_existing_transcript(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            parsed_plain=self.PARSED_PLAIN,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+
+        updated_processed = self.PROCESSED_PLAIN + ' Cierre del episodio.'
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'parsed_plain': self.PARSED_PLAIN,
+                'processed_plain': updated_processed,
+                'obsidian_markdown': self.OBSIDIAN_MARKDOWN,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['created'])
+        self.assertEqual(ContentTranscript.objects.filter(content=self.video).count(), 1)
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertIn('Cierre del episodio', transcript.processed_plain)
+
+    def test_get_detail_includes_transcript_status(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            parsed_plain=self.PARSED_PLAIN,
+            processed_plain=self.PROCESSED_PLAIN,
+            obsidian_markdown=self.OBSIDIAN_MARKDOWN,
+        )
+        response = self.client.get(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_transcript'])
+        self.assertTrue(response.data['transcript']['has_processed_plain'])
+
+    def test_put_requires_at_least_one_artifact(self):
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {},
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_put_rejects_non_media_content(self):
+        text_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Articulo',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{text_content.id}/',
+            {'processed_plain': self.PROCESSED_PLAIN},
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_put_rejects_invalid_optional_subtitles(self):
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'processed_plain': self.PROCESSED_PLAIN,
+                'source_subtitles': 'no es un srt valido',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

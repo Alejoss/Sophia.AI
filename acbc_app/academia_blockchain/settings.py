@@ -705,6 +705,9 @@ NOWPAYMENTS_API_URL = os.getenv(
 ACADEMIA_PUBLIC_URL = os.getenv('ACADEMIA_PUBLIC_URL', 'http://localhost:8000')
 FRONTEND_PUBLIC_URL = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5173')
 
+# External async workers that upload parsed subtitles/transcripts (machine-to-machine).
+TRANSCRIPT_INGEST_API_KEY = os.getenv('TRANSCRIPT_INGEST_API_KEY', '')
+
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry
 configure_sentry()

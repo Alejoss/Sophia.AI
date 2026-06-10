@@ -87,6 +87,22 @@ class NOWPaymentsClient:
         }
         return self._request('POST', '/payment', json=body)
 
+    def create_invoice(self, *, price_amount, price_currency, order_id, order_description,
+                       ipn_callback_url, success_url='', cancel_url=''):
+        """POST /v1/invoice — customer picks pay currency on the hosted invoice page."""
+        body = {
+            'price_amount': price_amount,
+            'price_currency': price_currency,
+            'order_id': order_id,
+            'order_description': order_description,
+            'ipn_callback_url': ipn_callback_url,
+        }
+        if success_url:
+            body['success_url'] = success_url
+        if cancel_url:
+            body['cancel_url'] = cancel_url
+        return self._request('POST', '/invoice', json=body)
+
     def get_payment_status(self, payment_id):
         return self._request('GET', f'/payment/{payment_id}')
 
