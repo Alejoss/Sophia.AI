@@ -22,6 +22,30 @@ from payments.services import (
 logger = logging.getLogger(__name__)
 
 
+def _find_crypto_payment_for_ipn(body: dict):
+    """Resolve CryptoPayment from NOWPayments IPN payload (payment or invoice flow)."""
+    order_id = body.get('order_id')
+    if order_id:
+        try:
+            return CryptoPayment.objects.select_related('registration').get(order_id=order_id)
+        except CryptoPayment.DoesNotExist:
+            pass
+
+    invoice_id = body.get('invoice_id')
+    if invoice_id is not None:
+        payment = CryptoPayment.objects.filter(nowpayments_payment_id=invoice_id).first()
+        if payment:
+            return payment
+
+    payment_id = body.get('payment_id')
+    if payment_id is not None:
+        payment = CryptoPayment.objects.filter(nowpayments_payment_id=payment_id).first()
+        if payment:
+            return payment
+
+    return None
+
+
 class PaymentGatewayStatusView(APIView):
     """Public info about whether crypto payments are enabled."""
 
@@ -81,8 +105,12 @@ class CryptoPaymentDetailView(APIView):
 
         client = NOWPaymentsClient()
         if client.configured and payment.nowpayments_payment_id:
+            remote_id = payment.nowpayments_payment_id
+            # Invoice flow stores invoice id first; payment status API needs payment_id.
+            if payment.provider_payload.get('payment_id'):
+                remote_id = payment.provider_payload['payment_id']
             try:
-                remote = client.get_payment_status(payment.nowpayments_payment_id)
+                remote = client.get_payment_status(remote_id)
                 payment = sync_payment_from_provider(payment, remote)
             except NOWPaymentsError as exc:
                 logger.warning('Could not refresh payment %s: %s', payment_id, exc)
@@ -138,15 +166,20 @@ class NOWPaymentsIPNView(APIView):
             return Response({'error': 'Invalid signature'}, status=status.HTTP_403_FORBIDDEN)
 
         order_id = body.get('order_id')
-        if not order_id:
-            return Response({'error': 'order_id missing'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            payment = CryptoPayment.objects.select_related('registration').get(order_id=order_id)
-        except CryptoPayment.DoesNotExist:
-            logger.warning('IPN for unknown order_id: %s', order_id)
+        payment = _find_crypto_payment_for_ipn(body)
+        if payment is None:
+            logger.warning(
+                'IPN for unknown payment (order_id=%s, invoice_id=%s, payment_id=%s)',
+                order_id,
+                body.get('invoice_id'),
+                body.get('payment_id'),
+            )
             return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
 
         sync_payment_from_provider(payment, body)
-        logger.info('IPN processed for order %s — status %s', order_id, body.get('payment_status'))
+        logger.info(
+            'IPN processed for order %s — status %s',
+            payment.order_id,
+            body.get('payment_status'),
+        )
         return Response({'status': 'ok'})

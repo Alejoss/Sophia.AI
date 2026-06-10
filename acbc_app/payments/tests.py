@@ -97,6 +97,45 @@ class SyncPaymentFromProviderTests(TestCase):
         self.assertEqual(self.registration.payment_status, 'PENDING')
 
 
+class IPNLookupTests(TestCase):
+    def setUp(self):
+        self.event = EventFactory(reference_price=50.0)
+        self.registration = EventRegistrationFactory(
+            event=self.event,
+            payment_status='PENDING',
+        )
+        self.crypto_payment = CryptoPayment.objects.create(
+            registration=self.registration,
+            order_id='evt-reg-invoice-order',
+            nowpayments_payment_id=999888777,
+            pay_currency='',
+            price_amount=50.0,
+            payment_status='waiting',
+            invoice_url='https://nowpayments.io/payment/?iid=999888777',
+        )
+
+    def test_ipn_finds_payment_by_order_id(self):
+        from payments.views import _find_crypto_payment_for_ipn
+
+        found = _find_crypto_payment_for_ipn({
+            'order_id': 'evt-reg-invoice-order',
+            'payment_status': 'waiting',
+        })
+        self.assertEqual(found.id, self.crypto_payment.id)
+
+    def test_ipn_finds_payment_by_invoice_id(self):
+        from payments.views import _find_crypto_payment_for_ipn
+
+        found = _find_crypto_payment_for_ipn({
+            'invoice_id': 999888777,
+            'payment_id': 12345,
+            'payment_status': 'finished',
+            'actually_paid': '50',
+            'pay_amount': '50',
+        })
+        self.assertEqual(found.id, self.crypto_payment.id)
+
+
 @override_settings(NOWPAYMENTS_API_KEY='test-key')
 class AcceptPaymentGatewayTests(TestCase):
     def setUp(self):

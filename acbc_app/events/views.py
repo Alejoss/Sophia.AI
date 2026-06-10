@@ -590,7 +590,10 @@ class EventParticipantsView(APIView):
                 logger.warning(f"Event participants request denied - permission denied - Event ID: {event_id}, User: {request.user.username}, Event Owner ID: {event.owner.id}")
                 return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             
-            registrations = EventRegistration.objects.filter(event=event)
+            registrations = EventRegistration.objects.filter(
+                event=event,
+                registration_status='REGISTERED',
+            )
             serializer = EventRegistrationListSerializer(registrations, many=True)
             
             logger.debug(f"Successfully retrieved {len(serializer.data)} event participants")
