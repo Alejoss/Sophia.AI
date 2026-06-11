@@ -1,16 +1,18 @@
 // src/api/eventsApi.js
 import axiosInstance from './axiosConfig.js';
+import { rethrowAxiosError } from '../utils/authErrorHandler.js';
+
+const fail = (error, message) => {
+  console.error(message, error);
+  rethrowAxiosError(error, message);
+};
 
 export const fetchEvents = async () => {
   try {
     const response = await axiosInstance.get('/events/');
     return response.data;
   } catch (error) {
-    console.error('Error fetching events:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching events');
   }
 };
 
@@ -19,11 +21,7 @@ export const createEvent = async (eventData) => {
     const response = await axiosInstance.post('/events/', eventData);
     return response.data;
   } catch (error) {
-    console.error('Error creating event:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error creating event');
   }
 };
 
@@ -32,11 +30,7 @@ export const fetchEventById = async (eventId) => {
     const response = await axiosInstance.get(`/events/${eventId}/`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching event:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching event');
   }
 };
 
@@ -45,11 +39,7 @@ export const updateEvent = async (eventId, eventData) => {
     const response = await axiosInstance.put(`/events/${eventId}/`, eventData);
     return response.data;
   } catch (error) {
-    console.error('Error updating event:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error updating event');
   }
 };
 
@@ -57,11 +47,7 @@ export const deleteEvent = async (eventId) => {
   try {
     await axiosInstance.delete(`/events/${eventId}/`);
   } catch (error) {
-    console.error('Error deleting event:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error deleting event');
   }
 };
 
@@ -71,11 +57,7 @@ export const registerForEvent = async (eventId) => {
     const response = await axiosInstance.post(`/events/${eventId}/register/`);
     return response.data;
   } catch (error) {
-    console.error('Error registering for event:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error registering for event');
   }
 };
 
@@ -84,11 +66,7 @@ export const cancelEventRegistration = async (eventId) => {
     const response = await axiosInstance.delete(`/events/${eventId}/register/`);
     return response.data;
   } catch (error) {
-    console.error('Error cancelling event registration:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error cancelling event registration');
   }
 };
 
@@ -97,11 +75,7 @@ export const getEventParticipants = async (eventId) => {
     const response = await axiosInstance.get(`/events/${eventId}/participants/`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching event participants:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching event participants');
   }
 };
 
@@ -110,11 +84,7 @@ export const getUserEventRegistrations = async () => {
     const response = await axiosInstance.get('/events/my-registrations/');
     return response.data;
   } catch (error) {
-    console.error('Error fetching user event registrations:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching user event registrations');
   }
 };
 
@@ -123,11 +93,7 @@ export const getUserCreatedEvents = async () => {
     const response = await axiosInstance.get('/events/my-events/');
     return response.data;
   } catch (error) {
-    console.error('Error fetching user created events:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching user created events');
   }
 };
 
@@ -137,11 +103,7 @@ export const getUserEventRegistrationsById = async (userId) => {
     // For now, return empty array since registrations are private
     return [];
   } catch (error) {
-    console.error('Error fetching user event registrations by ID:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching user event registrations by ID');
   }
 };
 
@@ -152,11 +114,7 @@ export const getUserCreatedEventsById = async (userId) => {
     console.log('Events by owner response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching user created events by ID:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error fetching user created events by ID');
   }
 };
 
@@ -167,10 +125,6 @@ export const updateParticipantStatus = async (eventId, registrationId, action) =
     });
     return response.data;
   } catch (error) {
-    console.error('Error updating participant status:', error);
-    if (error.response) {
-      throw error.response.data;
-    }
-    throw error;
+    fail(error, 'Error updating participant status');
   }
 };

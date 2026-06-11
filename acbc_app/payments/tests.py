@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient
 from payments.services import sync_payment_from_provider
+from payments.text_utils import to_ascii_safe, to_ascii_safe_json
 from tests.factories.events import EventFactory, EventRegistrationFactory
 from tests.factories.users import UserFactory
 
@@ -169,3 +170,15 @@ class PaymentGatewayStatusTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['enabled'])
         self.assertIn('bch', response.data['currencies'])
+
+
+class AsciiSafeStorageTests(TestCase):
+    def test_to_ascii_safe_strips_accents(self):
+        self.assertEqual(to_ascii_safe('Filosofía Cypherpunk'), 'Filosofia Cypherpunk')
+
+    def test_to_ascii_safe_json_escapes_unicode(self):
+        payload = {'order_description': 'Registro: Filosofía'}
+        safe = to_ascii_safe_json(payload)
+        raw = json.dumps(safe, ensure_ascii=True)
+        self.assertNotIn('í', raw)
+        self.assertIn('\\u00ed', raw)

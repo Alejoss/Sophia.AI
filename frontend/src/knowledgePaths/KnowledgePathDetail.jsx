@@ -38,6 +38,7 @@ import knowledgePathsApi from '../api/knowledgePathsApi';
 import certificatesApi from '../api/certificatesApi';
 import commentsApi from '../api/commentsApi';
 import { AuthContext } from '../context/AuthContext';
+import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
@@ -47,6 +48,9 @@ const KnowledgePathDetail = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
+  const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
+    strategy: AUTH_ERROR_STRATEGY.REDIRECT,
+  });
   const user = authState.user;
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -94,12 +98,10 @@ const KnowledgePathDetail = () => {
           }
         }
       } catch (err) {
-        if (err.response?.status === 401) {
-          // The axios interceptor will handle the redirect to login
-          setError('Por favor inicia sesión para ver este camino de conocimiento');
-        } else {
-          setError('Error al cargar el camino de conocimiento');
+        if (handleAuthError(err).handled) {
+          return;
         }
+        setError(getErrorMessage(err, 'Error al cargar el camino de conocimiento'));
       } finally {
         setLoading(false);
         setLoadingStatus(false);
@@ -107,7 +109,7 @@ const KnowledgePathDetail = () => {
     };
 
     fetchKnowledgePath();
-  }, [pathId, user?.username, authState.isAuthenticated, authState.user]);
+  }, [pathId, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage]);
 
   const handleAddComment = async (e) => {
     e.preventDefault();

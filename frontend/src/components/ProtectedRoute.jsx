@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
+import { LOGIN_PATH } from '../utils/authErrorHandler';
 
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -16,7 +17,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!authState.isAuthenticated) {
-    return <Navigate to="/profiles/login" replace state={{ from: location }} />;
+    return <Navigate to={LOGIN_PATH} replace state={{ from: location }} />;
   }
 
   return children;

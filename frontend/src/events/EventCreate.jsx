@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createEvent } from '../api/eventsApi';
+import { parse, isValid } from 'date-fns';
 import {
   Alert,
   Box,
@@ -56,6 +57,19 @@ const EventCreate = () => {
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
 
+  const startMinDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }, []);
+
+  const endMinDate = useMemo(() => {
+    if (!form.date_start) return undefined;
+    const [datePart] = form.date_start.split('T');
+    const parsed = parse(datePart, 'yyyy-MM-dd', new Date());
+    return isValid(parsed) ? parsed : undefined;
+  }, [form.date_start]);
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -69,10 +83,6 @@ const EventCreate = () => {
 
     if (!form.event_type) {
       newErrors.event_type = 'El tipo de evento es obligatorio';
-    }
-
-    if (!form.platform) {
-      newErrors.platform = 'La plataforma es obligatoria';
     }
 
     if (form.platform === 'other' && !form.other_platform.trim()) {
@@ -298,14 +308,14 @@ const EventCreate = () => {
 
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth error={Boolean(errors.platform)}>
-                    <InputLabel>Plataforma *</InputLabel>
+                    <InputLabel>Plataforma</InputLabel>
                     <Select
                       name="platform"
                       value={form.platform}
-                      label="Plataforma *"
+                      label="Plataforma"
                       onChange={handleChange}
                     >
-                      <MenuItem value="">Seleccionar plataforma</MenuItem>
+                      <MenuItem value="">Ninguna</MenuItem>
                       {PLATFORM_CHOICES.map((p) => (
                         <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
                       ))}
@@ -332,7 +342,7 @@ const EventCreate = () => {
 
               <TextField
                 name="reference_price"
-                label="Precio de Referencia (USD)"
+                label="Precio de Referencia en USD"
                 type="number"
                 value={form.reference_price}
                 onChange={handleChange}
@@ -348,6 +358,7 @@ const EventCreate = () => {
                     onChange={handleDateTimeChange('date_start')}
                     error={errors.date_start}
                     dateHelperText="Seleccione la fecha de inicio"
+                    minDate={startMinDate}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -357,6 +368,7 @@ const EventCreate = () => {
                     onChange={handleDateTimeChange('date_end')}
                     error={errors.date_end}
                     dateHelperText="Seleccione la fecha de fin"
+                    minDate={endMinDate}
                   />
                 </Grid>
               </Grid>

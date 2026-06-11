@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
 import { AuthContext } from '../context/AuthContext';
+import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 import CryptoPaymentModal from './CryptoPaymentModal';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
@@ -38,6 +39,7 @@ const EventDetail = () => {
   const { eventId } = useParams();
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { handleAuthError, getErrorMessage } = useAuthErrorHandler();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,11 +67,12 @@ const EventDetail = () => {
       );
       setIsRegistered(!!activeRegistration);
       setUserRegistration(activeRegistration || null);
-    } catch {
+    } catch (err) {
+      handleAuthError(err, { strategy: AUTH_ERROR_STRATEGY.IGNORE });
       setIsRegistered(false);
       setUserRegistration(null);
     }
-  }, [authState.isAuthenticated, eventId]);
+  }, [authState.isAuthenticated, eventId, handleAuthError]);
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -81,7 +84,7 @@ const EventDetail = () => {
           await loadRegistrationState();
         }
       } catch (err) {
-        setError('Error al cargar el evento. Por favor, inténtelo de nuevo.');
+        setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
         console.error('Error loading event:', err);
       } finally {
         setLoading(false);

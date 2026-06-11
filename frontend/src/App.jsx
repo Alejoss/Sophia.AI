@@ -199,10 +199,10 @@ const AppContent = () => {
             </Route>
             <Route path="events">
               <Route path="" element={<EventsList />} />
-              <Route path="create" element={<EventCreate />} />
+              <Route path="create" element={<ProtectedRoute><EventCreate /></ProtectedRoute>} />
               <Route path=":eventId" element={<EventDetail />} />
-              <Route path=":eventId/edit" element={<EventEdit />} />
-              <Route path=":eventId/manage" element={<ManageEvent />} />
+              <Route path=":eventId/edit" element={<ProtectedRoute><EventEdit /></ProtectedRoute>} />
+              <Route path=":eventId/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
             </Route>
           </Route>
 

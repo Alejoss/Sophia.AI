@@ -82,6 +82,11 @@ class EventList(APIView):
 
 class EventDetail(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
     
     def get_object(self, pk):
         return get_object_or_404(Event, pk=pk)

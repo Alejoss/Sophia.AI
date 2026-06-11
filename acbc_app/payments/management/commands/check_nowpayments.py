@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.migrations.executor import MigrationExecutor
 from django.db import connections
+from django.db.migrations.loader import MigrationLoader
 
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 
@@ -43,11 +43,17 @@ class Command(BaseCommand):
 
         self.stdout.write(f'IPN callback URL: {ipn_url}')
 
-        executor = MigrationExecutor(connections['default'])
-        plan = executor.migration_plan([('payments', None)])
-        if plan:
+        loader = MigrationLoader(connections['default'])
+        pending = [
+            name
+            for app_label, name in loader.graph.nodes
+            if app_label == 'payments' and (app_label, name) not in loader.applied_migrations
+        ]
+        if pending:
             ok = False
-            self.stdout.write(self.style.ERROR(f'Migrations: pending ({len(plan)} to apply)'))
+            self.stdout.write(
+                self.style.ERROR(f'Migrations: pending ({", ".join(sorted(pending))})')
+            )
         else:
             self.stdout.write(self.style.SUCCESS('Migrations: up to date'))
 

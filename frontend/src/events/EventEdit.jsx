@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import EventDateTimeField from './EventDateTimeField';
 import { formatDateTimeForInput } from '../utils/dateUtils';
+import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -45,6 +46,9 @@ const EVENT_TYPES = [
 const EventEdit = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
+    strategy: AUTH_ERROR_STRATEGY.REDIRECT,
+  });
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -88,15 +92,18 @@ const EventEdit = () => {
           setImagePreview(eventData.image);
         }
       } catch (err) {
+        if (handleAuthError(err).handled) {
+          return;
+        }
         console.error('Error loading event:', err);
-        setError('Error al cargar el evento. Por favor, inténtelo de nuevo.');
+        setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
       } finally {
         setFetchLoading(false);
       }
     };
 
     loadEvent();
-  }, [eventId]);
+  }, [eventId, getErrorMessage, handleAuthError]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -111,10 +118,6 @@ const EventEdit = () => {
 
     if (!form.event_type) {
       newErrors.event_type = 'El tipo de evento es obligatorio';
-    }
-
-    if (!form.platform) {
-      newErrors.platform = 'La plataforma es obligatoria';
     }
 
     if (form.platform === 'other' && !form.other_platform.trim()) {
@@ -367,14 +370,14 @@ const EventEdit = () => {
 
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth error={Boolean(errors.platform)}>
-                    <InputLabel>Plataforma *</InputLabel>
+                    <InputLabel>Plataforma</InputLabel>
                     <Select
                       name="platform"
                       value={form.platform}
-                      label="Plataforma *"
+                      label="Plataforma"
                       onChange={handleChange}
                     >
-                      <MenuItem value="">Seleccionar plataforma</MenuItem>
+                      <MenuItem value="">Ninguna</MenuItem>
                       {PLATFORM_CHOICES.map((p) => (
                         <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
                       ))}
@@ -401,7 +404,7 @@ const EventEdit = () => {
 
               <TextField
                 name="reference_price"
-                label="Precio de Referencia (USD)"
+                label="Precio de Referencia en USD"
                 type="number"
                 value={form.reference_price}
                 onChange={handleChange}

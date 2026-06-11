@@ -87,10 +87,8 @@ axiosInstance.interceptors.response.use(
     } catch (refreshError) {
       // If refresh fails, don't automatically clear auth state or redirect
       // This prevents hard page refresh that breaks React Router state
-      // Components will receive the 401 error and can handle it appropriately
-      
-      // Dispatch a custom event that components can listen to if needed
-      // This allows for graceful handling without hard page refresh
+      // AuthContext clears local session on this event. Navigation is left to callers —
+      // see utils/authErrorHandler.js and hooks/useAuthErrorHandler.js.
       window.dispatchEvent(new CustomEvent('auth:token_refresh_failed', { 
         detail: { 
           reason: 'token_refresh_failed',
@@ -99,9 +97,8 @@ axiosInstance.interceptors.response.use(
         } 
       }));
       
-      // Return the original 401 error so components can handle it
-      // Components can check error.response?.status === 401 and decide what to do
-      // They might want to verify auth status with checkAuth() or show appropriate UI
+      // Return the original 401 so API layers can rethrow as ApiError and components
+      // can call handleAuthError() with the appropriate strategy.
       return Promise.reject(error);
     }
   }

@@ -5,9 +5,11 @@ import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import votesApi from '../api/votesApi';
 import { AuthContext } from '../context/AuthContext';
+import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
 const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 }) => {
     const { authState } = useContext(AuthContext);
+    const { handleAuthError, getErrorMessage } = useAuthErrorHandler();
     const [voteCount, setVoteCount] = useState(Number(initialVoteCount) || 0);
     const [userVote, setUserVote] = useState(Number(initialUserVote) || 0);
     const [loading, setLoading] = useState(false);
@@ -127,17 +129,17 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
             setUserVote(newUserVote);
         } catch (error) {
             console.error('Error in handleVote:', error);
-            
-            // Handle authentication errors
-            if (error.response?.status === 401) {
-                console.log('Authentication required for voting');
-                // You might want to show a message to the user or redirect to login
-                alert('Por favor inicia sesión para votar');
+
+            const authResult = handleAuthError(error, {
+                strategy: AUTH_ERROR_STRATEGY.MESSAGE,
+                message: 'Por favor inicia sesión para votar',
+            });
+            if (authResult.handled) {
+                alert(authResult.message);
                 return;
             }
-            
-            // Handle other errors
-                alert('Ocurrió un error al procesar tu voto. Por favor intenta de nuevo.');
+
+            alert(getErrorMessage(error, 'Ocurrió un error al procesar tu voto. Por favor intenta de nuevo.'));
         } finally {
             setLoading(false);
         }

@@ -73,6 +73,13 @@ class EventRegistrationPaymentView(APIView):
         except EventRegistration.DoesNotExist:
             return Response({'error': 'Registro no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
+        logger.info(
+            'Payment create request registration=%s user=%s event=%s',
+            registration_id,
+            request.user.id,
+            registration.event_id,
+        )
+
         try:
             payment = create_event_registration_payment(
                 registration=registration,
@@ -84,8 +91,30 @@ class EventRegistrationPaymentView(APIView):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except NOWPaymentsError as exc:
+            logger.warning(
+                'NOWPayments error for registration=%s: %s',
+                registration_id,
+                exc,
+            )
             return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as exc:
+            logger.error(
+                'Unexpected error creating payment for registration=%s: %s',
+                registration_id,
+                exc,
+                exc_info=True,
+            )
+            return Response(
+                {'error': 'No se pudo iniciar el pago. Inténtelo de nuevo.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
+        logger.info(
+            'Payment created id=%s order=%s registration=%s',
+            payment.id,
+            payment.order_id,
+            registration_id,
+        )
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 

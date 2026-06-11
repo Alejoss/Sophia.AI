@@ -111,6 +111,21 @@ class EventDetailAPITest(TestCase):
         self.assertEqual(response.data['title'], self.event.title)
         self.assertEqual(response.data['owner']['username'], self.user.username)
 
+    def test_get_event_detail_anonymous(self):
+        """Test GET request allows unauthenticated access."""
+        self.client.force_authenticate(user=None)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], self.event.title)
+
+    def test_update_event_requires_auth(self):
+        """Test PUT request rejects unauthenticated users."""
+        self.client.force_authenticate(user=None)
+        response = self.client.put(self.url, {'title': 'Hacked'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_get_nonexistent_event(self):
         """Test GET request for non-existent event."""
         response = self.client.get(reverse('events:event-detail', kwargs={'pk': 99999}))

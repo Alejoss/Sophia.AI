@@ -24,9 +24,13 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
+import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
 const ManageEvent = () => {
   const { eventId } = useParams();
+  const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
+    strategy: AUTH_ERROR_STRATEGY.REDIRECT,
+  });
   const [event, setEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,8 +68,11 @@ const ManageEvent = () => {
       setEvent(eventData);
       setParticipants(participantsData);
     } catch (err) {
+      if (handleAuthError(err).handled) {
+        return;
+      }
       console.error('Error loading event data:', err);
-      setError(err.error || 'Error al cargar los datos del evento');
+      setError(getErrorMessage(err, 'Error al cargar los datos del evento'));
     } finally {
       setLoading(false);
     }
