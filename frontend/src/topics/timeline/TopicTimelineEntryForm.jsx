@@ -1,34 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
-  InputLabel,
-  ListItemText,
-  MenuItem,
-  OutlinedInput,
-  Select,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-
-const getAvailableContentId = (item) => item?.content?.id ?? item?.id;
-
-const getAvailableContentTitle = (item) => (
-  item?.title ||
-  item?.content?.original_title ||
-  item?.selected_profile?.title ||
-  'Contenido sin titulo'
-);
-
-const getAvailableContentMediaType = (item) => item?.content?.media_type || item?.media_type || 'TEXT';
+import TopicTimelineContentSelector from './TopicTimelineContentSelector';
 
 const buildInitialState = (entry) => {
   const links = [...(entry?.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -63,40 +46,25 @@ const TopicTimelineEntryForm = ({
     }
   }, [entry, open]);
 
-  const contentOptions = useMemo(() => {
-    return (availableContents || [])
-      .map((item) => ({
-        id: String(getAvailableContentId(item)),
-        title: getAvailableContentTitle(item),
-        mediaType: getAvailableContentMediaType(item),
-      }))
-      .filter((item) => item.id && item.id !== 'undefined');
-  }, [availableContents]);
-
-  const selectedLabels = form.selectedContentIds
-    .map((id) => contentOptions.find((item) => item.id === id)?.title)
-    .filter(Boolean)
-    .join(', ');
-
   const handleFieldChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const handleContentChange = (event) => {
-    const value = typeof event.target.value === 'string'
-      ? event.target.value.split(',')
-      : event.target.value;
+  const handleContentSelectionChange = (selectedIds) => {
     setForm((prev) => {
-      const nextSelected = value;
-      const nextPrimary = nextSelected.includes(prev.primaryContentId)
+      const nextPrimary = selectedIds.includes(prev.primaryContentId)
         ? prev.primaryContentId
-        : (nextSelected[0] || '');
+        : (selectedIds[0] || '');
       return {
         ...prev,
-        selectedContentIds: nextSelected,
+        selectedContentIds: selectedIds,
         primaryContentId: nextPrimary,
       };
     });
+  };
+
+  const handlePrimaryContentChange = (contentId) => {
+    setForm((prev) => ({ ...prev, primaryContentId: contentId }));
   };
 
   const handleSubmit = (event) => {
@@ -167,45 +135,14 @@ const TopicTimelineEntryForm = ({
               />
             </Stack>
 
-            <FormControl fullWidth disabled={loadingContents}>
-              <InputLabel id="timeline-entry-content-label">Contenidos del tema</InputLabel>
-              <Select
-                labelId="timeline-entry-content-label"
-                multiple
-                value={form.selectedContentIds}
-                onChange={handleContentChange}
-                input={<OutlinedInput label="Contenidos del tema" />}
-                renderValue={() => selectedLabels || 'Sin contenidos adjuntos'}
-              >
-                {contentOptions.map((item) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    <Checkbox checked={form.selectedContentIds.includes(item.id)} />
-                    <ListItemText primary={item.title} secondary={item.mediaType} />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {form.selectedContentIds.length > 0 && (
-              <FormControl fullWidth>
-                <InputLabel id="timeline-primary-content-label">Contenido principal</InputLabel>
-                <Select
-                  labelId="timeline-primary-content-label"
-                  value={form.primaryContentId}
-                  label="Contenido principal"
-                  onChange={handleFieldChange('primaryContentId')}
-                >
-                  {form.selectedContentIds.map((id) => {
-                    const option = contentOptions.find((item) => item.id === id);
-                    return (
-                      <MenuItem key={id} value={id}>
-                        {option?.title || `Contenido ${id}`}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </FormControl>
-            )}
+            <TopicTimelineContentSelector
+              items={availableContents}
+              selectedIds={form.selectedContentIds}
+              primaryContentId={form.primaryContentId}
+              loading={loadingContents}
+              onSelectionChange={handleContentSelectionChange}
+              onPrimaryChange={handlePrimaryContentChange}
+            />
 
             <Typography variant="caption" color="text.secondary">
               La fecha es opcional. Si no agregas fecha ni etiqueta, la entrada se mostrara como una etapa numerada.
