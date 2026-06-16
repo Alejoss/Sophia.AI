@@ -8,8 +8,17 @@ __pycache__
 .env.*
 !.env.example
 *.log
+logs/
 logs/*
 .git
+# Local-only migration/download data (in .gitignore; must not bloat build context)
+youtube_downloads/
+youtube_migration/
+# Large local video files (defense in depth)
+*.mp4
+*.mkv
+*.mov
+*.webm
 .gitignore
 *.md
 .pytest_cache

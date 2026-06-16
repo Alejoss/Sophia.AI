@@ -1,6 +1,6 @@
 # Multi-stage build for production frontend
 # Stage 1: Build the application
-FROM node:16-alpine AS builder
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 

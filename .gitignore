@@ -158,6 +158,9 @@ node_modules
 # Docker Compose override (development only)
 docker-compose.override.yml
 
+# Bulk thumbnail imports (local sources; uploaded to S3 via management command)
+ucronia_thumbnails/
+
 # YouTube migration (local downloads + logs; commit manifest JSON for server linking)
 acbc_app/youtube_downloads/
 acbc_app/youtube_migration/*
