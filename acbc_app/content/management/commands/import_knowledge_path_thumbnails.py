@@ -17,13 +17,13 @@ Run from acbc_app/:
 import re
 from pathlib import Path
 
-from django.core.files import File
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 
 from content.image_utils import (
     delete_content_profile_thumbnail_preview,
     generate_content_profile_thumbnail_preview,
-    validate_content_profile_thumbnail_size,
+    validate_image_bytes,
 )
 from knowledge_paths.models import KnowledgePath, Node
 
@@ -161,6 +161,25 @@ class Command(BaseCommand):
             f'{nodes.count()} nodes, {len(images_by_chapter)} images in {folder}'
         )
 
+        corrupt_in_folder = []
+        for chapter, image_path in sorted(images_by_chapter.items()):
+            try:
+                validate_image_bytes(image_path.read_bytes())
+            except ValueError as exc:
+                corrupt_in_folder.append((chapter, image_path.name, exc))
+
+        if corrupt_in_folder:
+            for chapter, name, exc in corrupt_in_folder:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f'  Corrupt image chapter={chapter} file={name}: {exc}'
+                    )
+                )
+            raise CommandError(
+                f'{len(corrupt_in_folder)} image(s) in {folder} are invalid or corrupt. '
+                'Fix or replace them before importing.'
+            )
+
         updated = 0
         skipped_existing = 0
         skipped_no_profile = 0
@@ -206,14 +225,14 @@ class Command(BaseCommand):
                 continue
 
             try:
-                with image_path.open('rb') as handle:
-                    uploaded = File(handle, name=image_path.name)
-                    validate_content_profile_thumbnail_size(uploaded)
-                    if profile.thumbnail:
-                        profile.thumbnail.delete(save=False)
-                    delete_content_profile_thumbnail_preview(profile, save=False)
-                    profile.thumbnail.save(image_path.name, uploaded, save=True)
-                    generate_content_profile_thumbnail_preview(profile)
+                image_data = image_path.read_bytes()
+                validate_image_bytes(image_data)
+                uploaded = ContentFile(image_data, name=image_path.name)
+                if profile.thumbnail:
+                    profile.thumbnail.delete(save=False)
+                delete_content_profile_thumbnail_preview(profile, save=False)
+                profile.thumbnail.save(image_path.name, uploaded, save=True)
+                generate_content_profile_thumbnail_preview(profile)
             except Exception as exc:
                 errors += 1
                 self.stdout.write(self.style.ERROR(f'{label} FAILED: {exc}'))

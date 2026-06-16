@@ -197,9 +197,9 @@ const NodeDetail = () => {
           <Box sx={{ mb: 3 }}>
             {nodeContent ? (
               <>
-                {console.log('🖼️ Rendering ContentDisplay with:', nodeContent.content)}
-                <ContentDisplay 
-                  content={nodeContent.content}
+                {console.log('🖼️ Rendering ContentDisplay with:', nodeContent)}
+                <ContentDisplay
+                  content={nodeContent}
                   variant="preview"
                   showAuthor={true}
                 />

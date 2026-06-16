@@ -39,6 +39,19 @@ def validate_content_profile_thumbnail_size(uploaded_file):
         raise ValueError('La imagen no debe superar 3 MB.')
 
 
+def validate_image_bytes(data, max_bytes=CONTENT_PROFILE_THUMB_MAX_BYTES):
+    """Raise ValueError if bytes are empty, too large, or not a readable image."""
+    if not data:
+        raise ValueError('El archivo de imagen está vacío.')
+    if len(data) > max_bytes:
+        raise ValueError('La imagen no debe superar 3 MB.')
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+    except Exception as exc:
+        raise ValueError(f'No es una imagen válida: {exc}') from exc
+
+
 def _s3_public_domain():
     domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
     if domain:
