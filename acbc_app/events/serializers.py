@@ -42,9 +42,8 @@ class EventSerializer(serializers.ModelSerializer):
         return data
 
     def validate(self, data):
-        request = self.context.get('request')
-        if request and 'is_visible' in request.data:
-            data['is_visible'] = _parse_bool(request.data.get('is_visible'))
+        if 'is_visible' in self.initial_data:
+            data['is_visible'] = _parse_bool(self.initial_data.get('is_visible'))
 
         # Validate required fields
         if not data.get('title', '').strip():

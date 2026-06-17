@@ -29,7 +29,8 @@ class EventLifecycleIntegrationTest(TestCase):
             'reference_price': 150.00,
             'date_start': (timezone.now() + timezone.timedelta(days=14)).isoformat(),
             'date_end': (timezone.now() + timezone.timedelta(days=14, hours=3)).isoformat(),
-            'schedule_description': 'Every Saturday for 4 weeks'
+            'schedule_description': 'Every Saturday for 4 weeks',
+            'is_visible': True,
         }
         
         create_response = self.client.post('/api/events/', event_data, format='json')
