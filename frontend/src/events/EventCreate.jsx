@@ -23,6 +23,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
+import { parseApiValidationErrors } from '../utils/apiFormErrors';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -210,17 +211,20 @@ const EventCreate = () => {
       
     } catch (err) {
       console.error('Error creating event:', err);
-      
-      if (err.other_platform) {
-        setErrors({ other_platform: err.other_platform });
-      } else if (err.date_end) {
-        setErrors({ date_end: err.date_end });
-      } else if (err.detail) {
-        setError(err.detail);
-      } else if (typeof err === 'string') {
-        setError(err);
-      } else {
-        setError('Error al crear el evento. Por favor, inténtelo de nuevo.');
+
+      const { fieldErrors, generalError } = parseApiValidationErrors(
+        err,
+        'Error al crear el evento. Por favor, inténtelo de nuevo.',
+      );
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+
+      if (generalError) {
+        setError(generalError);
+      } else if (Object.keys(fieldErrors).length === 0) {
+        setError(err?.message || 'Error al crear el evento. Por favor, inténtelo de nuevo.');
       }
     } finally {
       setLoading(false);

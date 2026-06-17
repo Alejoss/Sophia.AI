@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
 import { AuthContext } from '../context/AuthContext';
@@ -53,46 +53,71 @@ const EventDetail = () => {
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [imageError, setImageError] = useState(false);
-
-  const loadRegistrationState = useCallback(async () => {
-    if (!authState.isAuthenticated) {
-      setIsRegistered(false);
-      setUserRegistration(null);
-      return;
-    }
-    try {
-      const userRegistrations = await getUserEventRegistrations();
-      const activeRegistration = userRegistrations.find(
-        (reg) => reg.event === parseInt(eventId, 10) && reg.registration_status === 'REGISTERED',
-      );
-      setIsRegistered(!!activeRegistration);
-      setUserRegistration(activeRegistration || null);
-    } catch (err) {
-      handleAuthError(err, { strategy: AUTH_ERROR_STRATEGY.IGNORE });
-      setIsRegistered(false);
-      setUserRegistration(null);
-    }
-  }, [authState.isAuthenticated, eventId, handleAuthError]);
+  const userId = authState.user?.id;
+  const isAuthenticated = authState.isAuthenticated;
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadEvent = async () => {
       try {
         setLoading(true);
+        setError(null);
         const data = await fetchEventById(eventId);
+        if (cancelled) return;
         setEvent(data);
-        if (authState.isAuthenticated && data.owner.id !== authState.user?.id) {
-          await loadRegistrationState();
-        }
       } catch (err) {
+        if (cancelled) return;
         setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
         console.error('Error loading event:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadEvent();
-  }, [eventId, authState.isAuthenticated, authState.user, loadRegistrationState]);
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, getErrorMessage]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsRegistered(false);
+      setUserRegistration(null);
+      return;
+    }
+
+    if (!event || event.owner?.id === userId) {
+      setIsRegistered(false);
+      setUserRegistration(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRegistration = async () => {
+      try {
+        const userRegistrations = await getUserEventRegistrations();
+        if (cancelled) return;
+        const activeRegistration = userRegistrations.find(
+          (reg) => reg.event === parseInt(eventId, 10) && reg.registration_status === 'REGISTERED',
+        );
+        setIsRegistered(!!activeRegistration);
+        setUserRegistration(activeRegistration || null);
+      } catch (err) {
+        if (cancelled) return;
+        handleAuthError(err, { strategy: AUTH_ERROR_STRATEGY.IGNORE });
+        setIsRegistered(false);
+        setUserRegistration(null);
+      }
+    };
+
+    loadRegistration();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, userId, event?.id, event?.owner?.id, eventId, handleAuthError]);
 
   useEffect(() => {
     setImageError(false);

@@ -48,7 +48,7 @@ describe('EventsList', () => {
     renderWithRouter(<EventsList />);
 
     expect(await screen.findByText('No se encontraron eventos.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Crear tu Primer Evento/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Crear tu Evento/i })).toHaveAttribute(
       'href',
       '/events/create',
     );

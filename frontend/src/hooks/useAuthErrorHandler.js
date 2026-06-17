@@ -1,4 +1,4 @@
-import { useCallback, useContext } from 'react';
+import { useCallback, useContext, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -11,6 +11,8 @@ import {
 } from '../utils/authErrorHandler';
 
 export { AUTH_ERROR_STRATEGY, LOGIN_PATH };
+
+const EMPTY_AUTH_HANDLER_OPTIONS = Object.freeze({});
 
 /**
  * React hook that wires {@link handleAuthError} to the router and {@link AuthContext}.
@@ -60,14 +62,16 @@ export { AUTH_ERROR_STRATEGY, LOGIN_PATH };
  * @param {import('../utils/authErrorHandler').AuthErrorHandlerOptions} [defaultOptions]
  *   Options merged into every call (e.g. default `strategy`).
  */
-export default function useAuthErrorHandler(defaultOptions = {}) {
+export default function useAuthErrorHandler(defaultOptions = EMPTY_AUTH_HANDLER_OPTIONS) {
   const navigate = useNavigate();
   const location = useLocation();
   const { clearAuthState } = useContext(AuthContext);
+  const defaultOptionsRef = useRef(defaultOptions);
+  defaultOptionsRef.current = defaultOptions;
 
   const handle = useCallback(
     (error, callOptions = {}) => {
-      const merged = { ...defaultOptions, ...callOptions };
+      const merged = { ...defaultOptionsRef.current, ...callOptions };
 
       const returnTo =
         merged.returnTo === undefined
@@ -81,7 +85,7 @@ export default function useAuthErrorHandler(defaultOptions = {}) {
         clearAuthState,
       });
     },
-    [clearAuthState, defaultOptions, location.pathname, location.search, navigate],
+    [clearAuthState, location.pathname, location.search, navigate],
   );
 
   return {

@@ -28,6 +28,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
 import { formatDateTimeForInput } from '../utils/dateUtils';
+import { parseApiValidationErrors } from '../utils/apiFormErrors';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
 const PLATFORM_CHOICES = [
@@ -234,17 +235,20 @@ const EventEdit = () => {
       
     } catch (err) {
       console.error('Error updating event:', err);
-      
-      if (err.other_platform) {
-        setErrors({ other_platform: err.other_platform });
-      } else if (err.date_end) {
-        setErrors({ date_end: err.date_end });
-      } else if (err.detail) {
-        setError(err.detail);
-      } else if (typeof err === 'string') {
-        setError(err);
-      } else {
-        setError('Error al actualizar el evento. Por favor, inténtelo de nuevo.');
+
+      const { fieldErrors, generalError } = parseApiValidationErrors(
+        err,
+        'Error al actualizar el evento. Por favor, inténtelo de nuevo.',
+      );
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+
+      if (generalError) {
+        setError(generalError);
+      } else if (Object.keys(fieldErrors).length === 0) {
+        setError(err?.message || 'Error al actualizar el evento. Por favor, inténtelo de nuevo.');
       }
     } finally {
       setLoading(false);

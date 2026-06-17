@@ -124,7 +124,7 @@ const EventsList = () => {
         <Stack spacing={2} alignItems="center" sx={{ py: 4 }}>
           <Typography color="text.secondary">No se encontraron eventos.</Typography>
           <Button component={Link} to="/events/create" variant="contained">
-            Crear tu Primer Evento
+            Crear tu Evento
           </Button>
         </Stack>
       ) : (
