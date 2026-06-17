@@ -125,7 +125,9 @@ Fetches Cloudflare analytics (traffic, Core Web Vitals, security events) via Gra
 
 **GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly, evaluates actionable insights, and **creates a Notion row** in `NOTION_DATABASE_ID` when warranted (dedup `cf-analytics-YYYY-MM-DD`). Reports on the runner are not committed.
 
-**GitHub secrets:** `CF_*`, `NOTION_DATABASE_ID`, `NOTION_API_KEY` (or `NOTION_TOKEN`).
+**GitHub secrets:** `CF_*`, `NOTION_DATABASE_ID`, `NOTION_API_KEY`.
+
+Cloudflare → Notion rows are always **tipo = Tarea** (severity only affects title/body ordering, not tipo).
 
 **Local reports (persistent):** after `git pull`, run without `--notify-notion` to save under `reports/cloudflare/` (gitignored).
 

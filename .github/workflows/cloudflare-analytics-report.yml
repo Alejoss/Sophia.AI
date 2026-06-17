@@ -30,19 +30,14 @@ jobs:
           CF_ZONE_NAME: ${{ secrets.CF_ZONE_NAME }}
           CF_REPORT_DAYS: ${{ github.event.inputs.days || '7' }}
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          NOTION_TASKS_DATABASE_ID: ${{ secrets.NOTION_TASKS_DATABASE_ID }}
         run: |
           if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
             echo "Missing GitHub secrets: CF_API_TOKEN and CF_ACCOUNT_ID are required."
             exit 1
           fi
-          if [ -z "$NOTION_API_KEY" ] && [ -z "$NOTION_TOKEN" ]; then
-            echo "Warning: NOTION_API_KEY/NOTION_TOKEN not set; will skip Notion notify."
-          fi
-          if [ -z "$NOTION_DATABASE_ID" ] && [ -z "$NOTION_TASKS_DATABASE_ID" ]; then
-            echo "Warning: NOTION_DATABASE_ID not set; will skip Notion notify."
+          if [ -z "$NOTION_API_KEY" ] || [ -z "$NOTION_DATABASE_ID" ]; then
+            echo "Warning: NOTION_API_KEY and NOTION_DATABASE_ID required for Notion notify; will skip if missing."
           fi
           python3 scripts/cloudflare_analytics_report.py --days "${CF_REPORT_DAYS}" --notify-notion
 
@@ -50,4 +45,4 @@ jobs:
         if: success()
         run: |
           echo "JSON/MD reports are gitignored — run locally to persist under reports/cloudflare/."
-          echo "Notion: a row is created only when actionable insights are detected (dedup by cf-analytics-YYYY-MM-DD)."
+          echo "Notion: Tarea created only when actionable (dedup cf-analytics-YYYY-MM-DD)."
