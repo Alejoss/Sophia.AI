@@ -35,24 +35,18 @@
   }
 }
 
-/* Hero Background Image */
+/* Hero image layer (LCP element — use <img> in Home.jsx, not background-image) */
 .home-hero-background {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: url('/images/home_hero.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   z-index: 0;
-}
-
-/* Hero background for authenticated home (sobre nosotros): imagen sin overlay, enfocada en la parte superior */
-.home-hero-background-authenticated {
-  background-image: url('/images/sobre_nosotros_hero_image.jpg');
-  background-position: top center;
 }
 
 /* Hero Overlay - light overlay on image; text has its own 0.66 box */

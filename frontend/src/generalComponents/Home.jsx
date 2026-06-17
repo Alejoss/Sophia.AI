@@ -27,6 +27,7 @@ import {
   Hub as HubIcon,
 } from "@mui/icons-material";
 import { AuthContext } from "../context/AuthContext.jsx";
+import HomeHeroBackground from "../components/HomeHeroBackground.jsx";
 
 const GITHUB_URL = "https://github.com/Alejoss/Sophia.AI";
 
@@ -53,7 +54,11 @@ const Home = () => {
         flexDirection: 'column'
       }}>
         <Box className="home-hero-section">
-          <Box className="home-hero-background home-hero-background-authenticated" />
+          <HomeHeroBackground
+            src="/images/sobre_nosotros_hero_image.jpg"
+            alt=""
+            objectPosition="top center"
+          />
           <Box className="home-hero-overlay home-hero-overlay-authenticated" />
           <Box sx={{ position: 'absolute', top: { xs: 80, md: 88 }, right: { xs: 24, md: 40 }, zIndex: 3 }}>
             <Button
@@ -295,8 +300,7 @@ const Home = () => {
     }}>
       {/* Hero Section - Full Width */}
       <Box className="home-hero-section">
-        {/* Background Image Layer */}
-        <Box className="home-hero-background" />
+        <HomeHeroBackground src="/images/home_hero.jpg" alt="" />
         {/* Overlay for better text contrast */}
         <Box className="home-hero-overlay" />
         {/* Content Container - Centered */}

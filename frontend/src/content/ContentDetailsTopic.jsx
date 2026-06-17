@@ -4,7 +4,8 @@ import {
     Box, 
     Typography, 
     Button,
-    Paper
+    Paper,
+    Skeleton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
@@ -64,7 +65,18 @@ const ContentDetailsTopic = () => {
             });
     };
 
-    if (loading) return <Typography>Cargando contenido...</Typography>;
+    if (loading) {
+        return (
+            <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
+                <Skeleton variant="rounded" height={120} sx={{ mb: 2 }} />
+                <Skeleton variant="rounded" width={280} height={36} sx={{ mb: 2 }} />
+                <Paper sx={{ p: 3 }}>
+                    <Skeleton variant="text" width="60%" height={40} sx={{ mb: 2 }} />
+                    <Skeleton variant="rounded" width="100%" height={240} />
+                </Paper>
+            </Box>
+        );
+    }
     if (error) return <Typography color="error">{error}</Typography>;
     if (!content || !topic) return <Typography>Contenido o tema no encontrado</Typography>;
 
