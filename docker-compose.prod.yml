@@ -1,6 +1,7 @@
 services:
   nginx:
     image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-nginx:${IMAGE_TAG:-main}
+    pull_policy: always
     container_name: acbc_nginx_prod
     ports:
       - "80:80"
@@ -25,6 +26,7 @@ services:
 
   backend:
     image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG:-main}
+    pull_policy: always
     container_name: acbc_backend_prod
     # No volume mounts in production - code is baked into image
     volumes:
@@ -60,6 +62,7 @@ services:
 
   frontend:
     image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG:-main}
+    pull_policy: always
     container_name: acbc_frontend_prod
     # No volume mounts in production - static files are baked into image
     # Don't expose port directly - accessed via nginx

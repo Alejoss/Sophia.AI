@@ -80,7 +80,7 @@ const EventEdit = () => {
     const loadEvent = async () => {
       try {
         setFetchLoading(true);
-        const eventData = await fetchEventById(eventId);
+        const eventData = await fetchEventById(eventId, { bypassCache: true });
         
         setForm({
           title: eventData.title || '',

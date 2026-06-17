@@ -32,9 +32,12 @@
   ```bash
    cd /opt/acbc-app
    git pull origin main
+  ```
+   **Wait for GitHub Actions** on `main` to finish (workflow **CI** → job **Publish frontend image** when `frontend/**` changed). Deploying before CI completes leaves the old `:main` image on GHCR.
+  ```bash
    ./scripts/deploy.sh
   ```
-   The script reads DB credentials from `acbc_app/.env`, detects `GHCR_IMAGE_PREFIX` from the GitHub remote, pulls prebuilt images from GHCR, frees port 80 if host nginx/apache is using it, then starts the stack.
+   The script reads DB credentials from `acbc_app/.env`, detects `GHCR_IMAGE_PREFIX` from the GitHub remote, pulls prebuilt images from GHCR, frees port 80 if host nginx/apache is using it, then starts the stack. It **fails** if the running frontend/backend image does not match `git HEAD` (use `--allow-stale-images` only if intentional).
    It runs in non-interactive mode (no "press Enter" prompt).
    If GHCR images are private, log in on the server once with a token that has `read:packages`:
   ```bash
@@ -45,6 +48,7 @@
   ```bash
    ./scripts/deploy.sh --build-local-backend
   ```
+   **Does not update the frontend.** Use this only for Django/API changes. For React fixes use `./scripts/deploy.sh` after CI, or `./scripts/deploy.sh --build-local`.
    **Full local build (backend + frontend + nginx; can take 30–60+ minutes):**
   ```bash
    ./scripts/deploy.sh --build-local
@@ -250,5 +254,16 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres 
 ```bash
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
+
+**Frontend still shows old UI after deploy (e.g. bug fix in React not visible):**
+
+`git pull` only updates scripts on the server; the app runs from **GHCR Docker images**, not from the git checkout.
+
+1. Confirm GitHub Actions published a new **frontend** image for your commit.
+2. Redeploy: `./scripts/deploy.sh` (not `--build-local-backend`).
+3. Check stamp: `docker compose --env-file .env.compose -f docker-compose.prod.yml exec -T frontend cat /usr/share/nginx/html/.build_sha` should equal `git rev-parse HEAD`.
+4. Hard refresh the browser (Ctrl+Shift+R). Cloudflare may cache HTML for SPA routes.
+
+If CI is slow or GHCR is behind: `./scripts/deploy.sh --build-local` (needs `VITE_*` in root `.env`).
 
 For detailed instructions, see [Digital Ocean Deployment Guide](docs/deployment/digital-ocean.md).

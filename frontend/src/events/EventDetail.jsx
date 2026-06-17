@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
 import { AuthContext } from '../context/AuthContext';
@@ -55,28 +55,36 @@ const EventDetail = () => {
   const userId = authState.user?.id;
   const isAuthenticated = authState.isAuthenticated;
   const eventOwnerId = event?.owner?.id;
+  const activeLoadIdRef = useRef(null);
 
   useEffect(() => {
+    const requestedId = String(eventId);
+    if (activeLoadIdRef.current === requestedId) {
+      return undefined;
+    }
+    activeLoadIdRef.current = requestedId;
+
+    let cancelled = false;
+
     setIsRegistered(false);
     setUserRegistration(null);
-  }, [eventId]);
-
-  useEffect(() => {
-    let cancelled = false;
+    setError(null);
+    setEvent(null);
+    setLoading(true);
 
     const loadEvent = async () => {
       try {
-        setLoading(true);
-        setError(null);
         const data = await fetchEventById(eventId);
-        if (cancelled) return;
+        if (cancelled || activeLoadIdRef.current !== requestedId) return;
         setEvent(data);
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || activeLoadIdRef.current !== requestedId) return;
         setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
         console.error('Error loading event:', err);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && activeLoadIdRef.current === requestedId) {
+          setLoading(false);
+        }
       }
     };
 

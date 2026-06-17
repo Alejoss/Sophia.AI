@@ -24,6 +24,7 @@ Options:
   --skip-down              Deprecated: default is rolling recreate without full down
   --full-down              Stop all containers (docker compose down) before starting
   --allow-non-production   Allow deploy when ENVIRONMENT is not PRODUCTION
+  --allow-stale-images     Do not fail when GHCR images are older than git HEAD
   -h, --help               Show this help
 EOF
 }
@@ -34,6 +35,7 @@ LOCAL_BUILD_BACKEND_ONLY=false
 SKIP_PULL=false
 FULL_DOWN=false
 ALLOW_NON_PRODUCTION=false
+ALLOW_STALE_IMAGES=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -49,6 +51,7 @@ for arg in "$@"; do
             ;;
         --full-down) FULL_DOWN=true ;;
         --allow-non-production) ALLOW_NON_PRODUCTION=true ;;
+        --allow-stale-images) ALLOW_STALE_IMAGES=true ;;
         -h|--help)
             usage
             exit 0
@@ -106,6 +109,45 @@ detect_ghcr_image_prefix() {
     fi
 
     printf 'ghcr.io/%s\n' "$(printf '%s' "$repo_path" | tr '[:upper:]' '[:lower:]')"
+}
+
+log_image_metadata() {
+    local name="$1"
+    local image="${GHCR_IMAGE_PREFIX}-${name}:${IMAGE_TAG}"
+    if docker image inspect "$image" >/dev/null 2>&1; then
+        docker image inspect "$image" --format "   ${name}: {{.Id}} created={{.Created}}" 2>/dev/null || true
+    else
+        echo -e "${YELLOW}   ${name}: image not present locally (${image})${NC}"
+    fi
+}
+
+container_build_sha() {
+    local service="$1"
+    local path="$2"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T "$service" cat "$path" 2>/dev/null | tr -d '\r'
+}
+
+verify_service_build_sha() {
+    local service="$1"
+    local path="$2"
+    local label="$3"
+    local image_sha
+    image_sha="$(container_build_sha "$service" "$path")"
+
+    if [ -z "$image_sha" ]; then
+        echo -e "${YELLOW}   ⚠️  ${label}: no .build_sha in running container (image predates build stamp).${NC}"
+        return 2
+    fi
+
+    echo -e "${GREEN}   ${label} BUILD_SHA=${image_sha}  git HEAD=${LOCAL_GIT_SHA}${NC}"
+    if [ "$image_sha" = "$LOCAL_GIT_SHA" ]; then
+        return 0
+    fi
+
+    echo -e "${RED}   ❌ ${label} image does not match git HEAD on the server.${NC}"
+    echo -e "${RED}      Wait for GitHub Actions to publish GHCR images for ${LOCAL_GIT_SHA}, then redeploy.${NC}"
+    echo -e "${RED}      Or run: ./scripts/deploy.sh --build-local   (rebuild on server)${NC}"
+    return 1
 }
 
 # Check if .env file exists
@@ -186,6 +228,17 @@ fi
 rm -f "${COMPOSE_ENV_FILE}.db"
 
 echo -e "${YELLOW}🐳 Using images: ${GHCR_IMAGE_PREFIX}-{backend,frontend,nginx}:${IMAGE_TAG}${NC}"
+LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+if [ -n "$LOCAL_GIT_SHA" ]; then
+    echo -e "${YELLOW}📌 git HEAD: ${LOCAL_GIT_SHA}${NC}"
+    if [ "$IMAGE_TAG" = "main" ] && [ "$LOCAL_BUILD" != true ] && [ "$SKIP_PULL" != true ]; then
+        echo -e "${YELLOW}   Tip: wait until GitHub Actions finishes on main before deploying, or images may still be stale.${NC}"
+    fi
+fi
+if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
+    echo -e "${RED}⚠️  --build-local-backend updates ONLY the backend container. Frontend/nginx stay on the current GHCR/local images.${NC}"
+    echo -e "${RED}   For React/frontend fixes, use ./scripts/deploy.sh (GHCR pull) or ./scripts/deploy.sh --build-local.${NC}"
+fi
 if [ -n "${NGINX_CONF:-}" ]; then
     echo -e "${YELLOW}🔐 Using nginx config: ${NGINX_CONF}${NC}"
 fi
@@ -259,11 +312,12 @@ else
   if [ "$SKIP_PULL" = true ]; then
     echo -e "${YELLOW}⏭️  Skipping image pull (--skip-pull)${NC}"
   else
-    echo -e "${YELLOW}📥 Pulling prebuilt images from GHCR (backend tag: ${IMAGE_TAG})...${NC}"
+    echo -e "${YELLOW}📥 Pulling prebuilt images from GHCR (tag: ${IMAGE_TAG})...${NC}"
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" pull
-    BACKEND_IMAGE="${GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG}"
-    echo -e "${YELLOW}   Backend image: ${BACKEND_IMAGE}${NC}"
-    docker image inspect "$BACKEND_IMAGE" --format '   Created: {{.Created}}  Id: {{.Id}}' 2>/dev/null || true
+    echo -e "${YELLOW}   Pulled image metadata:${NC}"
+    log_image_metadata backend
+    log_image_metadata frontend
+    log_image_metadata nginx
   fi
 fi
 
@@ -319,23 +373,28 @@ else
 fi
 
 # Verify backend container includes expected application code (GHCR :main can be stale)
-echo -e "${YELLOW}🔎 Verifying backend image contents...${NC}"
-BACKEND_BUILD_SHA="$(docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend cat /app/.build_sha 2>/dev/null | tr -d '\r' || true)"
-LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+echo -e "${YELLOW}🔎 Verifying backend image matches git HEAD...${NC}"
+BACKEND_VERIFY=0
 if docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend test -f /app/content/views_youtube_migration.py 2>/dev/null; then
-    echo -e "${GREEN}✅ Backend image contains current app code (youtube migration module present)${NC}"
-    if [ -n "$BACKEND_BUILD_SHA" ] && [ -n "$LOCAL_GIT_SHA" ]; then
-        echo -e "${GREEN}   Image BUILD_SHA=${BACKEND_BUILD_SHA}  git HEAD=${LOCAL_GIT_SHA}${NC}"
-        if [ "$BACKEND_BUILD_SHA" != "$LOCAL_GIT_SHA" ]; then
-            echo -e "${YELLOW}   ⚠️  Image SHA differs from git HEAD. If you expect latest code, run: ./scripts/deploy.sh --build-local${NC}"
-        fi
+    verify_service_build_sha backend /app/.build_sha Backend
+    BACKEND_VERIFY=$?
+    if [ "$BACKEND_VERIFY" -eq 2 ]; then
+        echo -e "${YELLOW}   Backend has no .build_sha; using legacy file presence check only.${NC}"
+        BACKEND_VERIFY=0
     fi
 else
-    echo -e "${RED}❌ Backend container is missing code from this git checkout (stale GHCR image).${NC}"
+    echo -e "${RED}❌ Backend container is missing expected application code (stale GHCR image).${NC}"
     echo -e "${RED}   Running container image: $(docker inspect acbc_backend_prod --format '{{.Config.Image}}' 2>/dev/null || echo unknown)${NC}"
     echo -e "${RED}   Fix: ./scripts/deploy.sh --build-local-backend   (backend only, ~few min)${NC}"
     echo -e "${RED}   Or set IMAGE_TAG to the commit SHA published by GitHub Actions, then redeploy.${NC}"
+    BACKEND_VERIFY=1
+fi
+
+if [ "$BACKEND_VERIFY" -eq 1 ] && [ "$ALLOW_STALE_IMAGES" != true ]; then
     exit 1
+fi
+if [ "$BACKEND_VERIFY" -eq 1 ] && [ "$ALLOW_STALE_IMAGES" = true ]; then
+    echo -e "${YELLOW}   Continuing because --allow-stale-images was set.${NC}"
 fi
 
 # Check frontend health
@@ -345,6 +404,32 @@ else
     echo -e "${RED}❌ Frontend health check failed${NC}"
     docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" logs frontend
     exit 1
+fi
+
+# Verify frontend bundle matches git HEAD (critical for React deploys)
+echo -e "${YELLOW}🔎 Verifying frontend image matches git HEAD...${NC}"
+FRONTEND_VERIFY=0
+verify_service_build_sha frontend /usr/share/nginx/html/.build_sha Frontend
+FRONTEND_VERIFY=$?
+if [ "$FRONTEND_VERIFY" -eq 2 ]; then
+    CONTAINER_BUNDLE="$(docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T frontend sh -c 'grep -oE "assets/index-[^.]+\.js" /usr/share/nginx/html/index.html | head -n1' 2>/dev/null | tr -d '\r')"
+    SERVED_BUNDLE="$(curl -sf http://localhost/ | grep -oE 'assets/index-[^.]+\.js' | head -n1 || true)"
+    echo -e "${YELLOW}   Frontend .build_sha missing. Bundle in container: ${CONTAINER_BUNDLE:-unknown}${NC}"
+    echo -e "${YELLOW}   Bundle served via nginx: ${SERVED_BUNDLE:-unknown}${NC}"
+    if [ -n "$LOCAL_GIT_SHA" ] && git cat-file -e "${LOCAL_GIT_SHA}:frontend/src/events/EventDetail.jsx" 2>/dev/null; then
+        echo -e "${RED}   ❌ Cannot verify frontend version. GHCR image likely predates build stamping.${NC}"
+        echo -e "${RED}      Wait for CI to publish a new frontend image, then ./scripts/deploy.sh again.${NC}"
+        FRONTEND_VERIFY=1
+    else
+        FRONTEND_VERIFY=0
+    fi
+fi
+
+if [ "$FRONTEND_VERIFY" -eq 1 ] && [ "$ALLOW_STALE_IMAGES" != true ]; then
+    exit 1
+fi
+if [ "$FRONTEND_VERIFY" -eq 1 ] && [ "$ALLOW_STALE_IMAGES" = true ]; then
+    echo -e "${YELLOW}   Continuing because --allow-stale-images was set.${NC}"
 fi
 
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"

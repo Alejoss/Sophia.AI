@@ -18,3 +18,4 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-}
         VITE_GOOGLE_OAUTH_CLIENT_ID: ${VITE_GOOGLE_OAUTH_CLIENT_ID:-}
+        BUILD_SHA: ${BUILD_SHA:-local}

@@ -23,6 +23,8 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_GOOGLE_OAUTH_CLIENT_ID=${VITE_GOOGLE_OAUTH_CLIENT_ID}
 
 # Build the application
+ARG BUILD_SHA=unknown
+ENV VITE_BUILD_SHA=${BUILD_SHA}
 RUN npm run build
 
 # Stage 2: Serve with nginx
@@ -30,6 +32,8 @@ FROM nginx:alpine
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
+ARG BUILD_SHA=unknown
+RUN echo "${BUILD_SHA}" > /usr/share/nginx/html/.build_sha
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf

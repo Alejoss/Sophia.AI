@@ -7,6 +7,18 @@ const fail = (error, message) => {
   rethrowAxiosError(error, message);
 };
 
+/** In-flight + short-lived cache so detail pages cannot hammer the API on effect loops. */
+const eventDetailInflight = new Map();
+const eventDetailCache = new Map();
+
+export const invalidateEventDetailCache = (eventId) => {
+  if (eventId == null) {
+    eventDetailCache.clear();
+    return;
+  }
+  eventDetailCache.delete(String(eventId));
+};
+
 export const fetchEvents = async () => {
   try {
     const response = await axiosInstance.get('/events/');
@@ -25,18 +37,37 @@ export const createEvent = async (eventData) => {
   }
 };
 
-export const fetchEventById = async (eventId) => {
-  try {
-    const response = await axiosInstance.get(`/events/${eventId}/`);
-    return response.data;
-  } catch (error) {
-    fail(error, 'Error fetching event');
+export const fetchEventById = async (eventId, { bypassCache = false } = {}) => {
+  const id = String(eventId);
+
+  if (!bypassCache && eventDetailCache.has(id)) {
+    return eventDetailCache.get(id);
   }
+
+  if (eventDetailInflight.has(id)) {
+    return eventDetailInflight.get(id);
+  }
+
+  const request = (async () => {
+    try {
+      const response = await axiosInstance.get(`/events/${id}/`);
+      eventDetailCache.set(id, response.data);
+      return response.data;
+    } catch (error) {
+      fail(error, 'Error fetching event');
+    } finally {
+      eventDetailInflight.delete(id);
+    }
+  })();
+
+  eventDetailInflight.set(id, request);
+  return request;
 };
 
 export const updateEvent = async (eventId, eventData) => {
   try {
     const response = await axiosInstance.put(`/events/${eventId}/`, eventData);
+    invalidateEventDetailCache(eventId);
     return response.data;
   } catch (error) {
     fail(error, 'Error updating event');
@@ -46,6 +77,7 @@ export const updateEvent = async (eventId, eventData) => {
 export const deleteEvent = async (eventId) => {
   try {
     await axiosInstance.delete(`/events/${eventId}/`);
+    invalidateEventDetailCache(eventId);
   } catch (error) {
     fail(error, 'Error deleting event');
   }

@@ -34,8 +34,11 @@ En el servidor:
 ```bash
 cd /opt/acbc-app
 git pull origin main
+# Espera a que GitHub Actions termine en main (sobre todo "Publish frontend image")
 ./scripts/deploy.sh
 ```
+
+**Importante:** `git pull` actualiza el repo en el servidor, pero la app en producción corre desde **imágenes Docker en GHCR**, no desde los archivos del checkout. Si haces deploy antes de que CI publique la imagen, o usas `--build-local-backend`, el frontend puede quedarse en una versión vieja aunque el código en git sea nuevo.
 
 El script detecta `GHCR_IMAGE_PREFIX` desde el remote de Git. Para este repo el formato esperado es:
 
@@ -57,10 +60,18 @@ Si quieres fijarlo explícitamente:
 GHCR_IMAGE_PREFIX=ghcr.io/<owner>/<repo> IMAGE_TAG=main ./scripts/deploy.sh
 ```
 
-Para desplegar un commit específico:
+Para desplegar un commit específico (tag inmutable publicado por CI; formato `sha-` + SHA largo o SHA largo según metadata-action):
 
 ```bash
-IMAGE_TAG=sha-<commit-sha> ./scripts/deploy.sh
+IMAGE_TAG=sha-<commit-sha-completo> ./scripts/deploy.sh
+# o, si CI publicó solo el SHA largo:
+IMAGE_TAG=<commit-sha-completo> ./scripts/deploy.sh
+```
+
+Si el deploy falla por imagen desactualizada pero quieres continuar igual:
+
+```bash
+./scripts/deploy.sh --allow-stale-images
 ```
 
 Si las imágenes son privadas, autentica el servidor una vez:

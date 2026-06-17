@@ -71,6 +71,8 @@ chmod +x scripts/deploy.sh
 - Validates environment configuration
 - Stops existing containers
 - Pulls prebuilt GHCR images, unless `--build-local` is used
+- Verifies backend/frontend `BUILD_SHA` matches `git rev-parse HEAD` (fails if stale; use `--allow-stale-images` to override)
+- Warns loudly when using `--build-local-backend` (frontend is **not** updated)
 - Starts services
 - Runs database migrations
 - Collects static files
