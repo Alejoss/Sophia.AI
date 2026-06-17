@@ -123,9 +123,14 @@ chmod +x scripts/setup-ssl.sh
 ### `cloudflare_analytics_report.py`
 Fetches Cloudflare analytics (traffic, Core Web Vitals, security events) via GraphQL and writes local reports under `reports/cloudflare/` (gitignored).
 
-**Setup:**
+**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly as an API smoke test. Reports are **not** committed or uploaded — they exist only on the ephemeral runner.
+
+**Local reports (persistent):** after `git pull`, run the script on your machine; output stays in `reports/cloudflare/` (gitignored).
+
+**GitHub secrets** (for the workflow): `CF_API_TOKEN`, `CF_ACCOUNT_ID`, and optionally `CF_ZONE_ID` or `CF_ZONE_NAME`.
+
+**Local setup** — add to `acbc_app/.env` (see `scripts/cloudflare-report.env.example`):
 ```bash
-# Add to acbc_app/.env (see scripts/cloudflare-report.env.example)
 CF_API_TOKEN=...
 CF_ACCOUNT_ID=...
 CF_ZONE_NAME=academiablockchain.com
@@ -136,11 +141,6 @@ CF_ZONE_NAME=academiablockchain.com
 python3 scripts/cloudflare_analytics_report.py
 python3 scripts/cloudflare_analytics_report.py --days 14
 python3 scripts/cloudflare_analytics_report.py --check
-```
-
-**Cron (weekly):**
-```bash
-0 8 * * 1 cd /opt/acbc-app && set -a && source acbc_app/.env && set +a && python3 scripts/cloudflare_analytics_report.py >> reports/cloudflare/cron.log 2>&1
 ```
 
 **Cost:** $0 (included in Cloudflare plan; subject to API rate limits).

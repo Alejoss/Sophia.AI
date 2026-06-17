@@ -20,8 +20,8 @@ Usage:
   python3 scripts/cloudflare_analytics_report.py --days 14
   python3 scripts/cloudflare_analytics_report.py --check   # list enabled datasets only
 
-Cron example (weekly, Monday 08:00 on server):
-  0 8 * * 1 cd /opt/acbc-app && set -a && source acbc_app/.env && set +a && python3 scripts/cloudflare_analytics_report.py >> reports/cloudflare/cron.log 2>&1
+Scheduled runs: .github/workflows/cloudflare-analytics-report.yml (GitHub Actions).
+Reports are gitignored; run the script locally after pull to persist under reports/cloudflare/.
 """
 
 from __future__ import annotations
