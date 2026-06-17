@@ -2650,26 +2650,6 @@ class UserTopicInvitationsView(APIView):
 class TopicContentMediaTypeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_content_profile(self, content, request, topic):
-        """
-        Get the appropriate ContentProfile based on context.
-        For topics, we want the topic creator's profile for the content.
-        """
-        try:
-            # Try to get the topic creator's profile for this content
-            return ContentProfile.objects.get(content=content, user=topic.creator)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Fallback: try to get logged user's profile
-        try:
-            return ContentProfile.objects.get(content=content, user=request.user)
-        except ContentProfile.DoesNotExist:
-            pass
-
-        # Final fallback: return None (serializer will use original content data)
-        return None
-
     def get(self, request, pk, media_type):
         topic = get_object_or_404(Topic, pk=pk)
         media_type = media_type.upper()
@@ -2683,12 +2663,21 @@ class TopicContentMediaTypeView(APIView):
         )
         contents = topic.contents.filter(media_type=media_type).annotate(
             vote_count_value=Coalesce(vote_count_subquery, 0)
-        ).order_by('-vote_count_value', '-created_at').prefetch_related('file_details')
+        ).order_by('-vote_count_value', '-created_at').prefetch_related(
+            'file_details',
+            'profiles',
+            'profiles__user',
+        ).select_related('uploaded_by')
 
-        # Get the appropriate profile for each content
+        # Batch profile lookup via prefetch — avoids N+1 selects on content_contentprofile.
         contents_with_profiles = []
         for content in contents:
-            selected_profile = self.get_content_profile(content, request, topic)
+            selected_profile = get_topic_content_profile_for_display(
+                content,
+                request,
+                topic,
+                prefetched_profiles=list(content.profiles.all()),
+            )
             contents_with_profiles.append({
                 'content': content,
                 'selected_profile': selected_profile

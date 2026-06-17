@@ -2485,6 +2485,45 @@ class KnowledgePathAndTopicMediaTypeAPITests(APITestCase):
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['media_type'], 'VIDEO')
 
+    def test_topic_content_media_type_profile_lookup_is_batched(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        topic = Topic.objects.create(
+            title='Batch Profile Topic',
+            description='N+1 regression test',
+            creator=self.author,
+        )
+        for index in range(8):
+            content = Content.objects.create(
+                uploaded_by=self.author,
+                media_type='TEXT',
+                original_title=f'Text Content {index}',
+            )
+            ContentProfile.objects.create(
+                content=content,
+                user=self.author,
+                title=f'Text Profile {index}',
+            )
+            topic.contents.add(content)
+
+        url = reverse('content:topic-content-media-type', args=[topic.id, 'text'])
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 8)
+        profile_queries = [
+            query['sql']
+            for query in context.captured_queries
+            if 'content_contentprofile' in query['sql'].lower()
+        ]
+        self.assertLessEqual(
+            len(profile_queries),
+            2,
+            msg='Expected batched profile prefetch, not one query per content item',
+        )
+
 
 class TopicContentSuggestionsAPITests(APITestCase):
     def setUp(self):
