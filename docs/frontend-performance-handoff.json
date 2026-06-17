@@ -1,0 +1,362 @@
+{
+  "report_meta": {
+    "title": "Informe de rendimiento frontend — handoff para agente corrector",
+    "domain": "academiablockchain.com",
+    "generated_at": "2026-06-16",
+    "source": "Cloudflare Web Analytics (plan Free) + revisión de código React/Vite",
+    "scope": "Optimización LCP y tiempos de carga percibidos en rutas con tráfico real",
+    "out_of_scope": [
+      "Analítica de producto (funnels, eventos) — requiere PostHog u similar",
+      "Bot analysis humano vs bot — no disponible en Cloudflare Free",
+      "Errores y performance backend — cubierto por Sentry Django"
+    ]
+  },
+  "stack": {
+    "frontend": "React 18 + Vite SPA + Material-UI + Tailwind",
+    "backend": "Django REST API en Digital Ocean",
+    "cdn_dns": "Cloudflare (proxy activo, plan Free)",
+    "monitoring": {
+      "errors_performance": "Sentry (@sentry/react en frontend/src/main.jsx, sentry-sdk Django)",
+      "real_user_metrics": "Cloudflare Web Analytics (beacon JS)",
+      "session_replay": "Sentry 10% sample (maskAllText, blockAllMedia)"
+    }
+  },
+  "analytics_summary": {
+    "period": "Last 24 hours (GMT-5)",
+    "cloudflare_plan": "free",
+    "web_analytics": {
+      "visits": 10,
+      "page_views": 41,
+      "avg_pages_per_visit": 4.1,
+      "page_load_time_ms": 690,
+      "page_load_time_trend": "-73.84% vs periodo anterior",
+      "note": "Métrica más fiel a usuarios reales que HTTP Traffic Unique Visitors (154) o Account Requests (13.98k)"
+    },
+    "http_traffic_zone": {
+      "unique_visitors_24h": 154,
+      "note": "Incluye bots, assets, API, prefetch — no usar como proxy de usuarios humanos"
+    },
+    "account_analytics": {
+      "requests_24h": 13980,
+      "visits_24h": 626,
+      "page_views_24h": 2120,
+      "cache_rate_percent": 0.8,
+      "note": "Cache muy bajo; casi todo va al origen en DO"
+    }
+  },
+  "core_web_vitals": {
+    "lcp": {
+      "name": "Largest Contentful Paint",
+      "thresholds_ms": { "good": 2500, "needs_improvement": 4000 },
+      "distribution": { "good_percent": 75, "needs_improvement_percent": 25, "poor_percent": 0 },
+      "interpretation": "1 de cada 4 cargas tarda entre 2.5s y 4s en mostrar el contenido principal"
+    },
+    "inp": {
+      "name": "Interaction to Next Paint",
+      "thresholds_ms": { "good": 200, "needs_improvement": 500 },
+      "status": "all_good_in_summary",
+      "interpretation": "La app responde bien a clics e interacciones"
+    },
+    "cls": {
+      "name": "Cumulative Layout Shift",
+      "thresholds": { "good": 0.1, "needs_improvement": 0.25 },
+      "status": "all_good_in_summary",
+      "interpretation": "Poco o ningún salto visual durante la carga"
+    }
+  },
+  "urls_with_lcp_data": [
+    {
+      "path_pattern": "/",
+      "lcp_counts": { "good": 3, "needs_improvement": 1, "poor": 0 },
+      "priority": "high",
+      "sample_size": 4,
+      "likely_lcp_element": "Hero background image (CSS background-image)",
+      "related_files": [
+        "frontend/src/generalComponents/Home.jsx",
+        "frontend/src/styles/home.css"
+      ]
+    },
+    {
+      "path_pattern": "/content/13/*",
+      "lcp_counts": { "good": 1, "needs_improvement": 0, "poor": 0 },
+      "priority": "medium",
+      "sample_size": 1,
+      "likely_lcp_element": "Content thumbnail, media preview, or title after API load",
+      "related_files": [
+        "frontend/src/content/ContentDetailsLibrary.jsx",
+        "frontend/src/content/ContentDetailsTopic.jsx",
+        "frontend/src/content/ContentDisplay.jsx"
+      ]
+    },
+    {
+      "path_pattern": "/content/11/*",
+      "lcp_counts": { "good": 1, "needs_improvement": 0, "poor": 0 },
+      "priority": "medium",
+      "sample_size": 1,
+      "likely_lcp_element": "Content thumbnail, media preview, or title after API load",
+      "related_files": [
+        "frontend/src/content/ContentDetailsLibrary.jsx",
+        "frontend/src/content/ContentDetailsTopic.jsx",
+        "frontend/src/content/ContentDisplay.jsx"
+      ]
+    },
+    {
+      "path_pattern": "/knowledge_path/*",
+      "lcp_counts": { "good": 1, "needs_improvement": 0, "poor": 0 },
+      "priority": "medium",
+      "sample_size": 1,
+      "likely_lcp_element": "Path title and header after API fetch",
+      "related_files": [
+        "frontend/src/knowledgePaths/KnowledgePathDetail.jsx"
+      ]
+    },
+    {
+      "path_pattern": "/profiles/my_profile",
+      "lcp_counts": { "good": 1, "needs_improvement": 0, "poor": 0 },
+      "priority": "medium",
+      "sample_size": 1,
+      "likely_lcp_element": "Profile picture (150x150) or username heading",
+      "related_files": [
+        "frontend/src/profiles/Profile.jsx",
+        "frontend/src/profiles/ProfileHeader.jsx"
+      ]
+    }
+  ],
+  "code_findings": [
+    {
+      "id": "HERO-PNG-OVERSIZED",
+      "severity": "high",
+      "route": "/",
+      "issue": "home.css usa home_hero.png (1.9 MB) como background-image; existe home_hero.jpg (320 KB) sin usar",
+      "file": "frontend/src/styles/home.css",
+      "line_hint": 45,
+      "impact": "LCP del hero degradado; background-image no recibe fetchpriority ni preload",
+      "evidence": {
+        "css_property": "background-image: url('/images/home_hero.png')",
+        "file_sizes": {
+          "home_hero.png_bytes": 1992294,
+          "home_hero.jpg_bytes": 327680,
+          "sobre_nosotros_hero_image.jpg_bytes": 523264
+        }
+      }
+    },
+    {
+      "id": "HERO-CSS-BACKGROUND",
+      "severity": "high",
+      "route": "/",
+      "issue": "Hero renderizado como CSS background-image en lugar de <img> con fetchPriority='high'",
+      "files": [
+        "frontend/src/styles/home.css",
+        "frontend/src/generalComponents/Home.jsx"
+      ],
+      "impact": "Navegador prioriza peor el recurso LCP; no aparece en preload estándar"
+    },
+    {
+      "id": "HOME-AUTH-GATE",
+      "severity": "medium",
+      "route": "/",
+      "issue": "Home autenticada espera authInitialized antes de renderizar hero completo",
+      "file": "frontend/src/generalComponents/Home.jsx",
+      "line_hint": 45,
+      "impact": "Retraso adicional al LCP en usuarios logueados"
+    },
+    {
+      "id": "NO-PRELOAD-INDEX",
+      "severity": "medium",
+      "route": "/",
+      "issue": "index.html no tiene <link rel='preload'> para imagen hero ni fuentes críticas",
+      "file": "frontend/index.html",
+      "impact": "Descubrimiento tardío del recurso LCP"
+    },
+    {
+      "id": "CONTENT-BLANK-LOADING",
+      "severity": "high",
+      "route": "/content/:contentId/*",
+      "issue": "Pantalla en blanco con texto 'Cargando...' hasta completar múltiples APIs",
+      "file": "frontend/src/content/ContentDetailsLibrary.jsx",
+      "line_hint": 65,
+      "api_calls_blocking": [
+        "contentApi.getContentDetails(contentId, context, contextId)",
+        "contentApi.getContentReferences(contentId)",
+        "contentApi.listFileSuggestions(contentId) — opcional pero en Promise chain"
+      ],
+      "impact": "LCP no puede ocurrir hasta que llega JSON + render; sin skeleton"
+    },
+    {
+      "id": "THUMBNAIL-LAZY-ABOVE-FOLD",
+      "severity": "medium",
+      "route": "/content/:contentId/*",
+      "issue": "SequentialThumbnail usa loading='lazy' por defecto; ContentDisplay pasa lazy en vista detailed/listing",
+      "files": [
+        "frontend/src/content/ContentListingThumbnail.jsx",
+        "frontend/src/content/ContentDisplay.jsx"
+      ],
+      "line_hints": [10, 1038],
+      "impact": "Imagen principal above-the-fold se retrasa intencionalmente"
+    },
+    {
+      "id": "KP-SPINNER-BLOCK",
+      "severity": "medium",
+      "route": "/knowledge_path/:pathId",
+      "issue": "CircularProgress fullscreen hasta fetchKnowledgePath + llamadas secundarias",
+      "file": "frontend/src/knowledgePaths/KnowledgePathDetail.jsx",
+      "line_hints": [56, 339],
+      "api_calls": [
+        "knowledgePathsApi.getKnowledgePath(pathId)",
+        "certificatesApi.getKnowledgePathCertificateRequests — si es autor",
+        "commentsApi.getKnowledgePathComments — si completado",
+        "certificatesApi.getCertificateRequestStatus — si completado"
+      ],
+      "impact": "Título y cabecera no visibles hasta resolver cadena de APIs"
+    },
+    {
+      "id": "PROFILE-SPINNER-BLOCK",
+      "severity": "medium",
+      "route": "/profiles/my_profile",
+      "issue": "CircularProgress centrado hasta getUserProfile(); luego badges/notificaciones en paralelo",
+      "files": [
+        "frontend/src/profiles/Profile.jsx",
+        "frontend/src/profiles/ProfileHeader.jsx"
+      ],
+      "line_hints": [196, 515, 35],
+      "impact": "Foto de perfil y nombre no pintan hasta API; img sin width/height HTML attributes"
+    },
+    {
+      "id": "LARGE-DEFAULT-THUMBNAILS",
+      "severity": "low",
+      "issue": "PNG de 2.2 MB en public/images/ para audio/video; el código ya usa WebP en defaultMediaThumbnails.js",
+      "path": "frontend/public/images/",
+      "code_status": "defaultMediaThumbnails.js ya apunta a .webp — auditar que ningún otro archivo referencie los .png",
+      "files": {
+        "audio_thumbnail_default.png_bytes": 2306867,
+        "audio_thumbnail_default.webp_bytes": 12288,
+        "video_thumbnail_default.png_bytes": 2306867,
+        "video_thumbnail_default.webp_bytes": 11264
+      },
+      "impact": "Riesgo bajo salvo referencias directas al PNG; considerar eliminar PNGs duplicados del repo"
+    }
+  ],
+  "recommended_fixes": [
+    {
+      "priority": 1,
+      "title": "Optimizar hero de Home",
+      "tasks": [
+        "Cambiar home.css: usar home_hero.jpg (320KB) o WebP optimizado en lugar de home_hero.png (1.9MB)",
+        "Convertir hero a <img fetchPriority='high' decoding='async'> o añadir <link rel='preload' as='image'> en index.html",
+        "Considerar srcset/sizes si hay variantes responsive",
+        "Evaluar si authInitialized puede mostrar skeleton del hero mientras verifica sesión"
+      ],
+      "files": [
+        "frontend/src/styles/home.css",
+        "frontend/src/generalComponents/Home.jsx",
+        "frontend/index.html"
+      ],
+      "expected_impact": "Mayor mejora en LCP de / (única URL con needs_improvement confirmado)"
+    },
+    {
+      "priority": 2,
+      "title": "Content detail: skeleton + imagen prioritaria",
+      "tasks": [
+        "Reemplazar 'Cargando...' por skeleton que reserve espacio del título y media",
+        "Renderizar título/metadata en cuanto llegue getContentDetails; diferir references y fileSuggestions",
+        "Pasar loading='eager' y fetchPriority='high' a SequentialThumbnail en variant detailed above-the-fold",
+        "Preferir thumbnail_preview WebP sobre thumbnail full size"
+      ],
+      "files": [
+        "frontend/src/content/ContentDetailsLibrary.jsx",
+        "frontend/src/content/ContentDetailsTopic.jsx",
+        "frontend/src/content/ContentDisplay.jsx",
+        "frontend/src/content/ContentListingThumbnail.jsx"
+      ],
+      "expected_impact": "LCP más temprano en /content/*"
+    },
+    {
+      "priority": 3,
+      "title": "Knowledge path: render progresivo",
+      "tasks": [
+        "Mostrar título, descripción y progreso tras primera API; spinner solo en secciones secundarias",
+        "Diferir certificate requests, comments y certificate status con lazy load o tabs",
+        "Skeleton en lugar de CircularProgress fullscreen"
+      ],
+      "files": [
+        "frontend/src/knowledgePaths/KnowledgePathDetail.jsx"
+      ],
+      "expected_impact": "LCP basado en texto visible antes de APIs secundarias"
+    },
+    {
+      "priority": 4,
+      "title": "Profile: skeleton de header",
+      "tasks": [
+        "Skeleton de ProfileHeader mientras carga getUserProfile",
+        "Añadir width/height explícitos a img de profile_picture para evitar CLS",
+        "Diferir badges (useBadges) y notificaciones hasta después del paint del header"
+      ],
+      "files": [
+        "frontend/src/profiles/Profile.jsx",
+        "frontend/src/profiles/ProfileHeader.jsx"
+      ],
+      "expected_impact": "LCP más rápido en /profiles/my_profile"
+    },
+    {
+      "priority": 5,
+      "title": "Assets estáticos",
+      "tasks": [
+        "Auditar que defaultMediaThumbnails use .webp no .png",
+        "Comprimir o eliminar PNGs duplicados grandes en frontend/public/images/",
+        "Configurar cache headers vía nginx/Cloudflare para /images/*"
+      ],
+      "files": [
+        "frontend/src/content/defaultMediaThumbnails.js",
+        "frontend/public/images/"
+      ],
+      "expected_impact": "Menor peso en rutas con media sin thumbnail custom"
+    }
+  ],
+  "verification": {
+    "tools": [
+      "Cloudflare Web Analytics → Core Web Vitals → LCP por URL (comparar antes/después)",
+      "Chrome DevTools → Lighthouse → Performance",
+      "Chrome DevTools → Network → throttling Slow 4G en / y /content/*",
+      "Sentry Performance → transacciones frontend (ya configurado, tracesSampleRate 0.1)"
+    ],
+    "success_criteria": {
+      "lcp_good_percent_target": ">= 90",
+      "home_lcp_ms_target": "< 2500 en mobile Slow 4G",
+      "no_blank_loading_screens": "Skeleton visible en < 100ms en content/profile/knowledge_path"
+    },
+    "caveat": "Con solo ~10 visits/día, Web Analytics tarda en acumular muestras estadísticamente significativas por URL"
+  },
+  "routes_reference": {
+    "content_detail": [
+      "/content/:contentId/library",
+      "/content/:contentId/topic/:topicId",
+      "/content/search/:contentId"
+    ],
+    "knowledge_path": [
+      "/knowledge_path/:pathId",
+      "/knowledge_path/:pathId/nodes/:nodeId"
+    ],
+    "profile": [
+      "/profiles/my_profile",
+      "/profiles/user_profile/:profileId"
+    ]
+  },
+  "related_existing_patterns": {
+    "lazy_loading_already_used": [
+      "frontend/src/topics/TopicList.jsx",
+      "frontend/src/knowledgePaths/KnowledgePathList.jsx"
+    ],
+    "thumbnail_preview_api_fields": [
+      "selected_profile.thumbnail_preview",
+      "thumbnail_preview",
+      "customThumbnailForDisplay en ContentDisplay.jsx"
+    ],
+    "sentry_frontend_config": {
+      "file": "frontend/src/main.jsx",
+      "integrations": ["browserTracingIntegration", "replayIntegration"],
+      "tracesSampleRate": 0.1,
+      "replaysSessionSampleRate": 0.1,
+      "telegram_webview_replay_disabled": true
+    }
+  }
+}

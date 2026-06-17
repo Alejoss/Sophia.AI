@@ -34,7 +34,11 @@ const ProfileHeader = ({
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                         <img 
                             src={profile.profile_picture || '/default-avatar.png'} 
-                            alt="Profile" 
+                            alt="Profile"
+                            width={150}
+                            height={150}
+                            loading="eager"
+                            fetchPriority="high"
                             style={{ 
                                 width: '150px', 
                                 height: '150px', 

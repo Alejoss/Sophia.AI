@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationsCount, changePassword } from '../api/profilesApi';
 import ProfileHeader from './ProfileHeader';
+import ProfileHeaderSkeleton from '../components/ProfileHeaderSkeleton';
 import ProfileVerticalNavigation from './ProfileVerticalNavigation';
 import PublicationList from '../publications/PublicationList';
 import Notifications from './Notifications';
@@ -514,9 +515,9 @@ const Profile = () => {
 
     if (isLoading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-            </Box>
+            <Container maxWidth="xl" sx={{ pb: 3 }}>
+                <ProfileHeaderSkeleton />
+            </Container>
         );
     }
     

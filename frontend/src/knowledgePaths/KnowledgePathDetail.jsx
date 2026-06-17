@@ -42,6 +42,7 @@ import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorH
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
+import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
@@ -69,46 +70,68 @@ const KnowledgePathDetail = () => {
   const [pendingRequests, setPendingRequests] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadSecondaryData = async (data) => {
+      if (user?.username === data.author) {
+        try {
+          const requestsData = await certificatesApi.getKnowledgePathCertificateRequests(pathId);
+          if (!cancelled) setPendingRequests(requestsData.count);
+        } catch (error) {
+          console.error('Error fetching pending certificate requests:', error);
+        }
+      }
+
+      if (data.progress?.is_completed) {
+        try {
+          const commentsData = await commentsApi.getKnowledgePathComments(pathId);
+          if (!cancelled) setComments(commentsData);
+        } catch (error) {
+          console.error('Error fetching knowledge path comments:', error);
+        }
+
+        try {
+          const statusData = await certificatesApi.getCertificateRequestStatus(pathId);
+          if (!cancelled) setCertificateStatus(statusData);
+        } catch (error) {
+          console.error('Error fetching certificate status:', error);
+        }
+      }
+
+      if (!cancelled) setLoadingStatus(false);
+    };
+
     const fetchKnowledgePath = async () => {
+      setLoading(true);
+      setLoadingStatus(true);
+      setError(null);
+
       try {
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
+        if (cancelled) return;
+
         setKnowledgePath(data);
         setIsCreator(user?.username === data.author);
         setHasCompleted(data.progress?.is_completed || false);
+        setLoading(false);
 
-        // If user is the author, fetch pending certificate requests
-        if (user?.username === data.author) {
-          try {
-            const requestsData = await certificatesApi.getKnowledgePathCertificateRequests(pathId);
-            setPendingRequests(requestsData.count);
-          } catch (error) {
-            console.error('Error fetching pending certificate requests:', error);
-          }
-        }
-
-        if (data.progress?.is_completed) {
-          const commentsData = await commentsApi.getKnowledgePathComments(pathId);
-          setComments(commentsData);
-          
-          try {
-            const statusData = await certificatesApi.getCertificateRequestStatus(pathId);
-            setCertificateStatus(statusData);
-          } catch (error) {
-            console.error('Error fetching certificate status:', error);
-          }
-        }
+        await loadSecondaryData(data);
       } catch (err) {
+        if (cancelled) return;
         if (handleAuthError(err).handled) {
           return;
         }
         setError(getErrorMessage(err, 'Error al cargar el camino de conocimiento'));
-      } finally {
         setLoading(false);
         setLoadingStatus(false);
       }
     };
 
     fetchKnowledgePath();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathId, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage]);
 
   const handleAddComment = async (e) => {
@@ -337,13 +360,7 @@ const KnowledgePathDetail = () => {
   ]);
 
   if (loading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-          <CircularProgress size={60} />
-        </Box>
-      </Container>
-    );
+    return <KnowledgePathDetailSkeleton />;
   }
 
   if (error) {
@@ -387,6 +404,8 @@ const KnowledgePathDetail = () => {
             component="img"
             src={knowledgePath.image}
             alt={knowledgePath.title}
+            loading="eager"
+            fetchPriority="high"
             sx={{
               width: '100%',
               height: { xs: 200, md: 300 },

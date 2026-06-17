@@ -9,6 +9,7 @@ import ContentReferences from './ContentReferences';
 import ContentDisplay from './ContentDisplay';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import FileSuggestionUploadDialog from './FileSuggestionUploadDialog';
+import ContentDetailSkeleton from '../components/ContentDetailSkeleton';
 
 // ContentDisplay Mode: "detailed" - Full content detail view in library context
 const ContentDetailsLibrary = () => {
@@ -27,42 +28,59 @@ const ContentDetailsLibrary = () => {
     const currentUser = authState.user;
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+            setReferences(null);
+            setFileSuggestions([]);
+
             try {
-                // Get context parameters from location state or query params
                 const searchParams = new URLSearchParams(location.search);
                 const context = searchParams.get('context') || 'library';
                 const contextId = searchParams.get('id') || searchParams.get('userId') || currentUser?.id;
 
-                const [contentData, referencesData] = await Promise.all([
-                    contentApi.getContentDetails(contentId, context, contextId),
-                    contentApi.getContentReferences(contentId)
-                ]);
-                
-                setContent(contentData);
-                setReferences(referencesData);
+                const contentData = await contentApi.getContentDetails(contentId, context, contextId);
+                if (cancelled) return;
 
-                try {
-                    const suggestions = await contentApi.listFileSuggestions(contentId);
-                    setFileSuggestions(Array.isArray(suggestions) ? suggestions : []);
-                } catch (listErr) {
-                    // Suggestions are optional in this view; don't block the page.
-                    console.warn('Error loading file suggestions:', listErr);
-                    setFileSuggestions([]);
-                }
+                setContent(contentData);
+                setLoading(false);
+
+                contentApi.getContentReferences(contentId)
+                    .then((referencesData) => {
+                        if (!cancelled) setReferences(referencesData);
+                    })
+                    .catch((refErr) => {
+                        console.warn('Error loading content references:', refErr);
+                    });
+
+                contentApi.listFileSuggestions(contentId)
+                    .then((suggestions) => {
+                        if (!cancelled) {
+                            setFileSuggestions(Array.isArray(suggestions) ? suggestions : []);
+                        }
+                    })
+                    .catch((listErr) => {
+                        console.warn('Error loading file suggestions:', listErr);
+                    });
             } catch (err) {
+                if (cancelled) return;
                 console.error('Error in ContentDetailsLibrary:', err);
                 console.error('Error response:', err.response);
                 setError(err.message);
-            } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
+
+        return () => {
+            cancelled = true;
+        };
     }, [contentId, location.search, currentUser]);
 
-    if (loading) return <div>Cargando...</div>;
+    if (loading) return <ContentDetailSkeleton />;
     if (error) return <div>Error: {error}</div>;
     if (!content) return <div>No se encontró contenido</div>;
 

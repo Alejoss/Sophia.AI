@@ -357,6 +357,8 @@ const ContentDisplay = ({
             <img
               src={thumbUrl}
               alt={title || contentData.original_title || "Content image"}
+              loading={variant === "detailed" ? "eager" : "lazy"}
+              fetchPriority={variant === "detailed" ? "high" : undefined}
               style={{
                 maxWidth: "100%",
                 maxHeight: maxImageHeight,
@@ -412,6 +414,8 @@ const ContentDisplay = ({
               >
                 <SequentialThumbnail
                   sources={previewSources}
+                  loading={variant === "detailed" ? "eager" : "lazy"}
+                  fetchPriority={variant === "detailed" ? "high" : undefined}
                   fallback={
                     <Typography color="text.secondary">
                       Archivo de video no disponible
@@ -478,6 +482,8 @@ const ContentDisplay = ({
               >
                 <SequentialThumbnail
                   sources={previewSources}
+                  loading={variant === "detailed" ? "eager" : "lazy"}
+                  fetchPriority={variant === "detailed" ? "high" : undefined}
                   fallback={
                     <Typography color="text.secondary">
                       Archivo de audio no disponible

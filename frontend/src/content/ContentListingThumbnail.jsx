@@ -8,6 +8,7 @@ export function SequentialThumbnail({
   sources,
   fallback = null,
   loading = 'lazy',
+  fetchPriority,
   imgStyle,
   onImageClick,
 }) {
@@ -33,6 +34,7 @@ export function SequentialThumbnail({
       src={current.src}
       alt={current.alt}
       loading={loading}
+      fetchPriority={fetchPriority}
       style={{
         width: '100%',
         height: '100%',
