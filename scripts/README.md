@@ -123,25 +123,21 @@ chmod +x scripts/setup-ssl.sh
 ### `cloudflare_analytics_report.py`
 Fetches Cloudflare analytics (traffic, Core Web Vitals, security events) via GraphQL and writes local reports under `reports/cloudflare/` (gitignored).
 
-**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly. When metrics need attention, it can create rows in a Notion database (`--notify-notion`). Reports are **not** committed or uploaded.
+**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly, evaluates actionable insights, and **creates a Notion row** in `NOTION_DATABASE_ID` when warranted (dedup `cf-analytics-YYYY-MM-DD`). Reports on the runner are not committed.
 
-**GitHub secrets** (for the workflow):
-- Cloudflare: `CF_API_TOKEN`, `CF_ACCOUNT_ID`, and optionally `CF_ZONE_ID` or `CF_ZONE_NAME`
-- Notion: `NOTION_TOKEN`, `NOTION_DATABASE_ID`
+**GitHub secrets:** `CF_API_TOKEN`, `CF_ACCOUNT_ID`, optional `CF_ZONE_NAME` / `CF_ZONE_ID`, `NOTION_API_KEY`, `NOTION_DATABASE_ID`.
 
-**GitHub variables** (optional, match your Notion DB property names):
-`NOTION_PROP_TITLE`, `NOTION_PROP_DESCRIPTION`, `NOTION_PROP_SEVERITY`, `NOTION_PROP_STATUS`, `NOTION_PROP_SOURCE`, `NOTION_PROP_CATEGORY`, `NOTION_STATUS_VALUE`, `NOTION_SOURCE_VALUE`
+**GitHub variable (optional):** `CF_NOTION_MIN_SEVERITY` — `high` (default), `medium`, or `low`.
+
+Cloudflare → Notion rows are always **tipo = Tarea** (severity only affects title/body ordering, not tipo).
 
 **Notion setup:**
 1. Create an integration at https://www.notion.so/my-integrations
-2. Copy the internal integration secret → `NOTION_TOKEN` in GitHub Actions secrets
-3. Open your alerts database → **⋯** → **Connections** → add the integration
-4. Copy the database ID from the URL (`.../DATABASE_ID?v=...`) → `NOTION_DATABASE_ID`
-5. Ensure select options exist if you map severity/status/source/category (e.g. `critical`, `warning`, `To do`)
+2. Copy the internal integration secret → `NOTION_API_KEY` in GitHub Actions secrets
+3. Open your database → **⋯** → **Connections** → add the integration
+4. Database ID from the URL (`.../p/DATABASE_ID?...`) → `NOTION_DATABASE_ID`
 
-**Attention triggers:** API partial failures, Core Web Vitals below thresholds (LCP/INP/CLS), firewall block/challenge events in the last 24h.
-
-**Local reports (persistent):** after `git pull`, run the script on your machine; output stays in `reports/cloudflare/` (gitignored).
+**Local reports (persistent):** after `git pull`, run without `--notify-notion` to save under `reports/cloudflare/` (gitignored).
 
 **Local setup** — add to `acbc_app/.env` (see `scripts/cloudflare-report.env.example`):
 ```bash
@@ -155,8 +151,8 @@ CF_ZONE_NAME=academiablockchain.com
 python3 scripts/cloudflare_analytics_report.py
 python3 scripts/cloudflare_analytics_report.py --days 14
 python3 scripts/cloudflare_analytics_report.py --check
+python3 scripts/cloudflare_analytics_report.py --dry-run-insights
 python3 scripts/cloudflare_analytics_report.py --notify-notion
-python3 scripts/cloudflare_analytics_report.py --notify-notion --dry-run-notion
 ```
 
 **Cost:** $0 (included in Cloudflare plan; subject to API rate limits).
