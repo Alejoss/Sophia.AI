@@ -16,6 +16,10 @@ from typing import Any
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 
+NOTION_MIN_SEVERITY = os.environ.get("CF_NOTION_MIN_SEVERITY", "high").strip().lower()
+
+SEVERITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
 PROYECTO_ACBC = "Desarrollo de Software para Academia Blockchain"
 
 PROPERTY_ALIASES: dict[str, list[str]] = {
@@ -124,6 +128,12 @@ def build_task_title(findings: list[dict[str, Any]], max_len: int = 200) -> str:
     return f"{trimmed}..."
 
 
+def findings_meet_notify_threshold(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return findings at or above CF_NOTION_MIN_SEVERITY (default: high only)."""
+    min_rank = SEVERITY_RANK.get(NOTION_MIN_SEVERITY, SEVERITY_RANK["high"])
+    return [f for f in findings if SEVERITY_RANK.get(f.get("severity", ""), 9) <= min_rank]
+
+
 def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | None:
     """Return notification payload if something is worth communicating."""
     findings: list[dict[str, Any]] = []
@@ -214,16 +224,20 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
     if not findings:
         return None
 
+    notify_findings = findings_meet_notify_threshold(findings)
+    if not notify_findings:
+        return None
+
     priority_order = {"high": 0, "medium": 1, "low": 2}
     category_order = {"lcp": 0, "inp": 1, "cls": 2, "security": 3, "cache": 4, "traffic": 5}
-    findings.sort(
+    notify_findings.sort(
         key=lambda f: (
             priority_order.get(f["severity"], 9),
             category_order.get(f.get("category", ""), 9),
         )
     )
 
-    title = build_task_title(findings)
+    title = build_task_title(notify_findings)
 
     report_day = report.get("generated_at", "")[:10] or date.today().isoformat()
     dedup_id = f"cf-analytics-{report_day}"
@@ -235,7 +249,7 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
         "",
         "Hallazgos:",
     ]
-    for item in findings:
+    for item in notify_findings:
         body_lines.append(f"- [{item['severity']}] {item['message']}")
     body_lines.extend(
         [
@@ -250,7 +264,7 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
         "tipo": "Tarea",
         "title": title,
         "body": "\n".join(body_lines),
-        "findings": findings,
+        "findings": notify_findings,
         "report_day": report_day,
     }
 
