@@ -120,6 +120,31 @@ chmod +x scripts/setup-ssl.sh
 - Configures nginx with SSL
 - Sets up automatic certificate renewal
 
+### `cloudflare_analytics_report.py`
+Fetches Cloudflare analytics (traffic, Core Web Vitals, security events) via GraphQL and writes local reports under `reports/cloudflare/` (gitignored).
+
+**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly as an API smoke test. Reports are **not** committed or uploaded — they exist only on the ephemeral runner.
+
+**Local reports (persistent):** after `git pull`, run the script on your machine; output stays in `reports/cloudflare/` (gitignored).
+
+**GitHub secrets** (for the workflow): `CF_API_TOKEN`, `CF_ACCOUNT_ID`, and optionally `CF_ZONE_ID` or `CF_ZONE_NAME`.
+
+**Local setup** — add to `acbc_app/.env` (see `scripts/cloudflare-report.env.example`):
+```bash
+CF_API_TOKEN=...
+CF_ACCOUNT_ID=...
+CF_ZONE_NAME=academiablockchain.com
+```
+
+**Usage:**
+```bash
+python3 scripts/cloudflare_analytics_report.py
+python3 scripts/cloudflare_analytics_report.py --days 14
+python3 scripts/cloudflare_analytics_report.py --check
+```
+
+**Cost:** $0 (included in Cloudflare plan; subject to API rate limits).
+
 ### `backup-db.sh`
 Creates a backup of the PostgreSQL database. Use the same project root and `docker-compose.prod.yml` as deployment.
 

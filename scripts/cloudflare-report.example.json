@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-06-16T12:00:00+00:00",
+  "period": { "start": "2026-06-10", "end": "2026-06-16", "days": 7 },
+  "account_id": "YOUR_ACCOUNT_ID",
+  "zone": { "id": "YOUR_ZONE_ID", "name": "academiablockchain.com" },
+  "dataset_settings": {
+    "httpRequests1dGroups": { "enabled": true, "notOlderThan": 604800 },
+    "httpRequestsAdaptiveGroups": { "enabled": true },
+    "firewallEventsAdaptive": { "enabled": true }
+  },
+  "traffic": {
+    "daily": [
+      {
+        "dimensions": { "date": "2026-06-16" },
+        "sum": { "requests": 1398, "bytes": 12158000, "cachedRequests": 11, "cachedBytes": 97000 },
+        "uniq": { "uniques": 154 }
+      }
+    ],
+    "totals": {
+      "requests": 13980,
+      "bytes": 121580000,
+      "unique_ips_sum_daily": 154,
+      "days_with_data": 7
+    }
+  },
+  "top_countries": [
+    { "country": "EC", "requests": 8250, "bytes": 73080000 }
+  ],
+  "web_vitals": [
+    {
+      "host": "academiablockchain.com",
+      "samples": 41,
+      "lcp_p75_ms": 2800.5,
+      "inp_p75_ms": 120.0,
+      "cls_p75": 0.05
+    }
+  ],
+  "security_events": [],
+  "errors": []
+}

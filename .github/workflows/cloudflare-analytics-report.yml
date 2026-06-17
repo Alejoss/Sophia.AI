@@ -1,0 +1,45 @@
+name: Cloudflare analytics report
+
+on:
+  schedule:
+    # Mondays 08:00 UTC — smoke test that the API + script still work
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Lookback days
+        required: false
+        default: "7"
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Generate report (ephemeral)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Cloudflare analytics script
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_ZONE_NAME: ${{ secrets.CF_ZONE_NAME }}
+          CF_REPORT_DAYS: ${{ github.event.inputs.days || '7' }}
+        run: |
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "Missing GitHub secrets: CF_API_TOKEN and CF_ACCOUNT_ID are required."
+            echo "Optional: CF_ZONE_ID or CF_ZONE_NAME (defaults to academiablockchain.com via script)."
+            exit 1
+          fi
+          python3 scripts/cloudflare_analytics_report.py --days "${CF_REPORT_DAYS}"
+
+      - name: Note
+        if: success()
+        run: |
+          echo "Report generated on the runner only (not committed, no artifacts)."
+          echo "To keep reports locally, run after git pull:"
+          echo "  python3 scripts/cloudflare_analytics_report.py"
