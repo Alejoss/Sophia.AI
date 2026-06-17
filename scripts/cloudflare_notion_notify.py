@@ -109,16 +109,16 @@ def lcp_rating(ms: float | None) -> str:
 
 
 def build_task_title(findings: list[dict[str, Any]], max_len: int = 200) -> str:
-    """Use the primary finding message as the Notion title (readable, no JSON dumps)."""
+    """Notion title: Cloudflare: + primary finding message."""
     if not findings:
         return "Cloudflare: sin hallazgos"
 
-    title = findings[0]["message"]
+    message = findings[0]["message"]
     extra = len(findings) - 1
     if extra > 0:
-        suffix = f" (+{extra} más)"
-        title = f"{title}{suffix}"
+        message = f"{message} (+{extra} más)"
 
+    title = f"Cloudflare: {message}"
     if len(title) <= max_len:
         return title
 
@@ -146,12 +146,11 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
         lcp = row.get("lcp_p75_ms")
         rating = lcp_rating(lcp)
         if rating in ("needs_improvement", "poor"):
-            label = "lento" if rating == "needs_improvement" else "muy lento"
             findings.append(
                 {
                     "severity": "high" if rating == "poor" else "medium",
                     "category": "lcp",
-                    "message": f"LCP {label} (p75 {lcp} ms) en {host} — {samples} muestras",
+                    "message": f"LCP p75 {lcp} ms ({rating}) en {host} ({samples} muestras)",
                 }
             )
         inp = row.get("inp_p75_ms")
