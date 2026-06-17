@@ -13,15 +13,19 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   MenuItem,
   Paper,
   Select,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
 import { formatDateTimeForInput } from '../utils/dateUtils';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
@@ -62,6 +66,7 @@ const EventEdit = () => {
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -87,6 +92,7 @@ const EventEdit = () => {
           date_end: formatDateTimeForInput(eventData.date_end),
           schedule_description: eventData.schedule_description || '',
         });
+        setIsVisible(Boolean(eventData.is_visible));
 
         if (eventData.image) {
           setImagePreview(eventData.image);
@@ -211,6 +217,7 @@ const EventEdit = () => {
           formData.append(key, form[key]);
         }
       });
+      formData.append('is_visible', String(isVisible));
       
       // Add image if a new one was selected
       if (imageFile) {
@@ -440,6 +447,26 @@ const EventEdit = () => {
                 minRows={3}
                 fullWidth
               />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={isVisible}
+                    onChange={(e) => setIsVisible(e.target.checked)}
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Público
+                    </Typography>
+                  </Stack>
+                }
+              />
+              <Typography variant="caption" color="text.secondary">
+                Los eventos privados no aparecen en el listado público ni en tu perfil para otros usuarios.
+              </Typography>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                 <Button type="button" onClick={() => navigate(`/events/${eventId}`)} variant="outlined" color="inherit">

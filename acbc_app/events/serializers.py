@@ -9,6 +9,14 @@ from profiles.serializers import UserSerializer, AcceptedCryptoSerializer
 from profiles.models import AcceptedCrypto
 
 
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ('true', '1', 'yes', 'on')
+    return bool(value)
+
+
 class EventSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
     image = serializers.ImageField(required=False, allow_null=True)
@@ -34,6 +42,10 @@ class EventSerializer(serializers.ModelSerializer):
         return data
 
     def validate(self, data):
+        request = self.context.get('request')
+        if request and 'is_visible' in request.data:
+            data['is_visible'] = _parse_bool(request.data.get('is_visible'))
+
         # Validate required fields
         if not data.get('title', '').strip():
             raise serializers.ValidationError({
@@ -64,6 +76,7 @@ class EventSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['owner'] = request.user
+        validated_data.setdefault('is_visible', False)
         instance = super().create(validated_data)
         return instance
 
@@ -142,6 +155,9 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         # Check if event has already started
         if event.date_start and event.date_start < timezone.now():
             raise serializers.ValidationError("No se puede registrar para eventos que ya han comenzado")
+
+        if not event.is_visible:
+            raise serializers.ValidationError("No se puede registrar para eventos que no son públicos")
         
         return data
     

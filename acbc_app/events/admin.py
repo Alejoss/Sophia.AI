@@ -3,8 +3,8 @@ from events.models import Event, EventRegistration
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'owner', 'event_type', 'date_start', 'date_created')
-    list_filter = ('event_type', 'date_created', 'owner')
+    list_display = ('title', 'owner', 'event_type', 'is_visible', 'date_start', 'date_created')
+    list_filter = ('event_type', 'is_visible', 'date_created', 'owner')
     search_fields = ('title', 'description', 'owner__username')
     readonly_fields = ('date_created',)
 

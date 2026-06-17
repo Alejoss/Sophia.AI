@@ -29,6 +29,7 @@ class EventModelTest(TestCase):
         self.assertEqual(event.owner, self.user)
         self.assertEqual(event.event_type, 'LIVE_COURSE')
         self.assertFalse(event.deleted)
+        self.assertFalse(event.is_visible)
 
     def test_event_str_representation(self):
         """Test string representation of event."""

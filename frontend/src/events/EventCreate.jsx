@@ -10,14 +10,18 @@ import {
   CardContent,
   Container,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
 
 const PLATFORM_CHOICES = [
@@ -52,6 +56,7 @@ const EventCreate = () => {
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
@@ -188,6 +193,7 @@ const EventCreate = () => {
           formData.append(key, form[key]);
         }
       });
+      formData.append('is_visible', String(isVisible));
       
       // Add image if selected
       if (imageFile) {
@@ -383,6 +389,26 @@ const EventCreate = () => {
                 minRows={3}
                 fullWidth
               />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={isVisible}
+                    onChange={(e) => setIsVisible(e.target.checked)}
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Público
+                    </Typography>
+                  </Stack>
+                }
+              />
+              <Typography variant="caption" color="text.secondary">
+                Los eventos privados solo son visibles para ti hasta que los marques como públicos.
+              </Typography>
 
               <Button type="submit" variant="contained" disabled={loading}>
                 {loading ? 'Creando...' : 'Crear Evento'}

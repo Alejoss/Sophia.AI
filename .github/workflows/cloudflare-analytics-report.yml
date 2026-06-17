@@ -2,7 +2,7 @@ name: Cloudflare analytics report
 
 on:
   schedule:
-    # Mondays 08:00 UTC — smoke test that the API + script still work
+    # Mondays 08:00 UTC — weekly analytics + Notion alerts when needed
     - cron: "0 8 * * 1"
   workflow_dispatch:
     inputs:
@@ -10,17 +10,44 @@ on:
         description: Lookback days
         required: false
         default: "7"
+      notify_notion:
+        description: Create Notion rows for attention items
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
 
 jobs:
   report:
-    name: Generate report (ephemeral)
+    name: Generate report and notify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate secrets
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "Missing GitHub secrets: CF_API_TOKEN and CF_ACCOUNT_ID are required."
+            echo "Optional: CF_ZONE_ID or CF_ZONE_NAME (defaults to academiablockchain.com via script)."
+            exit 1
+          fi
+
+      - name: Check Cloudflare API datasets
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_ZONE_NAME: ${{ secrets.CF_ZONE_NAME }}
+        run: python3 scripts/cloudflare_analytics_report.py --check
 
       - name: Run Cloudflare analytics script
         env:
@@ -29,17 +56,33 @@ jobs:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_ZONE_NAME: ${{ secrets.CF_ZONE_NAME }}
           CF_REPORT_DAYS: ${{ github.event.inputs.days || '7' }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_PROP_TITLE: ${{ vars.NOTION_PROP_TITLE }}
+          NOTION_PROP_DESCRIPTION: ${{ vars.NOTION_PROP_DESCRIPTION }}
+          NOTION_PROP_SEVERITY: ${{ vars.NOTION_PROP_SEVERITY }}
+          NOTION_PROP_STATUS: ${{ vars.NOTION_PROP_STATUS }}
+          NOTION_PROP_SOURCE: ${{ vars.NOTION_PROP_SOURCE }}
+          NOTION_PROP_CATEGORY: ${{ vars.NOTION_PROP_CATEGORY }}
+          NOTION_STATUS_VALUE: ${{ vars.NOTION_STATUS_VALUE }}
+          NOTION_SOURCE_VALUE: ${{ vars.NOTION_SOURCE_VALUE }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
-          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
-            echo "Missing GitHub secrets: CF_API_TOKEN and CF_ACCOUNT_ID are required."
-            echo "Optional: CF_ZONE_ID or CF_ZONE_NAME (defaults to academiablockchain.com via script)."
-            exit 1
+          NOTIFY_FLAG=""
+          if [ "${{ github.event.inputs.notify_notion || 'true' }}" = "true" ]; then
+            NOTIFY_FLAG="--notify-notion"
+            if [ -z "$NOTION_TOKEN" ] || [ -z "$NOTION_DATABASE_ID" ]; then
+              echo "NOTION_TOKEN and NOTION_DATABASE_ID are not set; skipping Notion notifications."
+              NOTIFY_FLAG=""
+            fi
           fi
-          python3 scripts/cloudflare_analytics_report.py --days "${CF_REPORT_DAYS}"
+          python3 scripts/cloudflare_analytics_report.py --days "${CF_REPORT_DAYS}" ${NOTIFY_FLAG}
 
-      - name: Note
-        if: success()
+      - name: Summary
+        if: always()
         run: |
-          echo "Report generated on the runner only (not committed, no artifacts)."
-          echo "To keep reports locally, run after git pull:"
+          echo "Reports are generated on the ephemeral runner (not committed)."
+          echo "For local copies after git pull:"
           echo "  python3 scripts/cloudflare_analytics_report.py"

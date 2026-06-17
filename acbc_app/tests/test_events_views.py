@@ -92,6 +92,59 @@ class EventListAPITest(TestCase):
         # Check for title validation error (which comes first in the serializer)
         self.assertIn('title', response.data)
 
+    def test_public_list_excludes_hidden_events(self):
+        """Hidden events should not appear in the public event list."""
+        visible_event = EventFactory(is_visible=True)
+        EventFactory(is_visible=False)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], visible_event.title)
+
+    def test_owner_filter_excludes_hidden_events_for_visitors(self):
+        """Visitors should only see visible events when filtering by owner."""
+        owner = UserFactory()
+        visible_event = EventFactory(owner=owner, is_visible=True)
+        EventFactory(owner=owner, is_visible=False)
+
+        response = self.client.get(f"{self.url}?owner={owner.id}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], visible_event.title)
+
+    def test_owner_filter_includes_hidden_events_for_owner(self):
+        """Owners should see hidden events when filtering their own events."""
+        owner = UserFactory()
+        visible_event = EventFactory(owner=owner, is_visible=True)
+        hidden_event = EventFactory(owner=owner, is_visible=False)
+        self.client.force_authenticate(user=owner)
+
+        response = self.client.get(f"{self.url}?owner={owner.id}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        titles = [event['title'] for event in response.data]
+        self.assertIn(visible_event.title, titles)
+        self.assertIn(hidden_event.title, titles)
+
+    def test_create_event_defaults_to_private(self):
+        """New events should be private unless explicitly marked public."""
+        event_data = {
+            'title': 'Private Event',
+            'description': 'Test Description',
+            'event_type': 'LIVE_COURSE',
+            'platform': 'google_meet',
+            'reference_price': 0,
+        }
+
+        response = self.client.post(self.url, event_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data['is_visible'])
+
 
 class EventDetailAPITest(TestCase):
     """Test cases for EventDetail API endpoint."""
@@ -112,12 +165,30 @@ class EventDetailAPITest(TestCase):
         self.assertEqual(response.data['owner']['username'], self.user.username)
 
     def test_get_event_detail_anonymous(self):
-        """Test GET request allows unauthenticated access."""
+        """Test GET request allows unauthenticated access to public events."""
         self.client.force_authenticate(user=None)
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], self.event.title)
+
+    def test_get_hidden_event_detail_anonymous(self):
+        """Hidden events should not be accessible to anonymous users."""
+        hidden_event = EventFactory(owner=self.user, is_visible=False)
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse('events:event-detail', kwargs={'pk': hidden_event.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_hidden_event_detail_as_owner(self):
+        """Owners can access their hidden events."""
+        hidden_event = EventFactory(owner=self.user, is_visible=False)
+
+        response = self.client.get(reverse('events:event-detail', kwargs={'pk': hidden_event.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], hidden_event.title)
 
     def test_update_event_requires_auth(self):
         """Test PUT request rejects unauthenticated users."""
@@ -204,6 +275,15 @@ class EventRegistrationAPITest(TestCase):
         self.client.force_authenticate(user=self.event_owner)
         response = self.client.post(self.url)
         
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_register_for_hidden_event(self):
+        """Users cannot register for hidden events."""
+        hidden_event = EventFactory(owner=self.event_owner, is_visible=False)
+        url = reverse('events:event-register', kwargs={'event_id': hidden_event.pk})
+
+        response = self.client.post(url)
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_duplicate_registration(self):
@@ -345,6 +425,16 @@ class UserCreatedEventsAPITest(TestCase):
         self.assertIn(self.event1.title, [e['title'] for e in response.data])
         self.assertIn(self.event2.title, [e['title'] for e in response.data])
         self.assertNotIn(self.other_event.title, [e['title'] for e in response.data])
+
+    def test_get_user_created_events_includes_hidden(self):
+        """Owners should see hidden events in their created events list."""
+        hidden_event = EventFactory(owner=self.user, is_visible=False)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 3)
+        self.assertIn(hidden_event.title, [e['title'] for e in response.data])
 
 
 @override_settings(NOWPAYMENTS_API_KEY='')

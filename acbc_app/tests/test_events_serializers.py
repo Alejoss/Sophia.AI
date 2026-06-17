@@ -39,6 +39,16 @@ class EventSerializerTest(TestCase):
         self.assertEqual(event.owner, self.user)
         self.assertEqual(event.event_type, 'LIVE_COURSE')
         self.assertEqual(event.reference_price, 99.99)
+        self.assertFalse(event.is_visible)
+
+    def test_event_serializer_create_public(self):
+        """Test event can be created as public when requested."""
+        self.event_data['is_visible'] = True
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid())
+        event = serializer.save()
+
+        self.assertTrue(event.is_visible)
 
     def test_event_serializer_validation_other_platform_required(self):
         """Test validation when platform is 'other' but other_platform is missing."""
@@ -176,6 +186,15 @@ class EventRegistrationSerializerTest(TestCase):
         )
         
         data = {'event': past_event.id}
+        serializer = EventRegistrationSerializer(data=data, context={'request': self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('non_field_errors', serializer.errors)
+
+    def test_registration_serializer_hidden_event_prevention(self):
+        """Test that users cannot register for hidden events."""
+        hidden_event = EventFactory(owner=self.event_owner, is_visible=False)
+        data = {'event': hidden_event.id}
+
         serializer = EventRegistrationSerializer(data=data, context={'request': self.request})
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)

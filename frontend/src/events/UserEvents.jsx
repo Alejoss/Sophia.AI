@@ -16,6 +16,8 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { 
   getUserEventRegistrations, 
   getUserCreatedEvents,
@@ -250,7 +252,18 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1, mb: 1 }}>
                       <Typography variant="h6">{event.title || 'Evento sin título'}</Typography>
-                      <Chip size="small" variant="outlined" color="primary" label={getEventTypeLabel(event.event_type)} />
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="flex-end">
+                        {isOwnProfile && (
+                          <Chip
+                            size="small"
+                            icon={event.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                            label={event.is_visible ? 'Público' : 'Privado'}
+                            color={event.is_visible ? 'success' : 'default'}
+                            variant="outlined"
+                          />
+                        )}
+                        <Chip size="small" variant="outlined" color="primary" label={getEventTypeLabel(event.event_type)} />
+                      </Stack>
                     </Box>
 
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

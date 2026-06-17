@@ -47,6 +47,11 @@ class Event(models.Model):
     date_end = models.DateTimeField(null=True, blank=True)
     date_recorded = models.DateTimeField(null=True, blank=True)
     schedule_description = models.CharField(max_length=1000, blank=True)
+    is_visible = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text="Whether this event is visible to other users",
+    )
     deleted = models.BooleanField(default=False, blank=True)
 
     class Meta:

@@ -24,7 +24,7 @@
     }
   },
   "top_countries": [
-    { "country": "EC", "requests": 8250, "bytes": 73080000 }
+    { "country": "EC", "requests": 8250 }
   ],
   "web_vitals": [
     {

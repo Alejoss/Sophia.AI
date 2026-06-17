@@ -19,6 +19,7 @@ class EventFactory(DjangoModelFactory):
     date_start = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=7))
     date_end = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=7, hours=2))
     schedule_description = factory.Faker('text', max_nb_chars=200)
+    is_visible = True
 
 
 class EventRegistrationFactory(DjangoModelFactory):
