@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { apiRegister } from '../api/profilesApi';
 import SocialLogin from '../components/SocialLogin';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import {
   Alert,
   Box,
   Button,
   Container,
   Divider,
+  IconButton,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
@@ -28,6 +32,8 @@ const Register = () => {
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({}); // Track which fields have been touched
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validatePassword = (password) => {
     const errors = [];
@@ -323,7 +329,7 @@ const Register = () => {
               id="password"
               name="password"
               label="Contraseña"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleChange}
               onBlur={handleBlur}
@@ -342,6 +348,19 @@ const Register = () => {
                 )
               }
               fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      edge="end"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
 
             {!errors.password &&
@@ -357,13 +376,26 @@ const Register = () => {
               id="confirmPassword"
               name="confirmPassword"
               label="Confirmar contraseña"
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
               onChange={handleChange}
               onBlur={handleBlur}
               error={Boolean(errors.confirmPassword)}
               helperText={errors.confirmPassword || ''}
               fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      edge="end"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
 
             <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>

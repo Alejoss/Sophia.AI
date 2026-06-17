@@ -110,7 +110,7 @@ const EventEdit = () => {
     };
 
     loadEvent();
-  }, [eventId, getErrorMessage, handleAuthError]);
+  }, [eventId]);
 
   const validateForm = () => {
     const newErrors = {};

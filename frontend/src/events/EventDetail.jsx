@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
 import { AuthContext } from '../context/AuthContext';
-import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
+import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/authErrorHandler';
 import CryptoPaymentModal from './CryptoPaymentModal';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
@@ -39,7 +39,6 @@ const EventDetail = () => {
   const { eventId } = useParams();
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
-  const { handleAuthError, getErrorMessage } = useAuthErrorHandler();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,6 +54,12 @@ const EventDetail = () => {
   const [imageError, setImageError] = useState(false);
   const userId = authState.user?.id;
   const isAuthenticated = authState.isAuthenticated;
+  const eventOwnerId = event?.owner?.id;
+
+  useEffect(() => {
+    setIsRegistered(false);
+    setUserRegistration(null);
+  }, [eventId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,18 +84,10 @@ const EventDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [eventId, getErrorMessage]);
+  }, [eventId]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setIsRegistered(false);
-      setUserRegistration(null);
-      return;
-    }
-
-    if (!event || event.owner?.id === userId) {
-      setIsRegistered(false);
-      setUserRegistration(null);
+    if (!isAuthenticated || !eventOwnerId || eventOwnerId === userId) {
       return;
     }
 
@@ -117,7 +114,7 @@ const EventDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, userId, event?.id, event?.owner?.id, eventId, handleAuthError]);
+  }, [eventId, isAuthenticated, userId, eventOwnerId]);
 
   useEffect(() => {
     setImageError(false);

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { getUserFromLocalStorage, isAuthenticated, setUserInLocalStorage, setAuthenticationStatus, 
   getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus } from './localStorageUtils';
 import { checkAuth, getUserProfile } from '../api/profilesApi';
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
   });
   const [authInitialized, setAuthInitialized] = useState(false);
 
-  const updateAuthState = (userData, accessToken) => {
+  const updateAuthState = useCallback((userData, accessToken) => {
     if (accessToken) {
       setAccessTokenInLocalStorage(accessToken);
     }
@@ -48,9 +48,9 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: true,
       user: userData
     });
-  };
+  }, []);
 
-  const clearAuthState = () => {
+  const clearAuthState = useCallback(() => {
     removeAccessTokenFromLocalStorage();
     clearAuthenticationStatus();
     
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: false,
       user: null
     });
-  };
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -117,18 +117,20 @@ export const AuthProvider = ({ children }) => {
       clearAuthState,
       authState
     };
-  }, [authState]);
+  }, [clearAuthState]);
+
+  const contextValue = useMemo(() => ({
+    authState,
+    setAuthState,
+    updateAuthState,
+    clearAuthState,
+    user: authState.user,
+    isAuthenticated: authState.isAuthenticated,
+    authInitialized,
+  }), [authState, authInitialized, updateAuthState, clearAuthState]);
 
   return (
-    <AuthContext.Provider value={{ 
-      authState, 
-      setAuthState,
-      updateAuthState,
-      clearAuthState,
-      user: authState.user,
-      isAuthenticated: authState.isAuthenticated,
-      authInitialized
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
