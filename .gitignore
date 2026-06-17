@@ -161,6 +161,9 @@ docker-compose.override.yml
 # Bulk thumbnail imports (local sources; uploaded to S3 via management command)
 ucronia_thumbnails/
 
+# Cloudflare analytics reports (local snapshots; never commit)
+reports/cloudflare/
+
 # YouTube migration (local downloads + logs; commit manifest JSON for server linking)
 acbc_app/youtube_downloads/
 acbc_app/youtube_migration/*
