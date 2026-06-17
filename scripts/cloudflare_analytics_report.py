@@ -125,6 +125,39 @@ def us_to_ms(value: Any) -> float | None:
         return None
 
 
+def format_fetch_error(label: str, exc: Exception) -> str:
+    """Short, log-friendly error string (avoid dumping full GraphQL JSON)."""
+    msg = str(exc).strip()
+    if msg.startswith("["):
+        try:
+            parsed = json.loads(msg)
+            if isinstance(parsed, list) and parsed:
+                first = parsed[0]
+                if isinstance(first, dict) and first.get("message"):
+                    return f"{label}: {first['message']}"
+        except json.JSONDecodeError:
+            pass
+    if len(msg) > 200:
+        return f"{label}: {msg[:197]}..."
+    return f"{label}: {msg}"
+
+
+def security_query_window(
+    start_time: datetime,
+    end_time: datetime,
+    dataset_settings: dict[str, Any] | None,
+) -> tuple[datetime, datetime]:
+    """Clamp firewall events query to the zone's allowed maxDuration (often 24h on Free)."""
+    firewall = (dataset_settings or {}).get("firewallEventsAdaptive") or {}
+    max_seconds = firewall.get("maxDuration")
+    try:
+        max_seconds = int(max_seconds) if max_seconds is not None else 86400
+    except (TypeError, ValueError):
+        max_seconds = 86400
+    earliest = end_time - timedelta(seconds=max(1, max_seconds))
+    return max(start_time, earliest), end_time
+
+
 def fetch_dataset_settings(token: str, zone_tag: str) -> dict[str, Any]:
     query = """
     query DatasetSettings($zoneTag: string) {
@@ -188,7 +221,7 @@ def fetch_top_countries(token: str, zone_tag: str, start_time: datetime, end_tim
             orderBy: [count_DESC]
           ) {
             count
-            sum { bytes }
+            sum { edgeResponseBytes }
             dimensions { clientCountryName }
           }
         }
@@ -212,7 +245,7 @@ def fetch_top_countries(token: str, zone_tag: str, start_time: datetime, end_tim
         {
             "country": row.get("dimensions", {}).get("clientCountryName"),
             "requests": row.get("count"),
-            "bytes": (row.get("sum") or {}).get("bytes"),
+            "bytes": (row.get("sum") or {}).get("edgeResponseBytes"),
         }
         for row in rows
     ]
@@ -433,32 +466,35 @@ def build_report(days: int) -> dict[str, Any]:
         "errors": [],
     }
 
+    dataset_settings: dict[str, Any] = {}
     try:
-        report["dataset_settings"] = fetch_dataset_settings(token, zone_id)
+        dataset_settings = fetch_dataset_settings(token, zone_id)
+        report["dataset_settings"] = dataset_settings
     except Exception as exc:  # noqa: BLE001 - collect and continue
-        report["errors"].append(f"dataset_settings: {exc}")
+        report["errors"].append(format_fetch_error("dataset_settings", exc))
 
     try:
         daily = fetch_daily_traffic(token, zone_id, start_day, end_day)
         report["traffic"]["daily"] = daily
         report["traffic"]["totals"] = summarize_traffic(daily)
     except Exception as exc:  # noqa: BLE001
-        report["errors"].append(f"daily_traffic: {exc}")
+        report["errors"].append(format_fetch_error("daily_traffic", exc))
 
     try:
         report["top_countries"] = fetch_top_countries(token, zone_id, start_time, end_time)
     except Exception as exc:  # noqa: BLE001
-        report["errors"].append(f"top_countries: {exc}")
+        report["errors"].append(format_fetch_error("top_countries", exc))
 
     try:
         report["web_vitals"] = fetch_web_vitals(token, account_id, start_time, end_time)
     except Exception as exc:  # noqa: BLE001
-        report["errors"].append(f"web_vitals: {exc}")
+        report["errors"].append(format_fetch_error("web_vitals", exc))
 
+    security_start, security_end = security_query_window(start_time, end_time, dataset_settings)
     try:
-        report["security_events"] = fetch_security_events(token, zone_id, start_time, end_time)
+        report["security_events"] = fetch_security_events(token, zone_id, security_start, security_end)
     except Exception as exc:  # noqa: BLE001
-        report["errors"].append(f"security_events: {exc}")
+        report["errors"].append(format_fetch_error("security_events", exc))
 
     return report
 
@@ -539,7 +575,6 @@ def main() -> int:
         print("Completed with warnings:", file=sys.stderr)
         for err in report["errors"]:
             print(f"  - {err}", file=sys.stderr)
-        return 1
     return 0
 
 
