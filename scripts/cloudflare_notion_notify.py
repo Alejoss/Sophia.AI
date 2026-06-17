@@ -104,6 +104,26 @@ def lcp_rating(ms: float | None) -> str:
     return "poor"
 
 
+def build_task_title(findings: list[dict[str, Any]], max_len: int = 200) -> str:
+    """Use the primary finding message as the Notion title (readable, no JSON dumps)."""
+    if not findings:
+        return "Cloudflare: sin hallazgos"
+
+    title = findings[0]["message"]
+    extra = len(findings) - 1
+    if extra > 0:
+        suffix = f" (+{extra} más)"
+        title = f"{title}{suffix}"
+
+    if len(title) <= max_len:
+        return title
+
+    trimmed = title[: max_len - 3].rstrip()
+    if " " in trimmed:
+        trimmed = trimmed.rsplit(" ", 1)[0]
+    return f"{trimmed}..."
+
+
 def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | None:
     """Return notification payload if something is worth communicating."""
     findings: list[dict[str, Any]] = []
@@ -116,11 +136,12 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
         lcp = row.get("lcp_p75_ms")
         rating = lcp_rating(lcp)
         if rating in ("needs_improvement", "poor"):
+            label = "lento" if rating == "needs_improvement" else "muy lento"
             findings.append(
                 {
                     "severity": "high" if rating == "poor" else "medium",
                     "category": "lcp",
-                    "message": f"LCP p75 {lcp} ms ({rating}) en {host} ({samples} muestras)",
+                    "message": f"LCP {label} (p75 {lcp} ms) en {host} — {samples} muestras",
                 }
             )
         inp = row.get("inp_p75_ms")
@@ -194,12 +215,15 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
         return None
 
     priority_order = {"high": 0, "medium": 1, "low": 2}
-    findings.sort(key=lambda f: priority_order.get(f["severity"], 9))
+    category_order = {"lcp": 0, "inp": 1, "cls": 2, "security": 3, "cache": 4, "traffic": 5}
+    findings.sort(
+        key=lambda f: (
+            priority_order.get(f["severity"], 9),
+            category_order.get(f.get("category", ""), 9),
+        )
+    )
 
-    title_seed = findings[0]["message"]
-    title = f"Cloudflare: {title_seed}"
-    if len(title) > 72:
-        title = title[:69] + "..."
+    title = build_task_title(findings)
 
     report_day = report.get("generated_at", "")[:10] or date.today().isoformat()
     dedup_id = f"cf-analytics-{report_day}"
