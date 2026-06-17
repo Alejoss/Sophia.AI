@@ -20,8 +20,10 @@ Usage:
   python3 scripts/cloudflare_analytics_report.py --days 14
   python3 scripts/cloudflare_analytics_report.py --check   # list enabled datasets only
 
+  python3 scripts/cloudflare_analytics_report.py --notify-notion
+
 Scheduled runs: .github/workflows/cloudflare-analytics-report.yml (GitHub Actions).
-Reports are gitignored; run the script locally after pull to persist under reports/cloudflare/.
+With --notify-notion, creates a Notion task when actionable insights are found.
 """
 
 from __future__ import annotations
@@ -488,6 +490,16 @@ def main() -> int:
         action="store_true",
         help="Only print enabled GraphQL datasets for the zone",
     )
+    parser.add_argument(
+        "--notify-notion",
+        action="store_true",
+        help="Create a Notion task in NOTION_DATABASE_ID when actionable insights are found",
+    )
+    parser.add_argument(
+        "--dry-run-insights",
+        action="store_true",
+        help="Print actionable insight evaluation without writing Notion row",
+    )
     args = parser.parse_args()
 
     bootstrap_env()
@@ -507,6 +519,22 @@ def main() -> int:
     print(f"Wrote {json_path}")
     print(f"Wrote {md_path}")
     print(f"Updated {args.output_dir / 'latest.json'}")
+
+    if args.dry_run_insights or args.notify_notion:
+        scripts_dir = Path(__file__).resolve().parent
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from cloudflare_notion_notify import evaluate_actionable_insights, maybe_notify_notion
+
+        insight = evaluate_actionable_insights(report)
+        if args.dry_run_insights:
+            print(json.dumps({"actionable": insight is not None, "insight": insight}, indent=2, ensure_ascii=False))
+        elif args.notify_notion:
+            result = maybe_notify_notion(report)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            if result and result.get("status") == "created":
+                print(f"Notion task created: {result.get('url')}")
+
     if report["errors"]:
         print("Completed with warnings:", file=sys.stderr)
         for err in report["errors"]:
