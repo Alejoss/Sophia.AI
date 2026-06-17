@@ -73,9 +73,12 @@ Use `--full-down` only when you need a full `docker compose down` before `up` (m
 ```bash
 cd /opt/acbc-app
 git pull origin main
-# Wait until GitHub Actions finishes on main (especially publish-frontend when frontend/** changed)
-./scripts/deploy.sh
+./scripts/deploy.sh --wait-for-ci
 ```
+
+**Low-RAM droplet:** never `--build-local` (frontend `npm run build` OOMs). CI builds on GitHub; the server only pulls images.
+
+**Common pitfall:** `./scripts/deploy.sh --build-local-backend` recreates **only** the backend container. Frontend/nginx images are unchanged — React fixes will not appear.
 
 Optional: pin a specific image tag:
 

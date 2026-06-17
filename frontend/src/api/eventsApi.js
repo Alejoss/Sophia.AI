@@ -19,6 +19,10 @@ export const invalidateEventDetailCache = (eventId) => {
   eventDetailCache.delete(String(eventId));
 };
 
+/** Synchronous cache read — lets detail pages render without resetting to loading. */
+export const peekEventDetailCache = (eventId) =>
+  eventDetailCache.get(String(eventId)) ?? null;
+
 export const fetchEvents = async () => {
   try {
     const response = await axiosInstance.get('/events/');

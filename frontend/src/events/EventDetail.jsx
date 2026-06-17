@@ -1,6 +1,12 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchEventById, registerForEvent, cancelEventRegistration, getUserEventRegistrations } from '../api/eventsApi';
+import {
+  fetchEventById,
+  peekEventDetailCache,
+  registerForEvent,
+  cancelEventRegistration,
+  getUserEventRegistrations,
+} from '../api/eventsApi';
 import { AuthContext } from '../context/AuthContext';
 import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/authErrorHandler';
 import CryptoPaymentModal from './CryptoPaymentModal';
@@ -55,34 +61,37 @@ const EventDetail = () => {
   const userId = authState.user?.id;
   const isAuthenticated = authState.isAuthenticated;
   const eventOwnerId = event?.owner?.id;
-  const activeLoadIdRef = useRef(null);
 
   useEffect(() => {
-    const requestedId = String(eventId);
-    if (activeLoadIdRef.current === requestedId) {
-      return undefined;
-    }
-    activeLoadIdRef.current = requestedId;
-
     let cancelled = false;
 
     setIsRegistered(false);
     setUserRegistration(null);
+
+    const cached = peekEventDetailCache(eventId);
+    if (cached) {
+      setEvent(cached);
+      setError(null);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setError(null);
-    setEvent(null);
     setLoading(true);
 
     const loadEvent = async () => {
       try {
         const data = await fetchEventById(eventId);
-        if (cancelled || activeLoadIdRef.current !== requestedId) return;
+        if (cancelled) return;
         setEvent(data);
       } catch (err) {
-        if (cancelled || activeLoadIdRef.current !== requestedId) return;
+        if (cancelled) return;
         setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
         console.error('Error loading event:', err);
       } finally {
-        if (!cancelled && activeLoadIdRef.current === requestedId) {
+        if (!cancelled) {
           setLoading(false);
         }
       }
@@ -95,7 +104,9 @@ const EventDetail = () => {
   }, [eventId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !eventOwnerId || eventOwnerId === userId) {
+    const ownerId = eventOwnerId;
+    const viewerId = userId;
+    if (!isAuthenticated || ownerId == null || Number(ownerId) === Number(viewerId)) {
       return;
     }
 
@@ -163,7 +174,10 @@ const EventDetail = () => {
   };
 
   const isEventCreator = () =>
-    authState.isAuthenticated && event?.owner?.id === authState.user?.id;
+    authState.isAuthenticated
+    && event?.owner?.id != null
+    && authState.user?.id != null
+    && Number(event.owner.id) === Number(authState.user.id);
 
   const isEventStarted = () => {
     if (!event?.date_start) return false;

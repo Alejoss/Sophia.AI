@@ -25,6 +25,7 @@ Options:
   --full-down              Stop all containers (docker compose down) before starting
   --allow-non-production   Allow deploy when ENVIRONMENT is not PRODUCTION
   --allow-stale-images     Do not fail when GHCR images are older than git HEAD
+  --wait-for-ci            Poll GHCR until frontend image matches git HEAD (for low-RAM servers)
   -h, --help               Show this help
 EOF
 }
@@ -36,6 +37,9 @@ SKIP_PULL=false
 FULL_DOWN=false
 ALLOW_NON_PRODUCTION=false
 ALLOW_STALE_IMAGES=false
+WAIT_FOR_CI=false
+LOCAL_BUILD_FULL_MIN_MB=2800
+LOCAL_BUILD_BACKEND_MIN_MB=1200
 
 for arg in "$@"; do
     case "$arg" in
@@ -52,6 +56,7 @@ for arg in "$@"; do
         --full-down) FULL_DOWN=true ;;
         --allow-non-production) ALLOW_NON_PRODUCTION=true ;;
         --allow-stale-images) ALLOW_STALE_IMAGES=true ;;
+        --wait-for-ci) WAIT_FOR_CI=true ;;
         -h|--help)
             usage
             exit 0
@@ -111,6 +116,77 @@ detect_ghcr_image_prefix() {
     printf 'ghcr.io/%s\n' "$(printf '%s' "$repo_path" | tr '[:upper:]' '[:lower:]')"
 }
 
+mem_available_mb() {
+    if [ -r /proc/meminfo ]; then
+        awk '/MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo
+    else
+        echo 0
+    fi
+}
+
+ghcr_deploy_hint() {
+    echo -e "${RED}      1. Push to main and wait for GitHub Actions (job Publish frontend image).${NC}"
+    echo -e "${RED}      2. On the server: ./scripts/deploy.sh --wait-for-ci${NC}"
+    echo -e "${RED}      Do not use --build-local on this droplet (npm build needs ~3GB+ free RAM).${NC}"
+}
+
+require_ram_for_local_build() {
+    local need_mb="$1"
+    local label="$2"
+    local avail_mb
+    avail_mb="$(mem_available_mb)"
+    if [ "$avail_mb" -lt "$need_mb" ]; then
+        echo -e "${RED}❌ Not enough RAM for ${label}.${NC}"
+        echo -e "${RED}   Available: ${avail_mb} MB — need at least ${need_mb} MB free.${NC}"
+        ghcr_deploy_hint
+        exit 1
+    fi
+}
+
+image_build_sha_from_tar() {
+    local image="$1"
+    local path="$2"
+    local cid=""
+    cid="$(docker create "$image" 2>/dev/null)" || return 1
+    local sha=""
+    sha="$(docker cp "${cid}:${path}" - 2>/dev/null | tr -d '\r')"
+    docker rm "$cid" >/dev/null 2>&1 || true
+    if [ -n "$sha" ]; then
+        printf '%s' "$sha"
+    fi
+}
+
+wait_for_ghcr_frontend_image() {
+    local max_attempts="${WAIT_FOR_CI_ATTEMPTS:-40}"
+    local sleep_secs="${WAIT_FOR_CI_SLEEP:-90}"
+    local attempt=1
+    local frontend_image="${GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG}"
+    local sha=""
+
+    echo -e "${YELLOW}⏳ Waiting for GHCR frontend image to match git HEAD (${LOCAL_GIT_SHA})...${NC}"
+    echo -e "${YELLOW}   Polling every ${sleep_secs}s (max ${max_attempts} attempts). Ctrl+C to abort.${NC}"
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        echo -e "${YELLOW}   [${attempt}/${max_attempts}] docker pull ${frontend_image}${NC}"
+        if docker pull "$frontend_image" >/dev/null 2>&1; then
+            sha="$(image_build_sha_from_tar "$frontend_image" /usr/share/nginx/html/.build_sha)"
+            if [ -n "$sha" ] && [ "$sha" = "$LOCAL_GIT_SHA" ]; then
+                echo -e "${GREEN}✅ GHCR frontend image matches git HEAD.${NC}"
+                return 0
+            fi
+            echo -e "${YELLOW}   Image BUILD_SHA=${sha:-missing} — still waiting for CI...${NC}"
+        else
+            echo -e "${YELLOW}   Pull failed (CI may not have published yet). Retrying...${NC}"
+        fi
+        sleep "$sleep_secs"
+        attempt=$((attempt + 1))
+    done
+
+    echo -e "${RED}❌ Timed out waiting for GHCR frontend image for ${LOCAL_GIT_SHA}.${NC}"
+    echo -e "${RED}   Check GitHub Actions on main finished successfully, then retry.${NC}"
+    return 1
+}
+
 log_image_metadata() {
     local name="$1"
     local image="${GHCR_IMAGE_PREFIX}-${name}:${IMAGE_TAG}"
@@ -145,8 +221,7 @@ verify_service_build_sha() {
     fi
 
     echo -e "${RED}   ❌ ${label} image does not match git HEAD on the server.${NC}"
-    echo -e "${RED}      Wait for GitHub Actions to publish GHCR images for ${LOCAL_GIT_SHA}, then redeploy.${NC}"
-    echo -e "${RED}      Or run: ./scripts/deploy.sh --build-local   (rebuild on server)${NC}"
+    ghcr_deploy_hint
     return 1
 }
 
@@ -232,12 +307,16 @@ LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 if [ -n "$LOCAL_GIT_SHA" ]; then
     echo -e "${YELLOW}📌 git HEAD: ${LOCAL_GIT_SHA}${NC}"
     if [ "$IMAGE_TAG" = "main" ] && [ "$LOCAL_BUILD" != true ] && [ "$SKIP_PULL" != true ]; then
-        echo -e "${YELLOW}   Tip: wait until GitHub Actions finishes on main before deploying, or images may still be stale.${NC}"
+        echo -e "${YELLOW}   Tip: use --wait-for-ci after git pull if the droplet cannot run --build-local (low RAM).${NC}"
     fi
 fi
 if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
     echo -e "${RED}⚠️  --build-local-backend updates ONLY the backend container. Frontend/nginx stay on the current GHCR/local images.${NC}"
-    echo -e "${RED}   For React/frontend fixes, use ./scripts/deploy.sh (GHCR pull) or ./scripts/deploy.sh --build-local.${NC}"
+    echo -e "${RED}   For React/frontend fixes: push to main, wait for CI, then ./scripts/deploy.sh --wait-for-ci${NC}"
+fi
+if [ "$WAIT_FOR_CI" = true ] && [ "$LOCAL_BUILD" = true ]; then
+    echo -e "${RED}❌ --wait-for-ci cannot be combined with --build-local.${NC}"
+    exit 1
 fi
 if [ -n "${NGINX_CONF:-}" ]; then
     echo -e "${YELLOW}🔐 Using nginx config: ${NGINX_CONF}${NC}"
@@ -287,6 +366,12 @@ if [ "$LOCAL_BUILD" = true ]; then
     exit 1
   fi
 
+  if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
+    require_ram_for_local_build "$LOCAL_BUILD_BACKEND_MIN_MB" "--build-local-backend"
+  else
+    require_ram_for_local_build "$LOCAL_BUILD_FULL_MIN_MB" "--build-local (frontend npm build)"
+  fi
+
   export BUILD_SHA="$(git rev-parse HEAD 2>/dev/null || echo local)"
 
   BUILD_FLAGS=""
@@ -306,7 +391,15 @@ if [ "$LOCAL_BUILD" = true ]; then
   fi
 else
   if [ "$NO_CACHE_BUILD" = true ]; then
-    echo -e "${YELLOW}⚠️  Ignoring --no-cache because this deploy pulls prebuilt images. Use --build-local --no-cache for a local rebuild.${NC}"
+    echo -e "${YELLOW}⚠️  Ignoring --no-cache because this deploy pulls prebuilt images. Use --build-local --no-cache for a local rebuild (requires ~3GB+ RAM).${NC}"
+  fi
+
+  if [ "$WAIT_FOR_CI" = true ]; then
+    if [ -z "$LOCAL_GIT_SHA" ]; then
+      echo -e "${RED}❌ Cannot use --wait-for-ci outside a git checkout.${NC}"
+      exit 1
+    fi
+    wait_for_ghcr_frontend_image
   fi
 
   if [ "$SKIP_PULL" = true ]; then
@@ -418,7 +511,7 @@ if [ "$FRONTEND_VERIFY" -eq 2 ]; then
     echo -e "${YELLOW}   Bundle served via nginx: ${SERVED_BUNDLE:-unknown}${NC}"
     if [ -n "$LOCAL_GIT_SHA" ] && git cat-file -e "${LOCAL_GIT_SHA}:frontend/src/events/EventDetail.jsx" 2>/dev/null; then
         echo -e "${RED}   ❌ Cannot verify frontend version. GHCR image likely predates build stamping.${NC}"
-        echo -e "${RED}      Wait for CI to publish a new frontend image, then ./scripts/deploy.sh again.${NC}"
+        ghcr_deploy_hint
         FRONTEND_VERIFY=1
     else
         FRONTEND_VERIFY=0

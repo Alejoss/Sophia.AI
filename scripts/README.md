@@ -73,6 +73,7 @@ chmod +x scripts/deploy.sh
 - Pulls prebuilt GHCR images, unless `--build-local` is used
 - Verifies backend/frontend `BUILD_SHA` matches `git rev-parse HEAD` (fails if stale; use `--allow-stale-images` to override)
 - Warns loudly when using `--build-local-backend` (frontend is **not** updated)
+- Blocks `--build-local` when free RAM < ~3GB; recommends `--wait-for-ci` instead
 - Starts services
 - Runs database migrations
 - Collects static files

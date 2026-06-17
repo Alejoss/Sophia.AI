@@ -27,18 +27,21 @@ VITE_GOOGLE_OAUTH_CLIENT_ID
 
 Configúralas como **Repository variables** en GitHub, porque Vite las inyecta en build time.
 
-## Deploy normal desde GHCR
+## Deploy normal desde GHCR (servidor de producción)
 
-En el servidor:
+En el droplet con poca RAM, **solo** este flujo:
 
 ```bash
 cd /opt/acbc-app
 git pull origin main
-# Espera a que GitHub Actions termine en main (sobre todo "Publish frontend image")
-./scripts/deploy.sh
+./scripts/deploy.sh --wait-for-ci
 ```
 
-**Importante:** `git pull` actualiza el repo en el servidor, pero la app en producción corre desde **imágenes Docker en GHCR**, no desde los archivos del checkout. Si haces deploy antes de que CI publique la imagen, o usas `--build-local-backend`, el frontend puede quedarse en una versión vieja aunque el código en git sea nuevo.
+`--wait-for-ci` hace `docker pull` del frontend en GHCR cada ~90s hasta que `.build_sha` dentro de la imagen coincide con `git rev-parse HEAD`. No compila nada en el servidor.
+
+**No uses `--build-local` en producción** si el build de frontend se queda sin memoria (~3GB+ libres para `npm run build`). GitHub Actions construye las imágenes en runners con RAM suficiente.
+
+**Importante:** `git pull` actualiza el repo en el servidor, pero la app corre desde **imágenes Docker en GHCR**. Si despliegas antes de que CI publique la imagen, o usas `--build-local-backend`, el frontend puede quedarse viejo.
 
 El script detecta `GHCR_IMAGE_PREFIX` desde el remote de Git. Para este repo el formato esperado es:
 
@@ -84,19 +87,13 @@ El token necesita permiso `read:packages`.
 
 ## Deploy con build manual/local
 
-Usa este método solo si necesitas construir en el servidor de forma intencional, por ejemplo para probar cambios de Dockerfile antes de que GitHub Actions publique la imagen.
+Solo en una máquina con **~3GB+ RAM libre** (no el droplet de producción típico de 1–2GB):
 
 ```bash
-cd /opt/acbc-app
-git pull origin main
 ./scripts/deploy.sh --build-local
 ```
 
-Para una reconstrucción limpia sin cache:
-
-```bash
-./scripts/deploy.sh --build-local --no-cache
-```
+En el servidor de producción usa siempre GHCR + `--wait-for-ci`.
 
 El build manual usa `docker-compose.build.yml` como override. Ese archivo agrega los bloques `build:` que ya no existen en `docker-compose.prod.yml`.
 
