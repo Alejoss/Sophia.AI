@@ -108,15 +108,6 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
     """Return notification payload if something is worth communicating."""
     findings: list[dict[str, Any]] = []
 
-    for err in report.get("errors") or []:
-        findings.append(
-            {
-                "severity": "high",
-                "category": "api",
-                "message": f"Error parcial al consultar Cloudflare: {err}",
-            }
-        )
-
     for row in report.get("web_vitals") or []:
         samples = int(row.get("samples") or 0)
         if samples < 3:
@@ -195,7 +186,7 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
             {
                 "severity": "medium",
                 "category": "security",
-                "message": f"{len(blocked)} eventos de firewall block/challenge en el periodo",
+                "message": f"{len(blocked)} eventos de firewall block/challenge en las últimas 24 h",
             }
         )
 
