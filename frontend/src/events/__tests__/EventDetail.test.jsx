@@ -5,6 +5,8 @@ import React, { StrictMode } from 'react';
 import EventDetail from '../EventDetail';
 import { AuthContext } from '../../context/AuthContext';
 
+import { resetEventDetailSession } from '../../api/eventDetailSession';
+
 const mockEvent = {
   id: 2,
   title: 'Evento de prueba',
@@ -58,6 +60,7 @@ const renderEventDetail = ({
 describe('EventDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetEventDetailSession('2');
     peekEventDetailCache.mockReturnValue(null);
     getUserEventRegistrations.mockResolvedValue([]);
     fetchEventById.mockImplementation(
@@ -88,6 +91,16 @@ describe('EventDetail', () => {
 
     expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
     expect(fetchEventById).not.toHaveBeenCalled();
+  });
+
+  it('issues only one request under StrictMode double mount', async () => {
+    renderEventDetail({ strict: true });
+
+    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchEventById).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('does not refetch when auth state updates after load', async () => {

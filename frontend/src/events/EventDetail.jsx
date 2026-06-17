@@ -6,7 +6,13 @@ import {
   registerForEvent,
   cancelEventRegistration,
   getUserEventRegistrations,
+  invalidateEventDetailCache,
 } from '../api/eventsApi';
+import {
+  getEventDetailSessionSnapshot,
+  loadEventDetailOnce,
+  resetEventDetailSession,
+} from '../api/eventDetailSession';
 import { AuthContext } from '../context/AuthContext';
 import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/authErrorHandler';
 import CryptoPaymentModal from './CryptoPaymentModal';
@@ -45,9 +51,24 @@ const EventDetail = () => {
   const { eventId } = useParams();
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [event, setEvent] = useState(() => {
+    const cached = peekEventDetailCache(eventId);
+    if (cached) return cached;
+    const session = getEventDetailSessionSnapshot(eventId);
+    return session.status === 'done' ? session.data : null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (peekEventDetailCache(eventId)) return false;
+    const session = getEventDetailSessionSnapshot(eventId);
+    if (session.status === 'done' || session.status === 'error') return false;
+    return true;
+  });
+  const [error, setError] = useState(() => {
+    const session = getEventDetailSessionSnapshot(eventId);
+    return session.status === 'error'
+      ? getErrorMessage(session.error, 'Error al cargar el evento. Por favor, inténtelo de nuevo.')
+      : null;
+  });
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -63,44 +84,58 @@ const EventDetail = () => {
   const eventOwnerId = event?.owner?.id;
 
   useEffect(() => {
-    let cancelled = false;
-
-    setIsRegistered(false);
-    setUserRegistration(null);
-
     const cached = peekEventDetailCache(eventId);
     if (cached) {
       setEvent(cached);
       setError(null);
       setLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return undefined;
     }
 
-    setError(null);
-    setLoading(true);
+    const session = getEventDetailSessionSnapshot(eventId);
+    if (session.status === 'done' && session.data) {
+      setEvent(session.data);
+      setError(null);
+      setLoading(false);
+      return undefined;
+    }
 
-    const loadEvent = async () => {
-      try {
-        const data = await fetchEventById(eventId);
+    if (session.status === 'error') {
+      setEvent(null);
+      setError(getErrorMessage(session.error, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setError(null);
+    setLoading(session.status !== 'done');
+
+    loadEventDetailOnce(eventId, () => fetchEventById(eventId))
+      .then((data) => {
         if (cancelled) return;
         setEvent(data);
-      } catch (err) {
-        if (cancelled) return;
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled || err?.code === 'ERR_CANCELED') return;
         setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
         console.error('Error loading event:', err);
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    };
+      });
 
-    loadEvent();
     return () => {
       cancelled = true;
     };
+  }, [eventId]);
+
+  useEffect(() => {
+    setIsRegistered(false);
+    setUserRegistration(null);
   }, [eventId]);
 
   useEffect(() => {
@@ -295,7 +330,29 @@ const EventDetail = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
           <Alert severity="error">{error}</Alert>
-          <Button component={Link} to="/events" variant="contained">Volver a Eventos</Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                resetEventDetailSession(eventId);
+                invalidateEventDetailCache(eventId);
+                setError(null);
+                setLoading(true);
+                loadEventDetailOnce(eventId, () => fetchEventById(eventId, { bypassCache: true }))
+                  .then((data) => {
+                    setEvent(data);
+                    setError(null);
+                  })
+                  .catch((err) => {
+                    setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+                  })
+                  .finally(() => setLoading(false));
+              }}
+            >
+              Reintentar
+            </Button>
+            <Button component={Link} to="/events" variant="outlined">Volver a Eventos</Button>
+          </Stack>
         </Stack>
       </Container>
     );

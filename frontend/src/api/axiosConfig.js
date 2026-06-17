@@ -4,6 +4,8 @@ import axios from 'axios';
 // Relative /api avoids cross-origin when users open www vs apex (same nginx serves both).
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 
+let refreshInFlight = null;
+
 // Create a single axios instance with basic configuration
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -13,6 +15,17 @@ const axiosInstance = axios.create({
   withCredentials: true,
   timeout: 30000 // 30 second timeout
 });
+
+const refreshAccessToken = () => {
+  if (!refreshInFlight) {
+    refreshInFlight = axiosInstance
+      .post('/profiles/refresh_token/')
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+};
 
 // Request interceptor to add access token to requests
 axiosInstance.interceptors.request.use(
@@ -74,8 +87,7 @@ axiosInstance.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      // Try to refresh the token
-      const response = await axiosInstance.post('/profiles/refresh_token/');
+      const response = await refreshAccessToken();
       const { access_token } = response.data;
 
       // Store new token in localStorage

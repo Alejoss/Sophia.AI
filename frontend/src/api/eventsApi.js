@@ -1,4 +1,5 @@
 // src/api/eventsApi.js
+import axios from 'axios';
 import axiosInstance from './axiosConfig.js';
 import { rethrowAxiosError } from '../utils/authErrorHandler.js';
 
@@ -41,7 +42,10 @@ export const createEvent = async (eventData) => {
   }
 };
 
-export const fetchEventById = async (eventId, { bypassCache = false } = {}) => {
+export const fetchEventById = async (
+  eventId,
+  { bypassCache = false, signal } = {},
+) => {
   const id = String(eventId);
 
   if (!bypassCache && eventDetailCache.has(id)) {
@@ -54,10 +58,13 @@ export const fetchEventById = async (eventId, { bypassCache = false } = {}) => {
 
   const request = (async () => {
     try {
-      const response = await axiosInstance.get(`/events/${id}/`);
+      const response = await axiosInstance.get(`/events/${id}/`, { signal });
       eventDetailCache.set(id, response.data);
       return response.data;
     } catch (error) {
+      if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
+        throw error;
+      }
       fail(error, 'Error fetching event');
     } finally {
       eventDetailInflight.delete(id);

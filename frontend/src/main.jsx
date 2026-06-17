@@ -27,10 +27,12 @@ if (SENTRY_DSN) {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+const app = (
+  <Sentry.ErrorBoundary fallback={<p>Algo salió mal. Recarga la página o contacta soporte.</p>}>
+    <App />
+  </Sentry.ErrorBoundary>
+);
+
 root.render(
-  <React.StrictMode>
-    <Sentry.ErrorBoundary fallback={<p>Algo salió mal. Recarga la página o contacta soporte.</p>}>
-      <App />
-    </Sentry.ErrorBoundary>
-  </React.StrictMode>
+  import.meta.env.DEV ? <React.StrictMode>{app}</React.StrictMode> : app,
 );
