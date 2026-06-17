@@ -202,11 +202,6 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
     if not findings:
         return None
 
-    severities = [f["severity"] for f in findings]
-    has_high = "high" in severities
-    has_medium = "medium" in severities
-    tipo = "Tarea" if has_high or has_medium else "Idea"
-
     priority_order = {"high": 0, "medium": 1, "low": 2}
     findings.sort(key=lambda f: priority_order.get(f["severity"], 9))
 
@@ -237,7 +232,7 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
 
     return {
         "dedup_id": dedup_id,
-        "tipo": tipo,
+        "tipo": "Tarea",
         "title": title,
         "body": "\n".join(body_lines),
         "findings": findings,
@@ -246,19 +241,17 @@ def evaluate_actionable_insights(report: dict[str, Any]) -> dict[str, Any] | Non
 
 
 def notion_database_id_from_env() -> str:
-    for key in ("NOTION_DATABASE_ID", "NOTION_TASKS_DATABASE_ID"):
-        value = os.environ.get(key, "").strip()
-        if value:
-            return value
-    raise RuntimeError("Missing NOTION_DATABASE_ID or NOTION_TASKS_DATABASE_ID")
+    value = os.environ.get("NOTION_DATABASE_ID", "").strip()
+    if not value:
+        raise RuntimeError("Missing NOTION_DATABASE_ID")
+    return value
 
 
 def notion_token_from_env() -> str:
-    for key in ("NOTION_API_KEY", "NOTION_TOKEN", "NOTION_SECRET"):
-        value = os.environ.get(key, "").strip()
-        if value:
-            return value
-    raise RuntimeError("Missing NOTION_API_KEY (or NOTION_TOKEN)")
+    value = os.environ.get("NOTION_API_KEY", "").strip()
+    if not value:
+        raise RuntimeError("Missing NOTION_API_KEY")
+    return value
 
 
 def notion_page_exists(database_id: str, token: str, prop_map: dict[str, str], dedup_id: str) -> bool:
@@ -307,10 +300,9 @@ def build_notion_properties(
     if fecha_prop and schema_properties[fecha_prop]["type"] == "date":
         properties[fecha_prop] = {"date": {"start": insight["report_day"]}}
 
-    if insight["tipo"] == "Tarea":
-        estado_prop = prop_map.get("estado")
-        if estado_prop and schema_properties[estado_prop]["type"] == "status":
-            properties[estado_prop] = {"status": {"name": "Por Hacer"}}
+    estado_prop = prop_map.get("estado")
+    if estado_prop and schema_properties[estado_prop]["type"] == "status":
+        properties[estado_prop] = {"status": {"name": "Por Hacer"}}
 
     body = insight["body"]
     body_prop = prop_map.get("slack_procesado") or prop_map.get("notas")
@@ -373,15 +365,9 @@ def maybe_notify_notion(report: dict[str, Any]) -> dict[str, Any] | None:
     if insight is None:
         return {"status": "no_action", "reason": "no_actionable_insights"}
 
-    if not any(
-        os.environ.get(key, "").strip()
-        for key in (
-            "NOTION_API_KEY",
-            "NOTION_TOKEN",
-            "NOTION_SECRET",
-            "NOTION_DATABASE_ID",
-            "NOTION_TASKS_DATABASE_ID",
-        )
+    if not (
+        os.environ.get("NOTION_API_KEY", "").strip()
+        and os.environ.get("NOTION_DATABASE_ID", "").strip()
     ):
         return {
             "status": "skipped",
