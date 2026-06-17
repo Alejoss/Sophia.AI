@@ -123,24 +123,19 @@ chmod +x scripts/setup-ssl.sh
 ### `cloudflare_analytics_report.py`
 Fetches Cloudflare analytics (traffic, Core Web Vitals, security events) via GraphQL and writes local reports under `reports/cloudflare/` (gitignored).
 
-**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly as an API smoke test. Reports are **not** committed or uploaded — they exist only on the ephemeral runner.
+**GitHub Actions (scheduled):** `.github/workflows/cloudflare-analytics-report.yml` runs weekly, evaluates actionable insights, and **creates a Notion row** in `NOTION_DATABASE_ID` when warranted (dedup `cf-analytics-YYYY-MM-DD`). Reports on the runner are not committed.
 
-**Local reports (persistent):** after `git pull`, run the script on your machine; output stays in `reports/cloudflare/` (gitignored).
+**GitHub secrets:** `CF_*`, `NOTION_DATABASE_ID`, `NOTION_API_KEY` (or `NOTION_TOKEN`).
 
-**GitHub secrets** (for the workflow): `CF_API_TOKEN`, `CF_ACCOUNT_ID`, and optionally `CF_ZONE_ID` or `CF_ZONE_NAME`.
-
-**Local setup** — add to `acbc_app/.env` (see `scripts/cloudflare-report.env.example`):
-```bash
-CF_API_TOKEN=...
-CF_ACCOUNT_ID=...
-CF_ZONE_NAME=academiablockchain.com
-```
+**Local reports (persistent):** after `git pull`, run without `--notify-notion` to save under `reports/cloudflare/` (gitignored).
 
 **Usage:**
 ```bash
 python3 scripts/cloudflare_analytics_report.py
 python3 scripts/cloudflare_analytics_report.py --days 14
 python3 scripts/cloudflare_analytics_report.py --check
+python3 scripts/cloudflare_analytics_report.py --dry-run-insights
+python3 scripts/cloudflare_analytics_report.py --notify-notion
 ```
 
 **Cost:** $0 (included in Cloudflare plan; subject to API rate limits).
