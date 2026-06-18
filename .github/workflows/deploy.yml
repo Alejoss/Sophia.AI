@@ -193,6 +193,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changes, test, frontend-check]
     if: |
+      always() &&
       github.event_name != 'pull_request' &&
       (needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
@@ -246,6 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changes, test, frontend-check]
     if: |
+      always() &&
       github.event_name != 'pull_request' &&
       (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
@@ -309,6 +311,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changes, test, frontend-check]
     if: |
+      always() &&
       github.event_name != 'pull_request' &&
       (needs.changes.outputs.nginx == 'true' || needs.changes.outputs.ci == 'true') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
