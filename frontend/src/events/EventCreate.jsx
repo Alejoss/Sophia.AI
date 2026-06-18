@@ -411,7 +411,7 @@ const EventCreate = () => {
                 }
               />
               <Typography variant="caption" color="text.secondary">
-                Los eventos privados solo son visibles para ti hasta que los marques como públicos.
+                Los eventos privados no aparecen en el listado público ni en búsquedas, pero pueden compartirse con un enlace directo.
               </Typography>
 
               <Button type="submit" variant="contained" disabled={loading}>

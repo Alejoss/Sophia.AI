@@ -155,9 +155,6 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         if event.date_start and event.date_start < timezone.now():
             raise serializers.ValidationError("No se puede registrar para eventos que ya han comenzado")
 
-        if not event.is_visible:
-            raise serializers.ValidationError("No se puede registrar para eventos que no son públicos")
-        
         return data
     
     def create(self, validated_data):

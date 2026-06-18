@@ -190,14 +190,13 @@ class EventRegistrationSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
 
-    def test_registration_serializer_hidden_event_prevention(self):
-        """Test that users cannot register for hidden events."""
+    def test_registration_serializer_hidden_event_allowed(self):
+        """Hidden events can still accept registrations via direct link."""
         hidden_event = EventFactory(owner=self.event_owner, is_visible=False)
         data = {'event': hidden_event.id}
 
         serializer = EventRegistrationSerializer(data=data, context={'request': self.request})
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('non_field_errors', serializer.errors)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_registration_serializer_unauthenticated_user(self):
         """Test that unauthenticated users cannot register."""

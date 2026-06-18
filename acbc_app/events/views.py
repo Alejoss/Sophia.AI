@@ -26,20 +26,6 @@ from payments.services import is_payments_gateway_configured
 logger = logging.getLogger(__name__)
 
 
-def _can_view_event(event, user):
-    if event.is_visible:
-        return True
-    if user.is_authenticated and event.owner_id == user.id:
-        return True
-    if user.is_authenticated and EventRegistration.objects.filter(
-        user=user,
-        event=event,
-        registration_status='REGISTERED',
-    ).exists():
-        return True
-    return False
-
-
 def _filter_events_for_list(request):
     owner_id = request.query_params.get('owner')
     events = Event.objects.all()
@@ -121,16 +107,6 @@ class EventDetail(APIView):
         
         try:
             event = self.get_object(pk)
-            if not _can_view_event(event, request.user):
-                logger.warning(
-                    "Event detail denied - hidden event - Event ID: %s, User: %s",
-                    pk,
-                    request.user.username if request.user.is_authenticated else 'anonymous',
-                )
-                return Response(
-                    {'error': 'Event not found'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
             serializer = EventSerializer(event, context={'request': request})
             
             logger.debug(f"Event detail retrieved successfully - Event: {event.title}, Owner: {event.owner.username}")

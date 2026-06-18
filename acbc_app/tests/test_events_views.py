@@ -173,13 +173,14 @@ class EventDetailAPITest(TestCase):
         self.assertEqual(response.data['title'], self.event.title)
 
     def test_get_hidden_event_detail_anonymous(self):
-        """Hidden events should not be accessible to anonymous users."""
+        """Hidden events remain accessible via direct URL for anonymous users."""
         hidden_event = EventFactory(owner=self.user, is_visible=False)
         self.client.force_authenticate(user=None)
 
         response = self.client.get(reverse('events:event-detail', kwargs={'pk': hidden_event.pk}))
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], hidden_event.title)
 
     def test_get_hidden_event_detail_as_owner(self):
         """Owners can access their hidden events."""
@@ -278,13 +279,17 @@ class EventRegistrationAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_register_for_hidden_event(self):
-        """Users cannot register for hidden events."""
+        """Users can register for hidden events when they have the direct link."""
         hidden_event = EventFactory(owner=self.event_owner, is_visible=False)
         url = reverse('events:event-register', kwargs={'event_id': hidden_event.pk})
 
         response = self.client.post(url)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(EventRegistration.objects.filter(
+            user=self.user,
+            event=hidden_event,
+        ).exists())
 
     def test_duplicate_registration(self):
         """Test that duplicate registration is prevented."""

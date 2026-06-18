@@ -469,7 +469,7 @@ const EventEdit = () => {
                 }
               />
               <Typography variant="caption" color="text.secondary">
-                Los eventos privados no aparecen en el listado público ni en tu perfil para otros usuarios.
+                Los eventos privados no aparecen en el listado público ni en búsquedas, pero pueden compartirse con un enlace directo.
               </Typography>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
