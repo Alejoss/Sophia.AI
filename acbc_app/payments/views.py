@@ -15,7 +15,9 @@ from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.serializers import CryptoPaymentSerializer
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
+    OPEN_PAYMENT_STATUSES,
     create_event_registration_payment,
+    refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
 
@@ -36,10 +38,19 @@ def _find_crypto_payment_for_ipn(body: dict):
         payment = CryptoPayment.objects.filter(nowpayments_payment_id=invoice_id).first()
         if payment:
             return payment
+        payment = CryptoPayment.objects.filter(provider_payload__invoice_id=invoice_id).first()
+        if payment:
+            return payment
+        payment = CryptoPayment.objects.filter(provider_payload__id=invoice_id).first()
+        if payment:
+            return payment
 
     payment_id = body.get('payment_id')
     if payment_id is not None:
         payment = CryptoPayment.objects.filter(nowpayments_payment_id=payment_id).first()
+        if payment:
+            return payment
+        payment = CryptoPayment.objects.filter(provider_payload__payment_id=payment_id).first()
         if payment:
             return payment
 
@@ -133,14 +144,9 @@ class CryptoPaymentDetailView(APIView):
             return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
 
         client = NOWPaymentsClient()
-        if client.configured and payment.nowpayments_payment_id:
-            remote_id = payment.nowpayments_payment_id
-            # Invoice flow stores invoice id first; payment status API needs payment_id.
-            if payment.provider_payload.get('payment_id'):
-                remote_id = payment.provider_payload['payment_id']
+        if client.configured:
             try:
-                remote = client.get_payment_status(remote_id)
-                payment = sync_payment_from_provider(payment, remote)
+                payment = refresh_crypto_payment_from_nowpayments(payment)
             except NOWPaymentsError as exc:
                 logger.warning('Could not refresh payment %s: %s', payment_id, exc)
 
@@ -162,6 +168,22 @@ class RegistrationPaymentsListView(APIView):
             return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
 
         payments = CryptoPayment.objects.filter(registration=registration).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for registration %s: %s',
+                            payment.id,
+                            registration_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
         return Response(CryptoPaymentSerializer(payments, many=True).data)
 
 
