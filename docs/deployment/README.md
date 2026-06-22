@@ -9,6 +9,7 @@ This section contains guides for deploying the Sophia.AI Academia Blockchain pla
 - **[Docker](docker.md)** - Docker configuration and usage
 - **[Docker Checklist](docker-checklist.md)** - Backend image, entrypoint, env, volumes
 - **[Nginx Routes](nginx-routes.md)** - Which config to use, route diagram, `/health/` vs `/health`, SSL
+- **[Cloudflare Maintenance Mode](cloudflare-maintenance-mode.md)** - Activar/desactivar página de mantenimiento en Cloudflare
 - **[CI/CD Flow](cicd-flow.md)** - GitHub Actions, deploy steps, scripts
 - **[Deployment Summary](deployment-summary.md)** - Resumen y comandos
 - **[Deployment Checklist](deployment-checklist.md)** - Checklist producción y mantenimiento

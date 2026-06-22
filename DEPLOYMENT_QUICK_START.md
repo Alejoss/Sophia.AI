@@ -55,8 +55,18 @@
 3. **Point a custom domain (Namecheap + app config):**
   See [Custom domain (Namecheap + Digital Ocean)](#custom-domain-namecheap--digital-ocean) below.
 4. **Set up SSL (after DNS is configured):**
-  Certificates come from **Let's Encrypt** (free, via certbot). The script writes only to **nginx/nginx-ssl.conf** (gitignored), so **the repo is not modified**. To avoid rebuilding twice (once for ALLOWED_HOSTS, once for SSL), set `ALLOWED_HOSTS` in `acbc_app/.env` first, then run setup-ssl, then deploy once:
-   Certs live on the host at `/etc/letsencrypt`; nginx uses them via bind mount. Renewal is via crontab (certbot renew).
+  Certificates come from **Let's Encrypt** (free, via certbot). The script writes only to **nginx/nginx-ssl.conf** (gitignored), so **the repo is not modified**. Canonical host: use **`www.yourdomain.com`**; apex redirects with 301 (see [nginx-routes.md](docs/deployment/nginx-routes.md)).
+  **Maintenance window:** enable Cloudflare rule `maintainance-mode` before stopping nginx — see [Cloudflare maintenance mode](docs/deployment/cloudflare-maintenance-mode.md).
+  ```bash
+  ./scripts/setup-ssl.sh www.academiablockchain.com admin@academiablockchain.com
+  ```
+  Set in `acbc_app/.env` before or after SSL:
+  ```env
+  ALLOWED_HOSTS=academiablockchain.com,www.academiablockchain.com
+  FRONTEND_PUBLIC_URL=https://www.academiablockchain.com
+  CSRF_TRUSTED_ORIGINS=https://www.academiablockchain.com
+  ```
+  Certs live on the host at `/etc/letsencrypt`; nginx uses them via bind mount. Renewal is via crontab (certbot renew). **No GHCR image rebuild required** for SSL-only changes — `git pull` + `setup-ssl.sh` on the server is enough.
 5. **Create admin user:**
   ```bash
    docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
@@ -116,17 +126,54 @@ To serve the app at a custom URL (e.g. `https://academia.yourdomain.com`):
 
 - Certificates are from **Let's Encrypt** (free; [https://letsencrypt.org](https://letsencrypt.org)). The script **does not change any tracked file**: it generates **nginx/nginx-ssl.conf** (gitignored) on the server.
 - The certificate includes SANs for the hostname passed plus related apex/`www` variant (e.g., passing `yourdomain.com` includes `www.yourdomain.com`; passing `www.yourdomain.com` includes `yourdomain.com`).
-- After DNS points to the droplet, set **ALLOWED_HOSTS** in `acbc_app/.env`, then run setup-ssl, then deploy once (one rebuild):
+- After DNS points to the droplet, set **ALLOWED_HOSTS** and canonical URL in `acbc_app/.env`, enable [Cloudflare maintenance mode](docs/deployment/cloudflare-maintenance-mode.md) if users are live, then run setup-ssl (no deploy required for SSL alone):
   ```bash
-  ./scripts/setup-ssl.sh academia.yourdomain.com
-  ./scripts/deploy.sh
+  ./scripts/setup-ssl.sh www.academiablockchain.com admin@academiablockchain.com
   ```
-  Use the exact hostname you use in the browser. Renewal is automatic (crontab runs certbot renew).
+  Use **`www.`** as canonical hostname. Renewal is automatic (crontab runs certbot renew). Run `./scripts/deploy.sh` only if you also need new **application** images from GHCR.
 
 **Quick check**
 
 - From your machine: `ping academia.yourdomain.com` (or your host) — should resolve to the droplet IP.
 - Then open `http://academia.yourdomain.com` (or your host); after SSL, `https://academia.yourdomain.com`.
+
+### Maintenance mode (Cloudflare)
+
+Use before SSL/nginx work or risky deploys. Full guide: **[docs/deployment/cloudflare-maintenance-mode.md](docs/deployment/cloudflare-maintenance-mode.md)**
+
+1. Cloudflare → **Rules** → **Overview** → rule **`maintainance-mode`** → toggle **Enabled**
+2. Do server work (below)
+3. Verify site, then toggle **Disabled**
+
+### Infra-only changes (SSL / nginx) — no GHA wait
+
+These run on the **host** from git files; they do **not** use Docker images from GHCR:
+
+```bash
+cd /opt/acbc-app
+git pull origin main
+chmod +x scripts/setup-ssl.sh   # if Permission denied
+
+# Optional: disable Cloudflare maintenance 1–2 min during certbot (see maintenance doc)
+
+./scripts/setup-ssl.sh www.academiablockchain.com admin@academiablockchain.com
+
+curl -I https://academiablockchain.com/events/2   # expect 301 → www
+```
+
+You do **not** need to wait for GitHub Actions unless you also want new **frontend/backend** code in the running containers.
+
+### Application deploy (needs GHCR images)
+
+When `git pull` includes **React or Django code** changes baked into images:
+
+1. Push to `main` and wait for GitHub Actions to publish images to GHCR (~5–15 min), **or** check Actions tab until green
+2. On server:
+   ```bash
+   git pull origin main
+   ./scripts/deploy.sh --wait-for-ci   # polls until frontend image matches git HEAD
+   ```
+   Or `./scripts/deploy.sh` if CI already finished.
 
 ### Common Commands
 

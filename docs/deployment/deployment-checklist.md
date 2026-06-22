@@ -243,6 +243,21 @@ curl -s http://localhost/health/
 
 ## 🔄 Mantenimiento
 
+### Modo mantenimiento (Cloudflare)
+
+Antes de cambios de infra (SSL, nginx, certbot), activá la regla **`maintainance-mode`** en Cloudflare para redirigir todo el tráfico a la página de mantenimiento.
+
+Documentación completa: **[cloudflare-maintenance-mode.md](cloudflare-maintenance-mode.md)**
+
+Resumen:
+
+1. Cloudflare → **Rules** → **Overview** → `maintainance-mode` → **Enabled**
+2. Trabajá en el servidor (SSL, deploy, etc.)
+3. Verificá redirects y health
+4. **Disabled** para volver al sitio normal
+
+**Nota certbot:** desactivá la regla 1–2 minutos mientras corre `./scripts/setup-ssl.sh`, o añadí excepción para `/.well-known/acme-challenge/` (ver doc).
+
 ### Actualizar Aplicación
 
 ```bash
