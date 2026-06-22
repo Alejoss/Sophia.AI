@@ -19,7 +19,6 @@ if [ -z "$1" ]; then
 fi
 
 DOMAIN=$1
-EMAIL=${2:-"admin@${DOMAIN}"}
 DOT_COUNT=$(awk -F'.' '{print NF-1}' <<< "$DOMAIN")
 
 # Canonical host is always www; apex redirects there (see nginx-ssl.conf.template).
@@ -30,6 +29,10 @@ else
     APEX_HOST="$DOMAIN"
     CANONICAL_HOST="www.$DOMAIN"
 fi
+
+EMAIL=${2:-"admin@${APEX_HOST}"}
+# Let's Encrypt stores certs under the cert name (existing install uses apex).
+CERT_NAME="$APEX_HOST"
 
 # Build certificate SANs:
 # - If apex domain is provided (example.com), include www.example.com automatically.
@@ -72,6 +75,8 @@ done
 
 sudo certbot certonly --standalone \
     "${CERTBOT_DOMAIN_ARGS[@]}" \
+    --cert-name "$CERT_NAME" \
+    --expand \
     --email "$EMAIL" \
     --agree-tos \
     --non-interactive
@@ -84,7 +89,7 @@ if [ ! -f "$TEMPLATE" ]; then
     exit 1
 fi
 echo "Writing $OUTPUT (gitignored – repo unchanged)..."
-sed -e "s/SSL_DOMAIN_PLACEHOLDER/$DOMAIN/g" \
+sed -e "s/SSL_DOMAIN_PLACEHOLDER/$CERT_NAME/g" \
     -e "s/CANONICAL_HOST_PLACEHOLDER/$CANONICAL_HOST/g" \
     -e "s/APEX_HOST_PLACEHOLDER/$APEX_HOST/g" \
     "$TEMPLATE" > "$OUTPUT"
@@ -102,7 +107,7 @@ fi
 
 echo "✅ SSL setup complete."
 echo "   Canonical URL: https://$CANONICAL_HOST (apex $APEX_HOST redirects with 301)"
-echo "   Certificates: /etc/letsencrypt/live/$DOMAIN/ (on host)"
+echo "   Certificates: /etc/letsencrypt/live/$CERT_NAME/ (on host)"
 echo "   Nginx config: $OUTPUT (gitignored – not in repo)"
 echo "   Next: set ALLOWED_HOSTS=$APEX_HOST,$CANONICAL_HOST in acbc_app/.env"
 echo "         set FRONTEND_PUBLIC_URL=https://$CANONICAL_HOST"
