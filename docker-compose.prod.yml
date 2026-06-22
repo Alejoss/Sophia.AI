@@ -90,23 +90,18 @@ services:
   postgres:
     image: postgres:15
     container_name: acbc_postgres_prod
+    # Credentials come from acbc_app/.env only — avoid ${DB_PASSWORD} interpolation
+    # here so Docker Compose does not treat $ in passwords as variable references.
     env_file:
       - ./acbc_app/.env
     environment:
-      # PostgreSQL standard environment variables
-      # These are loaded from acbc_app/.env via env_file, but variable substitution
-      # in docker-compose.yml requires them in shell environment or root .env
-      # Priority: POSTGRES_* > DB_* > defaults
-      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-academiablockchain_prod}}
-      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD}}
       - POSTGRES_INITDB_ARGS=--locale=C
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" || pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5

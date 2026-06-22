@@ -1,5 +1,9 @@
-# HTTPS config template – SSL_DOMAIN_PLACEHOLDER replaced by setup-ssl.sh
+# HTTPS config template – placeholders replaced by setup-ssl.sh
 # Generated file nginx-ssl.conf is gitignored (not committed).
+#
+# CANONICAL_HOST_PLACEHOLDER = www.example.com (serves the app)
+# APEX_HOST_PLACEHOLDER       = example.com (301 → canonical)
+# SSL_DOMAIN_PLACEHOLDER      = cert path on disk (Let's Encrypt primary name)
 
 upstream backend {
     server backend:8000;
@@ -9,17 +13,30 @@ upstream frontend {
     server frontend:80;
 }
 
-# HTTP → redirect to HTTPS
+# HTTP → canonical HTTPS (single hop)
 server {
     listen 80;
-    server_name _;
-    return 301 https://$host$request_uri;
+    server_name APEX_HOST_PLACEHOLDER CANONICAL_HOST_PLACEHOLDER;
+    return 301 https://CANONICAL_HOST_PLACEHOLDER$request_uri;
 }
 
-# HTTPS
+# HTTPS apex → canonical (www and apex must not both serve the app)
 server {
     listen 443 ssl;
-    server_name _;
+    server_name APEX_HOST_PLACEHOLDER;
+
+    ssl_certificate     /etc/letsencrypt/live/SSL_DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/SSL_DOMAIN_PLACEHOLDER/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+
+    return 301 https://CANONICAL_HOST_PLACEHOLDER$request_uri;
+}
+
+# HTTPS – canonical host only
+server {
+    listen 443 ssl;
+    server_name CANONICAL_HOST_PLACEHOLDER;
 
     # Allow large uploads (e.g. videos, documentaries) for /api/content/upload-content/
     client_max_body_size 5120M;

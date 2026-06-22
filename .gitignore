@@ -9,6 +9,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 staticfiles/
+# Django admin static files ship with django.contrib.admin — do not vendor under static/
+acbc_app/static/admin/
 build/
 develop-eggs/
 dist/

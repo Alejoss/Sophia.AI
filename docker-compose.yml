@@ -14,17 +14,11 @@ services:
     # No command - entrypoint.sh elige según ENVIRONMENT del .env
     env_file:
       - ./acbc_app/.env
-    # Variables de entorno vienen principalmente del .env
-    # Estos son defaults que se sobrescriben con .env
+    # DB credentials live in acbc_app/.env (env_file). Do not use ${DB_PASSWORD} here:
+    # Docker Compose expands $ in substituted values and breaks passwords like "x$vL8y".
     environment:
-      - DB_NAME=${DB_NAME:-acbc_db}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_HOST=${DB_HOST:-postgres}
-      - DB_PORT=${DB_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-acbc_db}}
-      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
+      - DB_HOST=postgres
+      - DB_PORT=5432
     ports:
       - "8000:8000"
     depends_on:
@@ -62,17 +56,16 @@ services:
   postgres:
     image: postgres:15
     container_name: acbc_postgres
+    env_file:
+      - ./acbc_app/.env
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-acbc_db}}
-      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       - POSTGRES_INITDB_ARGS=--locale=C
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" || pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5

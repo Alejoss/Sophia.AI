@@ -324,6 +324,9 @@ fi
 
 # Only .env.compose for variable substitution (root .env may contain unescaped $ in secrets).
 COMPOSE_ENV_ARGS=(--env-file "$COMPOSE_ENV_FILE")
+if [ -f ".env" ] && grep -qE '^(DB_PASSWORD|POSTGRES_PASSWORD)=' .env 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Root .env contains DB_PASSWORD/POSTGRES_PASSWORD. Docker Compose still auto-loads .env and may warn about \$ in passwords (e.g. vL8). Keep DB secrets only in acbc_app/.env.${NC}"
+fi
 PROD_COMPOSE_FILES=(-f docker-compose.prod.yml)
 BUILD_COMPOSE_FILES=(-f docker-compose.prod.yml -f docker-compose.build.yml)
 
@@ -438,9 +441,9 @@ sleep 10
 echo -e "${YELLOW}📊 Running database migrations...${NC}"
 docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend python manage.py migrate --noinput
 
-# Collect static files
+# Collect static files (verbosity 0 hides harmless duplicate-path notices)
 echo -e "${YELLOW}📁 Collecting static files...${NC}"
-docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend python manage.py collectstatic --noinput
+docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend python manage.py collectstatic --noinput --verbosity 0
 
 # Check service health
 echo -e "${YELLOW}🏥 Checking service health...${NC}"
