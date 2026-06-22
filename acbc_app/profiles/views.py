@@ -47,6 +47,16 @@ from django.db.models import Count
 logger = logging.getLogger(__name__)
 
 
+def auth_cookie_kwargs() -> dict:
+    """Shared host-only cookie flags for set/delete (logout must match login scope)."""
+    return {
+        'httponly': True,
+        'secure': settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+        'samesite': settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
+        'path': settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+    }
+
+
 def set_refresh_token_cookie(response, refresh_token: str) -> None:
     """
     Persist the refresh token in a browser cookie with max_age aligned to SIMPLE_JWT.
@@ -59,10 +69,7 @@ def set_refresh_token_cookie(response, refresh_token: str) -> None:
         settings.SIMPLE_JWT['REFRESH_COOKIE'],
         refresh_token,
         max_age=max_age,
-        httponly=True,
-        secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-        samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-        path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+        **auth_cookie_kwargs(),
     )
 
 
@@ -718,11 +725,9 @@ class LogoutView(APIView):
             refresh_cookie_name = settings.SIMPLE_JWT['REFRESH_COOKIE']
             logger.debug(f"Attempting to delete cookie: {refresh_cookie_name}")
             
-            # Delete the refresh token cookie
             response.delete_cookie(
                 refresh_cookie_name,
-                path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
-                domain=None  # Let the browser determine the domain
+                **auth_cookie_kwargs(),
             )
             
             logger.info(f"Logout successful for user {request.user.username}")

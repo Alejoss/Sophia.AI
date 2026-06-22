@@ -22,6 +22,15 @@ DOMAIN=$1
 EMAIL=${2:-"admin@${DOMAIN}"}
 DOT_COUNT=$(awk -F'.' '{print NF-1}' <<< "$DOMAIN")
 
+# Canonical host is always www; apex redirects there (see nginx-ssl.conf.template).
+if [[ "$DOMAIN" == www.* ]]; then
+    CANONICAL_HOST="$DOMAIN"
+    APEX_HOST="${DOMAIN#www.}"
+else
+    APEX_HOST="$DOMAIN"
+    CANONICAL_HOST="www.$DOMAIN"
+fi
+
 # Build certificate SANs:
 # - If apex domain is provided (example.com), include www.example.com automatically.
 # - If www domain is provided, include the apex domain too.
@@ -75,7 +84,10 @@ if [ ! -f "$TEMPLATE" ]; then
     exit 1
 fi
 echo "Writing $OUTPUT (gitignored – repo unchanged)..."
-sed "s/SSL_DOMAIN_PLACEHOLDER/$DOMAIN/g" "$TEMPLATE" > "$OUTPUT"
+sed -e "s/SSL_DOMAIN_PLACEHOLDER/$DOMAIN/g" \
+    -e "s/CANONICAL_HOST_PLACEHOLDER/$CANONICAL_HOST/g" \
+    -e "s/APEX_HOST_PLACEHOLDER/$APEX_HOST/g" \
+    "$TEMPLATE" > "$OUTPUT"
 
 echo "Starting nginx with SSL config..."
 export NGINX_CONF=./nginx/nginx-ssl.conf
@@ -89,6 +101,9 @@ if ! (crontab -l 2>/dev/null | grep -q "certbot renew"); then
 fi
 
 echo "✅ SSL setup complete."
+echo "   Canonical URL: https://$CANONICAL_HOST (apex $APEX_HOST redirects with 301)"
 echo "   Certificates: /etc/letsencrypt/live/$DOMAIN/ (on host)"
 echo "   Nginx config: $OUTPUT (gitignored – not in repo)"
-echo "   Next: set ALLOWED_HOSTS in acbc_app/.env, then run ./scripts/deploy.sh once."
+echo "   Next: set ALLOWED_HOSTS=$APEX_HOST,$CANONICAL_HOST in acbc_app/.env"
+echo "         set FRONTEND_PUBLIC_URL=https://$CANONICAL_HOST"
+echo "         then run ./scripts/deploy.sh once."

@@ -68,26 +68,43 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  const restoreAuthenticatedSession = useCallback(async () => {
+    const storedAccessToken = getAccessTokenFromLocalStorage();
+    if (!storedAccessToken) {
+      return false;
+    }
+
+    let userToUse = getUserFromLocalStorage();
+    if (!userToUse || userToUse.id == null) {
+      const profile = await getUserProfile();
+      if (profile?.user) {
+        userToUse = profile.user;
+        setUserInLocalStorage(userToUse);
+      }
+    }
+
+    if (!userToUse) {
+      return false;
+    }
+
+    setAuthenticationStatus(true);
+    setAuthState({
+      isAuthenticated: true,
+      user: userToUse,
+    });
+    return true;
+  }, []);
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const backendAuthStatus = await checkAuth();
-        const storedUser = getUserFromLocalStorage();
-        const storedAccessToken = getAccessTokenFromLocalStorage();
 
-        if (backendAuthStatus && storedUser && storedAccessToken) {
-          let userToUse = storedUser;
-          if (storedUser.id == null) {
-            const profile = await getUserProfile();
-            if (profile?.user) {
-              userToUse = profile.user;
-              setUserInLocalStorage(userToUse);
-            }
+        if (backendAuthStatus) {
+          const restored = await restoreAuthenticatedSession();
+          if (!restored) {
+            clearAuthState();
           }
-          setAuthState({
-            isAuthenticated: true,
-            user: userToUse
-          });
         } else {
           clearAuthState();
         }
@@ -99,7 +116,22 @@ export const AuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-  }, []);
+  }, [clearAuthState, restoreAuthenticatedSession]);
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (!event.key || !['access_token', 'is_authenticated', 'user'].includes(event.key)) {
+        return;
+      }
+      if (getAccessTokenFromLocalStorage() && isAuthenticated()) {
+        restoreAuthenticatedSession();
+      } else {
+        clearAuthState();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [clearAuthState, restoreAuthenticatedSession]);
 
   useEffect(() => {
     const onRefreshFailed = () => {

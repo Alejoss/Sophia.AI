@@ -49,6 +49,33 @@ Copy the appropriate file to `/etc/nginx/sites-available` (or `conf.d`) and enab
   ```
 - Mount `certbot_data` and `certbot_certs` as in `docker-compose.prod.yml`. See [setup-ssl.sh](../../scripts/setup-ssl.sh) and deployment docs.
 
+## Canonical host (www vs apex)
+
+`www.example.com` and `example.com` are **different browser origins** (separate cookies and `localStorage`). Auth must use a single canonical URL.
+
+**Standard fix:** 301 redirect apex → `www` at nginx or Cloudflare. Do **not** handle this in React.
+
+- **Docker / setup-ssl:** `nginx/nginx-ssl.conf.template` defines:
+  - HTTP → `https://www…`
+  - HTTPS apex → `https://www…`
+  - HTTPS `www` → app (only server block that proxies)
+- Regenerate after template changes:
+  ```bash
+  ./scripts/setup-ssl.sh www.academiablockchain.com
+  # or ./scripts/setup-ssl.sh academiablockchain.com  (script adds www SAN + redirect)
+  ```
+- **Backend `.env`:** use the canonical URL only:
+  ```env
+  ALLOWED_HOSTS=academiablockchain.com,www.academiablockchain.com
+  FRONTEND_PUBLIC_URL=https://www.academiablockchain.com
+  CSRF_TRUSTED_ORIGINS=https://www.academiablockchain.com
+  ```
+- **Cloudflare (if proxy is orange-cloud):** Rules → Redirect Rule:
+  - If hostname equals `academiablockchain.com`
+  - Then static redirect to `https://www.academiablockchain.com${http.request.uri.path}` (301)
+
+If production already has `nginx/nginx-ssl.conf` (gitignored), re-run `setup-ssl.sh` or manually add the apex `server { return 301 … }` block from the template.
+
 ## Timeouts
 
 - `/api/`: `proxy_connect_timeout`, `proxy_send_timeout`, `proxy_read_timeout` = 120s for long-running requests (e.g. uploads). Adjust if needed.
