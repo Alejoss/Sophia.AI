@@ -32,4 +32,6 @@ build
 *.sqlite3
 media
 staticfiles
+# Vendored Django admin static files duplicate django.contrib.admin at collectstatic
+static/admin
 *.1
