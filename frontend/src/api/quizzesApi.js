@@ -1,18 +1,9 @@
 import axiosInstance from './axiosConfig';
 
-const quizApi = {  
+const quizApi = {
   createQuiz: async (pathId, quizData) => {
     try {
-      console.log('Creating quiz with data:', {
-        path_id: pathId,
-        node_id: quizData.precedingNodeId,
-        quiz: {
-          title: quizData.title,
-          description: quizData.description,
-          max_attempts_per_day: quizData.max_attempts_per_day,
-          questions: quizData.questions
-        }
-      });
+
 
       const quizResponse = await axiosInstance.post(`/quizzes/quiz-create/`, {
         path_id: pathId,
@@ -21,11 +12,11 @@ const quizApi = {
           title: quizData.title,
           description: quizData.description,
           max_attempts_per_day: quizData.max_attempts_per_day,
-          questions: quizData.questions.map(question => ({
+          questions: quizData.questions.map((question) => ({
             text: question.text,
             question_type: question.questionType,
             image: question.image,
-            options: question.options.map(option => ({
+            options: question.options.map((option) => ({
               text: option.text,
               is_correct: option.isCorrect
             }))
@@ -33,7 +24,7 @@ const quizApi = {
         }
       });
 
-      console.log('Quiz creation response:', quizResponse.data);
+
       return quizResponse.data;
     } catch (error) {
       console.error('Quiz creation error:', {
@@ -62,20 +53,17 @@ const quizApi = {
         description: quizData.description,
         node: quizData.precedingNodeId,
         max_attempts_per_day: quizData.max_attempts_per_day,
-        questions: quizData.questions.map(question => ({
+        questions: quizData.questions.map((question) => ({
           text: question.text,
           question_type: question.questionType,
-          options: question.options.map(option => ({
+          options: question.options.map((option) => ({
             text: option.text,
             is_correct: option.isCorrect
           }))
         }))
       };
 
-      console.log('Making updateQuiz request with data:', requestData);
-      console.log('max_attempts_per_day value:', requestData.max_attempts_per_day);
-      console.log('max_attempts_per_day type:', typeof requestData.max_attempts_per_day);
-      
+
       const response = await axiosInstance.put(`/quizzes/quiz-detail/${quizId}/`, requestData);
       return response.data;
     } catch (error) {
@@ -107,13 +95,10 @@ const quizApi = {
 
   submitQuiz: async (quizId, data) => {
     try {
-      console.log('Making quiz submission request:', {
-        url: `/quizzes/quiz/${quizId}/submit/`,
-        data
-      });
+
 
       const response = await axiosInstance.post(`/quizzes/quiz/${quizId}/submit/`, data);
-      console.log('Successful response data:', response.data);
+
       return response.data;
 
     } catch (error) {
@@ -123,4 +108,4 @@ const quizApi = {
   }
 };
 
-export default quizApi; 
+export default quizApi;

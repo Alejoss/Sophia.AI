@@ -7,8 +7,8 @@ import {
   setAuthenticationStatus,
   isAuthenticated,
   getAccessTokenFromLocalStorage,
-  setAccessTokenInLocalStorage,
-} from "../context/localStorageUtils.js";
+  setAccessTokenInLocalStorage } from
+"../context/localStorageUtils.js";
 import SocialLogin from "../components/SocialLogin";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -25,8 +25,8 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
-} from "@mui/material";
+  Typography } from
+"@mui/material";
 
 /**
  * Regular Login Component
@@ -48,60 +48,52 @@ const Login = () => {
     // Select a random login cover image (1-10)
     const randomImageNumber = Math.floor(Math.random() * 10) + 1;
     setLoginImage(`/images/login_cover/login_cover${randomImageNumber}.jpg`);
-
-    // Log environment variables to verify they're accessible
-    console.log(
-      "Google Client ID:",
-      import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID
-    );
-    console.log("API URL:", import.meta.env.VITE_API_URL);
-
     const storedUser = getUserFromLocalStorage();
     const localStorageAuth = isAuthenticated();
 
     // Check if the user is authenticated with the backend and sync with localStorage
     checkAuth().then((isBackendAuthenticated) => {
       setBackendAuthStatus(isBackendAuthenticated);
-      if (localStorageAuth && isBackendAuthenticated) {
-        console.log("User is already authenticated");
-      } else if (isBackendAuthenticated && !authState.isAuthenticated) {
+
+
+      if (isBackendAuthenticated && !authState.isAuthenticated) {
         // Backend says authenticated but context was cleared (e.g. after wrong redirect on refresh)
         // Restore session: get new token and user, then redirect away from login
         setIsRestoringSession(true);
-        refreshToken()
-          .then((data) => {
-            const access_token = data?.access_token;
-            if (!access_token) {
+        refreshToken().
+        then((data) => {
+          const access_token = data?.access_token;
+          if (!access_token) {
+            setIsRestoringSession(false);
+            return;
+          }
+          setAccessTokenInLocalStorage(access_token);
+          return getUserProfile().then((profile) => {
+            if (!profile?.user) {
               setIsRestoringSession(false);
               return;
             }
-            setAccessTokenInLocalStorage(access_token);
-            return getUserProfile().then((profile) => {
-              if (!profile?.user) {
-                setIsRestoringSession(false);
-                return;
-              }
-              updateAuthState(profile.user, access_token);
-              const from = location.state?.from?.pathname || "/profiles/my_profile";
-              navigate(from, { replace: true });
-            });
-          })
-          .catch(() => {
-            setIsRestoringSession(false);
-            // Restore failed (e.g. no refresh cookie); backendAuthStatus is still true so we show "Ya has iniciado sesión"
+            updateAuthState(profile.user, access_token);
+            const from = location.state?.from?.pathname || "/profiles/my_profile";
+            navigate(from, { replace: true });
           });
+        }).
+        catch(() => {
+          setIsRestoringSession(false);
+          // Restore failed (e.g. no refresh cookie); backendAuthStatus is still true so we show "Ya has iniciado sesión"
+        });
       } else if (isBackendAuthenticated && !localStorageAuth && storedUser) {
         setAuthenticationStatus(true);
         setAuthState({
           isAuthenticated: true,
-          user: storedUser,
+          user: storedUser
         });
       } else if (!isBackendAuthenticated && localStorageAuth) {
-        console.log("User is authenticated but backend is not");
+
         setAuthenticationStatus(false);
         setAuthState({
           isAuthenticated: false,
-          user: storedUser,
+          user: storedUser
         });
       }
     });
@@ -113,16 +105,16 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submitting login form with:", { username, password });
+
     try {
       // Check if user had previous session data before login using utilities
       const storedUser = getUserFromLocalStorage();
       const wasAuthenticated = isAuthenticated();
       const hadAccessToken = getAccessTokenFromLocalStorage() !== null;
-      const hadPreviousSession = (storedUser !== null) || wasAuthenticated || hadAccessToken;
-      
+      const hadPreviousSession = storedUser !== null || wasAuthenticated || hadAccessToken;
+
       const response = await apiLogin({ username, password });
-      console.log("Login API response:", response);
+
 
       if (response.data) {
         const { access_token, ...userData } = response.data;
@@ -137,9 +129,9 @@ const Login = () => {
     } catch (error) {
       console.error("Login error:", error);
       const errorMessage =
-        error.response?.data?.error ||
-        error.response?.statusText ||
-        "Error al iniciar sesión: " + error.message;
+      error.response?.data?.error ||
+      error.response?.statusText ||
+      "Error al iniciar sesión: " + error.message;
       setError(errorMessage);
     }
   };
@@ -152,8 +144,8 @@ const Login = () => {
           <CircularProgress size={28} />
           <Typography>Restaurando sesión...</Typography>
         </Stack>
-      </Box>
-    );
+      </Box>);
+
   }
 
   // Already authenticated (backend says so); show message only when not restoring
@@ -167,8 +159,8 @@ const Login = () => {
           </MuiLink>
           ?
         </Alert>
-      </Container>
-    );
+      </Container>);
+
   }
 
   // Not authenticated: show login form
@@ -183,18 +175,18 @@ const Login = () => {
           overflow: "hidden",
           border: "1px solid",
           borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
+          bgcolor: "background.paper"
+        }}>
+        
         <Box
           sx={{
             display: { xs: "none", md: "block" },
             minHeight: 460,
             backgroundImage: `url(${loginImage})`,
             backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
+            backgroundPosition: "center"
+          }} />
+        
 
         <Box sx={{ p: { xs: 3, md: 4 }, display: "flex", alignItems: "center" }}>
           <Paper elevation={0} sx={{ width: "100%" }}>
@@ -209,8 +201,8 @@ const Login = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   fullWidth
-                  autoComplete="username"
-                />
+                  autoComplete="username" />
+                
                 <TextField
                   label="Contraseña"
                   type={showPassword ? "text" : "password"}
@@ -219,19 +211,19 @@ const Login = () => {
                   fullWidth
                   autoComplete="current-password"
                   InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
+                    endAdornment:
+                    <InputAdornment position="end">
                         <IconButton
-                          edge="end"
-                          onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        >
+                        edge="end"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                        
                           {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                         </IconButton>
                       </InputAdornment>
-                    ),
-                  }}
-                />
+
+                  }} />
+                
 
                 {error && <Alert severity="error">{error}</Alert>}
 
@@ -253,8 +245,8 @@ const Login = () => {
           </Paper>
         </Box>
       </Box>
-    </Container>
-  );
+    </Container>);
+
 };
 
 export default Login;

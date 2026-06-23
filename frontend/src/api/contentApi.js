@@ -1,1291 +1,1288 @@
 import axiosInstance from './axiosConfig';
 
 const contentApi = {
-    getUserContent: async () => {
-        try {
-            const response = await axiosInstance.get('/content/user-content/');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user content:', error);
-            if (error.code === 'ECONNABORTED') {
-                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
-            }
-            throw error;
-        }
-    },
-
-    getUserContentWithDetails: async (params = {}) => {
-        try {
-            const query = {
-                page: params.page ?? 1,
-                page_size: params.page_size ?? 12,
-            };
-            if (params.media_type && params.media_type !== 'ALL') {
-                query.media_type = params.media_type;
-            }
-            if (params.search) {
-                query.search = params.search;
-            }
-            const response = await axiosInstance.get('/content/user-content-with-details/', {
-                params: query,
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user content with details:', error);
-            if (error.code === 'ECONNABORTED') {
-                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
-            }
-            throw error;
-        }
-    },
-
-    getUserContentById: async (userId) => {
-        try {
-            const response = await axiosInstance.get(`/content/user-content/${userId}/`);
-            return response.data;
-        } catch (error) {
-            console.error(`Error fetching content for user ${userId}:`, error);
-            if (error.code === 'ECONNABORTED') {
-                throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
-            }
-            if (error.response?.status === 404) {
-                throw new Error(`Usuario con ID ${userId} no encontrado.`);
-            }
-            throw error;
-        }
-    },
-
-    // Presign: get URL to upload file directly to S3
-    uploadContentPresign: async (metadata) => {
-        console.log('[S3 upload] Presign request:', { filename: metadata?.filename, file_size: metadata?.file_size, media_type: metadata?.media_type });
-        try {
-            const response = await axiosInstance.post('/content/upload-content/presign/', metadata, {
-                timeout: 15000,
-                headers: { 'Content-Type': 'application/json' }
-            });
-            console.log('[S3 upload] Presign OK, key:', response.data?.key);
-            return response.data;
-        } catch (err) {
-            console.error('[S3 upload] Presign failed:', err.response?.status, err.response?.data || err.message);
-            throw err;
-        }
-    },
-
-    // Upload file directly to S3 with optional progress (XHR for progress)
-    uploadFileToS3: async (file, uploadPayload, onProgress) => {
-        if (uploadPayload?.upload_mode === 'multipart') {
-            return contentApi.uploadFileToS3Multipart(file, uploadPayload, onProgress);
-        }
-        const uploadUrl = typeof uploadPayload === 'string' ? uploadPayload : uploadPayload?.upload_url;
-        const urlHost = uploadUrl ? new URL(uploadUrl).host : '(no URL)';
-        console.log('[S3 upload] PUT to S3 starting, host:', urlHost, 'size:', file?.size);
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', uploadUrl);
-            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-            xhr.withCredentials = false;
-            if (onProgress && xhr.upload) {
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) onProgress({ loaded: e.loaded, total: e.total });
-                };
-            }
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    console.log('[S3 upload] PUT to S3 success, status:', xhr.status);
-                    resolve();
-                } else {
-                    console.error('[S3 upload] PUT to S3 failed:', xhr.status, xhr.statusText);
-                    reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
-                }
-            };
-            xhr.onerror = () => {
-                console.error('[S3 upload] PUT to S3 network error');
-                reject(new Error('S3 upload failed'));
-            };
-            xhr.send(file);
-        });
-    },
-
-    uploadFileToS3Multipart: async (file, uploadPayload, onProgress) => {
-        const partUrls = uploadPayload?.part_urls || [];
-        const partSize = uploadPayload?.part_size || (64 * 1024 * 1024);
-        const totalSize = file?.size || 0;
-        if (!partUrls.length) {
-            throw new Error('Multipart upload inválido: no hay partes para subir');
-        }
-
-        let uploadedBytes = 0;
-        const parts = [];
-        const uploadPart = (partUrl, blob, partNumber) =>
-            new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open('PUT', partUrl);
-                xhr.withCredentials = false;
-                let lastLoaded = 0;
-                if (onProgress && xhr.upload) {
-                    xhr.upload.onprogress = (e) => {
-                        if (!e.lengthComputable) return;
-                        const delta = e.loaded - lastLoaded;
-                        lastLoaded = e.loaded;
-                        uploadedBytes += Math.max(0, delta);
-                        onProgress({ loaded: Math.min(uploadedBytes, totalSize), total: totalSize });
-                    };
-                }
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        const etag = xhr.getResponseHeader('ETag');
-                        if (!etag) {
-                            reject(new Error(`S3 multipart upload failed: missing ETag for part ${partNumber}`));
-                            return;
-                        }
-                        resolve({ part_number: partNumber, etag });
-                    } else {
-                        reject(new Error(`S3 multipart upload failed: ${xhr.status} ${xhr.statusText}`));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('S3 multipart upload failed'));
-                xhr.send(blob);
-            });
-
-        for (const part of partUrls) {
-            const partNumber = Number(part.part_number);
-            if (!partNumber || !part.upload_url) {
-                throw new Error('Multipart upload inválido: parte incompleta');
-            }
-            const start = (partNumber - 1) * partSize;
-            const end = Math.min(start + partSize, totalSize);
-            const chunk = file.slice(start, end);
-            const uploadedPart = await uploadPart(part.upload_url, chunk, partNumber);
-            uploadedBytes = end;
-            if (onProgress) onProgress({ loaded: uploadedBytes, total: totalSize });
-            parts.push(uploadedPart);
-        }
-
-        return {
-            upload_id: uploadPayload.upload_id,
-            parts: parts.sort((a, b) => a.part_number - b.part_number),
-        };
-    },
-
-    // Confirm: after S3 upload, create Content/ContentProfile/FileDetails
-    uploadContentConfirm: async (key, metadata) => {
-        console.log('[S3 upload] Confirm request, key:', key);
-        try {
-            const response = await axiosInstance.post('/content/upload-content/confirm/', { key, ...metadata }, {
-                timeout: 15000,
-                headers: { 'Content-Type': 'application/json' }
-            });
-            console.log('[S3 upload] Confirm OK, content_id:', response.data?.content_id);
-            return response.data;
-        } catch (err) {
-            console.error('[S3 upload] Confirm failed:', err.response?.status, err.response?.data || err.message);
-            throw err;
-        }
-    },
-
-    // Full S3 flow: presign -> upload to S3 -> confirm. Falls back to FormData upload if S3 not configured (e.g. dev).
-    uploadContentViaS3: async (file, metadata, onProgress) => {
-        console.log('[S3 upload] Starting flow for file:', file?.name, 'size:', file?.size);
-        try {
-            const presignData = await contentApi.uploadContentPresign({
-                filename: file.name,
-                file_size: file.size,
-                content_type: file.type || 'application/octet-stream',
-                media_type: metadata.media_type,
-                title: metadata.title,
-                author: metadata.author,
-                personalNote: metadata.personalNote,
-                is_visible: metadata.is_visible,
-                is_producer: metadata.is_producer,
-                has_spanish_subtitles: metadata.has_spanish_subtitles,
-                has_spanish_dubbing: metadata.has_spanish_dubbing
-            });
-            const uploadMetadata = await contentApi.uploadFileToS3(
-                file,
-                presignData.upload_mode ? presignData : presignData.upload_url,
-                onProgress
-            );
-            const result = await contentApi.uploadContentConfirm(presignData.key, {
-                media_type: metadata.media_type,
-                title: metadata.title,
-                author: metadata.author,
-                personalNote: metadata.personalNote,
-                is_visible: metadata.is_visible,
-                is_producer: metadata.is_producer,
-                has_spanish_subtitles: metadata.has_spanish_subtitles,
-                has_spanish_dubbing: metadata.has_spanish_dubbing,
-                file_size: file.size,
-                ...(uploadMetadata || {})
-            });
-            console.log('[S3 upload] Flow complete, content_id:', result?.content_id);
-            return result;
-        } catch (err) {
-            if (err.response?.status === 503) {
-                console.warn('[S3 upload] 503 received, falling back to FormData upload');
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('media_type', metadata.media_type);
-                formData.append('title', metadata.title || '');
-                formData.append('author', metadata.author || '');
-                formData.append('personalNote', metadata.personalNote || '');
-                formData.append('is_visible', String(metadata.is_visible ?? true));
-                formData.append('is_producer', String(metadata.is_producer ?? false));
-                formData.append('has_spanish_subtitles', String(metadata.has_spanish_subtitles ?? false));
-                formData.append('has_spanish_dubbing', String(metadata.has_spanish_dubbing ?? false));
-                const fallbackResult = await contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
-                console.log('[S3 upload] FormData fallback OK, content_id:', fallbackResult?.content_id);
-                return fallbackResult;
-            }
-            console.error('[S3 upload] Flow failed:', err.response?.status, err.message);
-            throw err;
-        }
-    },
-
-    // Legacy: single POST with FormData (used for URL-only or fallback)
-    uploadContent: async (contentData, options = {}) => {
-        try {
-            const config = contentData instanceof FormData
-                ? {
-                    timeout: options.timeout ?? 60000,
-                    onUploadProgress: options.onUploadProgress
-                }
-                : { headers: { 'Content-Type': 'multipart/form-data' } };
-            const response = await axiosInstance.post('/content/upload-content/', contentData, config);
-            return response.data;
-        } catch (error) {
-            console.error('Error uploading content:', error);
-            if (error.response) console.error('Error response:', error.response.data);
-            throw error;
-        }
-    },
-
-    getContentDetails: async (contentId, context = null, contextId = null) => {
-        try {
-            let url = `/content/content_details/${contentId}/`;
-            if (context && contextId) {
-                url += `?context=${context}&id=${contextId}`;
-            }
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching content details:', error);
-            throw error;
-        }
-    },
-
-    getContentPreview: async (contentId, context = null, contextId = null) => {
-        try {
-            let url = `/content/content_preview/${contentId}/`;
-            if (context && contextId) {
-                url += `?context=${context}&id=${contextId}`;
-            }
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching content preview:', error);
-            throw error;
-        }
-    },
-
-    getUserCollections: async () => {
-        try {
-            const response = await axiosInstance.get('/content/collections/');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user collections:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Paginated public collections (is_public + at least one visible item).
-     * @param {{ page?: number, page_size?: number, search?: string, owner?: number }} params
-     * @param {number} [params.owner] - filter by library owner's user id
-     */
-    getPublicCollections: async (params = {}) => {
-        try {
-            const searchParams = new URLSearchParams();
-            if (params.page != null) searchParams.set('page', String(params.page));
-            if (params.page_size != null) searchParams.set('page_size', String(params.page_size));
-            if (params.search) searchParams.set('search', params.search.trim());
-            if (params.owner != null && params.owner !== '') {
-                searchParams.set('owner', String(params.owner));
-            }
-            const qs = searchParams.toString();
-            const url = qs ? `/content/collections/public/?${qs}` : '/content/collections/public/';
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching public collections:', error);
-            throw error;
-        }
-    },
-
-    createCollection: async (collectionData) => {
-        try {
-            const response = await axiosInstance.post('/content/collections/', collectionData);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating collection:', error);
-            throw error;
-        }
-    },
-
-    getCollection: async (collectionId) => {
-        try {
-            const response = await axiosInstance.get(`/content/collections/${collectionId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching collection:', error.response || error);
-            throw error;
-        }
-    },
-
-    updateCollection: async (collectionId, collectionData) => {
-        try {
-            const response = await axiosInstance.patch(`/content/collections/${collectionId}/`, collectionData);
-            return response.data;
-        } catch (error) {
-            console.error('Error updating collection:', error.response || error);
-            throw error;
-        }
-    },
-
-    getCollectionContent: async (collectionId) => {
-        try {
-            const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching collection content:', error.response || error);
-            throw error;
-        }
-    },
-
-    addContentToCollection: async (collectionId, contentProfileIds) => {
-        try {
-            // Ensure contentProfileIds is an array
-            const ids = Array.isArray(contentProfileIds) ? contentProfileIds : [contentProfileIds];
-            
-            const response = await axiosInstance.post(`/content/collections/${collectionId}/content/`, {
-                content_profile_ids: ids
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error adding content to collection:', error);
-            throw error;
-        }
-    },
-
-    removeContentFromCollection: async (contentProfileId) => {
-        try {
-            const response = await axiosInstance.patch(`/content/content-profiles/${contentProfileId}/`, {
-                collection: null
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error removing content from collection:', error);
-            throw error;
-        }
-    },
-
-    createTopic: async (topicData) => {
-        try {
-            const response = await axiosInstance.post('/content/topics/', topicData);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating topic:', error);
-            throw error;
-        }
-    },
-
-    getTopicDetails: async (topicId, params = {}) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/`, { params });
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic details:', error);
-            throw error;
-        }
-    },
-
-    getTopicDetailsSimple: async (topicId) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic details (simple):', error);
-            throw error;
-        }
-    },
-
-    updateTopicImage: async (topicId, formData) => {
-        try {
-            const response = await axiosInstance.patch(
-                `/content/topics/${topicId}/`,
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error updating topic image:', error);
-            throw error;
-        }
-    },
-
-    getTopics: async () => {
-        try {
-            const response = await axiosInstance.get('/content/topics/');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topics:', error);
-            throw error;
-        }
-    },
-
-    addContentToTopic: async (topicId, contentProfileIds) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/content/`, {
-                content_profile_ids: contentProfileIds
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error adding content to topic:', error.response || error);
-            throw error;
-        }
-    },
-
-    removeContentFromTopic: async (topicId, contentIds) => {
-        try {
-            const response = await axiosInstance.patch(`/content/topics/${topicId}/content/`, {
-                content_ids: contentIds
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error removing content from topic:', error);
-            throw error;
-        }
-    },
-
-    getTopicContentByType: async (topicId, mediaType, params = {}) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/content/${mediaType}/`, {
-                params: {
-                    page: params.page,
-                    page_size: params.page_size,
-                },
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic content by type:', error);
-            throw error;
-        }
-    },
-
-    getTopicTimeline: async (topicId) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/timeline/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic timeline:', error);
-            throw error;
-        }
-    },
-
-    createTopicTimelineEntry: async (topicId, entryData) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/`, entryData);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating topic timeline entry:', error.response || error);
-            throw error;
-        }
-    },
-
-    updateTopicTimelineEntry: async (topicId, entryId, entryData) => {
-        try {
-            const response = await axiosInstance.patch(`/content/topics/${topicId}/timeline/${entryId}/`, entryData);
-            return response.data;
-        } catch (error) {
-            console.error('Error updating topic timeline entry:', error.response || error);
-            throw error;
-        }
-    },
-
-    deleteTopicTimelineEntry: async (topicId, entryId) => {
-        try {
-            const response = await axiosInstance.delete(`/content/topics/${topicId}/timeline/${entryId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error deleting topic timeline entry:', error.response || error);
-            throw error;
-        }
-    },
-
-    reorderTopicTimeline: async (topicId, entryIds) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/reorder/`, {
-                entry_ids: entryIds,
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error reordering topic timeline:', error.response || error);
-            throw error;
-        }
-    },
-
-    getTopicBasicDetails: async (topicId) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/basic/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic basic details:', error);
-            throw error;
-        }
-    },
-
-    getRecentContent: async () => {
-        try {
-            const response = await axiosInstance.get('/content/recent-user-content/');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching recent content:', error);
-            throw error;
-        }
-    },
-
-    updateContentProfile: async (profileId, profileData) => {
-        try {
-            const response = await axiosInstance.patch(
-                `/content/content-profiles/${profileId}/`,
-                profileData
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error updating content profile:', error);
-            throw error;
-        }
-    },
-
-    updateContentProfileContent: async (profileId, contentId) => {
-        try {
-            const response = await axiosInstance.put(
-                `/content/content-profiles/${profileId}/`,
-                { content_id: contentId }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error updating content profile content reference:', error);
-            throw error;
-        }
-    },
-
-    updateContent: async (contentId, contentData) => {
-        try {
-            console.log('contentApi.updateContent called with:', { contentId, contentData });
-            const response = await axiosInstance.put(
-                `/content/content_update/${contentId}/`,
-                contentData
-            );
-            console.log('contentApi.updateContent response:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error updating content:', error);
-            console.error('Error response:', error.response?.data);
-            throw error;
-        }
-    },
-
-    checkContentModification: async (contentId) => {
-        try {
-            const response = await axiosInstance.get(`/content/content_modification_check/${contentId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error checking content modification:', error);
-            throw error;
-        }
-    },
-
-    deleteContent: async (contentId) => {
-        try {
-            await axiosInstance.delete(`/content/content_details/${contentId}/`);
-        } catch (error) {
-            console.error('Error deleting content:', error);
-            throw error;
-        }
-    },
-
-    createPublication: async (publicationData) => {
-        try {
-            const response = await axiosInstance.post('/content/publications/', publicationData);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating publication:', error);
-            throw error;
-        }
-    },
-
-    getUserPublications: async () => {
-        try {
-            const response = await axiosInstance.get('/content/publications/');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user publications:', error);
-            throw error;
-        }
-    },
-
-    getUserPublicationsById: async (userId) => {
-        try {
-            const response = await axiosInstance.get(`/content/publications/user/${userId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user publications:', error);
-            throw error;
-        }
-    },
-
-    getPublicationDetails: async (publicationId) => {
-        try {
-            const response = await axiosInstance.get(`/content/publications/${publicationId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching publication details:', error);
-            throw error;
-        }
-    },
-
-    updatePublication: async (publicationId, publicationData) => {
-        try {
-            const response = await axiosInstance.put(`/content/publications/${publicationId}/`, publicationData);
-            return response.data;
-        } catch (error) {
-            console.error('Error updating publication:', error);
-            throw error;
-        }
-    },
-
-    deletePublication: async (publicationId) => {
-        try {
-            const response = await axiosInstance.delete(`/content/publications/${publicationId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error deleting publication:', error);
-            throw error;
-        }
-    },
-
-    getContentReferences: async (contentId) => {
-        try {
-            const response = await axiosInstance.get(`/content/references/${contentId}/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching content references:', error);
-            throw error;
-        }
-    },
-
-    updateTopic: async (topicId, topicData) => {
-        try {
-            const response = await axiosInstance.patch(`/content/topics/${topicId}/`, topicData);
-            return response.data;
-        } catch (error) {
-            console.error('Error updating topic:', error);
-            throw error;
-        }
-    },
-
-    deleteTopic: async (topicId) => {
-        try {
-            await axiosInstance.delete(`/content/topics/${topicId}/`);
-        } catch (error) {
-            console.error('Error deleting topic:', error);
-            throw error;
-        }
-    },
-
-    addTopicModerators: async (topicId, usernames) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/`, {
-                usernames: usernames
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error adding topic moderators:', error);
-            throw error;
-        }
-    },
-
-    removeTopicModerators: async (topicId, usernames) => {
-        try {
-            const response = await axiosInstance.delete(`/content/topics/${topicId}/moderators/`, {
-                data: { usernames: usernames }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error removing topic moderators:', error);
-            throw error;
-        }
-    },
-
-    searchUsersByUsername: async (query) => {
-        try {
-            const response = await axiosInstance.get('/content/users/search/', {
-                params: { q: query || '' }
-            });
-            return response.data?.results ?? [];
-        } catch (error) {
-            console.error('Error searching users:', error.response || error);
-            return [];
-        }
-    },
-
-    inviteTopicModerator: async (topicId, username, message = '') => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invite/`, {
-                username: username,
-                message: message
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error inviting topic moderator:', error.response || error);
-            throw error;
-        }
-    },
-
-    getTopicModeratorInvitations: async (topicId) => {
-        try {
-            const response = await axiosInstance.get(`/content/topics/${topicId}/moderators/invitations/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic moderator invitations:', error.response || error);
-            throw error;
-        }
-    },
-
-    acceptTopicModeratorInvitation: async (topicId, invitationId) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/accept/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error accepting topic moderator invitation:', error.response || error);
-            throw error;
-        }
-    },
-
-    declineTopicModeratorInvitation: async (topicId, invitationId) => {
-        try {
-            const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/decline/`);
-            return response.data;
-        } catch (error) {
-            console.error('Error declining topic moderator invitation:', error.response || error);
-            throw error;
-        }
-    },
-
-    getUserTopics: async (type = null) => {
-        try {
-            const url = type ? `/content/user/topics/?type=${type}` : '/content/user/topics/';
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user topics:', error.response || error);
-            throw error;
-        }
-    },
-
-    getUserTopicInvitations: async (status = 'PENDING') => {
-        try {
-            const response = await axiosInstance.get(`/content/user/topics/invitations/?status=${status}`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user topic invitations:', error.response || error);
-            throw error;
-        }
-    },
-
-    // Content Suggestions API methods
-    createContentSuggestion: async (topicId, contentId, message = '') => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/topics/${topicId}/content-suggestions/create/`,
-                { content_id: contentId, message: message }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error creating content suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    getTopicContentSuggestions: async (topicId, filters = {}) => {
-        try {
-            const params = new URLSearchParams();
-            if (filters.status) params.append('status', filters.status);
-            if (filters.is_duplicate !== undefined) params.append('is_duplicate', filters.is_duplicate);
-            
-            const url = `/content/topics/${topicId}/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching topic content suggestions:', error.response || error);
-            throw error;
-        }
-    },
-
-    acceptContentSuggestion: async (topicId, suggestionId) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/topics/${topicId}/content-suggestions/${suggestionId}/accept/`
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error accepting content suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    rejectContentSuggestion: async (topicId, suggestionId, rejectionReason) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/topics/${topicId}/content-suggestions/${suggestionId}/reject/`,
-                { rejection_reason: rejectionReason }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error rejecting content suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    getUserContentSuggestions: async (filters = {}) => {
-        try {
-            const params = new URLSearchParams();
-            if (filters.status) params.append('status', filters.status);
-            if (filters.topic_id) params.append('topic_id', filters.topic_id);
-            
-            const url = `/content/user/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user content suggestions:', error.response || error);
-            throw error;
-        }
-    },
-    deleteContentSuggestion: async (topicId, suggestionId) => {
-        try {
-            const response = await axiosInstance.delete(
-                `/content/topics/${topicId}/content-suggestions/${suggestionId}/`
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error deleting content suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    // File Suggestions API methods (URL -> optional file attachment)
-    createFileSuggestion: async (contentId, formData, options = {}) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/file-suggestions/`,
-                formData,
-                {
-                    timeout: options.timeout ?? 30000,
-                    onUploadProgress: options.onUploadProgress,
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error creating file suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    /** Presign for large file suggestions (direct S3 PUT, no multipart timeout through Django). */
-    fileSuggestionPresign: async (contentId, metadata) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/file-suggestions/presign/`,
-                metadata,
-                {
-                    timeout: 60000,
-                    headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error presigning file suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    /** After S3 PUT, register the FileSuggestion row (small JSON request). */
-    fileSuggestionConfirm: async (contentId, payload) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/file-suggestions/confirm/`,
-                payload,
-                {
-                    timeout: 120000,
-                    headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error confirming file suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    /** Presign for original uploader to attach a file (no FileSuggestion). */
-    ownerAttachPresign: async (contentId, metadata) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/owner-attach/presign/`,
-                metadata,
-                {
-                    timeout: 60000,
-                    headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error presigning owner attach:', error.response || error);
-            throw error;
-        }
-    },
-
-    /** After S3 PUT, persist key on FileDetails (uploader only). */
-    ownerAttachConfirm: async (contentId, payload) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/owner-attach/confirm/`,
-                payload,
-                {
-                    timeout: 120000,
-                    headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error confirming owner attach:', error.response || error);
-            throw error;
-        }
-    },
-
-    createOwnerContentFileAttach: async (contentId, formData, options = {}) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/content/${contentId}/owner-attach/`,
-                formData,
-                {
-                    timeout: options.timeout ?? 30000,
-                    onUploadProgress: options.onUploadProgress,
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error attaching owner file:', error.response || error);
-            throw error;
-        }
-    },
-
-    /**
-     * Large-friendly flow: presign -> PUT to S3 (XHR progress) -> confirm.
-     * If S3 is not configured (503), falls back to multipart POST with no timeout.
-     */
-    uploadFileSuggestionViaS3: async (contentId, file, message = '', onProgress) => {
-        try {
-            const presignData = await contentApi.fileSuggestionPresign(contentId, {
-                filename: file.name,
-                file_size: file.size,
-                content_type: file.type || 'application/octet-stream',
-            });
-            const uploadMetadata = await contentApi.uploadFileToS3(
-                file,
-                presignData.upload_mode ? presignData : presignData.upload_url,
-                onProgress
-            );
-            return await contentApi.fileSuggestionConfirm(contentId, {
-                key: presignData.key,
-                file_size: file.size,
-                message: message || '',
-                ...(uploadMetadata || {}),
-            });
-        } catch (err) {
-            if (err.response?.status === 503) {
-                console.warn('[File suggestion] S3 unavailable, using multipart fallback');
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('message', message || '');
-                return await contentApi.createFileSuggestion(contentId, formData, {
-                    timeout: 0,
-                    onUploadProgress: onProgress
-                        ? (e) => {
-                              if (e.total) onProgress({ loaded: e.loaded, total: e.total });
-                          }
-                        : undefined,
-                });
-            }
-            throw err;
-        }
-    },
-
-    /**
-     * Same as uploadFileSuggestionViaS3 but for the original uploader (no FileSuggestion, no message).
-     */
-    uploadOwnerContentFileViaS3: async (contentId, file, onProgress) => {
-        try {
-            const presignData = await contentApi.ownerAttachPresign(contentId, {
-                filename: file.name,
-                file_size: file.size,
-                content_type: file.type || 'application/octet-stream',
-            });
-            const uploadMetadata = await contentApi.uploadFileToS3(
-                file,
-                presignData.upload_mode ? presignData : presignData.upload_url,
-                onProgress
-            );
-            return await contentApi.ownerAttachConfirm(contentId, {
-                key: presignData.key,
-                file_size: file.size,
-                ...(uploadMetadata || {}),
-            });
-        } catch (err) {
-            if (err.response?.status === 503) {
-                console.warn('[Owner attach] S3 unavailable, using multipart fallback');
-                const formData = new FormData();
-                formData.append('file', file);
-                return await contentApi.createOwnerContentFileAttach(contentId, formData, {
-                    timeout: 0,
-                    onUploadProgress: onProgress
-                        ? (e) => {
-                              if (e.total) onProgress({ loaded: e.loaded, total: e.total });
-                          }
-                        : undefined,
-                });
-            }
-            throw err;
-        }
-    },
-
-    listFileSuggestions: async (contentId) => {
-        try {
-            const response = await axiosInstance.get(
-                `/content/content/${contentId}/file-suggestions/list/`
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error listing file suggestions:', error.response || error);
-            throw error;
-        }
-    },
-
-    acceptFileSuggestion: async (suggestionId) => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/file-suggestions/${suggestionId}/accept/`
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error accepting file suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    rejectFileSuggestion: async (suggestionId, rejectionReason = '') => {
-        try {
-            const response = await axiosInstance.post(
-                `/content/file-suggestions/${suggestionId}/reject/`,
-                { rejection_reason: rejectionReason }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error rejecting file suggestion:', error.response || error);
-            throw error;
-        }
-    },
-
-    createContentProfile: async (contentId, profileData) => {
-        try {
-            const response = await axiosInstance.post(`/content/content-profiles/`, {
-                content: contentId,
-                ...profileData
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error creating content profile:', error);
-            throw error;
-        }
-    },
-
-    fetchUrlMetadata: async (url) => {
-        console.log('\n=== Fetching URL Metadata ===');
-        console.log('URL:', url);
-        
-        try {
-            // First try server-side proxy if CORS allows
-            try {
-                console.log('Attempting server-side proxy...');
-                const response = await axiosInstance.post('/content/preview-url/', { url });
-                console.log('Server proxy successful:', response.data);
-                return response.data;
-            } catch (error) {
-                // Log the full error for debugging
-                console.log('Server proxy failed:', error.response?.data?.error || error.message);
-                
-                // If we got an error message from the server, use it
-                if (error.response?.data?.error) {
-                    throw new Error(error.response.data.error);
-                }
-                
-                console.log('Falling back to client-side fetch');
-            }
-
-            // Only try client-side fetch for certain domains that we know support CORS
-            const allowedDomains = ['youtube.com', 'youtu.be', 'github.com', 'githubusercontent.com'];
-            const urlDomain = new URL(url).hostname;
-            const isAllowedDomain = allowedDomains.some(domain => urlDomain.includes(domain));
-
-            if (!isAllowedDomain) {
-                throw new Error('No se puede obtener la vista previa para esta URL');
-            }
-
-            // Fallback to direct fetch if server fails
-            console.log('Making direct fetch request...');
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error('Error al obtener los datos de la URL');
-            }
-
-            const contentType = (response.headers.get('content-type') || '').toLowerCase();
-            if (contentType.includes('application/pdf')) {
-                const parsedUrl = new URL(url);
-                const fileName = decodeURIComponent(parsedUrl.pathname.split('/').pop() || 'Documento PDF');
-                return {
-                    title: fileName,
-                    description: 'Documento PDF',
-                    type: 'document',
-                    siteName: parsedUrl.hostname
-                };
-            }
-
-            if (!contentType.includes('text/html')) {
-                throw new Error('La URL debe apuntar a una página web o PDF');
-            }
-
-            const html = await response.text();
-            console.log('Parsing HTML content...');
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-
-            // Extract Open Graph metadata
-            console.log('Extracting metadata...');
-            const metadata = {
-                title: getMetaContent(doc, 'og:title') || doc.title,
-                description: getMetaContent(doc, 'og:description') || getMetaContent(doc, 'description'),
-                image: getMetaContent(doc, 'og:image'),
-                siteName: getMetaContent(doc, 'og:site_name'),
-                type: getMetaContent(doc, 'og:type') || 'website',
-                favicon: getFavicon(doc, url)
-            };
-
-            console.log('Initial metadata:', metadata);
-
-            // Special handling for YouTube
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                console.log('Detected YouTube URL, fetching additional data...');
-                const videoId = extractYouTubeId(url);
-                if (videoId) {
-                    console.log('YouTube video ID:', videoId);
-                    metadata.image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                    metadata.type = 'video';
-                    metadata.siteName = 'YouTube';
-                    
-                    try {
-                        console.log('Fetching YouTube oEmbed data...');
-                        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-                        const oembedResponse = await fetch(oembedUrl);
-                        if (!oembedResponse.ok) {
-                            throw new Error('Error al obtener los datos de YouTube');
-                        }
-                        const oembedData = await oembedResponse.json();
-                        if (oembedData.title) {
-                            console.log('YouTube title:', oembedData.title);
-                            metadata.title = oembedData.title;
-                        }
-                    } catch (e) {
-                        console.warn('Failed to fetch YouTube oEmbed data:', e.message);
-                    }
-                }
-            }
-
-            // Validate required fields
-            if (!metadata.title && !metadata.description && !metadata.image) {
-                throw new Error('No se pudo extraer la información de vista previa de esta URL');
-            }
-
-            console.log('Final metadata:', metadata);
-            return metadata;
-        } catch (error) {
-            // Log the full error for debugging
-            console.error('Error fetching URL metadata:', error);
-            
-            // Return a user-friendly error message
-            throw new Error(error.message || 'Error al obtener los datos de la URL');
-        }
+  getUserContent: async () => {
+    try {
+      const response = await axiosInstance.get('/content/user-content/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user content:', error);
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
+      }
+      throw error;
     }
+  },
+
+  getUserContentWithDetails: async (params = {}) => {
+    try {
+      const query = {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 12
+      };
+      if (params.media_type && params.media_type !== 'ALL') {
+        query.media_type = params.media_type;
+      }
+      if (params.search) {
+        query.search = params.search;
+      }
+      const response = await axiosInstance.get('/content/user-content-with-details/', {
+        params: query
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user content with details:', error);
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
+      }
+      throw error;
+    }
+  },
+
+  getUserContentById: async (userId) => {
+    try {
+      const response = await axiosInstance.get(`/content/user-content/${userId}/`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching content for user ${userId}:`, error);
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('La solicitud expiró. Por favor, inténtelo de nuevo.');
+      }
+      if (error.response?.status === 404) {
+        throw new Error(`Usuario con ID ${userId} no encontrado.`);
+      }
+      throw error;
+    }
+  },
+
+  // Presign: get URL to upload file directly to S3
+  uploadContentPresign: async (metadata) => {
+
+    try {
+      const response = await axiosInstance.post('/content/upload-content/presign/', metadata, {
+        timeout: 15000,
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      return response.data;
+    } catch (err) {
+      console.error('[S3 upload] Presign failed:', err.response?.status, err.response?.data || err.message);
+      throw err;
+    }
+  },
+
+  // Upload file directly to S3 with optional progress (XHR for progress)
+  uploadFileToS3: async (file, uploadPayload, onProgress) => {
+    if (uploadPayload?.upload_mode === 'multipart') {
+      return contentApi.uploadFileToS3Multipart(file, uploadPayload, onProgress);
+    }
+    const uploadUrl = typeof uploadPayload === 'string' ? uploadPayload : uploadPayload?.upload_url;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.withCredentials = false;
+      if (onProgress && xhr.upload) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress({ loaded: e.loaded, total: e.total });
+        };
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+
+          resolve();
+        } else {
+          console.error('[S3 upload] PUT to S3 failed:', xhr.status, xhr.statusText);
+          reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => {
+        console.error('[S3 upload] PUT to S3 network error');
+        reject(new Error('S3 upload failed'));
+      };
+      xhr.send(file);
+    });
+  },
+
+  uploadFileToS3Multipart: async (file, uploadPayload, onProgress) => {
+    const partUrls = uploadPayload?.part_urls || [];
+    const partSize = uploadPayload?.part_size || 64 * 1024 * 1024;
+    const totalSize = file?.size || 0;
+    if (!partUrls.length) {
+      throw new Error('Multipart upload inválido: no hay partes para subir');
+    }
+
+    let uploadedBytes = 0;
+    const parts = [];
+    const uploadPart = (partUrl, blob, partNumber) =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', partUrl);
+      xhr.withCredentials = false;
+      let lastLoaded = 0;
+      if (onProgress && xhr.upload) {
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          const delta = e.loaded - lastLoaded;
+          lastLoaded = e.loaded;
+          uploadedBytes += Math.max(0, delta);
+          onProgress({ loaded: Math.min(uploadedBytes, totalSize), total: totalSize });
+        };
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const etag = xhr.getResponseHeader('ETag');
+          if (!etag) {
+            reject(new Error(`S3 multipart upload failed: missing ETag for part ${partNumber}`));
+            return;
+          }
+          resolve({ part_number: partNumber, etag });
+        } else {
+          reject(new Error(`S3 multipart upload failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('S3 multipart upload failed'));
+      xhr.send(blob);
+    });
+
+    for (const part of partUrls) {
+      const partNumber = Number(part.part_number);
+      if (!partNumber || !part.upload_url) {
+        throw new Error('Multipart upload inválido: parte incompleta');
+      }
+      const start = (partNumber - 1) * partSize;
+      const end = Math.min(start + partSize, totalSize);
+      const chunk = file.slice(start, end);
+      const uploadedPart = await uploadPart(part.upload_url, chunk, partNumber);
+      uploadedBytes = end;
+      if (onProgress) onProgress({ loaded: uploadedBytes, total: totalSize });
+      parts.push(uploadedPart);
+    }
+
+    return {
+      upload_id: uploadPayload.upload_id,
+      parts: parts.sort((a, b) => a.part_number - b.part_number)
+    };
+  },
+
+  // Confirm: after S3 upload, create Content/ContentProfile/FileDetails
+  uploadContentConfirm: async (key, metadata) => {
+
+    try {
+      const response = await axiosInstance.post('/content/upload-content/confirm/', { key, ...metadata }, {
+        timeout: 15000,
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      return response.data;
+    } catch (err) {
+      console.error('[S3 upload] Confirm failed:', err.response?.status, err.response?.data || err.message);
+      throw err;
+    }
+  },
+
+  // Full S3 flow: presign -> upload to S3 -> confirm. Falls back to FormData upload if S3 not configured (e.g. dev).
+  uploadContentViaS3: async (file, metadata, onProgress) => {
+
+    try {
+      const presignData = await contentApi.uploadContentPresign({
+        filename: file.name,
+        file_size: file.size,
+        content_type: file.type || 'application/octet-stream',
+        media_type: metadata.media_type,
+        title: metadata.title,
+        author: metadata.author,
+        personalNote: metadata.personalNote,
+        is_visible: metadata.is_visible,
+        is_producer: metadata.is_producer,
+        has_spanish_subtitles: metadata.has_spanish_subtitles,
+        has_spanish_dubbing: metadata.has_spanish_dubbing
+      });
+      const uploadMetadata = await contentApi.uploadFileToS3(
+        file,
+        presignData.upload_mode ? presignData : presignData.upload_url,
+        onProgress
+      );
+      const result = await contentApi.uploadContentConfirm(presignData.key, {
+        media_type: metadata.media_type,
+        title: metadata.title,
+        author: metadata.author,
+        personalNote: metadata.personalNote,
+        is_visible: metadata.is_visible,
+        is_producer: metadata.is_producer,
+        has_spanish_subtitles: metadata.has_spanish_subtitles,
+        has_spanish_dubbing: metadata.has_spanish_dubbing,
+        file_size: file.size,
+        ...(uploadMetadata || {})
+      });
+
+      return result;
+    } catch (err) {
+      if (err.response?.status === 503) {
+        console.warn('[S3 upload] 503 received, falling back to FormData upload');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('media_type', metadata.media_type);
+        formData.append('title', metadata.title || '');
+        formData.append('author', metadata.author || '');
+        formData.append('personalNote', metadata.personalNote || '');
+        formData.append('is_visible', String(metadata.is_visible ?? true));
+        formData.append('is_producer', String(metadata.is_producer ?? false));
+        formData.append('has_spanish_subtitles', String(metadata.has_spanish_subtitles ?? false));
+        formData.append('has_spanish_dubbing', String(metadata.has_spanish_dubbing ?? false));
+        const fallbackResult = await contentApi.uploadContent(formData, { onUploadProgress: onProgress ? (e) => onProgress(e) : undefined });
+
+        return fallbackResult;
+      }
+      console.error('[S3 upload] Flow failed:', err.response?.status, err.message);
+      throw err;
+    }
+  },
+
+  // Legacy: single POST with FormData (used for URL-only or fallback)
+  uploadContent: async (contentData, options = {}) => {
+    try {
+      const config = contentData instanceof FormData ?
+      {
+        timeout: options.timeout ?? 60000,
+        onUploadProgress: options.onUploadProgress
+      } :
+      { headers: { 'Content-Type': 'multipart/form-data' } };
+      const response = await axiosInstance.post('/content/upload-content/', contentData, config);
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading content:', error);
+      if (error.response) console.error('Error response:', error.response.data);
+      throw error;
+    }
+  },
+
+  getContentDetails: async (contentId, context = null, contextId = null) => {
+    try {
+      let url = `/content/content_details/${contentId}/`;
+      if (context && contextId) {
+        url += `?context=${context}&id=${contextId}`;
+      }
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching content details:', error);
+      throw error;
+    }
+  },
+
+  getContentPreview: async (contentId, context = null, contextId = null) => {
+    try {
+      let url = `/content/content_preview/${contentId}/`;
+      if (context && contextId) {
+        url += `?context=${context}&id=${contextId}`;
+      }
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching content preview:', error);
+      throw error;
+    }
+  },
+
+  getUserCollections: async () => {
+    try {
+      const response = await axiosInstance.get('/content/collections/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user collections:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Paginated public collections (is_public + at least one visible item).
+   * @param {{ page?: number, page_size?: number, search?: string, owner?: number }} params
+   * @param {number} [params.owner] - filter by library owner's user id
+   */
+  getPublicCollections: async (params = {}) => {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params.page != null) searchParams.set('page', String(params.page));
+      if (params.page_size != null) searchParams.set('page_size', String(params.page_size));
+      if (params.search) searchParams.set('search', params.search.trim());
+      if (params.owner != null && params.owner !== '') {
+        searchParams.set('owner', String(params.owner));
+      }
+      const qs = searchParams.toString();
+      const url = qs ? `/content/collections/public/?${qs}` : '/content/collections/public/';
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching public collections:', error);
+      throw error;
+    }
+  },
+
+  createCollection: async (collectionData) => {
+    try {
+      const response = await axiosInstance.post('/content/collections/', collectionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      throw error;
+    }
+  },
+
+  getCollection: async (collectionId) => {
+    try {
+      const response = await axiosInstance.get(`/content/collections/${collectionId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching collection:', error.response || error);
+      throw error;
+    }
+  },
+
+  updateCollection: async (collectionId, collectionData) => {
+    try {
+      const response = await axiosInstance.patch(`/content/collections/${collectionId}/`, collectionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating collection:', error.response || error);
+      throw error;
+    }
+  },
+
+  getCollectionContent: async (collectionId) => {
+    try {
+      const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching collection content:', error.response || error);
+      throw error;
+    }
+  },
+
+  addContentToCollection: async (collectionId, contentProfileIds) => {
+    try {
+      // Ensure contentProfileIds is an array
+      const ids = Array.isArray(contentProfileIds) ? contentProfileIds : [contentProfileIds];
+
+      const response = await axiosInstance.post(`/content/collections/${collectionId}/content/`, {
+        content_profile_ids: ids
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding content to collection:', error);
+      throw error;
+    }
+  },
+
+  removeContentFromCollection: async (contentProfileId) => {
+    try {
+      const response = await axiosInstance.patch(`/content/content-profiles/${contentProfileId}/`, {
+        collection: null
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error removing content from collection:', error);
+      throw error;
+    }
+  },
+
+  createTopic: async (topicData) => {
+    try {
+      const response = await axiosInstance.post('/content/topics/', topicData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating topic:', error);
+      throw error;
+    }
+  },
+
+  getTopicDetails: async (topicId, params = {}) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic details:', error);
+      throw error;
+    }
+  },
+
+  getTopicDetailsSimple: async (topicId) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic details (simple):', error);
+      throw error;
+    }
+  },
+
+  updateTopicImage: async (topicId, formData) => {
+    try {
+      const response = await axiosInstance.patch(
+        `/content/topics/${topicId}/`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating topic image:', error);
+      throw error;
+    }
+  },
+
+  getTopics: async () => {
+    try {
+      const response = await axiosInstance.get('/content/topics/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+      throw error;
+    }
+  },
+
+  addContentToTopic: async (topicId, contentProfileIds) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/content/`, {
+        content_profile_ids: contentProfileIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding content to topic:', error.response || error);
+      throw error;
+    }
+  },
+
+  removeContentFromTopic: async (topicId, contentIds) => {
+    try {
+      const response = await axiosInstance.patch(`/content/topics/${topicId}/content/`, {
+        content_ids: contentIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error removing content from topic:', error);
+      throw error;
+    }
+  },
+
+  getTopicContentByType: async (topicId, mediaType, params = {}) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/content/${mediaType}/`, {
+        params: {
+          page: params.page,
+          page_size: params.page_size
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic content by type:', error);
+      throw error;
+    }
+  },
+
+  getTopicTimeline: async (topicId) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/timeline/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic timeline:', error);
+      throw error;
+    }
+  },
+
+  createTopicTimelineEntry: async (topicId, entryData) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/`, entryData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating topic timeline entry:', error.response || error);
+      throw error;
+    }
+  },
+
+  updateTopicTimelineEntry: async (topicId, entryId, entryData) => {
+    try {
+      const response = await axiosInstance.patch(`/content/topics/${topicId}/timeline/${entryId}/`, entryData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating topic timeline entry:', error.response || error);
+      throw error;
+    }
+  },
+
+  deleteTopicTimelineEntry: async (topicId, entryId) => {
+    try {
+      const response = await axiosInstance.delete(`/content/topics/${topicId}/timeline/${entryId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting topic timeline entry:', error.response || error);
+      throw error;
+    }
+  },
+
+  reorderTopicTimeline: async (topicId, entryIds) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/timeline/reorder/`, {
+        entry_ids: entryIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error reordering topic timeline:', error.response || error);
+      throw error;
+    }
+  },
+
+  getTopicBasicDetails: async (topicId) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/basic/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic basic details:', error);
+      throw error;
+    }
+  },
+
+  getRecentContent: async () => {
+    try {
+      const response = await axiosInstance.get('/content/recent-user-content/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent content:', error);
+      throw error;
+    }
+  },
+
+  updateContentProfile: async (profileId, profileData) => {
+    try {
+      const response = await axiosInstance.patch(
+        `/content/content-profiles/${profileId}/`,
+        profileData
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating content profile:', error);
+      throw error;
+    }
+  },
+
+  updateContentProfileContent: async (profileId, contentId) => {
+    try {
+      const response = await axiosInstance.put(
+        `/content/content-profiles/${profileId}/`,
+        { content_id: contentId }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating content profile content reference:', error);
+      throw error;
+    }
+  },
+
+  updateContent: async (contentId, contentData) => {
+    try {
+
+      const response = await axiosInstance.put(
+        `/content/content_update/${contentId}/`,
+        contentData
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Error updating content:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
+  },
+
+  checkContentModification: async (contentId) => {
+    try {
+      const response = await axiosInstance.get(`/content/content_modification_check/${contentId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking content modification:', error);
+      throw error;
+    }
+  },
+
+  deleteContent: async (contentId) => {
+    try {
+      await axiosInstance.delete(`/content/content_details/${contentId}/`);
+    } catch (error) {
+      console.error('Error deleting content:', error);
+      throw error;
+    }
+  },
+
+  createPublication: async (publicationData) => {
+    try {
+      const response = await axiosInstance.post('/content/publications/', publicationData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating publication:', error);
+      throw error;
+    }
+  },
+
+  getUserPublications: async () => {
+    try {
+      const response = await axiosInstance.get('/content/publications/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user publications:', error);
+      throw error;
+    }
+  },
+
+  getUserPublicationsById: async (userId) => {
+    try {
+      const response = await axiosInstance.get(`/content/publications/user/${userId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user publications:', error);
+      throw error;
+    }
+  },
+
+  getPublicationDetails: async (publicationId) => {
+    try {
+      const response = await axiosInstance.get(`/content/publications/${publicationId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching publication details:', error);
+      throw error;
+    }
+  },
+
+  updatePublication: async (publicationId, publicationData) => {
+    try {
+      const response = await axiosInstance.put(`/content/publications/${publicationId}/`, publicationData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating publication:', error);
+      throw error;
+    }
+  },
+
+  deletePublication: async (publicationId) => {
+    try {
+      const response = await axiosInstance.delete(`/content/publications/${publicationId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting publication:', error);
+      throw error;
+    }
+  },
+
+  getContentReferences: async (contentId) => {
+    try {
+      const response = await axiosInstance.get(`/content/references/${contentId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching content references:', error);
+      throw error;
+    }
+  },
+
+  updateTopic: async (topicId, topicData) => {
+    try {
+      const response = await axiosInstance.patch(`/content/topics/${topicId}/`, topicData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating topic:', error);
+      throw error;
+    }
+  },
+
+  deleteTopic: async (topicId) => {
+    try {
+      await axiosInstance.delete(`/content/topics/${topicId}/`);
+    } catch (error) {
+      console.error('Error deleting topic:', error);
+      throw error;
+    }
+  },
+
+  addTopicModerators: async (topicId, usernames) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/`, {
+        usernames: usernames
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding topic moderators:', error);
+      throw error;
+    }
+  },
+
+  removeTopicModerators: async (topicId, usernames) => {
+    try {
+      const response = await axiosInstance.delete(`/content/topics/${topicId}/moderators/`, {
+        data: { usernames: usernames }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error removing topic moderators:', error);
+      throw error;
+    }
+  },
+
+  searchUsersByUsername: async (query) => {
+    try {
+      const response = await axiosInstance.get('/content/users/search/', {
+        params: { q: query || '' }
+      });
+      return response.data?.results ?? [];
+    } catch (error) {
+      console.error('Error searching users:', error.response || error);
+      return [];
+    }
+  },
+
+  inviteTopicModerator: async (topicId, username, message = '') => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invite/`, {
+        username: username,
+        message: message
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error inviting topic moderator:', error.response || error);
+      throw error;
+    }
+  },
+
+  getTopicModeratorInvitations: async (topicId) => {
+    try {
+      const response = await axiosInstance.get(`/content/topics/${topicId}/moderators/invitations/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic moderator invitations:', error.response || error);
+      throw error;
+    }
+  },
+
+  acceptTopicModeratorInvitation: async (topicId, invitationId) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/accept/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error accepting topic moderator invitation:', error.response || error);
+      throw error;
+    }
+  },
+
+  declineTopicModeratorInvitation: async (topicId, invitationId) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/moderators/invitations/${invitationId}/decline/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error declining topic moderator invitation:', error.response || error);
+      throw error;
+    }
+  },
+
+  getUserTopics: async (type = null) => {
+    try {
+      const url = type ? `/content/user/topics/?type=${type}` : '/content/user/topics/';
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user topics:', error.response || error);
+      throw error;
+    }
+  },
+
+  getUserTopicInvitations: async (status = 'PENDING') => {
+    try {
+      const response = await axiosInstance.get(`/content/user/topics/invitations/?status=${status}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user topic invitations:', error.response || error);
+      throw error;
+    }
+  },
+
+  // Content Suggestions API methods
+  createContentSuggestion: async (topicId, contentId, message = '') => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/content-suggestions/create/`,
+        { content_id: contentId, message: message }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error creating content suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  getTopicContentSuggestions: async (topicId, filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.is_duplicate !== undefined) params.append('is_duplicate', filters.is_duplicate);
+
+      const url = `/content/topics/${topicId}/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic content suggestions:', error.response || error);
+      throw error;
+    }
+  },
+
+  acceptContentSuggestion: async (topicId, suggestionId) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/content-suggestions/${suggestionId}/accept/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error accepting content suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  rejectContentSuggestion: async (topicId, suggestionId, rejectionReason) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/content-suggestions/${suggestionId}/reject/`,
+        { rejection_reason: rejectionReason }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting content suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  getUserContentSuggestions: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.topic_id) params.append('topic_id', filters.topic_id);
+
+      const url = `/content/user/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user content suggestions:', error.response || error);
+      throw error;
+    }
+  },
+  deleteContentSuggestion: async (topicId, suggestionId) => {
+    try {
+      const response = await axiosInstance.delete(
+        `/content/topics/${topicId}/content-suggestions/${suggestionId}/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting content suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  // File Suggestions API methods (URL -> optional file attachment)
+  createFileSuggestion: async (contentId, formData, options = {}) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/file-suggestions/`,
+        formData,
+        {
+          timeout: options.timeout ?? 30000,
+          onUploadProgress: options.onUploadProgress
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error creating file suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  /** Presign for large file suggestions (direct S3 PUT, no multipart timeout through Django). */
+  fileSuggestionPresign: async (contentId, metadata) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/file-suggestions/presign/`,
+        metadata,
+        {
+          timeout: 60000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error presigning file suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  /** After S3 PUT, register the FileSuggestion row (small JSON request). */
+  fileSuggestionConfirm: async (contentId, payload) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/file-suggestions/confirm/`,
+        payload,
+        {
+          timeout: 120000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error confirming file suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  /** Presign for original uploader to attach a file (no FileSuggestion). */
+  ownerAttachPresign: async (contentId, metadata) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/owner-attach/presign/`,
+        metadata,
+        {
+          timeout: 60000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error presigning owner attach:', error.response || error);
+      throw error;
+    }
+  },
+
+  /** After S3 PUT, persist key on FileDetails (uploader only). */
+  ownerAttachConfirm: async (contentId, payload) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/owner-attach/confirm/`,
+        payload,
+        {
+          timeout: 120000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error confirming owner attach:', error.response || error);
+      throw error;
+    }
+  },
+
+  createOwnerContentFileAttach: async (contentId, formData, options = {}) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/content/${contentId}/owner-attach/`,
+        formData,
+        {
+          timeout: options.timeout ?? 30000,
+          onUploadProgress: options.onUploadProgress
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error attaching owner file:', error.response || error);
+      throw error;
+    }
+  },
+
+  /**
+   * Large-friendly flow: presign -> PUT to S3 (XHR progress) -> confirm.
+   * If S3 is not configured (503), falls back to multipart POST with no timeout.
+   */
+  uploadFileSuggestionViaS3: async (contentId, file, message = '', onProgress) => {
+    try {
+      const presignData = await contentApi.fileSuggestionPresign(contentId, {
+        filename: file.name,
+        file_size: file.size,
+        content_type: file.type || 'application/octet-stream'
+      });
+      const uploadMetadata = await contentApi.uploadFileToS3(
+        file,
+        presignData.upload_mode ? presignData : presignData.upload_url,
+        onProgress
+      );
+      return await contentApi.fileSuggestionConfirm(contentId, {
+        key: presignData.key,
+        file_size: file.size,
+        message: message || '',
+        ...(uploadMetadata || {})
+      });
+    } catch (err) {
+      if (err.response?.status === 503) {
+        console.warn('[File suggestion] S3 unavailable, using multipart fallback');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('message', message || '');
+        return await contentApi.createFileSuggestion(contentId, formData, {
+          timeout: 0,
+          onUploadProgress: onProgress ?
+          (e) => {
+            if (e.total) onProgress({ loaded: e.loaded, total: e.total });
+          } :
+          undefined
+        });
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Same as uploadFileSuggestionViaS3 but for the original uploader (no FileSuggestion, no message).
+   */
+  uploadOwnerContentFileViaS3: async (contentId, file, onProgress) => {
+    try {
+      const presignData = await contentApi.ownerAttachPresign(contentId, {
+        filename: file.name,
+        file_size: file.size,
+        content_type: file.type || 'application/octet-stream'
+      });
+      const uploadMetadata = await contentApi.uploadFileToS3(
+        file,
+        presignData.upload_mode ? presignData : presignData.upload_url,
+        onProgress
+      );
+      return await contentApi.ownerAttachConfirm(contentId, {
+        key: presignData.key,
+        file_size: file.size,
+        ...(uploadMetadata || {})
+      });
+    } catch (err) {
+      if (err.response?.status === 503) {
+        console.warn('[Owner attach] S3 unavailable, using multipart fallback');
+        const formData = new FormData();
+        formData.append('file', file);
+        return await contentApi.createOwnerContentFileAttach(contentId, formData, {
+          timeout: 0,
+          onUploadProgress: onProgress ?
+          (e) => {
+            if (e.total) onProgress({ loaded: e.loaded, total: e.total });
+          } :
+          undefined
+        });
+      }
+      throw err;
+    }
+  },
+
+  listFileSuggestions: async (contentId) => {
+    try {
+      const response = await axiosInstance.get(
+        `/content/content/${contentId}/file-suggestions/list/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error listing file suggestions:', error.response || error);
+      throw error;
+    }
+  },
+
+  acceptFileSuggestion: async (suggestionId) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/file-suggestions/${suggestionId}/accept/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error accepting file suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  rejectFileSuggestion: async (suggestionId, rejectionReason = '') => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/file-suggestions/${suggestionId}/reject/`,
+        { rejection_reason: rejectionReason }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting file suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  createContentProfile: async (contentId, profileData) => {
+    try {
+      const response = await axiosInstance.post(`/content/content-profiles/`, {
+        content: contentId,
+        ...profileData
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating content profile:', error);
+      throw error;
+    }
+  },
+
+  fetchUrlMetadata: async (url) => {
+
+
+    try {
+      // First try server-side proxy if CORS allows
+      try {
+
+        const response = await axiosInstance.post('/content/preview-url/', { url });
+
+        return response.data;
+      } catch (error) {
+        // Log the full error for debugging
+
+
+        // If we got an error message from the server, use it
+        if (error.response?.data?.error) {
+          throw new Error(error.response.data.error);
+        }
+
+
+      }
+
+      // Only try client-side fetch for certain domains that we know support CORS
+      const allowedDomains = ['youtube.com', 'youtu.be', 'github.com', 'githubusercontent.com'];
+      const urlDomain = new URL(url).hostname;
+      const isAllowedDomain = allowedDomains.some((domain) => urlDomain.includes(domain));
+
+      if (!isAllowedDomain) {
+        throw new Error('No se puede obtener la vista previa para esta URL');
+      }
+
+      // Fallback to direct fetch if server fails
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Error al obtener los datos de la URL');
+      }
+
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (contentType.includes('application/pdf')) {
+        const parsedUrl = new URL(url);
+        const fileName = decodeURIComponent(parsedUrl.pathname.split('/').pop() || 'Documento PDF');
+        return {
+          title: fileName,
+          description: 'Documento PDF',
+          type: 'document',
+          siteName: parsedUrl.hostname
+        };
+      }
+
+      if (!contentType.includes('text/html')) {
+        throw new Error('La URL debe apuntar a una página web o PDF');
+      }
+
+      const html = await response.text();
+
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // Extract Open Graph metadata
+
+      const metadata = {
+        title: getMetaContent(doc, 'og:title') || doc.title,
+        description: getMetaContent(doc, 'og:description') || getMetaContent(doc, 'description'),
+        image: getMetaContent(doc, 'og:image'),
+        siteName: getMetaContent(doc, 'og:site_name'),
+        type: getMetaContent(doc, 'og:type') || 'website',
+        favicon: getFavicon(doc, url)
+      };
+
+
+      // Special handling for YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+
+        const videoId = extractYouTubeId(url);
+        if (videoId) {
+
+          metadata.image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+          metadata.type = 'video';
+          metadata.siteName = 'YouTube';
+
+          try {
+
+            const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+            const oembedResponse = await fetch(oembedUrl);
+            if (!oembedResponse.ok) {
+              throw new Error('Error al obtener los datos de YouTube');
+            }
+            const oembedData = await oembedResponse.json();
+            if (oembedData.title) {
+
+              metadata.title = oembedData.title;
+            }
+          } catch (e) {
+            console.warn('Failed to fetch YouTube oEmbed data:', e.message);
+          }
+        }
+      }
+
+      // Validate required fields
+      if (!metadata.title && !metadata.description && !metadata.image) {
+        throw new Error('No se pudo extraer la información de vista previa de esta URL');
+      }
+
+
+      return metadata;
+    } catch (error) {
+      // Log the full error for debugging
+      console.error('Error fetching URL metadata:', error);
+
+      // Return a user-friendly error message
+      throw new Error(error.message || 'Error al obtener los datos de la URL');
+    }
+  }
 };
 
 // Helper functions
 function getMetaContent(doc, property) {
-    // Try Open Graph meta first
-    const ogMeta = doc.querySelector(`meta[property="${property}"]`);
-    if (ogMeta) return ogMeta.getAttribute('content');
+  // Try Open Graph meta first
+  const ogMeta = doc.querySelector(`meta[property="${property}"]`);
+  if (ogMeta) return ogMeta.getAttribute('content');
 
-    // Try name attribute as fallback
-    const nameMeta = doc.querySelector(`meta[name="${property}"]`);
-    if (nameMeta) return nameMeta.getAttribute('content');
+  // Try name attribute as fallback
+  const nameMeta = doc.querySelector(`meta[name="${property}"]`);
+  if (nameMeta) return nameMeta.getAttribute('content');
 
-    return null;
+  return null;
 }
 
 function getFavicon(doc, url) {
-    // Try standard favicon locations
-    const links = Array.from(doc.querySelectorAll('link[rel*="icon"]'));
-    if (links.length > 0) {
-        // Sort by size preference if specified
-        links.sort((a, b) => {
-            const sizeA = parseInt(a.getAttribute('sizes')?.split('x')[0] || '0');
-            const sizeB = parseInt(b.getAttribute('sizes')?.split('x')[0] || '0');
-            return sizeB - sizeA;
-        });
-        const href = links[0].getAttribute('href');
-        if (href) {
-            return href.startsWith('http') ? href : new URL(href, url).href;
-        }
+  // Try standard favicon locations
+  const links = Array.from(doc.querySelectorAll('link[rel*="icon"]'));
+  if (links.length > 0) {
+    // Sort by size preference if specified
+    links.sort((a, b) => {
+      const sizeA = parseInt(a.getAttribute('sizes')?.split('x')[0] || '0');
+      const sizeB = parseInt(b.getAttribute('sizes')?.split('x')[0] || '0');
+      return sizeB - sizeA;
+    });
+    const href = links[0].getAttribute('href');
+    if (href) {
+      return href.startsWith('http') ? href : new URL(href, url).href;
     }
+  }
 
-    // Fallback to default favicon location
-    const urlObj = new URL(url);
-    return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
+  // Fallback to default favicon location
+  const urlObj = new URL(url);
+  return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
 }
 
 function extractYouTubeId(url) {
-    const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/,
-        /^[^&?/]+$/  // Direct video ID
-    ];
+  const patterns = [
+  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/,
+  /^[^&?/]+$/ // Direct video ID
+  ];
 
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) return match[1];
-    }
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
 
-    return null;
+  return null;
 }
 
 export default contentApi;

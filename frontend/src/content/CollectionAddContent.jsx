@@ -4,59 +4,51 @@ import LibrarySelectMultiple from './LibrarySelectMultiple';
 import contentApi from '../api/contentApi';
 
 const CollectionAddContent = () => {
-    const { collectionId } = useParams();
-    const navigate = useNavigate();
+  const { collectionId } = useParams();
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        console.log('CollectionAddContent mounted with collectionId:', collectionId);
-    }, [collectionId]);
+  useEffect(() => {
 
-    const handleCancel = () => {
-        navigate(`/content/collections/${collectionId}`);
-    };
+  }, [collectionId]);
 
-    const handleSave = async (selectedContentProfileIds) => {
-        try {
-            console.log('Saving content to collection:', {
-                collectionId,
-                selectedContentProfileIds
-            });
-            // Make a single API call with all selected content profile IDs
-            await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
-            navigate(`/content/collections/${collectionId}`);
-        } catch (error) {
-            console.error('Failed to add content to collection:', error);
-            throw error;
-        }
-    };
+  const handleCancel = () => {
+    navigate(`/content/collections/${collectionId}`);
+  };
 
-    const filterContent = (content) => {
-        // Filter out content that's already in this collection
-        const contentCollectionId =
-            content?.collection && typeof content.collection === 'object'
-                ? content.collection.id
-                : content?.collection;
-        const isInCollection = contentCollectionId === parseInt(collectionId, 10);
-        console.log('CollectionAddContent filtering content:', {
-            contentId: content.id,
-            contentTitle: content.title,
-            collectionId: collectionId,
-            isInCollection,
-            contentCollection: content.collection,
-            contentStructure: JSON.stringify(content, null, 2)
-        });
-        return !isInCollection;
-    };
+  const handleSave = async (selectedContentProfileIds) => {
+    try {
 
-    return (
-        <LibrarySelectMultiple
-            title="Add Content to Collection"
-            description="Select content from your library to add to this collection"
-            onCancel={handleCancel}
-            onSave={handleSave}
-            filterFunction={filterContent}
-        />
-    );
+
+      // Make a single API call with all selected content profile IDs
+      await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
+      navigate(`/content/collections/${collectionId}`);
+    } catch (error) {
+      console.error('Failed to add content to collection:', error);
+      throw error;
+    }
+  };
+
+  const filterContent = (content) => {
+    // Filter out content that's already in this collection
+    const contentCollectionId =
+    content?.collection && typeof content.collection === 'object' ?
+    content.collection.id :
+    content?.collection;
+    const isInCollection = contentCollectionId === parseInt(collectionId, 10);
+
+
+    return !isInCollection;
+  };
+
+  return (
+    <LibrarySelectMultiple
+      title="Add Content to Collection"
+      description="Select content from your library to add to this collection"
+      onCancel={handleCancel}
+      onSave={handleSave}
+      filterFunction={filterContent} />);
+
+
 };
 
-export default CollectionAddContent; 
+export default CollectionAddContent;

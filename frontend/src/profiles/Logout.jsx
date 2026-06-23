@@ -19,10 +19,10 @@ const Logout = () => {
 
     const logoutUser = async () => {
       if (isLoggingOut) return; // Prevent multiple logout attempts
-      
+
       try {
         setIsLoggingOut(true);
-        console.log('Attempting to logout...');
+
         await apiLogout();
         clearAuthState();
         clearAuthenticationStatus();
@@ -46,13 +46,13 @@ const Logout = () => {
 
   return (
     <div>
-      {error ? (
-        <div style={{ color: 'red' }}>Error: {error}</div>
-      ) : (
-        <div>Cerrando sesión de {username}...</div>
-      )}
-    </div>
-  );
+      {error ?
+      <div style={{ color: 'red' }}>Error: {error}</div> :
+
+      <div>Cerrando sesión de {username}...</div>
+      }
+    </div>);
+
 };
 
 export default Logout;

@@ -8,8 +8,8 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Stack,
-} from '@mui/material';
+  Stack } from
+'@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentSelector from '../content/ContentSelector';
 
@@ -45,25 +45,23 @@ const NodeCreate = () => {
   }, [pathId]);
 
   const handleContentSelected = useCallback((content_profile) => {
-    console.log('Selected content profile:', content_profile);
-    console.log('Content profile title:', content_profile.title);
-    console.log('Content profile original title:', content_profile.content?.original_title);
-    
+
+
     setSelectedContent(content_profile);
-    setFormData(prev => {
+    setFormData((prev) => {
       const newFormData = {
         ...prev,
         content_profile_id: content_profile.id,
         title: prev.title || content_profile.title || content_profile.content?.original_title || 'Untitled'
       };
-      console.log('New form data being set:', newFormData);
+
       return newFormData;
     });
   }, []);
 
   const handleContentRemoved = useCallback(() => {
     setSelectedContent(null);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       content_profile_id: null
     }));
@@ -95,16 +93,16 @@ const NodeCreate = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
-      </Container>
-    );
+      </Container>);
+
   }
 
   if (error) {
     return (
       <Container sx={{ py: 4 }}>
         <Alert severity="error">{error}</Alert>
-      </Container>
-    );
+      </Container>);
+
   }
 
   return (
@@ -124,39 +122,39 @@ const NodeCreate = () => {
             onContentRemoved={handleContentRemoved}
             previewVariant="detailed"
             onUploadingChange={handleUploadingChange}
-            onPendingContentChange={setHasPendingContent}
-          />
+            onPendingContentChange={setHasPendingContent} />
+          
 
-          <Box 
-            component="form" 
-            onSubmit={handleSubmit} 
-            sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
-          >
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            
             <TextField
               fullWidth
               id="title"
               label="Título del Nodo"
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              required
-            />
+              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+              required />
+            
 
             <TextField
               fullWidth
               id="description"
               label="Descripción"
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               multiline
               minRows={5}
-              maxRows={24}
-            />
+              maxRows={24} />
+            
 
-            {isUploadingContent && (
-              <Alert severity="info" sx={{ mb: 1 }}>
+            {isUploadingContent &&
+            <Alert severity="info" sx={{ mb: 1 }}>
                 Subiendo contenido… Completa el título y la descripción del nodo mientras tanto.
               </Alert>
-            )}
+            }
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <Button
@@ -164,8 +162,8 @@ const NodeCreate = () => {
                 variant="contained"
                 color="primary"
                 disabled={!formData.content_profile_id || submitting || isUploadingContent || hasPendingContent}
-                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
-              >
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}>
+                
                 {submitting ? 'Agregando...' : 'Agregar Nodo'}
               </Button>
               <Button
@@ -173,16 +171,16 @@ const NodeCreate = () => {
                 onClick={() => navigate(`/knowledge_path/${pathId}/edit`)}
                 variant="outlined"
                 color="inherit"
-                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
-              >
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}>
+                
                 Cancelar
               </Button>
             </Stack>
           </Box>
         </Box>
       </Box>
-    </Container>
-  );
+    </Container>);
+
 };
 
 export default NodeCreate;

@@ -19,8 +19,8 @@ import {
   Tabs,
   Tab,
   Stack,
-  Link as MuiLink,
-} from "@mui/material";
+  Link as MuiLink } from
+"@mui/material";
 
 const Certificates = ({ isOwnProfile = false, userId = null }) => {
   const [activeTab, setActiveTab] = useState("certificates");
@@ -54,7 +54,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       } else {
         data = await certificatesApi.getUserCertificatesById(userId);
       }
-      console.log("DEBUG: Fetched certificates:", data);
+
       setCertificates(data);
     } catch (err) {
       setError("Error al cargar los certificados");
@@ -210,68 +210,68 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
   return (
     <Box>
       {/* Material-UI Tabs - Only show requests tab for owners */}
-      {isOwnProfile ? (
-        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+      {isOwnProfile ?
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
             <Tab label="Certificados" value="certificates" />
             <Tab label="Solicitudes de certificados" value="requests" />
           </Tabs>
-        </Box>
-      ) : (
-        // For visitors, show a simple header
-        <Box sx={{ mb: 3 }}>
+        </Box> :
+
+      // For visitors, show a simple header
+      <Box sx={{ mb: 3 }}>
           <Typography
-            variant="h4"
-            gutterBottom
-            sx={{
-              fontSize: {
-                xs: "1.5rem", // ~24px on mobile
-                sm: "1.75rem", // ~28px on small screens
-                md: "2.125rem", // ~34px on desktop (default h4)
-              },
-              fontWeight: 600,
-            }}
-          >
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontSize: {
+              xs: "1.5rem", // ~24px on mobile
+              sm: "1.75rem", // ~28px on small screens
+              md: "2.125rem" // ~34px on desktop (default h4)
+            },
+            fontWeight: 600
+          }}>
+          
             Certificados ({certificates.length})
           </Typography>
         </Box>
-      )}
+      }
 
       {/* Tab Content */}
       <Box>
-        {(activeTab === "certificates" || !isOwnProfile) && (
-          <Box>
-            {certificatesLoading ? (
-              <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                minHeight="200px"
-              >
+        {(activeTab === "certificates" || !isOwnProfile) &&
+        <Box>
+            {certificatesLoading ?
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            minHeight="200px">
+            
                 <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error">{error}</Alert>
-            ) : certificates.length === 0 ? (
-              <Typography variant="body1" color="text.secondary">
-                {isOwnProfile
-                  ? "Aún no has obtenido ningún certificado. ¡Completa caminos de conocimiento o asiste a eventos para obtener certificados!"
-                  : "No se encontraron certificados."}
-              </Typography>
-            ) : (
-              <Stack spacing={2}>
-                {certificates.map((certificate) => (
-                  <Card key={certificate.id}>
+              </Box> :
+          error ?
+          <Alert severity="error">{error}</Alert> :
+          certificates.length === 0 ?
+          <Typography variant="body1" color="text.secondary">
+                {isOwnProfile ?
+            "Aún no has obtenido ningún certificado. ¡Completa caminos de conocimiento o asiste a eventos para obtener certificados!" :
+            "No se encontraron certificados."}
+              </Typography> :
+
+          <Stack spacing={2}>
+                {certificates.map((certificate) =>
+            <Card key={certificate.id}>
                     <CardContent>
                       <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: 2,
-                          flexWrap: "wrap",
-                        }}
-                      >
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 2,
+                    flexWrap: "wrap"
+                  }}>
+                  
                         <Box sx={{ flex: 1, minWidth: 240 }}>
                           <Typography variant="h6" color="text.primary">
                             {getCertificateTitle(certificate)}
@@ -282,122 +282,122 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                           <Typography variant="body2" color="text.secondary">
                             Emitido el:{" "}
                             {new Date(
-                              certificate.issued_on
-                            ).toLocaleDateString()}
+                        certificate.issued_on
+                      ).toLocaleDateString()}
                           </Typography>
-                          {certificate.blockchain_hash && (
-                            <Chip
-                              label="En Blockchain"
-                              color="success"
-                              size="small"
-                              sx={{ mt: 1 }}
-                            />
-                          )}
+                          {certificate.blockchain_hash &&
+                    <Chip
+                      label="En Blockchain"
+                      color="success"
+                      size="small"
+                      sx={{ mt: 1 }} />
+
+                    }
                         </Box>
-                        {(certificate.download_url || certificate.certificate_file_url) && (
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            href={certificate.download_url || certificate.certificate_file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
+                        {(certificate.download_url || certificate.certificate_file_url) &&
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    href={certificate.download_url || certificate.certificate_file_url}
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    
                             Descargar
                           </Button>
-                        )}
+                  }
                       </Box>
                     </CardContent>
                   </Card>
-                ))}
-              </Stack>
             )}
+              </Stack>
+          }
           </Box>
-        )}
-        {isOwnProfile && activeTab === "requests" && (
-          <Box>
-            {requestsLoading ? (
-              <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                minHeight="200px"
-              >
+        }
+        {isOwnProfile && activeTab === "requests" &&
+        <Box>
+            {requestsLoading ?
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            minHeight="200px">
+            
                 <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error">{error}</Alert>
-            ) : requests.length === 0 ? (
-              <Box textAlign="center" py={4}>
+              </Box> :
+          error ?
+          <Alert severity="error">{error}</Alert> :
+          requests.length === 0 ?
+          <Box textAlign="center" py={4}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
                   ¿Tienes algo que enseñar? Crea un Camino de Conocimiento o un Evento
                   y emite certificados
                 </Typography>
                 <Box
-                  mt={3}
-                  sx={{
-                    display: {
-                      xs: "block", // mobile → stacked
-                      md: "flex", // md and up → flex row
-                    },
-                  }}
-                  gap={2}
-                  justifyContent="center"
-                >
+              mt={3}
+              sx={{
+                display: {
+                  xs: "block", // mobile → stacked
+                  md: "flex" // md and up → flex row
+                }
+              }}
+              gap={2}
+              justifyContent="center">
+              
                   <Button
-                    sx={{
-                      mb: {
-                        xs: 2, // vertical spacing between children on mobile
-                        md: 0, // no spacing when flex row
-                      },
-                    }}
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate("/knowledge_path/create")}
-                  >
+                sx={{
+                  mb: {
+                    xs: 2, // vertical spacing between children on mobile
+                    md: 0 // no spacing when flex row
+                  }
+                }}
+                variant="contained"
+                color="primary"
+                onClick={() => navigate("/knowledge_path/create")}>
+                
                     Crear camino de conocimiento
                   </Button>
                   <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={() => navigate("/events/create")}
-                  >
+                variant="contained"
+                color="secondary"
+                onClick={() => navigate("/events/create")}>
+                
                     Crear un evento
                   </Button>
                 </Box>
-              </Box>
-            ) : (
-              <Stack spacing={4}>
+              </Box> :
+
+          <Stack spacing={4}>
                 {/* Teacher View */}
                 {requests.filter(
-                  (req) =>
-                    req.knowledge_path_author === authState.user?.username
-                ).length > 0 && (
-                  <Box>
-                    <Typography 
-                      variant="h5" 
-                      gutterBottom 
-                      color="text.primary"
-                      sx={{ fontWeight: 600 }}
-                    >
+              (req) =>
+              req.knowledge_path_author === authState.user?.username
+            ).length > 0 &&
+            <Box>
+                    <Typography
+                variant="h5"
+                gutterBottom
+                color="text.primary"
+                sx={{ fontWeight: 600 }}>
+                
                       Solicitudes para revisar
                     </Typography>
                     {sortRequests(
-                      requests.filter(
-                        (req) =>
-                          req.knowledge_path_author === authState.user?.username
-                      )
-                    ).map((request) => (
-                      <Card key={request.id} sx={{ mb: 2 }}>
+                requests.filter(
+                  (req) =>
+                  req.knowledge_path_author === authState.user?.username
+                )
+              ).map((request) =>
+              <Card key={request.id} sx={{ mb: 2 }}>
                         <CardContent>
                           <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              gap: 2,
-                              flexWrap: "wrap",
-                            }}
-                          >
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 2,
+                      flexWrap: "wrap"
+                    }}>
+                    
                             <Box sx={{ flex: 1, minWidth: 240 }}>
                               <Typography variant="h6">
                                 {getRequestTitle(request)}
@@ -405,10 +405,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                               <Typography variant="body2" color="text.secondary">
                                 Solicitado por:{" "}
                                 <MuiLink
-                                  component={Link}
-                                  to={`/profiles/user_profile/${request.requester_id}`}
-                                  underline="hover"
-                                >
+                          component={Link}
+                          to={`/profiles/user_profile/${request.requester_id}`}
+                          underline="hover">
+                          
                                   {request.requester}
                                 </MuiLink>
                               </Typography>
@@ -416,100 +416,100 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 Tipo: {getRequestType(request)}
                               </Typography>
                               <Chip
-                                label={request.status}
-                                color={getStatusColor(request.status)}
-                                size="small"
-                                sx={{ mt: 1 }}
-                              />
-                              {request.notes &&
-                                ((typeof request.notes === "object" &&
-                                  Object.keys(request.notes).length > 0) ||
-                                  (typeof request.notes === "string" &&
-                                    request.notes.trim() !== "")) && (
-                                  <Typography variant="body2" sx={{ mt: 1 }}>
+                        label={request.status}
+                        color={getStatusColor(request.status)}
+                        size="small"
+                        sx={{ mt: 1 }} />
+                      
+                              {request.notes && (
+                      typeof request.notes === "object" &&
+                      Object.keys(request.notes).length > 0 ||
+                      typeof request.notes === "string" &&
+                      request.notes.trim() !== "") &&
+                      <Typography variant="body2" sx={{ mt: 1 }}>
                                     Notas:{" "}
-                                    {typeof request.notes === "object"
-                                      ? JSON.stringify(request.notes)
-                                      : request.notes}
+                                    {typeof request.notes === "object" ?
+                        JSON.stringify(request.notes) :
+                        request.notes}
                                   </Typography>
-                                )}
+                      }
                             </Box>
 
                             <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
-                              {request.status === "PENDING" && (
-                                <>
+                              {request.status === "PENDING" &&
+                      <>
                                   <Button
-                                    variant="contained"
-                                    color="success"
-                                    onClick={() => openApproveDialog(request)}
-                                  >
+                          variant="contained"
+                          color="success"
+                          onClick={() => openApproveDialog(request)}>
+                          
                                     Aprobar
                                   </Button>
                                   <Button
-                                    variant="contained"
-                                    color="error"
-                                    onClick={() => openRejectDialog(request)}
-                                  >
+                          variant="contained"
+                          color="error"
+                          onClick={() => openRejectDialog(request)}>
+                          
                                     Rechazar
                                   </Button>
                                 </>
-                              )}
-                              {request.status === "REJECTED" && (
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  onClick={() => openApproveDialog(request)}
-                                >
+                      }
+                              {request.status === "REJECTED" &&
+                      <Button
+                        variant="contained"
+                        color="success"
+                        onClick={() => openApproveDialog(request)}>
+                        
                                   Aceptar solicitud
                                 </Button>
-                              )}
+                      }
                             </Stack>
                           </Box>
 
-                          {request.rejection_reason && (
-                            <Typography
-                              variant="body2"
-                              color="error"
-                              sx={{ mt: 1 }}
-                            >
+                          {request.rejection_reason &&
+                  <Typography
+                    variant="body2"
+                    color="error"
+                    sx={{ mt: 1 }}>
+                    
                               Rejection reason: {request.rejection_reason}
                             </Typography>
-                          )}
+                  }
                         </CardContent>
                       </Card>
-                    ))}
+              )}
                   </Box>
-                )}
+            }
 
                 {/* Student View */}
                 {requests.filter(
-                  (req) => req.requester === authState.user?.username
-                ).length > 0 && (
-                  <Box>
-                    <Typography 
-                      variant="h5" 
-                      gutterBottom 
-                      color="text.primary"
-                      sx={{ fontWeight: 600 }}
-                    >
+              (req) => req.requester === authState.user?.username
+            ).length > 0 &&
+            <Box>
+                    <Typography
+                variant="h5"
+                gutterBottom
+                color="text.primary"
+                sx={{ fontWeight: 600 }}>
+                
                       Mis solicitudes
                     </Typography>
                     {sortRequests(
-                      requests.filter(
-                        (req) => req.requester === authState.user?.username
-                      )
-                    ).map((request) => (
-                      <Card key={request.id} sx={{ mb: 2 }}>
+                requests.filter(
+                  (req) => req.requester === authState.user?.username
+                )
+              ).map((request) =>
+              <Card key={request.id} sx={{ mb: 2 }}>
                         <CardContent>
                           <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              gap: 2,
-                              flexWrap: "wrap",
-                            }}
-                          >
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 2,
+                      flexWrap: "wrap"
+                    }}>
+                    
                             <Box sx={{ flex: 1, minWidth: 240 }}>
                               <Typography variant="h6" color="text.primary">
                                 {getRequestTitle(request)}
@@ -517,80 +517,80 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                               <Typography variant="body2" color="text.secondary">
                                 Solicitado el:{" "}
                                 {new Date(
-                                  request.request_date
-                                ).toLocaleDateString()}
+                          request.request_date
+                        ).toLocaleDateString()}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 Autor:{" "}
                                 <MuiLink
-                                  component={Link}
-                                  to={`/profiles/user_profile/${
-                                    request.knowledge_path_author_id ||
-                                    request.event_owner_id
-                                  }`}
-                                  underline="hover"
-                                >
+                          component={Link}
+                          to={`/profiles/user_profile/${
+                          request.knowledge_path_author_id ||
+                          request.event_owner_id}`
+                          }
+                          underline="hover">
+                          
                                   {request.knowledge_path_author ||
-                                    request.event_owner}
+                          request.event_owner}
                                 </MuiLink>
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 Tipo: {getRequestType(request)}
                               </Typography>
                               <Chip
-                                label={request.status}
-                                color={getStatusColor(request.status)}
-                                size="small"
-                                sx={{ mt: 1 }}
-                              />
-                              {request.notes &&
-                                ((typeof request.notes === "object" &&
-                                  Object.keys(request.notes).length > 0) ||
-                                  (typeof request.notes === "string" &&
-                                    request.notes.trim() !== "")) && (
-                                  <Typography variant="body2" sx={{ mt: 1 }}>
+                        label={request.status}
+                        color={getStatusColor(request.status)}
+                        size="small"
+                        sx={{ mt: 1 }} />
+                      
+                              {request.notes && (
+                      typeof request.notes === "object" &&
+                      Object.keys(request.notes).length > 0 ||
+                      typeof request.notes === "string" &&
+                      request.notes.trim() !== "") &&
+                      <Typography variant="body2" sx={{ mt: 1 }}>
                                     Notas:{" "}
-                                    {typeof request.notes === "object"
-                                      ? JSON.stringify(request.notes)
-                                      : request.notes}
+                                    {typeof request.notes === "object" ?
+                        JSON.stringify(request.notes) :
+                        request.notes}
                                   </Typography>
-                                )}
+                      }
                             </Box>
-                            {request.status === "PENDING" && (
-                              <Button
-                                variant="outlined"
-                                color="error"
-                                onClick={() => handleCancel(request.id)}
-                              >
+                            {request.status === "PENDING" &&
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => handleCancel(request.id)}>
+                      
                                 Cancelar
                               </Button>
-                            )}
+                    }
                           </Box>
-                          {request.rejection_reason && (
-                            <Typography
-                              variant="body2"
-                              color="error"
-                              sx={{ mt: 1 }}
-                            >
+                          {request.rejection_reason &&
+                  <Typography
+                    variant="body2"
+                    color="error"
+                    sx={{ mt: 1 }}>
+                    
                               Motivo del rechazo: {request.rejection_reason}
                             </Typography>
-                          )}
+                  }
                         </CardContent>
                       </Card>
-                    ))}
+              )}
                   </Box>
-                )}
+            }
               </Stack>
-            )}
+          }
           </Box>
-        )}
+        }
       </Box>
 
       {/* Approve Dialog */}
       <Dialog
         open={approveDialogOpen}
-        onClose={() => setApproveDialogOpen(false)}
-      >
+        onClose={() => setApproveDialogOpen(false)}>
+        
         <DialogTitle>Aprobar solicitud de certificado</DialogTitle>
         <DialogContent>
           <TextField
@@ -602,8 +602,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             multiline
             rows={4}
             value={approveNote}
-            onChange={(e) => setApproveNote(e.target.value)}
-          />
+            onChange={(e) => setApproveNote(e.target.value)} />
+          
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
@@ -616,8 +616,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       {/* Reject Dialog */}
       <Dialog
         open={rejectDialogOpen}
-        onClose={() => setRejectDialogOpen(false)}
-      >
+        onClose={() => setRejectDialogOpen(false)}>
+        
         <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
         <DialogContent>
           <TextField
@@ -630,8 +630,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             multiline
             rows={4}
             value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-          />
+            onChange={(e) => setRejectReason(e.target.value)} />
+          
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
@@ -640,8 +640,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  );
+    </Box>);
+
 };
 
 export default Certificates;

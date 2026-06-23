@@ -1,150 +1,150 @@
 import React, { useState } from 'react';
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    TextField,
-    Box,
-    IconButton,
-    Tooltip
-} from '@mui/material';
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Box,
+  IconButton,
+  Tooltip } from
+'@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 
 const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
-    const [openModal, setOpenModal] = useState(false);
-    const [formData, setFormData] = useState({
-        title: '',
-        author: '',
-        personalNote: ''
+  const [openModal, setOpenModal] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    author: '',
+    personalNote: ''
+  });
+
+  const handleOpen = (event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    // Handle different content structures:
+    // 1. From ContentDetailsTopic: content.selected_profile.title/author
+    // 2. From PublicationDetail: content.title/author (profile data)
+    // 3. Fallback to original content data
+    const title = content?.selected_profile?.title ||
+    content?.title ||
+    content?.content?.original_title ||
+    content?.original_title || '';
+
+    const author = content?.selected_profile?.author ||
+    content?.author ||
+    content?.content?.original_author ||
+    content?.original_author || '';
+
+    setFormData({
+      title: title,
+      author: author,
+      personalNote: ''
     });
+    setOpenModal(true);
+  };
 
-    const handleOpen = (event) => {
-        if (event) {
-            event.stopPropagation();
-        }
-        
-        // Handle different content structures:
-        // 1. From ContentDetailsTopic: content.selected_profile.title/author
-        // 2. From PublicationDetail: content.title/author (profile data)
-        // 3. Fallback to original content data
-        const title = content?.selected_profile?.title || 
-                     content?.title || 
-                     content?.content?.original_title || 
-                     content?.original_title || '';
-        
-        const author = content?.selected_profile?.author || 
-                      content?.author || 
-                      content?.content?.original_author || 
-                      content?.original_author || '';
-        
-        setFormData({
-            title: title,
-            author: author,
-            personalNote: ''
-        });
-        setOpenModal(true);
-    };
+  const handleClose = () => {
+    setOpenModal(false);
+  };
 
-    const handleClose = () => {
-        setOpenModal(false);
-    };
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-    const handleFormChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
+  const handleSubmit = async () => {
+    try {
+      // Get the correct content ID based on the content structure
+      // For ContentDetailsTopic: content.id is the Content ID
+      // For PublicationDetail: content.id is the ContentProfile ID, content.content.id is the Content ID
+      const contentId = content?.content?.id || content?.id;
 
-    const handleSubmit = async () => {
-        try {
-            // Get the correct content ID based on the content structure
-            // For ContentDetailsTopic: content.id is the Content ID
-            // For PublicationDetail: content.id is the ContentProfile ID, content.content.id is the Content ID
-            const contentId = content?.content?.id || content?.id;
-            
-            if (!contentId) {
-                console.error('AddToLibraryModal: No content ID found in content object:', content);
-                return;
-            }
-            
-            console.log('AddToLibraryModal: Creating content profile for content ID:', contentId);
-            await contentApi.createContentProfile(contentId, formData);
-            handleClose();
-            if (onSuccess) {
-                onSuccess();
-            }
-        } catch (error) {
-            console.error('Error adding to library:', error);
-        }
-    };
+      if (!contentId) {
+        console.error('AddToLibraryModal: No content ID found in content object:', content);
+        return;
+      }
 
-    return (
-        <>
+
+      await contentApi.createContentProfile(contentId, formData);
+      handleClose();
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Error adding to library:', error);
+    }
+  };
+
+  return (
+    <>
             <Tooltip title="Agregar a mi Biblioteca">
-                {buttonProps?.variant ? (
-                    // Show as a button with text when buttonProps are provided
-                    <Button
-                        onClick={handleOpen}
-                        startIcon={<AddIcon />}
-                        {...buttonProps}
-                    >
+                {buttonProps?.variant ?
+        // Show as a button with text when buttonProps are provided
+        <Button
+          onClick={handleOpen}
+          startIcon={<AddIcon />}
+          {...buttonProps}>
+          
                         Agregar a mi Biblioteca
-                    </Button>
-                ) : (
-                    // Show as an icon button (default behavior)
-                    <IconButton
-                        onClick={handleOpen}
-                        color="primary"
-                        size="small"
-                        {...buttonProps}
-                    >
+                    </Button> :
+
+        // Show as an icon button (default behavior)
+        <IconButton
+          onClick={handleOpen}
+          color="primary"
+          size="small"
+          {...buttonProps}>
+          
                         <AddIcon />
                     </IconButton>
-                )}
+        }
             </Tooltip>
 
-            <Dialog 
-                open={openModal} 
-                onClose={handleClose} 
-                maxWidth="sm" 
-                fullWidth
-                keepMounted={false}
-                disablePortal={false}
-                aria-labelledby="add-to-library-dialog-title"
-            >
+            <Dialog
+        open={openModal}
+        onClose={handleClose}
+        maxWidth="sm"
+        fullWidth
+        keepMounted={false}
+        disablePortal={false}
+        aria-labelledby="add-to-library-dialog-title">
+        
                 <DialogTitle id="add-to-library-dialog-title">Agregar a mi Biblioteca</DialogTitle>
                 <DialogContent>
                     <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <TextField
-                            name="title"
-                            label="Título"
-                            value={formData.title}
-                            onChange={handleFormChange}
-                            fullWidth
-                            required
-                        />
+              name="title"
+              label="Título"
+              value={formData.title}
+              onChange={handleFormChange}
+              fullWidth
+              required />
+            
                         <TextField
-                            name="author"
-                            label="Autor"
-                            value={formData.author}
-                            onChange={handleFormChange}
-                            fullWidth
-                        />
+              name="author"
+              label="Autor"
+              value={formData.author}
+              onChange={handleFormChange}
+              fullWidth />
+            
                         <TextField
-                            name="personalNote"
-                            label="Nota personal"
-                            value={formData.personalNote}
-                            onChange={handleFormChange}
-                            multiline
-                            rows={4}
-                            fullWidth
-                            placeholder="Agrega tus pensamientos o notas sobre este contenido..."
-                        />
+              name="personalNote"
+              label="Nota personal"
+              value={formData.personalNote}
+              onChange={handleFormChange}
+              multiline
+              rows={4}
+              fullWidth
+              placeholder="Agrega tus pensamientos o notas sobre este contenido..." />
+            
                     </Box>
                 </DialogContent>
                 <DialogActions>
@@ -154,8 +154,8 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </>
-    );
+        </>);
+
 };
 
-export default AddToLibraryModal; 
+export default AddToLibraryModal;

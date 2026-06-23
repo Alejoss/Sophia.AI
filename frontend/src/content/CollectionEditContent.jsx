@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-    Box, 
-    Typography, 
-    IconButton, 
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    Button,
-    Alert,
-    Chip,
-    Link as MuiLink,
-    Divider,
-    TextField,
-    FormControlLabel,
-    Switch,
-} from '@mui/material';
+import {
+  Box,
+  Typography,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Button,
+  Alert,
+  Chip,
+  Link as MuiLink,
+  Divider,
+  TextField,
+  FormControlLabel,
+  Switch } from
+'@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AddIcon from '@mui/icons-material/Add';
@@ -30,258 +30,247 @@ import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 
 const CollectionEditContent = () => {
-    const { collectionId } = useParams();
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [collectionData, setCollectionData] = useState(null);
-    const [collectionName, setCollectionName] = useState('');
-    const [editingName, setEditingName] = useState(false);
-    const [tempCollectionName, setTempCollectionName] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [saving, setSaving] = useState(false);
-    const [savingName, setSavingName] = useState(false);
-    const [savingPrivacy, setSavingPrivacy] = useState(false);
-    const [isPublic, setIsPublic] = useState(false);
-    const [showAddContent, setShowAddContent] = useState(false);
+  const { collectionId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collectionData, setCollectionData] = useState(null);
+  const [collectionName, setCollectionName] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [tempCollectionName, setTempCollectionName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [showAddContent, setShowAddContent] = useState(false);
 
-    useEffect(() => {
-        const fetchCollectionData = async () => {
-            try {
-                const [collectionInfo, contentData] = await Promise.all([
-                    contentApi.getCollection(collectionId),
-                    contentApi.getCollectionContent(collectionId)
-                ]);
-
-                if (collectionInfo.is_owner === false) {
-                    navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state });
-                    setLoading(false);
-                    return;
-                }
-
-                setCollectionName(collectionInfo.name || '');
-                setIsPublic(!!collectionInfo.is_public);
-                setCollectionData(contentData || []);
-                setLoading(false);
-            } catch (err) {
-                console.error('Error fetching collection data:', err);
-                setError('Error al obtener los datos de la colección');
-                setLoading(false);
-            }
-        };
-
-        fetchCollectionData();
-    }, [collectionId, navigate]);
-
-    const handleContentRemove = async (contentProfileId) => {
-        console.log('Removing content profile:', contentProfileId);
-        try {
-            setSaving(true);
-            await contentApi.removeContentFromCollection(contentProfileId);
-            console.log('Content removed successfully');
-            setCollectionData(prev => prev.filter(content => content.id !== contentProfileId));
-            setSaving(false);
-        } catch (err) {
-            console.error('Error removing content:', err);
-            setError('Error al eliminar contenido de la colección');
-            setSaving(false);
-        }
-    };
-
-    const handleCancelAdd = () => {
-        console.log('Canceling add content');
-        setShowAddContent(false);
-    };
-
-    const handleSaveAdd = async (selectedContentProfileIds) => {
-        console.log('Saving selected content profiles:', selectedContentProfileIds);
-        try {
-            setSaving(true);
-            // Make a single API call with all selected content profile IDs
-            await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
-            console.log('All content added successfully');
-            // Refresh collection content
-            const data = await contentApi.getCollectionContent(collectionId);
-            console.log('Refreshed collection content:', data);
-            setCollectionData(data);
-            setShowAddContent(false);
-            setSaving(false);
-        } catch (error) {
-            console.error('Error adding content:', error);
-            setError('Error al agregar contenido a la colección');
-            setSaving(false);
-        }
-    };
-
-    const handleStartEditName = () => {
-        setTempCollectionName(collectionName);
-        setEditingName(true);
-    };
-
-    const handleCancelEditName = () => {
-        setEditingName(false);
-        setTempCollectionName('');
-    };
-
-    const handleSaveName = async () => {
-        if (!tempCollectionName.trim()) {
-            setError('El nombre de la colección no puede estar vacío');
-            return;
-        }
-
-        try {
-            setSavingName(true);
-            const updatedCollection = await contentApi.updateCollection(collectionId, {
-                name: tempCollectionName.trim()
-            });
-            setCollectionName(updatedCollection.name);
-            setEditingName(false);
-            setSavingName(false);
-        } catch (err) {
-            console.error('Error updating collection name:', err);
-            setError('Error al actualizar el nombre de la colección');
-            setSavingName(false);
-        }
-    };
-
-    const handleTogglePublic = async (event) => {
-        const next = event.target.checked;
-        try {
-            setSavingPrivacy(true);
-            setError(null);
-            const updated = await contentApi.updateCollection(collectionId, { is_public: next });
-            setIsPublic(!!updated.is_public);
-        } catch (err) {
-            console.error('Error updating collection visibility:', err);
-            setError('No se pudo actualizar la visibilidad de la colección');
-        } finally {
-            setSavingPrivacy(false);
-        }
-    };
-
-    const filterContent = (content) => {
-        // Filter out content that's already in this collection
-        const isInCollection = content.collection === parseInt(collectionId);
-        console.log('CollectionEditContent filtering content:', {
-            contentId: content.id,
-            contentTitle: content.title,
-            collectionId: collectionId,
-            contentCollection: content.collection,
-            isInCollection,
-            contentStructure: JSON.stringify(content, null, 2)
-        });
-        return !isInCollection;
-    };
-
-    if (loading) {
-        console.log('Component is loading...');
-        return <Typography>Cargando contenido de la colección...</Typography>;
-    }
-    if (error) {
-        console.log('Component has error:', error);
-        return <Alert severity="error">{error}</Alert>;
-    }
-    if (!collectionData) {
-        console.log('No collection data available');
-        return <Alert severity="error">Colección no encontrada</Alert>;
-    }
-
-    if (showAddContent) {
-        console.log('Showing add content view');
-        return (
-            <LibrarySelectMultiple
-                title="Agregar contenido a la colección"
-                description="Selecciona contenido de tu biblioteca para agregar a esta colección"
-                onCancel={handleCancelAdd}
-                onSave={handleSaveAdd}
-                filterFunction={filterContent}
-                contextName={collectionName}
-            />
+  useEffect(() => {
+    const fetchCollectionData = async () => {
+      try {
+        const [collectionInfo, contentData] = await Promise.all([
+        contentApi.getCollection(collectionId),
+        contentApi.getCollectionContent(collectionId)]
         );
+
+        if (collectionInfo.is_owner === false) {
+          navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state });
+          setLoading(false);
+          return;
+        }
+
+        setCollectionName(collectionInfo.name || '');
+        setIsPublic(!!collectionInfo.is_public);
+        setCollectionData(contentData || []);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching collection data:', err);
+        setError('Error al obtener los datos de la colección');
+        setLoading(false);
+      }
+    };
+
+    fetchCollectionData();
+  }, [collectionId, navigate]);
+
+  const handleContentRemove = async (contentProfileId) => {
+
+    try {
+      setSaving(true);
+      await contentApi.removeContentFromCollection(contentProfileId);
+
+      setCollectionData((prev) => prev.filter((content) => content.id !== contentProfileId));
+      setSaving(false);
+    } catch (err) {
+      console.error('Error removing content:', err);
+      setError('Error al eliminar contenido de la colección');
+      setSaving(false);
+    }
+  };
+
+  const handleCancelAdd = () => {
+
+    setShowAddContent(false);
+  };
+
+  const handleSaveAdd = async (selectedContentProfileIds) => {
+
+    try {
+      setSaving(true);
+      // Make a single API call with all selected content profile IDs
+      await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
+
+      // Refresh collection content
+      const data = await contentApi.getCollectionContent(collectionId);
+
+      setCollectionData(data);
+      setShowAddContent(false);
+      setSaving(false);
+    } catch (error) {
+      console.error('Error adding content:', error);
+      setError('Error al agregar contenido a la colección');
+      setSaving(false);
+    }
+  };
+
+  const handleStartEditName = () => {
+    setTempCollectionName(collectionName);
+    setEditingName(true);
+  };
+
+  const handleCancelEditName = () => {
+    setEditingName(false);
+    setTempCollectionName('');
+  };
+
+  const handleSaveName = async () => {
+    if (!tempCollectionName.trim()) {
+      setError('El nombre de la colección no puede estar vacío');
+      return;
     }
 
-    console.log('Rendering collection content view:', {
-        collectionId,
-        collectionName,
-        contentCount: collectionData.length
-    });
+    try {
+      setSavingName(true);
+      const updatedCollection = await contentApi.updateCollection(collectionId, {
+        name: tempCollectionName.trim()
+      });
+      setCollectionName(updatedCollection.name);
+      setEditingName(false);
+      setSavingName(false);
+    } catch (err) {
+      console.error('Error updating collection name:', err);
+      setError('Error al actualizar el nombre de la colección');
+      setSavingName(false);
+    }
+  };
+
+  const handleTogglePublic = async (event) => {
+    const next = event.target.checked;
+    try {
+      setSavingPrivacy(true);
+      setError(null);
+      const updated = await contentApi.updateCollection(collectionId, { is_public: next });
+      setIsPublic(!!updated.is_public);
+    } catch (err) {
+      console.error('Error updating collection visibility:', err);
+      setError('No se pudo actualizar la visibilidad de la colección');
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
+  const filterContent = (content) => {
+    // Filter out content that's already in this collection
+    const isInCollection = content.collection === parseInt(collectionId);
+
+
+    return !isInCollection;
+  };
+
+  if (loading) {
+
+    return <Typography>Cargando contenido de la colección...</Typography>;
+  }
+  if (error) {
+
+    return <Alert severity="error">{error}</Alert>;
+  }
+  if (!collectionData) {
+
+    return <Alert severity="error">Colección no encontrada</Alert>;
+  }
+
+  if (showAddContent) {
 
     return (
-        <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
+      <LibrarySelectMultiple
+        title="Agregar contenido a la colección"
+        description="Selecciona contenido de tu biblioteca para agregar a esta colección"
+        onCancel={handleCancelAdd}
+        onSave={handleSaveAdd}
+        filterFunction={filterContent}
+        contextName={collectionName} />);
+
+
+  }
+
+
+  return (
+    <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
             <Paper sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                    <IconButton 
-                        onClick={() =>
-                            navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state })
-                        }
-                        sx={{ mr: 1 }}
-                    >
+                    <IconButton
+            onClick={() =>
+            navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state })
+            }
+            sx={{ mr: 1 }}>
+            
                         <ArrowBackIcon />
                     </IconButton>
                     <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 1, minWidth: 300 }}>
-                        {editingName ? (
-                            <>
+                        {editingName ?
+            <>
                                 <TextField
-                                    value={tempCollectionName}
-                                    onChange={(e) => setTempCollectionName(e.target.value)}
-                                    variant="outlined"
-                                    size="small"
-                                    sx={{ flexGrow: 1 }}
-                                    disabled={savingName}
-                                    autoFocus
-                                />
+                value={tempCollectionName}
+                onChange={(e) => setTempCollectionName(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ flexGrow: 1 }}
+                disabled={savingName}
+                autoFocus />
+              
                                 <IconButton
-                                    onClick={handleSaveName}
-                                    disabled={savingName}
-                                    color="primary"
-                                >
+                onClick={handleSaveName}
+                disabled={savingName}
+                color="primary">
+                
                                     <SaveIcon />
                                 </IconButton>
                                 <IconButton
-                                    onClick={handleCancelEditName}
-                                    disabled={savingName}
-                                >
+                onClick={handleCancelEditName}
+                disabled={savingName}>
+                
                                     <CancelIcon />
                                 </IconButton>
-                            </>
-                        ) : (
-                            <>
+                            </> :
+
+            <>
                                 <Typography variant="h4" sx={{ flexGrow: 1 }}>
                                     {collectionName}
                                 </Typography>
                                 <IconButton
-                                    onClick={handleStartEditName}
-                                    size="small"
-                                    sx={{ ml: 1 }}
-                                >
+                onClick={handleStartEditName}
+                size="small"
+                sx={{ ml: 1 }}>
+                
                                     <EditIcon fontSize="small" />
                                 </IconButton>
                             </>
-                        )}
+            }
                     </Box>
                     <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<AddIcon />}
-                        onClick={() => setShowAddContent(true)}
-                        sx={{ ml: 'auto' }}
-                    >
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setShowAddContent(true)}
+            sx={{ ml: 'auto' }}>
+            
                         Agregar contenido de tu biblioteca
                     </Button>
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
                     <FormControlLabel
-                        control={
-                            <Switch
-                                checked={isPublic}
-                                onChange={handleTogglePublic}
-                                disabled={savingPrivacy}
-                                color="primary"
-                            />
-                        }
-                        label={
-                            <Box>
+            control={
+            <Switch
+              checked={isPublic}
+              onChange={handleTogglePublic}
+              disabled={savingPrivacy}
+              color="primary" />
+
+            }
+            label={
+            <Box>
                                 <Typography variant="body2" component="span" display="block">
                                     Colección pública
                                 </Typography>
@@ -289,8 +278,8 @@ const CollectionEditContent = () => {
                                     Visible en la biblioteca para otros usuarios (solo ítems con visibilidad en búsqueda).
                                 </Typography>
                             </Box>
-                        }
-                    />
+            } />
+          
                 </Box>
 
                 <Divider sx={{ my: 3 }} />
@@ -311,67 +300,67 @@ const CollectionEditContent = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {collectionData.map((content) => (
-                                <TableRow 
-                                    key={content.id}
-                                    hover
-                                    sx={{ cursor: 'pointer' }}
-                                >
+                            {collectionData.map((content) =>
+              <TableRow
+                key={content.id}
+                hover
+                sx={{ cursor: 'pointer' }}>
+                
                                     <TableCell>{content.title || 'Sin título'}</TableCell>
                                     <TableCell>
-                                        <Chip 
-                                            label={content.content.media_type} 
-                                            size="small"
-                                            color="primary"
-                                        />
+                                        <Chip
+                    label={content.content.media_type}
+                    size="small"
+                    color="primary" />
+                  
                                     </TableCell>
                                     <TableCell>{content.author || 'Desconocido'}</TableCell>
                                     <TableCell>
                                         <MuiLink
-                                            href={`/content/${content.content.id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{ 
-                                                display: 'flex', 
-                                                alignItems: 'center',
-                                                gap: 0.5,
-                                                color: 'primary.main',
-                                                textDecoration: 'none',
-                                                '&:hover': {
-                                                    textDecoration: 'underline'
-                                                }
-                                            }}
-                                        >
+                    href={`/content/${content.content.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      color: 'primary.main',
+                      textDecoration: 'none',
+                      '&:hover': {
+                        textDecoration: 'underline'
+                      }
+                    }}>
+                    
                                             Ver
                                             <OpenInNewIcon fontSize="small" />
                                         </MuiLink>
                                     </TableCell>
                                     <TableCell>
                                         <Button
-                                            variant="outlined"
-                                            color="error"
-                                            size="small"
-                                            onClick={() => handleContentRemove(content.id)}
-                                            disabled={saving}
-                                        >
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={() => handleContentRemove(content.id)}
+                    disabled={saving}>
+                    
                                             Eliminar
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
-                            {collectionData.length === 0 && (
-                                <TableRow>
+              )}
+                            {collectionData.length === 0 &&
+              <TableRow>
                                     <TableCell colSpan={5} align="center">
                                         No hay contenido en esta colección
                                     </TableCell>
                                 </TableRow>
-                            )}
+              }
                         </TableBody>
                     </Table>
                 </TableContainer>
             </Paper>
-        </Box>
-    );
+        </Box>);
+
 };
 
-export default CollectionEditContent; 
+export default CollectionEditContent;

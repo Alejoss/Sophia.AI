@@ -43,7 +43,7 @@ const getUserProfile = async () => {
   } catch (error) {
     return null;
   }
-}
+};
 
 const getProfileById = async (profileId) => {
   try {
@@ -58,8 +58,8 @@ const updateProfile = async (formData) => {
   try {
     const response = await axiosInstance.put('/profiles/user_profile/', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+        'Content-Type': 'multipart/form-data'
+      }
     });
     return response.data;
   } catch (error) {
@@ -70,10 +70,10 @@ const updateProfile = async (formData) => {
 const apiLogout = async () => {
   try {
     const response = await axiosInstance.post('/profiles/logout/');
-    
+
     // Clear axios headers after successful logout
     delete axiosInstance.defaults.headers.common['Authorization'];
-    
+
     return response;
   } catch (error) {
     // Even if the API call fails, clear the headers
@@ -85,13 +85,13 @@ const apiLogout = async () => {
 const apiLogin = async ({ username, password }) => {
   try {
     const response = await axiosInstance.post('/profiles/login/', { username, password });
-    
+
     // Make sure we have an access token
     if (response.data.access_token) {
       // Set the token in the axios instance
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
     }
-    
+
     return response;
   } catch (error) {
     throw error;
@@ -101,13 +101,13 @@ const apiLogin = async ({ username, password }) => {
 const apiRegister = async (userData) => {
   try {
     const response = await axiosInstance.post('/profiles/register/', userData);
-    
+
     // Make sure we have an access token
     if (response.data.access_token) {
       // Set the token in the axios instance
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
     }
-    
+
     return response;
   } catch (error) {
     throw error;
@@ -122,9 +122,9 @@ async function setCsrfToken() {
       axiosInstance.defaults.headers.common['X-CSRFToken'] = csrftoken;
     }
   } catch (error) {
+
     // Error initializing CSRF token
-  }
-}
+  }}
 
 const refreshToken = async () => {
   try {
@@ -148,12 +148,12 @@ const socialLogin = async (credential) => {
 };
 
 const getNotifications = async (showAll = false) => {
-  console.log('getNotifications called');
+
   try {
-    console.log('Making API request to /profiles/notifications/');
+
     const url = showAll ? '/profiles/notifications/?show_all=true' : '/profiles/notifications/';
     const response = await axiosInstance.get(url);
-    console.log('Notifications API response:', response.data);
+
     return response.data.notifications;
   } catch (error) {
     console.error('Error in getNotifications:', error);
@@ -172,11 +172,11 @@ const getUnreadNotificationsCount = async () => {
 };
 
 const markNotificationAsRead = async (notificationId) => {
-  console.log('markNotificationAsRead called for ID:', notificationId);
+
   try {
-    console.log('Making API request to mark notification as read');
+
     const response = await axiosInstance.post(`/profiles/notifications/${notificationId}/mark-as-read/`);
-    console.log('Mark as read API response:', response.data);
+
     return response.data;
   } catch (error) {
     console.error('Error in markNotificationAsRead:', error);
@@ -185,11 +185,11 @@ const markNotificationAsRead = async (notificationId) => {
 };
 
 const deleteNotification = async (notificationId) => {
-  console.log('deleteNotification called for ID:', notificationId);
+
   try {
-    console.log('Making API request to delete notification');
+
     const response = await axiosInstance.delete(`/profiles/notifications/${notificationId}/delete/`);
-    console.log('Delete notification API response:', response.data);
+
     return response.data;
   } catch (error) {
     console.error('Error in deleteNotification:', error);
@@ -198,11 +198,11 @@ const deleteNotification = async (notificationId) => {
 };
 
 const cleanupNotifications = async () => {
-  console.log('cleanupNotifications called');
+
   try {
-    console.log('Making API request to cleanup notifications');
+
     const response = await axiosInstance.delete('/profiles/notifications/cleanup/');
-    console.log('Cleanup notifications API response:', response.data);
+
     return response.data;
   } catch (error) {
     console.error('Error in cleanupNotifications:', error);
@@ -211,11 +211,11 @@ const cleanupNotifications = async () => {
 };
 
 const markAllNotificationsAsRead = async () => {
-  console.log('markAllNotificationsAsRead called');
+
   try {
-    console.log('Making API request to mark all notifications as read');
+
     const response = await axiosInstance.post('/profiles/notifications/mark-all-as-read/');
-    console.log('Mark all as read API response:', response.data);
+
     return response.data;
   } catch (error) {
     console.error('Error in markAllNotificationsAsRead:', error);
@@ -297,7 +297,7 @@ const changePassword = async (oldPassword, newPassword, confirmPassword) => {
 const submitNewsletterSubscription = async (email) => {
   try {
     const response = await axiosInstance.post('/profiles/newsletter/subscribe/', {
-      email,
+      email
     });
     return response.data;
   } catch (error) {
@@ -306,15 +306,15 @@ const submitNewsletterSubscription = async (email) => {
   }
 };
 
-export { 
-  getUserProfile, 
-  apiLogout, 
-  setCsrfToken, 
-  apiLogin, 
-  checkAuth, 
-  getProfileById, 
-  updateProfile, 
-  apiRegister, 
+export {
+  getUserProfile,
+  apiLogout,
+  setCsrfToken,
+  apiLogin,
+  checkAuth,
+  getProfileById,
+  updateProfile,
+  apiRegister,
   refreshToken,
   socialLogin,
   getNotifications,
@@ -329,5 +329,4 @@ export {
   deleteAcceptedCrypto,
   submitSuggestion,
   changePassword,
-  submitNewsletterSubscription,
-};
+  submitNewsletterSubscription };
