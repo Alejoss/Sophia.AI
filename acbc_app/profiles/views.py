@@ -73,6 +73,21 @@ def set_refresh_token_cookie(response, refresh_token: str) -> None:
     )
 
 
+def clear_refresh_token_cookie(response) -> None:
+    """
+    Expire the refresh token cookie using the same flags as set_refresh_token_cookie.
+
+    delete_cookie() only accepts path/domain/samesite, so httponly/secure must be
+    cleared via set_cookie(max_age=0) to match the original cookie scope.
+    """
+    response.set_cookie(
+        settings.SIMPLE_JWT['REFRESH_COOKIE'],
+        '',
+        max_age=0,
+        **auth_cookie_kwargs(),
+    )
+
+
 class NewsletterSubscriptionForm(forms.Form):
     email = forms.EmailField(
         label="Email",
@@ -721,14 +736,11 @@ class LogoutView(APIView):
             logger.info(f"Processing logout request for user {request.user.username}")
             response = Response({'message': 'Cierre de sesión exitoso'}, status=status.HTTP_200_OK)
             
-            # Get the refresh token cookie name from settings
-            refresh_cookie_name = settings.SIMPLE_JWT['REFRESH_COOKIE']
-            logger.debug(f"Attempting to delete cookie: {refresh_cookie_name}")
-            
-            response.delete_cookie(
-                refresh_cookie_name,
-                **auth_cookie_kwargs(),
+            logger.debug(
+                "Attempting to delete cookie: %s",
+                settings.SIMPLE_JWT['REFRESH_COOKIE'],
             )
+            clear_refresh_token_cookie(response)
             
             logger.info(f"Logout successful for user {request.user.username}")
             return response
