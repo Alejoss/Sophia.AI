@@ -11,9 +11,9 @@ const Notifications = ({
   unreadCount = 0,
   onMarkAsRead = () => {},
   onMarkAllAsRead = () => {},
-  onRefresh = () => {},
+  onRefresh = () => {}
 }) => {
-  console.log('Notifications prop:', notifications);
+
 
   const getNotificationDescription = (notification) => {
     if (notification.verb === 'comentó en tu camino de conocimiento') {
@@ -53,8 +53,8 @@ const Notifications = ({
               <br />
               <br />
               {match[2]}
-            </>
-          );
+            </>);
+
         }
         // Fallback: intentar dividir por el primer ": " después de las comillas de cierre
         const quoteIndex = notification.description.lastIndexOf('"');
@@ -69,8 +69,8 @@ const Notifications = ({
                 <br />
                 <br />
                 {optionalMessage}
-              </>
-            );
+              </>);
+
           }
         }
         return notification.description;
@@ -108,11 +108,11 @@ const Notifications = ({
             fontSize: {
               xs: "1.5rem", // ~24px on mobile
               sm: "1.75rem", // ~28px on small screens
-              md: "2.125rem", // ~34px on desktop (default h4)
+              md: "2.125rem" // ~34px on desktop (default h4)
             },
-            fontWeight: 600,
-          }}
-        >
+            fontWeight: 600
+          }}>
+          
           Notificaciones
         </Typography>
       </Box>
@@ -121,44 +121,44 @@ const Notifications = ({
           Marcar todas como leídas
         </Button>
       </Box>
-      {loading ? (
-        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+      {loading ?
+      <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
           <Stack alignItems="center" spacing={1.5}>
             <CircularProgress size={28} />
             <Typography variant="body2" color="text.secondary">
               Cargando notificaciones...
             </Typography>
           </Stack>
-        </Box>
-      ) : error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : notifications.length === 0 ? (
-        <Alert severity="info">No se encontraron notificaciones</Alert>
-      ) : (
-        <Stack spacing={2}>
+        </Box> :
+      error ?
+      <Alert severity="error">{error}</Alert> :
+      notifications.length === 0 ?
+      <Alert severity="info">No se encontraron notificaciones</Alert> :
+
+      <Stack spacing={2}>
           {notifications.map((notification) => {
-            console.log('Notification:', notification);
-            return (
-              <Paper
-                key={notification.id}
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  borderColor: notification.unread ? 'primary.light' : 'divider',
-                  bgcolor: notification.unread ? 'action.hover' : 'background.paper',
-                }}
-              >
+
+          return (
+            <Paper
+              key={notification.id}
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderColor: notification.unread ? 'primary.light' : 'divider',
+                bgcolor: notification.unread ? 'action.hover' : 'background.paper'
+              }}>
+              
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                   <Box sx={{ flex: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {notification.actor && notification.actor_id ? (
-                        <MuiLink component={Link} to={`/profiles/user_profile/${notification.actor_id}`} underline="hover">
+                      {notification.actor && notification.actor_id ?
+                      <MuiLink component={Link} to={`/profiles/user_profile/${notification.actor_id}`} underline="hover">
                           {notification.actor}
-                        </MuiLink>
-                      ) : (
-                        notification.actor
-                      )}
+                        </MuiLink> :
+
+                      notification.actor
+                      }
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {new Date(notification.timestamp).toLocaleString()}
@@ -169,45 +169,45 @@ const Notifications = ({
                       <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
                       {getNotificationDescription(notification)}
                       </Typography>
-                    {notification.target_url && (
-                      <MuiLink
-                        component={Link}
-                        to={notification.target_url}
-                        underline="none"
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', ml: 1 }}
-                      >
+                    {notification.target_url &&
+                    <MuiLink
+                      component={Link}
+                      to={notification.target_url}
+                      underline="none"
+                      color="text.secondary"
+                      sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                      
                         <ApiIcon sx={{ fontSize: 20 }} />
                       </MuiLink>
-                    )}
+                    }
                     </Box>
                   </Box>
 
-                  {notification.unread && (
-                    <Tooltip title="Marcar como leída" arrow>
+                  {notification.unread &&
+                <Tooltip title="Marcar como leída" arrow>
                       <IconButton
-                        color="primary"
-                        onClick={() => onMarkAsRead(notification.id)}
-                      >
+                    color="primary"
+                    onClick={() => onMarkAsRead(notification.id)}>
+                    
                         <CheckCircleIcon sx={{ fontSize: 20 }} />
                       </IconButton>
                     </Tooltip>
-                  )}
+                }
                 </Box>
-              </Paper>
-            );
-          })}
+              </Paper>);
+
+        })}
         </Stack>
-      )}
+      }
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{ textAlign: 'center', display: 'block', mt: 2.5, fontStyle: 'italic' }}
-      >
+        sx={{ textAlign: 'center', display: 'block', mt: 2.5, fontStyle: 'italic' }}>
+        
         Las notificaciones leídas se eliminan después de 30 días
       </Typography>
-    </Container>
-  );
+    </Container>);
+
 };
 
-export default Notifications; 
+export default Notifications;

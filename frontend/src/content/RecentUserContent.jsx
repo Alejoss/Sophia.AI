@@ -12,9 +12,9 @@ const RecentUserContent = () => {
   useEffect(() => {
     const fetchRecentContent = async () => {
       try {
-        console.log('\n=== Fetching Recent Content ===');
+
         const data = await contentApi.getRecentContent();
-        console.log('Recent content data:', JSON.stringify(data, null, 2));
+
         setRecentContent(data);
         setLoading(false);
       } catch (err) {
@@ -35,16 +35,16 @@ const RecentUserContent = () => {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
         <CircularProgress />
-      </Box>
-    );
+      </Box>);
+
   }
 
   if (error) {
     return (
       <Typography color="error" align="center">
         {error}
-      </Typography>
-    );
+      </Typography>);
+
   }
 
   return (
@@ -61,21 +61,21 @@ const RecentUserContent = () => {
                 variant="simple"
                 showAuthor={false}
                 maxImageHeight={150}
-                onClick={() => handleContentClick(profile.content.id)}
-              />
-            </Grid>
-          );
+                onClick={() => handleContentClick(profile.content.id)} />
+              
+            </Grid>);
+
         })}
-        {recentContent.length === 0 && (
-          <Grid item xs={12}>
+        {recentContent.length === 0 &&
+        <Grid item xs={12}>
             <Typography color="text.secondary" align="center">
               No se encontró contenido reciente
             </Typography>
           </Grid>
-        )}
+        }
       </Grid>
-    </Box>
-  );
+    </Box>);
+
 };
 
-export default RecentUserContent; 
+export default RecentUserContent;

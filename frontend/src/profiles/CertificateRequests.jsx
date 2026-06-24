@@ -18,8 +18,8 @@ import {
   Box,
   Chip,
   Stack,
-  Link as MuiLink,
-} from '@mui/material';
+  Link as MuiLink } from
+'@mui/material';
 
 const CertificateRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -114,8 +114,8 @@ const CertificateRequests = () => {
 
   const sortRequests = (requests) => {
     // First, separate requests into pending and non-pending
-    const pendingRequests = requests.filter(req => req.status === 'PENDING');
-    const nonPendingRequests = requests.filter(req => req.status !== 'PENDING');
+    const pendingRequests = requests.filter((req) => req.status === 'PENDING');
+    const nonPendingRequests = requests.filter((req) => req.status !== 'PENDING');
 
     // Sort non-pending requests by date (newest first)
     nonPendingRequests.sort((a, b) => new Date(b.request_date) - new Date(a.request_date));
@@ -129,14 +129,7 @@ const CertificateRequests = () => {
 
     return sortedRequests.map((request) => {
       // Debug logs for each request
-      console.log('Request data:', {
-        id: request.id,
-        status: request.status,
-        knowledge_path_author: request.knowledge_path_author,
-        current_user: authState.user?.username,
-        isTeacher: request.knowledge_path_author === authState.user?.username,
-        isRejected: request.status === 'REJECTED'
-      });
+
 
       return (
         <Card key={request.id} sx={{ mb: 2 }}>
@@ -147,114 +140,112 @@ const CertificateRequests = () => {
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
                 gap: 2,
-                flexWrap: 'wrap',
-              }}
-            >
+                flexWrap: 'wrap'
+              }}>
+              
               <Box sx={{ flex: 1, minWidth: 240 }}>
                 <Typography variant="h6" color="text.primary">
                   {request.knowledge_path_title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {isTeacherView ? (
-                    <>
+                  {isTeacherView ?
+                  <>
                       Solicitado por:{' '}
                       <MuiLink
-                        component={Link}
-                        to={`/profiles/user_profile/${request.requester_id}`}
-                        underline="hover"
-                      >
+                      component={Link}
+                      to={`/profiles/user_profile/${request.requester_id}`}
+                      underline="hover">
+                      
                         {request.requester}
                       </MuiLink>
-                    </>
-                  ) : (
-                    `Solicitado el: ${new Date(request.request_date).toLocaleDateString()}`
-                  )}
+                    </> :
+
+                  `Solicitado el: ${new Date(request.request_date).toLocaleDateString()}`
+                  }
                 </Typography>
-                {!isTeacherView && (
-                  <Typography variant="body2" color="text.secondary">
+                {!isTeacherView &&
+                <Typography variant="body2" color="text.secondary">
                     Autor: {request.knowledge_path_author}
                   </Typography>
-                )}
+                }
                 <Chip
                   label={request.status}
                   color={getStatusColor(request.status)}
                   size="small"
-                  sx={{ mt: 1 }}
-                />
-                {request.notes && 
-                 ((typeof request.notes === 'object' && Object.keys(request.notes).length > 0) || 
-                  (typeof request.notes === 'string' && request.notes.trim() !== '')) && (
-                  <Typography variant="body2" sx={{ mt: 1 }}>
+                  sx={{ mt: 1 }} />
+                
+                {request.notes && (
+                typeof request.notes === 'object' && Object.keys(request.notes).length > 0 ||
+                typeof request.notes === 'string' && request.notes.trim() !== '') &&
+                <Typography variant="body2" sx={{ mt: 1 }}>
                     Notas: {typeof request.notes === 'object' ? JSON.stringify(request.notes) : request.notes}
                   </Typography>
-                )}
+                }
               </Box>
 
               <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-                {request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username && (
-                  <>
+                {request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username &&
+                <>
                     <Button
-                      variant="contained"
-                      color="success"
-                      onClick={() => openApproveDialog(request)}
-                    >
+                    variant="contained"
+                    color="success"
+                    onClick={() => openApproveDialog(request)}>
+                    
                       Aprobar
                     </Button>
                     <Button
-                      variant="contained"
-                      color="error"
-                      onClick={() => openRejectDialog(request)}
-                    >
+                    variant="contained"
+                    color="error"
+                    onClick={() => openRejectDialog(request)}>
+                    
                       Rechazar
                     </Button>
                   </>
-                )}
-                {request.status === 'REJECTED' && request.knowledge_path_author === authState.user?.username && (
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={() => openApproveDialog(request)}
-                  >
+                }
+                {request.status === 'REJECTED' && request.knowledge_path_author === authState.user?.username &&
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={() => openApproveDialog(request)}>
+                  
                     Aceptar solicitud
                   </Button>
-                )}
-                {request.status === 'PENDING' && request.requester === authState.user?.username && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleCancel(request.id)}
-                  >
+                }
+                {request.status === 'PENDING' && request.requester === authState.user?.username &&
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => handleCancel(request.id)}>
+                  
                     Cancelar
                   </Button>
-                )}
+                }
               </Stack>
             </Box>
 
-            {request.rejection_reason && (
-              <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            {request.rejection_reason &&
+            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
                 Motivo del rechazo: {request.rejection_reason}
               </Typography>
-            )}
+            }
           </CardContent>
-        </Card>
-      );
+        </Card>);
+
     });
   };
 
   // Add debug logs for the requests data
   useEffect(() => {
-    console.log('All requests:', requests);
-    console.log('Teacher requests:', requests.filter(req => req.knowledge_path_author === authState.user?.username));
-    console.log('Student requests:', requests.filter(req => req.requester === authState.user?.username));
-    console.log('Current user:', authState.user?.username);
+
+
   }, [requests, authState.user]);
 
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
         <CircularProgress />
-      </Box>
-    );
+      </Box>);
+
   }
 
   if (error) {
@@ -262,65 +253,65 @@ const CertificateRequests = () => {
   }
 
   // Separate requests into teacher view (requests to review) and student view (own requests)
-  const teacherRequests = requests.filter(req => req.knowledge_path_author === authState.user?.username);
-  const studentRequests = requests.filter(req => req.requester === authState.user?.username);
+  const teacherRequests = requests.filter((req) => req.knowledge_path_author === authState.user?.username);
+  const studentRequests = requests.filter((req) => req.requester === authState.user?.username);
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Typography 
-        variant="h4" 
-        gutterBottom 
+      <Typography
+        variant="h4"
+        gutterBottom
         color="text.primary"
-        sx={{ fontWeight: 600 }}
-      >
+        sx={{ fontWeight: 600 }}>
+        
         Solicitudes de certificados
       </Typography>
 
-      {requests.length === 0 ? (
-        <Typography variant="body1" color="text.secondary">
+      {requests.length === 0 ?
+      <Typography variant="body1" color="text.secondary">
           No se encontraron solicitudes de certificados.
-        </Typography>
-      ) : (
-        <Stack spacing={4}>
+        </Typography> :
+
+      <Stack spacing={4}>
           {/* Teacher View */}
-          {teacherRequests.length > 0 && (
-            <Box>
-              <Typography 
-                variant="h5" 
-                gutterBottom 
-                color="text.primary"
-                sx={{ fontWeight: 600 }}
-              >
+          {teacherRequests.length > 0 &&
+        <Box>
+              <Typography
+            variant="h5"
+            gutterBottom
+            color="text.primary"
+            sx={{ fontWeight: 600 }}>
+            
                 Solicitudes para revisar
               </Typography>
               {renderRequests(teacherRequests, true)}
             </Box>
-          )}
+        }
 
           {/* Student View */}
-          {studentRequests.length > 0 && (
-            <Box>
-              <Typography 
-                variant="h5" 
-                gutterBottom 
-                color="text.primary"
-                sx={{ fontWeight: 600 }}
-              >
+          {studentRequests.length > 0 &&
+        <Box>
+              <Typography
+            variant="h5"
+            gutterBottom
+            color="text.primary"
+            sx={{ fontWeight: 600 }}>
+            
                 Mis solicitudes
               </Typography>
               {renderRequests(studentRequests, false)}
             </Box>
-          )}
+        }
         </Stack>
-      )}
+      }
 
       {/* Approve Dialog */}
-      <Dialog 
-        open={approveDialogOpen} 
+      <Dialog
+        open={approveDialogOpen}
         onClose={() => setApproveDialogOpen(false)}
         maxWidth="sm"
-        fullWidth
-      >
+        fullWidth>
+        
         <DialogTitle>Aprobar solicitud de certificado</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
@@ -332,29 +323,29 @@ const CertificateRequests = () => {
               placeholder="Opcionalmente agrega una nota al estudiante"
               value={approveNote}
               onChange={(e) => setApproveNote(e.target.value)}
-              variant="outlined"
-            />
+              variant="outlined" />
+            
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
-          <Button 
+          <Button
             onClick={handleApprove}
             variant="contained"
-            color="success"
-          >
+            color="success">
+            
             Aprobar
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog 
-        open={rejectDialogOpen} 
+      <Dialog
+        open={rejectDialogOpen}
         onClose={() => setRejectDialogOpen(false)}
         maxWidth="sm"
-        fullWidth
-      >
+        fullWidth>
+        
         <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
@@ -366,24 +357,24 @@ const CertificateRequests = () => {
               rows={2}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              required
-            />
+              required />
+            
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-          <Button 
+          <Button
             onClick={handleReject}
             variant="contained"
             color="error"
-            disabled={!rejectReason.trim()}
-          >
+            disabled={!rejectReason.trim()}>
+            
             Rechazar
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
-  );
+    </Container>);
+
 };
 
-export default CertificateRequests; 
+export default CertificateRequests;

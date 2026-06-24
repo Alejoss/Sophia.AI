@@ -16,8 +16,8 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
-} from '@mui/material';
+  Typography } from
+'@mui/material';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const Register = () => {
     username: '',
     email: '',
     password: '',
-    confirmPassword: '',
+    confirmPassword: ''
   });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
@@ -65,7 +65,7 @@ const Register = () => {
       'A user with that username already exists.': 'Ya existe un usuario con ese nombre de usuario.',
       'A user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.',
       'user with this username already exists.': 'Ya existe un usuario con ese nombre de usuario.',
-      'user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.',
+      'user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.'
     };
 
     // Check if message is in translations
@@ -113,15 +113,15 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Prevent @ symbol in username field
     if (name === 'username' && value.includes('@')) {
       return; // Don't update the value if it contains @
     }
-    
+
     setFormData((prevData) => ({
       ...prevData,
-      [name]: value,
+      [name]: value
     }));
 
     // Clear error for this field when user starts typing
@@ -181,7 +181,7 @@ const Register = () => {
       username: true,
       email: true,
       password: true,
-      confirmPassword: true,
+      confirmPassword: true
     });
 
     // Validate all fields
@@ -226,7 +226,7 @@ const Register = () => {
     try {
       const { confirmPassword, ...registrationData } = formData;
       const response = await apiRegister(registrationData);
-      console.log("Register API response:", response);
+
 
       if (response.data) {
         const { access_token, ...userData } = response.data;
@@ -236,7 +236,7 @@ const Register = () => {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      
+
       if (error.response && error.response.data) {
         if (typeof error.response.data === 'object' && error.response.data !== null) {
           const backendErrors = {};
@@ -253,9 +253,9 @@ const Register = () => {
             } else {
               // For non-field errors like 'detail' or general 'error' from backend
               if (key === 'detail' || key === 'error') {
-                const errorMsg = typeof error.response.data[key] === 'string' 
-                  ? translateErrorMessage(error.response.data[key])
-                  : JSON.stringify(error.response.data[key]);
+                const errorMsg = typeof error.response.data[key] === 'string' ?
+                translateErrorMessage(error.response.data[key]) :
+                JSON.stringify(error.response.data[key]);
                 setServerError(errorMsg.charAt(0).toUpperCase() + errorMsg.slice(1));
                 continue;
               }
@@ -263,7 +263,7 @@ const Register = () => {
             }
           }
           if (Object.keys(backendErrors).length > 0) {
-            setErrors(prevErrors => ({...prevErrors, ...backendErrors}));
+            setErrors((prevErrors) => ({ ...prevErrors, ...backendErrors }));
           }
         } else {
           // Handle cases where error.response.data is a string
@@ -287,11 +287,11 @@ const Register = () => {
           Crear cuenta
         </Typography>
 
-        {serverError && (
-          <Alert severity="error" sx={{ mb: 2 }} role="alert">
+        {serverError &&
+        <Alert severity="error" sx={{ mb: 2 }} role="alert">
             {serverError}
           </Alert>
-        )}
+        }
 
         <Box component="form" onSubmit={handleSubmit}>
           <Stack spacing={2}>
@@ -309,8 +309,8 @@ const Register = () => {
               }}
               error={Boolean(errors.username)}
               helperText={errors.username || ''}
-              fullWidth
-            />
+              fullWidth />
+            
 
             <TextField
               id="email"
@@ -322,8 +322,8 @@ const Register = () => {
               onBlur={handleBlur}
               error={Boolean(errors.email)}
               helperText={errors.email || ''}
-              fullWidth
-            />
+              fullWidth />
+            
 
             <TextField
               id="password"
@@ -335,42 +335,42 @@ const Register = () => {
               onBlur={handleBlur}
               error={Boolean(errors.password)}
               helperText={
-                Array.isArray(errors.password) ? (
-                  <Box component="span">
-                    {errors.password.map((err, index) => (
-                      <Box key={index} component="span" sx={{ display: 'block' }}>
+              Array.isArray(errors.password) ?
+              <Box component="span">
+                    {errors.password.map((err, index) =>
+                <Box key={index} component="span" sx={{ display: 'block' }}>
                         {err}
                       </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  errors.password || ''
-                )
+                )}
+                  </Box> :
+
+              errors.password || ''
+
               }
               fullWidth
               InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
+                endAdornment:
+                <InputAdornment position="end">
                     <IconButton
-                      edge="end"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    >
+                    edge="end"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                    
                       {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                     </IconButton>
                   </InputAdornment>
-                ),
-              }}
-            />
+
+              }} />
+            
 
             {!errors.password &&
-              touched.password &&
-              formData.password &&
-              validatePassword(formData.password).length === 0 && (
-                <Alert severity="success">
+            touched.password &&
+            formData.password &&
+            validatePassword(formData.password).length === 0 &&
+            <Alert severity="success">
                   La contrasena cumple con todos los requisitos de seguridad.
                 </Alert>
-              )}
+            }
 
             <TextField
               id="confirmPassword"
@@ -384,19 +384,19 @@ const Register = () => {
               helperText={errors.confirmPassword || ''}
               fullWidth
               InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
+                endAdornment:
+                <InputAdornment position="end">
                     <IconButton
-                      edge="end"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    >
+                    edge="end"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                    
                       {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                     </IconButton>
                   </InputAdornment>
-                ),
-              }}
-            />
+
+              }} />
+            
 
             <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
               {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
@@ -407,8 +407,8 @@ const Register = () => {
         <Divider sx={{ my: 3 }}>O continúa con</Divider>
         <SocialLogin />
       </Paper>
-    </Container>
-  );
+    </Container>);
+
 };
 
 export default Register;

@@ -10,8 +10,8 @@ import {
   CircularProgress,
   Stack,
   Paper,
-  Divider,
-} from '@mui/material';
+  Divider } from
+'@mui/material';
 import QuizIcon from '@mui/icons-material/Quiz';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizzesApi from '../api/quizzesApi';
@@ -35,33 +35,33 @@ const NodeEdit = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('Fetching data for node edit');
+
         // Fetch both the knowledge path and node data
         const [pathData, nodeData] = await Promise.all([
-          knowledgePathsApi.getKnowledgePathBasic(pathId),
-          knowledgePathsApi.getNode(pathId, nodeId)
-        ]);
+        knowledgePathsApi.getKnowledgePathBasic(pathId),
+        knowledgePathsApi.getNode(pathId, nodeId)]
+        );
 
-        console.log('Node data:', nodeData);
+
         setKnowledgePath(pathData);
-        
+
         // Check if there's a content_profile_id
         const hasContentProfile = nodeData.content_profile_id !== null && nodeData.content_profile_id !== undefined;
-        console.log('Has content profile?', hasContentProfile, 'content_profile_id:', nodeData.content_profile_id);
-        
+
+
         // Set initial form data with the node information
         setFormData({
           title: nodeData.title,
           description: nodeData.description || '',
           content_profile_id: hasContentProfile ? nodeData.content_profile_id : null
         });
-        
+
         // If we have a content profile ID, fetch the content details
         if (hasContentProfile) {
           try {
-            console.log('Fetching content profile:', nodeData.content_profile_id);
+
             const contentProfileData = await knowledgePathsApi.getNodeContent(nodeData.content_profile_id);
-            console.log('Content profile data:', contentProfileData);
+
             setSelectedContent(contentProfileData);
           } catch (contentErr) {
             console.error('Error fetching content profile:', contentErr);
@@ -72,9 +72,9 @@ const NodeEdit = () => {
         // Fetch quiz associated with this node
         try {
           const quizzesData = await quizzesApi.getQuizzesByPathId(pathId);
-          const quizForNode = Array.isArray(quizzesData) 
-            ? quizzesData.find(quiz => quiz.node === parseInt(nodeId))
-            : null;
+          const quizForNode = Array.isArray(quizzesData) ?
+          quizzesData.find((quiz) => quiz.node === parseInt(nodeId)) :
+          null;
           setNodeQuiz(quizForNode || null);
         } catch (quizErr) {
           console.error('Error fetching quiz:', quizErr);
@@ -92,19 +92,16 @@ const NodeEdit = () => {
   }, [pathId, nodeId]);
 
   const handleContentSelected = (content_profile) => {
-    console.log('Selected content profile:', content_profile);
-    console.log('Content profile title:', content_profile.title);
-    console.log('Content profile original title:', content_profile.content?.original_title);
-    console.log('Current form data:', formData);
-    
+
+
     setSelectedContent(content_profile);
-    setFormData(prev => {
+    setFormData((prev) => {
       const newFormData = {
         ...prev,
         content_profile_id: content_profile.id,
         title: prev.title || content_profile.title || content_profile.content?.original_title || 'Untitled'
       };
-      console.log('New form data being set:', newFormData);
+
       return newFormData;
     });
   };
@@ -114,7 +111,7 @@ const NodeEdit = () => {
     setError(null);
 
     try {
-      console.log('Submitting form data:', formData);
+
       await knowledgePathsApi.updateNode(pathId, nodeId, formData);
       navigate(`/knowledge_path/${pathId}/edit`);
     } catch (err) {
@@ -129,16 +126,16 @@ const NodeEdit = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
-      </Container>
-    );
+      </Container>);
+
   }
 
   if (error) {
     return (
       <Container sx={{ py: 4 }}>
         <Alert severity="error">{error}</Alert>
-      </Container>
-    );
+      </Container>);
+
   }
 
   return (
@@ -157,18 +154,18 @@ const NodeEdit = () => {
             onContentSelected={handleContentSelected}
             onContentRemoved={() => {
               setSelectedContent(null);
-              setFormData(prev => ({
+              setFormData((prev) => ({
                 ...prev,
                 content_profile_id: null
               }));
             }}
             previewVariant="detailed"
-            onPendingContentChange={setHasPendingContent}
-          />
+            onPendingContentChange={setHasPendingContent} />
+          
 
           {/* Quiz Section */}
-          {nodeQuiz && (
-            <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
+          {nodeQuiz &&
+          <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
                 <Stack direction="row" spacing={1} alignItems="center">
                   <QuizIcon color="secondary" />
@@ -177,17 +174,17 @@ const NodeEdit = () => {
                   </Typography>
                 </Stack>
                 <Button
-                  component={Link}
-                  to={`/quizzes/${nodeQuiz.id}/edit`}
-                  variant="outlined"
-                  color="secondary"
-                  sx={{ textTransform: 'none' }}
-                >
+                component={Link}
+                to={`/quizzes/${nodeQuiz.id}/edit`}
+                variant="outlined"
+                color="secondary"
+                sx={{ textTransform: 'none' }}>
+                
                   Editar cuestionario
                 </Button>
               </Stack>
             </Paper>
-          )}
+          }
 
           <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <TextField
@@ -195,20 +192,20 @@ const NodeEdit = () => {
               id="title"
               label="Título del Nodo"
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              required
-            />
+              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+              required />
+            
 
             <TextField
               fullWidth
               id="description"
               label="Descripción"
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               multiline
               minRows={5}
-              maxRows={24}
-            />
+              maxRows={24} />
+            
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <Button
@@ -216,8 +213,8 @@ const NodeEdit = () => {
                 variant="contained"
                 color="success"
                 disabled={hasPendingContent}
-                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
-              >
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}>
+                
                 Guardar Cambios
               </Button>
               <Button
@@ -225,16 +222,16 @@ const NodeEdit = () => {
                 onClick={() => navigate(`/knowledge_path/${pathId}/edit`)}
                 variant="outlined"
                 color="inherit"
-                sx={{ minWidth: { xs: '100%', md: 'auto' } }}
-              >
+                sx={{ minWidth: { xs: '100%', md: 'auto' } }}>
+                
                 Cancelar
               </Button>
             </Stack>
           </Box>
         </Box>
       </Box>
-    </Container>
-  );
+    </Container>);
+
 };
 
 export default NodeEdit;

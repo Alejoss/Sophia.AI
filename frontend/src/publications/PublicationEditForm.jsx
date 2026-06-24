@@ -23,21 +23,21 @@ const PublicationEditForm = () => {
       try {
         setIsFetching(true);
         const publicationData = await contentApi.getPublicationDetails(publicationId);
-        console.log('Publication data:', publicationData);
-        
+
+
         // Set form data
         setFormData({
           text_content: publicationData.text_content || '',
           status: publicationData.status || 'PUBLISHED',
           content_profile_id: publicationData.content_profile_id || null
         });
-        
+
         // Set content if it exists
         if (publicationData.content) {
-          console.log('Setting content:', publicationData.content);
+
           setSelectedContent(publicationData.content);
         }
-        
+
         setError(null);
       } catch (err) {
         console.error('Error fetching publication details:', err);
@@ -51,11 +51,11 @@ const PublicationEditForm = () => {
   }, [publicationId]);
 
   const handleContentSelected = (contentProfile) => {
-    console.log('Content selected for publication edit:', contentProfile);
+
     const contentProfileId = contentProfile.profile_id || contentProfile.id;
-    
+
     setSelectedContent(contentProfile);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       content_profile_id: contentProfileId
     }));
@@ -63,7 +63,7 @@ const PublicationEditForm = () => {
 
   const handleContentRemoved = () => {
     setSelectedContent(null);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       content_profile_id: null
     }));
@@ -76,7 +76,7 @@ const PublicationEditForm = () => {
       const publicationData = {
         ...formData
       };
-      console.log('Sending publication update data:', publicationData);
+
       await contentApi.updatePublication(publicationId, publicationData);
       navigate('/profiles/my_profile');
     } catch (err) {
@@ -110,19 +110,19 @@ const PublicationEditForm = () => {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
         <CircularProgress />
-      </Box>
-    );
+      </Box>);
+
   }
 
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 3 }}>
-        <Link 
+        <Link
           component="button"
           variant="body2"
           onClick={() => navigate('/profiles/my_profile')}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-        >
+          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          
           ← Volver al Perfil
         </Link>
       </Box>
@@ -137,8 +137,8 @@ const PublicationEditForm = () => {
         onContentRemoved={handleContentRemoved}
         previewVariant="preview"
         onUploadingChange={setIsUploadingContent}
-        onPendingContentChange={setHasPendingContent}
-      />
+        onPendingContentChange={setHasPendingContent} />
+      
 
       <Paper elevation={2} sx={{ p: 4 }}>
         <Typography variant="h6" gutterBottom>
@@ -154,8 +154,8 @@ const PublicationEditForm = () => {
           value={formData.text_content}
           onChange={(e) => setFormData({ ...formData, text_content: e.target.value })}
           required
-          sx={{ mb: 3 }}
-        />
+          sx={{ mb: 3 }} />
+        
 
         <Divider sx={{ my: 3 }} />
 
@@ -164,34 +164,34 @@ const PublicationEditForm = () => {
             variant="outlined"
             color="error"
             onClick={handleDelete}
-            disabled={isLoading || isUploadingContent}
-          >
+            disabled={isLoading || isUploadingContent}>
+            
             Eliminar
           </Button>
           <Button
             variant="outlined"
             onClick={handleCancel}
-            disabled={isLoading || isUploadingContent}
-          >
+            disabled={isLoading || isUploadingContent}>
+            
             Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={isLoading || isUploadingContent || hasPendingContent}
-          >
+            disabled={isLoading || isUploadingContent || hasPendingContent}>
+            
             {isLoading ? 'Actualizando...' : 'Actualizar Publicación'}
           </Button>
         </Box>
       </Paper>
 
-      {error && (
-        <Typography color="error" sx={{ mt: 2 }}>
+      {error &&
+      <Typography color="error" sx={{ mt: 2 }}>
           {error}
         </Typography>
-      )}
-    </Box>
-  );
+      }
+    </Box>);
+
 };
 
-export default PublicationEditForm; 
+export default PublicationEditForm;

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -28,59 +28,59 @@ const ErrorMessage = styled.div`
  * Handles Google OAuth login
  */
 const SocialLogin = () => {
-    const navigate = useNavigate();
-    const { updateAuthState } = useContext(AuthContext);
-    const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { updateAuthState } = useContext(AuthContext);
+  const [error, setError] = useState(null);
 
-    const handleCredentialResponse = useCallback(async (response) => {
-        console.log('Google OAuth response received:', response);
-        setError(null);
+  const handleCredentialResponse = useCallback(async (response) => {
 
-        try {
-            // Check if user had previous session data before login using utilities
-            const storedUser = getUserFromLocalStorage();
-            const wasAuthenticated = isAuthenticated();
-            const hadAccessToken = getAccessTokenFromLocalStorage() !== null;
-            const hadPreviousSession = (storedUser !== null) || wasAuthenticated || hadAccessToken;
-            
-            console.log('Attempting to login with Google credential...');
-            const data = await socialLogin(response.credential);
-            console.log('Social login successful, raw response data:', data);
-            
-            if (!data || !data.id || !data.username || !data.email) {
-                console.error('Invalid user data structure:', data);
-                throw new Error('Invalid user data received from server');
-            }
-            
-            // Mark if this is a returning user
-            if (hadPreviousSession) {
-                sessionStorage.setItem('had_previous_session', 'true');
-            }
-            
-            updateAuthState(data, data.access_token);
-            navigate('/profiles/login_successful');
-        } catch (error) {
-            console.error('Google login failed:', error);
-            setError(error.message || 'Failed to login with Google');
-        }
-    }, [updateAuthState, navigate]);
+    setError(null);
 
-    return (
-        <SocialLoginContainer>
+    try {
+      // Check if user had previous session data before login using utilities
+      const storedUser = getUserFromLocalStorage();
+      const wasAuthenticated = isAuthenticated();
+      const hadAccessToken = getAccessTokenFromLocalStorage() !== null;
+      const hadPreviousSession = storedUser !== null || wasAuthenticated || hadAccessToken;
+
+
+      const data = await socialLogin(response.credential);
+
+
+      if (!data || !data.id || !data.username || !data.email) {
+        console.error('Invalid user data structure:', data);
+        throw new Error('Invalid user data received from server');
+      }
+
+      // Mark if this is a returning user
+      if (hadPreviousSession) {
+        sessionStorage.setItem('had_previous_session', 'true');
+      }
+
+      updateAuthState(data, data.access_token);
+      navigate('/profiles/login_successful');
+    } catch (error) {
+      console.error('Google login failed:', error);
+      setError(error.message || 'Failed to login with Google');
+    }
+  }, [updateAuthState, navigate]);
+
+  return (
+    <SocialLoginContainer>
             {error && <ErrorMessage>{error}</ErrorMessage>}
             <GoogleLogin
-                onSuccess={handleCredentialResponse}
-                onError={(error) => {
-                    console.error('Google OAuth error:', error);
-                    setError('Failed to initialize Google login');
-                }}
-                theme="filled_blue"
-                shape="rectangular"
-                text="continue_with"
-                locale="en"
-            />
-        </SocialLoginContainer>
-    );
+        onSuccess={handleCredentialResponse}
+        onError={(error) => {
+          console.error('Google OAuth error:', error);
+          setError('Failed to initialize Google login');
+        }}
+        theme="filled_blue"
+        shape="rectangular"
+        text="continue_with"
+        locale="en" />
+      
+        </SocialLoginContainer>);
+
 };
 
-export default SocialLogin; 
+export default SocialLogin;

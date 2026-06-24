@@ -10,8 +10,8 @@ import {
   Divider,
   IconButton,
   Tooltip,
-  Stack,
-} from "@mui/material";
+  Stack } from
+"@mui/material";
 import { getBookmarks, deleteBookmark } from "../api/bookmarkApi";
 import SchoolIcon from "@mui/icons-material/School";
 import ArticleIcon from "@mui/icons-material/Article";
@@ -30,8 +30,8 @@ const Bookmarks = () => {
   const fetchBookmarks = async () => {
     try {
       const bookmarksData = await getBookmarks();
-      console.log("\n=== Bookmarks Data ===");
-      console.log("Raw bookmarks:", bookmarksData);
+
+
       setBookmarks(bookmarksData);
     } catch (err) {
       console.error("Failed to load bookmarks:", err);
@@ -46,8 +46,8 @@ const Bookmarks = () => {
   }, []);
 
   const handleBookmarkClick = (bookmark) => {
-    console.log("\n=== Bookmark Click ===");
-    console.log("Bookmark data:", bookmark);
+
+
     const { content_type_name, object_id, topic } = bookmark;
 
     if (content_type_name === "content") {
@@ -79,11 +79,11 @@ const Bookmarks = () => {
         display="flex"
         justifyContent="center"
         alignItems="center"
-        minHeight="200px"
-      >
+        minHeight="200px">
+        
         <CircularProgress />
-      </Box>
-    );
+      </Box>);
+
   }
 
   if (error) {
@@ -92,8 +92,8 @@ const Bookmarks = () => {
         <Alert severity="error" sx={{ mt: 2 }}>
           {error}
         </Alert>
-      </Container>
-    );
+      </Container>);
+
   }
 
   return (
@@ -106,106 +106,103 @@ const Bookmarks = () => {
             fontSize: {
               xs: "1.5rem", // ~24px on mobile
               sm: "1.75rem", // ~28px on small screens
-              md: "2.125rem", // ~34px on desktop (default h4)
+              md: "2.125rem" // ~34px on desktop (default h4)
             },
-            fontWeight: 600,
-          }}
-        >
+            fontWeight: 600
+          }}>
+          
           Marcadores
         </Typography>
 
-        {bookmarks.length === 0 ? (
-          <Typography variant="body1" align="center" sx={{ py: 4 }}>
+        {bookmarks.length === 0 ?
+        <Typography variant="body1" align="center" sx={{ py: 4 }}>
             No hay elementos guardados
-          </Typography>
-        ) : (
-          <Box>
-            {bookmarks.map((bookmark, index) => {
-              console.log("\n=== Rendering Bookmark ===");
-              console.log("Bookmark:", bookmark);
-              console.log("Content type name:", bookmark.content_type_name);
-              console.log("Content profile:", bookmark.content_profile);
+          </Typography> :
 
-              return (
-                <Box key={bookmark.id}>
-                  {bookmark.content_type_name === "content" && bookmark.content_profile && (
-                    <Box
-                      onClick={() => handleBookmarkClick(bookmark)}
-                      sx={{
-                        cursor: "pointer",
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
-                        p: 2,
-                      }}
-                    >
+        <Box>
+            {bookmarks.map((bookmark, index) => {
+
+
+            return (
+              <Box key={bookmark.id}>
+                  {bookmark.content_type_name === "content" && bookmark.content_profile &&
+                <Box
+                  onClick={() => handleBookmarkClick(bookmark)}
+                  sx={{
+                    cursor: "pointer",
+                    "&:hover": {
+                      backgroundColor: "action.hover"
+                    },
+                    p: 2
+                  }}>
+                  
                       <ContentDisplay
-                        content={bookmark.content_profile}
-                        variant="simple"
-                        showAuthor={true}
-                        showActions={true}
-                        onClick={() => handleBookmarkClick(bookmark)}
-                        additionalActions={
-                          <Box sx={{ display: "flex", gap: 1 }}>
+                    content={bookmark.content_profile}
+                    variant="simple"
+                    showAuthor={true}
+                    showActions={true}
+                    onClick={() => handleBookmarkClick(bookmark)}
+                    additionalActions={
+                    <Box sx={{ display: "flex", gap: 1 }}>
                             {(() => {
-                              const profileUserId = bookmark.content_profile?.user;
-                              const currentUserId = authState.user?.id;
-                              const isOwnContent = profileUserId && currentUserId && parseInt(profileUserId) === parseInt(currentUserId);
-                              return !isOwnContent ? (
-                                <AddToLibraryModal
-                                  content={bookmark.content_profile}
-                                  onSuccess={fetchBookmarks}
-                                />
-                              ) : null;
-                            })()}
+                        const profileUserId = bookmark.content_profile?.user;
+                        const currentUserId = authState.user?.id;
+                        const isOwnContent = profileUserId && currentUserId && parseInt(profileUserId) === parseInt(currentUserId);
+                        return !isOwnContent ?
+                        <AddToLibraryModal
+                          content={bookmark.content_profile}
+                          onSuccess={fetchBookmarks} /> :
+
+                        null;
+                      })()}
                             <Tooltip title="Eliminar marcador">
                               <IconButton
-                                onClick={(e) => handleDelete(bookmark.id, e)}
-                                color="error"
-                                size="small"
-                              >
+                          onClick={(e) => handleDelete(bookmark.id, e)}
+                          color="error"
+                          size="small">
+                          
                                 <DeleteIcon />
                               </IconButton>
                             </Tooltip>
                           </Box>
-                        }
-                      />
+                    } />
+                  
                     </Box>
-                  )}
+                }
 
-                  {bookmark.content_type_name === "knowledgepath" && (
-                    <Box
-                      onClick={() => handleBookmarkClick(bookmark)}
-                      sx={{
-                        cursor: "pointer",
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
-                        p: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                      }}
-                    >
+                  {bookmark.content_type_name === "knowledgepath" &&
+                <Box
+                  onClick={() => handleBookmarkClick(bookmark)}
+                  sx={{
+                    cursor: "pointer",
+                    "&:hover": {
+                      backgroundColor: "action.hover"
+                    },
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2
+                  }}>
+                  
                       <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 60,
-                          height: 60,
-                          backgroundColor: "background.paper",
-                          borderRadius: 0.5,
-                        }}
-                      >
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 60,
+                      height: 60,
+                      backgroundColor: "background.paper",
+                      borderRadius: 0.5
+                    }}>
+                    
                         <SchoolIcon
-                          sx={{ fontSize: 40, color: "primary.main" }}
-                        />
+                      sx={{ fontSize: 40, color: "primary.main" }} />
+                    
                       </Box>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                            "Camino de conocimiento sin título"}
+                      "Camino de conocimiento sin título"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Camino de conocimiento
@@ -213,49 +210,49 @@ const Bookmarks = () => {
                       </Box>
                       <Tooltip title="Delete bookmark">
                         <IconButton
-                          onClick={(e) => handleDelete(bookmark.id, e)}
-                          color="error"
-                          size="small"
-                        >
+                      onClick={(e) => handleDelete(bookmark.id, e)}
+                      color="error"
+                      size="small">
+                      
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                     </Box>
-                  )}
+                }
 
-                  {bookmark.content_type_name === "publication" && (
-                    <Box
-                      onClick={() => handleBookmarkClick(bookmark)}
-                      sx={{
-                        cursor: "pointer",
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
-                        p: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                      }}
-                    >
+                  {bookmark.content_type_name === "publication" &&
+                <Box
+                  onClick={() => handleBookmarkClick(bookmark)}
+                  sx={{
+                    cursor: "pointer",
+                    "&:hover": {
+                      backgroundColor: "action.hover"
+                    },
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2
+                  }}>
+                  
                       <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 60,
-                          height: 60,
-                          backgroundColor: "background.paper",
-                          borderRadius: 0.5,
-                        }}
-                      >
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 60,
+                      height: 60,
+                      backgroundColor: "background.paper",
+                      borderRadius: 0.5
+                    }}>
+                    
                         <ArticleIcon
-                          sx={{ fontSize: 40, color: "primary.main" }}
-                        />
+                      sx={{ fontSize: 40, color: "primary.main" }} />
+                    
                       </Box>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                            "Publicación sin título"}
+                      "Publicación sin título"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Publicación
@@ -263,25 +260,25 @@ const Bookmarks = () => {
                       </Box>
                       <Tooltip title="Delete bookmark">
                         <IconButton
-                          onClick={(e) => handleDelete(bookmark.id, e)}
-                          color="error"
-                          size="small"
-                        >
+                      onClick={(e) => handleDelete(bookmark.id, e)}
+                      color="error"
+                      size="small">
+                      
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                     </Box>
-                  )}
+                }
 
                   {index < bookmarks.length - 1 && <Divider />}
-                </Box>
-              );
-            })}
+                </Box>);
+
+          })}
           </Box>
-        )}
+        }
       </Paper>
-    </Container>
-  );
+    </Container>);
+
 };
 
 export default Bookmarks;

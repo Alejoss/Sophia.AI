@@ -22,7 +22,7 @@ export const invalidateEventDetailCache = (eventId) => {
 
 /** Synchronous cache read — lets detail pages render without resetting to loading. */
 export const peekEventDetailCache = (eventId) =>
-  eventDetailCache.get(String(eventId)) ?? null;
+eventDetailCache.get(String(eventId)) ?? null;
 
 export const fetchEvents = async () => {
   try {
@@ -43,9 +43,9 @@ export const createEvent = async (eventData) => {
 };
 
 export const fetchEventById = async (
-  eventId,
-  { bypassCache = false, signal } = {},
-) => {
+eventId,
+{ bypassCache = false, signal } = {}) =>
+{
   const id = String(eventId);
 
   if (!bypassCache && eventDetailCache.has(id)) {
@@ -154,7 +154,7 @@ export const getUserCreatedEventsById = async (userId) => {
   try {
     // Use the events endpoint with owner filter
     const response = await axiosInstance.get(`/events/?owner=${userId}`);
-    console.log('Events by owner response:', response.data);
+
     return response.data;
   } catch (error) {
     fail(error, 'Error fetching user created events by ID');

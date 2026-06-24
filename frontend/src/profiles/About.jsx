@@ -1,9 +1,9 @@
 import '/src/styles/about.css';
 const About = () => {
-    console.log('estoy en about');
 
-    return (
-        <div>
+
+  return (
+    <div>
             <h1>Academia Blockchain: Decentralizing Education for the Future</h1>
 
             <div className="feature-block">
@@ -40,8 +40,8 @@ const About = () => {
                 <h4>Gamification System</h4>
                 <p>Earn badges and points by learning, contributing, and engaging with the community. Badges recognize meaningful achievements and contributions.</p>
             </div>
-        </div>
-    );
+        </div>);
+
 };
 
 export default About;
