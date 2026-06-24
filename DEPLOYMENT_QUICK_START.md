@@ -167,7 +167,7 @@ You do **not** need to wait for GitHub Actions unless you also want new **fronte
 
 When `git pull` includes **React or Django code** changes baked into images:
 
-1. Push to `main` and wait for GitHub Actions to publish images to GHCR (~5–15 min), **or** check Actions tab until green
+1. Push to `main` and wait for GitHub Actions (~5–15 min). **Every push to `main` republishes the frontend image** (even backend-only commits), so `BUILD_SHA` matches `git HEAD`.
 2. On server:
    ```bash
    git pull origin main

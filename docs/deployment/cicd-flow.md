@@ -38,14 +38,14 @@ Docs-only changes (for example `*.md` outside those paths) skip tests and image 
 ### Frontend check
 
 - Node **18**, `npm ci` then `npm run build`.
-- Runs only when frontend-related paths (or CI workflow) changed.
-- `VITE_*` from GitHub Repository variables, with CI fallbacks for the build step.
+- Runs when frontend-related paths (or CI workflow) changed, **or on every push to `main`** (so GHCR `:main` frontend `BUILD_SHA` stays aligned with `git HEAD` for `deploy.sh`).
 - Timeout: 20 minutes.
 
 ### Publish images (GHCR)
 
 - **Not run on pull requests** (validation only on PRs).
-- **Split into three jobs** (`publish-backend`, `publish-frontend`, `publish-nginx`) that run in parallel when their component changed.
+- **Frontend image**: published on **every successful push to `main`** (not only when `frontend/**` changed), so backend-only deploys do not leave a stale React bundle on GHCR.
+- **Split into three jobs** (`publish-backend`, `publish-frontend`, `publish-nginx`) that run in parallel when their component changed (frontend publish also runs on every main push).
 - Each job has `packages: write` only where needed; workflow default is `contents: read`.
 - Tags: `main` and `sha-<full-commit-sha>`.
 - Frontend publish requires `VITE_API_URL` and `VITE_GOOGLE_OAUTH_CLIENT_ID` repository variables.

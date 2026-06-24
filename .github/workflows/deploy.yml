@@ -163,7 +163,12 @@ jobs:
     name: Validate frontend lockfile and build
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true'
+    # Always validate/build on main pushes so publish-frontend can stamp BUILD_SHA=HEAD
+    # even when only backend changed (deploy.sh requires frontend stamp to match git).
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.ci == 'true'
     timeout-minutes: 20
 
     steps:
@@ -249,7 +254,11 @@ jobs:
     if: |
       always() &&
       github.event_name != 'pull_request' &&
-      (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ci == 'true') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        needs.changes.outputs.frontend == 'true' ||
+        needs.changes.outputs.ci == 'true'
+      ) &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.frontend-check.result == 'success' || needs.frontend-check.result == 'skipped')
     timeout-minutes: 45
