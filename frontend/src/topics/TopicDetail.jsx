@@ -327,7 +327,7 @@ function TopicImageLightbox({
 const TopicDetail = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user, isAuthenticated } = useAuth();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -445,11 +445,30 @@ const TopicDetail = () => {
         }
     }, [searchParams]);
 
+    const handleTabChange = (_, value) => {
+        setActiveTab(value);
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            if (value === 'content') {
+                next.delete('tab');
+            } else {
+                next.set('tab', value);
+            }
+            return next;
+        }, { replace: true });
+    };
+
     useEffect(() => {
+        if (loading) return;
         if (activeTab === 'timeline' && !showTimelineTab) {
             setActiveTab('content');
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('tab');
+                return next;
+            }, { replace: true });
         }
-    }, [activeTab, showTimelineTab]);
+    }, [activeTab, showTimelineTab, loading, setSearchParams]);
 
     const loadMoreImages = useCallback(async () => {
         if (imagePageInfo.loading || !imagePageInfo.hasNext) {
@@ -802,7 +821,7 @@ const TopicDetail = () => {
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                 <Tabs
                     value={activeTab}
-                    onChange={(_, value) => setActiveTab(value)}
+                    onChange={handleTabChange}
                     variant="scrollable"
                     allowScrollButtonsMobile
                 >

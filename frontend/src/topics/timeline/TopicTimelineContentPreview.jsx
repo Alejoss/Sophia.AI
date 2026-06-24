@@ -1,28 +1,15 @@
 import React from 'react';
-import { Box, Card, CardActionArea, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Box, Chip, Tooltip } from '@mui/material';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import AudiotrackIcon from '@mui/icons-material/Audiotrack';
 import ImageIcon from '@mui/icons-material/Image';
 import ArticleIcon from '@mui/icons-material/Article';
 import LinkIcon from '@mui/icons-material/Link';
-import ContentDisplay from '../../content/ContentDisplay';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { getTopicContentPath, TOPIC_TABS } from '../../utils/urlUtils';
 
-const MEDIA_LABELS = {
-  VIDEO: 'Video',
-  AUDIO: 'Audio',
-  IMAGE: 'Imagen',
-  TEXT: 'Texto',
-};
-
-const ROLE_LABELS = {
-  PRIMARY: 'Principal',
-  REFERENCE: 'Referencia',
-  EXAMPLE: 'Ejemplo',
-  OPTIONAL: 'Opcional',
-};
-
-const getMediaIcon = (mediaType, sx = {}) => {
-  const props = { fontSize: 'small', sx };
+const getMediaIcon = (mediaType) => {
+  const props = { fontSize: 'small' };
   switch ((mediaType || '').toUpperCase()) {
     case 'VIDEO':
       return <VideocamIcon {...props} />;
@@ -42,59 +29,45 @@ const getContentTitle = (content) => {
   return profile?.title || content?.original_title || 'Contenido sin titulo';
 };
 
-const TopicTimelineContentPreview = ({ link, topicId, navigate, compact = false }) => {
+const TopicTimelineContentPreview = ({ link, topicId }) => {
   const content = link?.content;
   if (!content) return null;
 
   const mediaType = (content.media_type || '').toUpperCase();
   const title = getContentTitle(content);
   const contentId = content.id;
-
-  if (!compact) {
-    return (
-      <Box sx={{ mt: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
-          <Chip size="small" color="primary" label={ROLE_LABELS[link.role] || 'Contenido'} />
-          <Chip size="small" variant="outlined" icon={getMediaIcon(mediaType)} label={MEDIA_LABELS[mediaType] || 'Contenido'} />
-        </Stack>
-        <ContentDisplay
-          content={content}
-          variant="card"
-          showAuthor
-          topicId={topicId}
-          onClick={() => navigate(`/content/${contentId}/topic/${topicId}`)}
-        />
-        {link.caption && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {link.caption}
-          </Typography>
-        )}
-      </Box>
-    );
-  }
+  const href = getTopicContentPath(contentId, topicId, TOPIC_TABS.TIMELINE);
 
   return (
-    <Card variant="outlined" sx={{ height: '100%', bgcolor: 'background.paper' }}>
-      <CardActionArea
-        onClick={() => navigate(`/content/${contentId}/topic/${topicId}`)}
-        sx={{ height: '100%' }}
-      >
-        <CardContent sx={{ p: 1.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            {getMediaIcon(mediaType, { color: 'primary.main' })}
-            <Chip size="small" label={MEDIA_LABELS[mediaType] || 'Contenido'} variant="outlined" />
-          </Stack>
-          <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-            {title}
-          </Typography>
-          {link.caption && (
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-              {link.caption}
-            </Typography>
-          )}
-        </CardContent>
-      </CardActionArea>
-    </Card>
+    <Tooltip title="Abre en una nueva pestaña">
+      <Chip
+        component="a"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        icon={getMediaIcon(mediaType)}
+        label={(
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+            <span>{title}</span>
+            <OpenInNewIcon sx={{ fontSize: 14, opacity: 0.65, flexShrink: 0 }} />
+          </Box>
+        )}
+        variant="outlined"
+        size="small"
+        clickable
+        sx={{
+          maxWidth: '100%',
+          height: 'auto',
+          py: 0.5,
+          textDecoration: 'none',
+          color: 'inherit',
+          '& .MuiChip-label': {
+            whiteSpace: 'normal',
+            lineHeight: 1.3,
+          },
+        }}
+      />
+    </Tooltip>
   );
 };
 

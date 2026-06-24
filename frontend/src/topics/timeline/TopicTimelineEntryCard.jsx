@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
-  Divider,
+  Collapse,
   IconButton,
   Stack,
   Tooltip,
@@ -16,6 +15,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import LinkIcon from '@mui/icons-material/Link';
 import TopicTimelineContentPreview from './TopicTimelineContentPreview';
 
 const formatDate = (value) => {
@@ -43,8 +45,8 @@ const TopicTimelineEntryCard = ({
   entry,
   index,
   topicId,
-  navigate,
   canEdit,
+  canReorder = false,
   onEdit,
   onDelete,
   onMoveUp,
@@ -52,10 +54,13 @@ const TopicTimelineEntryCard = ({
   isFirst,
   isLast,
 }) => {
+  const [expanded, setExpanded] = useState(false);
   const links = [...(entry.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const primaryLink = links.find((link) => link.role === 'PRIMARY') || links[0];
-  const secondaryLinks = links.filter((link) => link !== primaryLink);
   const dateLabel = getEntryDateLabel(entry, index);
+  const hasCollapsibleContent = Boolean(entry.description) || links.length > 0;
+  const relatedContentLabel = links.length === 1
+    ? '1 contenido relacionado'
+    : `${links.length} contenidos relacionados`;
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '28px 1fr', sm: '56px 1fr' }, gap: { xs: 1.5, sm: 2 } }}>
@@ -107,22 +112,38 @@ const TopicTimelineEntryCard = ({
               variant={entry.start_date ? 'filled' : 'outlined'}
               sx={{ fontWeight: 600 }}
             />
-            {canEdit && (
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              {links.length > 0 && (
+                <Tooltip title={relatedContentLabel}>
+                  <Chip
+                    icon={<LinkIcon />}
+                    label={links.length}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontWeight: 600 }}
+                  />
+                </Tooltip>
+              )}
+              {canEdit && (
               <Stack direction="row" spacing={0.5}>
-                <Tooltip title="Subir">
-                  <span>
-                    <IconButton size="small" onClick={() => onMoveUp(entry.id)} disabled={isFirst}>
-                      <KeyboardArrowUpIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Bajar">
-                  <span>
-                    <IconButton size="small" onClick={() => onMoveDown(entry.id)} disabled={isLast}>
-                      <KeyboardArrowDownIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+                {canReorder && (
+                  <>
+                    <Tooltip title="Subir">
+                      <span>
+                        <IconButton size="small" onClick={() => onMoveUp(entry.id)} disabled={isFirst}>
+                          <KeyboardArrowUpIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="Bajar">
+                      <span>
+                        <IconButton size="small" onClick={() => onMoveDown(entry.id)} disabled={isLast}>
+                          <KeyboardArrowDownIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </>
+                )}
                 <Tooltip title="Editar">
                   <IconButton size="small" onClick={() => onEdit(entry)}>
                     <EditIcon fontSize="small" />
@@ -134,61 +155,54 @@ const TopicTimelineEntryCard = ({
                   </IconButton>
                 </Tooltip>
               </Stack>
+              )}
+            </Stack>
+          </Stack>
+
+          <Stack
+            direction="row"
+            spacing={0.5}
+            alignItems="flex-start"
+            justifyContent="space-between"
+            sx={{ mt: 1.5 }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
+              {entry.title}
+            </Typography>
+            {hasCollapsibleContent && (
+              <Tooltip title={expanded ? 'Ocultar detalles' : 'Ver detalles'}>
+                <IconButton
+                  size="small"
+                  onClick={() => setExpanded((prev) => !prev)}
+                  aria-label={expanded ? 'Ocultar detalles' : 'Ver detalles'}
+                  aria-expanded={expanded}
+                  sx={{ mt: -0.25, flexShrink: 0 }}
+                >
+                  {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Tooltip>
             )}
           </Stack>
 
-          <Typography variant="h6" sx={{ mt: 1.5, fontWeight: 700 }}>
-            {entry.title}
-          </Typography>
-          {entry.description && (
-            <Typography variant="body1" color="text.secondary" sx={{ mt: 1, whiteSpace: 'pre-line' }}>
-              {entry.description}
-            </Typography>
-          )}
-
-          {primaryLink && (
-            <TopicTimelineContentPreview
-              link={primaryLink}
-              topicId={topicId}
-              navigate={navigate}
-            />
-          )}
-
-          {secondaryLinks.length > 0 && (
-            <Box sx={{ mt: 2.5 }}>
-              <Divider sx={{ mb: 1.5 }} />
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                Contenidos relacionados
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            {entry.description && (
+              <Typography variant="body1" color="text.secondary" sx={{ mt: 1.5, whiteSpace: 'pre-line' }}>
+                {entry.description}
               </Typography>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gap: 1.5,
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(2, minmax(0, 1fr))',
-                    md: 'repeat(3, minmax(0, 1fr))',
-                  },
-                }}
-              >
-                {secondaryLinks.map((link) => (
+            )}
+
+            {links.length > 0 && (
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
+                {links.map((link) => (
                   <TopicTimelineContentPreview
                     key={link.id || link.content?.id}
                     link={link}
                     topicId={topicId}
-                    navigate={navigate}
-                    compact
                   />
                 ))}
-              </Box>
-            </Box>
-          )}
-
-          {canEdit && links.length === 0 && (
-            <Button size="small" sx={{ mt: 2 }} onClick={() => onEdit(entry)}>
-              Adjuntar contenidos
-            </Button>
-          )}
+              </Stack>
+            )}
+          </Collapse>
         </CardContent>
       </Card>
     </Box>

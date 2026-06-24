@@ -12,6 +12,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
+import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
 import TopicTimelineEntryForm from './TopicTimelineEntryForm';
 
 const getErrorMessage = (error, fallback) => {
@@ -42,7 +43,7 @@ const TopicTimelineEntryPage = () => {
   const [canEdit, setCanEdit] = useState(false);
 
   const timelineUrl = useMemo(
-    () => `/content/topics/${topicId}?tab=timeline`,
+    () => getTopicDetailPath(topicId, TOPIC_TABS.TIMELINE),
     [topicId],
   );
 

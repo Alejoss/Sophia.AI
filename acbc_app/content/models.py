@@ -415,17 +415,9 @@ class TopicTimelineEntry(models.Model):
 
 
 class TopicTimelineEntryContent(models.Model):
-    ROLE_CHOICES = [
-        ('PRIMARY', 'Primary'),
-        ('REFERENCE', 'Reference'),
-        ('EXAMPLE', 'Example'),
-        ('OPTIONAL', 'Optional'),
-    ]
-
     entry = models.ForeignKey(TopicTimelineEntry, on_delete=models.CASCADE, related_name='entry_contents')
     content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='timeline_entry_links')
     order = models.PositiveIntegerField(default=0)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='REFERENCE')
     caption = models.CharField(max_length=255, blank=True)
 
     class Meta:

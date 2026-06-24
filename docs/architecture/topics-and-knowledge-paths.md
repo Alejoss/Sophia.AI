@@ -259,7 +259,6 @@ Backend: `content/models.py`.
 
 - `entry`, `content` — relación con la entrada y un `Content` del tema.
 - `order` — orden dentro de la entrada.
-- `role` — `PRIMARY`, `REFERENCE`, `EXAMPLE` u `OPTIONAL` (la UI actual asigna `PRIMARY` o `REFERENCE`).
 - `caption` — texto opcional (soportado por la API; la UI actual no lo expone).
 - `unique_together = ['entry', 'content']` — un contenido no puede repetirse en la misma entrada.
 
@@ -325,8 +324,8 @@ POST /content/topics/42/timeline/
   "start_date": "2008-10-31",
   "end_date": null,
   "contents": [
-    { "content_id": 101, "role": "PRIMARY", "order": 1 },
-    { "content_id": 102, "role": "REFERENCE", "order": 2 }
+    { "content_id": 101, "order": 1 },
+    { "content_id": 102, "order": 2 }
   ]
 }
 ```
@@ -365,6 +364,8 @@ Rutas de formulario (página completa, no modal):
 - `/content/topics/:topicId/timeline/new` — nueva entrada
 - `/content/topics/:topicId/timeline/:entryId/edit` — editar entrada
 - Tras guardar → `/content/topics/:topicId?tab=timeline`
+
+Plan futuro: [Sugerir entrada en la línea de tiempo](topic-timeline-entry-suggestions-plan.md).
 
 **API de frontend** (`contentApi.js`):
 

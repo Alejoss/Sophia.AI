@@ -108,8 +108,8 @@ Editorial timeline attached to a topic. One timeline per topic; entries are orde
     "start_date": "2008-10-31",
     "end_date": null,
     "contents": [
-      { "content_id": 1, "role": "PRIMARY", "order": 1 },
-      { "content_id": 2, "role": "REFERENCE", "order": 2 }
+      { "content_id": 1, "order": 1 },
+      { "content_id": 2, "order": 2 }
     ]
   }
   ```

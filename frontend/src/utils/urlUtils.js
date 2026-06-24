@@ -31,4 +31,30 @@ export const createContentDetailUrl = (contentId, context, contextId) => {
   }
   
   return url;
-}; 
+};
+
+export const TOPIC_TABS = {
+  CONTENT: 'content',
+  TIMELINE: 'timeline',
+  COMMENTS: 'comments',
+};
+
+const VALID_TOPIC_TABS = new Set(Object.values(TOPIC_TABS));
+
+export const normalizeTopicTab = (tab) => {
+  if (tab && VALID_TOPIC_TABS.has(tab)) return tab;
+  return TOPIC_TABS.CONTENT;
+};
+
+export const getTopicDetailPath = (topicId, tab = TOPIC_TABS.CONTENT) => {
+  const normalized = normalizeTopicTab(tab);
+  if (normalized === TOPIC_TABS.CONTENT) return `/content/topics/${topicId}`;
+  return `/content/topics/${topicId}?tab=${normalized}`;
+};
+
+export const getTopicContentPath = (contentId, topicId, tab = TOPIC_TABS.CONTENT) => {
+  const base = `/content/${contentId}/topic/${topicId}`;
+  const normalized = normalizeTopicTab(tab);
+  if (normalized === TOPIC_TABS.CONTENT) return base;
+  return `${base}?tab=${normalized}`;
+};

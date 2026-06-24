@@ -161,7 +161,7 @@ Editorial narrative attached to a topic (one timeline per topic).
 **`TopicTimelineEntryContent`**:
 - `entry` — ForeignKey to TopicTimelineEntry (`related_name='entry_contents'`)
 - `content` — ForeignKey to Content
-- `order`, `role` (PRIMARY | REFERENCE | EXAMPLE | OPTIONAL), `caption`
+- `order`, `caption`
 - `unique_together`: entry + content
 
 **Location**: `content/models.py`

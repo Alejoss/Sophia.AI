@@ -427,7 +427,7 @@ class TopicTimelineEntryContentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TopicTimelineEntryContent
-        fields = ['id', 'content', 'content_id', 'order', 'role', 'caption']
+        fields = ['id', 'content', 'content_id', 'order', 'caption']
 
 
 class TopicTimelineEntrySerializer(serializers.ModelSerializer):
@@ -522,7 +522,6 @@ class TopicTimelineEntrySerializer(serializers.ModelSerializer):
                 entry=entry,
                 content=content,
                 order=item.get('order', index),
-                role=item.get('role') or 'REFERENCE',
                 caption=item.get('caption') or '',
             ))
         if links:
@@ -557,12 +556,22 @@ class TopicTimelineEntrySerializer(serializers.ModelSerializer):
 
 
 class TopicTimelineSerializer(serializers.ModelSerializer):
-    entries = TopicTimelineEntrySerializer(many=True, read_only=True)
+    entries = serializers.SerializerMethodField()
 
     class Meta:
         model = TopicTimeline
         fields = ['id', 'topic', 'title', 'description', 'entries', 'created_by', 'created_at', 'updated_at']
         read_only_fields = ['topic', 'created_by', 'created_at', 'updated_at']
+
+    def get_entries(self, timeline):
+        from content.utils import sort_timeline_entries
+
+        sorted_entries = sort_timeline_entries(list(timeline.entries.all()))
+        return TopicTimelineEntrySerializer(
+            sorted_entries,
+            many=True,
+            context=self.context,
+        ).data
 
 
 class TopicContentSerializer(serializers.ModelSerializer):

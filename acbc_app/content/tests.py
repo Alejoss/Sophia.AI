@@ -1177,8 +1177,8 @@ class TopicAPITests(APITestCase):
             "description": "Contexto inicial",
             "start_date": "2008-01-01",
             "contents": [
-                {"content_id": content_video.id, "role": "PRIMARY", "order": 1},
-                {"content_id": content_text.id, "role": "REFERENCE", "order": 2},
+                {"content_id": content_video.id, "order": 1},
+                {"content_id": content_text.id, "order": 2},
             ],
         }
         create_response = self.client.post(url, payload, format="json")
@@ -1202,7 +1202,7 @@ class TopicAPITests(APITestCase):
             url,
             {
                 "title": "Invalid entry",
-                "contents": [{"content_id": outside_content.id, "role": "PRIMARY", "order": 1}],
+                "contents": [{"content_id": outside_content.id, "order": 1}],
             },
             format="json",
         )
@@ -1237,6 +1237,43 @@ class TopicAPITests(APITestCase):
         second.refresh_from_db()
         self.assertEqual(second.order, 1)
         self.assertEqual(first.order, 2)
+
+    def test_topic_timeline_sorts_dated_entries_by_start_date(self):
+        timeline = TopicTimeline.objects.create(topic=self.topic, created_by=self.user)
+        later = TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title="Later",
+            start_date="2009-01-03",
+            order=1,
+            created_by=self.user,
+        )
+        earlier = TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title="Earlier",
+            start_date="2008-10-31",
+            order=2,
+            created_by=self.user,
+        )
+        undated = TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title="Conceptual",
+            order=3,
+            created_by=self.user,
+        )
+
+        list_url = reverse("content:topic-timeline", args=[self.topic.id])
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        entry_ids = [entry["id"] for entry in response.data["entries"]]
+        self.assertEqual(entry_ids, [earlier.id, later.id, undated.id])
+
+        reorder_url = reverse("content:topic-timeline-reorder", args=[self.topic.id])
+        invalid = self.client.post(
+            reorder_url,
+            {"entry_ids": [later.id, earlier.id, undated.id]},
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class PublicationAPITests(APITestCase):

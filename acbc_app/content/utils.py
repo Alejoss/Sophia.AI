@@ -32,6 +32,29 @@ def build_media_url(file_field_or_key, request=None):
         return request.build_absolute_uri(path)
     return None
 
+
+def sort_timeline_entries(entries):
+    """Dated entries by start_date; undated entries by manual order."""
+    dated = sorted(
+        [entry for entry in entries if entry.start_date],
+        key=lambda entry: (entry.start_date, entry.created_at, entry.pk),
+    )
+    undated = sorted(
+        [entry for entry in entries if not entry.start_date],
+        key=lambda entry: (entry.order, entry.created_at, entry.pk),
+    )
+    return dated + undated
+
+
+def dated_timeline_entry_ids(timeline):
+    return [
+        entry.id
+        for entry in sorted(
+            timeline.entries.filter(start_date__isnull=False),
+            key=lambda entry: (entry.start_date, entry.created_at, entry.pk),
+        )
+    ]
+
 def get_top_voted_contents(topic, media_type, limit=None):
     """
     Get all contents of a specific media type for a topic, ordered by vote count.

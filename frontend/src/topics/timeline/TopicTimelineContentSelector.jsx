@@ -9,7 +9,6 @@ import {
   Link as MuiLink,
   MenuItem,
   Paper,
-  Radio,
   Select,
   Stack,
   Table,
@@ -83,10 +82,8 @@ const normalizeItems = (items = []) => (
 const TopicTimelineContentSelector = ({
   items = [],
   selectedIds = [],
-  primaryContentId = '',
   loading = false,
   onSelectionChange,
-  onPrimaryChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mediaTypeFilter, setMediaTypeFilter] = useState('');
@@ -138,15 +135,7 @@ const TopicTimelineContentSelector = ({
   );
 
   const setSelectedIds = (nextIds) => {
-    const nextUniqueIds = [...new Set(nextIds)];
-    onSelectionChange(nextUniqueIds);
-    if (nextUniqueIds.length === 0) {
-      onPrimaryChange('');
-      return;
-    }
-    if (!nextUniqueIds.includes(primaryContentId)) {
-      onPrimaryChange(nextUniqueIds[0]);
-    }
+    onSelectionChange([...new Set(nextIds)]);
   };
 
   const handleToggle = (itemId) => {
@@ -178,7 +167,7 @@ const TopicTimelineContentSelector = ({
             Contenidos del tema
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Selecciona uno o varios contenidos ya agregados al tema. Marca un contenido principal para destacarlo en la entrada.
+            Selecciona uno o varios contenidos ya agregados al tema.
           </Typography>
         </Box>
 
@@ -267,7 +256,6 @@ const TopicTimelineContentSelector = ({
                     disabled={loading || filteredItems.length === 0}
                   />
                 </TableCell>
-                <TableCell padding="checkbox">Principal</TableCell>
                 <TableCell>Titulo</TableCell>
                 <TableCell>Tipo</TableCell>
                 <TableCell>Autor</TableCell>
@@ -288,14 +276,6 @@ const TopicTimelineContentSelector = ({
                   >
                     <TableCell padding="checkbox">
                       <Checkbox checked={selected} />
-                    </TableCell>
-                    <TableCell padding="checkbox" onClick={(event) => event.stopPropagation()}>
-                      <Radio
-                        checked={primaryContentId === item.id}
-                        disabled={!selected}
-                        onChange={() => onPrimaryChange(item.id)}
-                        inputProps={{ 'aria-label': `Marcar ${item.title} como contenido principal` }}
-                      />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight={selected ? 700 : 400}>
@@ -328,7 +308,7 @@ const TopicTimelineContentSelector = ({
               })}
               {!loading && filteredItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                     {normalizedItems.length === 0
                       ? 'Este tema todavia no tiene contenidos para adjuntar.'
                       : 'No se encontro contenido con los filtros aplicados.'}

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation hub in `docs/` directory
 
 ### Changed
+- Removed `role` from topic timeline entry content links (model, API, migration `0018`)
 - Removed optional temporal label (`display_date`) from topic timeline entries; use `start_date` / `end_date` or numbered stages instead
 - Improved project structure documentation
 - Enhanced setup and deployment guides

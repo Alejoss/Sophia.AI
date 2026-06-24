@@ -5,13 +5,7 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import { useNavigate } from 'react-router-dom';
 import contentApi from '../../api/contentApi';
 import TopicTimelineEntryCard from './TopicTimelineEntryCard';
-
-const sortEntries = (entries) => [...(entries || [])].sort((a, b) => {
-  const orderA = a.order ?? 0;
-  const orderB = b.order ?? 0;
-  if (orderA !== orderB) return orderA - orderB;
-  return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-});
+import { hasTimelineDate, sortTimelineEntries } from './timelineUtils';
 
 const getErrorMessage = (error, fallback) => {
   const data = error?.response?.data;
@@ -31,7 +25,11 @@ const TopicTimeline = ({ topicId, canEdit }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const entries = useMemo(() => sortEntries(timeline?.entries || []), [timeline]);
+  const entries = useMemo(() => sortTimelineEntries(timeline?.entries || []), [timeline]);
+  const undatedEntries = useMemo(
+    () => entries.filter((entry) => !hasTimelineDate(entry)),
+    [entries],
+  );
 
   const loadTimeline = useCallback(async () => {
     try {
@@ -70,13 +68,16 @@ const TopicTimeline = ({ topicId, canEdit }) => {
   };
 
   const reorder = async (entryId, direction) => {
-    const index = entries.findIndex((entry) => entry.id === entryId);
-    const targetIndex = index + direction;
-    if (index < 0 || targetIndex < 0 || targetIndex >= entries.length) return;
+    const undatedIndex = undatedEntries.findIndex((entry) => entry.id === entryId);
+    const targetIndex = undatedIndex + direction;
+    if (undatedIndex < 0 || targetIndex < 0 || targetIndex >= undatedEntries.length) return;
 
-    const nextEntries = [...entries];
-    const [moved] = nextEntries.splice(index, 1);
-    nextEntries.splice(targetIndex, 0, moved);
+    const nextUndated = [...undatedEntries];
+    const [moved] = nextUndated.splice(undatedIndex, 1);
+    nextUndated.splice(targetIndex, 0, moved);
+
+    const datedEntries = entries.filter((entry) => hasTimelineDate(entry));
+    const nextEntries = [...datedEntries, ...nextUndated];
     const nextIds = nextEntries.map((entry) => entry.id);
 
     setTimeline((prev) => ({
@@ -152,22 +153,27 @@ const TopicTimeline = ({ topicId, canEdit }) => {
         </Paper>
       ) : (
         <Box>
-          {entries.map((entry, index) => (
+          {entries.map((entry, index) => {
+            const undatedIndex = undatedEntries.findIndex((item) => item.id === entry.id);
+            const canReorder = !hasTimelineDate(entry);
+
+            return (
             <TopicTimelineEntryCard
               key={entry.id}
               entry={entry}
               index={index}
               topicId={topicId}
-              navigate={navigate}
               canEdit={canEdit}
+              canReorder={canReorder}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onMoveUp={(id) => reorder(id, -1)}
               onMoveDown={(id) => reorder(id, 1)}
-              isFirst={index === 0}
-              isLast={index === entries.length - 1}
+              isFirst={canReorder && undatedIndex === 0}
+              isLast={canReorder && undatedIndex === undatedEntries.length - 1}
             />
-          ))}
+            );
+          })}
         </Box>
       )}
     </Box>

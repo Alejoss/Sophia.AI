@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { getTopicDetailPath, normalizeTopicTab, TOPIC_TABS } from '../utils/urlUtils';
 import { 
     Box, 
     Typography, 
@@ -23,6 +24,7 @@ const ContentDetailsTopic = () => {
     const { contentId, topicId } = useParams();
     const { authState } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [content, setContent] = useState(null);
     const [topic, setTopic] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -93,9 +95,21 @@ const ContentDetailsTopic = () => {
         audio: 'Todos los audios',
     };
     const allOfTypeLabel = mediaTypeLabels[mediaType] || `Todos los ${mediaType}s`;
-    const backPath = mediaType
-        ? `/content/topics/${topicId}/${mediaType}`
-        : `/content/topics/${topicId}`;
+    const returnTab = normalizeTopicTab(searchParams.get('tab'));
+    const backPath = returnTab !== TOPIC_TABS.CONTENT
+        ? getTopicDetailPath(topicId, returnTab)
+        : mediaType
+            ? `/content/topics/${topicId}/${mediaType}`
+            : getTopicDetailPath(topicId);
+    const backLabelsByTab = {
+        [TOPIC_TABS.TIMELINE]: 'Regresar a la linea de tiempo',
+        [TOPIC_TABS.COMMENTS]: 'Regresar a los comentarios',
+    };
+    const backLabel = returnTab !== TOPIC_TABS.CONTENT
+        ? (backLabelsByTab[returnTab] || 'Regresar al tema')
+        : mediaType
+            ? allOfTypeLabel
+            : 'Regresar a la vista principal del tema';
 
     return (
         <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -112,7 +126,7 @@ const ContentDetailsTopic = () => {
                     startIcon={<ArrowBackIcon />}
                     sx={{ mb: 2, textTransform: 'none' }}
                 >
-                    {mediaType ? allOfTypeLabel : 'Regresar a la vista principal del tema'}
+                    {backLabel}
                 </Button>
             </Box>
 

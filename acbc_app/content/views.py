@@ -2055,6 +2055,21 @@ class TopicTimelineReorderView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from content.utils import dated_timeline_entry_ids
+
+        expected_dated_ids = dated_timeline_entry_ids(timeline)
+        requested_dated_ids = [entry_id for entry_id in entry_ids if entry_id in expected_dated_ids]
+        if requested_dated_ids != expected_dated_ids:
+            return Response(
+                {
+                    'entry_ids': (
+                        'Las entradas con fecha se ordenan por fecha de inicio '
+                        'y no pueden reordenarse manualmente.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
             for index, entry_id in enumerate(entry_ids, start=1):
                 TopicTimelineEntry.objects.filter(
