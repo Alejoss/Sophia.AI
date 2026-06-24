@@ -25,7 +25,7 @@ const isBubbleRoute = (pathname) => {
   if (pathname === '/search' || pathname.startsWith('/content/search/')) {
     return true;
   }
-  if (pathname === '/content/topics' || pathname.startsWith('/content/topics/')) {
+  if (pathname === '/content/topics') {
     return true;
   }
   if (pathname === '/knowledge_path' || pathname.startsWith('/knowledge_path/')) {
