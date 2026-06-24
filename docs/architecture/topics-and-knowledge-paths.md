@@ -228,6 +228,164 @@ Rutas relevantes en `App.jsx` (prefijo `/content` enrutado a un layout protegido
 
 ---
 
+## Líneas de tiempo de tema (Topic Timelines)
+
+### Propósito
+
+Cada **Topic** puede tener una línea de tiempo editorial: una narrativa curada compuesta por **entradas ordenadas** que explican etapas, contexto o hitos del tema. Cada entrada puede vincular uno o varios contenidos ya asociados al tema (videos, audios, imágenes, textos), con un contenido marcado como **principal** y el resto como **referencia**.
+
+La línea de tiempo se crea de forma implícita al agregar la primera entrada; no requiere un paso de configuración previo.
+
+### Modelo de dominio
+
+Backend: `content/models.py`.
+
+**`TopicTimeline`** (relación 1:1 con `Topic`):
+
+- `topic` — el tema al que pertenece.
+- `title`, `description` — metadatos opcionales del contenedor (no editables desde la UI actual).
+- `created_by`, `created_at`, `updated_at`.
+
+**`TopicTimelineEntry`** (entradas de la narrativa):
+
+- `timeline` — FK a `TopicTimeline`.
+- `title` — obligatorio.
+- `description` — texto narrativo opcional.
+- `start_date`, `end_date` — fechas opcionales (`DateField`). Si `end_date` es anterior a `start_date`, la API rechaza la entrada.
+- `order` — orden de visualización; se asigna automáticamente al crear y se actualiza con el endpoint de reordenado.
+- `created_by`, `updated_by`, `created_at`, `updated_at`.
+
+**`TopicTimelineEntryContent`** (vínculo entrada ↔ contenido):
+
+- `entry`, `content` — relación con la entrada y un `Content` del tema.
+- `order` — orden dentro de la entrada.
+- `role` — `PRIMARY`, `REFERENCE`, `EXAMPLE` u `OPTIONAL` (la UI actual asigna `PRIMARY` o `REFERENCE`).
+- `caption` — texto opcional (soportado por la API; la UI actual no lo expone).
+- `unique_together = ['entry', 'content']` — un contenido no puede repetirse en la misma entrada.
+
+**Reglas de validación**:
+
+- Solo se pueden adjuntar contenidos que ya pertenecen al tema (`topic.contents`).
+- No se puede adjuntar el mismo contenido dos veces en una entrada.
+- El título de la entrada no puede estar vacío.
+
+**Orden de las entradas** (`Meta.ordering`): `order`, `start_date`, `created_at`.
+
+### Etiqueta de fecha en la UI
+
+Al crear o editar una entrada, el formulario ofrece tres modos de referencia temporal:
+
+| Modo | Campos | Uso típico |
+|------|--------|------------|
+| **Fecha concreta** (predeterminado en entradas nuevas) | Un `DatePicker` (día único) | Hitos puntuales (p. ej. publicación del whitepaper, 31 oct 2008) |
+| **Periodo de tiempo** | `DatePicker` inicial + final opcional | Etapas con duración (p. ej. "2011–2013"); la fecha final puede quedar vacía si el periodo sigue abierto |
+| **Sin fecha** | — | Etapas conceptuales (p. ej. "Período Jurásico"); se muestran como "Etapa N" |
+
+Los selectores usan `@mui/x-date-pickers` con calendario y locale español (`TopicTimelineDateFields.jsx`).
+
+Al mostrar la entrada (`TopicTimelineEntryCard`), la prioridad es:
+
+1. Rango `start_date` – `end_date` (formato localizado, p. ej. `31 oct 2008 - 3 ene 2009`).
+2. Solo `start_date`.
+3. Sin fechas → **"Etapa N"** (según posición en la línea de tiempo).
+
+### Permisos y visibilidad
+
+| Acción | Quién |
+|--------|-------|
+| Ver línea de tiempo (`GET`) | Cualquier usuario autenticado |
+| Crear, editar, eliminar entradas; reordenar | Creador del tema o moderadores (`topic.is_moderator_or_creator`) |
+
+**Pestaña en el frontend** (`TopicDetail.jsx`):
+
+- Visible si el usuario es creador/moderador **o** si la línea de tiempo tiene al menos una entrada.
+- Los visitantes autenticados ven la pestaña solo cuando ya hay contenido publicado en la línea de tiempo.
+
+### API backend
+
+Backend: `acbc_app/content/urls.py`, `acbc_app/content/views.py`, `acbc_app/content/serializers.py`.
+
+Prefijo: `/content/topics/<pk>/timeline/`.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/topics/<pk>/timeline/` | Devuelve la línea de tiempo con todas las entradas y contenidos. Si no existe, responde con `entries: []` y metadatos vacíos (200). |
+| `POST` | `/topics/<pk>/timeline/` | Crea una entrada (y la línea de tiempo si es la primera). |
+| `PATCH` | `/topics/<pk>/timeline/<entry_id>/` | Actualiza una entrada existente. |
+| `DELETE` | `/topics/<pk>/timeline/<entry_id>/` | Elimina una entrada. |
+| `POST` | `/topics/<pk>/timeline/reorder/` | Reordena todas las entradas. |
+
+**Ejemplo — crear entrada**:
+
+```json
+POST /content/topics/42/timeline/
+{
+  "title": "Publicación del Whitepaper de Bitcoin",
+  "description": "Satoshi Nakamoto publica el whitepaper...",
+  "start_date": "2008-10-31",
+  "end_date": null,
+  "contents": [
+    { "content_id": 101, "role": "PRIMARY", "order": 1 },
+    { "content_id": 102, "role": "REFERENCE", "order": 2 }
+  ]
+}
+```
+
+**Ejemplo — reordenar**:
+
+```json
+POST /content/topics/42/timeline/reorder/
+{
+  "entry_ids": [15, 12, 14]
+}
+```
+
+La lista `entry_ids` debe incluir **exactamente** todos los IDs de entradas de la línea de tiempo, en el orden deseado.
+
+**Perfiles de contenido en la respuesta**: al serializar, cada `content` incluye el `ContentProfile` preferido del creador del tema o, si no existe, del usuario que consulta (`get_topic_content_profile_for_display`).
+
+### Frontend
+
+Carpeta: `frontend/src/topics/timeline/`.
+
+| Componente | Rol |
+|------------|-----|
+| `TopicTimeline.jsx` | Contenedor: carga, listado, reordenado y navegación a crear/editar |
+| `TopicTimelineEntryPage.jsx` | Página de creación/edición (permisos, guardado, breadcrumbs) |
+| `TopicTimelineEntryForm.jsx` | Formulario reutilizable (título, descripción, fechas, contenidos) |
+| `TopicTimelineDateFields.jsx` | Selector de fecha con calendario y modos: sin fecha, fecha concreta, periodo |
+| `TopicTimelineEntryCard.jsx` | Tarjeta visual con línea vertical, chip de fecha y previews |
+| `TopicTimelineContentSelector.jsx` | Selector de contenidos del tema con búsqueda, filtro por tipo y orden |
+| `TopicTimelineContentPreview.jsx` | Vista previa de un contenido vinculado |
+
+Integración en `TopicDetail.jsx`: pestaña **"Línea de tiempo"** que renderiza `<TopicTimeline topicId={...} canEdit={...} />`.
+
+Rutas de formulario (página completa, no modal):
+
+- `/content/topics/:topicId/timeline/new` — nueva entrada
+- `/content/topics/:topicId/timeline/:entryId/edit` — editar entrada
+- Tras guardar → `/content/topics/:topicId?tab=timeline`
+
+**API de frontend** (`contentApi.js`):
+
+- `getTopicTimeline(topicId)`
+- `createTopicTimelineEntry(topicId, entryData)`
+- `updateTopicTimelineEntry(topicId, entryId, entryData)`
+- `deleteTopicTimelineEntry(topicId, entryId)`
+- `reorderTopicTimeline(topicId, entryIds)`
+
+Los contenidos disponibles para adjuntar se obtienen con `getTopicDetailsSimple(topicId)` (perfiles del usuario en ese tema).
+
+### Tests
+
+Backend: `acbc_app/content/tests.py` — clase de tests de timeline:
+
+- Crear entrada, listar y adjuntar varios contenidos.
+- Rechazar contenido que no pertenece al tema.
+- Permisos (outsider no puede crear) y reordenado por moderador.
+
+---
+
 ## Knowledge Paths
 
 ### Modelo de dominio

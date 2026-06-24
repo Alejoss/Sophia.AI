@@ -3,15 +3,14 @@ import {
   Alert,
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import TopicTimelineContentSelector from './TopicTimelineContentSelector';
+import TopicTimelineDateFields from './TopicTimelineDateFields';
+import dayjs from 'dayjs';
 
 const buildInitialState = (entry) => {
   const links = [...(entry?.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -20,7 +19,6 @@ const buildInitialState = (entry) => {
   return {
     title: entry?.title || '',
     description: entry?.description || '',
-    display_date: entry?.display_date || '',
     start_date: entry?.start_date || '',
     end_date: entry?.end_date || '',
     selectedContentIds: selectedIds,
@@ -29,22 +27,21 @@ const buildInitialState = (entry) => {
 };
 
 const TopicTimelineEntryForm = ({
-  open,
   entry,
   availableContents,
   loadingContents,
   saving,
   error,
-  onClose,
+  onCancel,
   onSubmit,
 }) => {
-  const [form, setForm] = useState(buildInitialState(entry));
+  const [form, setForm] = useState(() => buildInitialState(entry));
+  const [dateRangeError, setDateRangeError] = useState('');
 
   useEffect(() => {
-    if (open) {
-      setForm(buildInitialState(entry));
-    }
-  }, [entry, open]);
+    setForm(buildInitialState(entry));
+    setDateRangeError('');
+  }, [entry]);
 
   const handleFieldChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -67,18 +64,38 @@ const TopicTimelineEntryForm = ({
     setForm((prev) => ({ ...prev, primaryContentId: contentId }));
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const handleDateChange = ({ start_date, end_date }) => {
+    setForm((prev) => ({ ...prev, start_date, end_date }));
+    if (
+      start_date
+      && end_date
+      && dayjs(end_date).isBefore(dayjs(start_date), 'day')
+    ) {
+      setDateRangeError('La fecha final no puede ser anterior a la fecha inicial.');
+    } else {
+      setDateRangeError('');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!form.title.trim()) return;
+    if (
+      form.start_date
+      && form.end_date
+      && dayjs(form.end_date).isBefore(dayjs(form.start_date), 'day')
+    ) {
+      setDateRangeError('La fecha final no puede ser anterior a la fecha inicial.');
+      return;
+    }
     const contents = form.selectedContentIds.map((id, index) => ({
       content_id: Number(id),
       order: index + 1,
-      role: id === form.primaryContentId ? 'PRIMARY' : 'REFERENCE',
+      role: String(id) === String(form.primaryContentId) ? 'PRIMARY' : 'REFERENCE',
       caption: '',
     }));
-    onSubmit({
+    await onSubmit({
       title: form.title.trim(),
       description: form.description,
-      display_date: form.display_date.trim(),
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       contents,
@@ -86,79 +103,69 @@ const TopicTimelineEntryForm = ({
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="md" fullWidth>
-      <Box component="form" onSubmit={handleSubmit}>
-        <DialogTitle>
-          {entry ? 'Editar entrada de la linea de tiempo' : 'Nueva entrada de la linea de tiempo'}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            {error && <Alert severity="error">{error}</Alert>}
-            <TextField
-              label="Titulo"
-              value={form.title}
-              onChange={handleFieldChange('title')}
-              required
-              fullWidth
-            />
-            <TextField
-              label="Descripcion narrativa"
-              value={form.description}
-              onChange={handleFieldChange('description')}
-              fullWidth
-              multiline
-              minRows={3}
-            />
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
-                label="Etiqueta temporal opcional"
-                placeholder="Ej. Antes de Bitcoin, Decada de 1990"
-                value={form.display_date}
-                onChange={handleFieldChange('display_date')}
-                fullWidth
-              />
-              <TextField
-                label="Fecha inicial"
-                type="date"
-                value={form.start_date}
-                onChange={handleFieldChange('start_date')}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-              />
-              <TextField
-                label="Fecha final"
-                type="date"
-                value={form.end_date}
-                onChange={handleFieldChange('end_date')}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-              />
-            </Stack>
+    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+      <Stack spacing={2.5}>
+        {error && <Alert severity="error">{error}</Alert>}
+        {dateRangeError && <Alert severity="error">{dateRangeError}</Alert>}
 
-            <TopicTimelineContentSelector
-              items={availableContents}
-              selectedIds={form.selectedContentIds}
-              primaryContentId={form.primaryContentId}
-              loading={loadingContents}
-              onSelectionChange={handleContentSelectionChange}
-              onPrimaryChange={handlePrimaryContentChange}
-            />
+        <TextField
+          label="Titulo"
+          value={form.title}
+          onChange={handleFieldChange('title')}
+          fullWidth
+        />
+        <TextField
+          label="Descripcion narrativa"
+          value={form.description}
+          onChange={handleFieldChange('description')}
+          fullWidth
+          multiline
+          minRows={3}
+        />
 
-            <Typography variant="caption" color="text.secondary">
-              La fecha es opcional. Si no agregas fecha ni etiqueta, la entrada se mostrara como una etapa numerada.
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button type="submit" variant="contained" disabled={saving || !form.title.trim()}>
-            {saving ? 'Guardando...' : 'Guardar'}
-          </Button>
-        </DialogActions>
+        <TopicTimelineDateFields
+          key={entry?.id ?? 'new'}
+          startDate={form.start_date}
+          endDate={form.end_date}
+          onChange={handleDateChange}
+          disabled={saving}
+          isNewEntry={!entry}
+        />
+
+        <TopicTimelineContentSelector
+          items={availableContents}
+          selectedIds={form.selectedContentIds}
+          primaryContentId={form.primaryContentId}
+          loading={loadingContents}
+          onSelectionChange={handleContentSelectionChange}
+          onPrimaryChange={handlePrimaryContentChange}
+        />
+      </Stack>
+
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 1.5,
+          mt: 3,
+          pt: 2,
+          borderTop: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Button type="button" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={saving || !form.title.trim()}
+        >
+          {saving ? 'Guardando...' : 'Guardar'}
+        </Button>
       </Box>
-    </Dialog>
+    </Paper>
   );
 };
 

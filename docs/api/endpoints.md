@@ -88,6 +88,49 @@ See [Authentication Documentation](authentication.md) for detailed authenticatio
 - **DELETE** `/api/content/{id}/`
 - **Auth**: Required (must be owner)
 
+## Topics — Timeline
+
+Editorial timeline attached to a topic. One timeline per topic; entries are ordered and can link topic content.
+
+### Get Topic Timeline
+- **GET** `/api/content/topics/{topic_id}/timeline/`
+- **Auth**: Required
+- **Response**: Timeline object with `entries[]` (each entry has `title`, `description`, `start_date`, `end_date`, `order`, `contents[]`). Returns empty shell (`entries: []`) if no timeline exists yet.
+
+### Create Timeline Entry
+- **POST** `/api/content/topics/{topic_id}/timeline/`
+- **Auth**: Required (topic creator or moderator)
+- **Body**:
+  ```json
+  {
+    "title": "Entry title",
+    "description": "Optional narrative text",
+    "start_date": "2008-10-31",
+    "end_date": null,
+    "contents": [
+      { "content_id": 1, "role": "PRIMARY", "order": 1 },
+      { "content_id": 2, "role": "REFERENCE", "order": 2 }
+    ]
+  }
+  ```
+- **Response**: Created entry (201)
+
+### Update Timeline Entry
+- **PATCH** `/api/content/topics/{topic_id}/timeline/{entry_id}/`
+- **Auth**: Required (topic creator or moderator)
+- **Body**: Partial entry fields (same shape as create)
+
+### Delete Timeline Entry
+- **DELETE** `/api/content/topics/{topic_id}/timeline/{entry_id}/`
+- **Auth**: Required (topic creator or moderator)
+- **Response**: 204 No Content
+
+### Reorder Timeline Entries
+- **POST** `/api/content/topics/{topic_id}/timeline/reorder/`
+- **Auth**: Required (topic creator or moderator)
+- **Body**: `{ "entry_ids": [3, 1, 2] }` — must include every entry ID in the desired order
+- **Response**: `{ "message": "Timeline reordered successfully" }`
+
 ## Events
 
 ### List Events

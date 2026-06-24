@@ -1175,7 +1175,7 @@ class TopicAPITests(APITestCase):
         payload = {
             "title": "Antecedentes",
             "description": "Contexto inicial",
-            "display_date": "Antes de Bitcoin",
+            "start_date": "2008-01-01",
             "contents": [
                 {"content_id": content_video.id, "role": "PRIMARY", "order": 1},
                 {"content_id": content_text.id, "role": "REFERENCE", "order": 2},

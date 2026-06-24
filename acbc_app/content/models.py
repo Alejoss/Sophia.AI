@@ -396,11 +396,6 @@ class TopicTimelineEntry(models.Model):
     timeline = models.ForeignKey(TopicTimeline, on_delete=models.CASCADE, related_name='entries')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    display_date = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Optional human-friendly label such as 'Before Bitcoin' or '1990s'.",
-    )
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)

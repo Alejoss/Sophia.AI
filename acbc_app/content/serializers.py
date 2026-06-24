@@ -445,7 +445,6 @@ class TopicTimelineEntrySerializer(serializers.ModelSerializer):
             'id',
             'title',
             'description',
-            'display_date',
             'start_date',
             'end_date',
             'order',

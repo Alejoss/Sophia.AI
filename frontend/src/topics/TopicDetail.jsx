@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useParams, useNavigate, Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
@@ -327,6 +327,7 @@ function TopicImageLightbox({
 const TopicDetail = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user, isAuthenticated } = useAuth();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -340,7 +341,7 @@ const TopicDetail = () => {
     const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
     const [contentCounts, setContentCounts] = useState({});
-    const [activeTab, setActiveTab] = useState('content');
+    const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'content');
     const [timelineEntryCount, setTimelineEntryCount] = useState(0);
     const [imagePageInfo, setImagePageInfo] = useState({
         currentPage: 0,
@@ -436,6 +437,13 @@ const TopicDetail = () => {
     const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
     const canEditTimeline = isCreator || isModerator;
     const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'timeline' || tab === 'comments' || tab === 'content') {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (activeTab === 'timeline' && !showTimelineTab) {

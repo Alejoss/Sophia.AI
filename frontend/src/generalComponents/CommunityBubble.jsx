@@ -19,6 +19,9 @@ Crear Temas.
 Compartir tu Biblioteca.`;
 
 const isBubbleRoute = (pathname) => {
+  if (pathname.includes('/timeline/')) {
+    return false;
+  }
   if (pathname === '/search' || pathname.startsWith('/content/search/')) {
     return true;
   }

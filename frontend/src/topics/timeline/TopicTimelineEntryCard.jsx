@@ -32,7 +32,6 @@ const formatDate = (value) => {
 };
 
 const getEntryDateLabel = (entry, index) => {
-  if (entry.display_date) return entry.display_date;
   if (entry.start_date && entry.end_date) {
     return `${formatDate(entry.start_date)} - ${formatDate(entry.end_date)}`;
   }
@@ -104,8 +103,8 @@ const TopicTimelineEntryCard = ({
             <Chip
               icon={<CalendarTodayIcon />}
               label={dateLabel}
-              color={entry.display_date || entry.start_date ? 'primary' : 'default'}
-              variant={entry.display_date || entry.start_date ? 'filled' : 'outlined'}
+              color={entry.start_date ? 'primary' : 'default'}
+              variant={entry.start_date ? 'filled' : 'outlined'}
               sx={{ fontWeight: 600 }}
             />
             {canEdit && (

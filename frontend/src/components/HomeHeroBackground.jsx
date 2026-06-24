@@ -9,7 +9,7 @@ const HomeHeroBackground = ({ src, alt = '', objectPosition = 'center' }) => (
     alt={alt}
     className="home-hero-background"
     decoding="async"
-    fetchPriority="high"
+    fetchpriority="high"
     style={{ objectPosition }}
   />
 );

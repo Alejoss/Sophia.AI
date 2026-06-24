@@ -13,6 +13,18 @@ Map of API endpoints by permission level (public / authenticated / author / admi
 | Search | `GET /api/search/...` | Public search. |
 | Gamification | List badges (read) | `permission_classes = []`. |
 
+## Topic timeline (creator / moderator for writes)
+
+| Method | Endpoint | Read | Write |
+|--------|----------|------|-------|
+| GET | `/api/content/topics/<pk>/timeline/` | Authenticated | — |
+| POST | `/api/content/topics/<pk>/timeline/` | — | Creator or moderator |
+| PATCH | `/api/content/topics/<pk>/timeline/<entry_id>/` | — | Creator or moderator |
+| DELETE | `/api/content/topics/<pk>/timeline/<entry_id>/` | — | Creator or moderator |
+| POST | `/api/content/topics/<pk>/timeline/reorder/` | — | Creator or moderator |
+
+Write permission uses `topic.is_moderator_or_creator(request.user)` (same rule as editing topic content).
+
 ## Authenticated (`IsAuthenticated`)
 
 - **Profiles**: User detail, update, notifications, JWT set, etc.

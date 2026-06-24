@@ -141,6 +141,31 @@ Categories for organizing content.
 
 **Location**: `content/models.py`
 
+### Topic Timeline
+
+Editorial narrative attached to a topic (one timeline per topic).
+
+**`TopicTimeline`**:
+- `topic` — OneToOneField to Topic (`related_name='timeline'`)
+- `title`, `description` — optional container metadata
+- `created_by`, `created_at`, `updated_at`
+
+**`TopicTimelineEntry`**:
+- `timeline` — ForeignKey to TopicTimeline (`related_name='entries'`)
+- `title`, `description`
+- `start_date`, `end_date` — optional DateFields
+- `order` — display order (auto-assigned on create)
+- `created_by`, `updated_by`, `created_at`, `updated_at`
+- Ordering: `['order', 'start_date', 'created_at']`
+
+**`TopicTimelineEntryContent`**:
+- `entry` — ForeignKey to TopicTimelineEntry (`related_name='entry_contents'`)
+- `content` — ForeignKey to Content
+- `order`, `role` (PRIMARY | REFERENCE | EXAMPLE | OPTIONAL), `caption`
+- `unique_together`: entry + content
+
+**Location**: `content/models.py`
+
 ## User Interaction Models
 
 ### Comment

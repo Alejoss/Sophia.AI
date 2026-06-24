@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Topic timeline documentation (`docs/architecture/topics-and-knowledge-paths.md`, API endpoints, permissions map, data models)
 - Comprehensive documentation structure
 - Root-level README with project overview
 - CONTRIBUTING.md with contribution guidelines
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation hub in `docs/` directory
 
 ### Changed
+- Removed optional temporal label (`display_date`) from topic timeline entries; use `start_date` / `end_date` or numbered stages instead
 - Improved project structure documentation
 - Enhanced setup and deployment guides
 

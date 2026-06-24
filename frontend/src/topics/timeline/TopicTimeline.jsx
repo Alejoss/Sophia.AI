@@ -5,7 +5,6 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import { useNavigate } from 'react-router-dom';
 import contentApi from '../../api/contentApi';
 import TopicTimelineEntryCard from './TopicTimelineEntryCard';
-import TopicTimelineEntryForm from './TopicTimelineEntryForm';
 
 const sortEntries = (entries) => [...(entries || [])].sort((a, b) => {
   const orderA = a.order ?? 0;
@@ -31,12 +30,6 @@ const TopicTimeline = ({ topicId, canEdit }) => {
   const [timeline, setTimeline] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [availableContents, setAvailableContents] = useState([]);
-  const [loadingContents, setLoadingContents] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState(null);
 
   const entries = useMemo(() => sortEntries(timeline?.entries || []), [timeline]);
 
@@ -53,56 +46,16 @@ const TopicTimeline = ({ topicId, canEdit }) => {
     }
   }, [topicId]);
 
-  const loadAvailableContents = useCallback(async () => {
-    if (!canEdit) return;
-    try {
-      setLoadingContents(true);
-      const data = await contentApi.getTopicDetailsSimple(topicId);
-      setAvailableContents(data.contents || []);
-    } catch {
-      setAvailableContents([]);
-    } finally {
-      setLoadingContents(false);
-    }
-  }, [canEdit, topicId]);
-
   useEffect(() => {
     loadTimeline();
   }, [loadTimeline]);
 
-  useEffect(() => {
-    loadAvailableContents();
-  }, [loadAvailableContents]);
-
   const handleCreate = () => {
-    setEditingEntry(null);
-    setFormError(null);
-    setFormOpen(true);
+    navigate(`/content/topics/${topicId}/timeline/new`);
   };
 
   const handleEdit = (entry) => {
-    setEditingEntry(entry);
-    setFormError(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (payload) => {
-    try {
-      setSaving(true);
-      setFormError(null);
-      if (editingEntry) {
-        await contentApi.updateTopicTimelineEntry(topicId, editingEntry.id, payload);
-      } else {
-        await contentApi.createTopicTimelineEntry(topicId, payload);
-      }
-      setFormOpen(false);
-      setEditingEntry(null);
-      await loadTimeline();
-    } catch (err) {
-      setFormError(getErrorMessage(err, 'No se pudo guardar la entrada.'));
-    } finally {
-      setSaving(false);
-    }
+    navigate(`/content/topics/${topicId}/timeline/${entry.id}/edit`);
   };
 
   const handleDelete = async (entry) => {
@@ -217,22 +170,6 @@ const TopicTimeline = ({ topicId, canEdit }) => {
           ))}
         </Box>
       )}
-
-      <TopicTimelineEntryForm
-        open={formOpen}
-        entry={editingEntry}
-        availableContents={availableContents}
-        loadingContents={loadingContents}
-        saving={saving}
-        error={formError}
-        onClose={() => {
-          if (!saving) {
-            setFormOpen(false);
-            setEditingEntry(null);
-          }
-        }}
-        onSubmit={handleSubmit}
-      />
     </Box>
   );
 };
