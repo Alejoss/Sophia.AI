@@ -136,6 +136,25 @@ Location: `acbc_app/.env`
 - **Default**: `us-west-2`
 - **Example**: `AWS_S3_REGION_NAME=us-east-1`
 
+### Database backups (`scripts/backup-db.sh`)
+
+Uses the same AWS credentials as media storage. Upload is automatic when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set.
+
+#### `BACKUP_S3_PREFIX`
+- **Description**: S3 key prefix for database dumps
+- **Default**: `db-backups`
+- **Example**: `BACKUP_S3_PREFIX=db-backups`
+
+#### `BACKUP_S3_UPLOAD`
+- **Description**: Control S3 upload (`auto` uploads when AWS creds exist)
+- **Default**: `auto`
+- **Example**: `BACKUP_S3_UPLOAD=false`
+
+#### `BACKUP_RETENTION_DAYS` / `BACKUP_S3_RETENTION_DAYS`
+- **Description**: Days to keep local / S3 backups
+- **Default**: `7`
+- **Example**: `BACKUP_S3_RETENTION_DAYS=30`
+
 ### Email (Optional – Postmark)
 
 #### `SEND_EMAILS`

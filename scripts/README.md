@@ -161,7 +161,7 @@ python3 scripts/cloudflare_analytics_report.py --notify-notion
 **Cost:** $0 (included in Cloudflare plan; subject to API rate limits).
 
 ### `backup-db.sh`
-Creates a backup of the PostgreSQL database. Use the same project root and `docker-compose.prod.yml` as deployment.
+Creates a backup of the PostgreSQL database and optionally uploads it to Amazon S3. Run from the project root; uses `docker-compose.prod.yml` and reads DB/AWS settings from `acbc_app/.env`.
 
 **Usage:**
 ```bash
@@ -171,9 +171,40 @@ BACKUP_DIR=/path/to/backups ./scripts/backup-db.sh
 ```
 
 **What it does:**
-- Creates compressed database backup via `docker-compose -f docker-compose.prod.yml exec postgres pg_dump`
-- Uses `DB_NAME`, `DB_USER` from env (same as prod)
-- Stores in backup directory; cleans up backups older than 7 days
+- Creates a compressed database backup via `docker compose exec postgres pg_dump`
+- Reads `DB_NAME` / `DB_USER` and AWS settings from `acbc_app/.env` (or environment)
+- Stores backups locally and deletes files older than `BACKUP_RETENTION_DAYS` (default: 7)
+- If `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set, uploads to `s3://<bucket>/<BACKUP_S3_PREFIX>/` (default prefix: `db-backups`)
+- Deletes S3 backups older than `BACKUP_S3_RETENTION_DAYS` (default: 7)
+
+**S3 variables** (optional, in `acbc_app/.env` or shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKUP_S3_PREFIX` | `db-backups` | S3 key prefix (keeps backups separate from media) |
+| `BACKUP_S3_UPLOAD` | `auto` | `auto` = upload when AWS creds exist; `false` to disable |
+| `BACKUP_RETENTION_DAYS` | `7` | Local retention |
+| `BACKUP_S3_RETENTION_DAYS` | `7` | S3 retention |
+
+**Server setup (one-time):**
+```bash
+sudo apt update && sudo apt install -y awscli
+mkdir -p /opt/backups
+chmod +x scripts/backup-db.sh
+cd /opt/acbc-app
+BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+```
+
+**Automated daily backup (cron):**
+```bash
+0 2 * * * cd /opt/acbc-app && BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+```
+
+**Restore from S3:**
+```bash
+aws s3 cp s3://YOUR_BUCKET/db-backups/backup_YYYYMMDD_HHMMSS.sql.gz /opt/backups/
+./scripts/restore-db.sh /opt/backups/backup_YYYYMMDD_HHMMSS.sql.gz
+```
 
 ### `restore-db.sh`
 Restores the database from a backup file. Run from project root; uses `docker-compose.prod.yml` and `DB_NAME`/`DB_USER`.
@@ -220,6 +251,10 @@ The scripts use the following environment variables (can be set in `.env` or exp
 - `DB_NAME`: Database name (default: academiablockchain_prod)
 - `DB_USER`: Database user (default: postgres)
 - `BACKUP_DIR`: Backup directory (default: ./backups)
+- `BACKUP_RETENTION_DAYS`: Local backup retention in days (default: 7)
+- `BACKUP_S3_PREFIX`: S3 key prefix for backups (default: db-backups)
+- `BACKUP_S3_UPLOAD`: `auto` (default), `true`, or `false`
+- `BACKUP_S3_RETENTION_DAYS`: S3 backup retention in days (default: 7)
 
 ## Automated Backups
 
