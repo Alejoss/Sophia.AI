@@ -25,7 +25,7 @@ def create_notification(**kwargs):
     for field in ('description', 'verb'):
         if field in kwargs and kwargs[field]:
             kwargs[field] = prepare_text_for_db(kwargs[field])
-    return create_notification(**kwargs)
+    return Notification.objects.create(**kwargs)
 
 def notify_comment_reply(comment):
     """

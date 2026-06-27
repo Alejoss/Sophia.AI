@@ -8,6 +8,20 @@ from knowledge_paths.models import KnowledgePath
 from events.models import Event
 
 
+class CertificateNotesField(serializers.Field):
+    """Accept plain text or legacy JSON-shaped notes and normalize to TextField."""
+
+    default_empty_value = ''
+
+    def to_internal_value(self, data):
+        return normalize_notes_value(data)
+
+    def to_representation(self, value):
+        if value is None:
+            return ''
+        return value
+
+
 class CertificateRequestSerializer(serializers.ModelSerializer):
     requester = serializers.CharField(source='requester.username', read_only=True)
     requester_id = serializers.IntegerField(source='requester.id', read_only=True)
@@ -23,6 +37,7 @@ class CertificateRequestSerializer(serializers.ModelSerializer):
     event = serializers.PrimaryKeyRelatedField(
         queryset=Event.objects.all(), required=False, allow_null=True
     )
+    notes = CertificateNotesField(required=False, allow_null=True, default='')
 
     class Meta:
         model = CertificateRequest
@@ -45,9 +60,6 @@ class CertificateRequestSerializer(serializers.ModelSerializer):
             'notes'
         ]
         read_only_fields = ['status', 'response_date', 'rejection_reason', 'requester', 'requester_id', 'knowledge_path_title', 'knowledge_path_author', 'knowledge_path_author_id', 'event_title', 'event_owner', 'event_owner_id']
-
-    def validate_notes(self, value):
-        return normalize_notes_value(value)
 
     def create(self, validated_data):
         validated_data['requester'] = self.context['request'].user

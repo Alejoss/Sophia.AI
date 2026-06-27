@@ -248,3 +248,46 @@ class CertificateRequestFlowTest(TestCase):
 
         stored = CertificateRequest.objects.get(id=response.data['id'])
         self.assertEqual(stored.notes, note)
+
+
+class CertificateRequestSerializerNotesTests(TestCase):
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username='teacher',
+            email='teacher@test.com',
+            password='testpass123',
+        )
+        self.student = User.objects.create_user(
+            username='student',
+            email='student@test.com',
+            password='testpass123',
+        )
+        self.knowledge_path = KnowledgePath.objects.create(
+            title='Test Knowledge Path',
+            description='Test Description',
+            author=self.teacher,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.student)
+        self.request_url = reverse(
+            'certificates:certificate-request',
+            args=[self.knowledge_path.id],
+        )
+
+    def test_accepts_legacy_dict_notes_payload(self):
+        response = self.client.post(
+            self.request_url,
+            {'notes': {'message': 'Please review my completion'}},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['notes'], 'Please review my completion')
+
+    def test_accepts_plain_string_notes_payload(self):
+        response = self.client.post(
+            self.request_url,
+            {'notes': 'Muchas gracias por completar Ucronía'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['notes'], 'Muchas gracias por completar Ucronía')
