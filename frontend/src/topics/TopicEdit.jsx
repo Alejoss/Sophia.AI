@@ -24,6 +24,7 @@ import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
 import TopicModerators from "./TopicModerators";
 import ContentSuggestionsManager from "./ContentSuggestionsManager";
+import TimelineEntrySuggestionsManager from "./timeline/TimelineEntrySuggestionsManager";
 import ImageUploadModal from "../components/ImageUploadModal";
 
 const TopicEdit = () => {
@@ -293,6 +294,25 @@ const TopicEdit = () => {
                 topicId={topicId}
                 onSuggestionProcessed={async () => {
                   // Refresh topic data after suggestion is processed
+                  try {
+                    const updatedTopic = await contentApi.getTopicDetails(topicId);
+                    setTopic(updatedTopic);
+                  } catch (err) {
+                    console.error('Error refreshing topic:', err);
+                  }
+                }}
+              />
+            </Box>
+            <Divider sx={{ my: 3 }} />
+          </>
+        )}
+
+        {(isCreator || (topic.moderators && topic.moderators.some(mod => mod.id === user?.id))) && (
+          <>
+            <Box sx={{ mb: 3 }}>
+              <TimelineEntrySuggestionsManager
+                topicId={topicId}
+                onSuggestionProcessed={async () => {
                   try {
                     const updatedTopic = await contentApi.getTopicDetails(topicId);
                     setTopic(updatedTopic);

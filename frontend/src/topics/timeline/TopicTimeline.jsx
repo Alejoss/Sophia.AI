@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert, Badge, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { useNavigate } from 'react-router-dom';
 import contentApi from '../../api/contentApi';
 import TopicTimelineEntryCard from './TopicTimelineEntryCard';
@@ -19,7 +20,7 @@ const getErrorMessage = (error, fallback) => {
   return fallback;
 };
 
-const TopicTimeline = ({ topicId, canEdit }) => {
+const TopicTimeline = ({ topicId, canEdit, canSuggest = false, pendingSuggestionsCount = 0 }) => {
   const navigate = useNavigate();
   const [timeline, setTimeline] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,25 @@ const TopicTimeline = ({ topicId, canEdit }) => {
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreate}>
             Agregar entrada
           </Button>
+        )}
+        {canSuggest && (
+          <Button
+            variant="outlined"
+            startIcon={<LightbulbIcon />}
+            onClick={() => navigate(`/content/topics/${topicId}/timeline/suggest`)}
+          >
+            Sugerir entrada
+          </Button>
+        )}
+        {canEdit && pendingSuggestionsCount > 0 && (
+          <Badge badgeContent={pendingSuggestionsCount} color="error">
+            <Button
+              variant="outlined"
+              onClick={() => navigate(`/content/topics/${topicId}/edit?tab=timeline-suggestions`)}
+            >
+              Gestionar sugerencias
+            </Button>
+          </Badge>
         )}
       </Stack>
 

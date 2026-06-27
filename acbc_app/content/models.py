@@ -431,6 +431,77 @@ class TopicTimelineEntryContent(models.Model):
         return f"{self.entry.title} -> {self.content}"
 
 
+class TopicTimelineEntrySuggestion(models.Model):
+    """User-proposed timeline entry awaiting moderator review."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('REJECTED', 'Rejected'),
+    ]
+
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='timeline_entry_suggestions')
+    suggested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='timeline_entry_suggestions')
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_timeline_entry_suggestions',
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    message = models.TextField(blank=True)
+    rejection_reason = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    is_duplicate = models.BooleanField(
+        default=False,
+        help_text='Si ya existe una entrada equivalente en la linea de tiempo.',
+    )
+    accepted_entry = models.ForeignKey(
+        TopicTimelineEntry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='source_suggestions',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['topic', 'status']),
+            models.Index(fields=['suggested_by', 'status']),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.suggested_by.username} suggested timeline entry "
+            f"\"{self.title}\" for {self.topic.title} - {self.status}"
+        )
+
+
+class TopicTimelineEntrySuggestionContent(models.Model):
+    suggestion = models.ForeignKey(
+        TopicTimelineEntrySuggestion,
+        on_delete=models.CASCADE,
+        related_name='suggested_contents',
+    )
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name='timeline_entry_suggestion_links')
+    order = models.PositiveIntegerField(default=0)
+    caption = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        unique_together = [['suggestion', 'content']]
+
+    def __str__(self):
+        return f"{self.suggestion.title} -> {self.content}"
+
+
 class ModerationLog(models.Model):
     # Tracks moderation actions like deletions or reports performed by moderators on content.
 

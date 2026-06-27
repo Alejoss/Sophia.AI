@@ -337,6 +337,7 @@ const TopicDetail = () => {
     const [error, setError] = useState(null);
     const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
+    const [pendingTimelineSuggestionsCount, setPendingTimelineSuggestionsCount] = useState(0);
     const [isModerator, setIsModerator] = useState(false);
     const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
@@ -355,6 +356,15 @@ const TopicDetail = () => {
             page,
             page_size: pageSize,
         });
+    }, [topicId]);
+
+    const fetchPendingTimelineSuggestionsCount = useCallback(async () => {
+        try {
+            const suggestions = await contentApi.getTopicTimelineEntrySuggestions(topicId, { status: 'PENDING' });
+            setPendingTimelineSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
+        } catch {
+            // ignore
+        }
     }, [topicId]);
 
     const fetchPendingSuggestionsCount = useCallback(async () => {
@@ -414,6 +424,7 @@ const TopicDetail = () => {
 
             if (userIsModerator) {
                 fetchPendingSuggestionsCount();
+                fetchPendingTimelineSuggestionsCount();
             }
             setError(null);
         } catch {
@@ -421,7 +432,7 @@ const TopicDetail = () => {
         } finally {
             setLoading(false);
         }
-    }, [topicId, fetchContentByTypePage, fetchPendingSuggestionsCount, isAuthenticated, user?.id]);
+    }, [topicId, fetchContentByTypePage, fetchPendingSuggestionsCount, fetchPendingTimelineSuggestionsCount, isAuthenticated, user?.id]);
 
     useEffect(() => {
         refreshTopicPageData();
@@ -436,7 +447,8 @@ const TopicDetail = () => {
     const userId = user?.id;
     const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
     const canEditTimeline = isCreator || isModerator;
-    const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
+    const canSuggestTimeline = isAuthenticated && !canEditTimeline;
+    const showTimelineTab = canEditTimeline || timelineEntryCount > 0 || canSuggestTimeline;
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -875,7 +887,12 @@ const TopicDetail = () => {
             )}
 
             {activeTab === 'timeline' && (
-                <TopicTimeline topicId={topicId} canEdit={canEditTimeline} />
+                <TopicTimeline
+                    topicId={topicId}
+                    canEdit={canEditTimeline}
+                    canSuggest={canSuggestTimeline}
+                    pendingSuggestionsCount={pendingTimelineSuggestionsCount}
+                />
             )}
 
             {activeTab === 'comments' && (

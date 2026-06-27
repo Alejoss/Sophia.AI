@@ -67,6 +67,7 @@ const TopicsUser = () => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [suggestionsError, setSuggestionsError] = useState(null);
   const [deletingSuggestion, setDeletingSuggestion] = useState({});
+  const [timelineSuggestions, setTimelineSuggestions] = useState([]);
 
   const fetchData = async () => {
     // Reset loading states
@@ -116,11 +117,15 @@ const TopicsUser = () => {
 
     // Fetch content suggestions
     try {
-      const sugg = await contentApi.getUserContentSuggestions({});
-      setSuggestions(Array.isArray(sugg) ? sugg : []);
+      const [contentSugg, timelineSugg] = await Promise.all([
+        contentApi.getUserContentSuggestions({}),
+        contentApi.getUserTimelineEntrySuggestions({}),
+      ]);
+      setSuggestions(Array.isArray(contentSugg) ? contentSugg : []);
+      setTimelineSuggestions(Array.isArray(timelineSugg) ? timelineSugg : []);
     } catch (err) {
-      console.error('Error fetching content suggestions:', err);
-      setSuggestionsError('Error al cargar las sugerencias de contenido');
+      console.error('Error fetching suggestions:', err);
+      setSuggestionsError('Error al cargar tus sugerencias');
     } finally {
       setSuggestionsLoading(false);
     }
@@ -194,6 +199,22 @@ const TopicsUser = () => {
         delete newState[invitationId];
         return newState;
       });
+    }
+  };
+
+  const handleDeleteTimelineSuggestion = async (suggestion) => {
+    const topicId = suggestion.topic?.id;
+    if (!topicId) return;
+    const key = `timeline-${suggestion.id}`;
+    setDeletingSuggestion((prev) => ({ ...prev, [key]: true }));
+    try {
+      await contentApi.deleteTopicTimelineEntrySuggestion(topicId, suggestion.id);
+      setTimelineSuggestions((prev) => prev.filter((item) => item.id !== suggestion.id));
+    } catch (err) {
+      console.error('Error deleting timeline suggestion:', err);
+      setSuggestionsError('Error al eliminar la sugerencia de linea de tiempo');
+    } finally {
+      setDeletingSuggestion((prev) => ({ ...prev, [key]: false }));
     }
   };
 
@@ -545,17 +566,15 @@ const TopicsUser = () => {
       {/* Content Suggestions Tab */}
       {activeTab === 3 && !suggestionsLoading && !suggestionsError && (
         <Box>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+            Sugerencias de contenido
+          </Typography>
           {suggestions.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 1.5 }}>
-                No tienes sugerencias de contenido
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Las sugerencias de contenido que hagas para temas aparecerán aquí.
-              </Typography>
-            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+              Aun no has sugerido contenidos para temas.
+            </Typography>
           ) : (
-            <Stack spacing={2}>
+            <Stack spacing={2} sx={{ mb: 4 }}>
               {suggestions.map((suggestion) => (
                 <Paper
                   key={suggestion.id}
@@ -634,6 +653,74 @@ const TopicsUser = () => {
                       {suggestion.reviewed_by && ` por ${suggestion.reviewed_by.username}`}
                     </Typography>
                   )}
+                </Paper>
+              ))}
+            </Stack>
+          )}
+
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+            Sugerencias de linea de tiempo
+          </Typography>
+          {timelineSuggestions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Aun no has sugerido entradas para lineas de tiempo.
+            </Typography>
+          ) : (
+            <Stack spacing={2}>
+              {timelineSuggestions.map((suggestion) => (
+                <Paper key={`timeline-${suggestion.id}`} variant="outlined" sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        {suggestion.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Tema: {suggestion.topic?.title || 'Tema desconocido'}
+                      </Typography>
+                    </Box>
+                    {getStatusChip(suggestion.status)}
+                  </Box>
+                  {suggestion.message && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      <strong>Tu mensaje:</strong> {suggestion.message}
+                    </Typography>
+                  )}
+                  {(suggestion.contents || []).length > 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Contenidos propuestos: {(suggestion.contents || []).length}
+                    </Typography>
+                  )}
+                  {suggestion.status === 'REJECTED' && suggestion.rejection_reason && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      <strong>Razon de rechazo:</strong> {suggestion.rejection_reason}
+                    </Alert>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Sugerido el {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString() : '-'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => navigate(`/content/topics/${suggestion.topic?.id}?tab=timeline`)}
+                      >
+                        Ver tema
+                      </Button>
+                      {suggestion.status === 'PENDING' && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleDeleteTimelineSuggestion(suggestion)}
+                          disabled={deletingSuggestion[`timeline-${suggestion.id}`]}
+                        >
+                          Eliminar
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
                 </Paper>
               ))}
             </Stack>

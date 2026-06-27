@@ -10,6 +10,8 @@ from content.models import (
     TopicTimeline,
     TopicTimelineEntry,
     TopicTimelineEntryContent,
+    TopicTimelineEntrySuggestion,
+    TopicTimelineEntrySuggestionContent,
     ContentProfile,
     FileDetails,
     Publication,
@@ -1021,6 +1023,146 @@ class ContentSuggestionSerializer(serializers.ModelSerializer):
         ).first()
         
         return vote.value if vote else 0
+
+
+class TopicTimelineEntrySuggestionContentSerializer(serializers.ModelSerializer):
+    content = ContentSerializer(read_only=True)
+    content_id = serializers.PrimaryKeyRelatedField(
+        queryset=Content.objects.all(),
+        source='content',
+        write_only=True,
+    )
+
+    class Meta:
+        model = TopicTimelineEntrySuggestionContent
+        fields = ['id', 'content', 'content_id', 'order', 'caption']
+
+
+class TopicTimelineEntrySuggestionSerializer(serializers.ModelSerializer):
+    suggested_by = UserSerializer(read_only=True)
+    reviewed_by = UserSerializer(read_only=True)
+    topic = TopicBasicSerializer(read_only=True)
+    contents = TopicTimelineEntrySuggestionContentSerializer(
+        source='suggested_contents',
+        many=True,
+        required=False,
+    )
+    accepted_entry = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = TopicTimelineEntrySuggestion
+        fields = [
+            'id',
+            'topic',
+            'suggested_by',
+            'reviewed_by',
+            'title',
+            'description',
+            'start_date',
+            'end_date',
+            'message',
+            'rejection_reason',
+            'status',
+            'is_duplicate',
+            'accepted_entry',
+            'contents',
+            'created_at',
+            'updated_at',
+            'reviewed_at',
+        ]
+        read_only_fields = [
+            'suggested_by',
+            'reviewed_by',
+            'status',
+            'rejection_reason',
+            'is_duplicate',
+            'accepted_entry',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate(self, attrs):
+        start_date = attrs.get('start_date')
+        end_date = attrs.get('end_date')
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({
+                'end_date': 'La fecha final no puede ser anterior a la fecha inicial.',
+            })
+
+        title = attrs.get('title', '')
+        if not str(title).strip():
+            raise serializers.ValidationError({'title': 'El titulo no puede estar vacio.'})
+        return attrs
+
+    def create(self, validated_data):
+        from content.utils import (
+            timeline_entry_suggestion_is_duplicate,
+            validate_timeline_entry_suggestion_contents,
+        )
+
+        suggested_contents = validated_data.pop('suggested_contents', [])
+        topic = self.context['topic']
+        request = self.context['request']
+        user = request.user
+
+        if topic.is_moderator_or_creator(user):
+            raise serializers.ValidationError({
+                'error': 'Los moderadores y el creador del tema no pueden sugerir entradas de linea de tiempo.',
+            })
+
+        pending_exists = TopicTimelineEntrySuggestion.objects.filter(
+            topic=topic,
+            suggested_by=user,
+            title__iexact=validated_data['title'].strip(),
+            status='PENDING',
+        ).exists()
+        if pending_exists:
+            raise serializers.ValidationError({
+                'title': 'Ya tienes una sugerencia pendiente con este titulo para este tema.',
+            })
+
+        contents_payload = [
+            {
+                'content_id': item['content'].id,
+                'order': item.get('order'),
+                'caption': item.get('caption') or '',
+            }
+            for item in suggested_contents
+        ]
+        try:
+            normalized_contents = validate_timeline_entry_suggestion_contents(
+                topic,
+                user,
+                contents_payload,
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError(exc.args[0]) from exc
+
+        suggestion = TopicTimelineEntrySuggestion.objects.create(
+            topic=topic,
+            suggested_by=user,
+            is_duplicate=timeline_entry_suggestion_is_duplicate(
+                topic,
+                validated_data['title'],
+                validated_data.get('start_date'),
+                validated_data.get('end_date'),
+            ),
+            **validated_data,
+        )
+
+        links = []
+        for index, item in enumerate(normalized_contents):
+            links.append(TopicTimelineEntrySuggestionContent(
+                suggestion=suggestion,
+                content_id=item['content_id'],
+                order=item.get('order', index + 1),
+                caption=item.get('caption') or '',
+            ))
+        if links:
+            TopicTimelineEntrySuggestionContent.objects.bulk_create(links)
+
+        return suggestion
 
 
 class FileSuggestionSerializer(serializers.ModelSerializer):

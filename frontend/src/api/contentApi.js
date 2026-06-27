@@ -886,6 +886,83 @@ const contentApi = {
     }
   },
 
+  createTopicTimelineEntrySuggestion: async (topicId, payload) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/timeline-suggestions/create/`,
+        payload,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error creating timeline entry suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  getTopicTimelineEntrySuggestions: async (topicId, filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      const url = `/content/topics/${topicId}/timeline-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching timeline entry suggestions:', error.response || error);
+      throw error;
+    }
+  },
+
+  acceptTopicTimelineEntrySuggestion: async (topicId, suggestionId) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/timeline-suggestions/${suggestionId}/accept/`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error accepting timeline entry suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  rejectTopicTimelineEntrySuggestion: async (topicId, suggestionId, rejectionReason) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topics/${topicId}/timeline-suggestions/${suggestionId}/reject/`,
+        { rejection_reason: rejectionReason },
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting timeline entry suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
+  getUserTimelineEntrySuggestions: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.topic_id) params.append('topic_id', filters.topic_id);
+      const url = `/content/user/timeline-entry-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user timeline entry suggestions:', error.response || error);
+      throw error;
+    }
+  },
+
+  deleteTopicTimelineEntrySuggestion: async (topicId, suggestionId) => {
+    try {
+      const response = await axiosInstance.delete(
+        `/content/topics/${topicId}/timeline-suggestions/${suggestionId}/`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting timeline entry suggestion:', error.response || error);
+      throw error;
+    }
+  },
+
   // File Suggestions API methods (URL -> optional file attachment)
   createFileSuggestion: async (contentId, formData, options = {}) => {
     try {

@@ -55,6 +55,82 @@ def dated_timeline_entry_ids(timeline):
         )
     ]
 
+
+def timeline_entry_suggestion_is_duplicate(topic, title, start_date=None, end_date=None):
+    from content.models import TopicTimeline
+
+    timeline = TopicTimeline.objects.filter(topic=topic).first()
+    if timeline is None:
+        return False
+
+    normalized_title = (title or '').strip()
+    if not normalized_title:
+        return False
+
+    entries = timeline.entries.filter(title__iexact=normalized_title)
+    if start_date:
+        entries = entries.filter(start_date=start_date)
+    else:
+        entries = entries.filter(start_date__isnull=True)
+    if end_date:
+        entries = entries.filter(end_date=end_date)
+    else:
+        entries = entries.filter(end_date__isnull=True)
+    return entries.exists()
+
+
+def validate_timeline_entry_suggestion_contents(topic, user, contents_data):
+    from content.models import ContentProfile
+
+    if not contents_data:
+        return []
+
+    topic_content_ids = set(topic.contents.values_list('id', flat=True))
+    user_content_ids = set(
+        ContentProfile.objects.filter(user=user).values_list('content_id', flat=True)
+    )
+
+    seen_content_ids = set()
+    duplicate_content_ids = []
+    invalid_content_ids = []
+    normalized = []
+
+    for index, item in enumerate(contents_data):
+        content_id = item.get('content_id') if isinstance(item, dict) else None
+        if content_id is None:
+            continue
+        try:
+            content_id = int(content_id)
+        except (TypeError, ValueError):
+            invalid_content_ids.append(content_id)
+            continue
+
+        if content_id in seen_content_ids:
+            duplicate_content_ids.append(content_id)
+        seen_content_ids.add(content_id)
+
+        if content_id not in topic_content_ids and content_id not in user_content_ids:
+            invalid_content_ids.append(content_id)
+
+        normalized.append({
+            'content_id': content_id,
+            'order': item.get('order', index + 1),
+            'caption': (item.get('caption') or '').strip(),
+        })
+
+    errors = {}
+    if duplicate_content_ids:
+        errors['contents'] = 'No se puede adjuntar el mismo contenido mas de una vez.'
+    if invalid_content_ids:
+        errors['contents'] = (
+            'Solo puedes proponer contenidos que ya estan en el tema '
+            'o que pertenecen a tu biblioteca.'
+        )
+    if errors:
+        raise ValueError(errors)
+    return normalized
+
+
 def get_top_voted_contents(topic, media_type, limit=None):
     """
     Get all contents of a specific media type for a topic, ordered by vote count.

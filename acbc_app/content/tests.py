@@ -8,7 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from notifications.models import Notification
 from content.models import (
     Library, Collection, Content, ContentProfile, 
-    FileDetails, Topic, TopicTimeline, TopicTimelineEntry, Publication,
+    FileDetails, Topic, TopicTimeline, TopicTimelineEntry, TopicTimelineEntrySuggestion,
+    TopicTimelineEntrySuggestionContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript
 )
 from knowledge_paths.models import KnowledgePath, Node
@@ -1274,6 +1275,110 @@ class TopicAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TopicTimelineEntrySuggestionsAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='timelineuser',
+            email='timelineuser@example.com',
+            password='pass12345',
+        )
+        self.moderator = User.objects.create_user(
+            username='timelinesmod',
+            email='timelinesmod@example.com',
+            password='pass12345',
+        )
+        self.topic = Topic.objects.create(
+            title='Timeline Topic',
+            description='Desc',
+            creator=self.moderator,
+        )
+        self.topic.moderators.add(self.moderator)
+        self.client.force_authenticate(user=self.user)
+
+        self.library_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Library item',
+        )
+        ContentProfile.objects.create(
+            content=self.library_content,
+            user=self.user,
+            title='Library item',
+        )
+
+    def test_create_timeline_entry_suggestion_with_library_content(self):
+        url = reverse('content:topic-timeline-suggestion-create', args=[self.topic.id])
+        response = self.client.post(
+            url,
+            {
+                'title': 'Propuesta historica',
+                'description': 'Contexto sugerido',
+                'start_date': '2010-07-18',
+                'message': 'Creo que encaja aqui',
+                'contents': [{'content_id': self.library_content.id, 'order': 1}],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['title'], 'Propuesta historica')
+        self.assertEqual(len(response.data['contents']), 1)
+
+    def test_moderator_cannot_create_timeline_entry_suggestion(self):
+        self.client.force_authenticate(user=self.moderator)
+        url = reverse('content:topic-timeline-suggestion-create', args=[self.topic.id])
+        response = self.client.post(url, {'title': 'Nope'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_accept_timeline_entry_suggestion_creates_entry_and_adds_content(self):
+        suggestion = TopicTimelineEntrySuggestion.objects.create(
+            topic=self.topic,
+            suggested_by=self.user,
+            title='Propuesta historica',
+            description='Contexto sugerido',
+            start_date='2010-07-18',
+            status='PENDING',
+        )
+        TopicTimelineEntrySuggestionContent.objects.create(
+            suggestion=suggestion,
+            content=self.library_content,
+            order=1,
+        )
+
+        accept_url = reverse(
+            'content:topic-timeline-suggestion-accept',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'ACCEPTED')
+        self.assertIsNotNone(suggestion.accepted_entry_id)
+        self.assertTrue(self.topic.contents.filter(id=self.library_content.id).exists())
+
+        timeline = TopicTimeline.objects.get(topic=self.topic)
+        self.assertEqual(timeline.entries.count(), 1)
+        entry = timeline.entries.first()
+        self.assertEqual(entry.title, 'Propuesta historica')
+        self.assertEqual(entry.entry_contents.count(), 1)
+
+    def test_reject_timeline_entry_suggestion_requires_reason(self):
+        suggestion = TopicTimelineEntrySuggestion.objects.create(
+            topic=self.topic,
+            suggested_by=self.user,
+            title='Rechazable',
+            status='PENDING',
+        )
+        reject_url = reverse(
+            'content:topic-timeline-suggestion-reject',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(reject_url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class PublicationAPITests(APITestCase):
