@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from content.utils import build_media_url
+from utils.db_encoding import normalize_notes_value
 from .models import CertificateRequest, Certificate, CertificateTemplate
 from knowledge_paths.serializers import KnowledgePathSerializer
 from knowledge_paths.models import KnowledgePath
@@ -45,21 +46,12 @@ class CertificateRequestSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['status', 'response_date', 'rejection_reason', 'requester', 'requester_id', 'knowledge_path_title', 'knowledge_path_author', 'knowledge_path_author_id', 'event_title', 'event_owner', 'event_owner_id']
 
+    def validate_notes(self, value):
+        return normalize_notes_value(value)
+
     def create(self, validated_data):
-        print(f"DEBUG: CertificateRequestSerializer.create called with validated_data: {validated_data}")
-        # Set the requester to the current user
         validated_data['requester'] = self.context['request'].user
-        print(f"DEBUG: Added requester: {validated_data['requester'].username}")
-        try:
-            result = super().create(validated_data)
-            print(f"DEBUG: CertificateRequest created successfully with ID: {result.id}")
-            return result
-        except Exception as e:
-            print(f"DEBUG: Error in create method: {str(e)}")
-            print(f"DEBUG: Error type: {type(e)}")
-            import traceback
-            print(f"DEBUG: Create method traceback: {traceback.format_exc()}")
-            raise
+        return super().create(validated_data)
 
 class CertificateSerializer(serializers.ModelSerializer):
     knowledge_path_title = serializers.CharField(source='knowledge_path.title', read_only=True)

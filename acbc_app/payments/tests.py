@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient
 from payments.services import sync_payment_from_provider
-from payments.text_utils import to_ascii_safe, to_ascii_safe_json
+from utils.db_encoding import to_ascii_safe, to_ascii_safe_json
 from tests.factories.events import EventFactory, EventRegistrationFactory
 from tests.factories.users import UserFactory
 
@@ -176,9 +176,7 @@ class AsciiSafeStorageTests(TestCase):
     def test_to_ascii_safe_strips_accents(self):
         self.assertEqual(to_ascii_safe('Filosofía Cypherpunk'), 'Filosofia Cypherpunk')
 
-    def test_to_ascii_safe_json_escapes_unicode(self):
+    def test_to_ascii_safe_json_strips_unicode_in_dict(self):
         payload = {'order_description': 'Registro: Filosofía'}
         safe = to_ascii_safe_json(payload)
-        raw = json.dumps(safe, ensure_ascii=True)
-        self.assertNotIn('í', raw)
-        self.assertIn('\\u00ed', raw)
+        self.assertEqual(safe['order_description'], 'Registro: Filosofia')

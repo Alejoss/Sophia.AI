@@ -58,7 +58,7 @@ class CertificateRequestView(APIView):
             # Create new certificate request with notes
             request_data = {
                 'knowledge_path': knowledge_path.id,
-                'notes': request.data.get('notes', {})
+                'notes': request.data.get('notes', '')
             }
             logger.debug(f"Creating certificate request with data: {request_data}")
             
@@ -142,7 +142,7 @@ class EventCertificateRequestView(APIView):
             # Create new certificate request with notes
             request_data = {
                 'event': event.id,
-                'notes': request.data.get('notes', {})
+                'notes': request.data.get('notes', '')
             }
             logger.debug(f"Creating event certificate request with data: {request_data}")
             

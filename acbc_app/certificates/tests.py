@@ -233,3 +233,18 @@ class CertificateRequestFlowTest(TestCase):
         self.assertIn('APPROVED', statuses)
         self.assertIn('REJECTED', statuses)
         self.assertNotIn('CANCELLED', statuses)
+
+    def test_unicode_notes_are_stored_as_plain_text(self):
+        """Notes use TextField like knowledge path titles, preserving accents."""
+        self.client.force_authenticate(user=self.student)
+        note = 'Muchas gracias por completar Ucronía'
+        response = self.client.post(
+            self.request_url,
+            {'notes': note},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['notes'], note)
+
+        stored = CertificateRequest.objects.get(id=response.data['id'])
+        self.assertEqual(stored.notes, note)

@@ -8,7 +8,7 @@ from events.models import EventRegistration
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.handlers import on_crypto_payment_completed
-from payments.text_utils import to_ascii_safe, to_ascii_safe_json
+from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
 from utils.notification_utils import notify_payment_accepted
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> 
         crypto_payment.pay_address = pay_address
     if payload.get('actually_paid') is not None:
         crypto_payment.actually_paid = payload.get('actually_paid')
-    crypto_payment.provider_payload = to_ascii_safe_json(payload)
+    crypto_payment.provider_payload = prepare_json_for_db(payload)
     crypto_payment.save()
 
     if _should_mark_registration_paid(status, payload, crypto_payment):
@@ -146,7 +146,7 @@ def create_event_registration_payment(*, registration: EventRegistration, user, 
     frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
     event_url = f'{frontend_base}/events/{event.id}'
 
-    order_description = f'Registro: {to_ascii_safe(event.title)}'
+    order_description = f'Registro: {prepare_text_for_db(event.title)}'
     payload = client.create_invoice(
         price_amount=float(event.reference_price),
         price_currency='usd',
@@ -178,6 +178,6 @@ def create_event_registration_payment(*, registration: EventRegistration, user, 
             price_currency='usd',
             payment_status='waiting',
             invoice_url=invoice_url,
-            provider_payload=to_ascii_safe_json(payload),
+            provider_payload=prepare_json_for_db(payload),
         )
     return crypto_payment

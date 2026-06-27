@@ -49,6 +49,7 @@ else:
 
 # Application definition
 INSTALLED_APPS = [
+    'utils.apps.UtilsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -624,17 +625,22 @@ if ENVIRONMENT == "PRODUCTION" and SEND_EMAILS:
             "POSTMARK_SERVER_TOKEN must be set in production when SEND_EMAILS=True"
         )
 
+_POSTGRES_DB = {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": os.getenv("DB_NAME", "ACADEMIA_BLOCKCHAIN_DB"),
+    "USER": os.getenv("POSTGRES_USER", "postgres"),
+    "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
+    "HOST": os.getenv("DB_HOST", "postgres"),
+    "PORT": "5432",
+    "OPTIONS": {
+        "client_encoding": "UTF8",
+    },
+}
+
 if ENVIRONMENT == "PRODUCTION":
 
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "ACADEMIA_BLOCKCHAIN_DB"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
-            "HOST": os.getenv("DB_HOST", "postgres"),  # Use DB_HOST environment variable
-            "PORT": "5432",
-        }
+        "default": _POSTGRES_DB,
     }
 
     # AWS config (US West Oregon)
@@ -661,14 +667,7 @@ if ENVIRONMENT == "PRODUCTION":
 else:
 
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "ACADEMIA_BLOCKCHAIN_DB"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "any_password"),
-            "HOST": os.getenv("DB_HOST", "postgres"),  # Use DB_HOST environment variable
-            "PORT": "5432",
-        }
+        "default": _POSTGRES_DB,
     }
 
     MEDIA_URL = '/media/'

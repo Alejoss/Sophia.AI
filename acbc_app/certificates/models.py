@@ -146,9 +146,10 @@ class CertificateRequest(models.Model):
         null=True,
         help_text="Reason for rejection if status is REJECTED"
     )
-    notes = models.JSONField(
-        default=dict,
-        help_text="Additional request-specific data"
+    notes = models.TextField(
+        blank=True,
+        default='',
+        help_text='Optional message from the requester',
     )
 
     class Meta:
@@ -156,16 +157,10 @@ class CertificateRequest(models.Model):
 
     def clean(self):
         """Ensure either knowledge_path or event is set, but not both"""
-        print(f"DEBUG: CertificateRequest.clean() called")
-        print(f"DEBUG: knowledge_path: {self.knowledge_path}")
-        print(f"DEBUG: event: {self.event}")
         if not self.knowledge_path and not self.event:
-            print(f"DEBUG: ValidationError - neither knowledge_path nor event specified")
             raise ValidationError("Either knowledge_path or event must be specified")
         if self.knowledge_path and self.event:
-            print(f"DEBUG: ValidationError - both knowledge_path and event specified")
             raise ValidationError("Cannot specify both knowledge_path and event")
-        print(f"DEBUG: CertificateRequest.clean() passed validation")
 
     def save(self, *args, **kwargs):
         self.clean()

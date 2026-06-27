@@ -17,6 +17,16 @@ import logging
 # Get logger for notifications
 logger = logging.getLogger('academia_blockchain.notifications')
 
+
+def create_notification(**kwargs):
+    """Create a notification with text fields safe for the active DB encoding."""
+    from utils.db_encoding import prepare_text_for_db
+
+    for field in ('description', 'verb'):
+        if field in kwargs and kwargs[field]:
+            kwargs[field] = prepare_text_for_db(kwargs[field])
+    return create_notification(**kwargs)
+
 def notify_comment_reply(comment):
     """
     Create a notification when someone replies to a comment.
@@ -58,7 +68,7 @@ def notify_comment_reply(comment):
                 return
             
             # Create the notification directly
-            notification = Notification.objects.create(
+            notification = create_notification(
                 recipient=comment.parent.author,
                 actor_content_type=ContentType.objects.get_for_model(comment.author),
                 actor_object_id=comment.author.id,
@@ -176,7 +186,7 @@ def notify_knowledge_path_comment(comment):
             return
         
         # Create the notification directly
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=knowledge_path.author,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
@@ -290,7 +300,7 @@ def notify_content_comment(comment):
             return
         
         # Create the notification directly
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=content_profile.user,
             actor_content_type=ContentType.objects.get_for_model(comment.author),
             actor_object_id=comment.author.id,
@@ -390,7 +400,7 @@ def notify_knowledge_path_completion(user, knowledge_path):
         return
     
     # Create the notification
-    notification = Notification.objects.create(
+    notification = create_notification(
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
@@ -480,7 +490,7 @@ def notify_certificate_request(certificate_request):
         return
     
     # Create the notification
-    notification = Notification.objects.create(
+    notification = create_notification(
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
@@ -556,7 +566,7 @@ def notify_certificate_approval(certificate_request):
         return
     
     # Create the notification
-    notification = Notification.objects.create(
+    notification = create_notification(
         recipient=certificate_request.requester,
         actor_content_type=approver_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
@@ -632,7 +642,7 @@ def notify_certificate_rejection(certificate_request):
         return
     
     # Create the notification
-    notification = Notification.objects.create(
+    notification = create_notification(
         recipient=certificate_request.requester,
         actor_content_type=rejector_ct,
         actor_object_id=certificate_request.knowledge_path.author.id,
@@ -735,7 +745,7 @@ def notify_content_upvote(vote):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=content.uploaded_by,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
@@ -844,7 +854,7 @@ def notify_knowledge_path_upvote(vote):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=knowledge_path.author,
             actor_content_type=voter_ct,
             actor_object_id=vote.user.id,
@@ -945,7 +955,7 @@ def notify_event_registration(registration):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=registration.event.owner,
             actor_content_type=registrant_ct,
             actor_object_id=registration.user.id,
@@ -1047,7 +1057,7 @@ def notify_payment_accepted(registration):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
@@ -1149,7 +1159,7 @@ def notify_certificate_sent(registration):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=registration.user,
             actor_content_type=teacher_ct,
             actor_object_id=registration.event.owner.id,
@@ -1247,7 +1257,7 @@ def notify_topic_moderator_invitation(invitation):
             description += f': {invitation.message}'
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=invitation.invited_user,
             actor_content_type=invited_by_ct,
             actor_object_id=invitation.invited_by.id,
@@ -1348,7 +1358,7 @@ def notify_topic_moderator_invitation_accepted(invitation):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=invitation.topic.creator,
             actor_content_type=invited_user_ct,
             actor_object_id=invitation.invited_user.id,
@@ -1449,7 +1459,7 @@ def notify_topic_moderator_invitation_declined(invitation):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=invitation.topic.creator,
             actor_content_type=invited_user_ct,
             actor_object_id=invitation.invited_user.id,
@@ -1565,7 +1575,7 @@ def notify_topic_moderator_removed(topic, removed_user, removed_by):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=removed_user,
             actor_content_type=removed_by_ct,
             actor_object_id=removed_by.id,
@@ -1664,7 +1674,7 @@ def notify_content_suggestion_created(suggestion):
                 description += f': {suggestion.message[:100]}'
             
             # Create the notification
-            notification = Notification.objects.create(
+            notification = create_notification(
                 recipient=moderator,
                 actor_content_type=suggested_by_ct,
                 actor_object_id=suggestion.suggested_by.id,
@@ -1743,7 +1753,7 @@ def notify_content_suggestion_accepted(suggestion):
             return
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
@@ -1821,7 +1831,7 @@ def notify_content_suggestion_rejected(suggestion):
             description += f': {suggestion.rejection_reason[:100]}'
         
         # Create the notification
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
@@ -1842,6 +1852,119 @@ def notify_content_suggestion_rejected(suggestion):
             'suggestion_id': suggestion.id if suggestion else None,
             'topic_id': suggestion.topic.id if suggestion else None,
         }, exc_info=True)
+
+
+def notify_timeline_entry_suggestion_created(suggestion):
+    """Notify topic moderators when a user suggests a timeline entry."""
+    logger.info("Creating timeline entry suggestion notification", extra={
+        'suggestion_id': suggestion.id,
+        'topic_id': suggestion.topic.id,
+        'suggested_by_id': suggestion.suggested_by_id,
+    })
+
+    try:
+        moderators = list(suggestion.topic.moderators.all())
+        if suggestion.topic.creator and suggestion.topic.creator not in moderators:
+            moderators.append(suggestion.topic.creator)
+
+        suggested_by_ct = ContentType.objects.get_for_model(suggestion.suggested_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        notifications_created = 0
+
+        for moderator in moderators:
+            if moderator.id == suggestion.suggested_by.id:
+                continue
+
+            description = (
+                f'{suggestion.suggested_by.username} sugirio una entrada en la linea de tiempo '
+                f'para el tema "{suggestion.topic.title}": {suggestion.title[:80]}'
+            )
+            if suggestion.message:
+                description += f' — {suggestion.message[:100]}'
+
+            create_notification(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirio una entrada en la linea de tiempo para',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id,
+                description=description,
+            )
+            notifications_created += 1
+
+        logger.info(
+            f"Created {notifications_created} notifications for timeline entry suggestion",
+            extra={'suggestion_id': suggestion.id},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry suggestion notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
+
+
+def notify_timeline_entry_suggestion_accepted(suggestion):
+    """Notify suggester when their timeline entry suggestion is accepted."""
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        return
+
+    try:
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+
+        create_notification(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='acepto tu sugerencia de entrada en la linea de tiempo para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=(
+                f'{suggestion.reviewed_by.username} acepto tu sugerencia de entrada '
+                f'"{suggestion.title}" para el tema "{suggestion.topic.title}"'
+            ),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry suggestion accepted notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
+
+
+def notify_timeline_entry_suggestion_rejected(suggestion):
+    """Notify suggester when their timeline entry suggestion is rejected."""
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        return
+
+    try:
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+
+        description = (
+            f'{suggestion.reviewed_by.username} rechazo tu sugerencia de entrada '
+            f'"{suggestion.title}" para el tema "{suggestion.topic.title}"'
+        )
+        if suggestion.rejection_reason:
+            description += f': {suggestion.rejection_reason[:100]}'
+
+        create_notification(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazo tu sugerencia de entrada en la linea de tiempo para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=description,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry suggestion rejected notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
 
 
 def notify_file_suggestion_created(file_suggestion):
@@ -1905,7 +2028,7 @@ def notify_file_suggestion_created(file_suggestion):
         if file_suggestion.message:
             description += f': {file_suggestion.message[:100]}'
 
-        notification = Notification.objects.create(
+        notification = create_notification(
             recipient=owner,
             actor_content_type=suggested_by_ct,
             actor_object_id=suggester.id,
