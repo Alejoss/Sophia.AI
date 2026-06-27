@@ -226,17 +226,33 @@ docker-compose -f docker-compose.prod.yml exec backend python manage.py createsu
 
 ## Step 8: Set Up Automated Backups
 
+### Install AWS CLI (for S3 upload)
+
+If `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set in `acbc_app/.env`, backups are uploaded automatically to `s3://<bucket>/db-backups/`.
+
+```bash
+sudo apt install -y awscli
+```
+
 ### Create backup directory
 
 ```bash
 mkdir -p /opt/backups
 ```
 
+### Test backup manually
+
+```bash
+cd /opt/sophia-ai   # or /opt/acbc-app
+chmod +x scripts/backup-db.sh
+BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+```
+
 ### Add to crontab
 
 ```bash
-# Daily backup at 2 AM
-(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/sophia-ai && ./scripts/backup-db.sh") | crontab -
+# Daily backup at 2 AM (local + S3 when AWS vars are configured)
+(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/sophia-ai && BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
 ```
 
 ## Step 9: Configure Monitoring (Optional)
