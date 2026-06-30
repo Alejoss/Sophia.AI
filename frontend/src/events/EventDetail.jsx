@@ -18,6 +18,7 @@ import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/
 import CryptoPaymentModal from './CryptoPaymentModal';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
+import { getPaymentStatus, listRegistrationPayments } from '../api/paymentsApi';
 import {
   Alert,
   Box,
@@ -137,6 +138,50 @@ const EventDetail = () => {
     setIsRegistered(false);
     setUserRegistration(null);
   }, [eventId]);
+
+  useEffect(() => {
+    if (
+      !isAuthenticated
+      || !userRegistration?.id
+      || !(event?.reference_price > 0)
+      || userRegistration.payment_status === 'PAID'
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const syncPendingPayment = async () => {
+      try {
+        const payments = await listRegistrationPayments(userRegistration.id);
+        if (cancelled) return;
+        const paidPayment = payments.find((payment) => payment.is_paid);
+        if (paidPayment) {
+          setUserRegistration((prev) => (prev ? { ...prev, payment_status: 'PAID' } : prev));
+          return;
+        }
+        const openPayment = payments.find((payment) => payment.payment_status !== 'finished');
+        if (!openPayment) return;
+        const data = await getPaymentStatus(openPayment.id);
+        if (cancelled) return;
+        if (data.is_paid) {
+          setUserRegistration((prev) => (prev ? { ...prev, payment_status: 'PAID' } : prev));
+        }
+      } catch (err) {
+        handleAuthError(err, { strategy: AUTH_ERROR_STRATEGY.IGNORE });
+      }
+    };
+
+    syncPendingPayment();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isAuthenticated,
+    event?.reference_price,
+    userRegistration?.id,
+    userRegistration?.payment_status,
+  ]);
 
   useEffect(() => {
     const ownerId = eventOwnerId;

@@ -106,6 +106,34 @@ class NOWPaymentsClient:
     def get_payment_status(self, payment_id):
         return self._request('GET', f'/payment/{payment_id}')
 
+    def get_invoice_payment(self, invoice_id):
+        """Resolve the child payment created from a hosted invoice checkout."""
+        for param_name in ('invoiceId', 'iid'):
+            try:
+                payload = self._request(
+                    'GET',
+                    '/invoice-payment',
+                    params={param_name: invoice_id},
+                )
+            except NOWPaymentsError:
+                continue
+            if payload.get('payment_id') is not None:
+                return payload
+            if payload.get('message'):
+                continue
+            return payload
+        raise NOWPaymentsError('No NOWPayments payment found for invoice')
+
+    def list_payments(self, *, invoice_id=None, limit=10, page=0, order_by='desc'):
+        params = {
+            'limit': limit,
+            'page': page,
+            'orderBy': order_by,
+        }
+        if invoice_id is not None:
+            params['invoiceid'] = invoice_id
+        return self._request('GET', '/payment/', params=params)
+
     @staticmethod
     def sort_params(obj):
         """Recursively sort dict keys (required for IPN HMAC per NOWPayments docs)."""

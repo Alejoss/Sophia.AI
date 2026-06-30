@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -8,9 +9,13 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from payments.models import CryptoPayment
-from payments.nowpayments_client import NOWPaymentsClient
-from payments.services import sync_payment_from_provider
-from utils.db_encoding import to_ascii_safe, to_ascii_safe_json
+from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
+from payments.services import (
+    fetch_remote_payment_payload,
+    refresh_crypto_payment_from_nowpayments,
+    sync_payment_from_provider,
+)
+from payments.text_utils import to_ascii_safe, to_ascii_safe_json
 from tests.factories.events import EventFactory, EventRegistrationFactory
 from tests.factories.users import UserFactory
 
@@ -136,6 +141,75 @@ class IPNLookupTests(TestCase):
         })
         self.assertEqual(found.id, self.crypto_payment.id)
 
+    def test_ipn_finds_payment_by_payment_id_in_provider_payload(self):
+        from payments.views import _find_crypto_payment_for_ipn
+
+        self.crypto_payment.nowpayments_payment_id = 555444333
+        self.crypto_payment.provider_payload = {
+            'invoice_id': 999888777,
+            'payment_id': 12345,
+        }
+        self.crypto_payment.save(update_fields=['nowpayments_payment_id', 'provider_payload'])
+
+        found = _find_crypto_payment_for_ipn({
+            'payment_id': 12345,
+            'payment_status': 'finished',
+            'actually_paid': '50',
+            'pay_amount': '50',
+        })
+        self.assertEqual(found.id, self.crypto_payment.id)
+
+
+class InvoicePaymentSyncTests(TestCase):
+    def setUp(self):
+        self.event = EventFactory(reference_price=5.0)
+        self.registration = EventRegistrationFactory(
+            event=self.event,
+            payment_status='PENDING',
+        )
+        self.crypto_payment = CryptoPayment.objects.create(
+            registration=self.registration,
+            order_id='evt-reg-invoice-sync',
+            nowpayments_payment_id=999888777,
+            pay_currency='',
+            price_amount=5.0,
+            payment_status='waiting',
+            invoice_url='https://nowpayments.io/payment/?iid=999888777',
+            provider_payload={'id': 999888777, 'invoice_id': 999888777},
+        )
+
+    @patch.object(NOWPaymentsClient, 'get_invoice_payment')
+    def test_fetch_remote_payment_payload_uses_invoice_lookup(self, mock_get_invoice_payment):
+        mock_get_invoice_payment.return_value = {
+            'payment_id': 12345,
+            'payment_status': 'finished',
+            'actually_paid': '5',
+            'pay_amount': '5',
+            'pay_currency': 'bch',
+        }
+        client = NOWPaymentsClient()
+        payload = fetch_remote_payment_payload(client, self.crypto_payment)
+        self.assertEqual(payload['payment_id'], 12345)
+        mock_get_invoice_payment.assert_called_once_with(999888777)
+
+    @override_settings(NOWPAYMENTS_API_KEY='test-key')
+    @patch('payments.services.NOWPaymentsClient.get_invoice_payment')
+    def test_refresh_crypto_payment_marks_registration_paid(self, mock_get_invoice_payment):
+        mock_get_invoice_payment.return_value = {
+            'payment_id': 12345,
+            'payment_status': 'finished',
+            'actually_paid': '5',
+            'pay_amount': '5',
+            'pay_currency': 'bch',
+        }
+        refresh_crypto_payment_from_nowpayments(self.crypto_payment)
+        self.registration.refresh_from_db()
+        self.crypto_payment.refresh_from_db()
+        self.assertEqual(self.registration.payment_status, 'PAID')
+        self.assertEqual(self.crypto_payment.payment_status, 'finished')
+        self.assertEqual(self.crypto_payment.nowpayments_payment_id, 12345)
+        self.assertEqual(self.crypto_payment.provider_payload.get('invoice_id'), 999888777)
+
 
 @override_settings(NOWPAYMENTS_API_KEY='test-key')
 class AcceptPaymentGatewayTests(TestCase):
@@ -176,7 +250,9 @@ class AsciiSafeStorageTests(TestCase):
     def test_to_ascii_safe_strips_accents(self):
         self.assertEqual(to_ascii_safe('Filosofía Cypherpunk'), 'Filosofia Cypherpunk')
 
-    def test_to_ascii_safe_json_strips_unicode_in_dict(self):
+    def test_to_ascii_safe_json_escapes_unicode(self):
         payload = {'order_description': 'Registro: Filosofía'}
         safe = to_ascii_safe_json(payload)
-        self.assertEqual(safe['order_description'], 'Registro: Filosofia')
+        raw = json.dumps(safe, ensure_ascii=True)
+        self.assertNotIn('í', raw)
+        self.assertIn('\\u00ed', raw)

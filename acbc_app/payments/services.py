@@ -24,6 +24,96 @@ def _extract_pay_address(payload: dict) -> str:
     return payload.get('pay_address') or payload.get('payment_address') or ''
 
 
+def _invoice_id_for(crypto_payment: CryptoPayment):
+    payload = crypto_payment.provider_payload or {}
+    return payload.get('invoice_id') or payload.get('id') or crypto_payment.nowpayments_payment_id
+
+
+def _payment_id_for(crypto_payment: CryptoPayment):
+    payload = crypto_payment.provider_payload or {}
+    return payload.get('payment_id')
+
+
+def _pick_payment_payload_from_list(response: dict) -> dict:
+    if not isinstance(response, dict):
+        return {}
+    if response.get('payment_id') is not None:
+        return response
+    items = response.get('data') or []
+    if not items:
+        return {}
+    return items[0]
+
+
+def _merge_provider_payload(crypto_payment: CryptoPayment, payload: dict) -> dict:
+    previous_payload = crypto_payment.provider_payload or {}
+    safe_payload = prepare_json_for_db(payload)
+    invoice_id = (
+        previous_payload.get('invoice_id')
+        or previous_payload.get('id')
+        or payload.get('invoice_id')
+        or payload.get('id')
+    )
+    if invoice_id is not None and not safe_payload.get('invoice_id'):
+        safe_payload['invoice_id'] = invoice_id
+    return safe_payload
+
+
+def fetch_remote_payment_payload(client: NOWPaymentsClient, crypto_payment: CryptoPayment) -> dict:
+    """
+    Resolve the latest NOWPayments payment payload for a local record.
+
+    Invoice checkouts store an invoice id first; the real payment_id appears only
+    after the customer pays on the hosted invoice page.
+    """
+    payment_id = _payment_id_for(crypto_payment)
+    invoice_id = _invoice_id_for(crypto_payment)
+
+    if payment_id is not None:
+        try:
+            return client.get_payment_status(payment_id)
+        except NOWPaymentsError as exc:
+            logger.warning(
+                'NOWPayments payment lookup failed for payment_id=%s order=%s: %s',
+                payment_id,
+                crypto_payment.order_id,
+                exc,
+            )
+
+    if invoice_id is None:
+        raise NOWPaymentsError('El pago no tiene invoice_id ni payment_id de NOWPayments.')
+
+    for resolver_name, resolver in (
+        ('invoice-payment', lambda: client.get_invoice_payment(invoice_id)),
+        ('payment-list', lambda: _pick_payment_payload_from_list(
+            client.list_payments(invoice_id=invoice_id, limit=5, order_by='desc'),
+        )),
+    ):
+        try:
+            payload = resolver()
+        except NOWPaymentsError as exc:
+            logger.warning(
+                'NOWPayments %s lookup failed for invoice_id=%s order=%s: %s',
+                resolver_name,
+                invoice_id,
+                crypto_payment.order_id,
+                exc,
+            )
+            continue
+        if payload.get('payment_id') is not None:
+            return payload
+
+    raise NOWPaymentsError('NOWPayments aún no reporta un pago para esta invoice.')
+
+
+def refresh_crypto_payment_from_nowpayments(crypto_payment: CryptoPayment) -> CryptoPayment:
+    client = NOWPaymentsClient()
+    if not client.configured:
+        return crypto_payment
+    remote = fetch_remote_payment_payload(client, crypto_payment)
+    return sync_payment_from_provider(crypto_payment, remote)
+
+
 def _public_base_url():
     from django.conf import settings
     return getattr(settings, 'ACADEMIA_PUBLIC_URL', 'http://localhost:8000').rstrip('/')
@@ -96,7 +186,7 @@ def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> 
         crypto_payment.pay_address = pay_address
     if payload.get('actually_paid') is not None:
         crypto_payment.actually_paid = payload.get('actually_paid')
-    crypto_payment.provider_payload = prepare_json_for_db(payload)
+    crypto_payment.provider_payload = _merge_provider_payload(crypto_payment, payload)
     crypto_payment.save()
 
     if _should_mark_registration_paid(status, payload, crypto_payment):
@@ -130,14 +220,11 @@ def create_event_registration_payment(*, registration: EventRegistration, user, 
         .first()
     )
     if existing:
-        if existing.invoice_url:
-            return existing
-        if existing.nowpayments_payment_id:
-            try:
-                remote = client.get_payment_status(existing.nowpayments_payment_id)
-                return sync_payment_from_provider(existing, remote)
-            except NOWPaymentsError:
-                pass
+        try:
+            return refresh_crypto_payment_from_nowpayments(existing)
+        except NOWPaymentsError:
+            if existing.invoice_url:
+                return existing
 
     from django.conf import settings
 
@@ -168,6 +255,10 @@ def create_event_registration_payment(*, registration: EventRegistration, user, 
         payload.get('id'),
     )
 
+    stored_payload = prepare_json_for_db(payload)
+    if payload.get('id') is not None and not stored_payload.get('invoice_id'):
+        stored_payload['invoice_id'] = payload.get('id')
+
     with transaction.atomic():
         crypto_payment = CryptoPayment.objects.create(
             registration=registration,
@@ -178,6 +269,6 @@ def create_event_registration_payment(*, registration: EventRegistration, user, 
             price_currency='usd',
             payment_status='waiting',
             invoice_url=invoice_url,
-            provider_payload=prepare_json_for_db(payload),
+            provider_payload=stored_payload,
         )
     return crypto_payment
