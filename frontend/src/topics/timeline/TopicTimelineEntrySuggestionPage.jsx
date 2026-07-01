@@ -33,7 +33,6 @@ const TopicTimelineEntrySuggestionPage = () => {
   const { user, isAuthenticated } = useAuth();
 
   const [topicTitle, setTopicTitle] = useState('');
-  const [availableContents, setAvailableContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -49,13 +48,9 @@ const TopicTimelineEntrySuggestionPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [topicData, contentsData] = await Promise.all([
-        contentApi.getTopicDetails(topicId, { include_contents: false }),
-        contentApi.getTopicDetailsSimple(topicId),
-      ]);
+      const topicData = await contentApi.getTopicDetails(topicId, { include_contents: false });
 
       setTopicTitle(topicData?.title || '');
-      setAvailableContents(contentsData?.contents || []);
 
       const creatorId = typeof topicData?.creator === 'object'
         ? topicData.creator?.id
@@ -155,8 +150,6 @@ const TopicTimelineEntrySuggestionPage = () => {
 
       {canSuggest && !error && (
         <TopicTimelineEntrySuggestionForm
-          availableContents={availableContents}
-          loadingContents={loading}
           saving={saving}
           error={formError}
           onCancel={handleCancel}

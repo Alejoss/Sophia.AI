@@ -3,20 +3,16 @@ import {
   Alert,
   Box,
   Button,
-  Divider,
   Paper,
   Stack,
   TextField,
-  Typography,
 } from '@mui/material';
 import dayjs from 'dayjs';
 import ContentSuggestionPicker, { getProfileContentId } from '../../content/ContentSuggestionPicker';
-import TopicTimelineContentSelector from './TopicTimelineContentSelector';
+import { suggestEntryTitleFromFileName } from '../../content/inferTitleAuthorFromFileName';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
 const TopicTimelineEntrySuggestionForm = ({
-  availableContents,
-  loadingContents,
   saving,
   error,
   onCancel,
@@ -28,10 +24,20 @@ const TopicTimelineEntrySuggestionForm = ({
     start_date: '',
     end_date: '',
     message: '',
-    selectedTopicContentIds: [],
   });
   const [externalProfiles, setExternalProfiles] = useState([]);
   const [dateRangeError, setDateRangeError] = useState('');
+
+  const applyAutoTitleFromFileName = (filename) => {
+    const suggested = suggestEntryTitleFromFileName(filename);
+    if (!suggested) return;
+    setForm((prev) => ({ ...prev, title: suggested }));
+  };
+
+  const handleFileSelected = (file) => {
+    const name = file?.name;
+    if (name) applyAutoTitleFromFileName(name);
+  };
 
   const handleFieldChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -53,24 +59,14 @@ const TopicTimelineEntrySuggestionForm = ({
       return;
     }
 
-    const contentIdSet = new Set();
+    const profile = externalProfiles[0];
     const contents = [];
-
-    form.selectedTopicContentIds.forEach((id, index) => {
-      const numericId = Number(id);
-      if (!contentIdSet.has(numericId)) {
-        contentIdSet.add(numericId);
-        contents.push({ content_id: numericId, order: contents.length + 1, caption: '' });
-      }
-    });
-
-    externalProfiles.forEach((profile) => {
+    if (profile) {
       const contentId = getProfileContentId(profile);
-      if (contentId && !contentIdSet.has(contentId)) {
-        contentIdSet.add(contentId);
-        contents.push({ content_id: contentId, order: contents.length + 1, caption: '' });
+      if (contentId) {
+        contents.push({ content_id: contentId, order: 1, caption: '' });
       }
-    });
+    }
 
     await onSubmit({
       title: form.title.trim(),
@@ -88,6 +84,16 @@ const TopicTimelineEntrySuggestionForm = ({
         {error && <Alert severity="error">{error}</Alert>}
         {dateRangeError && <Alert severity="error">{dateRangeError}</Alert>}
 
+        <ContentSuggestionPicker
+          selectedProfiles={externalProfiles}
+          onSelectionChange={setExternalProfiles}
+          onFileSelected={handleFileSelected}
+          maxSelections={1}
+          disabled={saving}
+          title="Contenido de tu biblioteca o nuevo"
+          description="Opcional: propón un material que aun no esta en el tema. Si se acepta la entrada, tambien se evaluara para el tema."
+        />
+
         <TextField
           label="Titulo de la entrada"
           value={form.title}
@@ -97,6 +103,7 @@ const TopicTimelineEntrySuggestionForm = ({
         />
         <TextField
           label="Descripcion narrativa"
+          placeholder="Descripción narrativa para la línea de tiempo"
           value={form.description}
           onChange={handleFieldChange('description')}
           fullWidth
@@ -121,33 +128,6 @@ const TopicTimelineEntrySuggestionForm = ({
           minRows={2}
           helperText={`${form.message.length}/500 caracteres`}
           inputProps={{ maxLength: 500 }}
-        />
-
-        <Divider />
-
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Contenidos ya en el tema
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Opcional: relaciona contenidos que ya forman parte del tema.
-          </Typography>
-          <TopicTimelineContentSelector
-            items={availableContents}
-            selectedIds={form.selectedTopicContentIds}
-            loading={loadingContents}
-            onSelectionChange={(selectedIds) => {
-              setForm((prev) => ({ ...prev, selectedTopicContentIds: selectedIds }));
-            }}
-          />
-        </Box>
-
-        <ContentSuggestionPicker
-          selectedProfiles={externalProfiles}
-          onSelectionChange={setExternalProfiles}
-          disabled={saving}
-          title="Contenidos de tu biblioteca o nuevos"
-          description="Propón materiales que aun no estan en el tema. Si se acepta la entrada, tambien se evaluaran para el tema."
         />
       </Stack>
 

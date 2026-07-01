@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Topic timeline entry content suggestions: link library/topic content to an existing timeline entry (API, UI, moderation, notifications)
+- Documentation: [topic-timeline-entry-content-suggestions.md](docs/architecture/topic-timeline-entry-content-suggestions.md)
+- Backend tests: `TopicTimelineEntryContentSuggestionsAPITests` (19 cases)
 - Topic timeline documentation (`docs/architecture/topics-and-knowledge-paths.md`, API endpoints, permissions map, data models)
 - Comprehensive documentation structure
 - Root-level README with project overview

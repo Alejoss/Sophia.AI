@@ -13,7 +13,6 @@ import {
     Tab,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import EditIcon from '@mui/icons-material/Edit';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -28,7 +27,6 @@ import TopicHeader from './TopicHeader';
 import ContentDisplay from '../content/ContentDisplay';
 import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
-import { Badge } from '@mui/material';
 import TopicTimeline from './timeline/TopicTimeline';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
@@ -338,6 +336,7 @@ const TopicDetail = () => {
     const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
     const [pendingTimelineSuggestionsCount, setPendingTimelineSuggestionsCount] = useState(0);
+    const [pendingTimelineEntryContentSuggestionsCount, setPendingTimelineEntryContentSuggestionsCount] = useState(0);
     const [isModerator, setIsModerator] = useState(false);
     const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
@@ -360,8 +359,14 @@ const TopicDetail = () => {
 
     const fetchPendingTimelineSuggestionsCount = useCallback(async () => {
         try {
-            const suggestions = await contentApi.getTopicTimelineEntrySuggestions(topicId, { status: 'PENDING' });
-            setPendingTimelineSuggestionsCount(Array.isArray(suggestions) ? suggestions.length : 0);
+            const [entrySuggestions, entryContentSuggestions] = await Promise.all([
+                contentApi.getTopicTimelineEntrySuggestions(topicId, { status: 'PENDING' }),
+                contentApi.getTopicTimelineEntryContentSuggestions(topicId, { status: 'PENDING' }),
+            ]);
+            setPendingTimelineSuggestionsCount(Array.isArray(entrySuggestions) ? entrySuggestions.length : 0);
+            setPendingTimelineEntryContentSuggestionsCount(
+                Array.isArray(entryContentSuggestions) ? entryContentSuggestions.length : 0,
+            );
         } catch {
             // ignore
         }
@@ -782,25 +787,24 @@ const TopicDetail = () => {
     if (error) return <Typography color="error">{error}</Typography>;
     if (!topic) return <Typography>Tema no encontrado</Typography>;
 
+    const totalPendingSuggestions = pendingSuggestionsCount
+        + pendingTimelineSuggestionsCount
+        + pendingTimelineEntryContentSuggestionsCount;
+
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
             <TopicHeader 
                 topic={topic}
-                onEdit={() => navigate(`/content/topics/${topicId}/edit`)}
+                canEdit={canEditTimeline}
+                pendingSuggestionsCount={totalPendingSuggestions}
+                onEdit={() => navigate(
+                    `/content/topics/${topicId}/edit${totalPendingSuggestions > 0 ? '?tab=suggestions' : ''}`,
+                )}
             />
 
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                {/* Dueño y moderadores: Editar Contenido. Resto de usuarios autenticados: Sugerir Contenido */}
-                {canEditTimeline ? (
-                    <Button
-                        variant="contained"
-                        startIcon={<EditIcon />}
-                        onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
-                    >
-                        Editar Contenido
-                    </Button>
-                ) : isAuthenticated && (
+                {!canEditTimeline && isAuthenticated && (
                     <>
                         <Button
                             variant="contained"
@@ -814,19 +818,9 @@ const TopicDetail = () => {
                             startIcon={<ListIcon />}
                             onClick={() => navigate(`/content/topics/${topicId}/suggestions`)}
                         >
-                            Ver Todas las Sugerencias de Contenido
+                            Ver sugerencias del tema
                         </Button>
                     </>
-                )}
-                {isModerator && pendingSuggestionsCount > 0 && (
-                    <Badge badgeContent={pendingSuggestionsCount} color="error">
-                        <Button
-                            variant="outlined"
-                            onClick={() => navigate(`/content/topics/${topicId}/edit?tab=suggestions`)}
-                        >
-                            Gestionar Sugerencias
-                        </Button>
-                    </Badge>
                 )}
             </Box>
 
@@ -891,7 +885,6 @@ const TopicDetail = () => {
                     topicId={topicId}
                     canEdit={canEditTimeline}
                     canSuggest={canSuggestTimeline}
-                    pendingSuggestionsCount={pendingTimelineSuggestionsCount}
                 />
             )}
 

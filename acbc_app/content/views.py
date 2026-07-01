@@ -36,6 +36,7 @@ from content.models import (
     TopicTimelineEntry,
     TopicTimelineEntrySuggestion,
     TopicTimelineEntrySuggestionContent,
+    TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent,
     ContentProfile,
     FileDetails,
@@ -66,13 +67,20 @@ from content.serializers import (
     TopicTimelineSerializer,
     TopicTimelineEntrySerializer,
     TopicTimelineEntrySuggestionSerializer,
+    TopicTimelineEntryContentSuggestionSerializer,
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
     NodeSerializer
 )
 from .serializers import PublicationSerializer
-from content.utils import get_top_voted_contents, get_topic_contents_ordered_for_public_view
+from content.utils import (
+    accept_timeline_entry_suggestion,
+    accept_timeline_entry_content_suggestion,
+    get_top_voted_contents,
+    get_topic_content_id_set,
+    get_topic_contents_ordered_for_public_view,
+)
 from content.image_utils import generate_topic_thumbnail, delete_topic_thumbnail
 from content.s3_key_utils import is_unsafe_s3_key, sanitize_filename_for_s3_key
 from bs4 import BeautifulSoup
@@ -4552,7 +4560,10 @@ class TopicTimelineEntrySuggestionsView(APIView):
         serializer = TopicTimelineEntrySuggestionSerializer(
             suggestions,
             many=True,
-            context={'request': request},
+            context={
+                'request': request,
+                'topic_content_ids': get_topic_content_id_set(topic),
+            },
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -4585,47 +4596,7 @@ class TopicTimelineEntrySuggestionAcceptView(APIView):
 
         try:
             with transaction.atomic():
-                timeline, _ = TopicTimeline.objects.get_or_create(
-                    topic=topic,
-                    defaults={
-                        'title': topic.title,
-                        'created_by': request.user,
-                    },
-                )
-                max_order = timeline.entries.aggregate(models.Max('order'))['order__max'] or 0
-                entry = TopicTimelineEntry.objects.create(
-                    timeline=timeline,
-                    title=suggestion.title,
-                    description=suggestion.description,
-                    start_date=suggestion.start_date,
-                    end_date=suggestion.end_date,
-                    order=max_order + 1,
-                    created_by=suggestion.suggested_by,
-                    updated_by=request.user,
-                )
-
-                topic_content_ids = set(topic.contents.values_list('id', flat=True))
-                links = []
-                for index, link in enumerate(
-                    suggestion.suggested_contents.all().order_by('order', 'id')
-                ):
-                    if link.content_id not in topic_content_ids:
-                        topic.contents.add(link.content)
-                        topic_content_ids.add(link.content_id)
-                    links.append(TopicTimelineEntryContent(
-                        entry=entry,
-                        content=link.content,
-                        order=link.order or index + 1,
-                        caption=link.caption or '',
-                    ))
-                if links:
-                    TopicTimelineEntryContent.objects.bulk_create(links)
-
-                suggestion.status = 'ACCEPTED'
-                suggestion.reviewed_by = request.user
-                suggestion.reviewed_at = timezone.now()
-                suggestion.accepted_entry = entry
-                suggestion.save()
+                accept_timeline_entry_suggestion(suggestion, request.user)
 
             try:
                 from utils.notification_utils import notify_timeline_entry_suggestion_accepted
@@ -4639,7 +4610,10 @@ class TopicTimelineEntrySuggestionAcceptView(APIView):
 
             serializer = TopicTimelineEntrySuggestionSerializer(
                 suggestion,
-                context={'request': request},
+                context={
+                    'request': request,
+                    'topic_content_ids': get_topic_content_id_set(topic),
+                },
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
@@ -4762,6 +4736,246 @@ class UserTimelineEntrySuggestionsView(APIView):
 
         suggestions = suggestions.order_by('-created_at')
         serializer = TopicTimelineEntrySuggestionSerializer(
+            suggestions,
+            many=True,
+            context={'request': request},
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicTimelineEntryContentSuggestionCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk, entry_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        entry = get_object_or_404(
+            TopicTimelineEntry.objects.select_related('timeline'),
+            pk=entry_id,
+            timeline__topic=topic,
+        )
+        serializer = TopicTimelineEntryContentSuggestionSerializer(
+            data=request.data,
+            context={'request': request, 'topic': topic, 'entry': entry},
+        )
+        if serializer.is_valid():
+            suggestion = serializer.save()
+            try:
+                from utils.notification_utils import notify_timeline_entry_content_suggestion_created
+                notify_timeline_entry_content_suggestion_created(suggestion)
+            except Exception as e:
+                logger.error(
+                    f"Error sending timeline entry content suggestion notification: {str(e)}",
+                    extra={'suggestion_id': suggestion.id, 'topic_id': topic.id},
+                    exc_info=True,
+                )
+            response = TopicTimelineEntryContentSuggestionSerializer(
+                suggestion,
+                context={'request': request},
+            )
+            return Response(response.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TopicTimelineEntryContentSuggestionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        topic = get_object_or_404(Topic, pk=pk)
+        status_filter = request.query_params.get('status')
+        entry_id = request.query_params.get('entry_id')
+
+        suggestions = TopicTimelineEntryContentSuggestion.objects.filter(
+            topic=topic,
+        ).select_related(
+            'topic',
+            'entry',
+            'content',
+            'suggested_by',
+            'reviewed_by',
+        )
+        if status_filter:
+            suggestions = suggestions.filter(status=status_filter)
+        if entry_id:
+            suggestions = suggestions.filter(entry_id=entry_id)
+        suggestions = suggestions.order_by('-created_at')
+
+        serializer = TopicTimelineEntryContentSuggestionSerializer(
+            suggestions,
+            many=True,
+            context={
+                'request': request,
+                'topic_content_ids': get_topic_content_id_set(topic),
+            },
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicTimelineEntryContentSuggestionAcceptView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(
+            TopicTimelineEntryContentSuggestion.objects.select_related(
+                'topic', 'entry', 'content',
+            ),
+            pk=suggestion_id,
+            topic=topic,
+        )
+
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'Solo los moderadores y el creador del tema pueden aceptar sugerencias.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if suggestion.status != 'PENDING':
+            return Response(
+                {'error': 'Esta sugerencia ya no esta pendiente.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            with transaction.atomic():
+                accept_timeline_entry_content_suggestion(suggestion, request.user)
+
+            try:
+                from utils.notification_utils import notify_timeline_entry_content_suggestion_accepted
+                notify_timeline_entry_content_suggestion_accepted(suggestion)
+            except Exception as e:
+                logger.error(
+                    f"Error sending timeline entry content suggestion accepted notification: {str(e)}",
+                    extra={'suggestion_id': suggestion.id, 'topic_id': topic.id},
+                    exc_info=True,
+                )
+
+            serializer = TopicTimelineEntryContentSuggestionSerializer(
+                suggestion,
+                context={
+                    'request': request,
+                    'topic_content_ids': get_topic_content_id_set(topic),
+                },
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(
+                f"Error accepting timeline entry content suggestion: {str(e)}",
+                extra={'suggestion_id': suggestion.id, 'topic_id': topic.id},
+                exc_info=True,
+            )
+            return Response(
+                {'error': f'Error al aceptar la sugerencia: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class TopicTimelineEntryContentSuggestionRejectView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(
+            TopicTimelineEntryContentSuggestion,
+            pk=suggestion_id,
+            topic=topic,
+        )
+
+        if not topic.is_moderator_or_creator(request.user):
+            return Response(
+                {'error': 'Solo los moderadores y el creador del tema pueden rechazar sugerencias.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if suggestion.status != 'PENDING':
+            return Response(
+                {'error': 'Esta sugerencia ya no esta pendiente.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rejection_reason = request.data.get('rejection_reason', '')
+        if not rejection_reason or not str(rejection_reason).strip():
+            return Response(
+                {'error': 'Debe proporcionar una razon para rechazar la sugerencia.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        suggestion.status = 'REJECTED'
+        suggestion.reviewed_by = request.user
+        suggestion.reviewed_at = timezone.now()
+        suggestion.rejection_reason = rejection_reason.strip()
+        suggestion.save()
+
+        try:
+            from utils.notification_utils import notify_timeline_entry_content_suggestion_rejected
+            notify_timeline_entry_content_suggestion_rejected(suggestion)
+        except Exception as e:
+            logger.error(
+                f"Error sending timeline entry content suggestion rejected notification: {str(e)}",
+                extra={'suggestion_id': suggestion.id, 'topic_id': topic.id},
+                exc_info=True,
+            )
+
+        serializer = TopicTimelineEntryContentSuggestionSerializer(
+            suggestion,
+            context={'request': request},
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicTimelineEntryContentSuggestionDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk, suggestion_id):
+        topic = get_object_or_404(Topic, pk=pk)
+        suggestion = get_object_or_404(
+            TopicTimelineEntryContentSuggestion,
+            pk=suggestion_id,
+            topic=topic,
+        )
+
+        if suggestion.suggested_by != request.user:
+            return Response(
+                {'error': 'No tienes permiso para eliminar esta sugerencia.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if suggestion.status != 'PENDING':
+            return Response(
+                {'error': 'Solo puedes eliminar sugerencias pendientes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        suggestion.delete()
+        return Response(
+            {'message': 'Sugerencia eliminada exitosamente.'},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UserTimelineEntryContentSuggestionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        status_filter = request.query_params.get('status')
+        topic_id = request.query_params.get('topic_id')
+
+        suggestions = TopicTimelineEntryContentSuggestion.objects.filter(
+            suggested_by=request.user,
+        ).select_related(
+            'topic',
+            'entry',
+            'content',
+            'suggested_by',
+            'reviewed_by',
+        )
+
+        if status_filter:
+            suggestions = suggestions.filter(status=status_filter)
+        if topic_id:
+            suggestions = suggestions.filter(topic_id=topic_id)
+
+        suggestions = suggestions.order_by('-created_at')
+        serializer = TopicTimelineEntryContentSuggestionSerializer(
             suggestions,
             many=True,
             context={'request': request},

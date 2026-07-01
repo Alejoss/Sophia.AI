@@ -195,7 +195,7 @@ const TopicTimelineEntryForm = ({
         <TextField
 
           label="Descripcion narrativa"
-
+          placeholder="Descripción narrativa para la línea de tiempo"
           value={form.description}
 
           onChange={handleFieldChange('description')}

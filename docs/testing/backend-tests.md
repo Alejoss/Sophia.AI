@@ -28,6 +28,7 @@ docker-compose exec backend pytest
 
 ```bash
 docker-compose exec backend python manage.py test profiles
+docker-compose exec backend python manage.py test content.tests.TopicTimelineEntryContentSuggestionsAPITests
 docker-compose exec backend pytest acbc_app/profiles/tests.py
 ```
 

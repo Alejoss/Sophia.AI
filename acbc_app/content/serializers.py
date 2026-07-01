@@ -12,6 +12,7 @@ from content.models import (
     TopicTimelineEntryContent,
     TopicTimelineEntrySuggestion,
     TopicTimelineEntrySuggestionContent,
+    TopicTimelineEntryContentSuggestion,
     ContentProfile,
     FileDetails,
     Publication,
@@ -1032,10 +1033,23 @@ class TopicTimelineEntrySuggestionContentSerializer(serializers.ModelSerializer)
         source='content',
         write_only=True,
     )
+    is_in_topic = serializers.SerializerMethodField()
 
     class Meta:
         model = TopicTimelineEntrySuggestionContent
-        fields = ['id', 'content', 'content_id', 'order', 'caption']
+        fields = ['id', 'content', 'content_id', 'order', 'caption', 'is_in_topic']
+
+    def get_is_in_topic(self, obj):
+        topic_content_ids = self.context.get('topic_content_ids')
+        if topic_content_ids is not None:
+            return obj.content_id in topic_content_ids
+        topic = self.context.get('topic')
+        if topic is not None:
+            return topic.contents.filter(pk=obj.content_id).exists()
+        suggestion = getattr(obj, 'suggestion', None)
+        if suggestion is not None:
+            return suggestion.topic.contents.filter(pk=obj.content_id).exists()
+        return False
 
 
 class TopicTimelineEntrySuggestionSerializer(serializers.ModelSerializer):
@@ -1163,6 +1177,109 @@ class TopicTimelineEntrySuggestionSerializer(serializers.ModelSerializer):
             TopicTimelineEntrySuggestionContent.objects.bulk_create(links)
 
         return suggestion
+
+
+class TopicTimelineEntryBriefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TopicTimelineEntry
+        fields = ['id', 'title', 'description', 'start_date', 'end_date']
+
+
+class TopicTimelineEntryContentSuggestionSerializer(serializers.ModelSerializer):
+    suggested_by = UserSerializer(read_only=True)
+    reviewed_by = UserSerializer(read_only=True)
+    topic = TopicBasicSerializer(read_only=True)
+    entry = TopicTimelineEntryBriefSerializer(read_only=True)
+    content = ContentSerializer(read_only=True)
+    content_id = serializers.PrimaryKeyRelatedField(
+        queryset=Content.objects.all(),
+        source='content',
+        write_only=True,
+    )
+    is_in_topic = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TopicTimelineEntryContentSuggestion
+        fields = [
+            'id',
+            'topic',
+            'entry',
+            'content',
+            'content_id',
+            'suggested_by',
+            'reviewed_by',
+            'message',
+            'rejection_reason',
+            'status',
+            'is_duplicate',
+            'is_in_topic',
+            'created_at',
+            'updated_at',
+            'reviewed_at',
+        ]
+        read_only_fields = [
+            'suggested_by',
+            'reviewed_by',
+            'status',
+            'rejection_reason',
+            'is_duplicate',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_is_in_topic(self, obj):
+        topic_content_ids = self.context.get('topic_content_ids')
+        if topic_content_ids is not None:
+            return obj.content_id in topic_content_ids
+        return obj.topic.contents.filter(pk=obj.content_id).exists()
+
+    def create(self, validated_data):
+        from content.utils import (
+            timeline_entry_content_suggestion_is_duplicate,
+            validate_timeline_entry_content_suggestion_content,
+        )
+
+        topic = self.context['topic']
+        entry = self.context['entry']
+        request = self.context['request']
+        user = request.user
+        content = validated_data['content']
+
+        if topic.is_moderator_or_creator(user):
+            raise serializers.ValidationError({
+                'error': 'Los moderadores y el creador del tema no pueden sugerir contenidos para entradas.',
+            })
+
+        if entry.timeline.topic_id != topic.id:
+            raise serializers.ValidationError({
+                'entry': 'La entrada no pertenece a este tema.',
+            })
+
+        try:
+            validate_timeline_entry_content_suggestion_content(topic, user, content)
+        except ValueError as exc:
+            raise serializers.ValidationError(exc.args[0]) from exc
+
+        pending_exists = TopicTimelineEntryContentSuggestion.objects.filter(
+            entry=entry,
+            content=content,
+            suggested_by=user,
+            status='PENDING',
+        ).exists()
+        if pending_exists:
+            raise serializers.ValidationError({
+                'content_id': 'Ya tienes una sugerencia pendiente para este contenido en esta entrada.',
+            })
+
+        return TopicTimelineEntryContentSuggestion.objects.create(
+            topic=topic,
+            entry=entry,
+            content=content,
+            suggested_by=user,
+            message=(validated_data.get('message') or '').strip(),
+            is_duplicate=timeline_entry_content_suggestion_is_duplicate(entry, content),
+        )
 
 
 class FileSuggestionSerializer(serializers.ModelSerializer):

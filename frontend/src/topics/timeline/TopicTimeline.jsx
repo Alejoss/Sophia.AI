@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
@@ -20,7 +20,12 @@ const getErrorMessage = (error, fallback) => {
   return fallback;
 };
 
-const TopicTimeline = ({ topicId, canEdit, canSuggest = false, pendingSuggestionsCount = 0 }) => {
+const TopicTimeline = ({
+  topicId,
+  canEdit,
+  canSuggest = false,
+  returnContext = 'detail',
+}) => {
   const navigate = useNavigate();
   const [timeline, setTimeline] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,12 +54,14 @@ const TopicTimeline = ({ topicId, canEdit, canSuggest = false, pendingSuggestion
     loadTimeline();
   }, [loadTimeline]);
 
+  const editQuery = returnContext === 'edit' ? '?from=edit' : '';
+
   const handleCreate = () => {
-    navigate(`/content/topics/${topicId}/timeline/new`);
+    navigate(`/content/topics/${topicId}/timeline/new${editQuery}`);
   };
 
   const handleEdit = (entry) => {
-    navigate(`/content/topics/${topicId}/timeline/${entry.id}/edit`);
+    navigate(`/content/topics/${topicId}/timeline/${entry.id}/edit${editQuery}`);
   };
 
   const handleDelete = async (entry) => {
@@ -132,16 +139,6 @@ const TopicTimeline = ({ topicId, canEdit, canSuggest = false, pendingSuggestion
             Sugerir entrada
           </Button>
         )}
-        {canEdit && pendingSuggestionsCount > 0 && (
-          <Badge badgeContent={pendingSuggestionsCount} color="error">
-            <Button
-              variant="outlined"
-              onClick={() => navigate(`/content/topics/${topicId}/edit?tab=timeline-suggestions`)}
-            >
-              Gestionar sugerencias
-            </Button>
-          </Badge>
-        )}
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -184,6 +181,7 @@ const TopicTimeline = ({ topicId, canEdit, canSuggest = false, pendingSuggestion
               index={index}
               topicId={topicId}
               canEdit={canEdit}
+              canSuggest={canSuggest}
               canReorder={canReorder}
               onEdit={handleEdit}
               onDelete={handleDelete}

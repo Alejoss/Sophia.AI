@@ -221,7 +221,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                             <TableRow>
                                 <TableCell>Contenido</TableCell>
                                 <TableCell>Sugerido por</TableCell>
-                                <TableCell>Mensaje</TableCell>
+                                <TableCell>Mensaje para moderadores</TableCell>
                                 <TableCell>Estado</TableCell>
                                 <TableCell>Fecha</TableCell>
                                 <TableCell align="right">Acciones</TableCell>

@@ -2,7 +2,9 @@
 
 Documento de diseño para la funcionalidad **"Sugerir entrada en la línea de tiempo"**, modelada sobre el flujo existente de **Sugerir contenido** en temas.
 
-Estado: **planificado** (no implementado).
+Estado: **implementado** (sugerencias de timeline, hub de edición unificado y sugerencias de vínculo contenido ↔ entrada).
+
+Ver también: [Sugerir contenido para una entrada](topic-timeline-entry-content-suggestions.md).
 
 ---
 
@@ -48,7 +50,7 @@ Invariante: `unique_together = [topic, content, suggested_by]`.
 |------------|-----|
 | `TopicDetail` | Botón **Sugerir Contenido** (no moderador/creador) |
 | `ContentSuggestionModal` | Wizard biblioteca → mensaje → enviar |
-| `ContentSuggestionsManager` | Tab en `TopicEdit` |
+| `ContentSuggestionsManager` | Pestaña **Sugerencias** en `TopicEdit` |
 | `TopicContentSuggestionsPage` | Lista pública |
 | `TopicsUser` | Tab "Mis sugerencias" |
 

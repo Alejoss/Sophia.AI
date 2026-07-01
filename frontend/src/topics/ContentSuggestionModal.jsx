@@ -217,7 +217,7 @@ const ContentSuggestionModal = ({ open, onClose, topicId, onSuccess }) => {
                     fullWidth
                     multiline
                     rows={4}
-                    label="Mensaje (opcional)"
+                    label="Mensaje para moderadores (opcional)"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Explica por qué este contenido sería valioso para el tema..."

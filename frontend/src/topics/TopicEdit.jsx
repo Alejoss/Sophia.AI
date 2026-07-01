@@ -1,94 +1,159 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  Alert,
   Box,
-  Typography,
-  Paper,
   Button,
   Chip,
-  Divider,
-  Alert,
-  TextField,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Paper,
+  Snackbar,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import EditIcon from "@mui/icons-material/Edit";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import SaveIcon from "@mui/icons-material/Save";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import SettingsIcon from "@mui/icons-material/Settings";
+import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
+import TimelineIcon from "@mui/icons-material/Timeline";
+import LightbulbIcon from "@mui/icons-material/Lightbulb";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
+import ImageUploadModal from "../components/ImageUploadModal";
 import TopicModerators from "./TopicModerators";
+import TopicContentManager from "./TopicContentManager";
 import ContentSuggestionsManager from "./ContentSuggestionsManager";
 import TimelineEntrySuggestionsManager from "./timeline/TimelineEntrySuggestionsManager";
-import ImageUploadModal from "../components/ImageUploadModal";
+import TimelineEntryContentSuggestionsManager from "./timeline/TimelineEntryContentSuggestionsManager";
+import TopicTimeline from "./timeline/TopicTimeline";
+
+const TAB_IDS = {
+  general: "general",
+  content: "content",
+  timeline: "timeline",
+  suggestions: "suggestions",
+  moderators: "moderators",
+  danger: "danger",
+};
+
+const normalizeTab = (raw, { isCreator, canManage }) => {
+  const tab = (raw || "").toLowerCase();
+  if (tab === "timeline-suggestions") return TAB_IDS.suggestions;
+  if (tab === TAB_IDS.content) return TAB_IDS.content;
+  if (tab === TAB_IDS.timeline) return TAB_IDS.timeline;
+  if (tab === TAB_IDS.suggestions) return TAB_IDS.suggestions;
+  if (tab === TAB_IDS.moderators && isCreator) return TAB_IDS.moderators;
+  if (tab === TAB_IDS.danger && isCreator) return TAB_IDS.danger;
+  if (tab === TAB_IDS.general) return TAB_IDS.general;
+  return canManage ? TAB_IDS.general : TAB_IDS.general;
+};
 
 const TopicEdit = () => {
   const { topicId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+
   const [topic, setTopic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [saveMessage, setSaveMessage] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(0);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-  });
+  const [formData, setFormData] = useState({ title: "", description: "" });
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeletingTopic, setIsDeletingTopic] = useState(false);
-
-  const isFormDirty =
-    topic &&
-    (formData.title !== (topic.title || "") ||
-      formData.description !== (topic.description || ""));
+  const [pendingTimelineSuggestionsCount, setPendingTimelineSuggestionsCount] = useState(0);
+  const [pendingTimelineEntryContentSuggestionsCount, setPendingTimelineEntryContentSuggestionsCount] = useState(0);
+  const [pendingContentSuggestionsCount, setPendingContentSuggestionsCount] = useState(0);
 
   const creatorId = topic ? (typeof topic.creator === "object" ? topic.creator?.id : topic.creator) : null;
   const userId = user?.id;
-  const isCreator =
-    !!user &&
-    !!topic &&
-    creatorId != null &&
-    userId != null &&
-    String(creatorId) === String(userId);
+  const isCreator = !!user && !!topic && creatorId != null && userId != null && String(creatorId) === String(userId);
+  const isModerator = !!topic && (topic.moderators || []).some((mod) => String(mod?.id ?? mod) === String(userId));
+  const canManage = isCreator || isModerator;
+
+  const activeTab = normalizeTab(searchParams.get("tab"), { isCreator, canManage });
+
+  const isFormDirty = topic && (
+    formData.title !== (topic.title || "") ||
+    formData.description !== (topic.description || "")
+  );
+
+  const fetchPendingCounts = async () => {
+    try {
+      const [contentSugg, timelineSugg, entryContentSugg] = await Promise.all([
+        contentApi.getTopicContentSuggestions(topicId, { status: "PENDING" }),
+        contentApi.getTopicTimelineEntrySuggestions(topicId, { status: "PENDING" }),
+        contentApi.getTopicTimelineEntryContentSuggestions(topicId, { status: "PENDING" }),
+      ]);
+      setPendingContentSuggestionsCount(Array.isArray(contentSugg) ? contentSugg.length : 0);
+      setPendingTimelineSuggestionsCount(Array.isArray(timelineSugg) ? timelineSugg.length : 0);
+      setPendingTimelineEntryContentSuggestionsCount(Array.isArray(entryContentSugg) ? entryContentSugg.length : 0);
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     const fetchTopic = async () => {
       try {
-        const data = await contentApi.getTopicDetails(topicId);
+        setLoading(true);
+        const data = await contentApi.getTopicDetails(topicId, { include_contents: false });
         setTopic(data);
         setFormData({
           title: data.title || "",
           description: data.description || "",
         });
-        setLoading(false);
-      } catch (err) {
+        setError(null);
+      } catch {
         setError("Error al cargar los detalles del tema");
+      } finally {
         setLoading(false);
       }
     };
-
     fetchTopic();
   }, [topicId]);
 
-  const handleImageUpload = async (file, focalX = 0.5, focalY = 0.5) => {
-    const formData = new FormData();
-    formData.append("topic_image", file);
-    formData.append("topic_image_focal_x", String(focalX));
-    formData.append("topic_image_focal_y", String(focalY));
+  useEffect(() => {
+    if (canManage) fetchPendingCounts();
+  }, [topicId, canManage]);
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (!tab) return;
+    const normalized = normalizeTab(tab, { isCreator, canManage });
+    if (normalized !== tab && tab !== "timeline-suggestions") {
+      setSearchParams({ tab: normalized }, { replace: true });
+    }
+  }, [searchParams, isCreator, canManage, setSearchParams]);
+
+  const handleTabChange = (_, value) => {
+    setSearchParams({ tab: value }, { replace: true });
+  };
+
+  const handleImageUpload = async (file, focalX = 0.5, focalY = 0.5) => {
+    const payload = new FormData();
+    payload.append("topic_image", file);
+    payload.append("topic_image_focal_x", String(focalX));
+    payload.append("topic_image_focal_y", String(focalY));
     try {
-      const updatedTopic = await contentApi.updateTopicImage(topicId, formData);
+      const updatedTopic = await contentApi.updateTopicImage(topicId, payload);
       setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
       setImageCacheBuster(Date.now());
-      setError(null);
-    } catch (err) {
+      setSaveMessage("Imagen actualizada.");
+    } catch {
       setError("Error al actualizar la imagen del tema");
     }
   };
@@ -101,18 +166,14 @@ const TopicEdit = () => {
       });
       setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
       setImageCacheBuster(Date.now());
-      setError(null);
-    } catch (err) {
+    } catch {
       setError("Error al actualizar el foco de la imagen");
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -121,9 +182,9 @@ const TopicEdit = () => {
     try {
       const updatedTopic = await contentApi.updateTopic(topicId, formData);
       setTopic(updatedTopic);
+      setSaveMessage("Cambios guardados.");
       setError(null);
-      navigate(`/content/topics/${topicId}`);
-    } catch (err) {
+    } catch {
       setError("Error al actualizar los detalles del tema");
     } finally {
       setSaving(false);
@@ -137,20 +198,53 @@ const TopicEdit = () => {
       setDeleteDialogOpen(false);
       navigate("/content/topics", { replace: true });
     } catch (err) {
-      setError(err?.error || err?.detail || "Error al eliminar el tema. Por favor, inténtelo de nuevo.");
+      setError(err?.error || err?.detail || "Error al eliminar el tema.");
     } finally {
       setIsDeletingTopic(false);
     }
   };
 
-  if (loading) return <Typography>Cargando detalles del tema...</Typography>;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (!topic) return <Alert severity="info">Tema no encontrado</Alert>;
+  const pendingSuggestionsTotal = pendingContentSuggestionsCount
+    + pendingTimelineSuggestionsCount
+    + pendingTimelineEntryContentSuggestionsCount;
+
+  const tabs = useMemo(() => {
+    const items = [
+      { id: TAB_IDS.general, label: "General", icon: <SettingsIcon fontSize="small" /> },
+      { id: TAB_IDS.content, label: "Contenido", icon: <VideoLibraryIcon fontSize="small" /> },
+      { id: TAB_IDS.timeline, label: "Linea de tiempo", icon: <TimelineIcon fontSize="small" /> },
+      {
+        id: TAB_IDS.suggestions,
+        label: pendingSuggestionsTotal > 0 ? `Sugerencias (${pendingSuggestionsTotal})` : "Sugerencias",
+        icon: <LightbulbIcon fontSize="small" />,
+      },
+    ];
+    if (isCreator) {
+      items.push({ id: TAB_IDS.moderators, label: "Moderadores", icon: <SupervisorAccountIcon fontSize="small" /> });
+      items.push({ id: TAB_IDS.danger, label: "Peligro", icon: <WarningAmberIcon fontSize="small" /> });
+    }
+    return items;
+  }, [isCreator, pendingSuggestionsTotal]);
+
+  if (loading) return <Typography sx={{ p: 3 }}>Cargando edicion del tema...</Typography>;
+  if (!topic) return <Alert severity="info" sx={{ m: 3 }}>Tema no encontrado</Alert>;
+
+  if (!canManage) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 640, mx: "auto" }}>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          No tienes permiso para editar este tema.
+        </Alert>
+        <Button component={RouterLink} to={`/content/topics/${topicId}`} startIcon={<ArrowBackIcon />}>
+          Volver al tema
+        </Button>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 1.5 }, maxWidth: 800, mx: "auto" }}>
-      <Paper sx={{ p: 1.5, position: "relative" }}>
-        {/* Ver Tema (left), Editar Contenido + Guardar Cambios (right) */}
+    <Box sx={{ pt: { xs: 2, md: 3 }, px: { xs: 1, md: 2 }, pb: 4, maxWidth: 1200, mx: "auto" }}>
+      <Paper elevation={1} sx={{ borderRadius: 2, overflow: "hidden", mb: 2 }}>
         <Box
           sx={{
             display: "flex",
@@ -158,54 +252,50 @@ const TopicEdit = () => {
             gap: 1,
             justifyContent: "space-between",
             alignItems: "center",
-            mb: 2,
-            minWidth: 0,
+            px: { xs: 2, md: 3 },
+            py: 2,
           }}
         >
           <Button
-            component={Link}
+            component={RouterLink}
             to={`/content/topics/${topicId}`}
             variant="text"
             startIcon={<ArrowBackIcon />}
             size="small"
             sx={{ textTransform: "none" }}
           >
-            Ver Tema
+            Ver tema
           </Button>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<EditIcon />}
-              onClick={() => navigate(`/content/topics/${topicId}/edit-content`)}
-              size="small"
-            >
-              Editar Contenido
-            </Button>
-            <Button
-              type="submit"
-              form="topic-edit-form"
-              variant="contained"
-              color="primary"
-              startIcon={<SaveIcon />}
-              disabled={saving || !formData.title || !isFormDirty}
-              size="small"
-            >
-              {saving ? "Guardando..." : "Guardar Cambios"}
-            </Button>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+            {activeTab === TAB_IDS.general && isFormDirty && (
+              <Chip size="small" label="Cambios sin guardar" color="warning" variant="outlined" />
+            )}
+            {activeTab === TAB_IDS.general && (
+              <Button
+                type="submit"
+                form="topic-edit-form"
+                variant="contained"
+                startIcon={<SaveIcon />}
+                disabled={saving || !formData.title || !isFormDirty}
+                size="small"
+                sx={{ textTransform: "none" }}
+              >
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            )}
           </Box>
         </Box>
 
-        {/* Topic Image - portada (más ancha que alta, 16:9) */}
         <Box
           sx={{
             position: "relative",
-            width: "100%",
             aspectRatio: "16 / 9",
-            maxHeight: 280,
-            borderRadius: "4px",
+            maxHeight: 240,
+            mx: { xs: 2, md: 3 },
+            mb: 2,
+            borderRadius: 1,
             overflow: "hidden",
-            mb: 3,
+            width: { xs: "calc(100% - 32px)", md: "calc(100% - 48px)" },
           }}
         >
           <img
@@ -222,194 +312,125 @@ const TopicEdit = () => {
               objectPosition: `${((topic.topic_image_focal_x ?? 0.5) * 100).toFixed(1)}% ${((topic.topic_image_focal_y ?? 0.5) * 100).toFixed(1)}%`,
             }}
           />
-          <Button
-            component="span"
-            variant="contained"
-            startIcon={<EditIcon />}
-            onClick={() => setIsModalOpen(true)}
-            sx={{
-              position: "absolute",
-              bottom: 8,
-              right: 8,
-              backgroundColor: "rgba(0, 0, 0, 0.6)",
-              "&:hover": {
-                backgroundColor: "rgba(0, 0, 0, 0.8)",
-              },
-            }}
-          >
-            Editar Imagen
-          </Button>
+          {activeTab === TAB_IDS.general && (
+            <Button
+              variant="contained"
+              startIcon={<EditIcon />}
+              onClick={() => setIsModalOpen(true)}
+              sx={{
+                position: "absolute",
+                bottom: 8,
+                right: 8,
+                bgcolor: "rgba(0,0,0,0.6)",
+                "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                textTransform: "none",
+              }}
+            >
+              Editar imagen
+            </Button>
+          )}
         </Box>
 
-        {/* Topic Title and Description Form */}
-        <Box>
-            <form id="topic-edit-form" onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Título"
-                name="title"
-                value={formData.title}
-                onChange={handleInputChange}
-                margin="normal"
-                required
-                error={!formData.title}
-                helperText={!formData.title ? "El título es requerido" : ""}
-              />
-              <TextField
-                fullWidth
-                label="Descripción"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                margin="normal"
-                multiline
-                minRows={8}
-                maxRows={24}
-                placeholder="Describe el tema"
-              />
-            </form>
-          </Box>
+        <Typography variant="h5" sx={{ px: { xs: 2, md: 3 }, fontWeight: 700, mb: 0.5 }}>
+          Editar tema
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ px: { xs: 2, md: 3 }, mb: 1 }}>
+          {topic.title}
+        </Typography>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider sx={{ mt: 2 }} />
 
-        {/* Moderators Section - Only visible to creator */}
-        {isCreator && (
-          <Box sx={{ mb: 3 }}>
-            <TopicModerators
-              topicId={topicId}
-              onModeratorsUpdate={(updatedTopic) => {
-                setTopic(updatedTopic);
-              }}
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ px: { xs: 1, md: 2 } }}
+        >
+          {tabs.map((tab) => (
+            <Tab key={tab.id} value={tab.id} label={tab.label} icon={tab.icon} iconPosition="start" />
+          ))}
+        </Tabs>
+      </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
+        {activeTab === TAB_IDS.general && (
+          <Box component="form" id="topic-edit-form" onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Titulo"
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              margin="normal"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Descripcion"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              margin="normal"
+              multiline
+              minRows={8}
+              maxRows={24}
+              placeholder="Describe el tema"
             />
           </Box>
         )}
 
-        {isCreator && <Divider sx={{ my: 3 }} />}
-
-        {/* Content Suggestions Section - Only visible to creator/moderators */}
-        {(isCreator || (topic.moderators && topic.moderators.some(mod => mod.id === user?.id))) && (
-          <>
-            <Box sx={{ mb: 3 }}>
-              <ContentSuggestionsManager
-                topicId={topicId}
-                onSuggestionProcessed={async () => {
-                  // Refresh topic data after suggestion is processed
-                  try {
-                    const updatedTopic = await contentApi.getTopicDetails(topicId);
-                    setTopic(updatedTopic);
-                  } catch (err) {
-                    console.error('Error refreshing topic:', err);
-                  }
-                }}
-              />
-            </Box>
-            <Divider sx={{ my: 3 }} />
-          </>
+        {activeTab === TAB_IDS.content && (
+          <TopicContentManager topicId={topicId} topicTitle={topic.title} />
         )}
 
-        {(isCreator || (topic.moderators && topic.moderators.some(mod => mod.id === user?.id))) && (
-          <>
-            <Box sx={{ mb: 3 }}>
-              <TimelineEntrySuggestionsManager
-                topicId={topicId}
-                onSuggestionProcessed={async () => {
-                  try {
-                    const updatedTopic = await contentApi.getTopicDetails(topicId);
-                    setTopic(updatedTopic);
-                  } catch (err) {
-                    console.error('Error refreshing topic:', err);
-                  }
-                }}
-              />
-            </Box>
-            <Divider sx={{ my: 3 }} />
-          </>
+        {activeTab === TAB_IDS.timeline && (
+          <TopicTimeline
+            topicId={topicId}
+            canEdit
+            returnContext="edit"
+          />
         )}
 
-        <Box sx={{ mb: 3 }}>
-          <Typography 
-            variant="h6" 
-            gutterBottom 
-            color="text.primary"
-            sx={{
-              fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-              fontWeight: 400,
-              fontSize: "18px"
-            }}
-          >
-            Contenido del Tema
-          </Typography>
+        {activeTab === TAB_IDS.suggestions && (
+          <Box>
+            <ContentSuggestionsManager
+              topicId={topicId}
+              onSuggestionProcessed={fetchPendingCounts}
+            />
+            <Divider sx={{ my: 3 }} />
+            <TimelineEntrySuggestionsManager
+              topicId={topicId}
+              onSuggestionProcessed={fetchPendingCounts}
+            />
+            <Divider sx={{ my: 3 }} />
+            <TimelineEntryContentSuggestionsManager
+              topicId={topicId}
+              onSuggestionProcessed={fetchPendingCounts}
+            />
+          </Box>
+        )}
 
-          {topic.contents?.length > 0 ? (
-            <Box sx={{ mt: 2 }}>
-              {(() => {
-                // Contar contenido por tipo
-                const counts = {
-                  VIDEO: 0,
-                  AUDIO: 0,
-                  TEXT: 0,
-                  IMAGE: 0
-                };
-                
-                topic.contents.forEach(content => {
-                  const mediaType = content.media_type;
-                  if (mediaType && counts.hasOwnProperty(mediaType)) {
-                    counts[mediaType]++;
-                  }
-                });
+        {activeTab === TAB_IDS.moderators && isCreator && (
+          <TopicModerators
+            topicId={topicId}
+            onModeratorsUpdate={(updatedTopic) => setTopic(updatedTopic)}
+          />
+        )}
 
-                const typeLabels = {
-                  VIDEO: 'Videos',
-                  AUDIO: 'Audios',
-                  TEXT: 'Textos',
-                  IMAGE: 'Imágenes'
-                };
-
-                const typesWithContent = Object.keys(counts).filter(type => counts[type] > 0);
-
-                return (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                    {typesWithContent.map(type => (
-                      <Chip
-                        key={type}
-                        label={`${typeLabels[type]}: ${counts[type]}`}
-                        color="primary"
-                        variant="outlined"
-                        sx={{ fontSize: '0.875rem' }}
-                      />
-                    ))}
-                    {typesWithContent.length === 0 && (
-                      <Typography variant="body2" color="text.secondary">
-                        Sin contenido clasificado
-                      </Typography>
-                    )}
-                  </Box>
-                );
-              })()}
-            </Box>
-          ) : (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Aún no se ha agregado contenido a este tema.
-            </Alert>
-          )}
-        </Box>
-
-        {isCreator && (
-          <Paper
-            elevation={1}
-            sx={{
-              mt: 4,
-              p: 3,
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "error.light",
-            }}
-          >
+        {activeTab === TAB_IDS.danger && isCreator && (
+          <Box>
             <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
               Zona de peligro
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Si eliminas este tema se borrarán también su contenido asociado, moderadores e invitaciones y no podrás recuperarlos.
+              Si eliminas este tema se borraran tambien su contenido asociado, moderadores e invitaciones.
             </Typography>
             <Button
               variant="contained"
@@ -420,7 +441,7 @@ const TopicEdit = () => {
             >
               Eliminar tema
             </Button>
-          </Paper>
+          </Box>
         )}
       </Paper>
 
@@ -428,15 +449,15 @@ const TopicEdit = () => {
         <DialogTitle>Eliminar tema</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            ¿Seguro que deseas eliminar <strong>{topic?.title || "este tema"}</strong>? Se eliminará el contenido asociado, moderadores e invitaciones y esta acción no se puede deshacer.
+            Seguro que deseas eliminar <strong>{topic.title}</strong>? Esta accion no se puede deshacer.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingTopic} sx={{ textTransform: "none" }}>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingTopic}>
             Cancelar
           </Button>
-          <Button onClick={handleDeleteTopic} disabled={isDeletingTopic} color="error" variant="contained" sx={{ textTransform: "none" }}>
-            {isDeletingTopic ? "Eliminando…" : "Eliminar"}
+          <Button onClick={handleDeleteTopic} disabled={isDeletingTopic} color="error" variant="contained">
+            {isDeletingTopic ? "Eliminando..." : "Eliminar"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -451,6 +472,17 @@ const TopicEdit = () => {
         onFocalOnlyUpdate={handleFocalOnlyUpdate}
         entityLabel="tema"
       />
+
+      <Snackbar
+        open={Boolean(saveMessage)}
+        autoHideDuration={3000}
+        onClose={() => setSaveMessage(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setSaveMessage(null)}>
+          {saveMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

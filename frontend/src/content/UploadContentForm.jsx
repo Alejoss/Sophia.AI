@@ -4,6 +4,7 @@ import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import axiosInstance from '../api/axiosConfig';
 import contentApi from '../api/contentApi';
+import { inferTitleAuthorFromFileName, suggestEntryTitleFromFileName } from './inferTitleAuthorFromFileName';
 import {
   Grid,
   FormControlLabel,
@@ -200,7 +201,7 @@ const createSchema = () => yup.object({
 
 const schema = createSchema();
 
-const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true, onHasPendingContentChange }) => {
+const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true, onHasPendingContentChange }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -264,6 +265,32 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
   // Watch the URL and file fields for changes
   const url = watch('url');
   const file = watch('file');
+
+  const applyMetadataFromFileName = (filename) => {
+    if (!filename) return;
+    const suggestedTitle = suggestEntryTitleFromFileName(filename);
+    const { author } = inferTitleAuthorFromFileName(filename);
+    if (suggestedTitle) {
+      setValue('title', suggestedTitle, { shouldValidate: true });
+    }
+    if (author) {
+      setValue('author', author, { shouldValidate: true });
+    }
+  };
+
+  const handleFilePicked = (selectedFile) => {
+    if (!selectedFile) return;
+    applyMetadataFromFileName(selectedFile.name);
+    if (onFileSelected) onFileSelected(selectedFile);
+  };
+
+  useEffect(() => {
+    if (isUrlMode || isEditMode) return;
+    const selected = file?.[0];
+    if (selected?.name) {
+      applyMetadataFromFileName(selected.name);
+    }
+  }, [file, isUrlMode, isEditMode]);
 
   // Notify parent when user has pending content (URL or file filled but not yet saved)
   useEffect(() => {
@@ -650,6 +677,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
       trigger('file');
     }
     setHasSavedSuccessfully(false);
+    handleFilePicked(file);
   };
 
   return (
@@ -759,6 +787,7 @@ const UploadContentForm = ({ onContentUploaded, initialData = null, isEditMode =
                 onChange={(e) => {
                   fileInputOnChange(e);
                   setHasSavedSuccessfully(false);
+                  handleFilePicked(e.target.files?.[0]);
                 }}
                 style={{ display: 'none' }} />
               

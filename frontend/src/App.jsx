@@ -43,6 +43,7 @@ import TopicContentMediaType from './topics/TopicContentMediaType';
 import TopicContentSuggestionsPage from './topics/TopicContentSuggestionsPage';
 import TopicTimelineEntryPage from './topics/timeline/TopicTimelineEntryPage';
 import TopicTimelineEntrySuggestionPage from './topics/timeline/TopicTimelineEntrySuggestionPage';
+import TopicTimelineEntryContentSuggestionPage from './topics/timeline/TopicTimelineEntryContentSuggestionPage';
 import ContentProfileEdit from './content/ContentProfileEdit.jsx';
 import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationForm';
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
@@ -162,6 +163,7 @@ const AppContent = () => {
               <Route path="topics/:topicId/edit" element={<ProtectedRoute><TopicEdit /></ProtectedRoute>} />
               <Route path="topics" element={<TopicList />} />
               <Route path="topics/:topicId/timeline/suggest" element={<ProtectedRoute><TopicTimelineEntrySuggestionPage /></ProtectedRoute>} />
+              <Route path="topics/:topicId/timeline/:entryId/suggest-content" element={<ProtectedRoute><TopicTimelineEntryContentSuggestionPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/timeline/new" element={<ProtectedRoute><TopicTimelineEntryPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/timeline/:entryId/edit" element={<ProtectedRoute><TopicTimelineEntryPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/add-content" element={<ProtectedRoute><TopicAddContent /></ProtectedRoute>} />

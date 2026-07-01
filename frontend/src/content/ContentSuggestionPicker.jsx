@@ -17,10 +17,24 @@ const getProfileContentId = (profile) => profile?.content?.id;
 const ContentSuggestionPicker = ({
   selectedProfiles = [],
   onSelectionChange,
+  onFileSelected,
   disabled = false,
+  maxSelections = null,
   title = 'Contenidos de tu biblioteca o nuevos',
   description = 'Elige contenidos de tu biblioteca, desde una URL o subiendo un archivo.',
 }) => {
+  const singleSelection = maxSelections === 1;
+
+  const applyProfiles = (profiles) => {
+    const valid = (profiles || []).filter((profile) => profile?.id);
+    if (singleSelection) {
+      onSelectionChange(valid.length ? [valid[valid.length - 1]] : []);
+      return;
+    }
+    const map = new Map(selectedProfiles.map((profile) => [profile.id, profile]));
+    valid.forEach((profile) => map.set(profile.id, profile));
+    onSelectionChange([...map.values()]);
+  };
   const [step, setStep] = useState('choice');
   const [uploadMode, setUploadMode] = useState('file');
   const [uploadInProgress, setUploadInProgress] = useState(false);
@@ -30,19 +44,18 @@ const ContentSuggestionPicker = ({
     [selectedProfiles],
   );
 
-  const handleAddProfiles = (profiles) => {
-    const map = new Map(selectedProfiles.map((profile) => [profile.id, profile]));
-    profiles.forEach((profile) => {
-      if (profile?.id) map.set(profile.id, profile);
-    });
-    onSelectionChange([...map.values()]);
+  const handleAddProfiles = applyProfiles;
+
+  const notifyTitleHint = (name) => {
+    if (onFileSelected && name) onFileSelected({ name });
   };
 
   const handleContentUploaded = (contentProfile) => {
     if (contentProfile?.id) {
-      onSelectionChange([...selectedProfiles, contentProfile].filter(
-        (profile, index, arr) => arr.findIndex((item) => item.id === profile.id) === index,
-      ));
+      applyProfiles([contentProfile]);
+      notifyTitleHint(
+        contentProfile.title || contentProfile.content?.original_title,
+      );
     }
     setStep('choice');
   };
@@ -65,13 +78,16 @@ const ContentSuggestionPicker = ({
         </Button>
         <LibrarySelectMultiple
           onCancel={() => setStep('choice')}
-          onSave={(profiles) => {
-            handleAddProfiles(profiles);
+          onSave={() => {
+            const latest = selectedProfiles[selectedProfiles.length - 1];
+            if (latest) {
+              notifyTitleHint(latest.title || latest.content?.original_title);
+            }
             setStep('choice');
           }}
           onSelectionChange={handleAddProfiles}
           title="Seleccionar contenido"
-          maxSelections={null}
+          maxSelections={singleSelection ? 1 : maxSelections}
           selectedIds={selectedIds}
           compact
         />
@@ -98,6 +114,7 @@ const ContentSuggestionPicker = ({
         </Typography>
         <UploadContentForm
           onContentUploaded={handleContentUploaded}
+          onFileSelected={onFileSelected}
           onUploadingChange={setUploadInProgress}
           initialUrlMode={uploadMode === 'url'}
           showModeToggle={false}
@@ -158,7 +175,15 @@ const ContentSuggestionPicker = ({
 
       {selectedProfiles.length === 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          Opcional: puedes proponer contenidos relacionados ademas de los que ya estan en el tema.
+          {singleSelection
+            ? 'Opcional: puedes proponer un contenido relacionado con esta entrada.'
+            : 'Opcional: puedes proponer contenidos relacionados ademas de los que ya estan en el tema.'}
+        </Alert>
+      )}
+
+      {singleSelection && selectedProfiles.length > 0 && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Solo un contenido por sugerencia. Elige otro para reemplazar el actual.
         </Alert>
       )}
     </Paper>

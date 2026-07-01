@@ -50,3 +50,31 @@ export function resolveAuthorWithFolderHint(relativePath, inferred, defaultAutho
   }
   return { ...inferred };
 }
+
+const TRAILING_NUMERIC_SUFFIX = /[_-]+\d+$/;
+
+function toTitleCase(str) {
+  return str
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/**
+ * Derive a human-readable entry title from a file name.
+ * Strips extension, trailing numeric suffixes (e.g. "_84"), and converts
+ * underscores/hyphens into words.
+ */
+export function suggestEntryTitleFromFileName(filename) {
+  const { title: inferredTitle } = inferTitleAuthorFromFileName(filename);
+  let stem = inferredTitle.trim();
+  if (!stem) return '';
+
+  stem = stem.replace(TRAILING_NUMERIC_SUFFIX, '');
+  stem = stem.replace(/[_-]+/g, ' ');
+  stem = stem.replace(/\s+/g, ' ').trim();
+
+  if (!stem) return '';
+  return toTitleCase(stem);
+}

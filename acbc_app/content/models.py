@@ -502,6 +502,68 @@ class TopicTimelineEntrySuggestionContent(models.Model):
         return f"{self.suggestion.title} -> {self.content}"
 
 
+class TopicTimelineEntryContentSuggestion(models.Model):
+    """User-proposed link of content to an existing timeline entry."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('REJECTED', 'Rejected'),
+    ]
+
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name='timeline_entry_content_suggestions',
+    )
+    entry = models.ForeignKey(
+        TopicTimelineEntry,
+        on_delete=models.CASCADE,
+        related_name='content_link_suggestions',
+    )
+    content = models.ForeignKey(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='timeline_entry_content_suggestions',
+    )
+    suggested_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='timeline_entry_content_suggestions',
+    )
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_timeline_entry_content_suggestions',
+    )
+    message = models.TextField(blank=True)
+    rejection_reason = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    is_duplicate = models.BooleanField(
+        default=False,
+        help_text='Si el contenido ya esta vinculado a esta entrada.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['entry', 'content', 'suggested_by']]
+        indexes = [
+            models.Index(fields=['topic', 'status']),
+            models.Index(fields=['entry', 'status']),
+            models.Index(fields=['suggested_by', 'status']),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.suggested_by.username} suggested linking "
+            f"{self.content} to entry \"{self.entry.title}\" - {self.status}"
+        )
+
+
 class ModerationLog(models.Model):
     # Tracks moderation actions like deletions or reports performed by moderators on content.
 

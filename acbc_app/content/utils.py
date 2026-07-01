@@ -85,6 +85,15 @@ def validate_timeline_entry_suggestion_contents(topic, user, contents_data):
     if not contents_data:
         return []
 
+    content_items = [
+        item for item in contents_data
+        if isinstance(item, dict) and item.get('content_id') is not None
+    ]
+    if len(content_items) > 1:
+        raise ValueError({
+            'contents': 'Solo se puede proponer un contenido por sugerencia.',
+        })
+
     topic_content_ids = set(topic.contents.values_list('id', flat=True))
     user_content_ids = set(
         ContentProfile.objects.filter(user=user).values_list('content_id', flat=True)
@@ -129,6 +138,156 @@ def validate_timeline_entry_suggestion_contents(topic, user, contents_data):
     if errors:
         raise ValueError(errors)
     return normalized
+
+
+def resolve_pending_content_suggestions_for_topic_content(topic, content, reviewer):
+    """
+    When timeline acceptance adds (or uses) content on a topic, close matching
+    pending ContentSuggestion rows so moderators do not review the same material twice.
+    """
+    from django.utils import timezone
+    from content.models import ContentSuggestion
+
+    now = timezone.now()
+    pending = ContentSuggestion.objects.filter(
+        topic=topic,
+        content=content,
+        status='PENDING',
+    )
+    for content_suggestion in pending:
+        content_suggestion.status = 'ACCEPTED'
+        content_suggestion.reviewed_by = reviewer
+        content_suggestion.reviewed_at = now
+        content_suggestion.save(
+            update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'],
+        )
+
+
+def accept_timeline_entry_suggestion(suggestion, reviewer):
+    """
+    Publish a timeline entry from a suggestion: create the entry, link proposed
+    contents, add any new contents to the topic, and resolve duplicate content
+    suggestions. Returns (entry, list of content ids newly added to the topic).
+    """
+    from django.db import models
+    from django.utils import timezone
+    from content.models import (
+        TopicTimeline,
+        TopicTimelineEntry,
+        TopicTimelineEntryContent,
+    )
+
+    topic = suggestion.topic
+    timeline, _ = TopicTimeline.objects.get_or_create(
+        topic=topic,
+        defaults={
+            'title': topic.title,
+            'created_by': reviewer,
+        },
+    )
+    max_order = timeline.entries.aggregate(models.Max('order'))['order__max'] or 0
+    entry = TopicTimelineEntry.objects.create(
+        timeline=timeline,
+        title=suggestion.title,
+        description=suggestion.description,
+        start_date=suggestion.start_date,
+        end_date=suggestion.end_date,
+        order=max_order + 1,
+        created_by=suggestion.suggested_by,
+        updated_by=reviewer,
+    )
+
+    topic_content_ids = set(topic.contents.values_list('id', flat=True))
+    added_content_ids = []
+    entry_links = []
+
+    for index, link in enumerate(suggestion.suggested_contents.all().order_by('order', 'id')):
+        if link.content_id not in topic_content_ids:
+            topic.contents.add(link.content)
+            topic_content_ids.add(link.content_id)
+            added_content_ids.append(link.content_id)
+        resolve_pending_content_suggestions_for_topic_content(topic, link.content, reviewer)
+        entry_links.append(TopicTimelineEntryContent(
+            entry=entry,
+            content=link.content,
+            order=link.order or index + 1,
+            caption=link.caption or '',
+        ))
+
+    if entry_links:
+        TopicTimelineEntryContent.objects.bulk_create(entry_links)
+
+    suggestion.status = 'ACCEPTED'
+    suggestion.reviewed_by = reviewer
+    suggestion.reviewed_at = timezone.now()
+    suggestion.accepted_entry = entry
+    suggestion.save()
+
+    return entry, added_content_ids
+
+
+def get_topic_content_id_set(topic):
+    return set(topic.contents.values_list('id', flat=True))
+
+
+def timeline_entry_content_suggestion_is_duplicate(entry, content):
+    from content.models import TopicTimelineEntryContent
+
+    return TopicTimelineEntryContent.objects.filter(entry=entry, content=content).exists()
+
+
+def validate_timeline_entry_content_suggestion_content(topic, user, content):
+    from content.models import ContentProfile
+
+    topic_content_ids = set(topic.contents.values_list('id', flat=True))
+    user_content_ids = set(
+        ContentProfile.objects.filter(user=user).values_list('content_id', flat=True),
+    )
+    try:
+        content_id = int(content.id)
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError({'content_id': 'Contenido invalido.'}) from None
+
+    if content_id not in topic_content_ids and content_id not in user_content_ids:
+        raise ValueError({
+            'content_id': (
+                'Solo puedes proponer contenidos que ya estan en el tema '
+                'o que pertenecen a tu biblioteca.'
+            ),
+        })
+    return content
+
+
+def accept_timeline_entry_content_suggestion(suggestion, reviewer):
+    """
+    Publish a content link on an existing timeline entry. Adds content to the
+    topic when needed and resolves duplicate pending content suggestions.
+    """
+    from django.db import models
+    from django.utils import timezone
+    from content.models import TopicTimelineEntryContent
+
+    entry = suggestion.entry
+    topic = suggestion.topic
+    content = suggestion.content
+
+    if not timeline_entry_content_suggestion_is_duplicate(entry, content):
+        topic_content_ids = set(topic.contents.values_list('id', flat=True))
+        if content.id not in topic_content_ids:
+            topic.contents.add(content)
+        resolve_pending_content_suggestions_for_topic_content(topic, content, reviewer)
+        max_order = entry.entry_contents.aggregate(models.Max('order'))['order__max'] or 0
+        TopicTimelineEntryContent.objects.create(
+            entry=entry,
+            content=content,
+            order=max_order + 1,
+            caption='',
+        )
+
+    suggestion.status = 'ACCEPTED'
+    suggestion.reviewed_by = reviewer
+    suggestion.reviewed_at = timezone.now()
+    suggestion.save()
 
 
 def get_top_voted_contents(topic, media_type, limit=None):

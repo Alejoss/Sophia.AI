@@ -164,6 +164,13 @@ Editorial narrative attached to a topic (one timeline per topic).
 - `order`, `caption`
 - `unique_together`: entry + content
 
+**`TopicTimelineEntryContentSuggestion`** (community proposal to link content to an existing entry):
+- `topic`, `entry`, `content`, `suggested_by`, `reviewed_by`
+- `message`, `rejection_reason`, `status` (`PENDING` | `ACCEPTED` | `REJECTED`)
+- `is_duplicate` — true when content is already linked to the same entry
+- `unique_together`: entry + content + suggested_by
+- See [topic-timeline-entry-content-suggestions.md](topic-timeline-entry-content-suggestions.md)
+
 **Location**: `content/models.py`
 
 ## User Interaction Models

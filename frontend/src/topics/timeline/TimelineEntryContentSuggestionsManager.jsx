@@ -22,7 +22,6 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -42,7 +41,7 @@ const formatDate = (value) => {
   }
 };
 
-const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
+const TimelineEntryContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -59,11 +58,11 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
       if (filterStatus && filterStatus !== 'all') {
         filters.status = filterStatus;
       }
-      const data = await contentApi.getTopicTimelineEntrySuggestions(topicId, filters);
+      const data = await contentApi.getTopicTimelineEntryContentSuggestions(topicId, filters);
       setSuggestions(Array.isArray(data) ? data : []);
       setError(null);
     } catch {
-      setError('Error al cargar las sugerencias de linea de tiempo');
+      setError('Error al cargar las sugerencias de contenido para entradas');
     } finally {
       setLoading(false);
     }
@@ -77,7 +76,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
     setProcessingIds((prev) => new Set(prev).add(suggestion.id));
     setError(null);
     try {
-      await contentApi.acceptTopicTimelineEntrySuggestion(topicId, suggestion.id);
+      await contentApi.acceptTopicTimelineEntryContentSuggestion(topicId, suggestion.id);
       await fetchSuggestions();
       onSuggestionProcessed?.();
     } catch (err) {
@@ -100,7 +99,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
     setProcessingIds((prev) => new Set(prev).add(selectedSuggestion.id));
     setError(null);
     try {
-      await contentApi.rejectTopicTimelineEntrySuggestion(
+      await contentApi.rejectTopicTimelineEntryContentSuggestion(
         topicId,
         selectedSuggestion.id,
         rejectionReason,
@@ -124,15 +123,15 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Sugerencias de linea de tiempo
+        Contenido sugerido para entradas
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Revisa propuestas de entradas narrativas enviadas por la comunidad.
+        Propuestas de la comunidad para vincular material a entradas existentes de la linea de tiempo.
       </Typography>
       <Alert severity="info" sx={{ mb: 2 }}>
-        El contenido de las sugerencias que aceptes sera sumado al tema (si aun no forma parte de el)
-        y vinculado a la nueva entrada de la linea de tiempo. Las sugerencias de contenido pendientes
-        para el mismo material se cerraran automaticamente.
+        Al aceptar, el contenido se vinculara a la entrada indicada. Si aun no forma parte del tema,
+        se anadira automaticamente. Las sugerencias de contenido pendientes para el mismo material
+        se cerraran automaticamente.
       </Alert>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
@@ -166,10 +165,9 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Fechas</TableCell>
+                <TableCell>Entrada</TableCell>
+                <TableCell>Contenido</TableCell>
                 <TableCell>Sugerido por</TableCell>
-                <TableCell>Contenidos</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
@@ -177,54 +175,49 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
             <TableBody>
               {suggestions.map((suggestion) => {
                 const isProcessing = processingIds.has(suggestion.id);
-                const dateLabel = suggestion.end_date
-                  ? `${formatDate(suggestion.start_date)} - ${formatDate(suggestion.end_date)}`
-                  : formatDate(suggestion.start_date);
+                const entry = suggestion.entry || {};
+                const contentTitle = suggestion.content?.original_title || 'Sin titulo';
+                const dateLabel = entry.end_date
+                  ? `${formatDate(entry.start_date)} - ${formatDate(entry.end_date)}`
+                  : formatDate(entry.start_date);
+
                 return (
                   <TableRow key={suggestion.id} hover>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {suggestion.title}
+                        {entry.title || '—'}
                       </Typography>
-                      {suggestion.description && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {suggestion.description.slice(0, 120)}
-                          {suggestion.description.length > 120 ? '...' : ''}
-                        </Typography>
-                      )}
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {dateLabel}
+                      </Typography>
                       {suggestion.message && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                           Mensaje para moderadores: {suggestion.message}
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell>{dateLabel}</TableCell>
-                    <TableCell>{suggestion.suggested_by?.username || '-'}</TableCell>
                     <TableCell>
-                      {(suggestion.contents || []).length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">—</Typography>
-                      ) : (
-                        (suggestion.contents || []).map((item) => {
-                          const title = item.content?.original_title || 'Sin titulo';
-                          return (
-                            <Box key={item.id} sx={{ mb: 0.5 }}>
-                              <Typography variant="body2" component="span">
-                                {title}
-                              </Typography>
-                              {suggestion.status === 'PENDING' && (
-                                <Chip
-                                  size="small"
-                                  label={item.is_in_topic ? 'Ya en el tema' : 'Se anadira al tema'}
-                                  color={item.is_in_topic ? 'default' : 'primary'}
-                                  variant="outlined"
-                                  sx={{ ml: 1, verticalAlign: 'middle' }}
-                                />
-                              )}
-                            </Box>
-                          );
-                        })
+                      <Typography variant="body2">{contentTitle}</Typography>
+                      {suggestion.status === 'PENDING' && (
+                        <Chip
+                          size="small"
+                          label={suggestion.is_in_topic ? 'Ya en el tema' : 'Se anadira al tema'}
+                          color={suggestion.is_in_topic ? 'default' : 'primary'}
+                          variant="outlined"
+                          sx={{ mt: 0.5 }}
+                        />
+                      )}
+                      {suggestion.is_duplicate && suggestion.status === 'PENDING' && (
+                        <Chip
+                          size="small"
+                          label="Ya vinculado a la entrada"
+                          color="warning"
+                          variant="outlined"
+                          sx={{ mt: 0.5, ml: 0.5 }}
+                        />
                       )}
                     </TableCell>
+                    <TableCell>{suggestion.suggested_by?.username || '-'}</TableCell>
                     <TableCell>
                       <Chip
                         size="small"
@@ -237,43 +230,31 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                               : 'warning'
                         }
                       />
-                      {suggestion.is_duplicate && (
-                        <Chip size="small" label="Duplicada" color="warning" sx={{ ml: 0.5 }} />
-                      )}
                     </TableCell>
                     <TableCell align="right">
                       {suggestion.status === 'PENDING' && (
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Tooltip title="Publicar entrada y anadir contenido al tema si aplica">
-                            <span>
-                              <Button
-                                size="small"
-                                color="success"
-                                startIcon={<CheckCircleIcon />}
-                                disabled={isProcessing}
-                                onClick={() => handleAccept(suggestion)}
-                              >
-                                Aceptar
-                              </Button>
-                            </span>
-                          </Tooltip>
-                          <Tooltip title="Rechazar">
-                            <span>
-                              <Button
-                                size="small"
-                                color="error"
-                                startIcon={<CancelIcon />}
-                                disabled={isProcessing}
-                                onClick={() => {
-                                  setSelectedSuggestion(suggestion);
-                                  setRejectionReason('');
-                                  setRejectDialogOpen(true);
-                                }}
-                              >
-                                Rechazar
-                              </Button>
-                            </span>
-                          </Tooltip>
+                          <Button
+                            size="small"
+                            color="success"
+                            startIcon={<CheckCircleIcon />}
+                            disabled={isProcessing}
+                            onClick={() => handleAccept(suggestion)}
+                          >
+                            Aceptar
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            startIcon={<CancelIcon />}
+                            disabled={isProcessing}
+                            onClick={() => {
+                              setSelectedSuggestion(suggestion);
+                              setRejectDialogOpen(true);
+                            }}
+                          >
+                            Rechazar
+                          </Button>
                         </Stack>
                       )}
                     </TableCell>
@@ -285,22 +266,30 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
         </TableContainer>
       )}
 
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Rechazar sugerencia de linea de tiempo</DialogTitle>
+      <Dialog open={rejectDialogOpen} onClose={() => !processingIds.size && setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Rechazar sugerencia</DialogTitle>
         <DialogContent>
           <TextField
+            autoFocus
+            margin="dense"
+            label="Razon del rechazo"
             fullWidth
             multiline
             minRows={3}
-            label="Razon del rechazo"
             value={rejectionReason}
             onChange={(event) => setRejectionReason(event.target.value)}
-            sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-          <Button color="error" variant="contained" onClick={handleRejectConfirm}>
+          <Button onClick={() => setRejectDialogOpen(false)} disabled={processingIds.size > 0}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleRejectConfirm}
+            color="error"
+            variant="contained"
+            disabled={processingIds.size > 0 || !rejectionReason.trim()}
+          >
             Rechazar
           </Button>
         </DialogActions>
@@ -309,4 +298,4 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
   );
 };
 
-export default TimelineEntrySuggestionsManager;
+export default TimelineEntryContentSuggestionsManager;

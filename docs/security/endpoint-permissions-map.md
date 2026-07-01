@@ -25,6 +25,30 @@ Map of API endpoints by permission level (public / authenticated / author / admi
 
 Write permission uses `topic.is_moderator_or_creator(request.user)` (same rule as editing topic content).
 
+## Topic timeline suggestions (community)
+
+| Method | Endpoint | Create | Review (accept/reject) | Delete |
+|--------|----------|--------|------------------------|--------|
+| POST | `/api/content/topics/<pk>/timeline-suggestions/create/` | Authenticated, not creator/moderator | — | — |
+| GET | `/api/content/topics/<pk>/timeline-suggestions/` | — | Authenticated | — |
+| POST | `/api/content/topics/<pk>/timeline-suggestions/<id>/accept/` | — | Creator or moderator | — |
+| POST | `/api/content/topics/<pk>/timeline-suggestions/<id>/reject/` | — | Creator or moderator | — |
+| DELETE | `/api/content/topics/<pk>/timeline-suggestions/<id>/` | — | — | Suggester, `PENDING` only |
+| GET | `/api/content/user/timeline-entry-suggestions/` | — | Authenticated (own) | — |
+
+## Topic timeline entry content link suggestions
+
+Link existing content to an **existing** timeline entry. See [topic-timeline-entry-content-suggestions.md](../architecture/topic-timeline-entry-content-suggestions.md).
+
+| Method | Endpoint | Create | Review | Delete |
+|--------|----------|--------|--------|--------|
+| POST | `/api/content/topics/<pk>/timeline/<entry_id>/content-suggestions/create/` | Authenticated, not creator/moderator | — | — |
+| GET | `/api/content/topics/<pk>/timeline-entry-content-suggestions/` | — | Authenticated | — |
+| POST | `/api/content/topics/<pk>/timeline-entry-content-suggestions/<id>/accept/` | — | Creator or moderator | — |
+| POST | `/api/content/topics/<pk>/timeline-entry-content-suggestions/<id>/reject/` | — | Creator or moderator | — |
+| DELETE | `/api/content/topics/<pk>/timeline-entry-content-suggestions/<id>/` | — | — | Suggester, `PENDING` only |
+| GET | `/api/content/user/timeline-entry-content-suggestions/` | — | Authenticated (own) | — |
+
 ## Authenticated (`IsAuthenticated`)
 
 - **Profiles**: User detail, update, notifications, JWT set, etc.

@@ -1,10 +1,16 @@
 import React from "react";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
-import { Box, Typography, Paper, Button, Link as MuiLink } from "@mui/material";
+import { Box, Typography, Paper, Button, Link as MuiLink, Badge } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { useAuth } from "../context/AuthContext";
 
-const TopicHeader = ({ topic, onEdit, size = "large" }) => {
+const TopicHeader = ({
+  topic,
+  onEdit,
+  size = "large",
+  canEdit: canEditProp,
+  pendingSuggestionsCount = 0,
+}) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const creatorId = typeof topic.creator === "object" ? topic.creator.id : topic.creator;
@@ -14,6 +20,10 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
     creatorId != null &&
     userId != null &&
     String(creatorId) === String(userId);
+  const isModerator = isAuthenticated && (topic.moderators || []).some(
+    (mod) => String(mod?.id ?? mod) === String(userId),
+  );
+  const canEdit = canEditProp ?? (isCreator || isModerator);
 
   const handleTitleClick = () => {
     navigate(`/content/topics/${topic.id}`);
@@ -103,22 +113,29 @@ const TopicHeader = ({ topic, onEdit, size = "large" }) => {
               >
                 {topic.title}
               </Typography>
-              {isCreator && (
-                <Button
-                  variant="contained"
-                  size={size === "small" ? "small" : "medium"}
-                  startIcon={<EditIcon />}
-                  onClick={onEdit}
-                  sx={{
-                    backgroundColor: "rgba(255,255,255,0.95)",
-                    color: "grey.900",
-                    "&:hover": {
-                      backgroundColor: "white",
-                    },
-                  }}
+              {canEdit && (
+                <Badge
+                  badgeContent={pendingSuggestionsCount > 0 ? pendingSuggestionsCount : null}
+                  color="error"
+                  overlap="rectangular"
+                  sx={{ "& .MuiBadge-badge": { fontWeight: 700 } }}
                 >
-                  Editar Tema
-                </Button>
+                  <Button
+                    variant="contained"
+                    size={size === "small" ? "small" : "medium"}
+                    startIcon={<EditIcon />}
+                    onClick={onEdit}
+                    sx={{
+                      backgroundColor: "rgba(255,255,255,0.95)",
+                      color: "grey.900",
+                      "&:hover": {
+                        backgroundColor: "white",
+                      },
+                    }}
+                  >
+                    Editar Tema
+                  </Button>
+                </Badge>
               )}
             </Box>
           </Box>

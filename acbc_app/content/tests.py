@@ -9,7 +9,8 @@ from notifications.models import Notification
 from content.models import (
     Library, Collection, Content, ContentProfile, 
     FileDetails, Topic, TopicTimeline, TopicTimelineEntry, TopicTimelineEntrySuggestion,
-    TopicTimelineEntrySuggestionContent, Publication,
+    TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
+    TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript
 )
 from knowledge_paths.models import KnowledgePath, Node
@@ -1325,6 +1326,32 @@ class TopicTimelineEntrySuggestionsAPITests(APITestCase):
         self.assertEqual(response.data['title'], 'Propuesta historica')
         self.assertEqual(len(response.data['contents']), 1)
 
+    def test_create_timeline_entry_suggestion_rejects_multiple_contents(self):
+        second_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Second item',
+        )
+        ContentProfile.objects.create(
+            content=second_content,
+            user=self.user,
+            title='Second item',
+        )
+        url = reverse('content:topic-timeline-suggestion-create', args=[self.topic.id])
+        response = self.client.post(
+            url,
+            {
+                'title': 'Propuesta con dos contenidos',
+                'contents': [
+                    {'content_id': self.library_content.id, 'order': 1},
+                    {'content_id': second_content.id, 'order': 2},
+                ],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('contents', response.data)
+
     def test_moderator_cannot_create_timeline_entry_suggestion(self):
         self.client.force_authenticate(user=self.moderator)
         url = reverse('content:topic-timeline-suggestion-create', args=[self.topic.id])
@@ -1365,6 +1392,38 @@ class TopicTimelineEntrySuggestionsAPITests(APITestCase):
         self.assertEqual(entry.title, 'Propuesta historica')
         self.assertEqual(entry.entry_contents.count(), 1)
 
+    def test_accept_timeline_entry_suggestion_resolves_pending_content_suggestion(self):
+        content_suggestion = ContentSuggestion.objects.create(
+            topic=self.topic,
+            content=self.library_content,
+            suggested_by=self.user,
+            message='Quiero este contenido en el tema',
+            status='PENDING',
+        )
+        timeline_suggestion = TopicTimelineEntrySuggestion.objects.create(
+            topic=self.topic,
+            suggested_by=self.user,
+            title='Entrada con contenido',
+            status='PENDING',
+        )
+        TopicTimelineEntrySuggestionContent.objects.create(
+            suggestion=timeline_suggestion,
+            content=self.library_content,
+            order=1,
+        )
+
+        accept_url = reverse(
+            'content:topic-timeline-suggestion-accept',
+            args=[self.topic.id, timeline_suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        content_suggestion.refresh_from_db()
+        self.assertEqual(content_suggestion.status, 'ACCEPTED')
+        self.assertEqual(content_suggestion.reviewed_by, self.moderator)
+
     def test_reject_timeline_entry_suggestion_requires_reason(self):
         suggestion = TopicTimelineEntrySuggestion.objects.create(
             topic=self.topic,
@@ -1379,6 +1438,455 @@ class TopicTimelineEntrySuggestionsAPITests(APITestCase):
         self.client.force_authenticate(user=self.moderator)
         response = self.client.post(reject_url, {}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TopicTimelineEntryContentSuggestionsAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='entrycontentuser',
+            email='entrycontentuser@example.com',
+            password='pass12345',
+        )
+        self.moderator = User.objects.create_user(
+            username='entrycontentsmod',
+            email='entrycontentsmod@example.com',
+            password='pass12345',
+        )
+        self.topic = Topic.objects.create(
+            title='Entry Content Topic',
+            description='Desc',
+            creator=self.moderator,
+        )
+        self.topic.moderators.add(self.moderator)
+        self.timeline = TopicTimeline.objects.create(topic=self.topic)
+        self.entry = TopicTimelineEntry.objects.create(
+            timeline=self.timeline,
+            title='Bloque Genesis',
+            description='Comienza la maquina del tiempo',
+            start_date='2009-09-03',
+            order=1,
+        )
+        self.client.force_authenticate(user=self.user)
+
+        self.library_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='IMAGE',
+            original_title='Genesis block image',
+        )
+        ContentProfile.objects.create(
+            content=self.library_content,
+            user=self.user,
+            title='Genesis block image',
+        )
+
+    def test_create_timeline_entry_content_suggestion(self):
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {
+                'content_id': self.library_content.id,
+                'message': 'Encaja con esta entrada',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['content']['id'], self.library_content.id)
+        self.assertEqual(response.data['entry']['id'], self.entry.id)
+
+    def test_moderator_cannot_create_timeline_entry_content_suggestion(self):
+        self.client.force_authenticate(user=self.moderator)
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_accept_timeline_entry_content_suggestion_links_content_and_adds_to_topic(self):
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            message='Propuesta',
+            status='PENDING',
+        )
+        accept_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-accept',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'ACCEPTED')
+        self.assertTrue(self.topic.contents.filter(id=self.library_content.id).exists())
+        self.assertTrue(
+            TopicTimelineEntryContent.objects.filter(
+                entry=self.entry,
+                content=self.library_content,
+            ).exists(),
+        )
+
+    def test_accept_timeline_entry_content_suggestion_resolves_pending_content_suggestion(self):
+        content_suggestion = ContentSuggestion.objects.create(
+            topic=self.topic,
+            content=self.library_content,
+            suggested_by=self.user,
+            message='Quiero este contenido en el tema',
+            status='PENDING',
+        )
+        link_suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        accept_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-accept',
+            args=[self.topic.id, link_suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        content_suggestion.refresh_from_db()
+        self.assertEqual(content_suggestion.status, 'ACCEPTED')
+        self.assertEqual(content_suggestion.reviewed_by, self.moderator)
+
+    def test_reject_timeline_entry_content_suggestion_requires_reason(self):
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        reject_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-reject',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(reject_url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_with_content_already_in_topic(self):
+        self.topic.contents.add(self.library_content)
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['is_in_topic'])
+
+    def test_create_rejects_content_not_in_topic_or_library(self):
+        outsider = User.objects.create_user(
+            username='outsider',
+            email='outsider@example.com',
+            password='pass12345',
+        )
+        foreign_content = Content.objects.create(
+            uploaded_by=outsider,
+            media_type='TEXT',
+            original_title='Foreign',
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': foreign_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_allows_content_already_linked_to_another_entry(self):
+        other_entry = TopicTimelineEntry.objects.create(
+            timeline=self.timeline,
+            title='Whitepaper',
+            start_date='2008-10-31',
+            order=2,
+        )
+        TopicTimelineEntryContent.objects.create(
+            entry=other_entry,
+            content=self.library_content,
+            order=1,
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data['is_duplicate'])
+
+    def test_create_marks_duplicate_when_content_already_on_same_entry(self):
+        TopicTimelineEntryContent.objects.create(
+            entry=self.entry,
+            content=self.library_content,
+            order=1,
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['is_duplicate'])
+
+    def test_create_rejects_duplicate_pending_suggestion(self):
+        TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_timeline_entry_content_suggestions(self):
+        TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        list_url = reverse(
+            'content:topic-timeline-entry-content-suggestions',
+            args=[self.topic.id],
+        )
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['entry']['id'], self.entry.id)
+
+    def test_list_filters_by_entry_id(self):
+        other_entry = TopicTimelineEntry.objects.create(
+            timeline=self.timeline,
+            title='Otra entrada',
+            order=2,
+        )
+        TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        second_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Second',
+        )
+        ContentProfile.objects.create(content=second_content, user=self.user, title='Second')
+        TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=other_entry,
+            content=second_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        list_url = reverse(
+            'content:topic-timeline-entry-content-suggestions',
+            args=[self.topic.id],
+        )
+        response = self.client.get(f'{list_url}?entry_id={self.entry.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['entry']['id'], self.entry.id)
+
+    def test_delete_timeline_entry_content_suggestion_by_suggester(self):
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        delete_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-delete',
+            args=[self.topic.id, suggestion.id],
+        )
+        response = self.client.delete(delete_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(
+            TopicTimelineEntryContentSuggestion.objects.filter(pk=suggestion.id).exists(),
+        )
+
+    def test_delete_forbidden_for_non_suggester(self):
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        other = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='pass12345',
+        )
+        delete_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-delete',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=other)
+        response = self.client.delete(delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_reject_timeline_entry_content_suggestion_with_reason(self):
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        reject_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-reject',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(
+            reject_url,
+            {'rejection_reason': 'No encaja con la narrativa'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, 'REJECTED')
+        self.assertEqual(suggestion.rejection_reason, 'No encaja con la narrativa')
+
+    def test_accept_does_not_duplicate_link_on_same_entry(self):
+        TopicTimelineEntryContent.objects.create(
+            entry=self.entry,
+            content=self.library_content,
+            order=1,
+        )
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+            is_duplicate=True,
+        )
+        accept_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-accept',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            TopicTimelineEntryContent.objects.filter(
+                entry=self.entry,
+                content=self.library_content,
+            ).count(),
+            1,
+        )
+
+    def test_accept_links_same_content_to_second_entry(self):
+        other_entry = TopicTimelineEntry.objects.create(
+            timeline=self.timeline,
+            title='Whitepaper',
+            start_date='2008-10-31',
+            order=2,
+        )
+        TopicTimelineEntryContent.objects.create(
+            entry=self.entry,
+            content=self.library_content,
+            order=1,
+        )
+        suggestion = TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=other_entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        accept_url = reverse(
+            'content:topic-timeline-entry-content-suggestion-accept',
+            args=[self.topic.id, suggestion.id],
+        )
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(accept_url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            TopicTimelineEntryContent.objects.filter(
+                entry=other_entry,
+                content=self.library_content,
+            ).exists(),
+        )
+
+    def test_user_timeline_entry_content_suggestions_list(self):
+        TopicTimelineEntryContentSuggestion.objects.create(
+            topic=self.topic,
+            entry=self.entry,
+            content=self.library_content,
+            suggested_by=self.user,
+            status='PENDING',
+        )
+        list_url = reverse('content:user-timeline-entry-content-suggestions')
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_create_entry_not_in_topic_returns_404(self):
+        other_topic = Topic.objects.create(
+            title='Other',
+            description='Desc',
+            creator=self.moderator,
+        )
+        other_timeline = TopicTimeline.objects.create(topic=other_topic)
+        foreign_entry = TopicTimelineEntry.objects.create(
+            timeline=other_timeline,
+            title='Foreign entry',
+            order=1,
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, foreign_entry.id],
+        )
+        response = self.client.post(
+            url,
+            {'content_id': self.library_content.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class PublicationAPITests(APITestCase):

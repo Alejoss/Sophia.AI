@@ -131,6 +131,37 @@ Editorial timeline attached to a topic. One timeline per topic; entries are orde
 - **Body**: `{ "entry_ids": [3, 1, 2] }` — must include every entry ID in the desired order
 - **Response**: `{ "message": "Timeline reordered successfully" }`
 
+## Topics — Timeline entry content suggestions
+
+Community proposals to link existing content to a **specific timeline entry** (reviewed by topic creator/moderators). Same content may appear on multiple entries.
+
+Full spec: [topic-timeline-entry-content-suggestions.md](../architecture/topic-timeline-entry-content-suggestions.md).
+
+### Create entry content suggestion
+- **POST** `/api/content/topics/{topic_id}/timeline/{entry_id}/content-suggestions/create/`
+- **Auth**: Required (not topic creator/moderator)
+- **Body**: `{ "content_id": 101, "message": "optional note for moderators" }`
+- **Response**: Created suggestion (201). Content must be in the topic or in the suggester's library.
+
+### List entry content suggestions (topic)
+- **GET** `/api/content/topics/{topic_id}/timeline-entry-content-suggestions/`
+- **Auth**: Required
+- **Query**: `status`, `entry_id`
+
+### Accept / reject entry content suggestion
+- **POST** `/api/content/topics/{topic_id}/timeline-entry-content-suggestions/{suggestion_id}/accept/`
+- **POST** `/api/content/topics/{topic_id}/timeline-entry-content-suggestions/{suggestion_id}/reject/` — body `{ "rejection_reason": "..." }` (required)
+- **Auth**: Topic creator or moderator
+
+### Delete entry content suggestion
+- **DELETE** `/api/content/topics/{topic_id}/timeline-entry-content-suggestions/{suggestion_id}/`
+- **Auth**: Suggester only, `PENDING` only
+
+### My entry content suggestions
+- **GET** `/api/content/user/timeline-entry-content-suggestions/`
+- **Auth**: Required
+- **Query**: `status`, `topic_id`
+
 ## Events
 
 ### List Events

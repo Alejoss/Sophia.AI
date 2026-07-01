@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -13,7 +13,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
 import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
-import TopicTimelineEntryForm from './TopicTimelineEntryForm';
+import TopicTimelineEntryContentSuggestionForm from './TopicTimelineEntryContentSuggestionForm';
 
 const getErrorMessage = (error, fallback) => {
   const data = error?.response?.data;
@@ -27,42 +27,43 @@ const getErrorMessage = (error, fallback) => {
   return fallback;
 };
 
-const TopicTimelineEntryPage = () => {
+const TopicTimelineEntryContentSuggestionPage = () => {
   const { topicId, entryId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
-  const isEdit = Boolean(entryId);
-  const fromEdit = searchParams.get('from') === 'edit';
 
   const [topicTitle, setTopicTitle] = useState('');
   const [entry, setEntry] = useState(null);
-  const [availableContents, setAvailableContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
-  const [canEdit, setCanEdit] = useState(false);
+  const [canSuggest, setCanSuggest] = useState(false);
 
   const timelineUrl = useMemo(
-    () => (fromEdit
-      ? `/content/topics/${topicId}/edit?tab=timeline`
-      : getTopicDetailPath(topicId, TOPIC_TABS.TIMELINE)),
-    [fromEdit, topicId],
+    () => getTopicDetailPath(topicId, TOPIC_TABS.TIMELINE),
+    [topicId],
   );
 
   const loadPageData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [topicData, timelineData, contentsData] = await Promise.all([
+      const [topicData, timelineData] = await Promise.all([
         contentApi.getTopicDetails(topicId, { include_contents: false }),
         contentApi.getTopicTimeline(topicId),
-        contentApi.getTopicDetailsSimple(topicId),
       ]);
 
       setTopicTitle(topicData?.title || '');
-      setAvailableContents(contentsData?.contents || []);
+
+      const matchedEntry = (timelineData?.entries || []).find(
+        (item) => String(item.id) === String(entryId),
+      );
+      if (!matchedEntry) {
+        setError('No se encontro la entrada de la linea de tiempo.');
+        return;
+      }
+      setEntry(matchedEntry);
 
       const creatorId = typeof topicData?.creator === 'object'
         ? topicData.creator?.id
@@ -75,32 +76,18 @@ const TopicTimelineEntryPage = () => {
       const isModerator = (topicData?.moderators || []).some(
         (mod) => String(mod?.id ?? mod) === String(userId),
       );
-      const allowed = isCreator || isModerator;
-      setCanEdit(allowed);
+      const allowed = isAuthenticated && !isCreator && !isModerator;
+      setCanSuggest(allowed);
 
       if (!allowed) {
-        setError('No tienes permiso para editar la linea de tiempo de este tema.');
-        return;
-      }
-
-      if (isEdit) {
-        const found = (timelineData?.entries || []).find(
-          (item) => String(item.id) === String(entryId),
-        );
-        if (!found) {
-          setError('No se encontro la entrada de la linea de tiempo.');
-          return;
-        }
-        setEntry(found);
-      } else {
-        setEntry(null);
+        setError('Solo usuarios que no son moderadores pueden sugerir contenido para entradas.');
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo cargar la linea de tiempo.'));
+      setError(getErrorMessage(err, 'No se pudo cargar la informacion.'));
     } finally {
       setLoading(false);
     }
-  }, [entryId, isAuthenticated, isEdit, topicId, user?.id]);
+  }, [entryId, isAuthenticated, topicId, user?.id]);
 
   useEffect(() => {
     loadPageData();
@@ -114,14 +101,10 @@ const TopicTimelineEntryPage = () => {
     try {
       setSaving(true);
       setFormError(null);
-      if (isEdit) {
-        await contentApi.updateTopicTimelineEntry(topicId, entryId, payload);
-      } else {
-        await contentApi.createTopicTimelineEntry(topicId, payload);
-      }
+      await contentApi.createTopicTimelineEntryContentSuggestion(topicId, entryId, payload);
       navigate(timelineUrl);
     } catch (err) {
-      setFormError(getErrorMessage(err, 'No se pudo guardar la entrada.'));
+      setFormError(getErrorMessage(err, 'No se pudo enviar la sugerencia.'));
       throw err;
     } finally {
       setSaving(false);
@@ -149,9 +132,7 @@ const TopicTimelineEntryPage = () => {
         <MuiLink component={RouterLink} to={timelineUrl} underline="hover" color="inherit">
           Linea de tiempo
         </MuiLink>
-        <Typography color="text.primary">
-          {isEdit ? 'Editar entrada' : 'Nueva entrada'}
-        </Typography>
+        <Typography color="text.primary">Sugerir contenido</Typography>
       </Breadcrumbs>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -168,7 +149,7 @@ const TopicTimelineEntryPage = () => {
       </Stack>
 
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-        {isEdit ? 'Editar entrada de la linea de tiempo' : 'Nueva entrada de la linea de tiempo'}
+        Sugerir contenido para esta entrada
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         {topicTitle ? `Tema: ${topicTitle}` : ''}
@@ -180,11 +161,9 @@ const TopicTimelineEntryPage = () => {
         </Alert>
       )}
 
-      {canEdit && !error && (
-        <TopicTimelineEntryForm
+      {canSuggest && entry && !error && (
+        <TopicTimelineEntryContentSuggestionForm
           entry={entry}
-          availableContents={availableContents}
-          loadingContents={loading}
           saving={saving}
           error={formError}
           onCancel={handleCancel}
@@ -195,4 +174,4 @@ const TopicTimelineEntryPage = () => {
   );
 };
 
-export default TopicTimelineEntryPage;
+export default TopicTimelineEntryContentSuggestionPage;

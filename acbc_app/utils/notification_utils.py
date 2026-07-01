@@ -1967,6 +1967,123 @@ def notify_timeline_entry_suggestion_rejected(suggestion):
         )
 
 
+def notify_timeline_entry_content_suggestion_created(suggestion):
+    """Notify topic moderators when a user suggests linking content to a timeline entry."""
+    logger.info("Creating timeline entry content suggestion notification", extra={
+        'suggestion_id': suggestion.id,
+        'topic_id': suggestion.topic.id,
+        'entry_id': suggestion.entry_id,
+        'suggested_by_id': suggestion.suggested_by_id,
+    })
+
+    try:
+        moderators = list(suggestion.topic.moderators.all())
+        if suggestion.topic.creator and suggestion.topic.creator not in moderators:
+            moderators.append(suggestion.topic.creator)
+
+        suggested_by_ct = ContentType.objects.get_for_model(suggestion.suggested_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
+        notifications_created = 0
+
+        for moderator in moderators:
+            if moderator.id == suggestion.suggested_by.id:
+                continue
+
+            description = (
+                f'{suggestion.suggested_by.username} sugirio vincular contenido a la entrada '
+                f'"{suggestion.entry.title}" en "{suggestion.topic.title}": {content_title[:80]}'
+            )
+            if suggestion.message:
+                description += f' — {suggestion.message[:100]}'
+
+            create_notification(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirio vincular contenido a una entrada de la linea de tiempo en',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id,
+                description=description,
+            )
+            notifications_created += 1
+
+        logger.info(
+            f"Created {notifications_created} notifications for timeline entry content suggestion",
+            extra={'suggestion_id': suggestion.id},
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry content suggestion notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
+
+
+def notify_timeline_entry_content_suggestion_accepted(suggestion):
+    """Notify suggester when their timeline entry content link suggestion is accepted."""
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        return
+
+    try:
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
+
+        create_notification(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='acepto tu sugerencia de vincular contenido a una entrada en',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=(
+                f'{suggestion.reviewed_by.username} acepto vincular "{content_title}" '
+                f'a la entrada "{suggestion.entry.title}" en "{suggestion.topic.title}"'
+            ),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry content suggestion accepted notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
+
+
+def notify_timeline_entry_content_suggestion_rejected(suggestion):
+    """Notify suggester when their timeline entry content link suggestion is rejected."""
+    if suggestion.reviewed_by and suggestion.reviewed_by.id == suggestion.suggested_by.id:
+        return
+
+    try:
+        reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
+        topic_ct = ContentType.objects.get_for_model(suggestion.topic)
+        content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
+
+        description = (
+            f'{suggestion.reviewed_by.username} rechazo vincular "{content_title}" '
+            f'a la entrada "{suggestion.entry.title}" en "{suggestion.topic.title}"'
+        )
+        if suggestion.rejection_reason:
+            description += f': {suggestion.rejection_reason[:100]}'
+
+        create_notification(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazo tu sugerencia de vincular contenido a una entrada en',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+            description=description,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating timeline entry content suggestion rejected notification: {str(e)}",
+            extra={'suggestion_id': suggestion.id if suggestion else None},
+            exc_info=True,
+        )
+
+
 def notify_file_suggestion_created(file_suggestion):
     """
     Notify the content owner that a third party suggested a file for their URL-only content.

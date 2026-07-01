@@ -187,12 +187,20 @@ Frontend: `frontend/src/topics/*.jsx` y `frontend/src/api/contentApi.js`.
   - Usa `contentApi.createTopic`.
 
 - `TopicEdit.jsx`
-  - Edición de metadatos de un tema: título, descripción, imagen, moderadores, sugerencias.
-  - Usa:
-    - `contentApi.getTopicDetails` (carga inicial).
-    - `contentApi.updateTopic` y `updateTopicImage`.
-    - `TopicModerators` y `ContentSuggestionsManager`.
-  - Solo el creador ve y gestiona la sección de moderadores; creador/moderadores ven la gestión de sugerencias de contenido.
+  - Hub unificado de edición del tema con pestañas en URL (`?tab=`):
+    - `general` — título, descripción, imagen.
+    - `content` — gestión de contenidos (`TopicContentManager`).
+    - `timeline` — línea de tiempo en modo edición (`TopicTimeline` con `returnContext="edit"`).
+    - `suggestions` — sugerencias de contenido y de entradas de timeline.
+    - `moderators` — solo creador.
+    - `danger` — eliminar tema, solo creador.
+  - Usa `contentApi.getTopicDetails`, `updateTopic`, `updateTopicImage`, `TopicModerators`, `ContentSuggestionsManager`, `TimelineEntrySuggestionsManager`.
+
+- `TopicContentManager.jsx`
+  - Componente extraído para la pestaña **Contenido** del hub de edición: tabla, agregar/quitar, biblioteca y subida.
+
+- `TopicEditContent.jsx`
+  - Redirección legacy a `/content/topics/:topicId/edit?tab=content` (compatibilidad con enlaces antiguos).
 
 - `TopicList.jsx`
   - Lista de temas disponibles para el usuario (normalmente usando `getTopics` o `getUserTopics`).
@@ -201,8 +209,8 @@ Frontend: `frontend/src/topics/*.jsx` y `frontend/src/api/contentApi.js`.
   - Muestra un tema concreto, su imagen, descripción y contenidos destacados por tipo de media.
   - Integra detalles de contenido (votos, media, etc.).
 
-- `TopicAddContent.jsx` y `TopicEditContent.jsx`
-  - Pantallas para agregar o quitar contenido al tema, usando `getTopicDetailsSimple`, `addContentToTopic` y `removeContentFromTopic`.
+- `TopicAddContent.jsx`
+  - Pantalla para agregar contenido al tema desde la vista pública; enlace a edición en pestaña **Contenido**.
 
 - `TopicContentMediaType.jsx`
   - Muestra contenido de un tema filtrado por tipo (`VIDEO`, `AUDIO`, `TEXT`, `IMAGE`) utilizando `getTopicContentByType`.
@@ -220,9 +228,9 @@ Rutas relevantes en `App.jsx` (prefijo `/content` enrutado a un layout protegido
 - `/content/create_topic` → `TopicCreationForm`
 - `/content/topics` → `TopicList`
 - `/content/topics/:topicId` → `TopicDetail`
-- `/content/topics/:topicId/edit` → `TopicEdit`
+- `/content/topics/:topicId/edit` → `TopicEdit` (hub con `?tab=general|content|timeline|suggestions|moderators|danger`)
 - `/content/topics/:topicId/add-content` → `TopicAddContent`
-- `/content/topics/:topicId/edit-content` → `TopicEditContent`
+- `/content/topics/:topicId/edit-content` → redirección a `TopicEdit?tab=content`
 - `/content/topics/:topicId/suggestions` → `TopicContentSuggestionsPage`
 - `/content/topics/:topicId/:mediaType` → `TopicContentMediaType`
 
@@ -356,16 +364,37 @@ Carpeta: `frontend/src/topics/timeline/`.
 | `TopicTimelineEntryCard.jsx` | Tarjeta visual con línea vertical, chip de fecha y previews |
 | `TopicTimelineContentSelector.jsx` | Selector de contenidos del tema con búsqueda, filtro por tipo y orden |
 | `TopicTimelineContentPreview.jsx` | Vista previa de un contenido vinculado |
+| `TopicTimelineEntrySuggestionPage.jsx` | Página para sugerir una entrada narrativa nueva |
+| `TopicTimelineEntryContentSuggestionPage.jsx` | Página para sugerir contenido a una entrada existente |
+| `TimelineEntrySuggestionsManager.jsx` | Moderación de sugerencias de entradas nuevas |
+| `TimelineEntryContentSuggestionsManager.jsx` | Moderación de sugerencias de vínculo contenido ↔ entrada |
 
-Integración en `TopicDetail.jsx`: pestaña **"Línea de tiempo"** que renderiza `<TopicTimeline topicId={...} canEdit={...} />`.
+Integración en `TopicDetail.jsx`: pestaña **"Línea de tiempo"** que renderiza `<TopicTimeline topicId={...} canEdit={...} canSuggest={...} />`.
 
 Rutas de formulario (página completa, no modal):
 
-- `/content/topics/:topicId/timeline/new` — nueva entrada
-- `/content/topics/:topicId/timeline/:entryId/edit` — editar entrada
-- Tras guardar → `/content/topics/:topicId?tab=timeline`
+- `/content/topics/:topicId/timeline/new` — nueva entrada (moderador)
+- `/content/topics/:topicId/timeline/:entryId/edit` — editar entrada (moderador)
+- `/content/topics/:topicId/timeline/suggest` — sugerir entrada nueva (comunidad)
+- `/content/topics/:topicId/timeline/:entryId/suggest-content` — sugerir contenido para una entrada (comunidad)
+- Tras guardar o sugerir → `/content/topics/:topicId?tab=timeline`
 
-Plan futuro: [Sugerir entrada en la línea de tiempo](topic-timeline-entry-suggestions-plan.md).
+Documentación detallada:
+
+- [Sugerir entrada en la línea de tiempo](topic-timeline-entry-suggestions-plan.md)
+- [Sugerir contenido para una entrada](topic-timeline-entry-content-suggestions.md)
+
+### Sugerencias de la comunidad (línea de tiempo)
+
+Tres flujos complementarios en la pestaña **Línea de tiempo**:
+
+| Acción | UI | Ruta |
+|--------|-----|------|
+| Sugerir entrada nueva | Botón **Sugerir entrada** (cabecera) | `/timeline/suggest` |
+| Sugerir contenido a entrada | Ícono bombilla al expandir tarjeta | `/timeline/:entryId/suggest-content` |
+| Moderar todo | **Editar tema → Sugerencias** | `/edit?tab=suggestions` |
+
+El badge de pendientes en **Editar tema** cuenta sugerencias de contenido al tema, de entradas nuevas y de vínculos a entradas.
 
 **API de frontend** (`contentApi.js`):
 
@@ -374,16 +403,24 @@ Plan futuro: [Sugerir entrada en la línea de tiempo](topic-timeline-entry-sugge
 - `updateTopicTimelineEntry(topicId, entryId, entryData)`
 - `deleteTopicTimelineEntry(topicId, entryId)`
 - `reorderTopicTimeline(topicId, entryIds)`
+- `createTopicTimelineEntrySuggestion(topicId, payload)`
+- `getTopicTimelineEntrySuggestions(topicId, filters)`
+- `createTopicTimelineEntryContentSuggestion(topicId, entryId, payload)`
+- `getTopicTimelineEntryContentSuggestions(topicId, filters)`
 
 Los contenidos disponibles para adjuntar se obtienen con `getTopicDetailsSimple(topicId)` (perfiles del usuario en ese tema).
 
 ### Tests
 
-Backend: `acbc_app/content/tests.py` — clase de tests de timeline:
+Backend: `acbc_app/content/tests.py`:
 
-- Crear entrada, listar y adjuntar varios contenidos.
-- Rechazar contenido que no pertenece al tema.
-- Permisos (outsider no puede crear) y reordenado por moderador.
+- **Timeline CRUD**: crear entrada, listar, adjuntar contenidos, reordenar, permisos.
+- **`TopicTimelineEntrySuggestionsAPITests`**: sugerencias de entradas nuevas.
+- **`TopicTimelineEntryContentSuggestionsAPITests`**: sugerencias de vínculo contenido ↔ entrada (incluye reutilización del mismo contenido en varias entradas).
+
+```bash
+docker compose exec backend python manage.py test content.tests.TopicTimelineEntryContentSuggestionsAPITests -v 1
+```
 
 ---
 

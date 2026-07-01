@@ -18,6 +18,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import LinkIcon from '@mui/icons-material/Link';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
+import { useNavigate } from 'react-router-dom';
 import TopicTimelineContentPreview from './TopicTimelineContentPreview';
 
 const formatDate = (value) => {
@@ -46,6 +48,7 @@ const TopicTimelineEntryCard = ({
   index,
   topicId,
   canEdit,
+  canSuggest = false,
   canReorder = false,
   onEdit,
   onDelete,
@@ -54,10 +57,12 @@ const TopicTimelineEntryCard = ({
   isFirst,
   isLast,
 }) => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const links = [...(entry.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const dateLabel = getEntryDateLabel(entry, index);
   const hasCollapsibleContent = Boolean(entry.description) || links.length > 0;
+  const canExpand = hasCollapsibleContent || canSuggest;
   const relatedContentLabel = links.length === 1
     ? '1 contenido relacionado'
     : `${links.length} contenidos relacionados`;
@@ -169,7 +174,19 @@ const TopicTimelineEntryCard = ({
             <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
               {entry.title}
             </Typography>
-            {hasCollapsibleContent && (
+            {expanded && canSuggest && (
+              <Tooltip title="Sugerir contenido para esta entrada">
+                <IconButton
+                  size="small"
+                  onClick={() => navigate(`/content/topics/${topicId}/timeline/${entry.id}/suggest-content`)}
+                  aria-label="Sugerir contenido para esta entrada"
+                  sx={{ mt: -0.25, flexShrink: 0 }}
+                >
+                  <LightbulbOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canExpand && (
               <Tooltip title={expanded ? 'Ocultar detalles' : 'Ver detalles'}>
                 <IconButton
                   size="small"

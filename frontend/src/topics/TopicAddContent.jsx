@@ -240,7 +240,7 @@ const TopicAddContent = () => {
                     </Button>
                     <Button
                         component={Link}
-                        to={`/content/topics/${topicId}/edit-content`}
+                        to={`/content/topics/${topicId}/edit?tab=content`}
                         variant="text"
                         size="small"
                         startIcon={<EditIcon />}

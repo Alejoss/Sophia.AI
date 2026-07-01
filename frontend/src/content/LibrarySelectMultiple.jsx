@@ -179,6 +179,8 @@ const LibrarySelectMultiple = ({
             let newSelection;
             if (prev.some(p => p.id === contentProfile.id)) {
                 newSelection = prev.filter(p => p.id !== contentProfile.id);
+            } else if (maxSelections === 1) {
+                newSelection = [contentProfile];
             } else if (!maxSelections || prev.length < maxSelections) {
                 newSelection = [...prev, contentProfile];
             } else {
