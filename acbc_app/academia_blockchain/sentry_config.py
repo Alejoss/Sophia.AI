@@ -33,6 +33,15 @@ _SUPPRESSED_EXCEPTION_FQNS = frozenset(
 )
 
 
+# Environments that must NOT report to Sentry (local development / tests).
+# Sentry is reserved for production / beta, so development noise (e.g. transient
+# SyntaxError picked up by the runserver auto-reloader) does not create issues
+# or trigger alert emails.
+_DISABLED_SENTRY_ENVIRONMENTS = frozenset(
+    {"development", "dev", "local", "test", "testing"}
+)
+
+
 def _sentry_before_send(event, hint):
     """
     Drop noise from expected 4xx-class failures. Prefer fixing log levels at the source;
@@ -54,6 +63,16 @@ def configure_sentry():
     if not dsn:
         return
 
+    # Only report from production / beta. Skip local/development (and tests) so
+    # dev-only noise does not open Sentry issues or send alert emails.
+    env = os.environ.get("ENVIRONMENT", "development").strip()
+    if env.lower() in _DISABLED_SENTRY_ENVIRONMENTS:
+        logging.getLogger(__name__).info(
+            "Sentry disabled for ENVIRONMENT=%s (enabled only in production/beta).",
+            env,
+        )
+        return
+
     try:
         import sentry_sdk
         from sentry_sdk.integrations.django import DjangoIntegration
@@ -67,7 +86,6 @@ def configure_sentry():
         event_level=logging.ERROR  # Send errors as events
     )
 
-    env = os.environ.get("ENVIRONMENT", "development")
     # Lower sample rates in production to control volume; use 1.0 for beta if desired
     traces_sample_rate = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
     profiles_sample_rate = float(os.environ.get("SENTRY_PROFILES_SAMPLE_RATE", "0.0"))
