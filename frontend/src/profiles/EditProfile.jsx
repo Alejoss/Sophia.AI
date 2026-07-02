@@ -6,7 +6,6 @@ import {
     TextField, 
     Button, 
     Paper, 
-    Avatar, 
     CircularProgress,
     Chip,
     FormHelperText,
@@ -18,6 +17,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { AuthContext } from '../context/AuthContext';
 import { getAccessTokenFromLocalStorage } from '../context/localStorageUtils';
 import { getUserProfile, updateProfile } from '../api/profilesApi';
+import UserAvatar from '../components/UserAvatar';
 
 const EditProfile = () => {
     const navigate = useNavigate();
@@ -224,9 +224,11 @@ const EditProfile = () => {
                 <form onSubmit={handleSubmit}>
                     {/* Foto de perfil */}
                     <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <Avatar
-                            src={previewUrl || '/default-avatar.png'}
-                            sx={{ width: 120, height: 120, mb: 2 }}
+                        <UserAvatar
+                            src={previewUrl}
+                            username={formData.username}
+                            size={120}
+                            sx={{ mb: 2 }}
                         />
                         <Button
                             variant="outlined"

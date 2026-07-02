@@ -13,6 +13,7 @@ import MessageIcon from '@mui/icons-material/Message';
 import EditIcon from '@mui/icons-material/Edit';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import BadgeDisplay from '../gamification/BadgeDisplay';
+import UserAvatar from '../components/UserAvatar';
 
 const ProfileHeader = ({ 
     profile, 
@@ -32,19 +33,12 @@ const ProfileHeader = ({
             <Grid container spacing={3}>
                 <Grid item xs={12} md={3}>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                        <img 
-                            src={profile.profile_picture || '/default-avatar.png'} 
-                            alt="Profile"
-                            width={150}
-                            height={150}
-                            loading="eager"
-                            fetchPriority="high"
-                            style={{ 
-                                width: '150px', 
-                                height: '150px', 
-                                borderRadius: '50%', 
-                                objectFit: 'cover',
-                                ...(!isOwnProfile && { cursor: 'pointer' })
+                        <UserAvatar
+                            src={profile.profile_picture}
+                            username={profile.user?.username}
+                            size={150}
+                            sx={{
+                                ...(!isOwnProfile && { cursor: 'pointer' }),
                             }}
                             {...(!isOwnProfile && { onClick: handleProfileClick })}
                         />
