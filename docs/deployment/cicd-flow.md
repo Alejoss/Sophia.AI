@@ -4,13 +4,19 @@
 
 | Stage | When it runs | What it does |
 |-------|----------------|--------------|
-| **Detect changes** | Every push/PR to `main` | Decides which components changed (backend, frontend, nginx, CI config). |
+| **Detect changes** | Every push to `main` (or manual dispatch) | Decides which components changed (backend, frontend, nginx, CI config). |
 | **Backend tests** | Backend, compose, deploy script, or CI workflow changed | Django tests + `check --deploy`. |
 | **Frontend check** | Frontend, compose, deploy script, or CI workflow changed | `npm ci` + `npm run build`. |
 | **Publish images** | Push to `main` or manual dispatch only | Builds/pushes only the images for components that changed. |
 | **Deploy** | Manual on server | `git pull` + wait for CI + `./scripts/deploy.sh` (pull GHCR + rolling recreate + verify BUILD_SHA). |
 
 ## GitHub Actions ([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))
+
+### Triggers
+
+- **`push` to `main`**: full validation + GHCR publish (use this after batching local merges).
+- **`workflow_dispatch`**: manual run from GitHub Actions (validates and publishes all components).
+- **Pull requests do not run CI** — agent/feature branches are reviewed via diff only; merge locally and push once to `main` to run CI a single time.
 
 ### Concurrency
 
@@ -43,7 +49,7 @@ Docs-only changes (for example `*.md` outside those paths) skip tests and image 
 
 ### Publish images (GHCR)
 
-- **Not run on pull requests** (validation only on PRs).
+- **Not run on pull requests** (PRs do not trigger the workflow).
 - **Frontend image**: published on **every successful push to `main`** (not only when `frontend/**` changed), so backend-only deploys do not leave a stale React bundle on GHCR.
 - **Split into three jobs** (`publish-backend`, `publish-frontend`, `publish-nginx`) that run in parallel when their component changed (frontend publish also runs on every main push).
 - Each job has `packages: write` only where needed; workflow default is `contents: read`.
