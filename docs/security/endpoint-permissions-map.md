@@ -51,7 +51,7 @@ Link existing content to an **existing** timeline entry. See [topic-timeline-ent
 
 ## Authenticated (`IsAuthenticated`)
 
-- **Profiles**: User detail, update, notifications, JWT set, etc.
+- **Profiles**: User detail, update, [notifications](../backend/notifications.md) (`/api/profiles/notifications/`), JWT set, etc.
 - **Events**: List, create, detail, registrations (except public list if any).
 - **Content**: Libraries, content CRUD, topics, suggestions, uploads, etc.
 - **Comments**: List, create, replies (except `CommentView` update/delete → author).

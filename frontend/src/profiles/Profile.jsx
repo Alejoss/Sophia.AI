@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationsCount, changePassword } from '../api/profilesApi';
+import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, changePassword } from '../api/profilesApi';
+import { useNotifications } from '../context/NotificationsContext.jsx';
 import ProfileHeader from './ProfileHeader';
 import ProfileHeaderSkeleton from '../components/ProfileHeaderSkeleton';
 import ProfileVerticalNavigation from './ProfileVerticalNavigation';
@@ -201,7 +202,7 @@ const Profile = () => {
     const [notificationsLoading, setNotificationsLoading] = useState(false);
     const [notificationsError, setNotificationsError] = useState(null);
     const [isNavigating, setIsNavigating] = useState(false);
-    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+    const { unreadCount: unreadNotificationsCount, refreshUnreadCount } = useNotifications();
     const [suggestionModalOpen, setSuggestionModalOpen] = useState(false);
     /** Total public collections for another user's profile (sidebar button label). */
     const [sharedCollectionsCount, setSharedCollectionsCount] = useState(null);
@@ -293,12 +294,6 @@ const Profile = () => {
         };
     }, [isOwnProfile, profile?.user?.id]);
 
-    useEffect(() => {
-        if (isOwnProfile) {
-            fetchUnreadNotificationsCount();
-        }
-    }, [isOwnProfile]);
-
     // Handle URL parameters for section navigation
     useEffect(() => {
         const urlParams = new URLSearchParams(location.search);
@@ -330,20 +325,9 @@ const Profile = () => {
     useEffect(() => {
         if (isOwnProfile && activeSection === 'notifications') {
             fetchNotifications();
+            refreshUnreadCount(true);
         }
     }, [isOwnProfile, activeSection]);
-
-    const fetchUnreadNotificationsCount = async () => {
-        if (!isOwnProfile) return;
-        
-        try {
-            const count = await getUnreadNotificationsCount();
-            setUnreadNotificationsCount(count);
-        } catch (err) {
-            console.error('Error fetching unread notifications count:', err);
-            setUnreadNotificationsCount(0);
-        }
-    };
 
     const fetchNotifications = async () => {
         if (!isOwnProfile) return;
@@ -366,7 +350,7 @@ const Profile = () => {
         try {
             await markNotificationAsRead(notificationId);
             await fetchNotifications();
-            await fetchUnreadNotificationsCount(); // Refresh count after marking as read
+            await refreshUnreadCount(true);
         } catch (err) {
             console.error('Error marking notification as read:', err);
         }
@@ -426,7 +410,7 @@ const Profile = () => {
                                 try {
                                     await markAllNotificationsAsRead();
                                     await fetchNotifications();
-                                    await fetchUnreadNotificationsCount(); // Refresh count after marking all as read
+                                    await refreshUnreadCount(true);
                                 } catch (err) {
                                     console.error('Error marking all notifications as read:', err);
                                 }

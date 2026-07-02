@@ -1,11 +1,13 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemButton, ListItemText, useMediaQuery, useTheme } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemButton, ListItemText, useMediaQuery, useTheme, Badge, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useThemeMode } from '../context/ThemeContext.jsx';
+import { useNotifications } from '../context/NotificationsContext.jsx';
 import { getProfileMenuConfig } from '../profiles/ProfileVerticalNavigation.jsx';
 import { mergeMenuConfigs } from '../utils/menuUtils';
 import '../styles/header.css';
@@ -14,6 +16,7 @@ const HeaderComp = () => {
   const { authState } = useContext(AuthContext);
   const { isAuthenticated, user } = authState;
   const { mode, toggleMode } = useThemeMode();
+  const { unreadCount } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const theme = useTheme();
@@ -25,7 +28,7 @@ const HeaderComp = () => {
                          !location.pathname.includes('/register');
 
   // Get profile menu configuration if on profile page
-  const profileMenuConfig = isOnProfilePage ? getProfileMenuConfig(true, 0) : null;
+  const profileMenuConfig = isOnProfilePage ? getProfileMenuConfig(true, unreadCount) : null;
 
   // Merge all menu configurations for mobile navigation
   const mobileMenuItems = profileMenuConfig ? 
@@ -115,6 +118,47 @@ const HeaderComp = () => {
     return null;
   };
 
+  const renderNotificationBell = (sx = {}) => {
+    if (!isAuthenticated) {
+      return null;
+    }
+
+    return (
+      <Tooltip title="Notificaciones" arrow>
+        <IconButton
+          component={Link}
+          to="/profiles/my_profile?section=notifications"
+          aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ''}`}
+          sx={{
+            color: 'text.primary',
+            ...sx,
+          }}
+        >
+          <Badge
+            color="error"
+            badgeContent={unreadCount}
+            invisible={unreadCount <= 0}
+            max={99}
+          >
+            <NotificationsNoneIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+    );
+  };
+
+  const renderDarkModeToggle = (sx = {}) => (
+    <IconButton
+      onClick={toggleMode}
+      aria-label="toggle dark mode"
+      sx={{
+        color: 'text.primary',
+        ...sx,
+      }}
+    >
+      {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+    </IconButton>
+  );
   const navLinks = [
     { to: '/search', label: 'Buscar' },
     { to: '/knowledge_path', label: 'Caminos de conocimiento' },
@@ -244,30 +288,14 @@ const HeaderComp = () => {
             </Typography>
           ))}
           
-          {/* Dark Mode Toggle */}
-          <IconButton
-            onClick={toggleMode}
-            aria-label="toggle dark mode"
-            sx={{
-              ml: 1,
-              color: 'text.primary',
-            }}
-          >
-            {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
+          {renderNotificationBell({ ml: 0.5 })}
+          {renderDarkModeToggle({ ml: 0.5 })}
         </Box>
 
         {/* Mobile Menu Button and Dark Mode Toggle */}
-        <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 1 }}>
-          <IconButton
-            onClick={toggleMode}
-            aria-label="toggle dark mode"
-            sx={{
-              color: 'text.primary',
-            }}
-          >
-            {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
+        <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 0.5 }}>
+          {renderNotificationBell()}
+          {renderDarkModeToggle()}
           <IconButton
             onClick={() => setIsOpen(!isOpen)}
             aria-label="menu"

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'rea
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -130,6 +131,7 @@ const AppContent = () => {
       <CssBaseline />
       <Router>
         <AuthProvider>
+          <NotificationsProvider>
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
           <Route element={<MainLayout />}>
@@ -224,6 +226,7 @@ const AppContent = () => {
             <Route path="profiles/profile_bookmarks" element={<ProtectedRoute><Bookmarks /></ProtectedRoute>} />
           </Route>
           </Routes>
+          </NotificationsProvider>
         </AuthProvider>
         <CommunityBubble />
       </Router>

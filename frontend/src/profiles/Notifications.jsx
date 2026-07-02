@@ -28,9 +28,11 @@ const Notifications = ({
       return notification.description;
     } else if (notification.verb === 'rechazó tu solicitud de certificado para') {
       return notification.description;
-    } else if (notification.verb === 'votó a favor de tu contenido') {
+    } else if (notification.verb === 'votó positivamente tu contenido' || notification.verb === 'votó a favor de tu contenido') {
       return notification.description;
-    } else if (notification.verb === 'votó a favor de tu camino de conocimiento') {
+    } else if (notification.verb === 'votó positivamente tu camino de conocimiento' || notification.verb === 'votó a favor de tu camino de conocimiento') {
+      return notification.description;
+    } else if (notification.verb === 'comentó en tu contenido') {
       return notification.description;
     } else if (notification.verb === 'se registró en tu evento') {
       return notification.description;
@@ -90,6 +92,15 @@ const Notifications = ({
       return notification.description || `${notification.actor} rechazó tu sugerencia de contenido`;
     } else if (notification.verb === 'sugirió un archivo para tu contenido') {
       return notification.description || `${notification.actor} sugirió un archivo para tu contenido`;
+    } else if (
+      notification.verb === 'sugirió una entrada en la línea de tiempo para' ||
+      notification.verb === 'aceptó tu sugerencia de entrada en la línea de tiempo para' ||
+      notification.verb === 'rechazó tu sugerencia de entrada en la línea de tiempo para' ||
+      notification.verb === 'sugirió vincular contenido a una entrada de la línea de tiempo en' ||
+      notification.verb === 'aceptó tu sugerencia de vincular contenido a una entrada en' ||
+      notification.verb === 'rechazó tu sugerencia de vincular contenido a una entrada en'
+    ) {
+      return notification.description;
     }
     // Fallback: use description if available, otherwise construct a message
     if (notification.description) {

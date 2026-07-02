@@ -499,6 +499,14 @@ else:
         },
     }
 
+# In-process cache for lightweight read-mostly data (e.g. unread notification counts).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'acbc-default',
+    },
+}
+
 # REST Framework configuration
 # Default deny: views must explicitly use AllowAny for public endpoints (login, register, search, health).
 REST_FRAMEWORK = {

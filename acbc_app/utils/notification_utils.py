@@ -1875,8 +1875,19 @@ def notify_timeline_entry_suggestion_created(suggestion):
             if moderator.id == suggestion.suggested_by.id:
                 continue
 
+            existing_notifications = Notification.objects.filter(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirió una entrada en la línea de tiempo para',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id,
+            )
+            if existing_notifications.exists():
+                continue
+
             description = (
-                f'{suggestion.suggested_by.username} sugirio una entrada en la linea de tiempo '
+                f'{suggestion.suggested_by.username} sugirió una entrada en la línea de tiempo '
                 f'para el tema "{suggestion.topic.title}": {suggestion.title[:80]}'
             )
             if suggestion.message:
@@ -1886,7 +1897,7 @@ def notify_timeline_entry_suggestion_created(suggestion):
                 recipient=moderator,
                 actor_content_type=suggested_by_ct,
                 actor_object_id=suggestion.suggested_by.id,
-                verb='sugirio una entrada en la linea de tiempo para',
+                verb='sugirió una entrada en la línea de tiempo para',
                 target_content_type=topic_ct,
                 target_object_id=suggestion.topic.id,
                 description=description,
@@ -1914,15 +1925,26 @@ def notify_timeline_entry_suggestion_accepted(suggestion):
         reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
         topic_ct = ContentType.objects.get_for_model(suggestion.topic)
 
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='aceptó tu sugerencia de entrada en la línea de tiempo para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+        )
+        if existing_notifications.exists():
+            return
+
         create_notification(
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
-            verb='acepto tu sugerencia de entrada en la linea de tiempo para',
+            verb='aceptó tu sugerencia de entrada en la línea de tiempo para',
             target_content_type=topic_ct,
             target_object_id=suggestion.topic.id,
             description=(
-                f'{suggestion.reviewed_by.username} acepto tu sugerencia de entrada '
+                f'{suggestion.reviewed_by.username} aceptó tu sugerencia de entrada '
                 f'"{suggestion.title}" para el tema "{suggestion.topic.title}"'
             ),
         )
@@ -1943,8 +1965,19 @@ def notify_timeline_entry_suggestion_rejected(suggestion):
         reviewed_by_ct = ContentType.objects.get_for_model(suggestion.reviewed_by)
         topic_ct = ContentType.objects.get_for_model(suggestion.topic)
 
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazó tu sugerencia de entrada en la línea de tiempo para',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+        )
+        if existing_notifications.exists():
+            return
+
         description = (
-            f'{suggestion.reviewed_by.username} rechazo tu sugerencia de entrada '
+            f'{suggestion.reviewed_by.username} rechazó tu sugerencia de entrada '
             f'"{suggestion.title}" para el tema "{suggestion.topic.title}"'
         )
         if suggestion.rejection_reason:
@@ -1954,7 +1987,7 @@ def notify_timeline_entry_suggestion_rejected(suggestion):
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
-            verb='rechazo tu sugerencia de entrada en la linea de tiempo para',
+            verb='rechazó tu sugerencia de entrada en la línea de tiempo para',
             target_content_type=topic_ct,
             target_object_id=suggestion.topic.id,
             description=description,
@@ -1990,8 +2023,19 @@ def notify_timeline_entry_content_suggestion_created(suggestion):
             if moderator.id == suggestion.suggested_by.id:
                 continue
 
+            existing_notifications = Notification.objects.filter(
+                recipient=moderator,
+                actor_content_type=suggested_by_ct,
+                actor_object_id=suggestion.suggested_by.id,
+                verb='sugirió vincular contenido a una entrada de la línea de tiempo en',
+                target_content_type=topic_ct,
+                target_object_id=suggestion.topic.id,
+            )
+            if existing_notifications.exists():
+                continue
+
             description = (
-                f'{suggestion.suggested_by.username} sugirio vincular contenido a la entrada '
+                f'{suggestion.suggested_by.username} sugirió vincular contenido a la entrada '
                 f'"{suggestion.entry.title}" en "{suggestion.topic.title}": {content_title[:80]}'
             )
             if suggestion.message:
@@ -2001,7 +2045,7 @@ def notify_timeline_entry_content_suggestion_created(suggestion):
                 recipient=moderator,
                 actor_content_type=suggested_by_ct,
                 actor_object_id=suggestion.suggested_by.id,
-                verb='sugirio vincular contenido a una entrada de la linea de tiempo en',
+                verb='sugirió vincular contenido a una entrada de la línea de tiempo en',
                 target_content_type=topic_ct,
                 target_object_id=suggestion.topic.id,
                 description=description,
@@ -2030,15 +2074,26 @@ def notify_timeline_entry_content_suggestion_accepted(suggestion):
         topic_ct = ContentType.objects.get_for_model(suggestion.topic)
         content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
 
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='aceptó tu sugerencia de vincular contenido a una entrada en',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+        )
+        if existing_notifications.exists():
+            return
+
         create_notification(
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
-            verb='acepto tu sugerencia de vincular contenido a una entrada en',
+            verb='aceptó tu sugerencia de vincular contenido a una entrada en',
             target_content_type=topic_ct,
             target_object_id=suggestion.topic.id,
             description=(
-                f'{suggestion.reviewed_by.username} acepto vincular "{content_title}" '
+                f'{suggestion.reviewed_by.username} aceptó vincular "{content_title}" '
                 f'a la entrada "{suggestion.entry.title}" en "{suggestion.topic.title}"'
             ),
         )
@@ -2060,8 +2115,19 @@ def notify_timeline_entry_content_suggestion_rejected(suggestion):
         topic_ct = ContentType.objects.get_for_model(suggestion.topic)
         content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
 
+        existing_notifications = Notification.objects.filter(
+            recipient=suggestion.suggested_by,
+            actor_content_type=reviewed_by_ct,
+            actor_object_id=suggestion.reviewed_by.id,
+            verb='rechazó tu sugerencia de vincular contenido a una entrada en',
+            target_content_type=topic_ct,
+            target_object_id=suggestion.topic.id,
+        )
+        if existing_notifications.exists():
+            return
+
         description = (
-            f'{suggestion.reviewed_by.username} rechazo vincular "{content_title}" '
+            f'{suggestion.reviewed_by.username} rechazó vincular "{content_title}" '
             f'a la entrada "{suggestion.entry.title}" en "{suggestion.topic.title}"'
         )
         if suggestion.rejection_reason:
@@ -2071,7 +2137,7 @@ def notify_timeline_entry_content_suggestion_rejected(suggestion):
             recipient=suggestion.suggested_by,
             actor_content_type=reviewed_by_ct,
             actor_object_id=suggestion.reviewed_by.id,
-            verb='rechazo tu sugerencia de vincular contenido a una entrada en',
+            verb='rechazó tu sugerencia de vincular contenido a una entrada en',
             target_content_type=topic_ct,
             target_object_id=suggestion.topic.id,
             description=description,

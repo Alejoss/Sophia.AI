@@ -7,6 +7,38 @@ from content.utils import build_media_url
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile, Suggestion
 from notifications.models import Notification
 
+# Verbs that use the topic as notification target (title + navigation).
+TOPIC_TARGET_VERBS = (
+    'te invitó a moderar',
+    'aceptó tu invitación para moderar',
+    'rechazó tu invitación para moderar',
+    'te removió como moderador de',
+    'sugirió contenido para',
+    'aceptó tu sugerencia de contenido para',
+    'rechazó tu sugerencia de contenido para',
+    'sugirió una entrada en la línea de tiempo para',
+    'aceptó tu sugerencia de entrada en la línea de tiempo para',
+    'rechazó tu sugerencia de entrada en la línea de tiempo para',
+    'sugirió vincular contenido a una entrada de la línea de tiempo en',
+    'aceptó tu sugerencia de vincular contenido a una entrada en',
+    'rechazó tu sugerencia de vincular contenido a una entrada en',
+)
+
+TOPIC_MODERATION_VERBS = (
+    'sugirió contenido para',
+    'sugirió una entrada en la línea de tiempo para',
+    'sugirió vincular contenido a una entrada de la línea de tiempo en',
+)
+
+KNOWLEDGE_PATH_VERBS = (
+    'comentó en tu camino de conocimiento',
+    'completó tu camino de conocimiento',
+    'solicitó un certificado para tu camino de conocimiento',
+    'aprobó tu solicitud de certificado para',
+    'rechazó tu solicitud de certificado para',
+    'votó positivamente tu camino de conocimiento',
+)
+
 # Get logger for profiles serializers
 logger = logging.getLogger('academia_blockchain.profiles.serializers')
 
@@ -222,9 +254,14 @@ class NotificationSerializer(serializers.ModelSerializer):
                            'rechazó tu invitación para moderar', 'te removió como moderador de'] and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
             
-            # For content suggestions
-            if obj.verb in ['sugirió contenido para', 'aceptó tu sugerencia de contenido para', 
-                           'rechazó tu sugerencia de contenido para'] and obj.target:
+            # For content suggestions and timeline suggestions
+            if obj.verb in TOPIC_TARGET_VERBS and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
+            # For content comments (target is ContentProfile)
+            if obj.verb == 'comentó en tu contenido' and obj.target:
+                if hasattr(obj.target, 'display_title'):
+                    return obj.target.display_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
             # File suggestion for URL content (target is Content)
@@ -233,6 +270,16 @@ class NotificationSerializer(serializers.ModelSerializer):
                     return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
                 
+            # For knowledge path certificate and engagement actions
+            if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
+            # For content upvotes
+            if obj.verb == 'votó positivamente tu contenido' and obj.target:
+                if hasattr(obj.target, 'original_title'):
+                    return obj.target.original_title or None
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
             return None
         except Exception as e:
             logger.error("Error getting context title", extra={
@@ -244,66 +291,49 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_target_url(self, obj):
         try:
-            # For knowledge path comments
-            if obj.verb == 'comentó en tu camino de conocimiento' and obj.target:
+            if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
-            # For knowledge path completion
-            if obj.verb == 'completó tu camino de conocimiento' and obj.target:
-                return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
+
             # For comment replies
             if obj.verb == 'respondió a' and obj.action_object:
                 comment = obj.action_object
                 if comment and comment.content_object:
-                    if hasattr(comment.content_object, 'id'):
-                        return f'/knowledge_path/{comment.content_object.id}'
-            
-            # For content upvotes
+                    content_object = comment.content_object
+                    if hasattr(content_object, 'id'):
+                        if hasattr(content_object, 'display_title'):
+                            return f'/content/{content_object.id}/library'
+                        return f'/knowledge_path/{content_object.id}'
+
+            if obj.verb == 'comentó en tu contenido' and obj.target:
+                content_id = getattr(obj.target, 'content_id', None)
+                return f'/content/{content_id}/library' if content_id else None
+
             if obj.verb == 'votó positivamente tu contenido' and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
-            
-            # For knowledge path upvotes
-            if obj.verb == 'votó positivamente tu camino de conocimiento' and obj.target:
-                return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
+
             # For event registrations
-            if obj.verb == 'se registró en tu evento' and obj.target:
+            if obj.verb in ['se registró en tu evento', 'aceptó tu pago para', 'te envió un certificado para'] and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
-            # For payment accepted
-            if obj.verb == 'aceptó tu pago para' and obj.target:
-                return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
-            # For certificate sent
-            if obj.verb == 'te envió un certificado para' and obj.target:
-                return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
-            
+
             # For topic moderator invitations and related actions
-            # Link should go to the recipient's profile "Temas" section
-            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar', 
+            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar',
                            'rechazó tu invitación para moderar', 'te removió como moderador de']:
-                # Get the request from context to check if recipient is the current user
                 request = self.context.get('request')
                 recipient = obj.recipient
-                
+
                 if request and request.user.is_authenticated and request.user.id == recipient.id:
-                    # Current user is viewing their own notifications
                     return '/profiles/my_profile?section=topics'
-                else:
-                    # Link to recipient's profile topics section
-                    return f'/profiles/user_profile/{recipient.id}?section=topics' if recipient else None
-            
-            # For content suggestions
-            if obj.verb in ['sugirió contenido para', 'aceptó tu sugerencia de contenido para', 
-                           'rechazó tu sugerencia de contenido para'] and obj.target:
-                # Link to topic detail page or topic edit page for moderators
+                return f'/profiles/user_profile/{recipient.id}?section=topics' if recipient else None
+
+            if obj.verb in TOPIC_MODERATION_VERBS and obj.target:
+                return f'/content/topics/{obj.target.id}/edit?tab=suggestions' if hasattr(obj.target, 'id') else None
+
+            if obj.verb in TOPIC_TARGET_VERBS and obj.target:
                 return f'/content/topics/{obj.target.id}' if hasattr(obj.target, 'id') else None
 
-            # Pending file suggestions list lives on the library content view
             if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
-                
+
             return None
         except Exception as e:
             logger.error("Error getting target URL", extra={

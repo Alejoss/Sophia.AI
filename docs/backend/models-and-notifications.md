@@ -23,11 +23,13 @@ Consider adding indexes for:
 
 ## Notifications (django-notifications-hq, `notification_utils`)
 
+See **[notifications.md](notifications.md)** for the full API reference, verb catalog, and frontend integration.
+
+Summary:
+
 - **Deduplication**: Helpers check for existing notifications (same `recipient`, `actor`, `verb`, `action_object`, `target`) before creating. Reduces duplicates from repeated triggers.
-- **Cleanup**: Profiles views delete old read notifications (e.g. older than 30 days). Run periodically or on login to avoid unbounded growth.
-- **Volume**: High-traffic features (e.g. comments, votes, suggestions) can create many notifications. Monitor DB size and consider:
-  - Limiting notifications per user (e.g. cap unread, archive old).
-  - Batching or throttling creation in `notification_utils` for bursty events.
+- **Cleanup**: `GET /api/profiles/notifications/` deletes read notifications older than 30 days for the current user.
+- **Volume**: High-traffic features (e.g. comments, votes, suggestions) can create many notifications. Monitor DB size and consider limiting or throttling in `notification_utils` for bursty events.
 
 ## Fixtures and `load_fixtures`
 

@@ -41,6 +41,11 @@ from allauth.socialaccount.providers.google.provider import GoogleProvider
 from allauth.socialaccount.models import SocialApp, SocialToken
 from allauth.socialaccount.models import SocialAccount
 from notifications.models import Notification
+from utils.notification_cache import (
+    get_cached_unread_count,
+    invalidate_unread_count,
+    set_cached_unread_count,
+)
 from django.db import connection
 from django.db.models import Count
 
@@ -1142,6 +1147,8 @@ class UserNotificationsView(APIView):
         ).delete()[0]
         
         logger.debug(f"Cleaned up {deleted_count} old notifications for user {request.user.username}")
+        if deleted_count:
+            invalidate_unread_count(request.user.id)
         
         # Get notifications for the user
         notifications = Notification.objects.filter(recipient=request.user)
@@ -1205,6 +1212,7 @@ class UserNotificationsView(APIView):
                 logger.debug(f"Found notification: {notification.id} for user {request.user.username}")
                 
                 notification.mark_as_read()
+                invalidate_unread_count(request.user.id)
                 logger.debug(f"Successfully marked as read for user {request.user.username}")
                 
                 logger.info("=== End Marking Notification as Read ===")
@@ -1229,6 +1237,7 @@ class UserNotificationsView(APIView):
                 
                 # Mark all as read
                 unread_notifications.mark_all_as_read()
+                invalidate_unread_count(request.user.id)
                 logger.debug(f"Successfully marked {count} notifications as read for user {request.user.username}")
                 
                 logger.info("=== End Marking All Notifications as Read ===")
@@ -1244,52 +1253,6 @@ class UserNotificationsView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-    def delete(self, request, notification_id=None):
-        """
-        Delete a notification or clean up old notifications.
-        If notification_id is provided, delete that specific notification.
-        Otherwise, delete all read notifications older than 30 days.
-        """
-        logger.info(f"Deleting notifications for user {request.user.username}")
-        
-        if notification_id:
-            # Delete specific notification
-            try:
-                notification = Notification.objects.get(
-                    recipient=request.user,
-                    id=notification_id
-                )
-                notification.delete()
-                logger.debug(f"Deleted notification {notification_id} for user {request.user.username}")
-                return Response({'status': 'success'})
-            except Notification.DoesNotExist:
-                return Response(
-                    {'error': 'Notificación no encontrada'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            # Delete old read notifications
-            from django.utils import timezone
-            from datetime import timedelta
-            
-            # Delete notifications that are:
-            # 1. Read (unread=False)
-            # 2. Older than 30 days
-            # 3. Belong to the current user
-            cutoff_date = timezone.now() - timedelta(days=30)
-            deleted_count = Notification.objects.filter(
-                recipient=request.user,
-                unread=False,
-                timestamp__lt=cutoff_date
-            ).delete()[0]
-            
-            logger.debug(f"Deleted {deleted_count} old notifications for user {request.user.username}")
-            return Response({
-                'status': 'success',
-                'deleted_count': deleted_count
-            })
-
-
 class UnreadNotificationsCountView(APIView):
     """
     Lightweight endpoint that only returns the count of unread notifications.
@@ -1299,12 +1262,17 @@ class UnreadNotificationsCountView(APIView):
 
     def get(self, request):
         try:
-            # Simple count query - very lightweight
+            user_id = request.user.id
+            cached_count = get_cached_unread_count(user_id)
+            if cached_count is not None:
+                return Response({'unread_count': cached_count})
+
             unread_count = Notification.objects.filter(
-                recipient=request.user,
-                unread=True
+                recipient_id=user_id,
+                unread=True,
             ).count()
-            
+            set_cached_unread_count(user_id, unread_count)
+
             return Response({
                 'unread_count': unread_count
             })

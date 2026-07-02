@@ -35,7 +35,7 @@ The API uses JWT (JSON Web Tokens) for authentication. See [Authentication Guide
 - **[Messages](endpoints.md#messages)** - User messaging
 - **[Certificates](endpoints.md#certificates)** - Certificate management
 - **[Search](endpoints.md#search)** - Search functionality
-- **[Notifications](endpoints.md#notifications)** - Notifications
+- **[Notifications](endpoints.md#notifications)** - In-app notifications (`/api/profiles/notifications/`). See also [backend notifications](../backend/notifications.md).
 
 ## Request/Response Format
 

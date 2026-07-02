@@ -325,14 +325,26 @@ Full spec: [topic-timeline-entry-content-suggestions.md](../architecture/topic-t
 
 ## Notifications
 
+Custom in-app notification API under profiles. See [Notifications (backend)](../backend/notifications.md) for the verb catalog and policies.
+
 ### List Notifications
-- **GET** `/api/notifications/`
+- **GET** `/api/profiles/notifications/`
 - **Auth**: Required
-- **Query Params**: `unread_only`
-- **Response**: User's notifications
+- **Query Params**: `show_all` (`true` to include read; default is unread only)
+- **Response**: `{ "notifications": [...], "cleaned_up_count": N }`
+- **Note**: Automatically deletes read notifications older than 30 days for the current user.
+
+### Unread Count
+- **GET** `/api/profiles/notifications/unread-count/`
+- **Auth**: Required
+- **Response**: `{ "unread_count": N }`
 
 ### Mark as Read
-- **PATCH** `/api/notifications/{id}/read/`
+- **POST** `/api/profiles/notifications/{id}/mark-as-read/`
+- **Auth**: Required
+
+### Mark All as Read
+- **POST** `/api/profiles/notifications/mark-all-as-read/`
 - **Auth**: Required
 
 ## Interactive Documentation

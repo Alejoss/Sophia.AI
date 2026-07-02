@@ -24,8 +24,6 @@ urlpatterns = [
     path('notifications/', views.UserNotificationsView.as_view(), name='notifications'),
     path('notifications/unread-count/', views.UnreadNotificationsCountView.as_view(), name='notifications_unread_count'),
     path('notifications/<int:notification_id>/mark-as-read/', views.UserNotificationsView.as_view(), name='mark_notification_read'),
-    path('notifications/<int:notification_id>/delete/', views.UserNotificationsView.as_view(), name='delete_notification'),
-    path('notifications/cleanup/', views.UserNotificationsView.as_view(), name='cleanup_notifications'),
     path('notifications/mark-all-as-read/', views.UserNotificationsView.as_view(), name='mark_all_notifications_read'),
     
     # Cryptocurrency endpoints

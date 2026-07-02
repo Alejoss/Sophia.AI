@@ -77,7 +77,7 @@ graph TB
 - `bookmarks` - Bookmarking
 - `user_messages` - Messaging system
 - `search` - Search functionality
-- `notifications` - Notification system
+- `notifications` - Notification storage (django-notifications-hq; API exposed via `profiles`)
 
 ### 3. Data Layer
 

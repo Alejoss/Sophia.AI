@@ -184,32 +184,6 @@ const markNotificationAsRead = async (notificationId) => {
   }
 };
 
-const deleteNotification = async (notificationId) => {
-
-  try {
-
-    const response = await axiosInstance.delete(`/profiles/notifications/${notificationId}/delete/`);
-
-    return response.data;
-  } catch (error) {
-    console.error('Error in deleteNotification:', error);
-    throw error;
-  }
-};
-
-const cleanupNotifications = async () => {
-
-  try {
-
-    const response = await axiosInstance.delete('/profiles/notifications/cleanup/');
-
-    return response.data;
-  } catch (error) {
-    console.error('Error in cleanupNotifications:', error);
-    throw error;
-  }
-};
-
 const markAllNotificationsAsRead = async () => {
 
   try {
@@ -321,8 +295,6 @@ export {
   getUnreadNotificationsCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  deleteNotification,
-  cleanupNotifications,
   getCryptocurrencies,
   getUserAcceptedCryptos,
   addAcceptedCrypto,
