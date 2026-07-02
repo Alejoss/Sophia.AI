@@ -214,13 +214,21 @@ const Profile = () => {
     const badgesUserId = isOwnProfile ? null : (profileId || profile?.user?.id);
     const { badges: userBadges, loading: badgesLoading, error: badgesError } = useBadges(badgesUserId);
 
+    const updateProfileSectionUrl = (newSection, { tab = null } = {}) => {
+        const searchParams = new URLSearchParams(location.search);
+        searchParams.set('section', newSection);
+        if (tab) {
+            searchParams.set('tab', tab);
+        } else if (newSection !== 'certificates') {
+            searchParams.delete('tab');
+        }
+        navigate({ pathname: location.pathname, search: searchParams.toString() });
+    };
+
     // Function to handle section changes from external navigation (like header menu)
     const handleExternalSectionChange = (newSection) => {
         setActiveSection(newSection);
-        // Update URL without reloading
-        const url = new URL(window.location);
-        url.searchParams.set('section', newSection);
-        window.history.pushState({}, '', url);
+        updateProfileSectionUrl(newSection);
     };
 
     // Expose the function globally for header navigation
@@ -384,6 +392,9 @@ const Profile = () => {
 
     const handleSectionChange = (event, newSection) => {
         setActiveSection(newSection);
+        if (isOwnProfile) {
+            updateProfileSectionUrl(newSection);
+        }
     };
 
     const handleSuggestionClick = () => {

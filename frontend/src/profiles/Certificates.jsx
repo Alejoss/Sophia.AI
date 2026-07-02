@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import certificatesApi from "../api/certificatesApi";
 import { AuthContext } from "../context/AuthContext";
 import {
@@ -36,6 +36,16 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
   const [approveNote, setApproveNote] = useState("");
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const tabParam = new URLSearchParams(location.search).get('tab');
+    if (tabParam === 'requests' && isOwnProfile) {
+      setActiveTab('requests');
+    } else if (tabParam === 'certificates') {
+      setActiveTab('certificates');
+    }
+  }, [location.search, isOwnProfile]);
 
   useEffect(() => {
     if (activeTab === "certificates") {
@@ -205,6 +215,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+    if (isOwnProfile) {
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.set('section', 'certificates');
+      searchParams.set('tab', newValue);
+      navigate({ pathname: location.pathname, search: searchParams.toString() });
+    }
   };
 
   return (
