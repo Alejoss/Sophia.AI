@@ -250,9 +250,9 @@ class AsciiSafeStorageTests(TestCase):
     def test_to_ascii_safe_strips_accents(self):
         self.assertEqual(to_ascii_safe('Filosofía Cypherpunk'), 'Filosofia Cypherpunk')
 
-    def test_to_ascii_safe_json_escapes_unicode(self):
+    def test_to_ascii_safe_json_strips_unicode(self):
         payload = {'order_description': 'Registro: Filosofía'}
         safe = to_ascii_safe_json(payload)
+        self.assertEqual(safe['order_description'], 'Registro: Filosofia')
         raw = json.dumps(safe, ensure_ascii=True)
         self.assertNotIn('í', raw)
-        self.assertIn('\\u00ed', raw)
