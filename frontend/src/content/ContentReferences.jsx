@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box, Typography, List, ListItem, ListItemText, Avatar } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/dateUtils';
+import UserAvatar from '../components/UserAvatar';
 
 const ContentReferences = ({ references }) => {
     const navigate = useNavigate();
@@ -116,18 +117,12 @@ const ContentReferences = ({ references }) => {
                                     }
                                 }}
                             >
-                                <Avatar 
-                                    src={pub.profile_picture || '/default-avatar.png'} 
-                                    alt={pub.username}
-                                    sx={{ 
-                                        width: 40, 
-                                        height: 40, 
-                                        mr: 2,
-                                        bgcolor: 'grey.300'
-                                    }}
-                                >
-                                    {pub.username.charAt(0).toUpperCase()}
-                                </Avatar>
+                                <UserAvatar
+                                    src={pub.profile_picture}
+                                    username={pub.username}
+                                    size={40}
+                                    sx={{ mr: 2 }}
+                                />
                                 <ListItemText 
                                     primary={`Publicación por ${pub.username}`}
                                     secondary={formatDate(pub.published_at)}
