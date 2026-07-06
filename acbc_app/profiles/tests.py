@@ -1000,6 +1000,10 @@ class NotificationTests(APITestCase):
         self.assertIn('testuser solicitó un certificado para tu camino de conocimiento', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
+        self.assertEqual(
+            notification['target_url'],
+            '/profiles/my_profile?section=certificates&tab=requests'
+        )
 
     def test_certificate_approval_notification(self):
         """Test notification when a teacher approves a certificate request"""
@@ -1048,6 +1052,10 @@ class NotificationTests(APITestCase):
         self.assertIn('testuser aprobó tu solicitud de certificado para', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
+        self.assertEqual(
+            notification['target_url'],
+            '/profiles/my_profile?section=certificates'
+        )
 
     def test_certificate_rejection_notification(self):
         """Test notification when a teacher rejects a certificate request"""
@@ -1096,6 +1104,10 @@ class NotificationTests(APITestCase):
         self.assertIn('testuser rechazó tu solicitud de certificado para', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
+        self.assertEqual(
+            notification['target_url'],
+            '/profiles/my_profile?section=certificates'
+        )
 
     def test_certificate_request_notification_spam_protection(self):
         """Test that multiple certificate requests within 1 hour don't create duplicate notifications"""

@@ -453,7 +453,7 @@ const TopicDetail = () => {
     const isCreator = isAuthenticated && creatorId != null && userId != null && String(creatorId) === String(userId);
     const canEditTimeline = isCreator || isModerator;
     const canSuggestTimeline = isAuthenticated && !canEditTimeline;
-    const showTimelineTab = canEditTimeline || timelineEntryCount > 0 || canSuggestTimeline;
+    const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
 
     useEffect(() => {
         const tab = searchParams.get('tab');
