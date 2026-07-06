@@ -173,9 +173,11 @@ class NewsletterSubscriptionApiView(APIView):
         if not form.is_valid():
             return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        source = (request.data.get("source") or "frontend_subscribe").strip()[:100]
+
         subscription, created = NewsletterSubscription.objects.get_or_create(
             email=email,
-            defaults={"source": "frontend_subscribe"},
+            defaults={"source": source},
         )
 
         if created:

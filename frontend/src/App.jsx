@@ -11,6 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Home from './generalComponents/Home.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
+import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
 import Profile from './profiles/Profile.jsx';
@@ -140,6 +141,7 @@ const AppContent = () => {
               element={isTelegramInAppBrowser() ? <TelegramNotSupportedMessage /> : <Home />}
             />
             <Route path="unirme" element={<NewsletterSubscribe />} />
+            <Route path="club-de-lectura" element={<ClubDeLectura />} />
             <Route path="profiles">
               <Route path="login" element={
                 <GoogleOAuthInitializer>

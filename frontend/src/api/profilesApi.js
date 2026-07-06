@@ -268,10 +268,11 @@ const changePassword = async (oldPassword, newPassword, confirmPassword) => {
   }
 };
 
-const submitNewsletterSubscription = async (email) => {
+const submitNewsletterSubscription = async (email, source = 'frontend_subscribe') => {
   try {
     const response = await axiosInstance.post('/profiles/newsletter/subscribe/', {
-      email
+      email,
+      source,
     });
     return response.data;
   } catch (error) {
