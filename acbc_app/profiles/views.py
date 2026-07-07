@@ -101,6 +101,42 @@ class NewsletterSubscriptionForm(forms.Form):
     )
 
 
+NEWSLETTER_SOURCE_LABELS = {
+    'club_de_lectura': 'Club de Lectura',
+    'frontend_subscribe': 'Página /unirme',
+    'subscribe_page': 'Página de suscripción',
+}
+
+
+def _notify_admins_newsletter_subscription(email: str, source: str = '') -> None:
+    """Notify administrators about a new newsletter subscription."""
+    source_label = NEWSLETTER_SOURCE_LABELS.get(source) or (source or 'No especificada')
+    subject = 'Nueva suscripción a la newsletter'
+    html_message = (
+        '<p>Hay una nueva suscripción a la newsletter.</p>'
+        f'<p><strong>Email:</strong> {email}</p>'
+        f'<p><strong>Origen:</strong> {source_label}</p>'
+    )
+    text_message = (
+        'Hay una nueva suscripción a la newsletter.\n'
+        f'Email: {email}\n'
+        f'Origen: {source_label}'
+    )
+    try:
+        EmailService.send_to_admins(
+            subject=subject,
+            html_message=html_message,
+            text_message=text_message,
+            tags=['newsletter', 'subscription'],
+        )
+    except EmailServiceError as e:
+        logger.error(
+            'Error sending newsletter subscription notification email: %s',
+            str(e),
+            exc_info=True,
+        )
+
+
 @require_http_methods(["GET", "POST"])
 def newsletter_subscribe(request):
     """
@@ -118,29 +154,7 @@ def newsletter_subscribe(request):
             )
 
             if created:
-                try:
-                    subject = "Nueva suscripción a la newsletter"
-                    html_message = (
-                        "<p>Hay una nueva suscripción a la newsletter.</p>"
-                        f"<p><strong>Email:</strong> {email}</p>"
-                    )
-                    text_message = (
-                        "Hay una nueva suscripción a la newsletter.\n"
-                        f"Email: {email}"
-                    )
-                    EmailService.send_email(
-                        receiver_email="alejandro@academiablockchain.com",
-                        subject=subject,
-                        html_message=html_message,
-                        text_message=text_message,
-                        tags=["newsletter", "subscription"],
-                    )
-                except EmailServiceError as e:
-                    logger.error(
-                        "Error sending newsletter subscription notification email: %s",
-                        str(e),
-                        exc_info=True,
-                    )
+                _notify_admins_newsletter_subscription(email, source='subscribe_page')
 
             return render(
                 request,
@@ -181,29 +195,7 @@ class NewsletterSubscriptionApiView(APIView):
         )
 
         if created:
-            try:
-                subject = "Nueva suscripción a la newsletter"
-                html_message = (
-                    "<p>Hay una nueva suscripción a la newsletter.</p>"
-                    f"<p><strong>Email:</strong> {email}</p>"
-                )
-                text_message = (
-                    "Hay una nueva suscripción a la newsletter.\n"
-                    f"Email: {email}"
-                )
-                EmailService.send_email(
-                    receiver_email="alejandro@academiablockchain.com",
-                    subject=subject,
-                    html_message=html_message,
-                    text_message=text_message,
-                    tags=["newsletter", "subscription"],
-                )
-            except EmailServiceError as e:
-                logger.error(
-                    "Error sending newsletter subscription notification email (API): %s",
-                    str(e),
-                    exc_info=True,
-                )
+            _notify_admins_newsletter_subscription(email, source=source)
 
         return Response(
             {

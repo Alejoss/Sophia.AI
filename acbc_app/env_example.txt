@@ -119,8 +119,9 @@ EMAIL_FROM=academiablockchain@no-reply.com
 EMAIL_FROM_NAME=Academia Blockchain
 
 # Admin Email
-# Where to send suggestion/feedback notifications (or use staff users' emails)
-ADMIN_EMAIL=
+# Where to send admin notifications (newsletter signups, suggestions, etc.)
+# Staff users' emails are also included automatically
+ADMIN_EMAIL=alejandro@academiablockchain.com
 
 # Email Timeout (seconds)
 # Default: 10

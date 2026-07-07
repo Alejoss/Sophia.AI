@@ -1786,3 +1786,54 @@ class EmailServiceTests(TestCase):
         self.assertEqual(len(results['failed']), 0)
         # Should have called send_email for each admin
         self.assertEqual(mock_send_email.call_count, len(EmailService.get_admin_emails()))
+
+
+class NewsletterSubscriptionApiTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse('profiles:newsletter_subscribe_api')
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_newsletter_subscription_notifies_admins(self, mock_send_to_admins):
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+
+        response = self.client.post(
+            self.url,
+            {'email': 'nuevo@example.com', 'source': 'club_de_lectura'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['created'])
+        mock_send_to_admins.assert_called_once()
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertIn('nuevo@example.com', call_kwargs['html_message'])
+        self.assertIn('Club de Lectura', call_kwargs['html_message'])
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_newsletter_subscription_duplicate_does_not_notify(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscription
+        NewsletterSubscription.objects.create(email='existente@example.com', source='club_de_lectura')
+
+        response = self.client.post(
+            self.url,
+            {'email': 'existente@example.com', 'source': 'club_de_lectura'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data['created'])
+        mock_send_to_admins.assert_not_called()
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_newsletter_subscription_email_failure_does_not_fail_request(self, mock_send_to_admins):
+        mock_send_to_admins.side_effect = EmailServiceError('Email service unavailable')
+
+        response = self.client.post(
+            self.url,
+            {'email': 'otro@example.com'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['created'])
