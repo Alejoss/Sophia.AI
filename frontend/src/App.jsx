@@ -135,13 +135,13 @@ const AppContent = () => {
           <NotificationsProvider>
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
+          <Route path="club-de-lectura" element={<ClubDeLectura />} />
           <Route element={<MainLayout />}>
             <Route
               path="/"
               element={isTelegramInAppBrowser() ? <TelegramNotSupportedMessage /> : <Home />}
             />
             <Route path="unirme" element={<NewsletterSubscribe />} />
-            <Route path="club-de-lectura" element={<ClubDeLectura />} />
             <Route path="profiles">
               <Route path="login" element={
                 <GoogleOAuthInitializer>

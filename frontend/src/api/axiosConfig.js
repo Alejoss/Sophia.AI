@@ -97,6 +97,14 @@ axiosInstance.interceptors.response.use(
       originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
       return axiosInstance(originalRequest);
     } catch (refreshError) {
+      try {
+        await axiosInstance.post('/profiles/logout/');
+      } catch {
+        // ignore
+      }
+      localStorage.removeItem('access_token');
+      delete axiosInstance.defaults.headers.common['Authorization'];
+
       // If refresh fails, don't automatically clear auth state or redirect
       // This prevents hard page refresh that breaks React Router state
       // AuthContext clears local session on this event. Navigation is left to callers —

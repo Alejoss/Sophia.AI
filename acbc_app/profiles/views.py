@@ -97,6 +97,10 @@ class NewsletterSubscriptionForm(forms.Form):
     email = forms.EmailField(
         label="Email",
         max_length=254,
+        error_messages={
+            'required': 'El email es obligatorio.',
+            'invalid': 'Introduce un email válido.',
+        },
         widget=forms.EmailInput(attrs={"placeholder": "tu@email"})
     )
 
@@ -185,7 +189,14 @@ class NewsletterSubscriptionApiView(APIView):
 
         form = NewsletterSubscriptionForm({"email": email})
         if not form.is_valid():
-            return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+            email_errors = form.errors.get('email')
+            detail = email_errors[0] if email_errors else 'Email no válido.'
+            logger.warning(
+                'Newsletter subscription rejected for %r: %s',
+                email,
+                detail,
+            )
+            return Response({'detail': detail, 'email': form.errors.get('email', [])}, status=status.HTTP_400_BAD_REQUEST)
 
         source = (request.data.get("source") or "frontend_subscribe").strip()[:100]
 
@@ -815,19 +826,23 @@ class RefreshTokenView(APIView):
             
             if not refresh_token:
                 logger.warning(f"No refresh token found in cookies for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-                return Response(
+                response = Response(
                     {'error': 'No se encontró token de actualización'},
                     status=status.HTTP_403_FORBIDDEN
                 )
+                clear_refresh_token_cookie(response)
+                return response
             refresh = RefreshToken(refresh_token)
             user_id = refresh.get('user_id')
             user = User.objects.filter(id=user_id, is_active=True).first()
             if user is None:
                 logger.warning("Refresh token references an invalid or inactive user")
-                return Response(
+                response = Response(
                     {'error': 'Token de actualización inválido'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+                clear_refresh_token_cookie(response)
+                return response
 
             access_token = str(refresh.access_token)
             response = Response({
@@ -848,10 +863,12 @@ class RefreshTokenView(APIView):
                 "Token refresh failed with token error (expected)",
                 extra={'detail': str(e)},
             )
-            return Response(
+            response = Response(
                 {'error': 'Token de actualización inválido'},
                 status=status.HTTP_403_FORBIDDEN
             )
+            clear_refresh_token_cookie(response)
+            return response
         except Exception as e:
             logger.warning(
                 f"Token refresh failed for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {str(e)}",

@@ -1837,3 +1837,14 @@ class NewsletterSubscriptionApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data['created'])
+
+    def test_newsletter_subscription_invalid_email_returns_detail(self):
+        response = self.client.post(
+            self.url,
+            {'email': 'no-es-un-email'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+        self.assertIn('email', response.data['detail'].lower())

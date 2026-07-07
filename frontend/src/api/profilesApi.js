@@ -2,6 +2,16 @@
 import axiosInstance from './axiosConfig.js';
 import Cookies from "js-cookie";
 
+const clearStaleSession = async () => {
+  localStorage.removeItem('access_token');
+  delete axiosInstance.defaults.headers.common['Authorization'];
+  try {
+    await axiosInstance.post('/profiles/logout/');
+  } catch {
+    // Best-effort: clears httpOnly refresh cookie when the server accepts logout.
+  }
+};
+
 const checkAuth = async () => {
   try {
     // Get the stored token
@@ -19,14 +29,19 @@ const checkAuth = async () => {
       }
       // Access token missing/expired but HTTP-only refresh cookie still present: mint a new access token.
       if (response.data.reason === 'refresh_token_present_requires_refresh') {
-        const refreshResponse = await axiosInstance.post('/profiles/refresh_token/');
-        const { access_token } = refreshResponse.data;
-        if (access_token) {
-          localStorage.setItem('access_token', access_token);
-          axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        try {
+          const refreshResponse = await axiosInstance.post('/profiles/refresh_token/');
+          const { access_token } = refreshResponse.data;
+          if (access_token) {
+            localStorage.setItem('access_token', access_token);
+            axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+          }
+          const retry = await axiosInstance.get('/profiles/check_auth/');
+          return retry.status === 200 && retry.data.is_authenticated === true;
+        } catch {
+          await clearStaleSession();
+          return false;
         }
-        const retry = await axiosInstance.get('/profiles/check_auth/');
-        return retry.status === 200 && retry.data.is_authenticated === true;
       }
       return false;
     }
