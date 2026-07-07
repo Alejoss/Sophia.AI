@@ -50,7 +50,7 @@ const ClubDeLectura = () => {
       <Box
         component="img"
         src="/images/club-de-lectura.png"
-        alt="Club de Lectura — Historia y filosofía cypherpunk. Cohorte 001: El secuestro de Bitcoin de Roger Ver y Steve Patterson."
+        alt="Club de Lectura — Seminario Cypherpunk. El secuestro de Bitcoin de Roger Ver y Steve Patterson."
         sx={{
           width: '100%',
           maxWidth: 1200,
