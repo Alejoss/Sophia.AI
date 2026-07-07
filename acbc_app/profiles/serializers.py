@@ -291,6 +291,21 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_target_url(self, obj):
         try:
+            # Certificate request notifications link to the certificates section
+            if obj.verb == 'solicitó un certificado para tu camino de conocimiento':
+                request = self.context.get('request')
+                recipient = obj.recipient
+                if request and request.user.is_authenticated and request.user.id == recipient.id:
+                    return '/profiles/my_profile?section=certificates&tab=requests'
+                return f'/profiles/user_profile/{recipient.id}?section=certificates&tab=requests' if recipient else None
+
+            if obj.verb in ['aprobó tu solicitud de certificado para', 'rechazó tu solicitud de certificado para']:
+                request = self.context.get('request')
+                recipient = obj.recipient
+                if request and request.user.is_authenticated and request.user.id == recipient.id:
+                    return '/profiles/my_profile?section=certificates'
+                return f'/profiles/user_profile/{recipient.id}?section=certificates' if recipient else None
+
             if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
 
@@ -333,21 +348,6 @@ class NotificationSerializer(serializers.ModelSerializer):
 
             if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
-
-            # Certificate request notifications link to the certificates section
-            if obj.verb == 'solicitó un certificado para tu camino de conocimiento':
-                request = self.context.get('request')
-                recipient = obj.recipient
-                if request and request.user.is_authenticated and request.user.id == recipient.id:
-                    return '/profiles/my_profile?section=certificates&tab=requests'
-                return f'/profiles/user_profile/{recipient.id}?section=certificates&tab=requests' if recipient else None
-
-            if obj.verb in ['aprobó tu solicitud de certificado para', 'rechazó tu solicitud de certificado para']:
-                request = self.context.get('request')
-                recipient = obj.recipient
-                if request and request.user.is_authenticated and request.user.id == recipient.id:
-                    return '/profiles/my_profile?section=certificates'
-                return f'/profiles/user_profile/{recipient.id}?section=certificates' if recipient else None
 
             return None
         except Exception as e:
