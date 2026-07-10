@@ -367,6 +367,10 @@ class Topic(models.Model):
     )
     topic_image_focal_x = models.FloatField(default=0.5, blank=True)
     topic_image_focal_y = models.FloatField(default=0.5, blank=True)
+    is_public = models.BooleanField(
+        default=True,
+        help_text='When false, the topic is hidden from public listings and search.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     moderators = models.ManyToManyField(User, related_name='moderated_topics')
@@ -377,6 +381,14 @@ class Topic(models.Model):
 
     def is_moderator_or_creator(self, user):
         return user == self.creator or user in self.moderators.all()
+
+    def can_be_viewed_by(self, user):
+        if self.is_public:
+            return True
+        if user and user.is_authenticated:
+            if user.is_staff or self.is_moderator_or_creator(user):
+                return True
+        return False
 
 
 class TopicTimeline(models.Model):

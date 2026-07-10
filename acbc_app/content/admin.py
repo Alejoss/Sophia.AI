@@ -59,9 +59,32 @@ class ContentTranscriptAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'creator']
-    list_filter = ['creator']
-    search_fields = ['title']
+    list_display = ['id', 'title', 'creator', 'is_public', 'created_at', 'updated_at']
+    list_filter = ['is_public', 'creator', 'created_at']
+    search_fields = ['title', 'description', 'creator__username']
+    filter_horizontal = ['moderators', 'related_topics']
+    raw_id_fields = ['creator']
+    readonly_fields = ['topic_image_thumbnail', 'created_at', 'updated_at']
+    fieldsets = (
+        ('Información básica', {
+            'fields': ('title', 'description', 'creator', 'is_public'),
+        }),
+        ('Imagen de portada', {
+            'fields': (
+                'topic_image',
+                'topic_image_thumbnail',
+                'topic_image_focal_x',
+                'topic_image_focal_y',
+            ),
+        }),
+        ('Moderación y relaciones', {
+            'fields': ('moderators', 'related_topics'),
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 @admin.register(Publication)

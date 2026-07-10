@@ -100,7 +100,7 @@ def search_topics(query):
     
     try:
         topic_query = Q(title__icontains=query) | Q(description__icontains=query)
-        topics = Topic.objects.filter(topic_query).only(
+        topics = Topic.objects.filter(topic_query, is_public=True).only(
             'id', 'title', 'description', 'created_at'
         ).order_by('-created_at')
         

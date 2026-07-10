@@ -1093,6 +1093,49 @@ class TopicAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Test Topic')
 
+    def test_hidden_topic_excluded_from_public_list(self):
+        hidden_topic = Topic.objects.create(
+            title='Hidden Topic',
+            description='Hidden',
+            creator=self.user,
+            is_public=False,
+        )
+        url = reverse('content:topics')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        topic_ids = {item['id'] for item in response.data}
+        self.assertIn(self.topic.id, topic_ids)
+        self.assertNotIn(hidden_topic.id, topic_ids)
+
+    def test_hidden_topic_detail_visible_to_creator(self):
+        self.topic.is_public = False
+        self.topic.save(update_fields=['is_public'])
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_public'])
+
+    def test_hidden_topic_detail_hidden_from_other_users(self):
+        self.topic.is_public = False
+        self.topic.save(update_fields=['is_public'])
+        outsider = User.objects.create_user(
+            username='outsider',
+            email='out@example.com',
+            password='pass12345',
+        )
+        self.client.force_authenticate(user=outsider)
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_creator_can_hide_topic_via_patch(self):
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.patch(url, {'is_public': False}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_public'])
+        self.topic.refresh_from_db()
+        self.assertFalse(self.topic.is_public)
+
     def test_get_topic_basic(self):
         """Test retrieving topic basic info."""
         url = reverse('content:topic-basic', args=[self.topic.id])

@@ -353,7 +353,10 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Topic
-        fields = ['id', 'title', 'description', 'creator', 'creator_username', 'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y']
+        fields = [
+            'id', 'title', 'description', 'creator', 'creator_username', 'is_public',
+            'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y',
+        ]
         read_only_fields = ['creator']
 
     def to_representation(self, instance):

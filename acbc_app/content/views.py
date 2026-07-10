@@ -1571,6 +1571,17 @@ class NodeDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def get_topic_or_not_found_response(request, pk, queryset=None):
+    base_qs = queryset if queryset is not None else Topic.objects.all()
+    topic = get_object_or_404(base_qs, pk=pk)
+    if not topic.can_be_viewed_by(request.user):
+        return None, Response(
+            {'error': 'Tema no encontrado.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return topic, None
+
+
 def get_topic_content_profile_for_display(
     content, request, topic, prefetched_profiles=None
 ):
@@ -1621,7 +1632,7 @@ class TopicView(APIView):
         return [permission() for permission in self.permission_classes]
 
     def get(self, request):
-        topics = Topic.objects.all()
+        topics = Topic.objects.filter(is_public=True).order_by('-created_at')
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -1652,14 +1663,17 @@ class TopicDetailView(APIView):
         )
 
     def get(self, request, pk):
-        topic = get_object_or_404(
+        topic, error_response = get_topic_or_not_found_response(
+            request,
+            pk,
             Topic.objects.prefetch_related(
                 'contents',
                 'contents__file_details',
-                'contents__profiles'
+                'contents__profiles',
             ),
-            pk=pk
         )
+        if error_response is not None:
+            return error_response
 
         include_contents = request.query_params.get('include_contents', 'true').lower() not in (
             '0', 'false', 'no'
@@ -1899,7 +1913,9 @@ class TopicTimelineView(APIView):
         ).data
 
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic, error_response = get_topic_or_not_found_response(request, pk)
+        if error_response is not None:
+            return error_response
         timeline = self.get_timeline_queryset().filter(topic=topic).first()
         if timeline is None:
             return Response(
@@ -2096,7 +2112,9 @@ class TopicBasicView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic, error_response = get_topic_or_not_found_response(request, pk)
+        if error_response is not None:
+            return error_response
         serializer = TopicBasicSerializer(topic)
         return Response(serializer.data)
 
@@ -2678,7 +2696,9 @@ class TopicContentMediaTypeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk, media_type):
-        topic = get_object_or_404(Topic, pk=pk)
+        topic, error_response = get_topic_or_not_found_response(request, pk)
+        if error_response is not None:
+            return error_response
         media_type = media_type.upper()
         content_type = ContentType.objects.get_for_model(Content)
         vote_count_subquery = Subquery(
