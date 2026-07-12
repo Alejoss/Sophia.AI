@@ -20,6 +20,7 @@ from content.models import (
     ContentSuggestion,
     FileSuggestion,
     ContentTranscript,
+    TopicCreationRequest,
 )
 from content.utils import build_media_url
 from content.image_utils import (
@@ -1387,3 +1388,55 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
         if not file_details or not file_details.file:
             return None
         return file_details.file.name
+
+
+class TopicCreationRequestSerializer(serializers.ModelSerializer):
+    requested_by = UserSerializer(read_only=True)
+    reviewed_by = UserSerializer(read_only=True)
+    topic_id = serializers.IntegerField(source='topic.id', read_only=True, allow_null=True)
+
+    class Meta:
+        model = TopicCreationRequest
+        fields = [
+            'id',
+            'requested_by',
+            'proposed_title',
+            'proposed_description',
+            'approved_title',
+            'approved_description',
+            'status',
+            'rejection_reason',
+            'reviewed_by',
+            'topic_id',
+            'created_at',
+            'updated_at',
+            'reviewed_at',
+        ]
+        read_only_fields = fields
+
+
+class TopicCreationRequestCreateSerializer(serializers.ModelSerializer):
+    proposed_title = serializers.CharField(max_length=200, required=True)
+
+    class Meta:
+        model = TopicCreationRequest
+        fields = ['proposed_title', 'proposed_description']
+
+    def validate_proposed_title(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('El título no puede estar vacío.')
+        return value.strip()
+
+
+class TopicCreationRequestApproveSerializer(serializers.Serializer):
+    approved_title = serializers.CharField(max_length=200)
+    approved_description = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_approved_title(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('El título aprobado no puede estar vacío.')
+        return value.strip()
+
+
+class TopicCreationRequestRejectSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(required=False, allow_blank=True, default='')

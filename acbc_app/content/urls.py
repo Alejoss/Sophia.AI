@@ -72,7 +72,13 @@ from .views import (
     FileSuggestionConfirmView,
     FileSuggestionListView,
     FileSuggestionAcceptView,
-    FileSuggestionRejectView
+    FileSuggestionRejectView,
+    TopicCreationRequestListCreateView,
+    TopicCreationRequestCancelView,
+    AdminTopicCreationRequestsView,
+    AdminTopicCreationRequestApproveView,
+    AdminTopicCreationRequestFinalizeView,
+    AdminTopicCreationRequestRejectView,
 )
 from .views_youtube_migration import YouTubeMigrationManifestView
 from .views_transcript_ingest import (
@@ -104,6 +110,12 @@ urlpatterns = [
     path('knowledge-paths/<int:pk>/nodes/', KnowledgePathNodesView.as_view(), name='knowledge_path_nodes'),
     path('nodes/<int:pk>/', NodeDetailView.as_view(), name='node_detail'),
     path('topics/', TopicView.as_view(), name='topics'),
+    path('topic-creation-requests/', TopicCreationRequestListCreateView.as_view(), name='topic-creation-requests'),
+    path('topic-creation-requests/<int:request_id>/cancel/', TopicCreationRequestCancelView.as_view(), name='topic-creation-request-cancel'),
+    path('admin/topic-creation-requests/', AdminTopicCreationRequestsView.as_view(), name='admin-topic-creation-requests'),
+    path('admin/topic-creation-requests/<int:request_id>/approve/', AdminTopicCreationRequestApproveView.as_view(), name='admin-topic-creation-request-approve'),
+    path('admin/topic-creation-requests/<int:request_id>/finalize/', AdminTopicCreationRequestFinalizeView.as_view(), name='admin-topic-creation-request-finalize'),
+    path('admin/topic-creation-requests/<int:request_id>/reject/', AdminTopicCreationRequestRejectView.as_view(), name='admin-topic-creation-request-reject'),
     path('topics/<int:pk>/', TopicDetailView.as_view(), name='topic-detail'),
     path('topics/<int:pk>/content-simple/', TopicContentSimpleView.as_view(), name='topic-content-simple'),
     path('topics/<int:pk>/basic/', TopicBasicView.as_view(), name='topic-basic'),

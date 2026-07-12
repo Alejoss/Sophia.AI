@@ -391,6 +391,81 @@ class Topic(models.Model):
         return False
 
 
+class TopicCreationRequest(models.Model):
+    """User request to create a new topic; admin must approve title and description first."""
+    MAX_PENDING_REQUESTS_PER_USER = 3
+
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+
+    requested_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='topic_creation_requests'
+    )
+    proposed_title = models.CharField(max_length=200)
+    proposed_description = models.TextField(blank=True)
+    approved_title = models.CharField(max_length=200, blank=True)
+    approved_description = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_topic_creation_requests',
+    )
+    rejection_reason = models.TextField(blank=True)
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='creation_request',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status'], name='content_tcr_status_idx'),
+            models.Index(fields=['requested_by', 'status'], name='content_tcr_user_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.requested_by.username}: {self.proposed_title} ({self.status})"
+
+    def cancel(self):
+        if self.status != 'PENDING':
+            raise ValueError('Solo se pueden cancelar solicitudes pendientes.')
+        self.status = 'CANCELLED'
+        self.save(update_fields=['status', 'updated_at'])
+
+    def finalize_as_topic(self):
+        """Create the Topic for the requester and mark this request COMPLETED."""
+        if not self.approved_title:
+            raise ValueError('La solicitud no tiene título aprobado.')
+        if self.status not in ('APPROVED', 'PENDING'):
+            raise ValueError('Solo se puede crear el tema desde una solicitud pendiente o aprobada.')
+        if self.topic_id:
+            return self.topic
+
+        topic = Topic.objects.create(
+            title=self.approved_title,
+            description=self.approved_description or '',
+            creator=self.requested_by,
+        )
+        self.status = 'COMPLETED'
+        self.topic = topic
+        self.save(update_fields=['status', 'topic', 'updated_at'])
+        return topic
+
+
 class TopicTimeline(models.Model):
     # Editorial timeline attached to a topic. Entries carry the narrative; dates are optional.
     topic = models.OneToOneField(Topic, on_delete=models.CASCADE, related_name='timeline')
@@ -485,8 +560,8 @@ class TopicTimelineEntrySuggestion(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['topic', 'status']),
-            models.Index(fields=['suggested_by', 'status']),
+            models.Index(fields=['topic', 'status'], name='content_tl_sugg_topic_st_idx'),
+            models.Index(fields=['suggested_by', 'status'], name='content_tl_sugg_user_st_idx'),
         ]
 
     def __str__(self):
@@ -564,9 +639,9 @@ class TopicTimelineEntryContentSuggestion(models.Model):
         ordering = ['-created_at']
         unique_together = [['entry', 'content', 'suggested_by']]
         indexes = [
-            models.Index(fields=['topic', 'status']),
-            models.Index(fields=['entry', 'status']),
-            models.Index(fields=['suggested_by', 'status']),
+            models.Index(fields=['topic', 'status'], name='content_tl_ecs_topic_st_idx'),
+            models.Index(fields=['entry', 'status'], name='content_tl_ecs_entry_st_idx'),
+            models.Index(fields=['suggested_by', 'status'], name='content_tl_ecs_user_st_idx'),
         ]
 
     def __str__(self):
@@ -661,8 +736,8 @@ class ContentSuggestion(models.Model):
         unique_together = [['topic', 'content', 'suggested_by']]
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['topic', 'status']),
-            models.Index(fields=['suggested_by', 'status']),
+            models.Index(fields=['topic', 'status'], name='content_con_topic_i_047fd0_idx'),
+            models.Index(fields=['suggested_by', 'status'], name='content_con_suggest_770e6e_idx'),
         ]
     
     def __str__(self):
@@ -696,8 +771,8 @@ class FileSuggestion(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['content', 'status']),
-            models.Index(fields=['suggested_by', 'status']),
+            models.Index(fields=['content', 'status'], name='content_fil_content_32a911_idx'),
+            models.Index(fields=['suggested_by', 'status'], name='content_fil_suggest_bb8121_idx'),
         ]
 
     def __str__(self):

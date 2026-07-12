@@ -62,6 +62,7 @@ import PublicationEditForm from './publications/PublicationEditForm';
 import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import CommunityBubble from './generalComponents/CommunityBubble.jsx';
+import Dashboard from './generalComponents/Dashboard.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -204,6 +205,7 @@ const AppContent = () => {
               <Route path=":publicationId" element={<PublicationDetail />} />
             </Route>
             <Route path="search" element={<MainSearch />} />
+            <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="welcome" element={<Welcome />} />
             <Route path="messages" element={<MessagesLayout />}>
               <Route path="thread/:userId" element={<MessageThread />} />

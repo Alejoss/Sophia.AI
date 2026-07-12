@@ -10,6 +10,7 @@ from content.models import (
     FileSuggestion,
     Topic,
     TopicModeratorInvitation,
+    TopicCreationRequest,
 )
 import traceback
 import logging
@@ -2016,7 +2017,6 @@ def notify_timeline_entry_content_suggestion_created(suggestion):
 
         suggested_by_ct = ContentType.objects.get_for_model(suggestion.suggested_by)
         topic_ct = ContentType.objects.get_for_model(suggestion.topic)
-        content_title = getattr(suggestion.content, 'original_title', '') or 'contenido'
         notifications_created = 0
 
         for moderator in moderators:
@@ -2036,10 +2036,8 @@ def notify_timeline_entry_content_suggestion_created(suggestion):
 
             description = (
                 f'{suggestion.suggested_by.username} sugirió vincular contenido a la entrada '
-                f'"{suggestion.entry.title}" en "{suggestion.topic.title}": {content_title[:80]}'
+                f'"{suggestion.entry.title}" en "{suggestion.topic.title}"'
             )
-            if suggestion.message:
-                description += f' — {suggestion.message[:100]}'
 
             create_notification(
                 recipient=moderator,
@@ -2231,5 +2229,193 @@ def notify_file_suggestion_created(file_suggestion):
         logger.error(
             f"Error creating file suggestion notification: {str(e)}",
             extra={'file_suggestion_id': getattr(file_suggestion, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_topic_creation_request_created(creation_request):
+    """Notify all staff users when someone submits a topic creation request."""
+    from django.contrib.auth.models import User
+
+    logger.info("Creating topic creation request notifications for staff", extra={
+        'request_id': creation_request.id,
+        'requested_by_id': creation_request.requested_by_id,
+        'proposed_title': creation_request.proposed_title,
+    })
+
+    try:
+        requester_ct = ContentType.objects.get_for_model(creation_request.requested_by)
+        request_ct = ContentType.objects.get_for_model(creation_request)
+        staff_users = User.objects.filter(is_staff=True, is_active=True)
+
+        for staff_user in staff_users:
+            if staff_user.id == creation_request.requested_by_id:
+                continue
+
+            description = (
+                f'{creation_request.requested_by.username} solicitó crear el tema '
+                f'"{creation_request.proposed_title}"'
+            )
+            create_notification(
+                recipient=staff_user,
+                actor_content_type=requester_ct,
+                actor_object_id=creation_request.requested_by.id,
+                verb='solicitó crear un tema',
+                action_object_content_type=request_ct,
+                action_object_object_id=creation_request.id,
+                target_content_type=request_ct,
+                target_object_id=creation_request.id,
+                description=description,
+            )
+    except Exception as e:
+        logger.error(
+            f"Error creating topic creation request notifications: {str(e)}",
+            extra={'request_id': getattr(creation_request, 'id', None)},
+            exc_info=True,
+        )
+
+    _send_topic_creation_request_email_to_admins(creation_request)
+
+
+def _send_topic_creation_request_email_to_admins(creation_request):
+    """Email all administrators about a new topic creation request."""
+    from profiles.email_service import EmailService, EmailServiceError
+
+    requester = creation_request.requested_by
+    site_url = 'http://localhost:5173'
+    try:
+        from django.contrib.sites.models import Site
+        site = Site.objects.get_current()
+        if site.domain:
+            site_url = f'https://{site.domain}'
+    except Exception:
+        pass
+
+    dashboard_url = f'{site_url.rstrip("/")}/dashboard'
+    description = creation_request.proposed_description or 'Sin descripción.'
+    subject = f'Nueva solicitud de tema: {creation_request.proposed_title}'
+    html_message = (
+        '<p>Hay una nueva solicitud de creación de tema en Academia Blockchain.</p>'
+        f'<p><strong>Solicitante:</strong> {requester.username}'
+        f' ({requester.email or "sin email"})</p>'
+        f'<p><strong>Título propuesto:</strong> {creation_request.proposed_title}</p>'
+        f'<p><strong>Descripción:</strong></p>'
+        f'<p style="white-space: pre-wrap;">{description}</p>'
+        f'<p><a href="{dashboard_url}">Revisar en el dashboard</a></p>'
+    )
+    text_message = (
+        'Hay una nueva solicitud de creación de tema en Academia Blockchain.\n'
+        f'Solicitante: {requester.username} ({requester.email or "sin email"})\n'
+        f'Título propuesto: {creation_request.proposed_title}\n'
+        f'Descripción:\n{description}\n'
+        f'Revisar en el dashboard: {dashboard_url}'
+    )
+
+    try:
+        EmailService.send_to_admins(
+            subject=subject,
+            html_message=html_message,
+            text_message=text_message,
+            tags=['topic-creation-request', 'admin', 'notification'],
+        )
+        logger.info(
+            'Topic creation request email dispatched to administrators',
+            extra={'request_id': creation_request.id},
+        )
+    except EmailServiceError as e:
+        logger.error(
+            f'Error sending topic creation request admin email: {str(e)}',
+            extra={'request_id': getattr(creation_request, 'id', None)},
+            exc_info=True,
+        )
+    except Exception as e:
+        logger.error(
+            f'Unexpected error sending topic creation request admin email: {str(e)}',
+            extra={'request_id': getattr(creation_request, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_topic_creation_request_approved(creation_request):
+    """Notify the requester that their topic creation request was approved."""
+    logger.info("Creating topic creation approval notification", extra={
+        'request_id': creation_request.id,
+        'requested_by_id': creation_request.requested_by_id,
+    })
+
+    try:
+        reviewer = creation_request.reviewed_by
+        if not reviewer:
+            return
+
+        reviewer_ct = ContentType.objects.get_for_model(reviewer)
+        request_ct = ContentType.objects.get_for_model(creation_request)
+        if creation_request.topic_id:
+            topic_ct = ContentType.objects.get_for_model(creation_request.topic)
+            target_ct = topic_ct
+            target_id = creation_request.topic_id
+        else:
+            target_ct = request_ct
+            target_id = creation_request.id
+        description = (
+            f'Tu solicitud para crear el tema "{creation_request.approved_title}" fue aprobada '
+            f'y el tema ya está publicado.'
+        )
+        if creation_request.topic_id:
+            description += ' Puedes editarlo y añadir contenido.'
+        create_notification(
+            recipient=creation_request.requested_by,
+            actor_content_type=reviewer_ct,
+            actor_object_id=reviewer.id,
+            verb='aprobó tu solicitud de tema',
+            action_object_content_type=request_ct,
+            action_object_object_id=creation_request.id,
+            target_content_type=target_ct,
+            target_object_id=target_id,
+            description=description,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating topic creation approval notification: {str(e)}",
+            extra={'request_id': getattr(creation_request, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_topic_creation_request_rejected(creation_request):
+    """Notify the requester that their topic creation request was rejected."""
+    logger.info("Creating topic creation rejection notification", extra={
+        'request_id': creation_request.id,
+        'requested_by_id': creation_request.requested_by_id,
+    })
+
+    try:
+        reviewer = creation_request.reviewed_by
+        if not reviewer:
+            return
+
+        reviewer_ct = ContentType.objects.get_for_model(reviewer)
+        request_ct = ContentType.objects.get_for_model(creation_request)
+        description = (
+            f'Tu solicitud para crear el tema "{creation_request.proposed_title}" fue rechazada.'
+        )
+        if creation_request.rejection_reason:
+            description += f' Motivo: {creation_request.rejection_reason[:200]}'
+
+        create_notification(
+            recipient=creation_request.requested_by,
+            actor_content_type=reviewer_ct,
+            actor_object_id=reviewer.id,
+            verb='rechazó tu solicitud de tema',
+            action_object_content_type=request_ct,
+            action_object_object_id=creation_request.id,
+            target_content_type=request_ct,
+            target_object_id=creation_request.id,
+            description=description,
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating topic creation rejection notification: {str(e)}",
+            extra={'request_id': getattr(creation_request, 'id', None)},
             exc_info=True,
         )

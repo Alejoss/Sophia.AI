@@ -317,7 +317,7 @@ const TopicsUser = () => {
           variant="contained"
           color="primary"
         >
-          Crear Nuevo Tema
+          Solicitar creación de tema
         </Button>
       </Box>
 
@@ -423,7 +423,7 @@ const TopicsUser = () => {
               <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>Aún no has creado temas</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Comienza creando tu primer tema para organizar y compartir contenido relacionado.</Typography>
               <Button component={Link} to="/content/create_topic" variant="contained" color="primary">
-                Crear Tu Primer Tema
+                Solicitar tu primer tema
               </Button>
             </Box>
           )}

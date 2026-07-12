@@ -14,6 +14,26 @@ const Notifications = ({
   onRefresh = () => {}
 }) => {
 
+  const TOPIC_SUGGESTION_VERBS = [
+    'sugirió contenido para',
+    'sugirió una entrada en la línea de tiempo para',
+    'sugirió vincular contenido a una entrada de la línea de tiempo en',
+    'aceptó tu sugerencia de contenido para',
+    'rechazó tu sugerencia de contenido para',
+    'aceptó tu sugerencia de entrada en la línea de tiempo para',
+    'rechazó tu sugerencia de entrada en la línea de tiempo para',
+    'aceptó tu sugerencia de vincular contenido a una entrada en',
+    'rechazó tu sugerencia de vincular contenido a una entrada en',
+  ];
+
+  const stripActorFromDescription = (description, actor) => {
+    if (!description || !actor) return description;
+    const prefix = `${actor} `;
+    return description.startsWith(prefix) ? description.slice(prefix.length) : description;
+  };
+
+  const isTopicSuggestionsLink = (targetUrl) =>
+    typeof targetUrl === 'string' && targetUrl.includes('tab=suggestions');
 
   const getNotificationDescription = (notification) => {
     if (notification.verb === 'comentó en tu camino de conocimiento') {
@@ -84,23 +104,13 @@ const Notifications = ({
       return notification.description || `${notification.actor} rechazó tu invitación para moderar`;
     } else if (notification.verb === 'te removió como moderador de') {
       return notification.description || `${notification.actor} te removió como moderador`;
-    } else if (notification.verb === 'sugirió contenido para') {
-      return notification.description || `${notification.actor} sugirió contenido`;
-    } else if (notification.verb === 'aceptó tu sugerencia de contenido para') {
-      return notification.description || `${notification.actor} aceptó tu sugerencia de contenido`;
-    } else if (notification.verb === 'rechazó tu sugerencia de contenido para') {
-      return notification.description || `${notification.actor} rechazó tu sugerencia de contenido`;
     } else if (notification.verb === 'sugirió un archivo para tu contenido') {
       return notification.description || `${notification.actor} sugirió un archivo para tu contenido`;
-    } else if (
-      notification.verb === 'sugirió una entrada en la línea de tiempo para' ||
-      notification.verb === 'aceptó tu sugerencia de entrada en la línea de tiempo para' ||
-      notification.verb === 'rechazó tu sugerencia de entrada en la línea de tiempo para' ||
-      notification.verb === 'sugirió vincular contenido a una entrada de la línea de tiempo en' ||
-      notification.verb === 'aceptó tu sugerencia de vincular contenido a una entrada en' ||
-      notification.verb === 'rechazó tu sugerencia de vincular contenido a una entrada en'
-    ) {
-      return notification.description;
+    } else if (TOPIC_SUGGESTION_VERBS.includes(notification.verb)) {
+      return stripActorFromDescription(
+        notification.description || `${notification.actor} ${notification.verb}`,
+        notification.actor
+      );
     }
     // Fallback: use description if available, otherwise construct a message
     if (notification.description) {
@@ -176,21 +186,33 @@ const Notifications = ({
                       </Typography>
                     </Box>
 
-                    <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                    <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line', flex: 1 }}>
                       {getNotificationDescription(notification)}
                       </Typography>
-                    {notification.target_url &&
-                    <MuiLink
-                      component={Link}
-                      to={notification.target_url}
-                      underline="none"
-                      color="text.secondary"
-                      sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                      
-                        <ApiIcon sx={{ fontSize: 20 }} />
-                      </MuiLink>
-                    }
+                    {notification.target_url && (
+                      isTopicSuggestionsLink(notification.target_url) ? (
+                        <MuiLink
+                          component={Link}
+                          to={notification.target_url}
+                          underline="hover"
+                          variant="body2"
+                          sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}
+                        >
+                          Ver sugerencias
+                        </MuiLink>
+                      ) : (
+                        <MuiLink
+                          component={Link}
+                          to={notification.target_url}
+                          underline="none"
+                          color="text.secondary"
+                          sx={{ display: 'flex', alignItems: 'center' }}
+                        >
+                          <ApiIcon sx={{ fontSize: 20 }} />
+                        </MuiLink>
+                      )
+                    )}
                     </Box>
                   </Box>
 

@@ -32,6 +32,15 @@ Backend: `content/models.py` → modelo `Topic`.
 
 Modelos relacionados:
 
+- `TopicCreationRequest`
+  - Propósito: solicitud previa de un usuario para crear un tema; el administrador revisa título y descripción antes de permitir la creación.
+  - Campos clave: `requested_by`, `proposed_title`, `proposed_description`, `approved_title`, `approved_description`, `status (PENDING/APPROVED/REJECTED/COMPLETED/CANCELLED)`, `reviewed_by`, `rejection_reason`, `topic` (FK opcional al tema creado).
+  - Invariantes:
+    - Un usuario puede tener hasta 3 solicitudes `PENDING` a la vez.
+    - Solo solicitudes `APPROVED` permiten `POST /topics/` con `creation_request_id` (flujo legacy).
+    - Tras la aprobación admin, el tema se crea automáticamente y la solicitud pasa a `COMPLETED`.
+    - El solicitante puede cancelar (`CANCELLED`) solo solicitudes `PENDING`.
+
 - `TopicModeratorInvitation`
   - Controla invitaciones de moderador: `topic`, `invited_user`, `invited_by`, `status (PENDING/ACCEPTED/DECLINED/CANCELLED)`, `message`.
   - Invariantes:
@@ -65,6 +74,27 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
   - `POST /topics/` → `TopicView.post`
     - Crea un nuevo tema.
     - `creator` se define automáticamente desde `request.user`.
+    - **Usuarios normales**: requieren `creation_request_id` de una `TopicCreationRequest` en estado `APPROVED` que les pertenezca. El título y la descripción se toman de la solicitud aprobada (no del body).
+    - **Staff (`is_staff`)**: pueden crear temas directamente sin solicitud previa.
+    - Al crear el tema desde una solicitud aprobada, la solicitud pasa a `COMPLETED` y se vincula al `Topic` creado.
+
+- **Solicitudes de creación de tema**
+  - `GET /topic-creation-requests/` → `TopicCreationRequestListCreateView.get`
+    - Lista las solicitudes del usuario autenticado (filtro opcional `?status=`).
+  - `POST /topic-creation-requests/` → `TopicCreationRequestListCreateView.post`
+    - Envía una solicitud con `proposed_title` y `proposed_description`.
+    - Hasta 3 solicitudes `PENDING` por usuario a la vez.
+    - Notifica a los usuarios staff y envía correo a administradores.
+  - `POST /topic-creation-requests/<id>/cancel/` → `TopicCreationRequestCancelView.post`
+    - El solicitante cancela su propia solicitud si está `PENDING` (pasa a `CANCELLED`).
+  - `GET /admin/topic-creation-requests/` → `AdminTopicCreationRequestsView.get` (**solo staff**)
+    - Lista todas las solicitudes (filtro opcional `?status=`).
+  - `POST /admin/topic-creation-requests/<id>/approve/` → `AdminTopicCreationRequestApproveView.post` (**solo staff**)
+    - Aprueba con `approved_title` y `approved_description` (editables) y **publica el tema de inmediato** (`COMPLETED`).
+  - `POST /admin/topic-creation-requests/<id>/finalize/` → `AdminTopicCreationRequestFinalizeView.post` (**solo staff**)
+    - Publica el tema de solicitudes legacy en `APPROVED` sin `topic` vinculado.
+  - `POST /admin/topic-creation-requests/<id>/reject/` → `AdminTopicCreationRequestRejectView.post` (**solo staff**)
+    - Rechaza con `rejection_reason` opcional.
 
 - **Detalle y actualización de tema**
   - `GET /topics/<pk>/` → `TopicDetailView.get`
@@ -160,7 +190,13 @@ Frontend: `frontend/src/topics/*.jsx` y `frontend/src/api/contentApi.js`.
 
 **API de frontend (`contentApi`) relevante**:
 
-- `createTopic(topicData)` → `POST /content/topics/`
+- `createTopic(topicData)` → `POST /content/topics/` (requiere `creation_request_id` si no es staff)
+- `getTopicCreationRequests(filters)` → `GET /content/topic-creation-requests/`
+- `createTopicCreationRequest(requestData)` → `POST /content/topic-creation-requests/`
+- `cancelTopicCreationRequest(requestId)` → `POST /content/topic-creation-requests/<id>/cancel/`
+- `getAdminTopicCreationRequests(filters)` → `GET /content/admin/topic-creation-requests/`
+- `approveTopicCreationRequest(requestId, data)` → `POST /content/admin/topic-creation-requests/<id>/approve/`
+- `rejectTopicCreationRequest(requestId, data)` → `POST /content/admin/topic-creation-requests/<id>/reject/`
 - `getTopicDetails(topicId)` → `GET /content/topics/<id>/`
 - `getTopicDetailsSimple(topicId)` → `GET /content/topics/<id>/content-simple/`
 - `updateTopicImage(topicId, formData)` → `PATCH /content/topics/<id>/` (multipart).
@@ -183,8 +219,14 @@ Frontend: `frontend/src/topics/*.jsx` y `frontend/src/api/contentApi.js`.
 **Componentes principales de Topics** (carpeta `src/topics/`):
 
 - `TopicCreationForm.jsx`
-  - Formulario para crear nuevos temas (título, descripción, imagen).
-  - Usa `contentApi.createTopic`.
+  - Formulario para **solicitar** la creación de un tema (título y descripción propuestos).
+  - Muestra el historial de solicitudes del usuario y, si hay una aprobada, el botón **Crear tema**.
+  - Usa `contentApi.createTopicCreationRequest` y `contentApi.createTopic` con `creation_request_id`.
+
+- `TopicCreationRequestsAdmin.jsx`
+  - Sección del dashboard de administrador para revisar solicitudes de creación de temas.
+  - Permite aprobar (editando título/descripción) o rechazar con motivo.
+  - Accesible en `/dashboard` (solo usuarios `is_staff`).
 
 - `TopicEdit.jsx`
   - Hub unificado de edición del tema con pestañas en URL (`?tab=`):
@@ -225,7 +267,8 @@ Frontend: `frontend/src/topics/*.jsx` y `frontend/src/api/contentApi.js`.
 
 Rutas relevantes en `App.jsx` (prefijo `/content` enrutado a un layout protegido):
 
-- `/content/create_topic` → `TopicCreationForm`
+- `/content/create_topic` → `TopicCreationForm` (solicitud de creación)
+- `/dashboard` → `Dashboard` (panel admin, solo staff; incluye solicitudes de temas)
 - `/content/topics` → `TopicList`
 - `/content/topics/:topicId` → `TopicDetail`
 - `/content/topics/:topicId/edit` → `TopicEdit` (hub con `?tab=general|content|timeline|suggestions|moderators|danger`)

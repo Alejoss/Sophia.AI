@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -44,6 +44,7 @@ from content.models import (
     TopicModeratorInvitation,
     ContentSuggestion,
     FileSuggestion,
+    TopicCreationRequest,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
@@ -68,6 +69,10 @@ from content.serializers import (
     TopicTimelineEntrySerializer,
     TopicTimelineEntrySuggestionSerializer,
     TopicTimelineEntryContentSuggestionSerializer,
+    TopicCreationRequestSerializer,
+    TopicCreationRequestCreateSerializer,
+    TopicCreationRequestApproveSerializer,
+    TopicCreationRequestRejectSerializer,
 )
 from knowledge_paths.serializers import (
     KnowledgePathSerializer,
@@ -1637,12 +1642,50 @@ class TopicView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = TopicBasicSerializer(data=request.data, context={'request': request})
+        creation_request = None
+        if request.user.is_staff:
+            data = request.data
+        else:
+            creation_request_id = request.data.get('creation_request_id')
+            if not creation_request_id:
+                return Response(
+                    {
+                        'error': (
+                            'Debes enviar una solicitud de creación de tema y '
+                            'esperar su aprobación antes de crear un tema.'
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            try:
+                creation_request = TopicCreationRequest.objects.get(
+                    pk=creation_request_id,
+                    requested_by=request.user,
+                    status='APPROVED',
+                )
+            except TopicCreationRequest.DoesNotExist:
+                return Response(
+                    {'error': 'Solicitud de creación no válida o no aprobada.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            data = {
+                'title': creation_request.approved_title,
+                'description': creation_request.approved_description or '',
+            }
+            for field in ('topic_image', 'topic_image_focal_x', 'topic_image_focal_y'):
+                if field in request.data:
+                    data[field] = request.data[field]
+
+        serializer = TopicBasicSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             topic = serializer.save(creator=request.user)
-            # Best-effort; missing/unreadable cover only logs a warning, never fails the request.
             if topic.topic_image:
                 generate_topic_thumbnail(topic)
+            if creation_request:
+                creation_request.status = 'COMPLETED'
+                creation_request.topic = topic
+                creation_request.save(update_fields=['status', 'topic', 'updated_at'])
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -5001,3 +5044,222 @@ class UserTimelineEntryContentSuggestionsView(APIView):
             context={'request': request},
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TopicCreationRequestListCreateView(APIView):
+    """List or create topic creation requests for the authenticated user."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        requests_qs = TopicCreationRequest.objects.filter(
+            requested_by=request.user
+        ).select_related('requested_by', 'reviewed_by', 'topic')
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            requests_qs = requests_qs.filter(status=status_filter.upper())
+        serializer = TopicCreationRequestSerializer(
+            requests_qs, many=True, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        pending_count = TopicCreationRequest.objects.filter(
+            requested_by=request.user, status='PENDING'
+        ).count()
+        if pending_count >= TopicCreationRequest.MAX_PENDING_REQUESTS_PER_USER:
+            return Response(
+                {
+                    'error': (
+                        f'Ya tienes {TopicCreationRequest.MAX_PENDING_REQUESTS_PER_USER} '
+                        'solicitudes de creación de tema pendientes de revisión.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TopicCreationRequestCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        creation_request = serializer.save(requested_by=request.user, status='PENDING')
+        try:
+            from utils.notification_utils import notify_topic_creation_request_created
+            notify_topic_creation_request_created(creation_request)
+        except Exception as e:
+            logger.error(
+                f"Error sending topic creation request notification: {str(e)}",
+                extra={'request_id': creation_request.id},
+                exc_info=True,
+            )
+
+        response_serializer = TopicCreationRequestSerializer(
+            creation_request, context={'request': request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TopicCreationRequestCancelView(APIView):
+    """Allow the requester to cancel their own pending topic creation request."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, request_id):
+        creation_request = get_object_or_404(
+            TopicCreationRequest,
+            pk=request_id,
+            requested_by=request.user,
+        )
+        if creation_request.status != 'PENDING':
+            return Response(
+                {'error': 'Solo puedes cancelar solicitudes pendientes de revisión.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        creation_request.cancel()
+        serializer = TopicCreationRequestSerializer(
+            creation_request, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminTopicCreationRequestsView(APIView):
+    """Admin dashboard: list all topic creation requests."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        requests_qs = TopicCreationRequest.objects.select_related(
+            'requested_by', 'reviewed_by', 'topic'
+        )
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            requests_qs = requests_qs.filter(status=status_filter.upper())
+        serializer = TopicCreationRequestSerializer(
+            requests_qs, many=True, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminTopicCreationRequestApproveView(APIView):
+    """Admin approves a topic creation request (title and description may be edited)."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [JSONParser]
+
+    def post(self, request, request_id):
+        creation_request = get_object_or_404(TopicCreationRequest, pk=request_id)
+        if creation_request.status != 'PENDING':
+            return Response(
+                {'error': 'Solo se pueden aprobar solicitudes pendientes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TopicCreationRequestApproveSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        creation_request.approved_title = serializer.validated_data['approved_title']
+        creation_request.approved_description = serializer.validated_data.get(
+            'approved_description', ''
+        )
+        creation_request.reviewed_by = request.user
+        creation_request.reviewed_at = timezone.now()
+
+        try:
+            with transaction.atomic():
+                creation_request.save(
+                    update_fields=[
+                        'approved_title',
+                        'approved_description',
+                        'reviewed_by',
+                        'reviewed_at',
+                        'updated_at',
+                    ]
+                )
+                creation_request.finalize_as_topic()
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from utils.notification_utils import notify_topic_creation_request_approved
+            notify_topic_creation_request_approved(creation_request)
+        except Exception as e:
+            logger.error(
+                f"Error sending topic creation approval notification: {str(e)}",
+                extra={'request_id': creation_request.id},
+                exc_info=True,
+            )
+
+        response_serializer = TopicCreationRequestSerializer(
+            creation_request, context={'request': request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminTopicCreationRequestFinalizeView(APIView):
+    """Create the topic for an approved request that was not yet published."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [JSONParser]
+
+    def post(self, request, request_id):
+        creation_request = get_object_or_404(TopicCreationRequest, pk=request_id)
+        if creation_request.topic_id:
+            return Response(
+                {'error': 'Esta solicitud ya tiene un tema publicado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if creation_request.status != 'APPROVED':
+            return Response(
+                {'error': 'Solo se pueden publicar solicitudes aprobadas pendientes de creación.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            creation_request.finalize_as_topic()
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        response_serializer = TopicCreationRequestSerializer(
+            creation_request, context={'request': request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminTopicCreationRequestRejectView(APIView):
+    """Admin rejects a topic creation request."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [JSONParser]
+
+    def post(self, request, request_id):
+        creation_request = get_object_or_404(TopicCreationRequest, pk=request_id)
+        if creation_request.status != 'PENDING':
+            return Response(
+                {'error': 'Solo se pueden rechazar solicitudes pendientes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TopicCreationRequestRejectSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        creation_request.status = 'REJECTED'
+        creation_request.rejection_reason = serializer.validated_data.get(
+            'rejection_reason', ''
+        )
+        creation_request.reviewed_by = request.user
+        creation_request.reviewed_at = timezone.now()
+        creation_request.save()
+
+        try:
+            from utils.notification_utils import notify_topic_creation_request_rejected
+            notify_topic_creation_request_rejected(creation_request)
+        except Exception as e:
+            logger.error(
+                f"Error sending topic creation rejection notification: {str(e)}",
+                extra={'request_id': creation_request.id},
+                exc_info=True,
+            )
+
+        response_serializer = TopicCreationRequestSerializer(
+            creation_request, context={'request': request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

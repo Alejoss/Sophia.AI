@@ -71,7 +71,7 @@ const TopicList = () => {
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/content/create_topic')}
                     >
-                        Crear Tema
+                        Solicitar tema
                     </Button>
                 )}
             </Box>

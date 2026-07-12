@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails, Content, ContentProfile, ContentTranscript, Topic, Publication
+from content.models import Library, Collection, FileDetails, Content, ContentProfile, ContentTranscript, Topic, Publication, TopicCreationRequest
 
 
 @admin.register(Library)
@@ -85,6 +85,14 @@ class TopicAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+
+@admin.register(TopicCreationRequest)
+class TopicCreationRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'proposed_title', 'requested_by', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['proposed_title', 'approved_title', 'requested_by__username']
+    readonly_fields = ['created_at', 'updated_at', 'reviewed_at']
 
 
 @admin.register(Publication)

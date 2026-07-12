@@ -1,41 +1,136 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Grid, TextField, Button, Typography, Paper, Alert } from '@mui/material';
+import {
+    Box,
+    Grid,
+    TextField,
+    Button,
+    Typography,
+    Paper,
+    Alert,
+    Chip,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    CircularProgress,
+} from '@mui/material';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import contentApi from '../api/contentApi';
+
+const MAX_PENDING_TOPIC_REQUESTS = 3;
+
+const STATUS_LABELS = {
+    PENDING: 'Pendiente',
+    APPROVED: 'Aprobada',
+    REJECTED: 'Rechazada',
+    COMPLETED: 'Tema creado',
+    CANCELLED: 'Cancelada',
+};
+
+const STATUS_COLORS = {
+    PENDING: 'warning',
+    APPROVED: 'success',
+    REJECTED: 'error',
+    COMPLETED: 'default',
+    CANCELLED: 'default',
+};
 
 const TopicCreationForm = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
-        title: '',
-        description: ''
+        proposed_title: '',
+        proposed_description: '',
     });
+    const [requests, setRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [creatingTopicId, setCreatingTopicId] = useState(null);
+    const [cancellingId, setCancellingId] = useState(null);
     const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(false);
+    const [success, setSuccess] = useState(null);
+
+    const fetchRequests = useCallback(async () => {
+        try {
+            setLoadingRequests(true);
+            const data = await contentApi.getTopicCreationRequests();
+            setRequests(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Error loading topic creation requests:', err);
+        } finally {
+            setLoadingRequests(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchRequests();
+    }, [fetchRequests]);
+
+    const pendingCount = requests.filter((req) => req.status === 'PENDING').length;
+    const atPendingLimit = pendingCount >= MAX_PENDING_TOPIC_REQUESTS;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prevState => ({
-            ...prevState,
-            [name]: value
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
         }));
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmitRequest = async (e) => {
         e.preventDefault();
+        setSubmitting(true);
+        setError(null);
+        setSuccess(null);
         try {
-            const response = await contentApi.createTopic(formData);
-            setError(null);
+            await contentApi.createTopicCreationRequest(formData);
+            setSuccess('Solicitud enviada. Un administrador revisará el título y la descripción.');
+            setFormData({ proposed_title: '', proposed_description: '' });
+            await fetchRequests();
+        } catch (err) {
+            const apiError = err.response?.data?.error
+                || err.response?.data?.proposed_title?.[0]
+                || 'Error al enviar la solicitud';
+            setError(apiError);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleCreateTopic = async (request) => {
+        setCreatingTopicId(request.id);
+        setError(null);
+        try {
+            const response = await contentApi.createTopic({
+                creation_request_id: request.id,
+            });
             const topicId = response?.id ?? response?.data?.id;
             if (topicId) {
                 navigate(`/content/topics/${topicId}/edit`, { replace: true });
                 return;
             }
-            setSuccess(true);
-            setFormData({ title: '', description: '' });
+            await fetchRequests();
+            setSuccess('¡Tema creado exitosamente!');
         } catch (err) {
             setError(err.response?.data?.error || 'Error al crear el tema');
-            setSuccess(false);
+        } finally {
+            setCreatingTopicId(null);
+        }
+    };
+
+    const handleCancelRequest = async (request) => {
+        setCancellingId(request.id);
+        setError(null);
+        try {
+            await contentApi.cancelTopicCreationRequest(request.id);
+            setSuccess('Solicitud cancelada.');
+            await fetchRequests();
+        } catch (err) {
+            setError(err.response?.data?.error || 'Error al cancelar la solicitud');
+        } finally {
+            setCancellingId(null);
         }
     };
 
@@ -50,7 +145,6 @@ const TopicCreationForm = () => {
             }}
         >
             <Grid container spacing={3}>
-                {/* Left column: form */}
                 <Grid item xs={12} md={7}>
                     <Paper sx={{ p: 3, height: '100%' }}>
                         <Typography
@@ -60,14 +154,15 @@ const TopicCreationForm = () => {
                             sx={{
                                 fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
                                 fontWeight: 400,
-                                fontSize: {
-                                    xs: '20px',
-                                    sm: '24px',
-                                    md: '24px',
-                                },
+                                fontSize: { xs: '20px', sm: '24px', md: '24px' },
                             }}
                         >
-                            Crear Nuevo Tema
+                            Solicitar creación de tema
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Antes de crear un tema, envía una solicitud con el título y la descripción propuestos.
+                            Un administrador la revisará para asegurar que el tema sea lo bastante específico.
                         </Typography>
 
                         {error && (
@@ -78,47 +173,138 @@ const TopicCreationForm = () => {
 
                         {success && (
                             <Alert severity="success" sx={{ mb: 2 }}>
-                                ¡Tema creado exitosamente!
+                                {success}
                             </Alert>
                         )}
 
-                        <form onSubmit={handleSubmit}>
-                            <TextField
-                                fullWidth
-                                label="Título del tema"
-                                placeholder="Elige un tema no muy amplio"
-                                name="title"
-                                value={formData.title}
-                                onChange={handleChange}
-                                helperText="Un buen tema trata sobre algo de algo."
-                                required
-                                sx={{ mb: 2 }}
-                            />
+                        {atPendingLimit ? (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Ya tienes {MAX_PENDING_TOPIC_REQUESTS} solicitudes pendientes de revisión.
+                                Podrás enviar otra cuando alguna sea resuelta.
+                            </Alert>
+                        ) : (
+                            <form onSubmit={handleSubmitRequest}>
+                                <TextField
+                                    fullWidth
+                                    label="Título propuesto"
+                                    placeholder="Elige un tema no muy amplio"
+                                    name="proposed_title"
+                                    value={formData.proposed_title}
+                                    onChange={handleChange}
+                                    helperText="Un buen tema trata sobre algo de algo."
+                                    required
+                                    sx={{ mb: 2 }}
+                                />
 
-                            <TextField
-                                fullWidth
-                                label="Descripción"
-                                name="description"
-                                value={formData.description}
-                                onChange={handleChange}
-                                multiline
-                                rows={4}
-                                sx={{ mb: 3 }}
-                            />
+                                <TextField
+                                    fullWidth
+                                    label="Descripción propuesta"
+                                    name="proposed_description"
+                                    value={formData.proposed_description}
+                                    onChange={handleChange}
+                                    multiline
+                                    rows={4}
+                                    sx={{ mb: 3 }}
+                                />
 
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                color="primary"
-                                fullWidth
-                            >
-                                Crear Tema
-                            </Button>
-                        </form>
+                                <Button
+                                    type="submit"
+                                    variant="contained"
+                                    color="primary"
+                                    fullWidth
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'Enviando...' : 'Enviar solicitud'}
+                                </Button>
+                            </form>
+                        )}
+
+                        <Box sx={{ mt: 4 }}>
+                            <Typography variant="h6" gutterBottom>
+                                Mis solicitudes
+                            </Typography>
+                            {loadingRequests ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                    <CircularProgress size={28} />
+                                </Box>
+                            ) : requests.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    Aún no has enviado solicitudes.
+                                </Typography>
+                            ) : (
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Título</TableCell>
+                                                <TableCell>Estado</TableCell>
+                                                <TableCell align="right">Acción</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {requests.map((request) => (
+                                                <TableRow key={request.id}>
+                                                    <TableCell>
+                                                        <Typography variant="body2" fontWeight={500}>
+                                                            {request.status === 'APPROVED' || request.status === 'COMPLETED'
+                                                                ? request.approved_title
+                                                                : request.proposed_title}
+                                                        </Typography>
+                                                        {request.status === 'REJECTED' && request.rejection_reason && (
+                                                            <Typography variant="caption" color="error">
+                                                                {request.rejection_reason}
+                                                            </Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={STATUS_LABELS[request.status] || request.status}
+                                                            color={STATUS_COLORS[request.status] || 'default'}
+                                                            size="small"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        {request.status === 'PENDING' && (
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                color="error"
+                                                                onClick={() => handleCancelRequest(request)}
+                                                                disabled={cancellingId === request.id}
+                                                            >
+                                                                {cancellingId === request.id ? 'Cancelando...' : 'Cancelar'}
+                                                            </Button>
+                                                        )}
+                                                        {request.status === 'APPROVED' && (
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                onClick={() => handleCreateTopic(request)}
+                                                                disabled={creatingTopicId === request.id}
+                                                            >
+                                                                {creatingTopicId === request.id ? 'Creando...' : 'Crear tema'}
+                                                            </Button>
+                                                        )}
+                                                        {request.status === 'COMPLETED' && request.topic_id && (
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                onClick={() => navigate(`/content/topics/${request.topic_id}`)}
+                                                            >
+                                                                Ver tema
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )}
+                        </Box>
                     </Paper>
                 </Grid>
 
-                {/* Right column: educational card */}
                 <Grid item xs={12} md={5}>
                     <Paper
                         sx={{
@@ -173,15 +359,9 @@ const TopicCreationForm = () => {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
                                 Evita títulos demasiado amplios como:
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                • Terrorismo
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                • Medicina
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                • Política
-                            </Typography>
+                            <Typography variant="body2" color="text.secondary">• Terrorismo</Typography>
+                            <Typography variant="body2" color="text.secondary">• Medicina</Typography>
+                            <Typography variant="body2" color="text.secondary">• Política</Typography>
                         </Box>
 
                         <Box sx={{ mt: 2 }}>
@@ -192,23 +372,11 @@ const TopicCreationForm = () => {
                                 • Beneficios del consumo de miel para la salud
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • La verdad sobre el ataque terrorista de Oklahoma 
+                                • La verdad sobre el ataque terrorista de Oklahoma
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 • Radicalización online en los jóvenes
                             </Typography>
-                        </Box>
-
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Preguntas que pueden ayudarte:
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                • ¿Cuál es el mejor contenido que he encontrado sobre esto?
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                • ¿Qué me habría gustado tener organizado en un solo lugar?
-                            </Typography>                        
                         </Box>
                     </Paper>
                 </Grid>
@@ -217,4 +385,4 @@ const TopicCreationForm = () => {
     );
 };
 
-export default TopicCreationForm; 
+export default TopicCreationForm;

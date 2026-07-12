@@ -54,14 +54,14 @@ def is_sql_ascii_database() -> bool:
 
 
 def warn_if_sql_ascii_database() -> None:
-    """Log a critical warning when the DB cannot store Unicode natively."""
+    """Log a warning when the DB cluster is not UTF8 (operational notice, not a crash)."""
     encodings = get_postgres_encodings()
     if encodings is None:
         return
     if encodings.get('server') == 'SQL_ASCII':
-        logger.critical(
-            'PostgreSQL server encoding is SQL_ASCII. Unicode user input will fail or '
-            'be degraded. Migrate the database to UTF8: ./scripts/migrate-db-to-utf8.sh'
+        logger.warning(
+            'PostgreSQL server encoding is SQL_ASCII. Unicode may work via UTF-8 client '
+            'bytes, but migrate to UTF8 for full safety: ./scripts/migrate-db-to-utf8.sh'
         )
     elif encodings.get('server') != 'UTF8':
         logger.warning(

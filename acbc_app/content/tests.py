@@ -11,7 +11,8 @@ from content.models import (
     FileDetails, Topic, TopicTimeline, TopicTimelineEntry, TopicTimelineEntrySuggestion,
     TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent, Publication,
-    TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript
+    TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
+    TopicCreationRequest,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -1075,16 +1076,36 @@ class TopicAPITests(APITestCase):
         )
 
     def test_create_topic(self):
-        """Test creating a new topic"""
+        """Test creating a new topic requires an approved creation request for non-staff users."""
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='New Topic',
+            proposed_description='New Description',
+            approved_title='New Topic',
+            approved_description='New Description',
+            status='APPROVED',
+        )
         url = reverse('content:topics')
         data = {
-            'title': 'New Topic',
-            'description': 'New Description'
+            'creation_request_id': creation_request.id,
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Topic.objects.count(), 2)
         self.assertEqual(response.data['title'], 'New Topic')
+        creation_request.refresh_from_db()
+        self.assertEqual(creation_request.status, 'COMPLETED')
+        self.assertEqual(creation_request.topic_id, response.data['id'])
+
+    def test_create_topic_without_approved_request_forbidden(self):
+        """Non-staff users cannot create topics without an approved request."""
+        url = reverse('content:topics')
+        data = {
+            'title': 'New Topic',
+            'description': 'New Description',
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_get_topic_detail(self):
         """Test retrieving topic detail"""
@@ -1321,6 +1342,190 @@ class TopicAPITests(APITestCase):
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class TopicCreationRequestAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='topicrequester',
+            email='requester@example.com',
+            password='pass12345',
+        )
+        self.admin = User.objects.create_user(
+            username='topicadmin',
+            email='admin@example.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_user_can_submit_topic_creation_request(self):
+        url = reverse('content:topic-creation-requests')
+        response = self.client.post(
+            url,
+            {'proposed_title': 'Miel y salud', 'proposed_description': 'Beneficios de la miel'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'PENDING')
+        self.assertEqual(TopicCreationRequest.objects.count(), 1)
+
+    @patch('utils.notification_utils._send_topic_creation_request_email_to_admins')
+    def test_submit_topic_creation_request_notifies_staff(self, mock_send_email):
+        url = reverse('content:topic-creation-requests')
+        response = self.client.post(
+            url,
+            {'proposed_title': 'Tema nuevo', 'proposed_description': 'Descripción del tema'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notif = Notification.objects.filter(
+            recipient=self.admin,
+            verb='solicitó crear un tema',
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertEqual(int(notif.actor_object_id), self.user.id)
+        mock_send_email.assert_called_once()
+
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_submit_topic_creation_request_emails_admins(self, mock_send_to_admins):
+        mock_send_to_admins.return_value = {'sent': [self.admin.email], 'failed': []}
+        url = reverse('content:topic-creation-requests')
+        response = self.client.post(
+            url,
+            {'proposed_title': 'Tema por email', 'proposed_description': 'Detalle'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(mock_send_to_admins.called)
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertIn('Tema por email', call_kwargs['subject'])
+
+    def test_user_can_submit_up_to_three_pending_requests(self):
+        url = reverse('content:topic-creation-requests')
+        for i in range(TopicCreationRequest.MAX_PENDING_REQUESTS_PER_USER):
+            response = self.client.post(
+                url,
+                {'proposed_title': f'Topic {i}'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=f'request {i}')
+
+        self.assertEqual(
+            TopicCreationRequest.objects.filter(
+                requested_by=self.user, status='PENDING'
+            ).count(),
+            TopicCreationRequest.MAX_PENDING_REQUESTS_PER_USER,
+        )
+
+    def test_user_cannot_exceed_pending_request_limit(self):
+        for i in range(TopicCreationRequest.MAX_PENDING_REQUESTS_PER_USER):
+            TopicCreationRequest.objects.create(
+                requested_by=self.user,
+                proposed_title=f'Pending {i}',
+                status='PENDING',
+            )
+        url = reverse('content:topic-creation-requests')
+        response = self.client.post(
+            url,
+            {'proposed_title': 'One too many'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_can_approve_request(self):
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='Título amplio',
+            proposed_description='Descripción original',
+            status='PENDING',
+        )
+        self.client.force_authenticate(user=self.admin)
+        url = reverse(
+            'content:admin-topic-creation-request-approve',
+            args=[creation_request.id],
+        )
+        response = self.client.post(
+            url,
+            {
+                'approved_title': 'Título específico aprobado',
+                'approved_description': 'Descripción refinada',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        creation_request.refresh_from_db()
+        self.assertEqual(creation_request.status, 'COMPLETED')
+        self.assertEqual(creation_request.approved_title, 'Título específico aprobado')
+        self.assertIsNotNone(creation_request.topic_id)
+        self.assertEqual(Topic.objects.count(), 1)
+        topic = Topic.objects.get(pk=creation_request.topic_id)
+        self.assertEqual(topic.title, 'Título específico aprobado')
+        self.assertEqual(topic.creator_id, self.user.id)
+
+    def test_admin_can_finalize_legacy_approved_request(self):
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='Legacy',
+            approved_title='Legacy aprobado',
+            approved_description='Desc',
+            status='APPROVED',
+            reviewed_by=self.admin,
+        )
+        self.client.force_authenticate(user=self.admin)
+        url = reverse(
+            'content:admin-topic-creation-request-finalize',
+            args=[creation_request.id],
+        )
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        creation_request.refresh_from_db()
+        self.assertEqual(creation_request.status, 'COMPLETED')
+        self.assertIsNotNone(creation_request.topic_id)
+
+    def test_non_admin_cannot_access_admin_list(self):
+        url = reverse('content:admin-topic-creation-requests')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_user_can_cancel_own_pending_request(self):
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='Para cancelar',
+            status='PENDING',
+        )
+        url = reverse('content:topic-creation-request-cancel', args=[creation_request.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'CANCELLED')
+        creation_request.refresh_from_db()
+        self.assertEqual(creation_request.status, 'CANCELLED')
+
+    def test_user_cannot_cancel_other_users_request(self):
+        other = User.objects.create_user(
+            username='otheruser',
+            email='other@example.com',
+            password='pass12345',
+        )
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=other,
+            proposed_title='Ajena',
+            status='PENDING',
+        )
+        url = reverse('content:topic-creation-request-cancel', args=[creation_request.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_cannot_cancel_approved_request(self):
+        creation_request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='Ya aprobada',
+            approved_title='Ya aprobada',
+            status='APPROVED',
+        )
+        url = reverse('content:topic-creation-request-cancel', args=[creation_request.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class TopicTimelineEntrySuggestionsAPITests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -1538,6 +1743,46 @@ class TopicTimelineEntryContentSuggestionsAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['content']['id'], self.library_content.id)
         self.assertEqual(response.data['entry']['id'], self.entry.id)
+
+    def test_create_timeline_entry_content_suggestion_notification_is_concise(self):
+        long_message = (
+            'Wikipedia le bloqueo el acceso a uno de sus cofundadores, Larry Sanger '
+            'la cosa es seria. Deberia comunicarse seriedad!'
+        )
+        url = reverse(
+            'content:topic-timeline-entry-content-suggestion-create',
+            args=[self.topic.id, self.entry.id],
+        )
+        response = self.client.post(
+            url,
+            {
+                'content_id': self.library_content.id,
+                'message': long_message,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        notif = Notification.objects.filter(
+            recipient=self.moderator,
+            verb='sugirió vincular contenido a una entrada de la línea de tiempo en',
+        ).first()
+        self.assertIsNotNone(notif)
+        expected = (
+            f'{self.user.username} sugirió vincular contenido a la entrada '
+            f'"Bloque Genesis" en "Entry Content Topic"'
+        )
+        self.assertEqual(notif.description, expected)
+        self.assertNotIn(long_message, notif.description)
+        self.assertNotIn('Genesis block image', notif.description)
+
+        from profiles.serializers import NotificationSerializer
+
+        serialized = NotificationSerializer(notif).data
+        self.assertEqual(
+            serialized['target_url'],
+            f'/content/topics/{self.topic.id}/edit?tab=suggestions',
+        )
 
     def test_moderator_cannot_create_timeline_entry_content_suggestion(self):
         self.client.force_authenticate(user=self.moderator)

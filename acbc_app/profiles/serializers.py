@@ -30,6 +30,12 @@ TOPIC_MODERATION_VERBS = (
     'sugirió vincular contenido a una entrada de la línea de tiempo en',
 )
 
+TOPIC_CREATION_REQUEST_VERBS = (
+    'solicitó crear un tema',
+    'aprobó tu solicitud de tema',
+    'rechazó tu solicitud de tema',
+)
+
 KNOWLEDGE_PATH_VERBS = (
     'comentó en tu camino de conocimiento',
     'completó tu camino de conocimiento',
@@ -73,7 +79,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_staff']
 
 
 class CryptoCurrencySerializer(serializers.ModelSerializer):
@@ -212,7 +218,9 @@ class NotificationSerializer(serializers.ModelSerializer):
         if obj.target:
             target = obj.target
             title = None
-            if hasattr(target, 'title') and getattr(target, 'title', None):
+            if hasattr(target, 'proposed_title') and getattr(target, 'proposed_title', None):
+                title = target.proposed_title
+            elif hasattr(target, 'title') and getattr(target, 'title', None):
                 title = target.title
             elif hasattr(target, 'original_title'):
                 title = getattr(target, 'original_title', None) or None
@@ -270,6 +278,20 @@ class NotificationSerializer(serializers.ModelSerializer):
                     return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
                 
+            # For topic creation requests
+            if obj.verb == 'solicitó crear un tema' and obj.target:
+                return getattr(obj.target, 'proposed_title', None)
+            if obj.verb in ['aprobó tu solicitud de tema', 'rechazó tu solicitud de tema'] and obj.target:
+                return (
+                    getattr(obj.target, 'approved_title', None)
+                    or getattr(obj.target, 'proposed_title', None)
+                )
+
+            if obj.verb == 'aprobó tu solicitud de tema' and obj.action_object:
+                request = obj.action_object
+                if getattr(request, 'topic_id', None):
+                    return getattr(request, 'approved_title', None) or getattr(request, 'proposed_title', None)
+
             # For knowledge path certificate and engagement actions
             if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
@@ -348,6 +370,22 @@ class NotificationSerializer(serializers.ModelSerializer):
 
             if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
+
+            if obj.verb == 'solicitó crear un tema':
+                return '/dashboard'
+
+            if obj.verb in ['aprobó tu solicitud de tema', 'rechazó tu solicitud de tema']:
+                topic_id = None
+                if obj.target and obj.target_content_type:
+                    model_name = obj.target_content_type.model
+                    if model_name == 'topic':
+                        topic_id = obj.target.id
+                    elif model_name == 'topiccreationrequest' and getattr(obj.target, 'topic_id', None):
+                        topic_id = obj.target.topic_id
+                if obj.verb == 'aprobó tu solicitud de tema' and topic_id:
+                    return f'/content/topics/{topic_id}'
+                if obj.verb == 'rechazó tu solicitud de tema':
+                    return '/content/create_topic'
 
             return None
         except Exception as e:

@@ -397,6 +397,86 @@ const contentApi = {
     }
   },
 
+  getTopicCreationRequests: async (filters = {}) => {
+    try {
+      const response = await axiosInstance.get('/content/topic-creation-requests/', { params: filters });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching topic creation requests:', error);
+      throw error;
+    }
+  },
+
+  createTopicCreationRequest: async (requestData) => {
+    try {
+      const response = await axiosInstance.post('/content/topic-creation-requests/', requestData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating topic creation request:', error);
+      throw error;
+    }
+  },
+
+  cancelTopicCreationRequest: async (requestId) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/topic-creation-requests/${requestId}/cancel/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling topic creation request:', error);
+      throw error;
+    }
+  },
+
+  getAdminTopicCreationRequests: async (filters = {}) => {
+    try {
+      const response = await axiosInstance.get('/content/admin/topic-creation-requests/', { params: filters });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching admin topic creation requests:', error);
+      throw error;
+    }
+  },
+
+  approveTopicCreationRequest: async (requestId, data) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/admin/topic-creation-requests/${requestId}/approve/`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error approving topic creation request:', error);
+      throw error;
+    }
+  },
+
+  finalizeTopicCreationRequest: async (requestId) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/admin/topic-creation-requests/${requestId}/finalize/`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error finalizing topic creation request:', error);
+      throw error;
+    }
+  },
+
+  rejectTopicCreationRequest: async (requestId, data = {}) => {
+    try {
+      const response = await axiosInstance.post(
+        `/content/admin/topic-creation-requests/${requestId}/reject/`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting topic creation request:', error);
+      throw error;
+    }
+  },
+
   getTopicDetails: async (topicId, params = {}) => {
     try {
       const response = await axiosInstance.get(`/content/topics/${topicId}/`, { params });
