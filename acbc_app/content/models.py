@@ -373,7 +373,11 @@ class Topic(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    moderators = models.ManyToManyField(User, related_name='moderated_topics')
+    moderators = models.ManyToManyField(
+        User,
+        related_name='moderated_topics',
+        blank=True,
+    )
     related_topics = models.ManyToManyField('self', blank=True, related_name='related_to', symmetrical=False)
 
     def __str__(self):

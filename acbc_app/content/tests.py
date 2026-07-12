@@ -1075,6 +1075,28 @@ class TopicAPITests(APITestCase):
             creator=self.user
         )
 
+    def test_topic_admin_allows_empty_moderators(self):
+        """Moderators M2M is optional in Django admin (creator alone is enough)."""
+        from django.contrib.admin.sites import site
+        from content.admin import TopicAdmin
+
+        model_admin = TopicAdmin(Topic, site)
+        form_class = model_admin.get_form(request=None, obj=self.topic)
+        form = form_class(
+            data={
+                'title': self.topic.title,
+                'description': self.topic.description,
+                'creator': self.user.id,
+                'is_public': True,
+                'topic_image_focal_x': 0.5,
+                'topic_image_focal_y': 0.5,
+                'moderators': [],
+                'related_topics': [],
+            },
+            instance=self.topic,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
     def test_create_topic(self):
         """Test creating a new topic requires an approved creation request for non-staff users."""
         creation_request = TopicCreationRequest.objects.create(
