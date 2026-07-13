@@ -12,6 +12,10 @@ import Home from './generalComponents/Home.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
+import BookClubHub from './bookClubs/BookClubHub.jsx';
+import DiscussionQuestionsList from './bookClubs/DiscussionQuestionsList.jsx';
+import DiscussionQuestionDetail from './bookClubs/DiscussionQuestionDetail.jsx';
+import BookClubMeetings from './bookClubs/BookClubMeetings.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
 import Profile from './profiles/Profile.jsx';
@@ -137,6 +141,13 @@ const AppContent = () => {
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
           <Route path="club-de-lectura" element={<ClubDeLectura />} />
+          <Route path="club-de-lectura/:slug" element={<BookClubHub />} />
+          <Route path="club-de-lectura/:slug/preguntas" element={<DiscussionQuestionsList />} />
+          <Route
+            path="club-de-lectura/:slug/preguntas/:questionId"
+            element={<DiscussionQuestionDetail />}
+          />
+          <Route path="club-de-lectura/:slug/reuniones" element={<BookClubMeetings />} />
           <Route element={<MainLayout />}>
             <Route
               path="/"

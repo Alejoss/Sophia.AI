@@ -10,4 +10,9 @@ urlpatterns = [
     path('knowledge-path/<int:pk>/', views.KnowledgePathCommentsView.as_view(), name='knowledge_path_comments'),
     path('topic/<int:pk>/', views.TopicCommentsView.as_view(), name='topic_comments'),
     path('topic/<int:topic_pk>/content/<int:content_pk>/', views.ContentTopicCommentsView.as_view(), name='content_topic_comments'),
+    path(
+        'discussion-question/<int:pk>/',
+        views.DiscussionQuestionCommentsView.as_view(),
+        name='discussion_question_comments',
+    ),
 ]

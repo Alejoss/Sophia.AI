@@ -13,7 +13,15 @@ import { AuthContext } from '../context/AuthContext';
 import commentsApi from '../api/commentsApi';
 import { Comment } from './Comment';
 
-const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = null }) => {
+const CommentSection = ({
+    topicId = null,
+    contentId = null,
+    knowledgePathId = null,
+    discussionQuestionId = null,
+    readOnly = false,
+    title = 'Comentarios',
+    placeholder = 'Escriba un comentario...',
+}) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
@@ -22,14 +30,16 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
 
     useEffect(() => {
         loadComments();
-    }, [topicId, contentId, knowledgePathId]);
+    }, [topicId, contentId, knowledgePathId, discussionQuestionId]);
 
     const loadComments = async () => {
         try {
             setLoading(true);
             let fetchedComments;
             
-            if (knowledgePathId) {
+            if (discussionQuestionId) {
+                fetchedComments = await commentsApi.getDiscussionQuestionComments(discussionQuestionId);
+            } else if (knowledgePathId) {
                 fetchedComments = await commentsApi.getKnowledgePathComments(knowledgePathId);
             } else if (contentId) {
                 fetchedComments = await commentsApi.getContentComments(topicId, contentId);
@@ -61,7 +71,9 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         }
 
         try {
-            if (knowledgePathId) {
+            if (discussionQuestionId) {
+                await commentsApi.addDiscussionQuestionComment(discussionQuestionId, newComment);
+            } else if (knowledgePathId) {
                 await commentsApi.addKnowledgePathComment(knowledgePathId, newComment);
             } else if (contentId) {
                 await commentsApi.addContentComment(topicId, contentId, newComment);
@@ -72,7 +84,8 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             setNewComment('');
             await loadComments();
         } catch (error) {
-            setError('Error al agregar el comentario. Por favor, inténtelo de nuevo.');
+            const detail = error?.response?.data?.detail;
+            setError(detail || 'Error al agregar el comentario. Por favor, inténtelo de nuevo.');
         }
     };
 
@@ -80,7 +93,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             await commentsApi.deleteComment(commentId);
             await loadComments();
-        } catch (err) {
+        } catch {
             setError('Error al eliminar el comentario');
         }
     };
@@ -89,7 +102,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             await commentsApi.updateComment(commentId, body);
             await loadComments();
-        } catch (error) {
+        } catch {
             setError('Error al actualizar el comentario');
         }
     };
@@ -103,7 +116,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             await commentsApi.addCommentReply(parentId, body);
             await loadComments();
-        } catch (error) {
+        } catch {
             setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
         }
     };
@@ -113,16 +126,16 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
     return (
         <Paper sx={{ p: 3, mt: 3 }}>
             <Typography variant="h6" gutterBottom>
-                Comentarios
+                {title}
             </Typography>
             
-            {authState.isAuthenticated ? (
+            {authState.isAuthenticated && !readOnly ? (
                 <Box sx={{ mb: 3 }}>
                     <TextField
                         fullWidth
                         multiline
                         rows={3}
-                        placeholder="Escriba un comentario..."
+                        placeholder={placeholder}
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                     />
@@ -132,9 +145,13 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
                         onClick={handleAddComment}
                         disabled={!newComment.trim()}
                     >
-                        Publicar Comentario
+                        Publicar
                     </Button>
                 </Box>
+            ) : readOnly ? (
+                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Esta conversación está cerrada. Puedes leer las respuestas.
+                </Typography>
             ) : (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
                     Por favor, inicie sesión para dejar un comentario.

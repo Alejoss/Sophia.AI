@@ -38,6 +38,7 @@ urlpatterns = [
     path('api/quizzes/', include('quizzes.urls')),
     path('api/votes/', include('votes.urls')),
     path('api/knowledge_paths/', include('knowledge_paths.urls')),
+    path('api/book_clubs/', include('book_clubs.urls')),
     path('api/search/', include('search.urls')),
     path('api/messages/', include('user_messages.urls')),
     path('api/certificates/', include('certificates.urls')),

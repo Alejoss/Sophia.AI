@@ -1,12 +1,49 @@
-import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, Alert } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Alert, Box, Button, CircularProgress, TextField, Typography } from '@mui/material';
+import { AuthContext } from '../context/AuthContext';
 import { submitNewsletterSubscription } from '../api/profilesApi';
+import bookClubsApi from '../api/bookClubsApi';
 
 const ClubDeLectura = () => {
+  const { authState, authInitialized } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [activeClub, setActiveClub] = useState(null);
+  const [clubsLoading, setClubsLoading] = useState(false);
+  const [joining, setJoining] = useState(false);
+
+  useEffect(() => {
+    if (!authInitialized || !authState.isAuthenticated) {
+      setActiveClub(null);
+      return;
+    }
+    let cancelled = false;
+    setClubsLoading(true);
+    bookClubsApi
+      .listClubs()
+      .then((clubs) => {
+        if (cancelled) return;
+        const preferred =
+          clubs.find((c) => c.status === 'active') ||
+          clubs.find((c) => c.is_member) ||
+          clubs[0] ||
+          null;
+        setActiveClub(preferred);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveClub(null);
+      })
+      .finally(() => {
+        if (!cancelled) setClubsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authInitialized, authState.isAuthenticated]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +72,22 @@ const ClubDeLectura = () => {
     }
   };
 
+  const handleEnterClub = async () => {
+    if (!activeClub) return;
+    setJoining(true);
+    setErrorMessage('');
+    try {
+      if (!activeClub.is_member) {
+        await bookClubsApi.joinClub(activeClub.slug);
+      }
+      navigate(`/club-de-lectura/${activeClub.slug}`);
+    } catch (err) {
+      setErrorMessage(err?.response?.data?.detail || 'No se pudo entrar al club.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -59,6 +112,56 @@ const ClubDeLectura = () => {
           mb: 3,
         }}
       />
+
+      {authState.isAuthenticated && (
+        <Box sx={{ width: '100%', maxWidth: 480, mb: 3, textAlign: 'center' }}>
+          {clubsLoading ? (
+            <CircularProgress size={28} sx={{ color: '#FF6B35' }} />
+          ) : activeClub ? (
+            <>
+              <Typography sx={{ color: '#fff', mb: 1.5 }}>
+                {activeClub.is_member
+                  ? `Ya formas parte de «${activeClub.title}».`
+                  : `El club «${activeClub.title}» ya está activo.`}
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={handleEnterClub}
+                disabled={joining}
+                sx={{
+                  bgcolor: '#FF6B35',
+                  '&:hover': { bgcolor: '#E55A2B' },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  py: 1.2,
+                  mb: 1,
+                }}
+                fullWidth
+              >
+                {joining
+                  ? 'Entrando…'
+                  : activeClub.is_member
+                    ? 'Ir al hub del club'
+                    : 'Unirme y entrar al hub'}
+              </Button>
+            </>
+          ) : (
+            <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 1 }}>
+              Aún no hay un ciclo activo. Deja tu email y te avisamos.
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {!authState.isAuthenticated && (
+        <Button
+          component={RouterLink}
+          to="/profiles/login"
+          sx={{ color: '#FF6B35', mb: 2, textTransform: 'none' }}
+        >
+          ¿Ya tienes cuenta? Inicia sesión para entrar al hub
+        </Button>
+      )}
 
       <Box
         component="form"

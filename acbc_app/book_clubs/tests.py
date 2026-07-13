@@ -1,0 +1,250 @@
+"""
+Tests for the Book Club Hub, membership, and DiscussionQuestions.
+"""
+from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from book_clubs.models import (
+    BookClub,
+    BookClubEvent,
+    BookClubMembership,
+    BookClubStatus,
+    DiscussionQuestion,
+    DiscussionQuestionStatus,
+    MembershipRole,
+)
+from comments.models import Comment
+from content.models import Topic
+from events.models import Event
+from knowledge_paths.models import KnowledgePath, Node
+
+
+class BookClubAPITestCase(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='clubadmin', password='pass123', is_staff=True
+        )
+        self.mentor = User.objects.create_user(username='mentor', password='pass123')
+        self.member = User.objects.create_user(username='member', password='pass123')
+        self.outsider = User.objects.create_user(username='outsider', password='pass123')
+
+        self.path = KnowledgePath.objects.create(
+            title='Cypherpunk Book',
+            description='Read the book',
+            author=self.admin,
+            is_visible=True,
+        )
+        self.node1 = Node.objects.create(
+            knowledge_path=self.path,
+            title='Capítulos 1-3',
+            description='Misión 1',
+            order=1,
+            media_type='TEXT',
+        )
+        self.node2 = Node.objects.create(
+            knowledge_path=self.path,
+            title='Capítulos 4-6',
+            description='Misión 2',
+            order=2,
+            media_type='TEXT',
+        )
+        self.topic = Topic.objects.create(
+            title='Club Topic',
+            description='Community',
+            creator=self.admin,
+            is_public=True,
+        )
+        self.event = Event.objects.create(
+            title='Directo 1',
+            description='Live session',
+            owner=self.admin,
+            date_start=timezone.now() + timezone.timedelta(days=2),
+            is_visible=True,
+            event_type='LIVE_MASTER_CLASS',
+        )
+        self.club = BookClub.objects.create(
+            title='Club de Lectura Cypherpunk',
+            slug='cypherpunk',
+            description='Primer ciclo',
+            knowledge_path=self.path,
+            topic=self.topic,
+            status=BookClubStatus.ACTIVE,
+            created_by=self.admin,
+            starts_at=timezone.now() - timezone.timedelta(days=1),
+            ends_at=timezone.now() + timezone.timedelta(days=60),
+        )
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.admin, role=MembershipRole.ADMIN
+        )
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.mentor, role=MembershipRole.MENTOR
+        )
+        BookClubEvent.objects.create(book_club=self.club, event=self.event)
+
+    def auth(self, user):
+        token = RefreshToken.for_user(user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+    def test_join_club(self):
+        self.auth(self.member)
+        response = self.client.post('/api/book_clubs/cypherpunk/join/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            BookClubMembership.objects.filter(
+                book_club=self.club, user=self.member
+            ).exists()
+        )
+        # Idempotent
+        response2 = self.client.post('/api/book_clubs/cypherpunk/join/')
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+
+    def test_hub_requires_auth(self):
+        response = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_hub_payload_for_member(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.member)
+        response = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['club']['slug'], 'cypherpunk')
+        self.assertTrue(data['is_member'])
+        self.assertEqual(data['progress']['total_nodes'], 2)
+        self.assertIsNotNone(data['next_mission'])
+        self.assertEqual(data['next_mission']['order'], 1)
+        self.assertIsNotNone(data['next_event'])
+        self.assertEqual(data['next_event']['event_id'], self.event.id)
+        self.assertEqual(data['quick_links']['knowledge_path_id'], self.path.id)
+        self.assertEqual(data['quick_links']['topic_id'], self.topic.id)
+
+    def test_discussion_question_crud_and_comments(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.mentor)
+        create = self.client.post(
+            '/api/book_clubs/cypherpunk/discussion-questions/',
+            {
+                'body': '¿Qué idea de los primeros capítulos te sorprendió más?',
+                'node': self.node1.id,
+                'order': 1,
+                'status': DiscussionQuestionStatus.OPEN,
+            },
+            format='json',
+        )
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        qid = create.data['id']
+        self.assertEqual(create.data['mission_label'], 'Misión 1: Capítulos 1-3')
+        self.assertEqual(create.data['status'], 'open')
+
+        # Member sees it on hub
+        self.auth(self.member)
+        hub = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(len(hub.data['open_questions']), 1)
+
+        # Member answers
+        answer = self.client.post(
+            f'/api/comments/discussion-question/{qid}/',
+            {'body': 'Me sorprendió la tesis sobre captura institucional.'},
+            format='json',
+        )
+        self.assertEqual(answer.status_code, status.HTTP_201_CREATED)
+
+        # Second top-level blocked
+        answer2 = self.client.post(
+            f'/api/comments/discussion-question/{qid}/',
+            {'body': 'Otra respuesta'},
+            format='json',
+        )
+        self.assertEqual(answer2.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Outsider cannot answer
+        self.auth(self.outsider)
+        denied = self.client.post(
+            f'/api/comments/discussion-question/{qid}/',
+            {'body': 'No debería'},
+            format='json',
+        )
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Close question → appears in past
+        self.auth(self.mentor)
+        closed = self.client.patch(
+            f'/api/book_clubs/cypherpunk/discussion-questions/{qid}/',
+            {'status': DiscussionQuestionStatus.CLOSED},
+            format='json',
+        )
+        self.assertEqual(closed.status_code, status.HTTP_200_OK)
+
+        self.auth(self.member)
+        hub2 = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(len(hub2.data['open_questions']), 0)
+        self.assertEqual(len(hub2.data['past_questions']), 1)
+        self.assertEqual(hub2.data['past_questions'][0]['answer_count'], 1)
+
+        # Past answers still readable
+        listing = self.client.get(f'/api/comments/discussion-question/{qid}/')
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(listing.data), 1)
+
+        # Cannot answer closed
+        blocked = self.client.post(
+            f'/api/comments/discussion-question/{qid}/',
+            {'body': 'tarde'},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_schedule_auto_open(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        q = DiscussionQuestion.objects.create(
+            book_club=self.club,
+            node=self.node1,
+            body='Pregunta programada',
+            status=DiscussionQuestionStatus.DRAFT,
+            opens_at=timezone.now() - timezone.timedelta(minutes=5),
+            created_by=self.mentor,
+            order=2,
+        )
+        self.auth(self.member)
+        hub = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(len(hub.data['open_questions']), 1)
+        q.refresh_from_db()
+        self.assertEqual(q.status, DiscussionQuestionStatus.OPEN)
+
+    def test_member_cannot_create_question(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.member)
+        response = self.client.post(
+            '/api/book_clubs/cypherpunk/discussion-questions/',
+            {'body': 'No debería', 'status': 'open'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_link_event(self):
+        event2 = Event.objects.create(
+            title='Directo 2',
+            owner=self.admin,
+            date_start=timezone.now() + timezone.timedelta(days=10),
+            is_visible=True,
+        )
+        self.auth(self.mentor)
+        response = self.client.post(
+            '/api/book_clubs/cypherpunk/events/',
+            {'event_id': event2.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(BookClubEvent.objects.filter(book_club=self.club).count(), 2)

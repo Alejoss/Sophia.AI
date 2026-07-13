@@ -900,3 +900,97 @@ class CommentRepliesView(APIView):
                 {'error': 'An error occurred while creating the reply'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class DiscussionQuestionCommentsView(APIView):
+    """Public club discussion answers attached to a DiscussionQuestion via GFK."""
+    permission_classes = [IsAuthenticated]
+
+    def _get_question(self, pk):
+        from book_clubs.models import DiscussionQuestion
+        from book_clubs.permissions import user_can_view_question, user_can_answer_question
+
+        question = get_object_or_404(
+            DiscussionQuestion.objects.select_related('book_club', 'node'),
+            pk=pk,
+        )
+        if question.apply_schedule():
+            question.save(update_fields=['status', 'updated_at'])
+        return question
+
+    def get(self, request, pk):
+        from book_clubs.models import DiscussionQuestion
+        from book_clubs.permissions import user_can_view_question
+
+        try:
+            question = self._get_question(pk)
+            if not user_can_view_question(question, request.user):
+                return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
+            comments = Comment.objects.filter(
+                content_type=dq_type,
+                object_id=pk,
+                topic__isnull=True,
+                parent=None,
+                is_active=True,
+            ).order_by('-created_at')
+            serializer = CommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+        except Exception as e:
+            log_error(e, "Error retrieving discussion question comments", request.user.id, {
+                'discussion_question_id': pk,
+            })
+            return Response(
+                {'error': 'An error occurred while retrieving comments'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def post(self, request, pk):
+        from book_clubs.models import DiscussionQuestion
+        from book_clubs.permissions import user_can_answer_question
+
+        try:
+            question = self._get_question(pk)
+            if not user_can_answer_question(question, request.user):
+                return Response(
+                    {'detail': 'You cannot answer this question right now.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
+            # One top-level answer per user
+            existing = Comment.objects.filter(
+                content_type=dq_type,
+                object_id=pk,
+                author=request.user,
+                parent=None,
+                is_active=True,
+            ).first()
+            if existing and not request.data.get('parent'):
+                return Response(
+                    {'detail': 'You already answered this question. Edit your answer or reply to others.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            comment_data = {
+                'body': request.data.get('body'),
+                'content_type': dq_type.id,
+                'object_id': pk,
+                'author': request.user.id,
+                'parent': request.data.get('parent'),
+            }
+            serializer = CommentCreateSerializer(data=comment_data)
+            if serializer.is_valid():
+                comment = serializer.save()
+                return_serializer = CommentSerializer(comment, context={'request': request})
+                return Response(return_serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            log_error(e, "Error creating discussion question comment", request.user.id, {
+                'discussion_question_id': pk,
+                'request_data': request.data,
+            })
+            return Response(
+                {'error': 'An error occurred while creating the comment'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

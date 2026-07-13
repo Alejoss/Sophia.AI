@@ -84,7 +84,19 @@ const commentsApi = {
             console.error('Error adding knowledge path comment:', error);
             throw error.response?.data || error.message;
         }
-    }
+    },
+
+    getDiscussionQuestionComments: async (questionId) => {
+        const response = await axiosInstance.get(`/comments/discussion-question/${questionId}/`);
+        return response.data;
+    },
+
+    addDiscussionQuestionComment: async (questionId, body) => {
+        const response = await axiosInstance.post(`/comments/discussion-question/${questionId}/`, {
+            body,
+        });
+        return response.data;
+    },
 };
 
 export default commentsApi; 

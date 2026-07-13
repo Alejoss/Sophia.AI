@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'quizzes',
     'votes',
     'knowledge_paths',
+    'book_clubs',
     'gamification',
     'payments',
     'search',
