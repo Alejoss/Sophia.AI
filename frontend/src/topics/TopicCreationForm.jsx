@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Box,
     Grid,
@@ -19,6 +22,7 @@ import {
 } from '@mui/material';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import contentApi from '../api/contentApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 
 const MAX_PENDING_TOPIC_REQUESTS = 3;
 
@@ -38,19 +42,34 @@ const STATUS_COLORS = {
     CANCELLED: 'default',
 };
 
+const requestSchema = yup.object({
+    proposed_title: yup
+        .string()
+        .trim()
+        .required('El título propuesto es requerido.'),
+    proposed_description: yup.string().trim().default(''),
+});
+
 const TopicCreationForm = () => {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({
-        proposed_title: '',
-        proposed_description: '',
-    });
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
     const [creatingTopicId, setCreatingTopicId] = useState(null);
     const [cancellingId, setCancellingId] = useState(null);
-    const [error, setError] = useState(null);
+    const [formGeneralError, setFormGeneralError] = useState('');
+    const [actionError, setActionError] = useState('');
     const [success, setSuccess] = useState(null);
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(requestSchema),
+        defaultValues: { proposed_title: '', proposed_description: '' },
+    });
 
     const fetchRequests = useCallback(async () => {
         try {
@@ -71,37 +90,34 @@ const TopicCreationForm = () => {
     const pendingCount = requests.filter((req) => req.status === 'PENDING').length;
     const atPendingLimit = pendingCount >= MAX_PENDING_TOPIC_REQUESTS;
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    const handleSubmitRequest = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        setError(null);
+    const onSubmitRequest = async (formData) => {
+        setFormGeneralError('');
+        setActionError('');
         setSuccess(null);
+
         try {
             await contentApi.createTopicCreationRequest(formData);
             setSuccess('Solicitud enviada. Un administrador revisará el título y la descripción.');
-            setFormData({ proposed_title: '', proposed_description: '' });
+            reset({ proposed_title: '', proposed_description: '' });
             await fetchRequests();
         } catch (err) {
-            const apiError = err.response?.data?.error
-                || err.response?.data?.proposed_title?.[0]
-                || 'Error al enviar la solicitud';
-            setError(apiError);
-        } finally {
-            setSubmitting(false);
+            console.error('Error submitting topic creation request:', err);
+            const { generalError: parsed } = applyApiErrorsToForm(
+                err,
+                setError,
+                'Error al enviar la solicitud.',
+                { proposed_title: 'proposed_title', proposed_description: 'proposed_description' },
+            );
+            if (parsed) {
+                setFormGeneralError(parsed);
+            }
         }
     };
 
     const handleCreateTopic = async (request) => {
         setCreatingTopicId(request.id);
-        setError(null);
+        setActionError('');
+        setSuccess(null);
         try {
             const response = await contentApi.createTopic({
                 creation_request_id: request.id,
@@ -114,7 +130,7 @@ const TopicCreationForm = () => {
             await fetchRequests();
             setSuccess('¡Tema creado exitosamente!');
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al crear el tema');
+            setActionError(err.response?.data?.error || 'Error al crear el tema');
         } finally {
             setCreatingTopicId(null);
         }
@@ -122,13 +138,14 @@ const TopicCreationForm = () => {
 
     const handleCancelRequest = async (request) => {
         setCancellingId(request.id);
-        setError(null);
+        setActionError('');
+        setSuccess(null);
         try {
             await contentApi.cancelTopicCreationRequest(request.id);
             setSuccess('Solicitud cancelada.');
             await fetchRequests();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al cancelar la solicitud');
+            setActionError(err.response?.data?.error || 'Error al cancelar la solicitud');
         } finally {
             setCancellingId(null);
         }
@@ -165,9 +182,9 @@ const TopicCreationForm = () => {
                             Un administrador la revisará para asegurar que el tema sea lo bastante específico.
                         </Typography>
 
-                        {error && (
+                        {actionError && (
                             <Alert severity="error" sx={{ mb: 2 }}>
-                                {error}
+                                {actionError}
                             </Alert>
                         )}
 
@@ -183,15 +200,23 @@ const TopicCreationForm = () => {
                                 Podrás enviar otra cuando alguna sea resuelta.
                             </Alert>
                         ) : (
-                            <form onSubmit={handleSubmitRequest}>
+                            <form onSubmit={handleSubmit(onSubmitRequest)} noValidate>
+                                {formGeneralError && (
+                                    <Alert severity="error" sx={{ mb: 2 }}>
+                                        {formGeneralError}
+                                    </Alert>
+                                )}
+
                                 <TextField
                                     fullWidth
                                     label="Título propuesto"
                                     placeholder="Elige un tema no muy amplio"
-                                    name="proposed_title"
-                                    value={formData.proposed_title}
-                                    onChange={handleChange}
-                                    helperText="Un buen tema trata sobre algo de algo."
+                                    {...register('proposed_title')}
+                                    error={!!errors.proposed_title}
+                                    helperText={
+                                        errors.proposed_title?.message ||
+                                        'Un buen tema trata sobre algo de algo.'
+                                    }
                                     required
                                     sx={{ mb: 2 }}
                                 />
@@ -199,9 +224,9 @@ const TopicCreationForm = () => {
                                 <TextField
                                     fullWidth
                                     label="Descripción propuesta"
-                                    name="proposed_description"
-                                    value={formData.proposed_description}
-                                    onChange={handleChange}
+                                    {...register('proposed_description')}
+                                    error={!!errors.proposed_description}
+                                    helperText={errors.proposed_description?.message}
                                     multiline
                                     rows={4}
                                     sx={{ mb: 3 }}
@@ -212,9 +237,9 @@ const TopicCreationForm = () => {
                                     variant="contained"
                                     color="primary"
                                     fullWidth
-                                    disabled={submitting}
+                                    disabled={isSubmitting}
                                 >
-                                    {submitting ? 'Enviando...' : 'Enviar solicitud'}
+                                    {isSubmitting ? 'Enviando...' : 'Enviar solicitud'}
                                 </Button>
                             </form>
                         )}

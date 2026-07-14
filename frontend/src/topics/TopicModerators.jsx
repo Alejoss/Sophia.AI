@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   Box,
   Typography,
-  Paper,
   Button,
   Chip,
   Divider,
@@ -19,26 +21,48 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CancelIcon from "@mui/icons-material/Cancel";
 import contentApi from "../api/contentApi";
+import { applyApiErrorsToForm } from "../utils/apiFormErrors";
+
+const inviteSchema = yup.object({
+  username: yup
+    .string()
+    .trim()
+    .required("Por favor ingrese un nombre de usuario"),
+  message: yup.string().trim().default(""),
+});
 
 const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
   const [moderators, setModerators] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [usernameInput, setUsernameInput] = useState("");
-  const [messageInput, setMessageInput] = useState("");
-  const [inviting, setInviting] = useState(false);
+  const [inviteGeneralError, setInviteGeneralError] = useState("");
   const [removing, setRemoving] = useState({});
   const [canceling, setCanceling] = useState({});
   const [userOptions, setUserOptions] = useState([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
+
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    setError: setFormError,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(inviteSchema),
+    defaultValues: { username: "", message: "" },
+  });
+
+  const usernameValue = watch("username") || "";
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [topicData, invitationsData] = await Promise.all([
           contentApi.getTopicDetails(topicId),
-          contentApi.getTopicModeratorInvitations(topicId)
+          contentApi.getTopicModeratorInvitations(topicId),
         ]);
         setModerators(topicData.moderators || []);
         setInvitations(invitationsData || []);
@@ -52,9 +76,8 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
     fetchData();
   }, [topicId]);
 
-  // Debounced user search for autocomplete
   useEffect(() => {
-    const q = usernameInput.trim();
+    const q = usernameValue.trim();
     if (q.length < 2) {
       setUserOptions([]);
       return;
@@ -66,41 +89,38 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
       setUserSearchLoading(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [usernameInput]);
+  }, [usernameValue]);
 
-  const handleInviteModerator = async () => {
-    if (!usernameInput.trim()) {
-      setError("Por favor ingrese un nombre de usuario");
-      return;
+  const refreshModeratorData = async () => {
+    const [topicData, invitationsData] = await Promise.all([
+      contentApi.getTopicDetails(topicId),
+      contentApi.getTopicModeratorInvitations(topicId),
+    ]);
+    setModerators(topicData.moderators || []);
+    setInvitations(invitationsData || []);
+    if (onModeratorsUpdate) {
+      onModeratorsUpdate(topicData);
     }
+    return topicData;
+  };
 
-    setInviting(true);
-    setError(null);
+  const onInviteSubmit = async ({ username, message }) => {
+    setInviteGeneralError("");
 
     try {
-      const username = usernameInput.trim();
-      const message = messageInput.trim();
-      const invitation = await contentApi.inviteTopicModerator(topicId, username, message);
-      
-      // Refresh invitations and topic data
-      const [topicData, invitationsData] = await Promise.all([
-        contentApi.getTopicDetails(topicId),
-        contentApi.getTopicModeratorInvitations(topicId)
-      ]);
-      setModerators(topicData.moderators || []);
-      setInvitations(invitationsData || []);
-      setUsernameInput("");
-      setMessageInput("");
-      
-      if (onModeratorsUpdate) {
-        onModeratorsUpdate(topicData);
-      }
+      await contentApi.inviteTopicModerator(topicId, username.trim(), message.trim());
+      await refreshModeratorData();
+      reset({ username: "", message: "" });
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Error al enviar invitación"
+      const { generalError } = applyApiErrorsToForm(
+        err,
+        setFormError,
+        "Error al enviar invitación",
+        { username: "username", message: "message" },
       );
-    } finally {
-      setInviting(false);
+      if (generalError) {
+        setInviteGeneralError(generalError);
+      }
     }
   };
 
@@ -111,13 +131,13 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
     try {
       const updatedTopic = await contentApi.removeTopicModerators(topicId, [username]);
       setModerators(updatedTopic.moderators || []);
-      
+
       if (onModeratorsUpdate) {
         onModeratorsUpdate(updatedTopic);
       }
     } catch (err) {
       setError(
-        err.response?.data?.error || "Error al eliminar moderador"
+        err.response?.data?.error || "Error al eliminar moderador",
       );
     } finally {
       setRemoving((prev) => {
@@ -130,29 +150,29 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'PENDING':
-        return 'warning';
-      case 'ACCEPTED':
-        return 'success';
-      case 'DECLINED':
-        return 'error';
-      case 'CANCELLED':
-        return 'default';
+      case "PENDING":
+        return "warning";
+      case "ACCEPTED":
+        return "success";
+      case "DECLINED":
+        return "error";
+      case "CANCELLED":
+        return "default";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'PENDING':
-        return 'Pendiente';
-      case 'ACCEPTED':
-        return 'Aceptada';
-      case 'DECLINED':
-        return 'Rechazada';
-      case 'CANCELLED':
-        return 'Cancelada';
+      case "PENDING":
+        return "Pendiente";
+      case "ACCEPTED":
+        return "Aceptada";
+      case "DECLINED":
+        return "Rechazada";
+      case "CANCELLED":
+        return "Cancelada";
       default:
         return status;
     }
@@ -162,7 +182,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
     return <Typography>Cargando moderadores...</Typography>;
   }
 
-  const pendingInvitations = invitations.filter(inv => inv.status === 'PENDING');
+  const pendingInvitations = invitations.filter((inv) => inv.status === "PENDING");
 
   return (
     <Box>
@@ -186,51 +206,71 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
         </Alert>
       )}
 
-      {/* Invite Moderator */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-        <Autocomplete
-          freeSolo
-          options={userOptions}
-          getOptionLabel={(option) =>
-            typeof option === "string" ? option : option?.username ?? ""
-          }
-          inputValue={usernameInput}
-          onInputChange={(_, value) => setUsernameInput(value ?? "")}
-          onChange={(_, option) => {
-            if (option && typeof option === "object" && option.username) {
-              setUsernameInput(option.username);
-            }
-          }}
-          loading={userSearchLoading}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Nombre de usuario"
-              size="small"
-              placeholder="Escriba para buscar o ingrese el username"
+      <Box
+        component="form"
+        onSubmit={handleSubmit(onInviteSubmit)}
+        noValidate
+        sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}
+      >
+        {inviteGeneralError && (
+          <Alert severity="error" onClose={() => setInviteGeneralError("")}>
+            {inviteGeneralError}
+          </Alert>
+        )}
+        <Controller
+          name="username"
+          control={control}
+          render={({ field }) => (
+            <Autocomplete
+              freeSolo
+              options={userOptions}
+              getOptionLabel={(option) =>
+                typeof option === "string" ? option : option?.username ?? ""
+              }
+              inputValue={field.value}
+              onInputChange={(_, value) => field.onChange(value ?? "")}
+              onChange={(_, option) => {
+                if (option && typeof option === "object" && option.username) {
+                  field.onChange(option.username);
+                }
+              }}
+              loading={userSearchLoading}
+              disabled={isSubmitting}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Nombre de usuario"
+                  size="small"
+                  placeholder="Escriba para buscar o ingrese el username"
+                  error={!!errors.username}
+                  helperText={errors.username?.message}
+                  disabled={isSubmitting}
+                />
+              )}
             />
           )}
         />
         <TextField
           label="Mensaje (opcional)"
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
           size="small"
           multiline
           rows={2}
           placeholder="Mensaje opcional para el invitado"
+          error={!!errors.message}
+          helperText={errors.message?.message}
+          disabled={isSubmitting}
+          {...register("message")}
         />
         <Button
+          type="submit"
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={handleInviteModerator}
-          disabled={inviting || !usernameInput.trim()}
+          disabled={isSubmitting}
         >
-          Invitar Moderador
+          {isSubmitting ? "Enviando..." : "Invitar Moderador"}
         </Button>
       </Box>
 
-      {/* Pending Invitations */}
       {pendingInvitations.length > 0 && (
         <Box sx={{ mb: 3 }}>
           <Typography
@@ -253,11 +293,11 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
                 }}
               >
                 <ListItemText
-                  primary={invitation.invited_user?.username || 'Usuario'}
+                  primary={invitation.invited_user?.username || "Usuario"}
                   secondary={
                     <Box>
                       <Typography variant="body2" color="text.secondary">
-                        {invitation.message || 'Sin mensaje'}
+                        {invitation.message || "Sin mensaje"}
                       </Typography>
                       <Chip
                         label={getStatusLabel(invitation.status)}
@@ -272,7 +312,6 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
                   <IconButton
                     edge="end"
                     onClick={() => {
-                      // Cancel invitation - for now just show error, can be implemented later
                       setError("Cancelar invitación aún no está implementado");
                     }}
                     disabled={canceling[invitation.id]}
@@ -289,7 +328,6 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* Active Moderators List */}
       <Typography
         variant="subtitle1"
         gutterBottom

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, Paper, FormControlLabel, Switch } from '@mui/material';
+import { Box, Typography, TextField, Button, Paper, FormControlLabel, Switch, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import contentApi from '../api/contentApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 
 const schema = yup.object().shape({
     name: yup
@@ -16,15 +17,21 @@ const schema = yup.object().shape({
 });
 
 const CreateCollectionForm = () => {
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [generalError, setGeneralError] = useState('');
     const navigate = useNavigate();
-    const { register, handleSubmit, control, formState: { errors } } = useForm({
+    const {
+        register,
+        handleSubmit,
+        control,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm({
         resolver: yupResolver(schema),
         defaultValues: { name: '', is_public: false },
     });
 
     const onSubmit = async (data) => {
-        setIsSubmitting(true);
+        setGeneralError('');
         try {
             await contentApi.createCollection({
                 name: data.name,
@@ -33,9 +40,14 @@ const CreateCollectionForm = () => {
             navigate('/content/collections');
         } catch (error) {
             console.error('Failed to create collection:', error);
-            alert('Error al crear la colección. Por favor intenta de nuevo.');
-        } finally {
-            setIsSubmitting(false);
+            const { generalError: parsed } = applyApiErrorsToForm(
+                error,
+                setError,
+                'Error al crear la colección. Por favor intenta de nuevo.',
+            );
+            if (parsed) {
+                setGeneralError(parsed);
+            }
         }
     };
 
@@ -46,7 +58,13 @@ const CreateCollectionForm = () => {
                     Crear nueva colección
                 </Typography>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
+                {generalError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        {generalError}
+                    </Alert>
+                )}
+
+                <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <TextField
                         fullWidth
                         label="Nombre de la colección"
@@ -88,6 +106,7 @@ const CreateCollectionForm = () => {
                             type="button"
                             variant="outlined"
                             onClick={() => navigate('/content/collections')}
+                            disabled={isSubmitting}
                         >
                             Cancelar
                         </Button>

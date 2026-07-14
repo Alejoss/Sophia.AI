@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Alert,
   Box,
@@ -12,26 +15,65 @@ import ContentSuggestionPicker, { getProfileContentId } from '../../content/Cont
 import { suggestEntryTitleFromFileName } from '../../content/inferTitleAuthorFromFileName';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
+const schema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required('El título es requerido.'),
+  description: yup.string().default(''),
+  start_date: yup.string().default(''),
+  end_date: yup
+    .string()
+    .default('')
+    .test(
+      'date-range',
+      'La fecha final no puede ser anterior a la fecha inicial.',
+      function dateRange(value) {
+        const { start_date: startDate } = this.parent;
+        if (!value || !startDate) return true;
+        return !dayjs(value).isBefore(dayjs(startDate), 'day');
+      },
+    ),
+  message: yup
+    .string()
+    .max(500, 'El mensaje no puede exceder 500 caracteres.')
+    .default(''),
+});
+
 const TopicTimelineEntrySuggestionForm = ({
   saving,
   error,
   onCancel,
   onSubmit,
 }) => {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    start_date: '',
-    end_date: '',
-    message: '',
-  });
   const [externalProfiles, setExternalProfiles] = useState([]);
-  const [dateRangeError, setDateRangeError] = useState('');
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isValid },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: {
+      title: '',
+      description: '',
+      start_date: '',
+      end_date: '',
+      message: '',
+    },
+    mode: 'onChange',
+  });
+
+  const startDate = watch('start_date');
+  const endDate = watch('end_date');
+  const messageValue = watch('message');
 
   const applyAutoTitleFromFileName = (filename) => {
     const suggested = suggestEntryTitleFromFileName(filename);
     if (!suggested) return;
-    setForm((prev) => ({ ...prev, title: suggested }));
+    setValue('title', suggested, { shouldValidate: true });
   };
 
   const handleFileSelected = (file) => {
@@ -39,26 +81,7 @@ const TopicTimelineEntrySuggestionForm = ({
     if (name) applyAutoTitleFromFileName(name);
   };
 
-  const handleFieldChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
-  const handleDateChange = ({ start_date, end_date }) => {
-    setForm((prev) => ({ ...prev, start_date, end_date }));
-    if (start_date && end_date && dayjs(end_date).isBefore(dayjs(start_date), 'day')) {
-      setDateRangeError('La fecha final no puede ser anterior a la fecha inicial.');
-    } else {
-      setDateRangeError('');
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!form.title.trim()) return;
-    if (form.start_date && form.end_date && dayjs(form.end_date).isBefore(dayjs(form.start_date), 'day')) {
-      setDateRangeError('La fecha final no puede ser anterior a la fecha inicial.');
-      return;
-    }
-
+  const handleFormSubmit = async (form) => {
     const profile = externalProfiles[0];
     const contents = [];
     if (profile) {
@@ -79,10 +102,15 @@ const TopicTimelineEntrySuggestionForm = ({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+    <Paper
+      variant="outlined"
+      component="form"
+      onSubmit={handleSubmit(handleFormSubmit)}
+      noValidate
+      sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
+    >
       <Stack spacing={2.5}>
         {error && <Alert severity="error">{error}</Alert>}
-        {dateRangeError && <Alert severity="error">{dateRangeError}</Alert>}
 
         <ContentSuggestionPicker
           selectedProfiles={externalProfiles}
@@ -96,37 +124,45 @@ const TopicTimelineEntrySuggestionForm = ({
 
         <TextField
           label="Titulo de la entrada"
-          value={form.title}
-          onChange={handleFieldChange('title')}
+          {...register('title')}
+          error={Boolean(errors.title)}
+          helperText={errors.title?.message}
           fullWidth
           required
         />
         <TextField
           label="Descripcion narrativa"
           placeholder="Descripción narrativa para la línea de tiempo"
-          value={form.description}
-          onChange={handleFieldChange('description')}
+          {...register('description')}
+          error={Boolean(errors.description)}
+          helperText={errors.description?.message}
           fullWidth
           multiline
           minRows={3}
         />
 
         <TopicTimelineDateFields
-          startDate={form.start_date}
-          endDate={form.end_date}
-          onChange={handleDateChange}
+          startDate={startDate}
+          endDate={endDate}
+          onChange={({ start_date, end_date }) => {
+            setValue('start_date', start_date, { shouldValidate: true });
+            setValue('end_date', end_date, { shouldValidate: true });
+          }}
           disabled={saving}
           isNewEntry
         />
+        {errors.end_date && (
+          <Alert severity="error">{errors.end_date.message}</Alert>
+        )}
 
         <TextField
           label="Mensaje para moderadores (opcional)"
-          value={form.message}
-          onChange={handleFieldChange('message')}
+          {...register('message')}
+          error={Boolean(errors.message)}
+          helperText={errors.message?.message || `${messageValue.length}/500 caracteres`}
           fullWidth
           multiline
           minRows={2}
-          helperText={`${form.message.length}/500 caracteres`}
           inputProps={{ maxLength: 500 }}
         />
       </Stack>
@@ -146,10 +182,9 @@ const TopicTimelineEntrySuggestionForm = ({
           Cancelar
         </Button>
         <Button
-          type="button"
+          type="submit"
           variant="contained"
-          onClick={handleSubmit}
-          disabled={saving || !form.title.trim()}
+          disabled={saving || !isValid}
         >
           {saving ? 'Enviando...' : 'Enviar sugerencia'}
         </Button>

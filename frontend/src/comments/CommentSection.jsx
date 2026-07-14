@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Box,
     Typography,
@@ -7,18 +10,38 @@ import {
     Paper,
     Divider,
     Alert,
-    Snackbar
+    Snackbar,
+    CircularProgress,
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import commentsApi from '../api/commentsApi';
 import { Comment } from './Comment';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const commentSchema = yup.object({
+    body: yup
+        .string()
+        .trim()
+        .required('Escribe un comentario antes de publicar.'),
+});
 
 const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = null }) => {
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [generalError, setGeneralError] = useState('');
     const { authState } = useContext(AuthContext);
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError: setFormError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(commentSchema),
+        defaultValues: { body: '' },
+    });
 
     useEffect(() => {
         loadComments();
@@ -28,7 +51,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             setLoading(true);
             let fetchedComments;
-            
+
             if (knowledgePathId) {
                 fetchedComments = await commentsApi.getKnowledgePathComments(knowledgePathId);
             } else if (contentId) {
@@ -38,7 +61,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             } else {
                 throw new Error('No valid comment context provided');
             }
-            
+
             setComments(fetchedComments);
         } catch (err) {
             if (err.response?.status !== 404) {
@@ -50,29 +73,35 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         }
     };
 
-    const handleAddComment = async () => {
+    const onSubmit = async ({ body }) => {
         if (!authState.user) {
             setError('Debe iniciar sesión para comentar');
             return;
         }
 
-        if (!newComment.trim()) {
-            return;
-        }
+        setGeneralError('');
 
         try {
             if (knowledgePathId) {
-                await commentsApi.addKnowledgePathComment(knowledgePathId, newComment);
+                await commentsApi.addKnowledgePathComment(knowledgePathId, body);
             } else if (contentId) {
-                await commentsApi.addContentComment(topicId, contentId, newComment);
+                await commentsApi.addContentComment(topicId, contentId, body);
             } else if (topicId) {
-                await commentsApi.addTopicComment(topicId, newComment);
+                await commentsApi.addTopicComment(topicId, body);
             }
 
-            setNewComment('');
+            reset({ body: '' });
             await loadComments();
-        } catch (error) {
-            setError('Error al agregar el comentario. Por favor, inténtelo de nuevo.');
+        } catch (err) {
+            const { generalError: parsed } = applyApiErrorsToForm(
+                err,
+                setFormError,
+                'Error al agregar el comentario. Por favor, inténtelo de nuevo.',
+                { text: 'body', content: 'body' },
+            );
+            if (parsed) {
+                setGeneralError(parsed);
+            }
         }
     };
 
@@ -89,7 +118,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             await commentsApi.updateComment(commentId, body);
             await loadComments();
-        } catch (error) {
+        } catch (err) {
             setError('Error al actualizar el comentario');
         }
     };
@@ -103,7 +132,7 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
         try {
             await commentsApi.addCommentReply(parentId, body);
             await loadComments();
-        } catch (error) {
+        } catch (err) {
             setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
         }
     };
@@ -115,24 +144,37 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
             <Typography variant="h6" gutterBottom>
                 Comentarios
             </Typography>
-            
+
             {authState.isAuthenticated ? (
-                <Box sx={{ mb: 3 }}>
+                <Box
+                    component="form"
+                    onSubmit={handleSubmit(onSubmit)}
+                    noValidate
+                    sx={{ mb: 3 }}
+                >
+                    {generalError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {generalError}
+                        </Alert>
+                    )}
                     <TextField
                         fullWidth
                         multiline
                         rows={3}
                         placeholder="Escriba un comentario..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
+                        error={!!errors.body}
+                        helperText={errors.body?.message}
+                        disabled={isSubmitting}
+                        {...register('body')}
                     />
                     <Button
+                        type="submit"
                         variant="contained"
                         sx={{ mt: 1 }}
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim()}
+                        disabled={isSubmitting}
+                        startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : null}
                     >
-                        Publicar Comentario
+                        {isSubmitting ? 'Publicando...' : 'Publicar Comentario'}
                     </Button>
                 </Box>
             ) : (
@@ -177,4 +219,4 @@ const CommentSection = ({ topicId = null, contentId = null, knowledgePathId = nu
     );
 };
 
-export default CommentSection; 
+export default CommentSection;

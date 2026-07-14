@@ -1,6 +1,15 @@
 const API_ERROR_TRANSLATIONS = {
   'Upload a valid image. The file you uploaded was either not an image or a corrupted image.':
     'La imagen no es válida. El archivo puede estar dañado o no ser una imagen compatible.',
+  'This field may not be blank.': 'Este campo es requerido.',
+  'This field is required.': 'Este campo es requerido.',
+  'This field cannot be blank.': 'Este campo es requerido.',
+  'Enter a valid email address.': 'Introduce un correo electrónico válido.',
+  'A user with that username already exists.': 'Ya existe un usuario con ese nombre de usuario.',
+  'A user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.',
+  'user with this username already exists.': 'Ya existe un usuario con ese nombre de usuario.',
+  'user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.',
+  'Unable to log in with provided credentials.': 'Credenciales inválidas.',
 };
 
 const RESERVED_KEYS = new Set(['detail', 'error', 'non_field_errors']);
@@ -83,6 +92,27 @@ export function parseApiValidationErrors(error, fallback = null) {
 
   if (!generalError && Object.keys(fieldErrors).length === 0) {
     generalError = fallback;
+  }
+
+  return { fieldErrors, generalError };
+}
+
+/**
+ * Apply parsed API errors onto a react-hook-form instance via setError.
+ * Field messages surface as helperText; returns generalError for an Alert if needed.
+ *
+ * @param {unknown} error
+ * @param {(name: string, error: { type: string, message: string }) => void} setError
+ * @param {string|null} [fallback=null]
+ * @param {Record<string, string>} [fieldMap={}] Map API field names → form field names
+ * @returns {{ fieldErrors: Record<string, string>, generalError: string|null }}
+ */
+export function applyApiErrorsToForm(error, setError, fallback = null, fieldMap = {}) {
+  const { fieldErrors, generalError } = parseApiValidationErrors(error, fallback);
+
+  for (const [apiField, message] of Object.entries(fieldErrors)) {
+    const formField = fieldMap[apiField] || apiField;
+    setError(formField, { type: 'server', message });
   }
 
   return { fieldErrors, generalError };

@@ -15,10 +15,8 @@ Django REST Framework backend development:
 
 React frontend development:
 
-- [Components](frontend/components.md) - Component structure and patterns
-- [Routing](frontend/routing.md) - Routing configuration
-- [State Management](frontend/state-management.md) - Context API and state
-- [API Integration](frontend/api-integration.md) - API client usage
+- [Forms standard](frontend/forms.md) - React Hook Form + Yup, errors, auth contracts, PR checklist
+- Components, routing, state, and API client guides — planned (not written yet); follow existing `frontend/src` patterns and [Architecture](../architecture/overview.md)
 
 ## Smart Contract Development
 

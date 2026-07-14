@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Alert,
   Box,
@@ -28,6 +31,14 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import contentApi from '../../api/contentApi';
+import { applyApiErrorsToForm } from '../../utils/apiFormErrors.js';
+
+const rejectSchema = yup.object({
+  reason: yup
+    .string()
+    .trim()
+    .required('Debe proporcionar una razón para rechazar'),
+});
 
 const formatDate = (value) => {
   if (!value) return 'Sin fecha';
@@ -50,7 +61,18 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
   const [processingIds, setProcessingIds] = useState(new Set());
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectGeneralError, setRejectGeneralError] = useState('');
+
+  const {
+    register: registerReject,
+    handleSubmit: handleRejectSubmit,
+    reset: resetRejectForm,
+    setError: setRejectFormError,
+    formState: { errors: rejectErrors, isSubmitting: isRejectSubmitting },
+  } = useForm({
+    resolver: yupResolver(rejectSchema),
+    defaultValues: { reason: '' },
+  });
 
   const fetchSuggestions = async () => {
     try {
@@ -91,31 +113,38 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
     }
   };
 
-  const handleRejectConfirm = async () => {
-    if (!rejectionReason.trim()) {
-      setError('Debe proporcionar una razon para rechazar');
-      return;
-    }
+  const onRejectSubmit = async ({ reason }) => {
+    if (!selectedSuggestion) return;
 
-    setProcessingIds((prev) => new Set(prev).add(selectedSuggestion.id));
+    const suggestionId = selectedSuggestion.id;
+    setProcessingIds((prev) => new Set(prev).add(suggestionId));
+    setRejectGeneralError('');
     setError(null);
     try {
       await contentApi.rejectTopicTimelineEntrySuggestion(
         topicId,
-        selectedSuggestion.id,
-        rejectionReason,
+        suggestionId,
+        reason,
       );
       setRejectDialogOpen(false);
       setSelectedSuggestion(null);
-      setRejectionReason('');
+      resetRejectForm({ reason: '' });
       await fetchSuggestions();
       onSuggestionProcessed?.();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al rechazar la sugerencia');
+      const { generalError } = applyApiErrorsToForm(
+        err,
+        setRejectFormError,
+        'Error al rechazar la sugerencia',
+        { rejection_reason: 'reason' },
+      );
+      if (generalError) {
+        setRejectGeneralError(generalError);
+      }
     } finally {
       setProcessingIds((prev) => {
         const next = new Set(prev);
-        next.delete(selectedSuggestion.id);
+        next.delete(suggestionId);
         return next;
       });
     }
@@ -266,7 +295,8 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                                 disabled={isProcessing}
                                 onClick={() => {
                                   setSelectedSuggestion(suggestion);
-                                  setRejectionReason('');
+                                  resetRejectForm({ reason: '' });
+                                  setRejectGeneralError('');
                                   setRejectDialogOpen(true);
                                 }}
                               >
@@ -285,25 +315,46 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
         </TableContainer>
       )}
 
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Rechazar sugerencia de linea de tiempo</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            multiline
-            minRows={3}
-            label="Razon del rechazo"
-            value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-          <Button color="error" variant="contained" onClick={handleRejectConfirm}>
-            Rechazar
-          </Button>
-        </DialogActions>
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={() => !isRejectSubmitting && setRejectDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
+          <DialogTitle>Rechazar sugerencia de linea de tiempo</DialogTitle>
+          <DialogContent>
+            {rejectGeneralError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {rejectGeneralError}
+              </Alert>
+            )}
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Razon del rechazo"
+              error={!!rejectErrors.reason}
+              helperText={rejectErrors.reason?.message}
+              disabled={isRejectSubmitting}
+              sx={{ mt: 1 }}
+              {...registerReject('reason')}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              color="error"
+              variant="contained"
+              disabled={isRejectSubmitting}
+            >
+              {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
     </Box>
   );

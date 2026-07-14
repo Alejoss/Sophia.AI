@@ -42,7 +42,7 @@ const renderEditPage = () =>
         <Routes>
           <Route path="/content/:contentId/edit" element={<ContentProfileEdit />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     </AuthContext.Provider>,
   );
 
@@ -105,5 +105,63 @@ describe('ContentProfileEdit URL actions', () => {
       expect(contentApi.checkContentModification).toHaveBeenCalledWith('42');
       expect(contentApi.updateContent).toHaveBeenCalledWith('42', { url: null });
     });
+  });
+});
+
+describe('ContentProfileEdit form', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    contentApi.getContentDetails.mockResolvedValue(baseContent);
+    contentApi.checkContentModification.mockResolvedValue({
+      can_modify: true,
+      message: 'El contenido puede ser modificado',
+    });
+  });
+
+  it('shows a title validation error and does not call the API', async () => {
+    const user = userEvent.setup();
+    renderEditPage();
+
+    const titleField = await screen.findByLabelText(/^título$/i);
+    await user.clear(titleField);
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    expect(await screen.findByText(/el título es requerido/i)).toBeInTheDocument();
+    expect(contentApi.updateContentProfile).not.toHaveBeenCalled();
+  });
+
+  it('saves the updated profile fields', async () => {
+    const user = userEvent.setup();
+    contentApi.updateContentProfile.mockResolvedValue({ id: 7 });
+    renderEditPage();
+
+    const titleField = await screen.findByLabelText(/^título$/i);
+    await user.clear(titleField);
+    await user.type(titleField, 'Nuevo título');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() => {
+      expect(contentApi.updateContentProfile).toHaveBeenCalledWith(
+        7,
+        expect.objectContaining({ title: 'Nuevo título' }),
+      );
+    });
+  });
+
+  it('shows a Spanish alert when the API call fails', async () => {
+    const user = userEvent.setup();
+    contentApi.updateContentProfile.mockRejectedValue({
+      response: { data: { error: 'No se pudo actualizar el contenido' } },
+    });
+    renderEditPage();
+
+    const titleField = await screen.findByLabelText(/^título$/i);
+    await user.clear(titleField);
+    await user.type(titleField, 'Otro título');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    expect(
+      await screen.findByText(/no se pudo actualizar el contenido/i),
+    ).toBeInTheDocument();
   });
 });

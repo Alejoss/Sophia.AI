@@ -1,37 +1,48 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Box, Typography, TextField, Button, Alert } from '@mui/material';
 import { submitNewsletterSubscription } from '../api/profilesApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { emailField } from '../utils/formSchemas';
+
+const schema = yup.object({
+  email: emailField(),
+});
 
 const ClubDeLectura = () => {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [generalError, setGeneralError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { email: '' },
+  });
+
+  const onSubmit = async ({ email }) => {
     setSuccessMessage('');
-    setErrorMessage('');
+    setGeneralError('');
 
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setErrorMessage('Por favor, introduce un email válido.');
-      return;
-    }
-
-    setLoading(true);
     try {
-      await submitNewsletterSubscription(trimmedEmail, 'club_de_lectura');
+      await submitNewsletterSubscription(email.trim(), 'club_de_lectura');
       setSuccessMessage('¡Gracias! Te avisaremos sobre el Club de Lectura.');
-      setEmail('');
+      reset({ email: '' });
     } catch (err) {
-      const detail =
-        err?.response?.data?.detail ||
-        err?.response?.data?.email?.[0] ||
-        'No se ha podido registrar tu email. Inténtalo de nuevo más tarde.';
-      setErrorMessage(detail);
-    } finally {
-      setLoading(false);
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'No se ha podido registrar tu email. Inténtalo de nuevo más tarde.',
+      );
+      if (parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
@@ -62,7 +73,7 @@ const ClubDeLectura = () => {
 
       <Box
         component="form"
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         noValidate
         sx={{
           width: '100%',
@@ -83,8 +94,9 @@ const ClubDeLectura = () => {
         <TextField
           type="email"
           label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          {...register('email')}
+          error={!!errors.email}
+          helperText={errors.email?.message}
           placeholder="tu@email.com"
           fullWidth
           variant="outlined"
@@ -96,12 +108,13 @@ const ClubDeLectura = () => {
             },
             '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
             '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,107,53,0.5)' },
+            '& .MuiFormHelperText-root': { color: 'error.light' },
           }}
         />
 
-        {errorMessage && (
+        {generalError && (
           <Alert severity="error" variant="filled">
-            {errorMessage}
+            {generalError}
           </Alert>
         )}
         {successMessage && (
@@ -113,7 +126,7 @@ const ClubDeLectura = () => {
         <Button
           type="submit"
           variant="contained"
-          disabled={loading}
+          disabled={isSubmitting}
           sx={{
             bgcolor: '#FF6B35',
             '&:hover': { bgcolor: '#E55A2B' },
@@ -123,7 +136,7 @@ const ClubDeLectura = () => {
           }}
           fullWidth
         >
-          {loading ? 'Enviando...' : 'Quiero participar'}
+          {isSubmitting ? 'Enviando...' : 'Quiero participar'}
         </Button>
 
         <Typography

@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { AuthContext } from '../context/AuthContext';
 import { getUserProfile, getProfileById, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, changePassword } from '../api/profilesApi';
 import { useNotifications } from '../context/NotificationsContext.jsx';
@@ -37,64 +40,70 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SecurityIcon from '@mui/icons-material/Security';
+import { passwordField } from '../utils/formSchemas.js';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const changePasswordSchema = yup.object({
+  old_password: yup
+    .string()
+    .required('La contraseña actual es requerida.'),
+  new_password: passwordField().test(
+    'different-from-old',
+    'La nueva contraseña debe ser diferente a la actual.',
+    function differentFromOld(value) {
+      return value !== this.parent.old_password;
+    },
+  ),
+  confirm_password: yup
+    .string()
+    .required('Confirma la nueva contraseña.')
+    .oneOf([yup.ref('new_password')], 'Las contraseñas no coinciden.'),
+});
 
 // Security Section Component
-const SecuritySection = () => {
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export const SecuritySection = () => {
+  const [generalError, setGeneralError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(changePasswordSchema),
+    defaultValues: {
+      old_password: '',
+      new_password: '',
+      confirm_password: '',
+    },
+  });
+
+  const onSubmit = async ({ old_password, new_password, confirm_password }) => {
+    setGeneralError('');
     setSuccess(false);
 
-    // Validation
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setError('Por favor, completa todos los campos.');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setError('La nueva contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
-      return;
-    }
-
-    if (oldPassword === newPassword) {
-      setError('La nueva contraseña debe ser diferente a la actual.');
-      return;
-    }
-
-    setLoading(true);
-
     try {
-      await changePassword(oldPassword, newPassword, confirmPassword);
+      await changePassword(old_password, new_password, confirm_password);
       setSuccess(true);
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      reset({
+        old_password: '',
+        new_password: '',
+        confirm_password: '',
+      });
       setTimeout(() => {
         setSuccess(false);
       }, 5000);
     } catch (err) {
-      const errorMessage = err.response?.data?.old_password?.[0] ||
-                          err.response?.data?.new_password?.[0] ||
-                          err.response?.data?.confirm_password?.[0] ||
-                          err.response?.data?.error ||
-                          err.response?.data?.message ||
-                          err.message ||
-                          'Error al cambiar la contraseña. Por favor, intenta nuevamente.';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'Error al cambiar la contraseña. Por favor, intenta nuevamente.',
+      );
+      if (parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
@@ -105,31 +114,31 @@ const SecuritySection = () => {
         gutterBottom
         sx={{
           fontSize: {
-            xs: "1.5rem", // ~24px on mobile
-            sm: "1.75rem", // ~28px on small screens
-            md: "2.125rem", // ~34px on desktop (default h4)
+            xs: "1.5rem",
+            sm: "1.75rem",
+            md: "2.125rem",
           },
           fontWeight: 600,
         }}
       >
         Configuración de seguridad
       </Typography>
-      
+
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Cambia tu contraseña para mantener tu cuenta segura.
       </Typography>
 
       <Paper elevation={1} sx={{ p: 3, maxWidth: 600 }}>
-        <form onSubmit={handleSubmit}>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {success && (
             <Alert severity="success" sx={{ mb: 2 }}>
               ¡Contraseña cambiada exitosamente!
             </Alert>
           )}
-          
-          {error && (
+
+          {generalError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
+              {generalError}
             </Alert>
           )}
 
@@ -137,37 +146,36 @@ const SecuritySection = () => {
             fullWidth
             label="Contraseña actual"
             type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
             margin="normal"
-            required
-            disabled={loading || success}
+            disabled={isSubmitting || success}
             autoComplete="current-password"
+            error={!!errors.old_password}
+            helperText={errors.old_password?.message}
+            {...register('old_password')}
           />
 
           <TextField
             fullWidth
             label="Nueva contraseña"
             type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
             margin="normal"
-            required
-            disabled={loading || success}
+            disabled={isSubmitting || success}
             autoComplete="new-password"
-            helperText="Mínimo 8 caracteres"
+            error={!!errors.new_password}
+            helperText={errors.new_password?.message || 'Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos'}
+            {...register('new_password')}
           />
 
           <TextField
             fullWidth
             label="Confirmar nueva contraseña"
             type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
             margin="normal"
-            required
-            disabled={loading || success}
+            disabled={isSubmitting || success}
             autoComplete="new-password"
+            error={!!errors.confirm_password}
+            helperText={errors.confirm_password?.message}
+            {...register('confirm_password')}
           />
 
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
@@ -175,13 +183,13 @@ const SecuritySection = () => {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={loading || success}
-              startIcon={loading ? <CircularProgress size={20} /> : null}
+              disabled={isSubmitting || success}
+              startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
             >
-              {loading ? 'Cambiando...' : success ? 'Cambiada' : 'Cambiar contraseña'}
+              {isSubmitting ? 'Cambiando...' : success ? 'Cambiada' : 'Cambiar contraseña'}
             </Button>
           </Box>
-        </form>
+        </Box>
       </Paper>
     </Box>
   );

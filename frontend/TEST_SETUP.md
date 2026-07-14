@@ -27,25 +27,20 @@ Run tests with coverage:
 npm run test:coverage
 ```
 
-## Test Files
+## Test Coverage (forms)
 
-- `src/gamification/__tests__/BadgeDisplay.test.jsx` - Tests for BadgeDisplay component
-- `src/gamification/__tests__/BadgeList.test.jsx` - Tests for BadgeList component
-- `src/gamification/__tests__/FeaturedBadgeSelector.test.jsx` - Tests for FeaturedBadgeSelector component
-- `src/gamification/__tests__/useBadges.test.js` - Tests for useBadges hook
-- `src/gamification/__tests__/badgeIconMap.test.js` - Tests for badge icon mapping utilities
+Form-related suites live under each feature’s `__tests__/` folder and use `src/test/formTestUtils.jsx`. Typical coverage per form:
 
-## Test Coverage
+1. Invalid / empty submit → Spanish `helperText` or Alert; API not called  
+2. Valid submit → mocked API / callback with expected payload  
+3. API rejection → visible Spanish error (not console-only)
 
-The tests cover:
-- Badge display and rendering
-- Badge list functionality
-- Featured badge selection
-- Badge data fetching hooks
-- Badge icon mapping
-- Error handling
-- Loading states
-- Edge cases
+Helpers: `apiFormErrors.test.js`, `formSchemas.test.js`.
+
+```bash
+cd frontend
+npm run test
+```
 
 ## Notes
 

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { fetchEventById, updateEvent, deleteEvent } from '../api/eventsApi';
 import {
   Alert,
@@ -14,6 +17,7 @@ import {
   DialogTitle,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   Grid,
   InputLabel,
   MenuItem,
@@ -28,7 +32,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
 import { formatDateTimeForInput } from '../utils/dateUtils';
-import { parseApiValidationErrors } from '../utils/apiFormErrors';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
 const PLATFORM_CHOICES = [
@@ -48,41 +52,95 @@ const EVENT_TYPES = [
   { value: 'LIVE_MASTER_CLASS', label: 'Clase Magistral en Vivo' },
 ];
 
+const schema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required('El título es obligatorio'),
+  description: yup
+    .string()
+    .trim()
+    .required('La descripción es obligatoria'),
+  event_type: yup
+    .string()
+    .required('El tipo de evento es obligatorio'),
+  platform: yup.string().default(''),
+  other_platform: yup
+    .string()
+    .default('')
+    .when('platform', {
+      is: 'other',
+      then: (field) => field.trim().required('El nombre de la otra plataforma es obligatorio'),
+      otherwise: (field) => field,
+    }),
+  reference_price: yup.string().default(''),
+  date_start: yup.string().default(''),
+  date_end: yup
+    .string()
+    .default('')
+    .test(
+      'after-start',
+      'La fecha de fin debe ser posterior a la fecha de inicio',
+      function afterStart(value) {
+        const { date_start: dateStart } = this.parent;
+        if (!value || !dateStart) return true;
+        return new Date(value) > new Date(dateStart);
+      },
+    ),
+  schedule_description: yup.string().default(''),
+});
+
 const EventEdit = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
     strategy: AUTH_ERROR_STRATEGY.REDIRECT,
   });
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    event_type: '',
-    platform: '',
-    other_platform: '',
-    reference_price: '',
-    date_start: '',
-    date_end: '',
-    schedule_description: '',
-  });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageError, setImageError] = useState('');
   const [isVisible, setIsVisible] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [error, setError] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: {
+      title: '',
+      description: '',
+      event_type: '',
+      platform: '',
+      other_platform: '',
+      reference_price: '',
+      date_start: '',
+      date_end: '',
+      schedule_description: '',
+    },
+  });
+
+  const platform = watch('platform');
+  const title = watch('title');
 
   useEffect(() => {
     const loadEvent = async () => {
       try {
         setFetchLoading(true);
+        setLoadError(null);
         const eventData = await fetchEventById(eventId, { bypassCache: true });
-        
-        setForm({
+
+        reset({
           title: eventData.title || '',
           description: eventData.description || '',
           event_type: eventData.event_type || '',
@@ -103,115 +161,54 @@ const EventEdit = () => {
           return;
         }
         console.error('Error loading event:', err);
-        setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+        setLoadError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
       } finally {
         setFetchLoading(false);
       }
     };
 
     loadEvent();
-  }, [eventId]);
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!form.title.trim()) {
-      newErrors.title = 'El título es obligatorio';
-    }
-
-    if (!form.description.trim()) {
-      newErrors.description = 'La descripción es obligatoria';
-    }
-
-    if (!form.event_type) {
-      newErrors.event_type = 'El tipo de evento es obligatorio';
-    }
-
-    if (form.platform === 'other' && !form.other_platform.trim()) {
-      newErrors.other_platform = 'El nombre de la otra plataforma es obligatorio';
-    }
-
-    if (form.date_start && form.date_end) {
-      const startDate = new Date(form.date_start);
-      const endDate = new Date(form.date_end);
-      if (endDate <= startDate) {
-        newErrors.date_end = 'La fecha de fin debe ser posterior a la fecha de inicio';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleDateTimeChange = (name) => (value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
+  }, [eventId, reset, handleAuthError, getErrorMessage]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, image: 'Por favor, seleccione un archivo de imagen válido' }));
-        return;
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: 'El tamaño de la imagen debe ser menor a 5MB' }));
-        return;
-      }
+    if (!file) return;
 
-      setImageFile(file);
-      setErrors(prev => ({ ...prev, image: '' }));
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      setImageError('Por favor, seleccione un archivo de imagen válido');
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('El tamaño de la imagen debe ser menor a 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    setImageError('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setErrors(prev => ({ ...prev, image: '' }));
+    setImageError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const onSubmit = async (form) => {
+    setSubmitError(null);
     setSuccess(null);
-    setError(null);
-
-    if (!validateForm()) {
-      setLoading(false);
-      return;
-    }
+    setImageError('');
 
     try {
       const formData = new FormData();
-      
-      // Add form fields
-      Object.keys(form).forEach(key => {
+
+      Object.keys(form).forEach((key) => {
         if (key === 'reference_price') {
           formData.append(key, form[key] ? parseFloat(form[key]) : 0);
         } else {
@@ -219,51 +216,47 @@ const EventEdit = () => {
         }
       });
       formData.append('is_visible', String(isVisible));
-      
-      // Add image if a new one was selected
+
       if (imageFile) {
         formData.append('image', imageFile);
       }
-      
+
       const updatedEvent = await updateEvent(eventId, formData);
       setSuccess('¡Evento actualizado exitosamente!');
-      
-      // Navigate to the updated event after a short delay
+
       setTimeout(() => {
         navigate(`/events/${updatedEvent.id}`);
       }, 1500);
-      
     } catch (err) {
       console.error('Error updating event:', err);
 
-      const { fieldErrors, generalError } = parseApiValidationErrors(
+      const imageErrors = err?.response?.data?.image;
+      if (imageErrors) {
+        const imageMsg = Array.isArray(imageErrors) ? imageErrors.join(' ') : String(imageErrors);
+        setImageError(imageMsg);
+      }
+
+      const { generalError: parsed } = applyApiErrorsToForm(
         err,
+        setError,
         'Error al actualizar el evento. Por favor, inténtelo de nuevo.',
       );
 
-      if (Object.keys(fieldErrors).length > 0) {
-        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      if (!imageErrors && parsed) {
+        setSubmitError(parsed);
       }
-
-      if (generalError) {
-        setError(generalError);
-      } else if (Object.keys(fieldErrors).length === 0) {
-        setError(err?.message || 'Error al actualizar el evento. Por favor, inténtelo de nuevo.');
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDeleteEvent = async () => {
     setIsDeletingEvent(true);
-    setError(null);
+    setSubmitError(null);
     try {
       await deleteEvent(eventId);
       setDeleteDialogOpen(false);
       navigate('/events', { replace: true });
     } catch (err) {
-      setError(err?.detail || err?.error || 'Error al eliminar el evento. Por favor, inténtelo de nuevo.');
+      setSubmitError(err?.detail || err?.error || 'Error al eliminar el evento. Por favor, inténtelo de nuevo.');
     } finally {
       setIsDeletingEvent(false);
     }
@@ -280,12 +273,12 @@ const EventEdit = () => {
     );
   }
 
-  if (error && !form.title) {
+  if (loadError && !title) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
           <Typography variant="h4" sx={{ fontWeight: 600 }}>Editar Evento</Typography>
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error">{loadError}</Alert>
           <Button onClick={() => navigate('/events')} variant="contained">
             Volver a Eventos
           </Button>
@@ -302,26 +295,22 @@ const EventEdit = () => {
 
       <Card variant="outlined">
         <CardContent>
-          <Box component="form" onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <Stack spacing={2.5}>
               <TextField
-                name="title"
                 label="Título *"
-                value={form.title}
-                onChange={handleChange}
+                {...register('title')}
                 error={Boolean(errors.title)}
-                helperText={errors.title || ''}
+                helperText={errors.title?.message || ''}
                 placeholder="Ingrese el título del evento"
                 fullWidth
               />
 
               <TextField
-                name="description"
                 label="Descripción *"
-                value={form.description}
-                onChange={handleChange}
+                {...register('description')}
                 error={Boolean(errors.description)}
-                helperText={errors.description || ''}
+                helperText={errors.description?.message || ''}
                 placeholder="Describa su evento..."
                 multiline
                 minRows={3}
@@ -332,7 +321,7 @@ const EventEdit = () => {
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Imagen del Evento
                 </Typography>
-                <Button component="label" variant="outlined">
+                <Button component="label" variant="outlined" disabled={isSubmitting}>
                   {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
                   <input type="file" accept="image/*" hidden onChange={handleImageChange} />
                 </Button>
@@ -351,101 +340,114 @@ const EventEdit = () => {
                     </Box>
                   </Box>
                 )}
-                {errors.image && (
+                {imageError && (
                   <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                    {errors.image}
+                    {imageError}
                   </Typography>
                 )}
               </Box>
 
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth error={Boolean(errors.event_type)}>
-                    <InputLabel>Tipo de Evento *</InputLabel>
-                    <Select
-                      name="event_type"
-                      value={form.event_type}
-                      label="Tipo de Evento *"
-                      onChange={handleChange}
-                    >
-                      <MenuItem value="">Seleccionar tipo</MenuItem>
-                      {EVENT_TYPES.map((et) => (
-                        <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  {errors.event_type && (
-                    <Typography variant="caption" color="error">{errors.event_type}</Typography>
-                  )}
+                  <Controller
+                    name="event_type"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth error={Boolean(errors.event_type)}>
+                        <InputLabel>Tipo de Evento *</InputLabel>
+                        <Select {...field} label="Tipo de Evento *">
+                          <MenuItem value="">Seleccionar tipo</MenuItem>
+                          {EVENT_TYPES.map((et) => (
+                            <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
+                          ))}
+                        </Select>
+                        {errors.event_type && (
+                          <FormHelperText>{errors.event_type.message}</FormHelperText>
+                        )}
+                      </FormControl>
+                    )}
+                  />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth error={Boolean(errors.platform)}>
-                    <InputLabel>Plataforma</InputLabel>
-                    <Select
-                      name="platform"
-                      value={form.platform}
-                      label="Plataforma"
-                      onChange={handleChange}
-                    >
-                      <MenuItem value="">Ninguna</MenuItem>
-                      {PLATFORM_CHOICES.map((p) => (
-                        <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  {errors.platform && (
-                    <Typography variant="caption" color="error">{errors.platform}</Typography>
-                  )}
+                  <Controller
+                    name="platform"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth error={Boolean(errors.platform)}>
+                        <InputLabel>Plataforma</InputLabel>
+                        <Select {...field} label="Plataforma">
+                          <MenuItem value="">Ninguna</MenuItem>
+                          {PLATFORM_CHOICES.map((p) => (
+                            <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                          ))}
+                        </Select>
+                        {errors.platform && (
+                          <FormHelperText>{errors.platform.message}</FormHelperText>
+                        )}
+                      </FormControl>
+                    )}
+                  />
                 </Grid>
               </Grid>
 
-              {form.platform === 'other' && (
+              {platform === 'other' && (
                 <TextField
-                  name="other_platform"
                   label="Otra Plataforma *"
-                  value={form.other_platform}
-                  onChange={handleChange}
+                  {...register('other_platform')}
                   error={Boolean(errors.other_platform)}
-                  helperText={errors.other_platform || ''}
+                  helperText={errors.other_platform?.message || ''}
                   placeholder="Ingrese el nombre de la plataforma"
                   fullWidth
                 />
               )}
 
               <TextField
-                name="reference_price"
                 label="Precio de Referencia en USD"
                 type="number"
-                value={form.reference_price}
-                onChange={handleChange}
+                {...register('reference_price')}
+                error={Boolean(errors.reference_price)}
+                helperText={errors.reference_price?.message || ''}
                 placeholder="0.00"
                 fullWidth
               />
 
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <EventDateTimeField
-                    label="Fecha/Hora de Inicio"
-                    value={form.date_start}
-                    onChange={handleDateTimeChange('date_start')}
+                  <Controller
+                    name="date_start"
+                    control={control}
+                    render={({ field }) => (
+                      <EventDateTimeField
+                        label="Fecha/Hora de Inicio"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.date_start?.message}
+                      />
+                    )}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <EventDateTimeField
-                    label="Fecha/Hora de Fin"
-                    value={form.date_end}
-                    onChange={handleDateTimeChange('date_end')}
-                    error={errors.date_end}
+                  <Controller
+                    name="date_end"
+                    control={control}
+                    render={({ field }) => (
+                      <EventDateTimeField
+                        label="Fecha/Hora de Fin"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.date_end?.message}
+                      />
+                    )}
                   />
                 </Grid>
               </Grid>
 
               <TextField
-                name="schedule_description"
                 label="Descripción del Horario"
-                value={form.schedule_description}
-                onChange={handleChange}
+                {...register('schedule_description')}
+                error={Boolean(errors.schedule_description)}
+                helperText={errors.schedule_description?.message || ''}
                 placeholder="ej., Todos los martes durante 5 semanas"
                 multiline
                 minRows={3}
@@ -457,6 +459,7 @@ const EventEdit = () => {
                   <Switch
                     checked={isVisible}
                     onChange={(e) => setIsVisible(e.target.checked)}
+                    disabled={isSubmitting}
                   />
                 }
                 label={
@@ -476,8 +479,8 @@ const EventEdit = () => {
                 <Button type="button" onClick={() => navigate(`/events/${eventId}`)} variant="outlined" color="inherit">
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={loading} variant="contained">
-                  {loading ? 'Actualizando...' : 'Actualizar Evento'}
+                <Button type="submit" disabled={isSubmitting} variant="contained">
+                  {isSubmitting ? 'Actualizando...' : 'Actualizar Evento'}
                 </Button>
               </Stack>
             </Stack>
@@ -501,7 +504,7 @@ const EventEdit = () => {
         <DialogTitle>Eliminar evento</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            ¿Seguro que deseas eliminar <strong>{form.title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
+            ¿Seguro que deseas eliminar <strong>{title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -515,9 +518,9 @@ const EventEdit = () => {
       </Dialog>
 
       {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
-      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      {submitError && <Alert severity="error" sx={{ mt: 2 }}>{submitError}</Alert>}
     </Container>
   );
 };
 
-export default EventEdit; 
+export default EventEdit;

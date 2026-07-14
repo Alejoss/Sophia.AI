@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-    Box, 
-    Typography, 
-    TextField, 
-    Button, 
-    Paper, 
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
+import {
+    Box,
+    Typography,
+    TextField,
+    Button,
+    Paper,
     CircularProgress,
     Chip,
     FormHelperText,
-    InputAdornment
+    InputAdornment,
+    Alert,
 } from '@mui/material';
 import LinkIcon from '@mui/icons-material/Link';
 import InterestsIcon from '@mui/icons-material/Interests';
@@ -17,178 +21,205 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { AuthContext } from '../context/AuthContext';
 import { getAccessTokenFromLocalStorage } from '../context/localStorageUtils';
 import { getUserProfile, updateProfile } from '../api/profilesApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import UserAvatar from '../components/UserAvatar';
 
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_INTERESTS = 10;
+const MAX_USERNAME_CHANGES = 2;
+
+const schema = yup.object({
+    username: yup
+        .string()
+        .trim()
+        .required('El nombre de usuario es requerido.')
+        .min(3, 'El nombre de usuario debe tener al menos 3 caracteres.')
+        .matches(
+            /^[a-zA-Z0-9_]+$/,
+            'El nombre de usuario solo puede contener letras, números y guiones bajos (_).',
+        ),
+    profile_description: yup
+        .string()
+        .max(MAX_DESCRIPTION_LENGTH, `Máximo ${MAX_DESCRIPTION_LENGTH} caracteres.`),
+    external_url: yup
+        .string()
+        .trim()
+        .test(
+            'url-or-empty',
+            'Introduce una URL válida (incluye https://).',
+            (value) => {
+                if (!value) return true;
+                try {
+                    // eslint-disable-next-line no-new
+                    new URL(value);
+                    return true;
+                } catch {
+                    return false;
+                }
+            },
+        ),
+});
+
+/**
+ * Profile edit — if username changes and API returns user, updateAuthState with
+ * existing access token (do not touch refresh cookie; never log tokens).
+ */
 const EditProfile = () => {
     const navigate = useNavigate();
     const { updateAuthState } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState(null);
-    const [formData, setFormData] = useState({
-        username: '',
-        profile_description: '',
-        interests: [],
-        external_url: '',
-        profile_picture: null
-    });
+    const [loadError, setLoadError] = useState(null);
+    const [generalError, setGeneralError] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [interestInput, setInterestInput] = useState('');
+    const [interests, setInterests] = useState([]);
+    const [profilePicture, setProfilePicture] = useState(null);
     const [usernameChangeCount, setUsernameChangeCount] = useState(0);
     const [originalUsername, setOriginalUsername] = useState('');
-    const MAX_DESCRIPTION_LENGTH = 500;
-    const MAX_INTERESTS = 10;
-    const MAX_USERNAME_CHANGES = 2;
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        watch,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(schema),
+        defaultValues: {
+            username: '',
+            profile_description: '',
+            external_url: '',
+        },
+    });
+
+    const username = watch('username');
+    const profileDescription = watch('profile_description') || '';
+    const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
+    const remainingUsernameChanges = MAX_USERNAME_CHANGES - usernameChangeCount;
+    const remainingChars = MAX_DESCRIPTION_LENGTH - profileDescription.length;
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const profile = await getUserProfile();
-                // Convertir interests string a array
-                const interestsArray = profile.interests 
-                    ? profile.interests.split(',').map(i => i.trim()).filter(i => i)
+                const interestsArray = profile.interests
+                    ? profile.interests.split(',').map((i) => i.trim()).filter((i) => i)
                     : [];
-                
-                setFormData({
+
+                reset({
                     username: profile.user.username,
                     profile_description: profile.profile_description || '',
-                    interests: interestsArray,
                     external_url: profile.external_url || '',
-                    profile_picture: null
                 });
+                setInterests(interestsArray);
                 setUsernameChangeCount(profile.username_change_count ?? 0);
                 setOriginalUsername(profile.user.username || '');
                 setPreviewUrl(profile.profile_picture);
-                setError(null);
+                setLoadError(null);
             } catch (err) {
-                setError('Error al cargar el perfil');
+                setLoadError('Error al cargar el perfil');
             } finally {
                 setLoading(false);
             }
         };
 
         fetchProfile();
-    }, []);
+    }, [reset]);
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+    const addInterestFromValue = (value) => {
+        if (interests.length >= MAX_INTERESTS) return;
+        const normalizedValue = value.trim();
+        if (!normalizedValue) return;
+        const exists = interests.some(
+            (tag) => tag.toLowerCase() === normalizedValue.toLowerCase(),
+        );
+        if (!exists) {
+            setInterests((prev) => [...prev, normalizedValue]);
+        }
+        setInterestInput('');
+    };
+
+    const addInterest = () => {
+        if (interestInput.trim()) {
+            addInterestFromValue(interestInput.trim());
+        }
+    };
+
+    const removeInterest = (indexToRemove) => {
+        setInterests((prev) => prev.filter((_, index) => index !== indexToRemove));
     };
 
     const handleInterestInputKeyDown = (e) => {
         if (e.key === 'Enter' || e.key === ',') {
             e.preventDefault();
             addInterest();
-        } else if (e.key === 'Backspace' && interestInput === '' && formData.interests.length > 0) {
-            // Si el input está vacío y presiona backspace, eliminar el último tag
-            removeInterest(formData.interests.length - 1);
+        } else if (e.key === 'Backspace' && interestInput === '' && interests.length > 0) {
+            removeInterest(interests.length - 1);
         }
     };
 
     const handleInterestInputChange = (e) => {
         const value = e.target.value;
-        // Si el usuario escribe una coma, crear el tag automáticamente
         if (value.endsWith(',')) {
             const tagValue = value.slice(0, -1).trim();
             if (tagValue) {
                 addInterestFromValue(tagValue);
-                setInterestInput('');
             }
         } else {
             setInterestInput(value);
         }
     };
 
-    const addInterest = () => {
-        if (interestInput.trim()) {
-            addInterestFromValue(interestInput.trim());
-            setInterestInput('');
-        }
-    };
-
-    const addInterestFromValue = (value) => {
-        if (formData.interests.length >= MAX_INTERESTS) {
-            return;
-        }
-
-        const normalizedValue = value.trim();
-        if (!normalizedValue) return;
-
-        // Verificar si ya existe (case-insensitive)
-        const exists = formData.interests.some(
-            tag => tag.toLowerCase() === normalizedValue.toLowerCase()
-        );
-
-        if (!exists) {
-            setFormData(prev => ({
-                ...prev,
-                interests: [...prev.interests, normalizedValue]
-            }));
-        } else {
-            setInterestInput('');
-        }
-    };
-
-    const removeInterest = (indexToRemove) => {
-        setFormData(prev => ({
-            ...prev,
-            interests: prev.interests.filter((_, index) => index !== indexToRemove)
-        }));
-    };
-
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            setFormData(prev => ({
-                ...prev,
-                profile_picture: file
-            }));
+            setProfilePicture(file);
             setPreviewUrl(URL.createObjectURL(file));
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
+    const onSubmit = async (data) => {
+        setGeneralError(null);
 
         try {
             const formDataToSend = new FormData();
-            formDataToSend.append('profile_description', formData.profile_description);
-            // Convertir array de interests a string separado por comas
-            formDataToSend.append('interests', formData.interests.join(', '));
-            if (formData.external_url) {
-                formDataToSend.append('external_url', formData.external_url);
+            formDataToSend.append('profile_description', data.profile_description || '');
+            formDataToSend.append('interests', interests.join(', '));
+            if (data.external_url) {
+                formDataToSend.append('external_url', data.external_url);
             }
-            if (formData.profile_picture) {
-                formDataToSend.append('profile_picture', formData.profile_picture);
+            if (profilePicture) {
+                formDataToSend.append('profile_picture', profilePicture);
             }
-            const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
-            const usernameChanged = formData.username.trim() !== originalUsername;
-            if (canEditUsername && usernameChanged && formData.username.trim()) {
-                formDataToSend.append('username', formData.username.trim());
+
+            const usernameChanged = data.username.trim() !== originalUsername;
+            if (canEditUsername && usernameChanged && data.username.trim()) {
+                formDataToSend.append('username', data.username.trim());
             }
 
             const response = await updateProfile(formDataToSend);
+
+            // Auth contract: refresh session user if username changed; reuse current access token
             if (usernameChanged && response?.user) {
                 const accessToken = getAccessTokenFromLocalStorage();
-                updateAuthState(response.user, accessToken);
+                if (accessToken) {
+                    updateAuthState(response.user, accessToken);
+                }
             }
+
             navigate('/profiles/my_profile');
         } catch (err) {
-            const msg = err.response?.data?.error || err.response?.data?.username?.[0] || 'Error al actualizar el perfil';
-            setError(msg);
-        } finally {
-            setSaving(false);
+            const { generalError: parsed } = applyApiErrorsToForm(
+                err,
+                setError,
+                'Error al actualizar el perfil',
+            );
+            if (parsed) {
+                setGeneralError(parsed);
+            }
         }
     };
-
-    const remainingChars = MAX_DESCRIPTION_LENGTH - formData.profile_description.length;
-    const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
-    const remainingUsernameChanges = MAX_USERNAME_CHANGES - usernameChangeCount;
 
     if (loading) {
         return (
@@ -198,42 +229,46 @@ const EditProfile = () => {
         );
     }
 
+    if (loadError) {
+        return (
+            <Box sx={{ p: 3, maxWidth: 700, mx: 'auto' }}>
+                <Alert severity="error">{loadError}</Alert>
+            </Box>
+        );
+    }
+
     return (
         <Box sx={{ p: 3, maxWidth: 700, mx: 'auto' }}>
             <Paper elevation={3} sx={{ p: 4 }}>
-                <Typography 
-                    variant="h4" 
-                    gutterBottom 
+                <Typography
+                    variant="h4"
+                    gutterBottom
                     color="text.primary"
                     sx={{
-                        fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
+                        fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
                         fontWeight: 400,
-                        fontSize: "24px",
-                        mb: 3
+                        fontSize: '24px',
+                        mb: 3,
                     }}
                 >
                     Editar perfil
                 </Typography>
 
-                {error && (
-                    <Typography color="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Typography>
+                {generalError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        {generalError}
+                    </Alert>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    {/* Foto de perfil */}
+                <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <UserAvatar
                             src={previewUrl}
-                            username={formData.username}
+                            username={username}
                             size={120}
                             sx={{ mb: 2 }}
                         />
-                        <Button
-                            variant="outlined"
-                            component="label"
-                        >
+                        <Button variant="outlined" component="label">
                             Cambiar foto de perfil
                             <input
                                 type="file"
@@ -244,32 +279,34 @@ const EditProfile = () => {
                         </Button>
                     </Box>
 
-                    {/* Nombre de usuario */}
                     <TextField
-                        name="username"
                         label="Nombre de usuario"
-                        value={formData.username}
-                        onChange={handleInputChange}
+                        {...register('username')}
                         fullWidth
                         disabled={!canEditUsername}
-                        sx={{ mb: 3 }}
+                        error={!!errors.username}
                         helperText={
-                            canEditUsername
+                            errors.username?.message ||
+                            (canEditUsername
                                 ? remainingUsernameChanges === 2
                                     ? 'Puedes cambiar tu nombre de usuario hasta 2 veces. Te quedan 2 cambios.'
                                     : `Puedes cambiar tu nombre de usuario hasta 2 veces. Te queda ${remainingUsernameChanges} cambio.`
-                                : 'Ya no puedes cambiar tu nombre de usuario.'
+                                : 'Ya no puedes cambiar tu nombre de usuario.')
                         }
+                        sx={{ mb: 3 }}
+                        autoComplete="username"
                     />
 
-                    {/* URL Externa */}
                     <TextField
-                        name="external_url"
                         label="Sitio web o enlace externo"
-                        value={formData.external_url}
-                        onChange={handleInputChange}
+                        {...register('external_url')}
                         fullWidth
                         placeholder="https://tu-sitio-web.com"
+                        error={!!errors.external_url}
+                        helperText={
+                            errors.external_url?.message ||
+                            'Comparte tu sitio web, blog, portafolio o cualquier enlace relevante'
+                        }
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
@@ -278,10 +315,8 @@ const EditProfile = () => {
                             ),
                         }}
                         sx={{ mb: 3 }}
-                        helperText="Comparte tu sitio web, blog, portafolio o cualquier enlace relevante"
                     />
 
-                    {/* Intereses como Tags */}
                     <Box>
                         <TextField
                             label="Intereses"
@@ -289,27 +324,28 @@ const EditProfile = () => {
                             onChange={handleInterestInputChange}
                             onKeyDown={handleInterestInputKeyDown}
                             fullWidth
-                            placeholder={formData.interests.length === 0 
-                                ? "Escribe un interés y presiona Enter o coma (,) para agregar"
-                                : "Escribe otro interés..."
+                            placeholder={
+                                interests.length === 0
+                                    ? 'Escribe un interés y presiona Enter o coma (,) para agregar'
+                                    : 'Escribe otro interés...'
                             }
                             helperText={
-                                formData.interests.length >= MAX_INTERESTS
+                                interests.length >= MAX_INTERESTS
                                     ? `Límite alcanzado (${MAX_INTERESTS} intereses)`
-                                    : `${formData.interests.length}/${MAX_INTERESTS} intereses. Escribe y presiona Enter o coma (,) para agregar`
+                                    : `${interests.length}/${MAX_INTERESTS} intereses. Escribe y presiona Enter o coma (,) para agregar`
                             }
-                            disabled={formData.interests.length >= MAX_INTERESTS}
+                            disabled={interests.length >= MAX_INTERESTS || isSubmitting}
                             InputProps={{
                                 startAdornment: (
                                     <>
                                         <InputAdornment position="start">
                                             <InterestsIcon color="action" />
                                         </InputAdornment>
-                                        {formData.interests.length > 0 && (
+                                        {interests.length > 0 && (
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: 1 }}>
-                                                {formData.interests.map((interest, index) => (
+                                                {interests.map((interest, index) => (
                                                     <Chip
-                                                        key={index}
+                                                        key={`${interest}-${index}`}
                                                         label={interest}
                                                         onDelete={() => removeInterest(index)}
                                                         variant="outlined"
@@ -324,60 +360,63 @@ const EditProfile = () => {
                             }}
                             sx={{ mb: 1 }}
                         />
-                        {formData.interests.length > 0 && (
+                        {interests.length > 0 && (
                             <FormHelperText sx={{ mt: -1, mb: 2, color: 'text.secondary', fontSize: '0.75rem' }}>
-                                💡 Tip: Escribe y presiona Enter o coma (,) para crear un tag. Presiona la X en un tag para eliminarlo.
+                                Tip: Escribe y presiona Enter o coma (,) para crear un tag. Presiona la X en un tag para eliminarlo.
                             </FormHelperText>
                         )}
                     </Box>
 
-                    {/* Descripción con límite de caracteres */}
                     <TextField
-                        name="profile_description"
                         label="Sobre ti"
-                        value={formData.profile_description}
-                        onChange={handleInputChange}
+                        {...register('profile_description')}
                         multiline
                         rows={5}
                         fullWidth
                         inputProps={{ maxLength: MAX_DESCRIPTION_LENGTH }}
                         placeholder="Cuéntanos quién eres, qué te apasiona y qué aportas a la comunidad. Sé auténtico y comparte lo que te hace único en el mundo de la tecnología y blockchain."
+                        error={!!errors.profile_description}
+                        helperText={
+                            errors.profile_description?.message || (
+                                <Box
+                                    component="span"
+                                    sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}
+                                >
+                                    <span>Comparte tu historia y conecta con otros miembros de la comunidad</span>
+                                    <span
+                                        style={{
+                                            fontWeight: remainingChars < 50 ? 600 : 400,
+                                        }}
+                                    >
+                                        {remainingChars} caracteres restantes
+                                    </span>
+                                </Box>
+                            )
+                        }
                         InputProps={{
                             startAdornment: (
-                                <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1.5 }}>
+                                <InputAdornment
+                                    position="start"
+                                    sx={{ alignSelf: 'flex-start', mt: 1.5 }}
+                                >
                                     <DescriptionIcon color="action" />
                                 </InputAdornment>
                             ),
                         }}
-                        helperText={
-                            <Box component="span" sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                <span>Comparte tu historia y conecta con otros miembros de la comunidad</span>
-                                <span style={{ 
-                                    color: remainingChars < 50 ? 'warning.main' : 'text.secondary',
-                                    fontWeight: remainingChars < 50 ? 600 : 400
-                                }}>
-                                    {remainingChars} caracteres restantes
-                                </span>
-                            </Box>
-                        }
                         sx={{ mb: 3 }}
                     />
 
-                    {/* Botones de acción */}
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
                         <Button
                             type="button"
                             onClick={() => navigate('/profiles/my_profile')}
                             variant="outlined"
+                            disabled={isSubmitting}
                         >
                             Cancelar
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={saving}
-                        >
-                            {saving ? 'Guardando...' : 'Guardar cambios'}
+                        <Button type="submit" variant="contained" disabled={isSubmitting}>
+                            {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
                         </Button>
                     </Box>
                 </form>

@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import certificatesApi from '../api/certificatesApi';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -20,6 +23,14 @@ import {
   Stack,
   Link as MuiLink } from
 '@mui/material';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const rejectSchema = yup.object({
+  reason: yup
+    .string()
+    .trim()
+    .required('El motivo del rechazo es requerido.'),
+});
 
 const CertificateRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -28,9 +39,20 @@ const CertificateRequests = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
   const [approveNote, setApproveNote] = useState('');
+  const [rejectGeneralError, setRejectGeneralError] = useState('');
   const { authState } = useContext(AuthContext);
+
+  const {
+    register: registerReject,
+    handleSubmit: handleRejectSubmit,
+    reset: resetRejectForm,
+    setError: setRejectFormError,
+    formState: { errors: rejectErrors, isSubmitting: isRejectSubmitting },
+  } = useForm({
+    resolver: yupResolver(rejectSchema),
+    defaultValues: { reason: '' },
+  });
 
   useEffect(() => {
     fetchRequests();
@@ -64,18 +86,27 @@ const CertificateRequests = () => {
     }
   };
 
-  const handleReject = async () => {
+  const onRejectSubmit = async ({ reason }) => {
     if (!selectedRequest) return;
 
+    setRejectGeneralError('');
+
     try {
-      await certificatesApi.rejectCertificateRequest(selectedRequest.id, rejectReason);
+      await certificatesApi.rejectCertificateRequest(selectedRequest.id, reason);
       setRejectDialogOpen(false);
-      setRejectReason('');
+      resetRejectForm({ reason: '' });
       setSelectedRequest(null);
-      fetchRequests(); // Refresh the list
+      fetchRequests();
     } catch (err) {
-      setError('Error al rechazar la solicitud');
-      console.error(err);
+      const { generalError } = applyApiErrorsToForm(
+        err,
+        setRejectFormError,
+        'Error al rechazar la solicitud',
+        { rejection_reason: 'reason' },
+      );
+      if (generalError) {
+        setRejectGeneralError(generalError);
+      }
     }
   };
 
@@ -96,6 +127,8 @@ const CertificateRequests = () => {
 
   const openRejectDialog = (request) => {
     setSelectedRequest(request);
+    resetRejectForm({ reason: '' });
+    setRejectGeneralError('');
     setRejectDialogOpen(true);
   };
 
@@ -342,36 +375,46 @@ const CertificateRequests = () => {
       {/* Reject Dialog */}
       <Dialog
         open={rejectDialogOpen}
-        onClose={() => setRejectDialogOpen(false)}
+        onClose={() => !isRejectSubmitting && setRejectDialogOpen(false)}
         maxWidth="sm"
         fullWidth>
-        
-        <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              margin="dense"
-              label="Motivo del rechazo"
-              multiline
-              rows={2}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              required />
-            
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-          <Button
-            onClick={handleReject}
-            variant="contained"
-            color="error"
-            disabled={!rejectReason.trim()}>
-            
-            Rechazar
-          </Button>
-        </DialogActions>
+
+        <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
+          <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2 }}>
+              {rejectGeneralError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {rejectGeneralError}
+                </Alert>
+              )}
+              <TextField
+                fullWidth
+                margin="dense"
+                label="Motivo del rechazo"
+                multiline
+                rows={2}
+                error={!!rejectErrors.reason}
+                helperText={rejectErrors.reason?.message}
+                disabled={isRejectSubmitting}
+                {...registerReject('reason')}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="error"
+              disabled={isRejectSubmitting}
+            >
+              {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
     </Container>);
 

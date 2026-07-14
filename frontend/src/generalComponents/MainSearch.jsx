@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Box,
   Button,
@@ -16,25 +19,37 @@ import {
   Alert,
   Stack,
   Link as MuiLink,
+  Paper,
 } from '@mui/material';
 import generalApi from '../api/generalApi';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from '../content/ContentDisplay';
 
-// Import icons for different result types
 import TopicIcon from '@mui/icons-material/Label';
 import KnowledgePathIcon from '@mui/icons-material/AccountTree';
 
+const searchSchema = yup.object({
+  query: yup
+    .string()
+    .trim()
+    .required('Escribe algo para buscar.'),
+  searchType: yup
+    .string()
+    .oneOf(['all', 'content', 'topics', 'knowledge_paths'])
+    .default('all'),
+});
+
 const MainSearch = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchType, setSearchType] = useState('all'); // 'all', 'content', 'topics', 'knowledge_paths', 'people'
+  const [searchError, setSearchError] = useState(null);
+  const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
-    totalResults: 0
+    totalResults: 0,
   });
   const [publicCollections, setPublicCollections] = useState([]);
   const [publicLoading, setPublicLoading] = useState(false);
@@ -42,6 +57,17 @@ const MainSearch = () => {
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const isAuthenticated = authState.isAuthenticated;
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(searchSchema),
+    defaultValues: { query: '', searchType: 'all' },
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -62,7 +88,7 @@ const MainSearch = () => {
       } catch (err) {
         if (!cancelled) {
           setPublicError(
-            err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones'
+            err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones',
           );
           setPublicCollections([]);
         }
@@ -76,43 +102,44 @@ const MainSearch = () => {
     };
   }, [isAuthenticated]);
 
-  const handleSearch = async (e, page = 1) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
+  const runSearch = async (query, searchType, page = 1) => {
     setIsLoading(true);
+    setSearchError(null);
+    setHasSearched(true);
+    setLastSubmittedQuery(query);
+
     try {
-      const response = await generalApi.search(searchQuery, searchType, page);
-      
-      // Update search results
+      const response = await generalApi.search(query, searchType, page);
       setSearchResults(response.results);
-      
-      // Update pagination info
       setPagination({
         currentPage: response.current_page,
         totalPages: response.total_pages,
-        totalResults: response.count
+        totalResults: response.count,
       });
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
+      setSearchError('No se pudo completar la búsqueda. Inténtalo de nuevo.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const onSubmit = async ({ query, searchType }) => {
+    await runSearch(query.trim(), searchType, 1);
+  };
+
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      handleSearch(new Event('submit'), newPage);
-    }
+    if (newPage < 1 || newPage > pagination.totalPages) return;
+    const { query, searchType } = getValues();
+    if (!query?.trim()) return;
+    runSearch(query.trim(), searchType, newPage);
   };
 
   const handleResultClick = (result) => {
-    // Construct URL based on result type and ID
     let url;
-    
+
     if (result.type === 'content') {
-      // If it's a content profile, include the profile ID in the URL
       if (result.source === 'profile' && result.profile_id) {
         url = `/content/search/${result.content.id}?profile=${result.profile_id}`;
       } else {
@@ -123,28 +150,24 @@ const MainSearch = () => {
     } else if (result.type === 'knowledge_path') {
       url = `/knowledge_path/${result.id}`;
     }
-    
+
     if (url) {
-      // Pass the search query to the next component
-      navigate(url, { state: { searchQuery } });
+      navigate(url, { state: { searchQuery: lastSubmittedQuery } });
     }
   };
 
-  // Get icon for result type
   const getResultTypeIcon = (type) => {
     if (type === 'topic') {
       return <TopicIcon sx={{ fontSize: 18 }} />;
-    } else if (type === 'knowledge_path') {
-      return <KnowledgePathIcon sx={{ fontSize: 18 }} />;
-    } else {
-      return null; // ContentDisplay will handle content icons
     }
+    if (type === 'knowledge_path') {
+      return <KnowledgePathIcon sx={{ fontSize: 18 }} />;
+    }
+    return null;
   };
 
-  // Render search result item
   const renderResultItem = (result) => {
     if (result.type === 'content') {
-      // Use ContentDisplay for content results
       return (
         <Box component="li" key={result.id} sx={{ listStyle: 'none' }}>
           <ContentDisplay
@@ -155,70 +178,90 @@ const MainSearch = () => {
           />
         </Box>
       );
-    } else {
-      // Render topics and knowledge paths with the original format
-      return (
-        <Paper
-          component="li"
-          key={result.id} 
-          variant="outlined"
-          onClick={() => handleResultClick(result)}
-          sx={{ listStyle: 'none', p: 2, cursor: 'pointer', '&:hover': { boxShadow: 2 } }}
-        >
-          <Box sx={{ mb: 1 }}>
-            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, borderRadius: 1, bgcolor: 'action.hover' }}>
-              {getResultTypeIcon(result.type)}
-              <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
-                {result.type}
-              </Typography>
-            </Box>
-          </Box>
-          
-          <Typography variant="h6" sx={{ mb: 0.5 }}>{result.title}</Typography>
-          
-          {result.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              {result.description}
-            </Typography>
-          )}
-          
-          <Button size="small" variant="outlined">Ver Detalles</Button>
-        </Paper>
-      );
     }
+
+    return (
+      <Paper
+        component="li"
+        key={result.id}
+        variant="outlined"
+        onClick={() => handleResultClick(result)}
+        sx={{ listStyle: 'none', p: 2, cursor: 'pointer', '&:hover': { boxShadow: 2 } }}
+      >
+        <Box sx={{ mb: 1 }}>
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1,
+              py: 0.5,
+              borderRadius: 1,
+              bgcolor: 'action.hover',
+            }}
+          >
+            {getResultTypeIcon(result.type)}
+            <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
+              {result.type}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Typography variant="h6" sx={{ mb: 0.5 }}>
+          {result.title}
+        </Typography>
+
+        {result.description && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            {result.description}
+          </Typography>
+        )}
+
+        <Button size="small" variant="outlined">
+          Ver Detalles
+        </Button>
+      </Paper>
+    );
   };
+
+  const busy = isLoading || isSubmitting;
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
         Buscar
       </Typography>
-      
-      <Box component="form" onSubmit={(e) => handleSearch(e, 1)} sx={{ mb: 3 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mb: 3 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="flex-start">
           <TextField
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            {...register('query')}
             placeholder="Buscar contenido, temas, caminos de conocimiento o personas..."
             fullWidth
+            error={!!errors.query}
+            helperText={errors.query?.message}
           />
-          <Button type="submit" variant="contained">
-            Buscar
+          <Button type="submit" variant="contained" disabled={busy} sx={{ flexShrink: 0 }}>
+            {busy ? 'Buscando...' : 'Buscar'}
           </Button>
         </Stack>
-        
-        <RadioGroup
-          row
+
+        <Controller
           name="searchType"
-          value={searchType}
-          onChange={(e) => setSearchType(e.target.value)}
-          sx={{ mt: 1 }}
-        >
-          <FormControlLabel value="all" control={<Radio size="small" />} label="Todo" />
-          <FormControlLabel value="content" control={<Radio size="small" />} label="Contenido" />
-          <FormControlLabel value="topics" control={<Radio size="small" />} label="Temas" />
-          <FormControlLabel value="knowledge_paths" control={<Radio size="small" />} label="Caminos de Conocimiento" />
-        </RadioGroup>
+          control={control}
+          render={({ field }) => (
+            <RadioGroup row {...field} sx={{ mt: 1 }}>
+              <FormControlLabel value="all" control={<Radio size="small" />} label="Todo" />
+              <FormControlLabel value="content" control={<Radio size="small" />} label="Contenido" />
+              <FormControlLabel value="topics" control={<Radio size="small" />} label="Temas" />
+              <FormControlLabel
+                value="knowledge_paths"
+                control={<Radio size="small" />}
+                label="Caminos de Conocimiento"
+              />
+            </RadioGroup>
+          )}
+        />
       </Box>
 
       <Box component="section" aria-labelledby="search-collections-heading" sx={{ mb: 3 }}>
@@ -230,17 +273,26 @@ const MainSearch = () => {
         </Typography>
         {!isAuthenticated && (
           <Typography variant="body2" sx={{ mt: 1 }}>
-            <MuiLink component={Link} to="/profiles/login" underline="hover">Inicia sesión</MuiLink> para ver colecciones públicas.
+            <MuiLink component={Link} to="/profiles/login" underline="hover">
+              Inicia sesión
+            </MuiLink>{' '}
+            para ver colecciones públicas.
           </Typography>
         )}
         {isAuthenticated && publicLoading && (
-          <Typography variant="body2" sx={{ mt: 1 }}>Cargando colecciones…</Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Cargando colecciones…
+          </Typography>
         )}
         {isAuthenticated && publicError && !publicLoading && (
-          <Alert severity="error" sx={{ mt: 1 }}>{publicError}</Alert>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {publicError}
+          </Alert>
         )}
         {isAuthenticated && !publicLoading && !publicError && publicCollections.length === 0 && (
-          <Typography variant="body2" sx={{ mt: 1 }}>Aún no hay colecciones públicas con contenido visible.</Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Aún no hay colecciones públicas con contenido visible.
+          </Typography>
         )}
         {isAuthenticated && !publicLoading && publicCollections.length > 0 && (
           <Box
@@ -260,7 +312,11 @@ const MainSearch = () => {
                   borderColor: 'divider',
                 }}
               >
-                <CardActionArea onClick={() => navigate(`/content/collections/${c.id}`, { state: { from: '/search' } })}>
+                <CardActionArea
+                  onClick={() =>
+                    navigate(`/content/collections/${c.id}`, { state: { from: '/search' } })
+                  }
+                >
                   <CardContent sx={{ py: 2 }}>
                     <Typography variant="subtitle1" fontWeight={600} gutterBottom component="div">
                       {c.name}
@@ -279,6 +335,12 @@ const MainSearch = () => {
           </Box>
         )}
       </Box>
+
+      {searchError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {searchError}
+        </Alert>
+      )}
 
       {isLoading ? (
         <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
@@ -299,8 +361,7 @@ const MainSearch = () => {
               <Stack component="ul" spacing={2} sx={{ pl: 0, m: 0 }}>
                 {searchResults.map(renderResultItem)}
               </Stack>
-              
-              {/* Pagination controls */}
+
               {pagination.totalPages > 1 && (
                 <Box
                   sx={{
@@ -328,19 +389,21 @@ const MainSearch = () => {
                   >
                     Anterior
                   </Button>
-                  
+
                   <Typography variant="body2" color="text.secondary">
                     Página {pagination.currentPage} de {pagination.totalPages}
                   </Typography>
-                  
+
                   <Button
                     onClick={() => handlePageChange(pagination.currentPage + 1)}
                     disabled={pagination.currentPage === pagination.totalPages}
                     variant="contained"
                     color={pagination.currentPage < pagination.totalPages ? 'primary' : 'inherit'}
                     sx={{
-                      bgcolor: pagination.currentPage < pagination.totalPages ? 'primary.main' : 'grey.300',
-                      color: pagination.currentPage < pagination.totalPages ? 'white' : 'text.disabled',
+                      bgcolor:
+                        pagination.currentPage < pagination.totalPages ? 'primary.main' : 'grey.300',
+                      color:
+                        pagination.currentPage < pagination.totalPages ? 'white' : 'text.disabled',
                       textTransform: 'none',
                       '&:disabled': {
                         bgcolor: 'grey.300',
@@ -354,9 +417,10 @@ const MainSearch = () => {
               )}
             </>
           ) : (
-            searchQuery && (
+            hasSearched &&
+            !searchError && (
               <Alert severity="info">
-                No se encontraron resultados para "{searchQuery}"
+                No se encontraron resultados para &quot;{lastSubmittedQuery}&quot;
               </Alert>
             )
           )}

@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Alert,
   Box,
@@ -33,6 +36,13 @@ const getEntryDateLabel = (entry) => {
   return 'Sin fecha';
 };
 
+const schema = yup.object({
+  message: yup
+    .string()
+    .max(500, 'El mensaje no puede exceder 500 caracteres.')
+    .default(''),
+});
+
 const TopicTimelineEntryContentSuggestionForm = ({
   entry,
   saving,
@@ -40,29 +50,50 @@ const TopicTimelineEntryContentSuggestionForm = ({
   onCancel,
   onSubmit,
 }) => {
-  const [message, setMessage] = useState('');
   const [externalProfiles, setExternalProfiles] = useState([]);
-  const [validationError, setValidationError] = useState('');
 
-  const handleSubmit = async () => {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    clearErrors,
+    watch,
+    formState: { errors },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { message: '' },
+  });
+
+  const messageValue = watch('message');
+
+  const handleFormSubmit = async (form) => {
     const profile = externalProfiles[0];
     const contentId = profile ? getProfileContentId(profile) : null;
     if (!contentId) {
-      setValidationError('Selecciona un contenido para vincular a esta entrada.');
+      setError('content', {
+        type: 'manual',
+        message: 'Selecciona un contenido para vincular a esta entrada.',
+      });
       return;
     }
-    setValidationError('');
+
     await onSubmit({
       content_id: contentId,
-      message: message.trim(),
+      message: form.message.trim(),
     });
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+    <Paper
+      variant="outlined"
+      component="form"
+      onSubmit={handleSubmit(handleFormSubmit)}
+      noValidate
+      sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
+    >
       <Stack spacing={2.5}>
         {error && <Alert severity="error">{error}</Alert>}
-        {validationError && <Alert severity="error">{validationError}</Alert>}
+        {errors.content && <Alert severity="error">{errors.content.message}</Alert>}
 
         <Box
           sx={{
@@ -96,7 +127,12 @@ const TopicTimelineEntryContentSuggestionForm = ({
 
         <ContentSuggestionPicker
           selectedProfiles={externalProfiles}
-          onSelectionChange={setExternalProfiles}
+          onSelectionChange={(profiles) => {
+            setExternalProfiles(profiles);
+            if (profiles.length > 0) {
+              clearErrors('content');
+            }
+          }}
           maxSelections={1}
           disabled={saving}
           title="Contenido a vincular"
@@ -105,12 +141,12 @@ const TopicTimelineEntryContentSuggestionForm = ({
 
         <TextField
           label="Mensaje para moderadores (opcional)"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          {...register('message')}
+          error={Boolean(errors.message)}
+          helperText={errors.message?.message || `${messageValue.length}/500 caracteres`}
           fullWidth
           multiline
           minRows={2}
-          helperText={`${message.length}/500 caracteres`}
           inputProps={{ maxLength: 500 }}
         />
       </Stack>
@@ -130,10 +166,9 @@ const TopicTimelineEntryContentSuggestionForm = ({
           Cancelar
         </Button>
         <Button
-          type="button"
+          type="submit"
           variant="contained"
-          onClick={handleSubmit}
-          disabled={saving || externalProfiles.length === 0}
+          disabled={saving}
         >
           {saving ? 'Enviando...' : 'Enviar sugerencia'}
         </Button>

@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Dialog,
   DialogTitle,
@@ -8,17 +11,49 @@ import {
   TextField,
   Box,
   IconButton,
-  Tooltip } from
-'@mui/material';
+  Tooltip,
+  Alert,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+
+const schema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required('El título es requerido.'),
+  author: yup.string().trim().default(''),
+  personalNote: yup.string().trim().default(''),
+});
+
+const getDefaultTitle = (content) =>
+  content?.selected_profile?.title ||
+  content?.title ||
+  content?.content?.original_title ||
+  content?.original_title ||
+  '';
+
+const getDefaultAuthor = (content) =>
+  content?.selected_profile?.author ||
+  content?.author ||
+  content?.content?.original_author ||
+  content?.original_author ||
+  '';
 
 const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
   const [openModal, setOpenModal] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    author: '',
-    personalNote: ''
+  const [generalError, setGeneralError] = useState('');
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { title: '', author: '', personalNote: '' },
   });
 
   const handleOpen = (event) => {
@@ -26,136 +61,121 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
       event.stopPropagation();
     }
 
-    // Handle different content structures:
-    // 1. From ContentDetailsTopic: content.selected_profile.title/author
-    // 2. From PublicationDetail: content.title/author (profile data)
-    // 3. Fallback to original content data
-    const title = content?.selected_profile?.title ||
-    content?.title ||
-    content?.content?.original_title ||
-    content?.original_title || '';
-
-    const author = content?.selected_profile?.author ||
-    content?.author ||
-    content?.content?.original_author ||
-    content?.original_author || '';
-
-    setFormData({
-      title: title,
-      author: author,
-      personalNote: ''
+    setGeneralError('');
+    reset({
+      title: getDefaultTitle(content),
+      author: getDefaultAuthor(content),
+      personalNote: '',
     });
     setOpenModal(true);
   };
 
   const handleClose = () => {
+    if (isSubmitting) return;
     setOpenModal(false);
+    setGeneralError('');
   };
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  const onSubmit = async (formData) => {
+    setGeneralError('');
 
-  const handleSubmit = async () => {
+    const contentId = content?.content?.id || content?.id;
+
+    if (!contentId) {
+      setGeneralError('No se pudo identificar el contenido. Recarga la página e inténtalo de nuevo.');
+      return;
+    }
+
     try {
-      // Get the correct content ID based on the content structure
-      // For ContentDetailsTopic: content.id is the Content ID
-      // For PublicationDetail: content.id is the ContentProfile ID, content.content.id is the Content ID
-      const contentId = content?.content?.id || content?.id;
-
-      if (!contentId) {
-        console.error('AddToLibraryModal: No content ID found in content object:', content);
-        return;
-      }
-
-
       await contentApi.createContentProfile(contentId, formData);
-      handleClose();
+      setOpenModal(false);
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
       console.error('Error adding to library:', error);
+      const { generalError: parsed } = applyApiErrorsToForm(
+        error,
+        setError,
+        'No se pudo agregar a tu biblioteca. Inténtalo de nuevo.',
+        { personal_note: 'personalNote', title: 'title', author: 'author' },
+      );
+      if (parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
   return (
     <>
-            <Tooltip title="Agregar a mi Biblioteca">
-                {buttonProps?.variant ?
-        // Show as a button with text when buttonProps are provided
-        <Button
-          onClick={handleOpen}
-          startIcon={<AddIcon />}
-          {...buttonProps}>
-          
-                        Agregar a mi Biblioteca
-                    </Button> :
+      <Tooltip title="Agregar a mi Biblioteca">
+        {buttonProps?.variant ? (
+          <Button onClick={handleOpen} startIcon={<AddIcon />} {...buttonProps}>
+            Agregar a mi Biblioteca
+          </Button>
+        ) : (
+          <IconButton onClick={handleOpen} color="primary" size="small" {...buttonProps}>
+            <AddIcon />
+          </IconButton>
+        )}
+      </Tooltip>
 
-        // Show as an icon button (default behavior)
-        <IconButton
-          onClick={handleOpen}
-          color="primary"
-          size="small"
-          {...buttonProps}>
-          
-                        <AddIcon />
-                    </IconButton>
-        }
-            </Tooltip>
-
-            <Dialog
+      <Dialog
         open={openModal}
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
         keepMounted={false}
         disablePortal={false}
-        aria-labelledby="add-to-library-dialog-title">
-        
-                <DialogTitle id="add-to-library-dialog-title">Agregar a mi Biblioteca</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
-              name="title"
-              label="Título"
-              value={formData.title}
-              onChange={handleFormChange}
-              fullWidth
-              required />
-            
-                        <TextField
-              name="author"
-              label="Autor"
-              value={formData.author}
-              onChange={handleFormChange}
-              fullWidth />
-            
-                        <TextField
-              name="personalNote"
-              label="Nota personal"
-              value={formData.personalNote}
-              onChange={handleFormChange}
-              multiline
-              rows={4}
-              fullWidth
-              placeholder="Agrega tus pensamientos o notas sobre este contenido..." />
-            
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose}>Cancelar</Button>
-                    <Button onClick={handleSubmit} variant="contained" color="primary">
-                        Agregar a mi Biblioteca
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </>);
+        aria-labelledby="add-to-library-dialog-title"
+      >
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+          <DialogTitle id="add-to-library-dialog-title">Agregar a mi Biblioteca</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Título"
+                {...register('title')}
+                error={!!errors.title}
+                helperText={errors.title?.message}
+                fullWidth
+                required
+              />
 
+              <TextField
+                label="Autor"
+                {...register('author')}
+                error={!!errors.author}
+                helperText={errors.author?.message}
+                fullWidth
+              />
+
+              <TextField
+                label="Nota personal"
+                {...register('personalNote')}
+                error={!!errors.personalNote}
+                helperText={errors.personalNote?.message}
+                multiline
+                rows={4}
+                fullWidth
+                placeholder="Agrega tus pensamientos o notas sobre este contenido..."
+              />
+
+              {generalError && <Alert severity="error">{generalError}</Alert>}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleClose} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Agregando...' : 'Agregar a mi Biblioteca'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </>
+  );
 };
 
 export default AddToLibraryModal;
