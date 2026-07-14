@@ -248,3 +248,111 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(BookClubEvent.objects.filter(book_club=self.club).count(), 2)
+
+    def _open_question_with_member_answer(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        question = DiscussionQuestion.objects.create(
+            book_club=self.club,
+            node=self.node1,
+            body='¿Pregunta abierta?',
+            status=DiscussionQuestionStatus.OPEN,
+            created_by=self.mentor,
+            order=1,
+        )
+        dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
+        answer = Comment.objects.create(
+            author=self.member,
+            body='Respuesta del miembro',
+            content_type=dq_type,
+            object_id=question.id,
+            parent=None,
+        )
+        return question, answer
+
+    def test_outsider_cannot_reply_via_generic_endpoint(self):
+        question, answer = self._open_question_with_member_answer()
+        self.auth(self.outsider)
+        response = self.client.post(
+            f'/api/comments/replies/{answer.id}/',
+            {'body': 'Respuesta de forastero'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Comment.objects.filter(parent=answer, author=self.outsider).exists()
+        )
+
+    def test_member_can_reply_via_generic_endpoint(self):
+        question, answer = self._open_question_with_member_answer()
+        other = User.objects.create_user(username='member2', password='pass123')
+        BookClubMembership.objects.create(
+            book_club=self.club, user=other, role=MembershipRole.MEMBER
+        )
+        self.auth(other)
+        response = self.client.post(
+            f'/api/comments/replies/{answer.id}/',
+            {'body': 'Buen punto'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Comment.objects.filter(parent=answer, author=other).exists())
+
+    def test_closed_question_blocks_generic_reply(self):
+        question, answer = self._open_question_with_member_answer()
+        question.status = DiscussionQuestionStatus.CLOSED
+        question.save(update_fields=['status', 'updated_at'])
+
+        self.auth(self.mentor)
+        response = self.client.post(
+            f'/api/comments/replies/{answer.id}/',
+            {'body': 'tarde para responder'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_outsider_cannot_list_replies_on_discussion(self):
+        question, answer = self._open_question_with_member_answer()
+        Comment.objects.create(
+            author=self.mentor,
+            body='Reply interno',
+            content_type=answer.content_type,
+            object_id=answer.object_id,
+            parent=answer,
+        )
+        self.auth(self.outsider)
+        response = self.client.get(f'/api/comments/replies/{answer.id}/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_hub_redacts_questions_for_non_members(self):
+        DiscussionQuestion.objects.create(
+            book_club=self.club,
+            node=self.node1,
+            body='Secreto del club',
+            status=DiscussionQuestionStatus.OPEN,
+            created_by=self.mentor,
+            order=1,
+        )
+        self.auth(self.outsider)
+        response = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_member'])
+        self.assertEqual(response.data['open_questions'], [])
+        self.assertEqual(response.data['past_questions'], [])
+        self.assertEqual(response.data['draft_questions'], [])
+        self.assertIsNone(response.data['quick_links']['knowledge_path_id'])
+        self.assertEqual(response.data['quick_links']['events'], [])
+
+    def test_events_list_requires_membership(self):
+        self.auth(self.outsider)
+        denied = self.client.get('/api/book_clubs/cypherpunk/events/')
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.member)
+        ok = self.client.get('/api/book_clubs/cypherpunk/events/')
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(ok.data), 1)

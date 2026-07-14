@@ -773,6 +773,43 @@ class CommentView(APIView):
             )
 
 
+def _discussion_question_access_denied(request, parent_comment, *, writing=False):
+    """
+    When a comment (or its ancestor) belongs to a DiscussionQuestion, enforce
+    club membership and open/closed rules. Returns a Response if access should
+    be denied, otherwise None.
+    """
+    from book_clubs.models import DiscussionQuestion
+    from book_clubs.permissions import user_can_answer_question, user_can_view_question
+
+    dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
+    if parent_comment.content_type_id != dq_type.id:
+        return None
+
+    question = (
+        DiscussionQuestion.objects.select_related('book_club')
+        .filter(pk=parent_comment.object_id)
+        .first()
+    )
+    if question is None:
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if question.apply_schedule():
+        question.save(update_fields=['status', 'updated_at'])
+
+    if writing:
+        if not user_can_answer_question(question, request.user):
+            return Response(
+                {'detail': 'You cannot reply to this discussion right now.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return None
+
+    if not user_can_view_question(question, request.user):
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    return None
+
+
 class CommentRepliesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -785,6 +822,12 @@ class CommentRepliesView(APIView):
             })
             
             parent_comment = get_object_or_404(Comment, pk=pk, is_active=True)
+            denied = _discussion_question_access_denied(
+                request, parent_comment, writing=False
+            )
+            if denied is not None:
+                return denied
+
             replies = Comment.objects.filter(parent=parent_comment, is_active=True).order_by('created_at')
             serializer = CommentSerializer(replies, many=True, context={'request': request})
             
@@ -821,6 +864,11 @@ class CommentRepliesView(APIView):
             })
             
             parent_comment = get_object_or_404(Comment, pk=pk)
+            denied = _discussion_question_access_denied(
+                request, parent_comment, writing=True
+            )
+            if denied is not None:
+                return denied
             
             comments_logger.debug("Creating reply for comment", extra={
                 'user_id': request.user.id,

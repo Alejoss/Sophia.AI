@@ -291,6 +291,9 @@ class BookClubHubView(APIView):
             recent_activity.sort(key=lambda x: x['created_at'], reverse=True)
             recent_activity = recent_activity[:10]
 
+        # Non-members of active clubs may peek at club meta / next event only;
+        # question bodies, drafts, activity and event listings stay members-only.
+        question_ctx = {'request': request}
         return Response(
             {
                 'club': BookClubDetailSerializer(club, context={'request': request}).data,
@@ -304,18 +307,18 @@ class BookClubHubView(APIView):
                 'next_mission': next_mission if is_member else None,
                 'next_event': next_event_data,
                 'open_questions': DiscussionQuestionSerializer(
-                    open_questions, many=True, context={'request': request}
+                    open_questions if is_member else [], many=True, context=question_ctx
                 ).data,
                 'past_questions': DiscussionQuestionSerializer(
-                    past_questions, many=True, context={'request': request}
+                    past_questions if is_member else [], many=True, context=question_ctx
                 ).data,
                 'draft_questions': DiscussionQuestionSerializer(
-                    draft_questions, many=True, context={'request': request}
+                    draft_questions if is_member else [], many=True, context=question_ctx
                 ).data,
                 'recent_activity': recent_activity,
                 'quick_links': {
-                    'knowledge_path_id': club.knowledge_path_id,
-                    'topic_id': club.topic_id,
+                    'knowledge_path_id': club.knowledge_path_id if is_member else None,
+                    'topic_id': club.topic_id if is_member else None,
                     'events': [
                         {
                             'event_id': link.event_id,
@@ -325,7 +328,9 @@ class BookClubHubView(APIView):
                         for link in BookClubEvent.objects.filter(book_club=club)
                         .select_related('event')
                         .order_by('event__date_start')
-                    ],
+                    ]
+                    if is_member
+                    else [],
                 },
             }
         )
@@ -336,6 +341,11 @@ class BookClubEventListCreateView(APIView):
 
     def get(self, request, slug):
         club = _get_club(slug)
+        if not club.user_is_member(request.user):
+            return Response(
+                {'detail': 'Join the club to view events.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         links = (
             BookClubEvent.objects.filter(book_club=club, event__deleted=False)
             .select_related('event')
