@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Box,
     Typography,
@@ -32,6 +35,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
 import { getContentOpenInNewTabUrl } from '../utils/fileUtils';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const rejectSchema = yup.object({
+    reason: yup
+        .string()
+        .trim()
+        .required('Debe proporcionar una razón para rechazar'),
+});
 
 const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
     const [suggestions, setSuggestions] = useState([]);
@@ -43,7 +54,18 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
     const [processingIds, setProcessingIds] = useState(new Set());
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const [selectedSuggestion, setSelectedSuggestion] = useState(null);
-    const [rejectionReason, setRejectionReason] = useState('');
+    const [rejectGeneralError, setRejectGeneralError] = useState('');
+
+    const {
+        register: registerReject,
+        handleSubmit: handleRejectSubmit,
+        reset: resetRejectForm,
+        setError: setRejectFormError,
+        formState: { errors: rejectErrors, isSubmitting: isRejectSubmitting },
+    } = useForm({
+        resolver: yupResolver(rejectSchema),
+        defaultValues: { reason: '' },
+    });
 
     const fetchSuggestions = async () => {
         try {
@@ -94,34 +116,42 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
 
     const handleRejectClick = (suggestion) => {
         setSelectedSuggestion(suggestion);
-        setRejectionReason('');
+        resetRejectForm({ reason: '' });
+        setRejectGeneralError('');
         setRejectDialogOpen(true);
     };
 
-    const handleRejectConfirm = async () => {
-        if (!rejectionReason.trim()) {
-            setError('Debe proporcionar una razón para rechazar');
-            return;
-        }
+    const onRejectSubmit = async ({ reason }) => {
+        if (!selectedSuggestion) return;
 
-        setProcessingIds(prev => new Set(prev).add(selectedSuggestion.id));
+        const suggestionId = selectedSuggestion.id;
+        setProcessingIds(prev => new Set(prev).add(suggestionId));
+        setRejectGeneralError('');
         setError(null);
-        
+
         try {
-            await contentApi.rejectContentSuggestion(topicId, selectedSuggestion.id, rejectionReason);
+            await contentApi.rejectContentSuggestion(topicId, suggestionId, reason);
             setRejectDialogOpen(false);
             setSelectedSuggestion(null);
-            setRejectionReason('');
+            resetRejectForm({ reason: '' });
             await fetchSuggestions();
             if (onSuggestionProcessed) {
                 onSuggestionProcessed();
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al rechazar la sugerencia');
+            const { generalError } = applyApiErrorsToForm(
+                err,
+                setRejectFormError,
+                'Error al rechazar la sugerencia',
+                { rejection_reason: 'reason' },
+            );
+            if (generalError) {
+                setRejectGeneralError(generalError);
+            }
         } finally {
             setProcessingIds(prev => {
                 const newSet = new Set(prev);
-                newSet.delete(selectedSuggestion.id);
+                newSet.delete(suggestionId);
                 return newSet;
             });
         }
@@ -326,34 +356,52 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
             )}
 
             {/* Reject Dialog */}
-            <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Rechazar Sugerencia</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Por favor, proporciona una razón para rechazar esta sugerencia de contenido.
-                    </Typography>
-                    <TextField
-                        fullWidth
-                        multiline
-                        rows={4}
-                        label="Razón de rechazo"
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Explica por qué se rechaza esta sugerencia..."
-                        required
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-                    <Button
-                        onClick={handleRejectConfirm}
-                        variant="contained"
-                        color="error"
-                        disabled={!rejectionReason.trim() || processingIds.has(selectedSuggestion?.id)}
-                    >
-                        Rechazar
-                    </Button>
-                </DialogActions>
+            <Dialog
+                open={rejectDialogOpen}
+                onClose={() => !isRejectSubmitting && setRejectDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
+                    <DialogTitle>Rechazar Sugerencia</DialogTitle>
+                    <DialogContent>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Por favor, proporciona una razón para rechazar esta sugerencia de contenido.
+                        </Typography>
+                        {rejectGeneralError && (
+                            <Alert severity="error" sx={{ mb: 2 }}>
+                                {rejectGeneralError}
+                            </Alert>
+                        )}
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            label="Razón de rechazo"
+                            placeholder="Explica por qué se rechaza esta sugerencia..."
+                            error={!!rejectErrors.reason}
+                            helperText={rejectErrors.reason?.message}
+                            disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
+                            {...registerReject('reason')}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            onClick={() => setRejectDialogOpen(false)}
+                            disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            color="error"
+                            disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
+                        >
+                            {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+                        </Button>
+                    </DialogActions>
+                </Box>
             </Dialog>
         </Box>
     );

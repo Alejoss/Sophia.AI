@@ -1,5 +1,8 @@
 import { useState, useEffect, useContext } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { AuthContext } from "../context/AuthContext.jsx";
 import { apiLogin, checkAuth, refreshToken, getUserProfile } from "../api/profilesApi.js";
 import {
@@ -12,6 +15,7 @@ import {
 import SocialLogin from "../components/SocialLogin";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { parseApiValidationErrors } from "../utils/apiFormErrors.js";
 import {
   Alert,
   Box,
@@ -28,6 +32,16 @@ import {
   Typography } from
 "@mui/material";
 
+const loginSchema = yup.object({
+  username: yup
+    .string()
+    .trim()
+    .required("El usuario o correo es requerido."),
+  password: yup
+    .string()
+    .required("La contraseña es requerida."),
+});
+
 /**
  * Regular Login Component
  * Handles traditional username/email and password login
@@ -36,13 +50,22 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { authState, setAuthState, updateAuthState } = useContext(AuthContext);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [generalError, setGeneralError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(false);
   const [loginImage, setLoginImage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [sessionUsername, setSessionUsername] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(loginSchema),
+    defaultValues: { username: "", password: "" },
+  });
 
   useEffect(() => {
     // Select a random login cover image (1-10)
@@ -98,13 +121,14 @@ const Login = () => {
       }
     });
 
-    if (storedUser) {
-      setUsername(storedUser.username);
+    if (storedUser?.username) {
+      setSessionUsername(storedUser.username);
+      setValue("username", storedUser.username);
     }
-  }, [setAuthState, authState.isAuthenticated, updateAuthState, location.state?.from?.pathname, navigate]);
+  }, [setAuthState, authState.isAuthenticated, updateAuthState, location.state?.from?.pathname, navigate, setValue]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async ({ username, password }) => {
+    setGeneralError("");
 
     try {
       // Check if user had previous session data before login using utilities
@@ -115,24 +139,28 @@ const Login = () => {
 
       const response = await apiLogin({ username, password });
 
-
-      if (response.data) {
+      if (response.data?.access_token) {
         const { access_token, ...userData } = response.data;
         // Mark if this is a returning user
         if (hadPreviousSession) {
           sessionStorage.setItem('had_previous_session', 'true');
         }
-        // Use centralized auth state update
+        // Use centralized auth state update (access in storage; refresh cookie set by backend)
         updateAuthState(userData, access_token);
         navigate("/profiles/login_successful");
+        return;
       }
+
+      setGeneralError(
+        "No se recibió un token de acceso. Inténtalo de nuevo o contacta soporte.",
+      );
     } catch (error) {
       console.error("Login error:", error);
-      const errorMessage =
-      error.response?.data?.error ||
-      error.response?.statusText ||
-      "Error al iniciar sesión: " + error.message;
-      setError(errorMessage);
+      const { generalError: parsed } = parseApiValidationErrors(
+        error,
+        "Error al iniciar sesión. Inténtalo de nuevo.",
+      );
+      setGeneralError(parsed || "Error al iniciar sesión. Inténtalo de nuevo.");
     }
   };
 
@@ -153,7 +181,7 @@ const Login = () => {
     return (
       <Container maxWidth="sm" sx={{ py: 4 }}>
         <Alert severity="info">
-          Ya has iniciado sesión como {username}, ¿deseas
+          Ya has iniciado sesión como {sessionUsername || "usuario"}, ¿deseas
           <MuiLink component={Link} to="/profiles/logout" underline="hover" sx={{ ml: 0.5 }}>
             cerrar sesión
           </MuiLink>
@@ -194,20 +222,22 @@ const Login = () => {
               Iniciar sesión
             </Typography>
 
-            <Box component="form" onSubmit={handleSubmit}>
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack spacing={2.5}>
                 <TextField
                   label="Usuario o correo electrónico"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  {...register("username")}
+                  error={!!errors.username}
+                  helperText={errors.username?.message}
                   fullWidth
                   autoComplete="username" />
                 
                 <TextField
                   label="Contraseña"
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  {...register("password")}
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
                   fullWidth
                   autoComplete="current-password"
                   InputProps={{
@@ -225,10 +255,10 @@ const Login = () => {
                   }} />
                 
 
-                {error && <Alert severity="error">{error}</Alert>}
+                {generalError && <Alert severity="error">{generalError}</Alert>}
 
-                <Button type="submit" variant="contained" size="large">
-                  Iniciar sesión
+                <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
+                  {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
                 </Button>
               </Stack>
             </Box>

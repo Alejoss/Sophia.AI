@@ -21,3 +21,8 @@ if (!window.matchMedia) {
     })),
   });
 }
+
+// jsdom does not implement scrollIntoView; RHF invalid handlers often call it
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn();
+}

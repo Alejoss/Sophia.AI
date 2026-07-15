@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Alert,
@@ -29,6 +32,7 @@ import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
+import { applyApiErrorsToForm } from "../utils/apiFormErrors";
 import ImageUploadModal from "../components/ImageUploadModal";
 import TopicModerators from "./TopicModerators";
 import TopicContentManager from "./TopicContentManager";
@@ -36,6 +40,14 @@ import ContentSuggestionsManager from "./ContentSuggestionsManager";
 import TimelineEntrySuggestionsManager from "./timeline/TimelineEntrySuggestionsManager";
 import TimelineEntryContentSuggestionsManager from "./timeline/TimelineEntryContentSuggestionsManager";
 import TopicTimeline from "./timeline/TopicTimeline";
+
+const topicSchema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required("El título es requerido."),
+  description: yup.string().trim().default(""),
+});
 
 const TAB_IDS = {
   general: "general",
@@ -66,12 +78,23 @@ const TopicEdit = () => {
 
   const [topic, setTopic] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [pageError, setPageError] = useState(null);
   const [saveMessage, setSaveMessage] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(0);
-  const [formData, setFormData] = useState({ title: "", description: "" });
-  const [saving, setSaving] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setError,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm({
+    resolver: yupResolver(topicSchema),
+    defaultValues: { title: "", description: "" },
+  });
+
+  const titleValue = watch("title");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeletingTopic, setIsDeletingTopic] = useState(false);
   const [pendingTimelineSuggestionsCount, setPendingTimelineSuggestionsCount] = useState(0);
@@ -85,11 +108,6 @@ const TopicEdit = () => {
   const canManage = isCreator || isModerator;
 
   const activeTab = normalizeTab(searchParams.get("tab"), { isCreator, canManage });
-
-  const isFormDirty = topic && (
-    formData.title !== (topic.title || "") ||
-    formData.description !== (topic.description || "")
-  );
 
   const fetchPendingCounts = async () => {
     try {
@@ -112,19 +130,19 @@ const TopicEdit = () => {
         setLoading(true);
         const data = await contentApi.getTopicDetails(topicId, { include_contents: false });
         setTopic(data);
-        setFormData({
+        reset({
           title: data.title || "",
           description: data.description || "",
         });
-        setError(null);
+        setPageError(null);
       } catch {
-        setError("Error al cargar los detalles del tema");
+        setPageError("Error al cargar los detalles del tema");
       } finally {
         setLoading(false);
       }
     };
     fetchTopic();
-  }, [topicId]);
+  }, [topicId, reset]);
 
   useEffect(() => {
     if (canManage) fetchPendingCounts();
@@ -154,7 +172,7 @@ const TopicEdit = () => {
       setImageCacheBuster(Date.now());
       setSaveMessage("Imagen actualizada.");
     } catch {
-      setError("Error al actualizar la imagen del tema");
+      setPageError("Error al actualizar la imagen del tema");
     }
   };
 
@@ -167,27 +185,29 @@ const TopicEdit = () => {
       setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
       setImageCacheBuster(Date.now());
     } catch {
-      setError("Error al actualizar el foco de la imagen");
+      setPageError("Error al actualizar el foco de la imagen");
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+  const onSubmit = async (formData) => {
     try {
       const updatedTopic = await contentApi.updateTopic(topicId, formData);
       setTopic(updatedTopic);
+      reset({
+        title: updatedTopic.title || "",
+        description: updatedTopic.description || "",
+      });
       setSaveMessage("Cambios guardados.");
-      setError(null);
-    } catch {
-      setError("Error al actualizar los detalles del tema");
-    } finally {
-      setSaving(false);
+      setPageError(null);
+    } catch (err) {
+      const { generalError } = applyApiErrorsToForm(
+        err,
+        setError,
+        "Error al actualizar los detalles del tema",
+      );
+      if (generalError) {
+        setPageError(generalError);
+      }
     }
   };
 
@@ -198,7 +218,7 @@ const TopicEdit = () => {
       setDeleteDialogOpen(false);
       navigate("/content/topics", { replace: true });
     } catch (err) {
-      setError(err?.error || err?.detail || "Error al eliminar el tema.");
+      setPageError(err?.error || err?.detail || "Error al eliminar el tema.");
     } finally {
       setIsDeletingTopic(false);
     }
@@ -267,7 +287,7 @@ const TopicEdit = () => {
             Ver tema
           </Button>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-            {activeTab === TAB_IDS.general && isFormDirty && (
+            {activeTab === TAB_IDS.general && isDirty && (
               <Chip size="small" label="Cambios sin guardar" color="warning" variant="outlined" />
             )}
             {activeTab === TAB_IDS.general && (
@@ -276,11 +296,11 @@ const TopicEdit = () => {
                 form="topic-edit-form"
                 variant="contained"
                 startIcon={<SaveIcon />}
-                disabled={saving || !formData.title || !isFormDirty}
+                disabled={isSubmitting || !titleValue?.trim() || !isDirty}
                 size="small"
                 sx={{ textTransform: "none" }}
               >
-                {saving ? "Guardando..." : "Guardar cambios"}
+                {isSubmitting ? "Guardando..." : "Guardar cambios"}
               </Button>
             )}
           </Box>
@@ -353,30 +373,29 @@ const TopicEdit = () => {
         </Tabs>
       </Paper>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+      {pageError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPageError(null)}>
+          {pageError}
         </Alert>
       )}
 
       <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
         {activeTab === TAB_IDS.general && (
-          <Box component="form" id="topic-edit-form" onSubmit={handleSubmit}>
+          <Box component="form" id="topic-edit-form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <TextField
               fullWidth
               label="Titulo"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
+              {...register("title")}
+              error={Boolean(errors.title)}
+              helperText={errors.title?.message}
               margin="normal"
-              required
             />
             <TextField
               fullWidth
               label="Descripcion"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
+              {...register("description")}
+              error={Boolean(errors.description)}
+              helperText={errors.description?.message}
               margin="normal"
               multiline
               minRows={8}

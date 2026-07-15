@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../authErrorHandler';
-import { parseApiValidationErrors } from '../apiFormErrors';
+import { applyApiErrorsToForm, parseApiValidationErrors } from '../apiFormErrors';
 
 describe('apiFormErrors', () => {
   it('extracts field errors from ApiError data', () => {
@@ -21,6 +21,14 @@ describe('apiFormErrors', () => {
     expect(generalError).toBeNull();
   });
 
+  it('translates common DRF required-field messages', () => {
+    const { fieldErrors } = parseApiValidationErrors({
+      response: { data: { title: ['This field is required.'] } },
+    });
+
+    expect(fieldErrors.title).toBe('Este campo es requerido.');
+  });
+
   it('extracts general errors from detail and non_field_errors', () => {
     const { fieldErrors, generalError } = parseApiValidationErrors({
       data: { detail: 'No autorizado' },
@@ -38,5 +46,35 @@ describe('apiFormErrors', () => {
 
     expect(fieldErrors).toEqual({});
     expect(generalError).toBe('Error genérico');
+  });
+
+  it('applyApiErrorsToForm maps fields onto react-hook-form setError', () => {
+    const setError = vi.fn();
+    const { generalError } = applyApiErrorsToForm(
+      { response: { data: { personal_note: ['This field may not be blank.'], error: 'Falló' } } },
+      setError,
+      null,
+      { personal_note: 'personalNote' },
+    );
+
+    expect(setError).toHaveBeenCalledWith('personalNote', {
+      type: 'server',
+      message: 'Este campo es requerido.',
+    });
+    expect(generalError).toBe('Falló');
+  });
+
+  it('translates registration duplicate-user messages', () => {
+    const { fieldErrors } = parseApiValidationErrors({
+      response: {
+        data: {
+          email: ['A user with this email already exists.'],
+          username: ['A user with that username already exists.'],
+        },
+      },
+    });
+
+    expect(fieldErrors.email).toBe('Ya existe un usuario con ese correo electrónico.');
+    expect(fieldErrors.username).toBe('Ya existe un usuario con ese nombre de usuario.');
   });
 });

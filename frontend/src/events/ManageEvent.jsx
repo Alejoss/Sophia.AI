@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Link, useParams } from 'react-router-dom';
 import { fetchEventById, getEventParticipants, updateParticipantStatus } from '../api/eventsApi';
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
@@ -25,6 +28,11 @@ import {
   Typography,
 } from '@mui/material';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+
+const certificateSchema = yup.object({
+  certificateNote: yup.string().trim().default(''),
+});
 
 const ManageEvent = () => {
   const { eventId } = useParams();
@@ -39,8 +47,19 @@ const ManageEvent = () => {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState(null);
-  const [certificateNote, setCertificateNote] = useState('');
+  const [certificateGeneralError, setCertificateGeneralError] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  const {
+    register: registerCertificate,
+    handleSubmit: handleCertificateSubmit,
+    reset: resetCertificateForm,
+    setError: setCertificateFormError,
+    formState: { errors: certificateErrors, isSubmitting: isCertificateSubmitting },
+  } = useForm({
+    resolver: yupResolver(certificateSchema),
+    defaultValues: { certificateNote: '' },
+  });
   const [paymentConfirmationDialog, setPaymentConfirmationDialog] = useState(false);
   const [selectedPaymentRegistration, setSelectedPaymentRegistration] = useState(null);
   const [cryptoPaymentsEnabled, setCryptoPaymentsEnabled] = useState(false);
@@ -173,8 +192,16 @@ const ManageEvent = () => {
 
   const openCertificateDialog = (registration) => {
     setSelectedRegistration(registration);
-    setCertificateNote('');
+    resetCertificateForm({ certificateNote: '' });
+    setCertificateGeneralError('');
     setCertificateDialogOpen(true);
+  };
+
+  const handleCloseCertificateDialog = () => {
+    if (!isCertificateSubmitting) {
+      setCertificateDialogOpen(false);
+      setCertificateGeneralError('');
+    }
   };
 
   const openPaymentConfirmationDialog = (registration) => {
@@ -216,44 +243,48 @@ const ManageEvent = () => {
     }
   };
 
-  const handleGenerateCertificate = async () => {
+  const onCertificateSubmit = async ({ certificateNote }) => {
     if (!selectedRegistration) return;
 
+    setCertificateGeneralError('');
+    setError(null);
+    setUpdatingStatus(selectedRegistration.id);
+
     try {
-      setUpdatingStatus(selectedRegistration.id);
-      setCertificateDialogOpen(false);
-      setError(null);
-      
-      // Use the new certificate generation API
-      const result = await certificatesApi.generateEventCertificate(
-        eventId, 
-        selectedRegistration.id, 
-        {
-          note: certificateNote
-        }
+      await certificatesApi.generateEventCertificate(
+        eventId,
+        selectedRegistration.id,
+        { note: certificateNote },
       );
-      
-      // Refresh participants list
+
       const participantsData = await getEventParticipants(eventId);
       setParticipants(participantsData);
-      
-        setSnackbar({
-          open: true,
-          message: '¡Certificado generado y enviado exitosamente!',
-          severity: 'success'
-        });
+
+      setCertificateDialogOpen(false);
+      setSelectedRegistration(null);
+      setSnackbar({
+        open: true,
+        message: '¡Certificado generado y enviado exitosamente!',
+        severity: 'success',
+      });
     } catch (err) {
       console.error('Error generating certificate:', err);
-      const errorMessage = err.error || err.details || 'Error al generar el certificado';
+      const { generalError } = applyApiErrorsToForm(
+        err,
+        setCertificateFormError,
+        err.error || err.details || 'Error al generar el certificado',
+        { note: 'certificateNote' },
+      );
+      const errorMessage = generalError || 'Error al generar el certificado';
+      setCertificateGeneralError(errorMessage);
       setError(errorMessage);
       setSnackbar({
         open: true,
         message: errorMessage,
-        severity: 'error'
+        severity: 'error',
       });
     } finally {
       setUpdatingStatus(null);
-      setSelectedRegistration(null);
     }
   };
 
@@ -438,42 +469,56 @@ const ManageEvent = () => {
       </Box>
 
       {/* Certificate Generation Dialog */}
-      <Dialog 
-        open={certificateDialogOpen} 
-        onClose={() => setCertificateDialogOpen(false)}
+      <Dialog
+        open={certificateDialogOpen}
+        onClose={handleCloseCertificateDialog}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Enviar Certificado</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <strong>Nota:</strong> Cualquier mensaje que agregue a continuación será visible para el estudiante en su certificado.
-            </Alert>
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="Mensaje Personal (opcional)"
-              placeholder="Agregue un mensaje personal para felicitar al estudiante o agregar notas especiales..."
-              value={certificateNote}
-              onChange={(e) => setCertificateNote(e.target.value)}
-              variant="outlined"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCertificateDialogOpen(false)}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleGenerateCertificate}
-            variant="contained"
-            color="primary"
-          >
-            Enviar Certificado
-          </Button>
-        </DialogActions>
+        <Box
+          component="form"
+          onSubmit={handleCertificateSubmit(onCertificateSubmit)}
+          noValidate
+        >
+          <DialogTitle>Enviar Certificado</DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2 }}>
+              {certificateGeneralError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {certificateGeneralError}
+                </Alert>
+              )}
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <strong>Nota:</strong> Cualquier mensaje que agregue a continuación será visible para el estudiante en su certificado.
+              </Alert>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Mensaje Personal (opcional)"
+                placeholder="Agregue un mensaje personal para felicitar al estudiante o agregar notas especiales..."
+                variant="outlined"
+                error={!!certificateErrors.certificateNote}
+                helperText={certificateErrors.certificateNote?.message}
+                disabled={isCertificateSubmitting}
+                {...registerCertificate('certificateNote')}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseCertificateDialog} disabled={isCertificateSubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={isCertificateSubmitting}
+            >
+              {isCertificateSubmitting ? 'Enviando...' : 'Enviar Certificado'}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
 
       {/* Payment Confirmation Dialog */}

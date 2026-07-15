@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Dialog,
     DialogTitle,
@@ -13,6 +16,11 @@ import {
 } from '@mui/material';
 import contentApi from '../api/contentApi';
 import { formatFileSize } from '../utils/fileUtils';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const messageSchema = yup.object({
+    message: yup.string().default(''),
+});
 
 /**
  * Modal to suggest a file for URL-only content: S3 presign + PUT + confirm (same idea as UploadContentForm),
@@ -28,41 +36,54 @@ const FileSuggestionUploadDialog = ({
     introText = (
         <>
             Academia Blockchain es un proyecto colaborativo. Reconocemos lo importante que es poder descargarnos
-            archivos y guardarlos localmente. 
+            archivos y guardarlos localmente.
         </>
     ),
 }) => {
     const [suggestionFile, setSuggestionFile] = useState(null);
-    const [suggestionMessage, setSuggestionMessage] = useState('');
-    const [error, setError] = useState('');
+    const [fileError, setFileError] = useState('');
+    const [generalError, setGeneralError] = useState('');
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError,
+        formState: { errors },
+    } = useForm({
+        resolver: yupResolver(messageSchema),
+        defaultValues: { message: '' },
+    });
 
     useEffect(() => {
         if (!open) {
             setSuggestionFile(null);
-            setSuggestionMessage('');
-            setError('');
+            reset({ message: '' });
+            setFileError('');
+            setGeneralError('');
             setUploading(false);
             setUploadProgress(null);
         }
-    }, [open]);
+    }, [open, reset]);
 
-    const handleSubmit = async () => {
-        setError('');
+    const onSubmit = async ({ message }) => {
+        setFileError('');
+        setGeneralError('');
+
         if (!suggestionFile) {
-            setError('Debes seleccionar un archivo.');
+            setFileError('Debes seleccionar un archivo.');
             return;
         }
 
         setUploading(true);
-        // null = fase presign/confirm (barra indeterminada); número = progreso del PUT a S3
         setUploadProgress(null);
         try {
             await contentApi.uploadFileSuggestionViaS3(
                 contentId,
                 suggestionFile,
-                suggestionMessage,
+                message,
                 (e) => {
                     if (e.total) {
                         setUploadProgress(Math.round((e.loaded / e.total) * 100));
@@ -72,20 +93,14 @@ const FileSuggestionUploadDialog = ({
             onSuccess?.();
             onClose();
         } catch (err) {
-            const raw = err?.response?.data?.error;
-            let msg = err?.message || 'No se pudo enviar la sugerencia.';
-            if (typeof raw === 'string') {
-                msg = raw;
-            } else if (raw != null && typeof raw === 'object') {
-                try {
-                    msg = JSON.stringify(raw);
-                } catch {
-                    msg = 'No se pudo enviar la sugerencia.';
-                }
-            } else if (raw != null) {
-                msg = String(raw);
+            const { generalError: parsed } = applyApiErrorsToForm(
+                err,
+                setError,
+                'No se pudo enviar la sugerencia.',
+            );
+            if (parsed) {
+                setGeneralError(parsed);
             }
-            setError(msg);
         } finally {
             setUploading(false);
             setUploadProgress(null);
@@ -94,69 +109,75 @@ const FileSuggestionUploadDialog = ({
 
     return (
         <Dialog open={open} onClose={uploading ? undefined : onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{dialogTitle}</DialogTitle>
-            <DialogContent>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {introText}
-                </Typography>
-
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
-                )}
-
-                {uploading && (
-                    <Box sx={{ mb: 2 }}>
-                        {uploadProgress === null ? (
-                            <>
-                                <LinearProgress />
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                                    Preparando subida…
-                                </Typography>
-                            </>
-                        ) : (
-                            <>
-                                <LinearProgress variant="determinate" value={uploadProgress} />
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                                    {uploadProgress}%
-                                </Typography>
-                            </>
-                        )}
-                    </Box>
-                )}
-
-                <Button variant="outlined" component="label" sx={{ mb: 2 }} disabled={uploading}>
-                    Seleccionar archivo
-                    <input
-                        type="file"
-                        hidden
-                        onChange={(e) => setSuggestionFile(e.target.files?.[0] || null)}
-                    />
-                </Button>
-                {suggestionFile && (
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                        Archivo: {suggestionFile.name} ({formatFileSize(suggestionFile.size)})
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+                <DialogTitle>{dialogTitle}</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {introText}
                     </Typography>
-                )}
-                <TextField
-                    label="Mensaje (opcional)"
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={suggestionMessage}
-                    onChange={(e) => setSuggestionMessage(e.target.value)}
-                    disabled={uploading}
-                />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} disabled={uploading}>
-                    Cancelar
-                </Button>
-                <Button variant="contained" onClick={handleSubmit} disabled={uploading}>
-                    {uploading ? 'Subiendo…' : submitLabel}
-                </Button>
-            </DialogActions>
+
+                    {(generalError || fileError) && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {generalError || fileError}
+                        </Alert>
+                    )}
+
+                    {uploading && (
+                        <Box sx={{ mb: 2 }}>
+                            {uploadProgress === null ? (
+                                <>
+                                    <LinearProgress />
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                        Preparando subida…
+                                    </Typography>
+                                </>
+                            ) : (
+                                <>
+                                    <LinearProgress variant="determinate" value={uploadProgress} />
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                        {uploadProgress}%
+                                    </Typography>
+                                </>
+                            )}
+                        </Box>
+                    )}
+
+                    <Button variant="outlined" component="label" sx={{ mb: 2 }} disabled={uploading}>
+                        Seleccionar archivo
+                        <input
+                            type="file"
+                            hidden
+                            onChange={(e) => {
+                                setSuggestionFile(e.target.files?.[0] || null);
+                                setFileError('');
+                            }}
+                        />
+                    </Button>
+                    {suggestionFile && (
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                            Archivo: {suggestionFile.name} ({formatFileSize(suggestionFile.size)})
+                        </Typography>
+                    )}
+                    <TextField
+                        label="Mensaje (opcional)"
+                        fullWidth
+                        multiline
+                        rows={3}
+                        error={!!errors.message}
+                        helperText={errors.message?.message}
+                        disabled={uploading}
+                        {...register('message')}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose} disabled={uploading}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" variant="contained" disabled={uploading}>
+                        {uploading ? 'Subiendo…' : submitLabel}
+                    </Button>
+                </DialogActions>
+            </Box>
         </Dialog>
     );
 };

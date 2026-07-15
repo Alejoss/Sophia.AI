@@ -1,8 +1,30 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { AuthContext } from '../context/AuthContext';
 import { fetchOrCreateThread, fetchMessages, sendMessage } from '../api/messagesApi';
-import { Box, Typography, Paper, CircularProgress, TextField, Button, List, ListItem, ListItemText } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Paper,
+  CircularProgress,
+  TextField,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Alert,
+} from '@mui/material';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const messageSchema = yup.object({
+  text: yup
+    .string()
+    .trim()
+    .required('Escribe un mensaje antes de enviar.'),
+});
 
 const MessageThread = () => {
   const { userId } = useParams();
@@ -12,9 +34,19 @@ const MessageThread = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newMessage, setNewMessage] = useState('');
-  const [sending, setSending] = useState(false);
+  const [generalError, setGeneralError] = useState('');
   const messagesEndRef = useRef(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError: setFormError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(messageSchema),
+    defaultValues: { text: '' },
+  });
 
   const getOtherUser = () => {
     if (!thread || !currentUser) return null;
@@ -45,20 +77,28 @@ const MessageThread = () => {
     loadThreadAndMessages();
   }, [userId]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !thread) return;
-    setSending(true);
+  const onSubmit = async ({ text }) => {
+    if (!thread) return;
+
+    setGeneralError('');
+
     try {
-      await sendMessage(thread.id, newMessage);
+      await sendMessage(thread.id, text);
       const messagesRes = await fetchMessages(thread.id);
       const messagesData = Array.isArray(messagesRes.data) ? messagesRes.data : [];
       setMessages(messagesData);
-      setNewMessage('');
+      reset({ text: '' });
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Error al enviar el mensaje.');
-    } finally {
-      setSending(false);
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setFormError,
+        'Error al enviar el mensaje.',
+        { message: 'text', content: 'text' },
+      );
+      if (parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
@@ -79,9 +119,9 @@ const MessageThread = () => {
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <Typography variant="h5" gutterBottom>
           Conversación con{' '}
-          <Link 
+          <Link
             to={`/profiles/user_profile/${otherUser?.id}`}
-            style={{ 
+            style={{
               textDecoration: 'none',
               color: 'inherit',
               '&:hover': {
@@ -97,7 +137,7 @@ const MessageThread = () => {
             <ListItem><ListItemText primary="Aún no hay mensajes." /></ListItem>
           )}
           {messages && messages.map(msg => (
-            <ListItem 
+            <ListItem
               key={msg.id}
               sx={{
                 justifyContent: msg.sender.id === currentUser.id ? 'flex-end' : 'flex-start',
@@ -115,9 +155,9 @@ const MessageThread = () => {
                 }}
               >
                 <Typography variant="body1">{msg.text}</Typography>
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
+                <Typography
+                  variant="caption"
+                  sx={{
                     display: 'block',
                     color: msg.sender.id === currentUser.id ? 'rgba(255,255,255,0.7)' : 'text.secondary',
                     mt: 0.5
@@ -130,24 +170,39 @@ const MessageThread = () => {
           ))}
           <div ref={messagesEndRef} />
         </List>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            fullWidth
-            variant="outlined"
-            size="small"
-            placeholder="Escriba su mensaje..."
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSendMessage(); }}
-            disabled={sending}
-          />
-          <Button variant="contained" color="primary" onClick={handleSendMessage} disabled={sending || !newMessage.trim()}>
-            Enviar
-          </Button>
+        <Box
+          component="form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}
+        >
+          {generalError && (
+            <Alert severity="error">{generalError}</Alert>
+          )}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Escriba su mensaje..."
+              error={!!errors.text}
+              helperText={errors.text?.message}
+              disabled={isSubmitting}
+              {...register('text')}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
+            </Button>
+          </Box>
         </Box>
       </Paper>
     </Box>
   );
 };
 
-export default MessageThread; 
+export default MessageThread;

@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Box,
     Typography,
@@ -7,11 +10,20 @@ import {
     Paper,
     Divider,
     Alert,
-    Snackbar
+    Snackbar,
+    CircularProgress,
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import commentsApi from '../api/commentsApi';
 import { Comment } from './Comment';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const commentSchema = yup.object({
+    body: yup
+        .string()
+        .trim()
+        .required('Escribe un comentario antes de publicar.'),
+});
 
 const CommentSection = ({
     topicId = null,
@@ -23,10 +35,21 @@ const CommentSection = ({
     placeholder = 'Escriba un comentario...',
 }) => {
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [generalError, setGeneralError] = useState('');
     const { authState } = useContext(AuthContext);
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError: setFormError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(commentSchema),
+        defaultValues: { body: '' },
+    });
 
     useEffect(() => {
         loadComments();
@@ -36,7 +59,7 @@ const CommentSection = ({
         try {
             setLoading(true);
             let fetchedComments;
-            
+
             if (discussionQuestionId) {
                 fetchedComments = await commentsApi.getDiscussionQuestionComments(discussionQuestionId);
             } else if (knowledgePathId) {
@@ -48,7 +71,7 @@ const CommentSection = ({
             } else {
                 throw new Error('No valid comment context provided');
             }
-            
+
             setComments(fetchedComments);
         } catch (err) {
             if (err.response?.status !== 404) {
@@ -60,32 +83,37 @@ const CommentSection = ({
         }
     };
 
-    const handleAddComment = async () => {
+    const onSubmit = async ({ body }) => {
         if (!authState.user) {
             setError('Debe iniciar sesión para comentar');
             return;
         }
 
-        if (!newComment.trim()) {
-            return;
-        }
+        setGeneralError('');
 
         try {
             if (discussionQuestionId) {
-                await commentsApi.addDiscussionQuestionComment(discussionQuestionId, newComment);
+                await commentsApi.addDiscussionQuestionComment(discussionQuestionId, body);
             } else if (knowledgePathId) {
-                await commentsApi.addKnowledgePathComment(knowledgePathId, newComment);
+                await commentsApi.addKnowledgePathComment(knowledgePathId, body);
             } else if (contentId) {
-                await commentsApi.addContentComment(topicId, contentId, newComment);
+                await commentsApi.addContentComment(topicId, contentId, body);
             } else if (topicId) {
-                await commentsApi.addTopicComment(topicId, newComment);
+                await commentsApi.addTopicComment(topicId, body);
             }
 
-            setNewComment('');
+            reset({ body: '' });
             await loadComments();
-        } catch (error) {
-            const detail = error?.response?.data?.detail;
-            setError(detail || 'Error al agregar el comentario. Por favor, inténtelo de nuevo.');
+        } catch (err) {
+            const { generalError: parsed } = applyApiErrorsToForm(
+                err,
+                setFormError,
+                'Error al agregar el comentario. Por favor, inténtelo de nuevo.',
+                { text: 'body', content: 'body' },
+            );
+            if (parsed) {
+                setGeneralError(parsed);
+            }
         }
     };
 
@@ -128,24 +156,37 @@ const CommentSection = ({
             <Typography variant="h6" gutterBottom>
                 {title}
             </Typography>
-            
+
             {authState.isAuthenticated && !readOnly ? (
-                <Box sx={{ mb: 3 }}>
+                <Box
+                    component="form"
+                    onSubmit={handleSubmit(onSubmit)}
+                    noValidate
+                    sx={{ mb: 3 }}
+                >
+                    {generalError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {generalError}
+                        </Alert>
+                    )}
                     <TextField
                         fullWidth
                         multiline
                         rows={3}
                         placeholder={placeholder}
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
+                        error={!!errors.body}
+                        helperText={errors.body?.message}
+                        disabled={isSubmitting}
+                        {...register('body')}
                     />
                     <Button
+                        type="submit"
                         variant="contained"
                         sx={{ mt: 1 }}
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim()}
+                        disabled={isSubmitting}
+                        startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : null}
                     >
-                        Publicar
+                        {isSubmitting ? 'Publicando...' : 'Publicar Comentario'}
                     </Button>
                 </Box>
             ) : readOnly ? (
@@ -194,4 +235,4 @@ const CommentSection = ({
     );
 };
 
-export default CommentSection; 
+export default CommentSection;

@@ -1,40 +1,51 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Container, Box, Typography, TextField, Button, Alert, useTheme } from '@mui/material';
 import { submitNewsletterSubscription } from '../api/profilesApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { emailField } from '../utils/formSchemas';
+
+const schema = yup.object({
+  email: emailField(),
+});
 
 const NewsletterSubscribe = () => {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [generalError, setGeneralError] = useState('');
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const heroBoxBg = isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.77)';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { email: '' },
+  });
+
+  const onSubmit = async ({ email }) => {
     setSuccessMessage('');
-    setErrorMessage('');
+    setGeneralError('');
 
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setErrorMessage('Por favor, introduce un email válido.');
-      return;
-    }
-
-    setLoading(true);
     try {
-      await submitNewsletterSubscription(trimmedEmail);
+      await submitNewsletterSubscription(email.trim());
       setSuccessMessage('¡Gracias por suscribirte! Te avisaremos de las próximas novedades.');
-      setEmail('');
+      reset({ email: '' });
     } catch (err) {
-      const detail =
-        err?.response?.data?.detail ||
-        err?.response?.data?.email?.[0] ||
-        'No se ha podido completar la suscripción. Inténtalo de nuevo más tarde.';
-      setErrorMessage(detail);
-    } finally {
-      setLoading(false);
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'No se ha podido completar la suscripción. Inténtalo de nuevo más tarde.',
+      );
+      if (parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
@@ -106,21 +117,27 @@ const NewsletterSubscribe = () => {
             construcción de esta plataforma revolucionaria.
           </Typography>
 
-          <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box
+            component="form"
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+          >
             <TextField
               type="email"
               label="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register('email')}
+              error={!!errors.email}
+              helperText={errors.email?.message}
               placeholder="tu@email"
               fullWidth
               variant="outlined"
               size="medium"
             />
 
-            {errorMessage && (
+            {generalError && (
               <Alert severity="error" variant={isDark ? 'filled' : 'outlined'}>
-                {errorMessage}
+                {generalError}
               </Alert>
             )}
             {successMessage && (
@@ -133,7 +150,7 @@ const NewsletterSubscribe = () => {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={loading}
+                disabled={isSubmitting}
                 sx={{
                   bgcolor: '#FF6B35',
                   '&:hover': {
@@ -146,7 +163,7 @@ const NewsletterSubscribe = () => {
                 }}
                 fullWidth
               >
-                {loading ? 'Enviando...' : 'Quiero suscribirme'}
+                {isSubmitting ? 'Enviando...' : 'Quiero suscribirme'}
               </Button>
             </Box>
           </Box>
@@ -170,5 +187,3 @@ const NewsletterSubscribe = () => {
 };
 
 export default NewsletterSubscribe;
-
-

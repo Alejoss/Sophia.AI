@@ -1,4 +1,7 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AuthContext } from '../context/AuthContext';
@@ -18,8 +21,130 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import commentsApi from '../api/commentsApi';
 import VoteComponent from '../votes/VoteComponent';
 import BadgeDisplay from '../gamification/BadgeDisplay';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 
 const MAX_DEPTH = 3;
+
+const commentBodySchema = yup.object({
+    body: yup
+        .string()
+        .trim()
+        .required('El comentario no puede estar vacío'),
+});
+
+const EditCommentForm = ({ initialBody, onSave, onCancel }) => {
+    const [generalError, setGeneralError] = useState('');
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(commentBodySchema),
+        defaultValues: { body: initialBody },
+    });
+
+    useEffect(() => {
+        reset({ body: initialBody });
+        setGeneralError('');
+    }, [initialBody, reset]);
+
+    const onSubmit = async ({ body }) => {
+        setGeneralError('');
+        const success = await onSave(body, { setError, setGeneralError });
+        if (success) {
+            onCancel();
+        }
+    };
+
+    return (
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 1 }}>
+            {generalError && (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                    {generalError}
+                </Alert>
+            )}
+            <TextField
+                fullWidth
+                multiline
+                size="small"
+                error={!!errors.body}
+                helperText={errors.body?.message}
+                disabled={isSubmitting}
+                {...register('body')}
+            />
+            <Box sx={{ mt: 1 }}>
+                <Button
+                    type="submit"
+                    size="small"
+                    disabled={isSubmitting}
+                >
+                    {isSubmitting ? 'Guardando...' : 'Guardar'}
+                </Button>
+                <Button size="small" onClick={onCancel} disabled={isSubmitting}>
+                    Cancelar
+                </Button>
+            </Box>
+        </Box>
+    );
+};
+
+const ReplyCommentForm = ({ onReply, onCancel }) => {
+    const [generalError, setGeneralError] = useState('');
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: yupResolver(commentBodySchema),
+        defaultValues: { body: '' },
+    });
+
+    useEffect(() => {
+        reset({ body: '' });
+        setGeneralError('');
+    }, [reset]);
+
+    const onSubmit = async ({ body }) => {
+        setGeneralError('');
+        const success = await onReply(body, { setError, setGeneralError });
+        if (success) {
+            reset({ body: '' });
+            onCancel();
+        }
+    };
+
+    return (
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 2 }}>
+            {generalError && (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                    {generalError}
+                </Alert>
+            )}
+            <TextField
+                fullWidth
+                multiline
+                placeholder="Escriba una respuesta..."
+                size="small"
+                error={!!errors.body}
+                helperText={errors.body?.message}
+                disabled={isSubmitting}
+                {...register('body')}
+            />
+            <Box sx={{ mt: 1 }}>
+                <Button type="submit" size="small" disabled={isSubmitting}>
+                    {isSubmitting ? 'Enviando...' : 'Enviar'}
+                </Button>
+                <Button size="small" onClick={onCancel} disabled={isSubmitting}>
+                    Cancelar
+                </Button>
+            </Box>
+        </Box>
+    );
+};
 
 // Helper function to find a comment in the nested structure
 const findComment = (comments, commentId) => {
@@ -71,7 +196,7 @@ const addReplyToComment = (comments, parentId, newReply) => {
     });
 };
 
-export const Comment = ({ 
+export const Comment = ({
     comment,
     depth = 0,
     allComments,
@@ -79,9 +204,7 @@ export const Comment = ({
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [editedBody, setEditedBody] = useState(comment.body);
     const [isReplying, setIsReplying] = useState(false);
-    const [replyBody, setReplyBody] = useState('');
     const [error, setError] = useState(null);
     const [showReplies, setShowReplies] = useState(true);
     const { authState } = useContext(AuthContext);
@@ -93,9 +216,9 @@ export const Comment = ({
     const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
     const handleMenuClose = () => setAnchorEl(null);
 
-    const handleReply = async () => {
-        if (!authState?.user || !canReply || !replyBody.trim()) {
-            return;
+    const handleReply = async (replyBody, { setError: setFormError, setGeneralError }) => {
+        if (!authState?.user || !canReply) {
+            return false;
         }
 
         const optimisticReply = {
@@ -112,62 +235,76 @@ export const Comment = ({
             isOptimistic: true
         };
 
-        // Optimistically update the UI
-        setAllComments(prevComments => 
+        setAllComments(prevComments =>
             addReplyToComment(prevComments, comment.id, optimisticReply)
         );
-        setIsReplying(false);
-        setReplyBody('');
 
         try {
             const newReply = await commentsApi.addCommentReply(comment.id, replyBody);
-            // Update the temporary comment with the real one
-            setAllComments(prevComments => 
+            setAllComments(prevComments =>
                 updateCommentInTree(prevComments, optimisticReply.id, () => ({
                     ...newReply,
                     replies: []
                 }))
             );
-        } catch (error) {
-            setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
-            // Revert the optimistic update
-            setAllComments(prevComments => 
+            return true;
+        } catch (err) {
+            const { generalError } = applyApiErrorsToForm(
+                err,
+                setFormError,
+                'Error al agregar la respuesta. Por favor, inténtelo de nuevo.',
+                { text: 'body', content: 'body' },
+            );
+            if (generalError) {
+                setGeneralError(generalError);
+            }
+            setAllComments(prevComments =>
                 updateCommentInTree(prevComments, comment.id, comment => ({
                     ...comment,
                     replies: comment.replies.filter(r => r.id !== optimisticReply.id),
                     reply_count: comment.reply_count - 1
                 }))
             );
+            return false;
         }
     };
 
-    const handleEditComment = async () => {
-        if (!editedBody.trim()) return;
+    const handleEditComment = async (editedBody, { setError: setFormError, setGeneralError }) => {
+        if (editedBody === comment.body) {
+            return true;
+        }
 
         const originalBody = comment.body;
-        
-        // Optimistically update the UI
-        setAllComments(prevComments => 
+
+        setAllComments(prevComments =>
             updateCommentInTree(prevComments, comment.id, comment => ({
                 ...comment,
                 body: editedBody,
                 is_edited: true
             }))
         );
-        setIsEditing(false);
 
         try {
             await commentsApi.updateComment(comment.id, editedBody);
-        } catch (error) {
-            setError('Error al editar el comentario. Por favor, inténtelo de nuevo.');
-            // Revert the optimistic update
-            setAllComments(prevComments => 
+            return true;
+        } catch (err) {
+            const { generalError } = applyApiErrorsToForm(
+                err,
+                setFormError,
+                'Error al editar el comentario. Por favor, inténtelo de nuevo.',
+                { text: 'body', content: 'body' },
+            );
+            if (generalError) {
+                setGeneralError(generalError);
+            }
+            setAllComments(prevComments =>
                 updateCommentInTree(prevComments, comment.id, comment => ({
                     ...comment,
                     body: originalBody,
                     is_edited: comment.is_edited
                 }))
             );
+            return false;
         }
     };
 
@@ -176,8 +313,7 @@ export const Comment = ({
             return;
         }
 
-        // Optimistically update the UI
-        setAllComments(prevComments => 
+        setAllComments(prevComments =>
             updateCommentInTree(prevComments, comment.id, comment => ({
                 ...comment,
                 is_active: false
@@ -188,8 +324,7 @@ export const Comment = ({
             await commentsApi.deleteComment(comment.id);
         } catch (error) {
             setError('Error al eliminar el comentario. Por favor, inténtelo de nuevo.');
-            // Revert the optimistic update
-            setAllComments(prevComments => 
+            setAllComments(prevComments =>
                 updateCommentInTree(prevComments, comment.id, comment => ({
                     ...comment,
                     is_active: true
@@ -211,9 +346,9 @@ export const Comment = ({
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Typography variant="subtitle2">{comment.author_name}</Typography>
                             {comment.featured_badge && (
-                                <BadgeDisplay 
-                                    badge={comment.featured_badge} 
-                                    showName={false} 
+                                <BadgeDisplay
+                                    badge={comment.featured_badge}
+                                    showName={false}
                                     context="comment"
                                 />
                             )}
@@ -246,35 +381,11 @@ export const Comment = ({
                     </Box>
 
                     {isEditing ? (
-                        <Box sx={{ mt: 1 }}>
-                            <TextField
-                                fullWidth
-                                multiline
-                                value={editedBody}
-                                onChange={(e) => setEditedBody(e.target.value)}
-                                size="small"
-                                error={editedBody.trim() === ''}
-                                helperText={editedBody.trim() === '' ? 'El comentario no puede estar vacío' : ''}
-                            />
-                            <Box sx={{ mt: 1 }}>
-                                <Button 
-                                    size="small" 
-                                    onClick={handleEditComment}
-                                    disabled={!editedBody.trim() || editedBody === comment.body}
-                                >
-                                    Guardar
-                                </Button>
-                                <Button 
-                                    size="small" 
-                                    onClick={() => {
-                                        setIsEditing(false);
-                                        setEditedBody(comment.body);
-                                    }}
-                                >
-                                    Cancelar
-                                </Button>
-                            </Box>
-                        </Box>
+                        <EditCommentForm
+                            initialBody={comment.body}
+                            onSave={handleEditComment}
+                            onCancel={() => setIsEditing(false)}
+                        />
                     ) : (
                         <Typography variant="body2">{comment.body}</Typography>
                     )}
@@ -290,8 +401,8 @@ export const Comment = ({
                             </Button>
                         )}
                         {hasReplies && (
-                            <Button 
-                                size="small" 
+                            <Button
+                                size="small"
                                 onClick={() => setShowReplies(!showReplies)}
                                 sx={{ ml: 'auto' }}
                             >
@@ -301,37 +412,16 @@ export const Comment = ({
                     </Box>
 
                     {isReplying && (
-                        <Box sx={{ mt: 2 }}>
-                            <TextField
-                                fullWidth
-                                multiline
-                                placeholder="Escriba una respuesta..."
-                                value={replyBody}
-                                onChange={(e) => setReplyBody(e.target.value)}
-                                size="small"
-                            />
-                            <Box sx={{ mt: 1 }}>
-                                <Button 
-                                    size="small" 
-                                    onClick={handleReply}
-                                    disabled={!replyBody.trim()}
-                                >
-                                    Enviar
-                                </Button>
-                                <Button size="small" onClick={() => {
-                                    setIsReplying(false);
-                                    setReplyBody('');
-                                }}>
-                                    Cancelar
-                                </Button>
-                            </Box>
-                        </Box>
+                        <ReplyCommentForm
+                            onReply={handleReply}
+                            onCancel={() => setIsReplying(false)}
+                        />
                     )}
                 </Box>
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <VoteComponent 
+                <VoteComponent
                     type="comment"
                     ids={{ commentId: comment.id }}
                     initialVoteCount={comment.vote_count}
@@ -364,4 +454,4 @@ export const Comment = ({
             </Snackbar>
         </Box>
     );
-}; 
+};

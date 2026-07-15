@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
     Box,
     Typography,
@@ -27,6 +30,22 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+
+const approveSchema = yup.object({
+    approvedTitle: yup
+        .string()
+        .trim()
+        .required('El título es requerido.'),
+    approvedDescription: yup.string().default(''),
+});
+
+const rejectSchema = yup.object({
+    rejectionReason: yup
+        .string()
+        .trim()
+        .required('El motivo del rechazo es requerido.'),
+});
 
 const STATUS_LABELS = {
     PENDING: 'Pendiente',
@@ -61,9 +80,30 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
     const [approveDialogOpen, setApproveDialogOpen] = useState(false);
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
-    const [approvedTitle, setApprovedTitle] = useState('');
-    const [approvedDescription, setApprovedDescription] = useState('');
-    const [rejectionReason, setRejectionReason] = useState('');
+    const [approveGeneralError, setApproveGeneralError] = useState('');
+    const [rejectGeneralError, setRejectGeneralError] = useState('');
+
+    const {
+        register: registerApprove,
+        handleSubmit: handleApproveSubmit,
+        reset: resetApproveForm,
+        setError: setApproveFormError,
+        formState: { errors: approveErrors, isSubmitting: isApproveSubmitting },
+    } = useForm({
+        resolver: yupResolver(approveSchema),
+        defaultValues: { approvedTitle: '', approvedDescription: '' },
+    });
+
+    const {
+        register: registerReject,
+        handleSubmit: handleRejectSubmit,
+        reset: resetRejectForm,
+        setError: setRejectFormError,
+        formState: { errors: rejectErrors, isSubmitting: isRejectSubmitting },
+    } = useForm({
+        resolver: yupResolver(rejectSchema),
+        defaultValues: { rejectionReason: '' },
+    });
 
     const isStaff = Boolean(authState.user?.is_staff);
 
@@ -105,22 +145,30 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
 
     const openApproveDialog = (request) => {
         setSelectedRequest(request);
-        setApprovedTitle(request.proposed_title);
-        setApprovedDescription(request.proposed_description || '');
+        resetApproveForm({
+            approvedTitle: request.proposed_title,
+            approvedDescription: request.proposed_description || '',
+        });
+        setApproveGeneralError('');
         setApproveDialogOpen(true);
     };
 
     const openRejectDialog = (request) => {
         setSelectedRequest(request);
-        setRejectionReason('');
+        resetRejectForm({ rejectionReason: '' });
+        setRejectGeneralError('');
         setRejectDialogOpen(true);
     };
 
-    const handleApprove = async () => {
+    const onApproveSubmit = async ({ approvedTitle, approvedDescription }) => {
         if (!selectedRequest) return;
-        setProcessingIds((prev) => new Set(prev).add(selectedRequest.id));
+
+        const requestId = selectedRequest.id;
+        setProcessingIds((prev) => new Set(prev).add(requestId));
+        setApproveGeneralError('');
+
         try {
-            await contentApi.approveTopicCreationRequest(selectedRequest.id, {
+            await contentApi.approveTopicCreationRequest(requestId, {
                 approved_title: approvedTitle,
                 approved_description: approvedDescription,
             });
@@ -128,11 +176,55 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             setSelectedRequest(null);
             await fetchRequests();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al aprobar la solicitud');
+            const { generalError } = applyApiErrorsToForm(
+                err,
+                setApproveFormError,
+                'Error al aprobar la solicitud',
+                {
+                    approved_title: 'approvedTitle',
+                    approved_description: 'approvedDescription',
+                },
+            );
+            if (generalError) {
+                setApproveGeneralError(generalError);
+            }
         } finally {
             setProcessingIds((prev) => {
                 const next = new Set(prev);
-                next.delete(selectedRequest.id);
+                next.delete(requestId);
+                return next;
+            });
+        }
+    };
+
+    const onRejectSubmit = async ({ rejectionReason }) => {
+        if (!selectedRequest) return;
+
+        const requestId = selectedRequest.id;
+        setProcessingIds((prev) => new Set(prev).add(requestId));
+        setRejectGeneralError('');
+
+        try {
+            await contentApi.rejectTopicCreationRequest(requestId, {
+                rejection_reason: rejectionReason,
+            });
+            setRejectDialogOpen(false);
+            setSelectedRequest(null);
+            await fetchRequests();
+        } catch (err) {
+            const { generalError } = applyApiErrorsToForm(
+                err,
+                setRejectFormError,
+                'Error al rechazar la solicitud',
+                { rejection_reason: 'rejectionReason' },
+            );
+            if (generalError) {
+                setRejectGeneralError(generalError);
+            }
+        } finally {
+            setProcessingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(requestId);
                 return next;
             });
         }
@@ -150,27 +242,6 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             setProcessingIds((prev) => {
                 const next = new Set(prev);
                 next.delete(request.id);
-                return next;
-            });
-        }
-    };
-
-    const handleReject = async () => {
-        if (!selectedRequest) return;
-        setProcessingIds((prev) => new Set(prev).add(selectedRequest.id));
-        try {
-            await contentApi.rejectTopicCreationRequest(selectedRequest.id, {
-                rejection_reason: rejectionReason,
-            });
-            setRejectDialogOpen(false);
-            setSelectedRequest(null);
-            await fetchRequests();
-        } catch (err) {
-            setError(err.response?.data?.error || 'Error al rechazar la solicitud');
-        } finally {
-            setProcessingIds((prev) => {
-                const next = new Set(prev);
-                next.delete(selectedRequest.id);
                 return next;
             });
         }
@@ -388,105 +459,138 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                 </Stack>
             )}
 
-            <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Aprobar solicitud de tema</DialogTitle>
-                <DialogContent>
-                    {selectedRequest && (
-                        <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                            <Typography variant="caption" color="text.secondary" display="block">
-                                Propuesta de {selectedRequest.requested_by?.username}
-                            </Typography>
-                            <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
-                                {selectedRequest.proposed_title}
-                            </Typography>
-                            {selectedRequest.proposed_description && (
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ mt: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                                >
-                                    {selectedRequest.proposed_description}
+            <Dialog
+                open={approveDialogOpen}
+                onClose={() => !isApproveSubmitting && setApproveDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <Box component="form" onSubmit={handleApproveSubmit(onApproveSubmit)} noValidate>
+                    <DialogTitle>Aprobar solicitud de tema</DialogTitle>
+                    <DialogContent>
+                        {approveGeneralError && (
+                            <Alert severity="error" sx={{ mb: 2 }}>
+                                {approveGeneralError}
+                            </Alert>
+                        )}
+                        {selectedRequest && (
+                            <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    Propuesta de {selectedRequest.requested_by?.username}
                                 </Typography>
-                            )}
-                        </Box>
-                    )}
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Ajusta el título y la descripción finales. Al aprobar, el tema se publicará de inmediato.
-                    </Typography>
-                    <TextField
-                        fullWidth
-                        label="Título aprobado"
-                        value={approvedTitle}
-                        onChange={(e) => setApprovedTitle(e.target.value)}
-                        required
-                        sx={{ mb: 2, mt: 1 }}
-                    />
-                    <TextField
-                        fullWidth
-                        label="Descripción aprobada"
-                        value={approvedDescription}
-                        onChange={(e) => setApprovedDescription(e.target.value)}
-                        multiline
-                        minRows={4}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        onClick={handleApprove}
-                        disabled={!approvedTitle.trim() || processingIds.has(selectedRequest?.id)}
-                    >
-                        Aprobar y publicar
-                    </Button>
-                </DialogActions>
+                                <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
+                                    {selectedRequest.proposed_title}
+                                </Typography>
+                                {selectedRequest.proposed_description && (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                    >
+                                        {selectedRequest.proposed_description}
+                                    </Typography>
+                                )}
+                            </Box>
+                        )}
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Ajusta el título y la descripción finales. Al aprobar, el tema se publicará de inmediato.
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            label="Título aprobado"
+                            error={!!approveErrors.approvedTitle}
+                            helperText={approveErrors.approvedTitle?.message}
+                            disabled={isApproveSubmitting}
+                            sx={{ mb: 2, mt: 1 }}
+                            {...registerApprove('approvedTitle')}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Descripción aprobada"
+                            multiline
+                            minRows={4}
+                            error={!!approveErrors.approvedDescription}
+                            helperText={approveErrors.approvedDescription?.message}
+                            disabled={isApproveSubmitting}
+                            {...registerApprove('approvedDescription')}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setApproveDialogOpen(false)} disabled={isApproveSubmitting}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            color="success"
+                            disabled={isApproveSubmitting || processingIds.has(selectedRequest?.id)}
+                        >
+                            {isApproveSubmitting ? 'Aprobando...' : 'Aprobar y publicar'}
+                        </Button>
+                    </DialogActions>
+                </Box>
             </Dialog>
 
-            <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Rechazar solicitud de tema</DialogTitle>
-                <DialogContent>
-                    {selectedRequest && (
-                        <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                            <Typography variant="caption" color="text.secondary" display="block">
-                                Propuesta de {selectedRequest.requested_by?.username}
-                            </Typography>
-                            <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
-                                {selectedRequest.proposed_title}
-                            </Typography>
-                            {selectedRequest.proposed_description && (
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ mt: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                                >
-                                    {selectedRequest.proposed_description}
+            <Dialog
+                open={rejectDialogOpen}
+                onClose={() => !isRejectSubmitting && setRejectDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
+                    <DialogTitle>Rechazar solicitud de tema</DialogTitle>
+                    <DialogContent>
+                        {rejectGeneralError && (
+                            <Alert severity="error" sx={{ mb: 2 }}>
+                                {rejectGeneralError}
+                            </Alert>
+                        )}
+                        {selectedRequest && (
+                            <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    Propuesta de {selectedRequest.requested_by?.username}
                                 </Typography>
-                            )}
-                        </Box>
-                    )}
-                    <TextField
-                        fullWidth
-                        label="Motivo del rechazo (opcional)"
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        multiline
-                        minRows={3}
-                        sx={{ mt: 1 }}
-                        placeholder="Ej.: El título es demasiado amplio. Intenta enfocarlo en un aspecto concreto."
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleReject}
-                        disabled={processingIds.has(selectedRequest?.id)}
-                    >
-                        Rechazar
-                    </Button>
-                </DialogActions>
+                                <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
+                                    {selectedRequest.proposed_title}
+                                </Typography>
+                                {selectedRequest.proposed_description && (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                    >
+                                        {selectedRequest.proposed_description}
+                                    </Typography>
+                                )}
+                            </Box>
+                        )}
+                        <TextField
+                            fullWidth
+                            label="Motivo del rechazo"
+                            multiline
+                            minRows={3}
+                            error={!!rejectErrors.rejectionReason}
+                            helperText={rejectErrors.rejectionReason?.message}
+                            disabled={isRejectSubmitting}
+                            sx={{ mt: 1 }}
+                            placeholder="Ej.: El título es demasiado amplio. Intenta enfocarlo en un aspecto concreto."
+                            {...registerReject('rejectionReason')}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            color="error"
+                            disabled={isRejectSubmitting || processingIds.has(selectedRequest?.id)}
+                        >
+                            {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+                        </Button>
+                    </DialogActions>
+                </Box>
             </Dialog>
         </Box>
     );

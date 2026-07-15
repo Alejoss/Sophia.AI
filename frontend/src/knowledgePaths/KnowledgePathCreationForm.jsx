@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Container,
   Box,
@@ -14,24 +17,37 @@ import {
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+
+const schema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required('El título es requerido.'),
+  description: yup
+    .string()
+    .trim()
+    .required('La descripción es requerida.'),
+});
 
 const KnowledgePathCreationForm = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    title: '',
-    description: ''
-  });
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [error, setError] = useState(null);
+  const [generalError, setGeneralError] = useState(null);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: value
-    }));
-  };
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { title: '', description: '' },
+  });
+
+  const titleValue = watch('title');
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -41,39 +57,33 @@ const KnowledgePathCreationForm = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async ({ title, description }) => {
+    setGeneralError(null);
 
     try {
-      // Prepare form data with image if selected
-      const submitData = { ...formData };
+      const submitData = { title, description };
       if (selectedImage) {
         submitData.image = selectedImage;
       }
-      
+
       const data = await knowledgePathsApi.createKnowledgePath(submitData);
       navigate(`/knowledge_path/${data.id}/edit`);
     } catch (err) {
-      const data = err.response?.data;
-      let msg = err.message || 'Error al crear el camino de conocimiento';
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const fieldLabel = { image: 'Imagen', title: 'Título', description: 'Descripción' };
-        const lines = [];
-        for (const [key, val] of Object.entries(data)) {
-          if (key === 'detail') continue;
-          const label = fieldLabel[key] || key;
-          const parts = Array.isArray(val) ? val : [val];
-          parts.forEach((p) => lines.push(`${label}: ${p}`));
-        }
-        if (lines.length) {
-          msg = lines.join('\n');
-        } else if (data.detail != null) {
-          const d = data.detail;
-          msg = Array.isArray(d) ? d.join('\n') : String(d);
-        }
+      const imageErrors = err?.response?.data?.image;
+      if (imageErrors) {
+        const imageMsg = Array.isArray(imageErrors) ? imageErrors.join(' ') : String(imageErrors);
+        setGeneralError(`Imagen: ${imageMsg}`);
       }
-      setError(msg);
+
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'Error al crear el camino de conocimiento',
+      );
+
+      if (!imageErrors && parsed) {
+        setGeneralError(parsed);
+      }
     }
   };
 
@@ -81,27 +91,32 @@ const KnowledgePathCreationForm = () => {
     <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
       <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
         <Grid container spacing={3}>
-          {/* Left column: form */}
           <Grid item xs={12} md={7}>
             <Box sx={{ mb: 2 }}>
               <Typography variant="h4" component="h1" sx={{ mb: 1.5 }}>
                 Crear Camino de Conocimiento
               </Typography>
-              {error && (
+              {generalError && (
                 <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>
-                  {error}
+                  {generalError}
                 </Alert>
               )}
             </Box>
 
             <Paper sx={{ p: 3, height: '100%' }}>
-              <form onSubmit={handleSubmit}>
-                {/* Image Upload Section */}
+              <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
                     Imagen de Portada (Opcional)
                   </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { xs: 'stretch', sm: 'flex-start' } }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: 2,
+                      alignItems: { xs: 'stretch', sm: 'flex-start' },
+                    }}
+                  >
                     <Box
                       sx={{
                         width: { xs: '100%', sm: 240 },
@@ -137,7 +152,7 @@ const KnowledgePathCreationForm = () => {
                             fontWeight: 700,
                           }}
                         >
-                          {formData.title ? formData.title.charAt(0).toUpperCase() : 'K'}
+                          {titleValue ? titleValue.charAt(0).toUpperCase() : 'K'}
                         </Box>
                       )}
                     </Box>
@@ -154,6 +169,7 @@ const KnowledgePathCreationForm = () => {
                           component="span"
                           variant="outlined"
                           startIcon={<PhotoCameraIcon />}
+                          disabled={isSubmitting}
                           sx={{
                             textTransform: 'none',
                             borderRadius: 2,
@@ -172,11 +188,10 @@ const KnowledgePathCreationForm = () => {
                 <TextField
                   fullWidth
                   id="title"
-                  name="title"
                   label="Título"
-                  value={formData.title}
-                  onChange={handleChange}
-                  required
+                  {...register('title')}
+                  error={!!errors.title}
+                  helperText={errors.title?.message}
                   placeholder="Ingresa el título del camino de conocimiento"
                   sx={{ mb: 2 }}
                 />
@@ -184,11 +199,10 @@ const KnowledgePathCreationForm = () => {
                 <TextField
                   fullWidth
                   id="description"
-                  name="description"
                   label="Descripción"
-                  value={formData.description}
-                  onChange={handleChange}
-                  required
+                  {...register('description')}
+                  error={!!errors.description}
+                  helperText={errors.description?.message}
                   multiline
                   minRows={8}
                   maxRows={24}
@@ -201,15 +215,17 @@ const KnowledgePathCreationForm = () => {
                     type="submit"
                     variant="contained"
                     color="primary"
+                    disabled={isSubmitting}
                     sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                   >
-                    Crear Camino de Conocimiento
+                    {isSubmitting ? 'Creando...' : 'Crear Camino de Conocimiento'}
                   </Button>
                   <Button
                     type="button"
                     onClick={() => navigate('/knowledge_path')}
                     variant="contained"
                     color="inherit"
+                    disabled={isSubmitting}
                     sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                   >
                     Cancelar
@@ -219,7 +235,6 @@ const KnowledgePathCreationForm = () => {
             </Paper>
           </Grid>
 
-          {/* Right column: educational card */}
           <Grid item xs={12} md={5}>
             <Paper
               sx={{
