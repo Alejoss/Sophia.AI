@@ -800,6 +800,98 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class CompleteFromInviteView(APIView):
+    """
+    Create account from book-club guest invite token (email already verified via signed link).
+    Body: { token, username, password }
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request, format=None):
+        from django.core import signing
+        from book_clubs.guest_tokens import load_guest_token
+        from book_clubs.models import BookClub, BookClubMembership, MembershipRole
+
+        token = (request.data.get('token') or '').strip()
+        username = (request.data.get('username') or '').strip()
+        password = request.data.get('password') or ''
+
+        if not token or not username or not password:
+            return Response(
+                {'detail': 'Token, usuario y contraseña son obligatorios.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payload = load_guest_token(token)
+        except signing.SignatureExpired:
+            return Response(
+                {'detail': 'El enlace ha caducado. Vuelve al club e introduce tu correo otra vez.', 'code': 'token_expired'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except signing.BadSignature:
+            return Response(
+                {'detail': 'Enlace inválido.', 'code': 'token_invalid'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = payload['email']
+        slug = payload['slug']
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {
+                    'detail': 'Ya existe una cuenta con este correo. Inicia sesión.',
+                    'code': 'email_exists',
+                    'next_hint': f'/club-de-lectura/{slug}',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = UserRegistrationSerializer(
+            data={'username': username, 'email': email, 'password': password}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        profile = Profile.objects.create(user=user)
+        if hasattr(profile, 'email_confirmed'):
+            profile.email_confirmed = True
+            profile.save(update_fields=['email_confirmed'])
+
+        club = BookClub.objects.filter(slug=slug).first()
+        if club:
+            BookClubMembership.objects.get_or_create(
+                book_club=club,
+                user=user,
+                defaults={'role': MembershipRole.MEMBER},
+            )
+
+        try:
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+            response_data = {
+                **UserSerializer(user).data,
+                'access_token': access_token,
+                'club_slug': slug,
+            }
+            response = Response(response_data, status=status.HTTP_201_CREATED)
+            set_refresh_token_cookie(response, refresh_token)
+            return response
+        except Exception as e:
+            logger.error(
+                'Error generating JWT after complete-from-invite for %s: %s',
+                username,
+                e,
+                exc_info=True,
+            )
+            return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
 class RefreshTokenView(APIView):
     """
     Handles JWT token refresh.

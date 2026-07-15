@@ -10,11 +10,13 @@ import {
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
+import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, formatClubDate } from './clubTheme';
 
 const BookClubMeetings = () => {
   const { slug } = useParams();
   const { authState } = useContext(AuthContext);
+  const { guestToken } = useBookClub();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ const BookClubMeetings = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await bookClubsApi.listEvents(slug);
+      const data = await bookClubsApi.listEvents(slug, { guestToken: guestToken || undefined });
       setEvents(data);
       setError('');
     } catch (err) {
@@ -30,12 +32,11 @@ const BookClubMeetings = () => {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, guestToken]);
 
   useEffect(() => {
-    if (authState.isAuthenticated) load();
-    else setLoading(false);
-  }, [authState.isAuthenticated, load]);
+    load();
+  }, [load]);
 
   if (loading) {
     return (

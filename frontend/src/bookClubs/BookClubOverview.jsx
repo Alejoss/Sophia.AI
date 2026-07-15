@@ -18,6 +18,7 @@ import {
   resolveExperiencePhase,
   resolveWeekLabel,
 } from './clubExperience';
+import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const SectionLabel = ({ children }) => (
   <Typography
@@ -55,9 +56,17 @@ const PrimaryCta = ({ to, children, onClick }) => (
 );
 
 const BookClubOverview = () => {
-  const { slug, hub, club } = useBookClub();
+  const { slug, hub, club, isGuest, canParticipate } = useBookClub();
   const { authState } = useContext(AuthContext);
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  const guest = getGuestSession(slug);
+  const accountCta = {
+    label: 'Crear cuenta para participar →',
+    to: guest?.token
+      ? guestCompleteAccountUrl(slug, guest.token)
+      : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}`)}`,
+  };
 
   const phase = useMemo(
     () =>
@@ -84,6 +93,15 @@ const BookClubOverview = () => {
     : 'misiones';
 
   const hero = (() => {
+    if (isGuest) {
+      return {
+        eyebrow: phase === 'pre' ? 'Próximamente' : `Semana ${week.weekNum}`,
+        title: nextMission?.title || club.title,
+        body:
+          'Explora el club en solo lectura. Crea tu cuenta para completar misiones y unirte al debate.',
+        cta: accountCta,
+      };
+    }
     if (phase === 'pre') {
       return {
         eyebrow: daysToStart != null && daysToStart > 0 ? `Comenzamos en ${daysToStart} día${daysToStart === 1 ? '' : 's'}` : 'Estamos preparando el ciclo',
@@ -191,7 +209,7 @@ const BookClubOverview = () => {
       </Box>
 
       {/* Nivel 1b — Tu misión actual (solo si hay misión accionable y no es solo el hero) */}
-      {phase === 'active' && nextMission && !nextMission.locked && (
+      {phase === 'active' && nextMission && !nextMission.locked && canParticipate && (
         <Box>
           <SectionLabel>Tu misión actual</SectionLabel>
           <Box
@@ -315,7 +333,7 @@ const BookClubOverview = () => {
               to={`/club-de-lectura/${slug}/preguntas/${weeklyQuestion.id}`}
               sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              Entrar al debate →
+              {canParticipate ? 'Entrar al debate →' : 'Leer el debate →'}
             </Button>
           </Box>
         ) : (

@@ -29,6 +29,9 @@ const toRequestBody = (payload) => {
   return formData;
 };
 
+const guestHeaders = (guestToken) =>
+  guestToken ? { 'X-Book-Club-Guest': guestToken } : undefined;
+
 const bookClubsApi = {
   listClubs: async () => {
     const response = await axiosInstance.get('/book_clubs/');
@@ -42,7 +45,6 @@ const bookClubsApi = {
 
   createClub: async (payload) => {
     const data = toRequestBody(payload);
-    // Let axiosConfig set Content-Type (JSON or multipart boundary)
     const response = await axiosInstance.post('/book_clubs/', data);
     return response.data;
   },
@@ -58,13 +60,29 @@ const bookClubsApi = {
     return response.data;
   },
 
-  getHub: async (slug) => {
-    const response = await axiosInstance.get(`/book_clubs/${slug}/hub/`);
+  requestGuestAccess: async (slug, email) => {
+    const response = await axiosInstance.post(`/book_clubs/${slug}/guest-access/`, { email });
     return response.data;
   },
 
-  listEvents: async (slug) => {
-    const response = await axiosInstance.get(`/book_clubs/${slug}/events/`);
+  getInvitePreview: async (token) => {
+    const response = await axiosInstance.get('/book_clubs/invite-preview/', {
+      params: { token },
+    });
+    return response.data;
+  },
+
+  getHub: async (slug, { guestToken } = {}) => {
+    const response = await axiosInstance.get(`/book_clubs/${slug}/hub/`, {
+      headers: guestHeaders(guestToken),
+    });
+    return response.data;
+  },
+
+  listEvents: async (slug, { guestToken } = {}) => {
+    const response = await axiosInstance.get(`/book_clubs/${slug}/events/`, {
+      headers: guestHeaders(guestToken),
+    });
     return response.data;
   },
 
@@ -75,17 +93,19 @@ const bookClubsApi = {
     return response.data;
   },
 
-  listDiscussionQuestions: async (slug, status) => {
+  listDiscussionQuestions: async (slug, status, { guestToken } = {}) => {
     const params = status ? { status } : undefined;
     const response = await axiosInstance.get(`/book_clubs/${slug}/discussion-questions/`, {
       params,
+      headers: guestHeaders(guestToken),
     });
     return response.data;
   },
 
-  getDiscussionQuestion: async (slug, questionId) => {
+  getDiscussionQuestion: async (slug, questionId, { guestToken } = {}) => {
     const response = await axiosInstance.get(
-      `/book_clubs/${slug}/discussion-questions/${questionId}/`
+      `/book_clubs/${slug}/discussion-questions/${questionId}/`,
+      { headers: guestHeaders(guestToken) }
     );
     return response.data;
   },

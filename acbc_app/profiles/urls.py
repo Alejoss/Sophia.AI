@@ -11,6 +11,7 @@ urlpatterns = [
     path('<int:pk>/', views.ProfileDetail.as_view(), name='profile-detail'),
 
     path('register/', views.RegisterView.as_view(), name='register'),
+    path('complete-from-invite/', views.CompleteFromInviteView.as_view(), name='complete_from_invite'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
 

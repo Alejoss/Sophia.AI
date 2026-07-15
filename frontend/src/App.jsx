@@ -13,6 +13,7 @@ import Home from './generalComponents/Home.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
+import CompletarCuenta from './profiles/CompletarCuenta.jsx';
 import BookClubLayout from './bookClubs/BookClubLayout.jsx';
 import BookClubOverview from './bookClubs/BookClubOverview.jsx';
 import BookClubMissions from './bookClubs/BookClubMissions.jsx';
@@ -178,6 +179,7 @@ const AppContent = () => {
                   <Register />
                 </GoogleOAuthInitializer>
               } />
+              <Route path="completar-cuenta" element={<CompletarCuenta />} />
               <Route path="login_successful" element={<LoginSuccessful />} />
               <Route path="logout" element={<Logout />} />
               <Route path="notifications" element={<Notifications />} />

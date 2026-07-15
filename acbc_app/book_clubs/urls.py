@@ -6,7 +6,9 @@ app_name = 'book_clubs'
 
 urlpatterns = [
     path('', views.BookClubListCreateView.as_view(), name='book-club-list'),
+    path('invite-preview/', views.BookClubInvitePreviewView.as_view(), name='invite-preview'),
     path('<slug:slug>/', views.BookClubDetailView.as_view(), name='book-club-detail'),
+    path('<slug:slug>/guest-access/', views.BookClubGuestAccessView.as_view(), name='book-club-guest-access'),
     path('<slug:slug>/join/', views.BookClubJoinView.as_view(), name='book-club-join'),
     path('<slug:slug>/hub/', views.BookClubHubView.as_view(), name='book-club-hub'),
     path('<slug:slug>/events/', views.BookClubEventListCreateView.as_view(), name='book-club-events'),

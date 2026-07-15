@@ -1,5 +1,5 @@
 import { useState, useContext, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -15,6 +15,7 @@ import {
   passwordField,
   usernameField,
 } from '../utils/formSchemas';
+import { getAuthNextPath } from '../utils/authNext';
 import {
   Alert,
   Box,
@@ -50,6 +51,9 @@ const registerSchema = yup.object({
  */
 const Register = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const authNext = getAuthNextPath(searchParams, location.state);
   const { updateAuthState } = useContext(AuthContext);
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -119,7 +123,7 @@ const Register = () => {
       if (response.data?.access_token) {
         const { access_token, ...userData } = response.data;
         updateAuthState(userData, access_token);
-        navigate('/profiles/login_successful');
+        navigate(authNext || '/profiles/login_successful');
         return;
       }
 

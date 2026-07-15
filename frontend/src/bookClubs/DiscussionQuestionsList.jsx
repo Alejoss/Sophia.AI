@@ -19,19 +19,21 @@ const DiscussionQuestionsList = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
-  const { hub, reload, club } = useBookClub();
+  const { hub, reload, club, guestToken, canParticipate } = useBookClub();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newQuestion, setNewQuestion] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const canManage = club?.can_manage;
+  const canManage = Boolean(canParticipate && club?.can_manage);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await bookClubsApi.listDiscussionQuestions(slug);
+      const data = await bookClubsApi.listDiscussionQuestions(slug, undefined, {
+        guestToken: guestToken || undefined,
+      });
       setQuestions(data);
       setError('');
     } catch (err) {
@@ -39,12 +41,11 @@ const DiscussionQuestionsList = () => {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, guestToken]);
 
   useEffect(() => {
-    if (authState.isAuthenticated) load();
-    else setLoading(false);
-  }, [authState.isAuthenticated, load]);
+    load();
+  }, [load]);
 
   const handleCreate = async () => {
     if (!newQuestion.trim()) return;

@@ -296,6 +296,15 @@ const submitNewsletterSubscription = async (email, source = 'frontend_subscribe'
   }
 };
 
+const completeFromInvite = async ({ token, username, password }) => {
+  const response = await axiosInstance.post('/profiles/complete-from-invite/', {
+    token,
+    username,
+    password,
+  });
+  return response.data;
+};
+
 export {
   getUserProfile,
   apiLogout,
@@ -305,6 +314,7 @@ export {
   getProfileById,
   updateProfile,
   apiRegister,
+  completeFromInvite,
   refreshToken,
   socialLogin,
   getNotifications,

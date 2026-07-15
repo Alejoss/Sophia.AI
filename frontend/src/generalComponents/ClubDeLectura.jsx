@@ -36,10 +36,7 @@ const ClubDeLectura = () => {
   });
 
   useEffect(() => {
-    if (!authInitialized || !authState.isAuthenticated) {
-      setActiveClub(null);
-      return;
-    }
+    if (!authInitialized) return;
     let cancelled = false;
     setClubsLoading(true);
     bookClubsApi
@@ -73,6 +70,9 @@ const ClubDeLectura = () => {
       trackMetaLead();
       setSuccessMessage('¡Gracias! Te avisaremos sobre el Club de Lectura.');
       reset({ email: '' });
+      if (activeClub?.slug) {
+        navigate(`/club-de-lectura/${activeClub.slug}`);
+      }
     } catch (err) {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
@@ -90,12 +90,13 @@ const ClubDeLectura = () => {
     setJoining(true);
     setGeneralError('');
     try {
-      if (!activeClub.is_member) {
+      if (authState.isAuthenticated && !activeClub.is_member) {
         await bookClubsApi.joinClub(activeClub.slug);
       }
       navigate(`/club-de-lectura/${activeClub.slug}`);
     } catch (err) {
-      setGeneralError(err?.response?.data?.detail || 'No se pudo entrar al club.');
+      // Still navigate — layout will show email gate if needed
+      navigate(`/club-de-lectura/${activeClub.slug}`);
     } finally {
       setJoining(false);
     }
@@ -167,13 +168,44 @@ const ClubDeLectura = () => {
       )}
 
       {!authState.isAuthenticated && (
-        <Button
-          component={RouterLink}
-          to="/profiles/login"
-          sx={{ color: '#FF6B35', mb: 2, textTransform: 'none' }}
-        >
-          ¿Ya tienes cuenta? Inicia sesión para entrar al hub
-        </Button>
+        <Box sx={{ width: '100%', maxWidth: 480, mb: 3, textAlign: 'center' }}>
+          {clubsLoading ? (
+            <CircularProgress size={28} sx={{ color: '#FF6B35' }} />
+          ) : activeClub ? (
+            <>
+              <Typography sx={{ color: '#fff', mb: 1.5 }}>
+                El club «{activeClub.title}» ya está activo. Entra con tu correo para explorarlo.
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={handleEnterClub}
+                disabled={joining}
+                sx={{
+                  bgcolor: '#FF6B35',
+                  '&:hover': { bgcolor: '#E55A2B' },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  py: 1.2,
+                  mb: 1,
+                }}
+                fullWidth
+              >
+                {joining ? 'Entrando…' : 'Entrar al club'}
+              </Button>
+            </>
+          ) : null}
+          <Button
+            component={RouterLink}
+            to={
+              activeClub
+                ? `/profiles/login?next=${encodeURIComponent(`/club-de-lectura/${activeClub.slug}`)}`
+                : '/profiles/login'
+            }
+            sx={{ color: '#FF6B35', textTransform: 'none' }}
+          >
+            ¿Ya tienes cuenta? Inicia sesión
+          </Button>
+        </Box>
       )}
 
       <Box

@@ -3,12 +3,18 @@ import { Link as RouterLink } from 'react-router-dom';
 import { Alert, Box, Button, LinearProgress, Stack, Typography } from '@mui/material';
 import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
+import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const BookClubMissions = () => {
-  const { hub } = useBookClub();
+  const { slug, hub, isGuest, canParticipate } = useBookClub();
   const progressPct = Math.round(hub.progress?.percentage || 0);
   const pathId = hub.quick_links?.knowledge_path_id;
   const next = hub.next_mission;
+  const readOnly = isGuest || !canParticipate;
+  const guest = getGuestSession(slug);
+  const accountUrl = guest?.token
+    ? guestCompleteAccountUrl(slug, guest.token)
+    : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}`)}`;
 
   return (
     <Stack spacing={3}>
@@ -20,6 +26,20 @@ const BookClubMissions = () => {
           El knowledge path del club es la secuencia de lecturas y ejercicios del ciclo.
         </Typography>
       </Box>
+
+      {readOnly && (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" component={RouterLink} to={accountUrl} sx={{ fontWeight: 700 }}>
+              Crear cuenta
+            </Button>
+          }
+          sx={{ bgcolor: 'rgba(255,107,53,0.1)', color: '#fff', border: '1px solid rgba(255,107,53,0.35)' }}
+        >
+          Puedes ver el resumen de misiones. Para abrirlas y marcar progreso, crea tu cuenta.
+        </Alert>
+      )}
 
       <Box
         sx={{
@@ -58,7 +78,16 @@ const BookClubMissions = () => {
           <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
             Misión {next.order}: {next.title}
           </Typography>
-          {next.locked ? (
+          {readOnly ? (
+            <Button
+              variant="contained"
+              component={RouterLink}
+              to={accountUrl}
+              sx={{ mt: 2, bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
+            >
+              Crear cuenta para abrir
+            </Button>
+          ) : next.locked ? (
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 1 }}>
               Esta misión está bloqueada hasta completar la anterior.
             </Typography>
@@ -86,7 +115,7 @@ const BookClubMissions = () => {
         </Box>
       )}
 
-      {pathId && (
+      {pathId && !readOnly && (
         <Button
           variant="outlined"
           component={RouterLink}

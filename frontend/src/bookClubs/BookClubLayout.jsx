@@ -7,16 +7,21 @@ import {
   CircularProgress,
   Container,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
+import GoogleOAuthInitializer from '../components/GoogleOAuthInitializer';
+import SocialLogin from '../components/SocialLogin';
 import bookClubsApi from '../api/bookClubsApi';
-import {
-  CLUB_ACCENT,
-  CLUB_ACCENT_HOVER,
-  CLUB_BG,
-} from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_BG } from './clubTheme';
 import { resolveWeekLabel, shortTagline } from './clubExperience';
+import {
+  clearGuestSession,
+  getGuestSession,
+  guestCompleteAccountUrl,
+  setGuestSession,
+} from './guestStorage';
 
 export const BookClubContext = createContext(null);
 
@@ -60,48 +65,193 @@ const WeekDots = ({ total, completed }) => {
   );
 };
 
+const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
+  const [email, setEmail] = useState('');
+  const clubPath = clubSlug ? `/club-de-lectura/${clubSlug}` : window.location.pathname;
+  const loginNext = encodeURIComponent(clubPath);
+
+  return (
+    <Box sx={{ bgcolor: CLUB_BG, minHeight: '100vh', color: '#fff', py: 8 }}>
+      <Container maxWidth="sm">
+        <Typography
+          variant="overline"
+          sx={{ color: CLUB_ACCENT, letterSpacing: 2, fontWeight: 700 }}
+        >
+          Club de Lectura
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, mb: 1 }}>
+          {clubTitle || 'Entra al club'}
+        </Typography>
+        <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 3 }}>
+          Deja tu correo para explorar el club en solo lectura, o regístrate con Google para
+          participar de inmediato. Con el correo te enviaremos un enlace para crear tu cuenta.
+        </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Stack
+          component="form"
+          spacing={2}
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit(email.trim());
+          }}
+        >
+          <TextField
+            type="email"
+            required
+            fullWidth
+            label="Tu correo"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            sx={{
+              '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.06)', color: '#fff' },
+              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.6)' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,107,53,0.4)' },
+            }}
+          />
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.5}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+          >
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || !email.trim()}
+              sx={{
+                flex: 1,
+                bgcolor: CLUB_ACCENT,
+                '&:hover': { bgcolor: CLUB_ACCENT_HOVER },
+                py: 1.1,
+              }}
+            >
+              {loading ? 'Entrando…' : 'Entrar con mi correo'}
+            </Button>
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'rgba(255,255,255,0.45)',
+                textAlign: 'center',
+                px: { sm: 0.5 },
+                display: { xs: 'none', sm: 'block' },
+              }}
+            >
+              o
+            </Typography>
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                justifyContent: { xs: 'stretch', sm: 'flex-start' },
+                '& > div': { width: '100%', margin: 0 },
+                '& iframe, & div[role="button"]': { width: '100% !important' },
+              }}
+            >
+              <GoogleOAuthInitializer>
+                <SocialLogin redirectTo={clubPath} text="signup_with" />
+              </GoogleOAuthInitializer>
+            </Box>
+          </Stack>
+          <Typography
+            variant="body2"
+            sx={{ color: 'rgba(255,255,255,0.45)', display: { xs: 'block', sm: 'none' }, textAlign: 'center' }}
+          >
+            — o regístrate con Google arriba —
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.45)' }}>
+            ¿Ya tienes cuenta?{' '}
+            <Box
+              component={RouterLink}
+              to={`/profiles/login?next=${loginNext}`}
+              sx={{ color: CLUB_ACCENT }}
+            >
+              Inicia sesión
+            </Box>
+          </Typography>
+        </Stack>
+      </Container>
+    </Box>
+  );
+};
+
 const BookClubLayout = () => {
   const { slug } = useParams();
   const { authState, authInitialized } = useContext(AuthContext);
   const [hub, setHub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [gateError, setGateError] = useState('');
+  const [gateLoading, setGateLoading] = useState(false);
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [guestToken, setGuestToken] = useState(() => getGuestSession(slug)?.token || null);
+
+  const isAuthenticated = Boolean(authState.isAuthenticated);
 
   const loadHub = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await bookClubsApi.getHub(slug);
+      const session = getGuestSession(slug);
+      const token = isAuthenticated ? null : session?.token || guestToken;
+      const data = await bookClubsApi.getHub(slug, { guestToken: token || undefined });
       setHub(data);
+      setNeedsEmail(false);
+      if (isAuthenticated) {
+        clearGuestSession(slug);
+        setGuestToken(null);
+        if (!data.is_member) {
+          try {
+            await bookClubsApi.joinClub(slug);
+            const refreshed = await bookClubsApi.getHub(slug);
+            setHub(refreshed);
+          } catch {
+            /* join may fail if closed; hub still useful for staff */
+          }
+        }
+      }
     } catch (err) {
-      setError(err?.response?.data?.detail || 'No se pudo cargar el club.');
-      setHub(null);
+      const code = err?.response?.data?.code;
+      const detail = err?.response?.data?.detail || 'No se pudo cargar el club.';
+      if (code === 'email_required' || err?.response?.status === 401) {
+        setNeedsEmail(true);
+        setHub(null);
+        if (code === 'guest_token_invalid') {
+          clearGuestSession(slug);
+          setGuestToken(null);
+          setGateError(detail);
+        }
+      } else {
+        setError(detail);
+        setHub(null);
+      }
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, isAuthenticated, guestToken]);
 
   useEffect(() => {
     if (!authInitialized) return;
-    if (!authState.isAuthenticated) {
-      setLoading(false);
-      setError('Inicia sesión para entrar al Club de Lectura.');
-      return;
-    }
     loadHub();
-  }, [authInitialized, authState.isAuthenticated, loadHub]);
+  }, [authInitialized, loadHub]);
 
-  const handleJoin = async () => {
-    setJoining(true);
-    setError('');
+  const handleEmailSubmit = async (email) => {
+    setGateLoading(true);
+    setGateError('');
     try {
-      await bookClubsApi.joinClub(slug);
-      await loadHub();
+      const data = await bookClubsApi.requestGuestAccess(slug, email);
+      setGuestSession(slug, { token: data.guest_token, email: data.email });
+      setGuestToken(data.guest_token);
+      setNeedsEmail(false);
+      const hubData = await bookClubsApi.getHub(slug, { guestToken: data.guest_token });
+      setHub(hubData);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'No se pudo unir al club.');
+      setGateError(err?.response?.data?.detail || 'No se pudo registrar el correo.');
     } finally {
-      setJoining(false);
+      setGateLoading(false);
     }
   };
 
@@ -110,10 +260,13 @@ const BookClubLayout = () => {
       slug,
       hub,
       club: hub?.club,
+      guestToken: isAuthenticated ? null : guestToken,
+      isGuest: Boolean(hub?.is_guest),
+      canParticipate: Boolean(hub?.can_participate),
       reload: loadHub,
       setError,
     }),
-    [slug, hub, loadHub]
+    [slug, hub, guestToken, isAuthenticated, loadHub]
   );
 
   if (!authInitialized || loading) {
@@ -124,23 +277,15 @@ const BookClubLayout = () => {
     );
   }
 
-  if (!authState.isAuthenticated) {
+  if (needsEmail && !isAuthenticated) {
     return (
-      <Box sx={{ bgcolor: CLUB_BG, minHeight: '100vh', color: '#fff', py: 8 }}>
-        <Container maxWidth="sm">
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {error || 'Inicia sesión para acceder al Club de Lectura.'}
-          </Alert>
-          <Button
-            variant="contained"
-            component={RouterLink}
-            to="/profiles/login"
-            sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
-          >
-            Iniciar sesión
-          </Button>
-        </Container>
-      </Box>
+      <EmailGate
+        clubTitle={hub?.club?.title}
+        clubSlug={slug}
+        onSubmit={handleEmailSubmit}
+        loading={gateLoading}
+        error={gateError}
+      />
     );
   }
 
@@ -148,9 +293,26 @@ const BookClubLayout = () => {
     return (
       <Box sx={{ bgcolor: CLUB_BG, minHeight: '100vh', color: '#fff', py: 8 }}>
         <Container maxWidth="sm">
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+          <Button component={RouterLink} to="/club-de-lectura" sx={{ color: CLUB_ACCENT }}>
+            Volver
+          </Button>
         </Container>
       </Box>
+    );
+  }
+
+  if (!hub) {
+    return (
+      <EmailGate
+        clubTitle=""
+        clubSlug={slug}
+        onSubmit={handleEmailSubmit}
+        loading={gateLoading}
+        error={gateError || error}
+      />
     );
   }
 
@@ -158,6 +320,10 @@ const BookClubLayout = () => {
   const week = resolveWeekLabel({ club, progress: hub.progress });
   const tagline = shortTagline(club.description);
   const coverUrl = club.cover_image;
+  const showGuestBanner = hub.is_guest && !hub.can_participate;
+  const completeUrl = guestToken
+    ? guestCompleteAccountUrl(slug, guestToken)
+    : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}`)}`;
 
   return (
     <BookClubContext.Provider value={ctx}>
@@ -173,6 +339,33 @@ const BookClubLayout = () => {
             {error && (
               <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setError('')}>
                 {error}
+              </Alert>
+            )}
+
+            {showGuestBanner && (
+              <Alert
+                severity="info"
+                sx={{
+                  mb: 2,
+                  bgcolor: 'rgba(255,107,53,0.12)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,107,53,0.35)',
+                }}
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    component={RouterLink}
+                    to={completeUrl}
+                    sx={{ fontWeight: 700, color: CLUB_ACCENT }}
+                  >
+                    Crear cuenta
+                  </Button>
+                }
+              >
+                Estás explorando en solo lectura
+                {hub.guest_email ? ` (${hub.guest_email})` : ''}. Para comentar, completar misiones y
+                unirte de verdad, crea tu cuenta — te enviamos el enlace también por correo.
               </Alert>
             )}
 
@@ -237,7 +430,7 @@ const BookClubLayout = () => {
                 <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, maxWidth: 520 }}>
                   {tagline}
                 </Typography>
-                {hub.is_member && (
+                {(hub.is_member || hub.is_guest) && (
                   <>
                     <Typography
                       variant="body2"
@@ -254,21 +447,6 @@ const BookClubLayout = () => {
                     />
                   </>
                 )}
-
-                {!hub.is_member && (
-                  <Button
-                    variant="contained"
-                    onClick={handleJoin}
-                    disabled={joining}
-                    sx={{
-                      mt: 2,
-                      bgcolor: CLUB_ACCENT,
-                      '&:hover': { bgcolor: CLUB_ACCENT_HOVER },
-                    }}
-                  >
-                    {joining ? 'Uniéndote…' : 'Unirme al club'}
-                  </Button>
-                )}
               </Box>
             </Stack>
 
@@ -283,7 +461,7 @@ const BookClubLayout = () => {
                 px: { xs: 1, sm: 0 },
               }}
             >
-              {NAV_ITEMS.map((item) => (
+              {NAV_ITEMS.filter((item) => !(item.to === 'cuaderno' && hub.is_guest)).map((item) => (
                 <Box
                   key={item.label}
                   component={NavLink}
@@ -314,13 +492,7 @@ const BookClubLayout = () => {
         </Box>
 
         <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
-          {!hub.is_member ? (
-            <Alert severity="info" sx={{ bgcolor: 'rgba(255,107,53,0.08)', color: '#fff' }}>
-              Únete para seguir la lectura colectiva: misiones, debates, reuniones y tu cuaderno.
-            </Alert>
-          ) : (
-            <Outlet />
-          )}
+          <Outlet />
         </Container>
       </Box>
     </BookClubContext.Provider>

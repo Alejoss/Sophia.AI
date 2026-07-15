@@ -25,22 +25,19 @@ const GoogleOAuthInitializer = ({ children }) => {
   if (!clientId) {
     console.error('Google OAuth Client ID is not defined in environment variables');
     return (
-      <>
-        <div
-          style={{
-            margin: '0 0 12px 0',
-            padding: '10px 12px',
-            borderRadius: '8px',
-            backgroundColor: '#fff3cd',
-            color: '#664d03',
-            border: '1px solid #ffecb5',
-            fontSize: '0.95rem',
-          }}
-        >
-          El inicio de sesion con Google no esta disponible temporalmente.
-        </div>
-        {children}
-      </>
+      <div
+        style={{
+          margin: '0 0 12px 0',
+          padding: '10px 12px',
+          borderRadius: '8px',
+          backgroundColor: '#fff3cd',
+          color: '#664d03',
+          border: '1px solid #ffecb5',
+          fontSize: '0.95rem',
+        }}
+      >
+        El inicio de sesión con Google no está disponible temporalmente.
+      </div>
     );
   }
 

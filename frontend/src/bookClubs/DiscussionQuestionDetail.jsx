@@ -12,11 +12,14 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
 import CommentSection from '../comments/CommentSection';
+import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT } from './clubTheme';
+import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const DiscussionQuestionDetail = () => {
   const { slug, questionId } = useParams();
   const { authState } = useContext(AuthContext);
+  const { guestToken, canParticipate } = useBookClub();
   const [question, setQuestion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,7 +29,9 @@ const DiscussionQuestionDetail = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await bookClubsApi.getDiscussionQuestion(slug, questionId);
+      const data = await bookClubsApi.getDiscussionQuestion(slug, questionId, {
+        guestToken: guestToken || undefined,
+      });
       setQuestion(data);
     } catch (err) {
       setError(err?.response?.data?.detail || 'No se pudo cargar la pregunta.');
@@ -34,12 +39,11 @@ const DiscussionQuestionDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [slug, questionId]);
+  }, [slug, questionId, guestToken]);
 
   useEffect(() => {
-    if (authState.isAuthenticated) load();
-    else setLoading(false);
-  }, [authState.isAuthenticated, load]);
+    load();
+  }, [load]);
 
   const setStatus = async (status) => {
     setUpdating(true);
@@ -65,8 +69,12 @@ const DiscussionQuestionDetail = () => {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  const canAnswer = question.can_answer;
+  const canAnswer = Boolean(question.can_answer && canParticipate);
   const closed = question.status === 'closed' || question.effective_status === 'closed';
+  const guest = getGuestSession(slug);
+  const accountUrl = guest?.token
+    ? guestCompleteAccountUrl(slug, guest.token)
+    : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}/preguntas/${questionId}`)}`;
 
   return (
     <Box>
@@ -84,6 +92,19 @@ const DiscussionQuestionDetail = () => {
         </Alert>
       )}
 
+      {!canParticipate && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2, bgcolor: 'rgba(255,107,53,0.1)', color: '#fff' }}
+          action={
+            <Button component={RouterLink} to={accountUrl} sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
+              Crear cuenta
+            </Button>
+          }
+        >
+          Puedes leer el debate. Para responder, crea tu cuenta.
+        </Alert>
+      )}
       {question.mission_label && (
         <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
           Después de {question.mission_label}

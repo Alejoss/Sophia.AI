@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -16,6 +16,7 @@ import SocialLogin from "../components/SocialLogin";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { parseApiValidationErrors } from "../utils/apiFormErrors.js";
+import { getAuthNextPath } from "../utils/authNext";
 import {
   Alert,
   Box,
@@ -49,6 +50,8 @@ const loginSchema = yup.object({
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const authNext = getAuthNextPath(searchParams, location.state);
   const { authState, setAuthState, updateAuthState } = useContext(AuthContext);
   const [generalError, setGeneralError] = useState("");
   const [backendAuthStatus, setBackendAuthStatus] = useState(false);
@@ -147,7 +150,7 @@ const Login = () => {
         }
         // Use centralized auth state update (access in storage; refresh cookie set by backend)
         updateAuthState(userData, access_token);
-        navigate("/profiles/login_successful");
+        navigate(authNext || "/profiles/login_successful");
         return;
       }
 
@@ -268,7 +271,15 @@ const Login = () => {
 
             <Typography variant="body2" sx={{ textAlign: "center", mt: 3 }}>
               ¿No tienes cuenta?{" "}
-              <MuiLink component={Link} to="/profiles/register" underline="hover">
+              <MuiLink
+                component={Link}
+                to={
+                  authNext
+                    ? `/profiles/register?next=${encodeURIComponent(authNext)}`
+                    : "/profiles/register"
+                }
+                underline="hover"
+              >
                 Regístrate
               </MuiLink>
             </Typography>

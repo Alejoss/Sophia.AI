@@ -1,6 +1,8 @@
 """
 Tests for the Book Club Hub, membership, and DiscussionQuestions.
 """
+import unittest.mock
+
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
@@ -418,4 +420,129 @@ class BookClubCreateUpdateAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data['status'], 'active')
         self.assertEqual(response.data['description'], 'Actualizado')
+
+
+class BookClubGuestOnboardingTests(BookClubAPITestCase):
+    """Guest email gate, read-only hub, and complete-from-invite."""
+
+    @unittest.mock.patch('book_clubs.views.send_book_club_invite_email', return_value=True)
+    def test_guest_access_creates_subscription_and_token(self, mock_email):
+        from profiles.models import NewsletterSubscription
+
+        response = self.client.post(
+            '/api/book_clubs/cypherpunk/guest-access/',
+            {'email': 'lector@example.com'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertIn('guest_token', response.data)
+        self.assertEqual(response.data['email'], 'lector@example.com')
+        self.assertTrue(
+            NewsletterSubscription.objects.filter(email='lector@example.com').exists()
+        )
+        mock_email.assert_called_once()
+        self.assertEqual(mock_email.call_args.kwargs['email'], 'lector@example.com')
+
+    def test_hub_requires_email_without_guest_or_auth(self):
+        response = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data.get('code'), 'email_required')
+
+    @unittest.mock.patch('book_clubs.views.send_book_club_invite_email', return_value=True)
+    def test_hub_guest_is_read_only(self, _mock_email):
+        guest = self.client.post(
+            '/api/book_clubs/cypherpunk/guest-access/',
+            {'email': 'guest@example.com'},
+            format='json',
+        )
+        token = guest.data['guest_token']
+        response = self.client.get(
+            '/api/book_clubs/cypherpunk/hub/',
+            HTTP_X_BOOK_CLUB_GUEST=token,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data['is_guest'])
+        self.assertFalse(response.data['is_member'])
+        self.assertFalse(response.data['can_participate'])
+        self.assertEqual(response.data['guest_email'], 'guest@example.com')
+        self.assertIn('club', response.data)
+        self.assertIn('progress', response.data)
+
+    def test_hub_member_can_participate(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.member)
+        response = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data['is_member'])
+        self.assertTrue(response.data['can_participate'])
+        self.assertFalse(response.data.get('is_guest'))
+
+    def test_invite_preview_and_complete_from_invite(self):
+        from book_clubs.guest_tokens import dump_guest_token
+
+        token = dump_guest_token(email='nuevo@example.com', slug='cypherpunk')
+        preview = self.client.get('/api/book_clubs/invite-preview/', {'token': token})
+        self.assertEqual(preview.status_code, status.HTTP_200_OK, preview.data)
+        self.assertEqual(preview.data['email'], 'nuevo@example.com')
+        self.assertEqual(preview.data['slug'], 'cypherpunk')
+
+        response = self.client.post(
+            '/api/profiles/complete-from-invite/',
+            {
+                'token': token,
+                'username': 'nuevolector',
+                'password': 'testpass123',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertIn('access_token', response.data)
+        self.assertEqual(response.data['club_slug'], 'cypherpunk')
+        user = User.objects.get(username='nuevolector')
+        self.assertEqual(user.email, 'nuevo@example.com')
+        self.assertTrue(
+            BookClubMembership.objects.filter(
+                book_club=self.club, user=user
+            ).exists()
+        )
+
+    def test_complete_from_invite_email_exists(self):
+        from book_clubs.guest_tokens import dump_guest_token
+
+        User.objects.create_user(
+            username='yaexiste',
+            email='yaexiste@example.com',
+            password='testpass123',
+        )
+        token = dump_guest_token(email='yaexiste@example.com', slug='cypherpunk')
+        response = self.client.post(
+            '/api/profiles/complete-from-invite/',
+            {
+                'token': token,
+                'username': 'otrouser',
+                'password': 'testpass123',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('code'), 'email_exists')
+
+    def test_guest_token_slug_mismatch_rejected_on_hub(self):
+        from book_clubs.guest_tokens import dump_guest_token
+
+        token = dump_guest_token(email='mismatch@example.com', slug='otro-club')
+        response = self.client.get(
+            '/api/book_clubs/cypherpunk/hub/',
+            HTTP_X_BOOK_CLUB_GUEST=token,
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data.get('code'), 'guest_token_invalid')
+
+    def test_anonymous_can_list_active_clubs(self):
+        response = self.client.get('/api/book_clubs/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        slugs = [c['slug'] for c in response.data]
+        self.assertIn('cypherpunk', slugs)
 

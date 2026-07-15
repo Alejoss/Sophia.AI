@@ -1,13 +1,18 @@
 from django.contrib.contenttypes.models import ContentType
+from django.core import signing
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from book_clubs.emailing import send_book_club_invite_email
+from book_clubs.guest_tokens import dump_guest_token, load_guest_token
 from book_clubs.models import (
     BookClub,
     BookClubEvent,
@@ -30,7 +35,7 @@ from book_clubs.serializers import (
 )
 from comments.models import Comment
 from knowledge_paths.services.node_user_activity_service import get_knowledge_path_progress
-from profiles.models import UserNodeCompletion
+from profiles.models import NewsletterSubscription, UserNodeCompletion
 
 
 def _get_club(slug):
@@ -38,6 +43,28 @@ def _get_club(slug):
         BookClub.objects.select_related('knowledge_path', 'topic', 'created_by'),
         slug=slug,
     )
+
+
+def _guest_token_from_request(request):
+    return (
+        request.headers.get('X-Book-Club-Guest')
+        or request.META.get('HTTP_X_BOOK_CLUB_GUEST')
+        or ''
+    ).strip()
+
+
+def _resolve_guest_payload(request, slug):
+    """Return (payload_dict|None|'expired'|'invalid', raw_token)."""
+    token = _guest_token_from_request(request)
+    if not token:
+        return None, None
+    try:
+        payload = load_guest_token(token, expected_slug=slug)
+        return payload, token
+    except signing.SignatureExpired:
+        return 'expired', token
+    except signing.BadSignature:
+        return 'invalid', token
 
 
 def _sync_question_schedules(queryset):
@@ -113,14 +140,110 @@ def _build_club_pulse(club, open_questions, member_ids):
     }
 
 
+class BookClubGuestAccessView(APIView):
+    """Email gate: newsletter + signed guest token + invite email."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request, slug):
+        club = _get_club(slug)
+        if club.status == BookClubStatus.CLOSED:
+            return Response(
+                {'detail': 'This book club is closed.', 'code': 'club_closed'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        email = (request.data.get('email') or '').strip().lower()
+        if not email:
+            return Response(
+                {'detail': 'El email es obligatorio.', 'code': 'email_required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            return Response(
+                {'detail': 'Email no válido.', 'code': 'invalid_email'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        source = f'club_de_lectura:{slug}'[:100]
+        NewsletterSubscription.objects.get_or_create(
+            email=email,
+            defaults={'source': source},
+        )
+
+        guest_token = dump_guest_token(email=email, slug=club.slug)
+        send_book_club_invite_email(email=email, club=club, token=guest_token)
+
+        cover = None
+        if club.cover_image:
+            cover = request.build_absolute_uri(club.cover_image.url)
+
+        return Response(
+            {
+                'guest_token': guest_token,
+                'email': email,
+                'club': {
+                    'title': club.title,
+                    'slug': club.slug,
+                    'cover_image': cover,
+                },
+                'message': (
+                    'Revisa tu correo para crear tu cuenta. '
+                    'Mientras tanto ya puedes explorar el club.'
+                ),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class BookClubInvitePreviewView(APIView):
+    """Return email + club from invite token (for completar-cuenta page)."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        token = (request.query_params.get('token') or '').strip()
+        if not token:
+            return Response(
+                {'detail': 'Token requerido.', 'code': 'token_required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = load_guest_token(token)
+        except signing.SignatureExpired:
+            return Response(
+                {'detail': 'El enlace ha caducado.', 'code': 'token_expired'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except signing.BadSignature:
+            return Response(
+                {'detail': 'Enlace inválido.', 'code': 'token_invalid'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        club = BookClub.objects.filter(slug=payload['slug']).first()
+        return Response(
+            {
+                'email': payload['email'],
+                'slug': payload['slug'],
+                'club_title': club.title if club else payload['slug'],
+            }
+        )
+
+
 class BookClubListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request):
         qs = BookClub.objects.select_related('knowledge_path', 'topic')
-        # Non-staff only see active clubs, or clubs they belong to
-        if not request.user.is_staff:
+        if not request.user.is_authenticated:
+            qs = qs.filter(status=BookClubStatus.ACTIVE)
+        elif not request.user.is_staff:
             qs = qs.filter(
                 Q(status=BookClubStatus.ACTIVE)
                 | Q(memberships__user=request.user)
@@ -129,6 +252,8 @@ class BookClubListCreateView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         if not (request.user.is_staff or request.user.is_superuser):
             return Response(
                 {'detail': 'Only staff can create book clubs.'},
@@ -182,11 +307,7 @@ class BookClubJoinView(APIView):
                 {'detail': 'This book club is closed.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if club.status == BookClubStatus.DRAFT and not request.user.is_staff:
-            return Response(
-                {'detail': 'This book club is not open yet.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Draft and active clubs are open to join; closed is the only hard stop.
         membership, created = BookClubMembership.objects.get_or_create(
             book_club=club,
             user=request.user,
@@ -203,14 +324,52 @@ class BookClubJoinView(APIView):
 
 
 class BookClubHubView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, slug):
         club = _get_club(slug)
-        if not club.user_is_member(request.user) and club.status != BookClubStatus.ACTIVE:
-            return Response({'detail': 'Join the club to view the hub.'}, status=status.HTTP_403_FORBIDDEN)
-        # Allow peeking at active clubs to encourage join; membership required for full hub content
-        is_member = club.user_is_member(request.user)
+        user = request.user if request.user.is_authenticated else None
+        is_staff = bool(user and (user.is_staff or user.is_superuser))
+        is_member = bool(user and club.user_is_member(user))
+
+        guest_result, _guest_token = _resolve_guest_payload(request, slug)
+        if guest_result in ('expired', 'invalid'):
+            return Response(
+                {
+                    'detail': 'Tu acceso de invitado ha caducado o es inválido. Introduce tu correo de nuevo.',
+                    'code': 'guest_token_invalid',
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        is_guest = isinstance(guest_result, dict)
+
+        if club.status == BookClubStatus.CLOSED and not is_member and not is_staff:
+            return Response(
+                {'detail': 'This book club is closed.', 'code': 'club_closed'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if is_staff and user and not is_member:
+            BookClubMembership.objects.get_or_create(
+                book_club=club,
+                user=user,
+                defaults={'role': MembershipRole.ADMIN},
+            )
+            is_member = True
+
+        if not user and not is_guest:
+            return Response(
+                {
+                    'detail': 'Introduce tu correo para entrar al club.',
+                    'code': 'email_required',
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        can_participate = is_member
+        # Guests and members see content; authenticated non-members get a redacted teaser
+        # until the frontend joins them.
+        can_view_content = is_member or is_guest
 
         progress = {
             'completed_nodes': 0,
@@ -221,11 +380,8 @@ class BookClubHubView(APIView):
         }
         next_mission = None
         if is_member and club.knowledge_path_id:
-            progress = get_knowledge_path_progress(request.user, club.knowledge_path)
-            nodes_by_id = {
-                n.id: n
-                for n in club.knowledge_path.nodes.all()
-            }
+            progress = get_knowledge_path_progress(user, club.knowledge_path)
+            nodes_by_id = {n.id: n for n in club.knowledge_path.nodes.all()}
             for node_data in progress.get('nodes_progress', []):
                 if not node_data.get('is_completed') and node_data.get('is_available'):
                     node = nodes_by_id.get(node_data['node_id'])
@@ -239,7 +395,6 @@ class BookClubHubView(APIView):
                     }
                     break
             if next_mission is None:
-                # Fallback: first incomplete regardless of availability
                 for node_data in progress.get('nodes_progress', []):
                     if not node_data.get('is_completed'):
                         node = nodes_by_id.get(node_data['node_id'])
@@ -252,6 +407,19 @@ class BookClubHubView(APIView):
                             'locked': not node_data.get('is_available', False),
                         }
                         break
+        elif is_guest and club.knowledge_path_id:
+            # Teaser: first mission of the path (no personal progress).
+            first = club.knowledge_path.nodes.order_by('order').first()
+            if first:
+                next_mission = {
+                    'node_id': first.id,
+                    'title': first.title,
+                    'order': first.order,
+                    'path_id': club.knowledge_path_id,
+                    'description': first.description or '',
+                    'locked': True,
+                    'teaser': True,
+                }
 
         now = timezone.now()
         next_link = (
@@ -261,7 +429,6 @@ class BookClubHubView(APIView):
             .order_by('event__date_start')
             .first()
         )
-        # Prefer upcoming by date_start; if none, show most recent past for reference
         if next_link is None:
             next_link = (
                 BookClubEvent.objects.filter(book_club=club, event__deleted=False)
@@ -286,25 +453,21 @@ class BookClubHubView(APIView):
             .order_by('order', 'created_at')
         )
         _sync_question_schedules(questions)
-        # Reload after possible status updates
         questions = list(
             DiscussionQuestion.objects.filter(book_club=club)
             .select_related('node', 'event', 'created_by')
             .order_by('order', 'created_at')
         )
 
-        can_manage = club.user_can_manage(request.user)
+        can_manage = bool(user and club.user_can_manage(user))
         visible = []
         for q in questions:
             if q.status == DiscussionQuestionStatus.DRAFT and not can_manage:
-                continue
-            if not is_member and q.status == DiscussionQuestionStatus.DRAFT:
                 continue
             visible.append(q)
 
         open_questions = [q for q in visible if q.status == DiscussionQuestionStatus.OPEN]
         past_questions = [q for q in visible if q.status == DiscussionQuestionStatus.CLOSED]
-        # Mentors also see drafts in a separate light list folded into open for manage UX? Keep drafts out of open.
         draft_questions = (
             [q for q in visible if q.status == DiscussionQuestionStatus.DRAFT]
             if can_manage
@@ -312,7 +475,7 @@ class BookClubHubView(APIView):
         )
 
         recent_activity = []
-        if is_member:
+        if can_view_content:
             ct_dq = ContentType.objects.get_for_model(DiscussionQuestion)
             dq_ids = [q.id for q in visible if q.status != DiscussionQuestionStatus.DRAFT]
             dq_comments = (
@@ -365,8 +528,6 @@ class BookClubHubView(APIView):
             recent_activity.sort(key=lambda x: x['created_at'], reverse=True)
             recent_activity = recent_activity[:10]
 
-        # Non-members of active clubs may peek at club meta / next event only;
-        # question bodies, drafts, activity and event listings stay members-only.
         question_ctx = {'request': request}
         member_ids = list(club.memberships.values_list('user_id', flat=True))
         club_pulse = _build_club_pulse(club, open_questions, member_ids)
@@ -391,27 +552,31 @@ class BookClubHubView(APIView):
                 for n in progress.get('nodes_progress', [])
             ]
 
+        show_lists = can_view_content
         return Response(
             {
                 'club': BookClubDetailSerializer(club, context={'request': request}).data,
                 'is_member': is_member,
+                'is_guest': is_guest and not is_member,
+                'can_participate': can_participate,
+                'guest_email': guest_result.get('email') if is_guest and not is_member else None,
                 'progress': progress_payload,
-                'next_mission': next_mission if is_member else None,
+                'next_mission': next_mission if show_lists else None,
                 'next_event': next_event_data,
                 'open_questions': DiscussionQuestionSerializer(
-                    open_questions if is_member else [], many=True, context=question_ctx
+                    open_questions if show_lists else [], many=True, context=question_ctx
                 ).data,
                 'past_questions': DiscussionQuestionSerializer(
-                    past_questions if is_member else [], many=True, context=question_ctx
+                    past_questions if show_lists else [], many=True, context=question_ctx
                 ).data,
                 'draft_questions': DiscussionQuestionSerializer(
                     draft_questions if is_member else [], many=True, context=question_ctx
                 ).data,
                 'recent_activity': recent_activity,
-                'club_pulse': club_pulse if is_member else None,
+                'club_pulse': club_pulse if show_lists else None,
                 'quick_links': {
                     'knowledge_path_id': club.knowledge_path_id if is_member else None,
-                    'topic_id': club.topic_id if is_member else None,
+                    'topic_id': club.topic_id if show_lists else None,
                     'events': [
                         {
                             'event_id': link.event_id,
@@ -422,7 +587,7 @@ class BookClubHubView(APIView):
                         .select_related('event')
                         .order_by('event__date_start')
                     ]
-                    if is_member
+                    if show_lists
                     else [],
                 },
             }
@@ -430,14 +595,28 @@ class BookClubHubView(APIView):
 
 
 class BookClubEventListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, slug):
         club = _get_club(slug)
-        if not club.user_is_member(request.user):
+        user = request.user if request.user.is_authenticated else None
+        is_member = bool(user and club.user_is_member(user))
+        guest_result, _ = _resolve_guest_payload(request, slug)
+        if guest_result in ('expired', 'invalid'):
             return Response(
-                {'detail': 'Join the club to view events.'},
-                status=status.HTTP_403_FORBIDDEN,
+                {'detail': 'Guest token inválido.', 'code': 'guest_token_invalid'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        is_guest = isinstance(guest_result, dict)
+        if not is_member and not is_guest:
+            if user:
+                return Response(
+                    {'detail': 'Join the club to view events.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return Response(
+                {'detail': 'Introduce tu correo para ver las reuniones.', 'code': 'email_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
         links = (
             BookClubEvent.objects.filter(book_club=club, event__deleted=False)
@@ -447,6 +626,8 @@ class BookClubEventListCreateView(APIView):
         return Response(BookClubEventSerializer(links, many=True).data)
 
     def post(self, request, slug):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         club = _get_club(slug)
         if not club.user_can_manage(request.user):
             return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
@@ -461,12 +642,29 @@ class BookClubEventListCreateView(APIView):
 
 
 class DiscussionQuestionListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, slug):
         club = _get_club(slug)
-        if not club.user_is_member(request.user):
-            return Response({'detail': 'Join the club to view questions.'}, status=status.HTTP_403_FORBIDDEN)
+        user = request.user if request.user.is_authenticated else None
+        is_member = bool(user and club.user_is_member(user))
+        guest_result, _ = _resolve_guest_payload(request, slug)
+        if guest_result in ('expired', 'invalid'):
+            return Response(
+                {'detail': 'Guest token inválido.', 'code': 'guest_token_invalid'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        is_guest = isinstance(guest_result, dict)
+        if not is_member and not is_guest:
+            if user:
+                return Response(
+                    {'detail': 'Join the club to view discussion questions.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return Response(
+                {'detail': 'Introduce tu correo para ver los debates.', 'code': 'email_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         qs = list(
             DiscussionQuestion.objects.filter(book_club=club)
@@ -479,19 +677,16 @@ class DiscussionQuestionListCreateView(APIView):
             .select_related('node', 'event')
             .order_by('order', 'created_at')
         )
-        status_filter = request.query_params.get('status')
-        visible = []
-        for q in qs:
-            if not user_can_view_question(q, request.user):
-                continue
-            if status_filter and q.status != status_filter:
-                continue
-            visible.append(q)
+        can_manage = bool(user and club.user_can_manage(user))
+        if not can_manage:
+            qs = [q for q in qs if q.status != DiscussionQuestionStatus.DRAFT]
         return Response(
-            DiscussionQuestionSerializer(visible, many=True, context={'request': request}).data
+            DiscussionQuestionSerializer(qs, many=True, context={'request': request}).data
         )
 
     def post(self, request, slug):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         club = _get_club(slug)
         if not club.user_can_manage(request.user):
             return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
@@ -507,7 +702,7 @@ class DiscussionQuestionListCreateView(APIView):
 
 
 class DiscussionQuestionDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_object(self, slug, pk):
         club = _get_club(slug)
@@ -522,17 +717,42 @@ class DiscussionQuestionDetailView(APIView):
 
     def get(self, request, slug, pk):
         club, question = self.get_object(slug, pk)
-        if not user_can_view_question(question, request.user):
+        user = request.user if request.user.is_authenticated else None
+        is_member = bool(user and club.user_is_member(user))
+        guest_result, _ = _resolve_guest_payload(request, slug)
+        if guest_result in ('expired', 'invalid'):
+            return Response(
+                {'detail': 'Guest token inválido.', 'code': 'guest_token_invalid'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        is_guest = isinstance(guest_result, dict)
+        if not is_member and not is_guest:
+            if user:
+                return Response(
+                    {'detail': 'Join the club to view this discussion.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return Response(
+                {'detail': 'Introduce tu correo para ver este debate.', 'code': 'email_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        if question.status == DiscussionQuestionStatus.DRAFT and not (
+            user and club.user_can_manage(user)
+        ):
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if user and not user_can_view_question(question, user) and not is_guest:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         data = DiscussionQuestionSerializer(question, context={'request': request}).data
-        data['can_answer'] = (
-            club.user_is_member(request.user)
-            and question.status == DiscussionQuestionStatus.OPEN
+        data['can_answer'] = bool(
+            is_member and question.status == DiscussionQuestionStatus.OPEN
         )
-        data['can_manage'] = club.user_can_manage(request.user)
+        data['can_manage'] = bool(user and club.user_can_manage(user))
         return Response(data)
 
     def patch(self, request, slug, pk):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         club, question = self.get_object(slug, pk)
         if not club.user_can_manage(request.user):
             return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
@@ -549,6 +769,8 @@ class DiscussionQuestionDetailView(APIView):
         )
 
     def delete(self, request, slug, pk):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         club, question = self.get_object(slug, pk)
         if not club.user_can_manage(request.user):
             return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
