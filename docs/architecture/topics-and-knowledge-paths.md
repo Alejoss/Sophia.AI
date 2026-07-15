@@ -21,9 +21,28 @@ Backend: `content/models.py` → modelo `Topic`.
 - `description` (`TextField`): descripción del tema.
 - `creator` (`ForeignKey(User)`): usuario que creó el tema.
 - `topic_image` (`ImageField`, `upload_to=topic_image_path`): imagen de portada del tema.
+- `is_public` (`BooleanField`, default `True`): si es `False`, el tema no aparece en listados públicos ni en búsqueda.
+- `activity_score` (`IntegerField`, default `0`, indexado): ranking cacheado para ordenar el listado público. Se actualiza por deltas en eventos (contenido, likes, comentarios, timeline); recálculo completo solo con el comando de management.
 - `created_at`, `updated_at` (`DateTimeField`): metadatos temporales.
-- `moderators` (`ManyToManyField(User)`): usuarios con permisos de moderación sobre el tema.
+- `moderators` (`ManyToManyField(User)`, `blank=True`): usuarios con permisos de moderación sobre el tema.
 - `related_topics` (`ManyToManyField('self')`): relación dirigida con otros temas relacionados.
+
+**Fórmula de `activity_score`:**
+
+```text
+score =
+  (contenidos * 10)
++ (likes positivos en contenidos del tema * 3)
++ (comentarios activos con topic_id * 5)
++ (¿tiene ≥1 entrada de timeline? 50 : 0)
+```
+
+Actualización incremental en caliente (`UPDATE … activity_score = activity_score + delta`). Tras migrar, backfill una vez:
+
+```bash
+python manage.py recompute_topic_activity_scores
+python manage.py recompute_topic_activity_scores --topic-id 42
+```
 
 **Relaciones con otros modelos**:
 
@@ -70,7 +89,7 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
 
 - **Listado y creación de temas**
   - `GET /topics/` → `TopicView.get`
-    - Devuelve todos los temas como lista de `TopicBasicSerializer`.
+    - Devuelve temas públicos (`is_public=True`) ordenados por `-activity_score`, luego `-created_at`, como lista de `TopicBasicSerializer`.
   - `POST /topics/` → `TopicView.post`
     - Crea un nuevo tema.
     - `creator` se define automáticamente desde `request.user`.

@@ -371,6 +371,12 @@ class Topic(models.Model):
         default=True,
         help_text='When false, the topic is hidden from public listings and search.',
     )
+    activity_score = models.IntegerField(
+        default=0,
+        db_default=0,
+        db_index=True,
+        help_text='Cached ranking score from contents, likes, comments, and timeline presence.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     moderators = models.ManyToManyField(
@@ -463,6 +469,7 @@ class TopicCreationRequest(models.Model):
             title=self.approved_title,
             description=self.approved_description or '',
             creator=self.requested_by,
+            activity_score=0,
         )
         self.status = 'COMPLETED'
         self.topic = topic

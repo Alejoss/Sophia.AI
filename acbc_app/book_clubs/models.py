@@ -28,13 +28,16 @@ class BookClub(models.Model):
     Orchestrates a KnowledgePath (missions), Topic (community), and Events (lives).
     """
     title = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=220, unique=True)
+    slug = models.SlugField(max_length=220, unique=True, blank=True)
     description = models.TextField(blank=True)
     cover_image = models.ImageField(upload_to='book_club_covers/', null=True, blank=True)
     knowledge_path = models.ForeignKey(
         'knowledge_paths.KnowledgePath',
         on_delete=models.PROTECT,
         related_name='book_clubs',
+        null=True,
+        blank=True,
+        help_text='Optional. If omitted on create, an empty path is created for missions.',
     )
     topic = models.ForeignKey(
         'content.Topic',

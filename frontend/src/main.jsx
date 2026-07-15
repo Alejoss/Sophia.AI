@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import App from './App.jsx';
+import { initMetaPixel } from './utils/metaPixel';
 import './index.css';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
@@ -25,6 +26,8 @@ if (SENTRY_DSN) {
     replaysSessionSampleRate: isTelegramOrWebView ? 0 : 0.1,
   });
 }
+
+initMetaPixel();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 const app = (

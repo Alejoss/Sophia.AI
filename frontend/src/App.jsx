@@ -6,16 +6,26 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
+import MetaPixelTracker from './components/MetaPixelTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/Home.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
-import BookClubHub from './bookClubs/BookClubHub.jsx';
+import BookClubLayout from './bookClubs/BookClubLayout.jsx';
+import BookClubOverview from './bookClubs/BookClubOverview.jsx';
+import BookClubMissions from './bookClubs/BookClubMissions.jsx';
+import BookClubCommunity from './bookClubs/BookClubCommunity.jsx';
+import BookClubNotebook from './bookClubs/BookClubNotebook.jsx';
 import DiscussionQuestionsList from './bookClubs/DiscussionQuestionsList.jsx';
 import DiscussionQuestionDetail from './bookClubs/DiscussionQuestionDetail.jsx';
 import BookClubMeetings from './bookClubs/BookClubMeetings.jsx';
+import BookClubAdminLayout from './bookClubs/admin/BookClubAdminLayout.jsx';
+import BookClubAdminGeneral from './bookClubs/admin/BookClubAdminGeneral.jsx';
+import BookClubAdminConnections from './bookClubs/admin/BookClubAdminConnections.jsx';
+import BookClubAdminMeetings from './bookClubs/admin/BookClubAdminMeetings.jsx';
+import BookClubAdminQuestions from './bookClubs/admin/BookClubAdminQuestions.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
 import Profile from './profiles/Profile.jsx';
@@ -136,18 +146,21 @@ const AppContent = () => {
     <MuiThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
+        <MetaPixelTracker />
         <AuthProvider>
           <NotificationsProvider>
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
           <Route path="club-de-lectura" element={<ClubDeLectura />} />
-          <Route path="club-de-lectura/:slug" element={<BookClubHub />} />
-          <Route path="club-de-lectura/:slug/preguntas" element={<DiscussionQuestionsList />} />
-          <Route
-            path="club-de-lectura/:slug/preguntas/:questionId"
-            element={<DiscussionQuestionDetail />}
-          />
-          <Route path="club-de-lectura/:slug/reuniones" element={<BookClubMeetings />} />
+          <Route path="club-de-lectura/:slug" element={<BookClubLayout />}>
+            <Route index element={<BookClubOverview />} />
+            <Route path="misiones" element={<BookClubMissions />} />
+            <Route path="comunidad" element={<BookClubCommunity />} />
+            <Route path="preguntas" element={<DiscussionQuestionsList />} />
+            <Route path="preguntas/:questionId" element={<DiscussionQuestionDetail />} />
+            <Route path="reuniones" element={<BookClubMeetings />} />
+            <Route path="cuaderno" element={<BookClubNotebook />} />
+          </Route>
           <Route element={<MainLayout />}>
             <Route
               path="/"
@@ -216,7 +229,16 @@ const AppContent = () => {
               <Route path=":publicationId" element={<PublicationDetail />} />
             </Route>
             <Route path="search" element={<MainSearch />} />
-            <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
+              <Route path="book-clubs/nuevo" element={<BookClubAdminGeneral mode="create" />} />
+              <Route path="book-clubs/:slug" element={<BookClubAdminLayout />}>
+                <Route index element={<Navigate to="general" replace />} />
+                <Route path="general" element={<BookClubAdminGeneral />} />
+                <Route path="conexiones" element={<BookClubAdminConnections />} />
+                <Route path="reuniones" element={<BookClubAdminMeetings />} />
+                <Route path="preguntas" element={<BookClubAdminQuestions />} />
+              </Route>
+            </Route>
             <Route path="welcome" element={<Welcome />} />
             <Route path="messages" element={<MessagesLayout />}>
               <Route path="thread/:userId" element={<MessageThread />} />

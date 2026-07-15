@@ -4,6 +4,7 @@ import { Alert, Box, Button, CircularProgress, TextField, Typography } from '@mu
 import { AuthContext } from '../context/AuthContext';
 import { submitNewsletterSubscription } from '../api/profilesApi';
 import bookClubsApi from '../api/bookClubsApi';
+import { trackMetaLead } from '../utils/metaPixel';
 
 const ClubDeLectura = () => {
   const { authState, authInitialized } = useContext(AuthContext);
@@ -59,6 +60,7 @@ const ClubDeLectura = () => {
     setLoading(true);
     try {
       await submitNewsletterSubscription(trimmedEmail, 'club_de_lectura');
+      trackMetaLead();
       setSuccessMessage('¡Gracias! Te avisaremos sobre el Club de Lectura.');
       setEmail('');
     } catch (err) {

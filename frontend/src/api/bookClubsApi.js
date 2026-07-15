@@ -1,5 +1,34 @@
 import axiosInstance from './axiosConfig';
 
+const appendIfPresent = (formData, key, value) => {
+  if (value === undefined || value === null || value === '') return;
+  formData.append(key, value);
+};
+
+/** Prefer JSON; use FormData only when uploading a cover image. */
+const toRequestBody = (payload) => {
+  const hasFile = payload?.cover_image instanceof File;
+  if (!hasFile) {
+    const body = { ...payload };
+    delete body.cover_image;
+    Object.keys(body).forEach((key) => {
+      if (body[key] === undefined || body[key] === '') {
+        delete body[key];
+      }
+    });
+    return body;
+  }
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value instanceof File) {
+      formData.append(key, value);
+    } else {
+      appendIfPresent(formData, key, value);
+    }
+  });
+  return formData;
+};
+
 const bookClubsApi = {
   listClubs: async () => {
     const response = await axiosInstance.get('/book_clubs/');
@@ -8,6 +37,19 @@ const bookClubsApi = {
 
   getClub: async (slug) => {
     const response = await axiosInstance.get(`/book_clubs/${slug}/`);
+    return response.data;
+  },
+
+  createClub: async (payload) => {
+    const data = toRequestBody(payload);
+    // Let axiosConfig set Content-Type (JSON or multipart boundary)
+    const response = await axiosInstance.post('/book_clubs/', data);
+    return response.data;
+  },
+
+  updateClub: async (slug, payload) => {
+    const data = toRequestBody(payload);
+    const response = await axiosInstance.patch(`/book_clubs/${slug}/`, data);
     return response.data;
   },
 

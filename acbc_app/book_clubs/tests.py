@@ -356,3 +356,66 @@ class BookClubAPITestCase(APITestCase):
         ok = self.client.get('/api/book_clubs/cypherpunk/events/')
         self.assertEqual(ok.status_code, status.HTTP_200_OK)
         self.assertEqual(len(ok.data), 1)
+
+
+class BookClubCreateUpdateAPITestCase(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='staffuser', password='pass123', is_staff=True
+        )
+        self.member = User.objects.create_user(username='regular', password='pass123')
+
+    def auth(self, user):
+        token = RefreshToken.for_user(user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+    def test_non_staff_cannot_create(self):
+        self.auth(self.member)
+        response = self.client.post(
+            '/api/book_clubs/',
+            {'title': 'Club ilegal'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_can_create_without_path_or_slug(self):
+        self.auth(self.staff)
+        before = KnowledgePath.objects.count()
+        response = self.client.post(
+            '/api/book_clubs/',
+            {
+                'title': 'Cypherpunk sin path',
+                'description': 'Se crea el path solo',
+                'status': 'draft',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertTrue(response.data['slug'])
+        self.assertIsNotNone(response.data['knowledge_path'])
+        self.assertEqual(KnowledgePath.objects.count(), before + 1)
+        club = BookClub.objects.get(slug=response.data['slug'])
+        self.assertEqual(club.created_by_id, self.staff.id)
+        self.assertTrue(
+            BookClubMembership.objects.filter(
+                book_club=club, user=self.staff, role=MembershipRole.ADMIN
+            ).exists()
+        )
+
+    def test_staff_can_patch_status(self):
+        self.auth(self.staff)
+        created = self.client.post(
+            '/api/book_clubs/',
+            {'title': 'Club editable', 'status': 'draft'},
+            format='json',
+        )
+        slug = created.data['slug']
+        response = self.client.patch(
+            f'/api/book_clubs/{slug}/',
+            {'status': 'active', 'description': 'Actualizado'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['status'], 'active')
+        self.assertEqual(response.data['description'], 'Actualizado')
+

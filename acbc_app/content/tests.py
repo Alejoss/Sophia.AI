@@ -1365,6 +1365,182 @@ class TopicAPITests(APITestCase):
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class TopicActivityScoreTests(TestCase):
+    """Incremental activity_score updates and list ordering."""
+
+    def setUp(self):
+        from django.contrib.contenttypes.models import ContentType
+        from votes.models import Vote
+        from comments.models import Comment
+        from content.topic_activity import (
+            WEIGHT_COMMENT,
+            WEIGHT_CONTENT,
+            WEIGHT_LIKE,
+            WEIGHT_TIMELINE,
+            compute_topic_activity_score,
+            recompute_topic_activity_score,
+        )
+
+        self.ContentType = ContentType
+        self.Vote = Vote
+        self.Comment = Comment
+        self.WEIGHT_COMMENT = WEIGHT_COMMENT
+        self.WEIGHT_CONTENT = WEIGHT_CONTENT
+        self.WEIGHT_LIKE = WEIGHT_LIKE
+        self.WEIGHT_TIMELINE = WEIGHT_TIMELINE
+        self.compute_topic_activity_score = compute_topic_activity_score
+        self.recompute_topic_activity_score = recompute_topic_activity_score
+
+        self.user = User.objects.create_user(
+            username='scoreuser',
+            email='score@example.com',
+            password='pass12345',
+        )
+        self.topic_hot = Topic.objects.create(
+            title='Hot Topic',
+            description='Active',
+            creator=self.user,
+            is_public=True,
+        )
+        self.topic_cold = Topic.objects.create(
+            title='Cold Topic',
+            description='Quiet',
+            creator=self.user,
+            is_public=True,
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Scored content',
+        )
+
+    def test_new_topic_has_zero_activity_score(self):
+        self.assertEqual(self.topic_hot.activity_score, 0)
+
+    def test_adding_content_increments_score(self):
+        self.topic_hot.contents.add(self.content)
+        self.topic_hot.refresh_from_db()
+        self.assertEqual(self.topic_hot.activity_score, self.WEIGHT_CONTENT)
+
+    def test_vote_increments_score_for_linked_topic(self):
+        self.topic_hot.contents.add(self.content)
+        self.topic_hot.refresh_from_db()
+        base = self.topic_hot.activity_score
+
+        self.Vote.objects.create(
+            user=self.user,
+            content_type=self.ContentType.objects.get_for_model(Content),
+            object_id=self.content.id,
+            topic=None,
+            value=1,
+        )
+        self.topic_hot.refresh_from_db()
+        self.assertEqual(self.topic_hot.activity_score, base + self.WEIGHT_LIKE)
+
+    def test_comment_increments_score(self):
+        self.Comment.objects.create(
+            author=self.user,
+            body='Hola',
+            content_type=self.ContentType.objects.get_for_model(Topic),
+            object_id=self.topic_hot.id,
+            topic=self.topic_hot,
+            is_active=True,
+        )
+        self.topic_hot.refresh_from_db()
+        self.assertEqual(self.topic_hot.activity_score, self.WEIGHT_COMMENT)
+
+    def test_first_timeline_entry_adds_bonus(self):
+        timeline = TopicTimeline.objects.create(topic=self.topic_hot, created_by=self.user)
+        TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title='Entry one',
+            order=1,
+            created_by=self.user,
+        )
+        self.topic_hot.refresh_from_db()
+        self.assertEqual(self.topic_hot.activity_score, self.WEIGHT_TIMELINE)
+
+        TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title='Entry two',
+            order=2,
+            created_by=self.user,
+        )
+        self.topic_hot.refresh_from_db()
+        self.assertEqual(self.topic_hot.activity_score, self.WEIGHT_TIMELINE)
+
+    def test_recompute_matches_incremental_score(self):
+        self.topic_hot.contents.add(self.content)
+        self.Vote.objects.create(
+            user=self.user,
+            content_type=self.ContentType.objects.get_for_model(Content),
+            object_id=self.content.id,
+            value=1,
+        )
+        self.Comment.objects.create(
+            author=self.user,
+            body='Nota',
+            content_type=self.ContentType.objects.get_for_model(Content),
+            object_id=self.content.id,
+            topic=self.topic_hot,
+            is_active=True,
+        )
+        timeline = TopicTimeline.objects.create(topic=self.topic_hot, created_by=self.user)
+        TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title='Entry',
+            order=1,
+            created_by=self.user,
+        )
+
+        self.topic_hot.refresh_from_db()
+        incremental = self.topic_hot.activity_score
+        expected = self.compute_topic_activity_score(self.topic_hot)
+        self.assertEqual(incremental, expected)
+
+        Topic.objects.filter(pk=self.topic_hot.id).update(activity_score=0)
+        recomputed = self.recompute_topic_activity_score(self.topic_hot.id)
+        self.assertEqual(recomputed, expected)
+
+    def test_approve_topic_creation_request_sets_activity_score(self):
+        request = TopicCreationRequest.objects.create(
+            requested_by=self.user,
+            proposed_title='Nuevo tema score',
+            proposed_description='Desc',
+            approved_title='Nuevo tema score',
+            approved_description='Desc',
+            status='PENDING',
+        )
+        topic = request.finalize_as_topic()
+        self.assertEqual(topic.activity_score, 0)
+        topic.refresh_from_db()
+        self.assertEqual(topic.activity_score, 0)
+
+    def test_public_list_orders_by_activity_score(self):
+        self.topic_cold.contents.add(self.content)
+        other_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Hot content',
+        )
+        self.topic_hot.contents.add(other_content)
+        self.Comment.objects.create(
+            author=self.user,
+            body='Activo',
+            content_type=self.ContentType.objects.get_for_model(Topic),
+            object_id=self.topic_hot.id,
+            topic=self.topic_hot,
+            is_active=True,
+        )
+
+        client = APIClient()
+        url = reverse('content:topics')
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [row['id'] for row in response.data]
+        self.assertLess(ids.index(self.topic_hot.id), ids.index(self.topic_cold.id))
+
+
 class TopicCreationRequestAPITests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(

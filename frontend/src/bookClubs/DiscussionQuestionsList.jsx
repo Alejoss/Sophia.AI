@@ -1,33 +1,39 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  Container,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
-
-const accent = '#FF6B35';
+import { useBookClub } from './BookClubLayout';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
 
 const DiscussionQuestionsList = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
+  const { hub, reload, club } = useBookClub();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [newQuestion, setNewQuestion] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const canManage = club?.can_manage;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await bookClubsApi.listDiscussionQuestions(slug);
       setQuestions(data);
+      setError('');
     } catch (err) {
       setError(err?.response?.data?.detail || 'No se pudieron cargar las preguntas.');
     } finally {
@@ -40,14 +46,34 @@ const DiscussionQuestionsList = () => {
     else setLoading(false);
   }, [authState.isAuthenticated, load]);
 
+  const handleCreate = async () => {
+    if (!newQuestion.trim()) return;
+    setCreating(true);
+    try {
+      await bookClubsApi.createDiscussionQuestion(slug, {
+        body: newQuestion.trim(),
+        status: 'open',
+        order: (questions?.length || 0) + 1,
+        node: hub?.next_mission?.node_id || null,
+      });
+      setNewQuestion('');
+      await load();
+      await reload();
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'No se pudo crear la pregunta.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const open = questions.filter((q) => q.status === 'open' || q.effective_status === 'open');
   const past = questions.filter((q) => q.status === 'closed' || q.effective_status === 'closed');
   const drafts = questions.filter((q) => q.status === 'draft');
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: accent }} />
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress sx={{ color: CLUB_ACCENT }} />
       </Box>
     );
   }
@@ -70,11 +96,11 @@ const DiscussionQuestionsList = () => {
                 p: 2,
                 borderRadius: 1,
                 border: '1px solid rgba(255,255,255,0.1)',
-                '&:hover': { borderColor: accent },
+                '&:hover': { borderColor: CLUB_ACCENT },
               }}
             >
               {q.mission_label && (
-                <Typography variant="caption" sx={{ color: accent, fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: CLUB_ACCENT, fontWeight: 600 }}>
                   Después de {q.mission_label}
                 </Typography>
               )}
@@ -83,7 +109,7 @@ const DiscussionQuestionsList = () => {
                 <Chip
                   size="small"
                   label={q.effective_status || q.status}
-                  sx={{ bgcolor: 'rgba(255,107,53,0.15)', color: accent }}
+                  sx={{ bgcolor: 'rgba(255,107,53,0.15)', color: CLUB_ACCENT }}
                 />
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>
                   {q.answer_count} respuesta{q.answer_count === 1 ? '' : 's'}
@@ -97,19 +123,64 @@ const DiscussionQuestionsList = () => {
   );
 
   return (
-    <Box sx={{ bgcolor: '#0d0d0d', minHeight: '100%', color: '#fff', py: { xs: 3, md: 5 } }}>
-      <Container maxWidth="md">
-        <Button component={RouterLink} to={`/club-de-lectura/${slug}`} sx={{ color: accent, mb: 2 }}>
-          ← Volver al hub
-        </Button>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
-          Preguntas de debate
-        </Typography>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {renderGroup('Abiertas', open)}
-        {drafts.length > 0 && renderGroup('Borradores', drafts)}
-        {renderGroup('Pasadas', past)}
-      </Container>
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+        Preguntas de debate
+      </Typography>
+      <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
+        Preguntas abiertas después de misiones o reuniones. Las respuestas son visibles para todo el club.
+      </Typography>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
+      {canManage && (
+        <Box
+          sx={{
+            mb: 4,
+            p: 2.5,
+            border: '1px solid rgba(255,107,53,0.35)',
+            borderRadius: 1,
+            bgcolor: 'rgba(255,107,53,0.05)',
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ mb: 1, color: 'rgba(255,255,255,0.9)' }}>
+            Iniciar una conversación (mentores)
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            value={newQuestion}
+            onChange={(e) => setNewQuestion(e.target.value)}
+            placeholder="Escribe la pregunta que quieres abrir al club…"
+            sx={{
+              mb: 1.5,
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(255,107,53,0.4)',
+              },
+            }}
+          />
+          <Button
+            variant="contained"
+            disabled={creating || !newQuestion.trim()}
+            onClick={handleCreate}
+            sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
+          >
+            Abrir pregunta
+          </Button>
+        </Box>
+      )}
+
+      {renderGroup('Abiertas', open)}
+      {drafts.length > 0 && renderGroup('Borradores', drafts)}
+      {renderGroup('Pasadas', past)}
     </Box>
   );
 };

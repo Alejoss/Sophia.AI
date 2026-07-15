@@ -1637,7 +1637,7 @@ class TopicView(APIView):
         return [permission() for permission in self.permission_classes]
 
     def get(self, request):
-        topics = Topic.objects.filter(is_public=True).order_by('-created_at')
+        topics = Topic.objects.filter(is_public=True).order_by('-activity_score', '-created_at')
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 

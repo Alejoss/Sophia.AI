@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,6 +30,7 @@ from book_clubs.serializers import (
 )
 from comments.models import Comment
 from knowledge_paths.services.node_user_activity_service import get_knowledge_path_progress
+from profiles.models import UserNodeCompletion
 
 
 def _get_club(slug):
@@ -50,8 +52,70 @@ def _sync_question_schedules(queryset):
     return queryset
 
 
+def _build_club_pulse(club, open_questions, member_ids):
+    """Collective signals for the reading experience (not admin stats)."""
+    member_count = len(member_ids)
+    open_debates = len(open_questions)
+    total_answers = 0
+    if open_questions:
+        ct = ContentType.objects.get_for_model(DiscussionQuestion)
+        total_answers = Comment.objects.filter(
+            content_type=ct,
+            object_id__in=[q.id for q in open_questions],
+            parent=None,
+            is_active=True,
+        ).count()
+
+    first_mission_completions = 0
+    active_readers_7d = 0
+    path_completion_pct = 0
+    if club.knowledge_path_id and member_ids:
+        nodes = list(club.knowledge_path.nodes.order_by('order').values_list('id', 'order'))
+        node_ids = [n[0] for n in nodes]
+        if nodes:
+            first_node_id = nodes[0][0]
+            first_mission_completions = UserNodeCompletion.objects.filter(
+                user_id__in=member_ids,
+                node_id=first_node_id,
+                is_completed=True,
+            ).count()
+            week_ago = timezone.now() - timezone.timedelta(days=7)
+            active_readers_7d = (
+                UserNodeCompletion.objects.filter(
+                    user_id__in=member_ids,
+                    node_id__in=node_ids,
+                    is_completed=True,
+                    completed_at__gte=week_ago,
+                )
+                .values('user_id')
+                .distinct()
+                .count()
+            )
+            # Average path completion across members (rough social pulse)
+            total_nodes = len(node_ids)
+            if total_nodes and member_count:
+                completed_pairs = UserNodeCompletion.objects.filter(
+                    user_id__in=member_ids,
+                    node_id__in=node_ids,
+                    is_completed=True,
+                ).count()
+                path_completion_pct = round(
+                    (completed_pairs / (member_count * total_nodes)) * 100
+                )
+
+    return {
+        'member_count': member_count,
+        'active_readers_7d': active_readers_7d,
+        'open_debates': open_debates,
+        'total_answers': total_answers,
+        'first_mission_completions': first_mission_completions,
+        'path_completion_pct': path_completion_pct,
+    }
+
+
 class BookClubListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request):
         qs = BookClub.objects.select_related('knowledge_path', 'topic')
@@ -83,6 +147,7 @@ class BookClubListCreateView(APIView):
 
 class BookClubDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request, slug):
         club = _get_club(slug)
@@ -149,32 +214,41 @@ class BookClubHubView(APIView):
 
         progress = {
             'completed_nodes': 0,
-            'total_nodes': club.knowledge_path.nodes.count(),
+            'total_nodes': club.knowledge_path.nodes.count() if club.knowledge_path_id else 0,
             'percentage': 0,
             'is_completed': False,
             'nodes_progress': [],
         }
         next_mission = None
-        if is_member:
+        if is_member and club.knowledge_path_id:
             progress = get_knowledge_path_progress(request.user, club.knowledge_path)
+            nodes_by_id = {
+                n.id: n
+                for n in club.knowledge_path.nodes.all()
+            }
             for node_data in progress.get('nodes_progress', []):
                 if not node_data.get('is_completed') and node_data.get('is_available'):
+                    node = nodes_by_id.get(node_data['node_id'])
                     next_mission = {
                         'node_id': node_data['node_id'],
                         'title': node_data['title'],
                         'order': node_data['order'],
                         'path_id': club.knowledge_path_id,
+                        'description': (node.description or '') if node else '',
+                        'locked': False,
                     }
                     break
             if next_mission is None:
                 # Fallback: first incomplete regardless of availability
                 for node_data in progress.get('nodes_progress', []):
                     if not node_data.get('is_completed'):
+                        node = nodes_by_id.get(node_data['node_id'])
                         next_mission = {
                             'node_id': node_data['node_id'],
                             'title': node_data['title'],
                             'order': node_data['order'],
                             'path_id': club.knowledge_path_id,
+                            'description': (node.description or '') if node else '',
                             'locked': not node_data.get('is_available', False),
                         }
                         break
@@ -294,16 +368,34 @@ class BookClubHubView(APIView):
         # Non-members of active clubs may peek at club meta / next event only;
         # question bodies, drafts, activity and event listings stay members-only.
         question_ctx = {'request': request}
+        member_ids = list(club.memberships.values_list('user_id', flat=True))
+        club_pulse = _build_club_pulse(club, open_questions, member_ids)
+
+        progress_payload = {
+            'completed_nodes': progress.get('completed_nodes', 0),
+            'total_nodes': progress.get('total_nodes', 0),
+            'percentage': progress.get(
+                'completion_percentage', progress.get('percentage', 0)
+            ),
+            'is_completed': progress.get('is_completed', False),
+        }
+        if is_member:
+            progress_payload['nodes_progress'] = [
+                {
+                    'node_id': n.get('node_id'),
+                    'title': n.get('title'),
+                    'order': n.get('order'),
+                    'is_completed': n.get('is_completed'),
+                    'is_available': n.get('is_available'),
+                }
+                for n in progress.get('nodes_progress', [])
+            ]
+
         return Response(
             {
                 'club': BookClubDetailSerializer(club, context={'request': request}).data,
                 'is_member': is_member,
-                'progress': {
-                    'completed_nodes': progress.get('completed_nodes', 0),
-                    'total_nodes': progress.get('total_nodes', 0),
-                    'percentage': progress.get('completion_percentage', progress.get('percentage', 0)),
-                    'is_completed': progress.get('is_completed', False),
-                },
+                'progress': progress_payload,
                 'next_mission': next_mission if is_member else None,
                 'next_event': next_event_data,
                 'open_questions': DiscussionQuestionSerializer(
@@ -316,6 +408,7 @@ class BookClubHubView(APIView):
                     draft_questions if is_member else [], many=True, context=question_ctx
                 ).data,
                 'recent_activity': recent_activity,
+                'club_pulse': club_pulse if is_member else None,
                 'quick_links': {
                     'knowledge_path_id': club.knowledge_path_id if is_member else None,
                     'topic_id': club.topic_id if is_member else None,

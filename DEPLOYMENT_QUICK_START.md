@@ -240,6 +240,15 @@ Local equivalent (dev stack):
 docker-compose exec backend python manage.py generate_topic_thumbnails
 ```
 
+**Topic activity scores** — after deploying `activity_score`, run once so the public topic list ranks by existing activity (later updates are incremental):
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py recompute_topic_activity_scores
+
+# One topic only
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend python manage.py recompute_topic_activity_scores --topic-id 42
+```
+
 ### Health Checks
 
 **Script (on server):**

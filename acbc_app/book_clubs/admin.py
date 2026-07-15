@@ -4,8 +4,10 @@ from book_clubs.models import (
     BookClub,
     BookClubEvent,
     BookClubMembership,
+    MembershipRole,
     DiscussionQuestion,
 )
+from knowledge_paths.models import KnowledgePath
 
 
 class BookClubMembershipInline(admin.TabularInline):
@@ -29,12 +31,31 @@ class DiscussionQuestionInline(admin.TabularInline):
 
 @admin.register(BookClub)
 class BookClubAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'status', 'starts_at', 'ends_at', 'knowledge_path')
+    list_display = ('title', 'slug', 'status', 'starts_at', 'ends_at', 'knowledge_path', 'created_by')
     list_filter = ('status',)
     prepopulated_fields = {'slug': ('title',)}
     search_fields = ('title', 'slug', 'description')
-    raw_id_fields = ('knowledge_path', 'topic', 'created_by')
+    raw_id_fields = ('knowledge_path', 'topic')
+    readonly_fields = ('created_by', 'created_at', 'updated_at')
     inlines = [BookClubMembershipInline, BookClubEventInline, DiscussionQuestionInline]
+
+    def save_model(self, request, obj, form, change):
+        if not obj.created_by_id:
+            obj.created_by = request.user
+        if not obj.knowledge_path_id:
+            obj.knowledge_path = KnowledgePath.objects.create(
+                title=obj.title,
+                description=obj.description or '',
+                author=request.user,
+                is_visible=False,
+            )
+        super().save_model(request, obj, form, change)
+        if not change:
+            BookClubMembership.objects.get_or_create(
+                book_club=obj,
+                user=request.user,
+                defaults={'role': MembershipRole.ADMIN},
+            )
 
 
 @admin.register(BookClubMembership)

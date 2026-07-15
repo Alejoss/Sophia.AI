@@ -63,7 +63,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'profiles',
     'events',
-    'content',
+    'content.apps.ContentConfig',
     'certificates',
     'comments',
     'quizzes',

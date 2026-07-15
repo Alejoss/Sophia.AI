@@ -31,7 +31,7 @@ class BookClubListSerializer(serializers.ModelSerializer):
     member_count = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
-    knowledge_path_title = serializers.CharField(source='knowledge_path.title', read_only=True)
+    knowledge_path_title = serializers.SerializerMethodField()
 
     class Meta:
         model = BookClub
@@ -53,6 +53,9 @@ class BookClubListSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'slug', 'created_at']
+
+    def get_knowledge_path_title(self, obj):
+        return obj.knowledge_path.title if obj.knowledge_path_id else None
 
     def get_member_count(self, obj):
         return obj.memberships.count()
@@ -103,11 +106,19 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
             'slug',
         ]
         extra_kwargs = {
-            'slug': {'required': False},
+            'slug': {'required': False, 'allow_blank': True},
+            'knowledge_path': {'required': False, 'allow_null': True},
             'topic': {'required': False, 'allow_null': True},
+            'description': {'required': False, 'allow_blank': True},
+            'cover_image': {'required': False, 'allow_null': True},
+            'starts_at': {'required': False, 'allow_null': True},
+            'ends_at': {'required': False, 'allow_null': True},
+            'status': {'required': False},
         }
 
     def validate_knowledge_path(self, value):
+        if value is None:
+            return value
         if not isinstance(value, KnowledgePath):
             raise serializers.ValidationError('Invalid knowledge path.')
         return value
@@ -117,15 +128,34 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Invalid topic.')
         return value
 
+    def _ensure_knowledge_path(self, club, user):
+        if club.knowledge_path_id:
+            return club
+        club.knowledge_path = KnowledgePath.objects.create(
+            title=club.title,
+            description=club.description or '',
+            author=user,
+            is_visible=False,
+        )
+        club.save(update_fields=['knowledge_path', 'updated_at'])
+        return club
+
     def create(self, validated_data):
         request = self.context['request']
         club = BookClub.objects.create(created_by=request.user, **validated_data)
+        self._ensure_knowledge_path(club, request.user)
         BookClubMembership.objects.create(
             book_club=club,
             user=request.user,
             role=MembershipRole.ADMIN,
         )
         return club
+
+    def update(self, instance, validated_data):
+        club = super().update(instance, validated_data)
+        request = self.context.get('request')
+        user = request.user if request else club.created_by
+        return self._ensure_knowledge_path(club, user)
 
 
 class BookClubEventSerializer(serializers.ModelSerializer):
@@ -260,6 +290,10 @@ class DiscussionQuestionWriteSerializer(serializers.ModelSerializer):
         if value is None:
             return value
         club = self.context['book_club']
+        if not club.knowledge_path_id:
+            raise serializers.ValidationError(
+                'This club has no knowledge path yet.'
+            )
         if value.knowledge_path_id != club.knowledge_path_id:
             raise serializers.ValidationError(
                 'Node must belong to this club\'s knowledge path.'
