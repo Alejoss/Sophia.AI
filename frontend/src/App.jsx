@@ -7,6 +7,7 @@ import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
 import GoogleOAuthInitializer from './components/GoogleOAuthInitializer';
 import MetaPixelTracker from './components/MetaPixelTracker';
+import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/Home.jsx';
@@ -148,6 +149,7 @@ const AppContent = () => {
       <CssBaseline />
       <Router>
         <MetaPixelTracker />
+        <GoogleAnalyticsTracker />
         <AuthProvider>
           <NotificationsProvider>
           <Routes>

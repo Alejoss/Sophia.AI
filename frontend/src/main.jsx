@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import App from './App.jsx';
 import { initMetaPixel } from './utils/metaPixel';
+import { initGoogleAnalytics } from './utils/googleAnalytics';
 import './index.css';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
@@ -28,6 +29,7 @@ if (SENTRY_DSN) {
 }
 
 initMetaPixel();
+initGoogleAnalytics();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 const app = (

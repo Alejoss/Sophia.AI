@@ -197,6 +197,23 @@ Location: `frontend/.env`
 - **Example**: `VITE_GOOGLE_OAUTH_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com`
 - **Note**: Should match the backend `GOOGLE_OAUTH_CLIENT_ID` or use a separate web client ID
 
+#### `VITE_GA_MEASUREMENT_ID`
+- **Description**: Google Analytics 4 Measurement ID (`G-XXXXXXXX`)
+- **Required**: No (analytics only loads when set)
+- **Example**: `VITE_GA_MEASUREMENT_ID=G-PMB87DKKP6`
+- **Note**: Injected at Vite build time. Set as a GitHub Repository variable for production image builds.
+
+#### `VITE_META_PIXEL_ID`
+- **Description**: Meta (Facebook) Pixel ID
+- **Required**: No (pixel only loads when set)
+- **Example**: `VITE_META_PIXEL_ID=123456789012345`
+- **Note**: Injected at Vite build time. Set as a GitHub Repository variable for production image builds.
+
+#### `VITE_SENTRY_DSN`
+- **Description**: Sentry DSN for frontend error tracking
+- **Required**: No
+- **Example**: `VITE_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx`
+
 ## Environment File Examples
 
 ### Backend Development (.env)
@@ -252,6 +269,9 @@ SENTRY_DSN=your-sentry-dsn
 ```env
 VITE_API_URL=http://localhost:8000/api
 VITE_GOOGLE_OAUTH_CLIENT_ID=your-client-id
+# Optional – leave unset locally to avoid polluting production analytics
+# VITE_GA_MEASUREMENT_ID=G-PMB87DKKP6
+# VITE_META_PIXEL_ID=your-meta-pixel-id
 ```
 
 ### Frontend Production (.env)
@@ -259,6 +279,8 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=your-client-id
 ```env
 VITE_API_URL=https://sophia-ai-api.algobeat.com/api
 VITE_GOOGLE_OAUTH_CLIENT_ID=your-client-id
+VITE_GA_MEASUREMENT_ID=G-PMB87DKKP6
+VITE_META_PIXEL_ID=your-meta-pixel-id
 ```
 
 ## Security Best Practices
