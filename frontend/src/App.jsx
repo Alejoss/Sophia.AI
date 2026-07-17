@@ -28,6 +28,7 @@ import BookClubAdminGeneral from './bookClubs/admin/BookClubAdminGeneral.jsx';
 import BookClubAdminConnections from './bookClubs/admin/BookClubAdminConnections.jsx';
 import BookClubAdminMeetings from './bookClubs/admin/BookClubAdminMeetings.jsx';
 import BookClubAdminQuestions from './bookClubs/admin/BookClubAdminQuestions.jsx';
+import BookClubAdminMembers from './bookClubs/admin/BookClubAdminMembers.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import ProfilePageLayout from './layouts/ProfilePageLayout.jsx';
 import Profile from './profiles/Profile.jsx';
@@ -241,6 +242,7 @@ const AppContent = () => {
                 <Route path="conexiones" element={<BookClubAdminConnections />} />
                 <Route path="reuniones" element={<BookClubAdminMeetings />} />
                 <Route path="preguntas" element={<BookClubAdminQuestions />} />
+                <Route path="miembros" element={<BookClubAdminMembers />} />
               </Route>
             </Route>
             <Route path="welcome" element={<Welcome />} />

@@ -319,6 +319,63 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(BookClubEvent.objects.filter(book_club=self.club).count(), 2)
 
+    def test_unlink_event_and_admin_member_management(self):
+        membership = BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        self.auth(self.mentor)
+
+        # Public roster empty until presentation
+        public_roster = self.client.get('/api/book_clubs/cypherpunk/members/')
+        self.assertEqual(public_roster.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_roster.data, [])
+
+        # Admin roster includes everyone
+        admin_roster = self.client.get(
+            '/api/book_clubs/cypherpunk/members/', {'include_all': 1}
+        )
+        self.assertEqual(admin_roster.status_code, status.HTTP_200_OK)
+        ids = {item['user_id'] for item in admin_roster.data}
+        self.assertIn(self.member.id, ids)
+        self.assertIn(self.admin.id, ids)
+
+        role_update = self.client.patch(
+            f'/api/book_clubs/cypherpunk/members/{membership.id}/',
+            {'role': MembershipRole.MENTOR},
+            format='json',
+        )
+        self.assertEqual(role_update.status_code, status.HTTP_200_OK, role_update.data)
+        membership.refresh_from_db()
+        self.assertEqual(membership.role, MembershipRole.MENTOR)
+
+        unlink = self.client.delete(
+            '/api/book_clubs/cypherpunk/events/',
+            {'event_id': self.event.id},
+            format='json',
+        )
+        self.assertEqual(unlink.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            BookClubEvent.objects.filter(book_club=self.club, event=self.event).exists()
+        )
+
+        # Plain member cannot change roles; include_all is ignored without manage perms.
+        reader = User.objects.create_user(username='reader', password='pass123')
+        reader_membership = BookClubMembership.objects.create(
+            book_club=self.club, user=reader, role=MembershipRole.MEMBER
+        )
+        self.auth(reader)
+        public_as_reader = self.client.get(
+            '/api/book_clubs/cypherpunk/members/', {'include_all': 1}
+        )
+        self.assertEqual(public_as_reader.status_code, status.HTTP_200_OK)
+        self.assertEqual(public_as_reader.data, [])
+        denied_role = self.client.patch(
+            f'/api/book_clubs/cypherpunk/members/{reader_membership.id}/',
+            {'role': MembershipRole.ADMIN},
+            format='json',
+        )
+        self.assertEqual(denied_role.status_code, status.HTTP_403_FORBIDDEN)
+
     def _open_question_with_member_answer(self):
         BookClubMembership.objects.create(
             book_club=self.club, user=self.member, role=MembershipRole.MEMBER

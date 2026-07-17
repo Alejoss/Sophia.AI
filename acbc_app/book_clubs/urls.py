@@ -20,6 +20,11 @@ urlpatterns = [
         views.BookClubMemberListView.as_view(),
         name='book-club-members',
     ),
+    path(
+        '<slug:slug>/members/<int:membership_id>/',
+        views.BookClubMemberRoleUpdateView.as_view(),
+        name='book-club-member-role',
+    ),
     path('<slug:slug>/hub/', views.BookClubHubView.as_view(), name='book-club-hub'),
     path('<slug:slug>/events/', views.BookClubEventListCreateView.as_view(), name='book-club-events'),
     path(

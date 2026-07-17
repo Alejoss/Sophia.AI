@@ -66,6 +66,23 @@ const BookClubAdminMeetings = () => {
     }
   };
 
+  const handleUnlink = async (linkedEventId) => {
+    if (!window.confirm('¿Desvincular esta reunión del club?')) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await bookClubsApi.unlinkEvent(slug, linkedEventId);
+      setSuccess('Reunión desvinculada.');
+      await load();
+      await reload?.();
+    } catch (err) {
+      setError(extractApiError(err, 'No se pudo desvincular el evento.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const linkedIds = new Set(linked.map((e) => e.event_id));
   const available = myEvents.filter((e) => !linkedIds.has(e.id));
 
@@ -131,9 +148,19 @@ const BookClubAdminMeetings = () => {
               <Typography variant="body2" color="text.secondary">
                 {formatClubDate(ev.date_start) || 'Sin fecha'}
               </Typography>
-              <Button size="small" component={RouterLink} to={`/events/${ev.event_id}`}>
-                Abrir evento
-              </Button>
+              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                <Button size="small" component={RouterLink} to={`/events/${ev.event_id}`}>
+                  Abrir evento
+                </Button>
+                <Button
+                  size="small"
+                  color="error"
+                  disabled={saving}
+                  onClick={() => handleUnlink(ev.event_id)}
+                >
+                  Desvincular
+                </Button>
+              </Stack>
             </Box>
           ))}
         </Stack>

@@ -367,29 +367,77 @@ class BookClubMemberIntroductionView(APIView):
 
 
 class BookClubMemberListView(APIView):
-    """Member-only roster with club-specific introductions."""
+    """Member roster with club-specific introductions."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request, slug):
         club = _get_club(slug)
-        if not club.user_is_member(request.user):
+        can_manage = club.user_can_manage(request.user)
+        if not club.user_is_member(request.user) and not can_manage:
             return Response(
                 {'detail': 'Debes ser miembro para ver la comunidad del club.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        # Only members who completed "Preséntate al club" appear in the roster.
-        # Content comes from Profile; intro_updated_at marks club presentation.
-        memberships = (
-            club.memberships.select_related('user', 'user__profile')
-            .filter(intro_updated_at__isnull=False)
-            .order_by('joined_at')
+        # Public community: only members who completed "Preséntate".
+        # Managers can pass ?include_all=1 to see everyone (roles / pending intros).
+        include_all = (
+            can_manage
+            and request.query_params.get('include_all', '').lower() in ('1', 'true', 'yes')
         )
+        memberships = club.memberships.select_related('user', 'user__profile').order_by(
+            'joined_at'
+        )
+        if not include_all:
+            memberships = memberships.filter(intro_updated_at__isnull=False)
         return Response(
             BookClubMemberPublicSerializer(
                 memberships,
                 many=True,
                 context={'request': request},
+            ).data
+        )
+
+
+class BookClubMemberRoleUpdateView(APIView):
+    """Mentor/admin can change a member's role in the club."""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, slug, membership_id):
+        club = _get_club(slug)
+        if not club.user_can_manage(request.user):
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+        membership = get_object_or_404(
+            BookClubMembership.objects.select_related('user', 'user__profile'),
+            pk=membership_id,
+            book_club=club,
+        )
+        role = request.data.get('role')
+        valid_roles = {c.value for c in MembershipRole}
+        if role not in valid_roles:
+            return Response(
+                {'detail': f'Invalid role. Choose one of: {", ".join(sorted(valid_roles))}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Prevent demoting the last admin accidentally.
+        if (
+            membership.role == MembershipRole.ADMIN
+            and role != MembershipRole.ADMIN
+            and not club.memberships.filter(role=MembershipRole.ADMIN)
+            .exclude(pk=membership.pk)
+            .exists()
+            and not (request.user.is_staff or request.user.is_superuser)
+        ):
+            return Response(
+                {'detail': 'No puedes quitar el último admin del club.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        membership.role = role
+        membership.save(update_fields=['role'])
+        return Response(
+            BookClubMemberPublicSerializer(
+                membership, context={'request': request}
             ).data
         )
 
@@ -672,6 +720,7 @@ class BookClubEventListCreateView(APIView):
         club = _get_club(slug)
         user = request.user if request.user.is_authenticated else None
         is_member = bool(user and club.user_is_member(user))
+        can_manage = bool(user and club.user_can_manage(user))
         guest_result, _ = _resolve_guest_payload(request, slug)
         if guest_result in ('expired', 'invalid'):
             return Response(
@@ -679,7 +728,7 @@ class BookClubEventListCreateView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         is_guest = isinstance(guest_result, dict)
-        if not is_member and not is_guest:
+        if not is_member and not is_guest and not can_manage:
             if user:
                 return Response(
                     {'detail': 'Join the club to view events.'},
@@ -711,6 +760,29 @@ class BookClubEventListCreateView(APIView):
             BookClubEventSerializer(link).data, status=status.HTTP_201_CREATED
         )
 
+    def delete(self, request, slug):
+        """Unlink an event from the club. Body: { "event_id": N }."""
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        club = _get_club(slug)
+        if not club.user_can_manage(request.user):
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+        event_id = request.data.get('event_id')
+        if not event_id:
+            return Response(
+                {'detail': 'event_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        deleted, _ = BookClubEvent.objects.filter(
+            book_club=club, event_id=event_id
+        ).delete()
+        if not deleted:
+            return Response(
+                {'detail': 'Event link not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class DiscussionQuestionListCreateView(APIView):
     permission_classes = [AllowAny]
@@ -719,6 +791,7 @@ class DiscussionQuestionListCreateView(APIView):
         club = _get_club(slug)
         user = request.user if request.user.is_authenticated else None
         is_member = bool(user and club.user_is_member(user))
+        can_manage = bool(user and club.user_can_manage(user))
         guest_result, _ = _resolve_guest_payload(request, slug)
         if guest_result in ('expired', 'invalid'):
             return Response(
@@ -726,7 +799,7 @@ class DiscussionQuestionListCreateView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         is_guest = isinstance(guest_result, dict)
-        if not is_member and not is_guest:
+        if not is_member and not is_guest and not can_manage:
             if user:
                 return Response(
                     {'detail': 'Join the club to view discussion questions.'},
@@ -748,7 +821,6 @@ class DiscussionQuestionListCreateView(APIView):
             .select_related('node', 'event')
             .order_by('order', 'created_at')
         )
-        can_manage = bool(user and club.user_can_manage(user))
         if not can_manage:
             qs = [q for q in qs if q.status != DiscussionQuestionStatus.DRAFT]
         return Response(
