@@ -379,9 +379,10 @@ class BookClubMemberListView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         # Only members who completed "Preséntate al club" appear in the roster.
+        # Content comes from Profile; intro_updated_at marks club presentation.
         memberships = (
-            club.memberships.select_related('user')
-            .exclude(intro_description='')
+            club.memberships.select_related('user', 'user__profile')
+            .filter(intro_updated_at__isnull=False)
             .order_by('joined_at')
         )
         return Response(

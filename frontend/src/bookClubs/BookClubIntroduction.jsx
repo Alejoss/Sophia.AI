@@ -175,8 +175,8 @@ const BookClubIntroduction = () => {
         Preséntate al club
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, mb: 3 }}>
-        Comparte una presentación breve con los miembros de {club.title}. Podrás
-        editarla cuando quieras.
+        Esto actualiza tu perfil público (Sobre ti y tu enlace). Si ya los tenías,
+        aparecen aquí listos para confirmar o editar para {club.title}.
       </Typography>
 
       {generalError && (
@@ -187,7 +187,7 @@ const BookClubIntroduction = () => {
 
       <Stack spacing={2.5}>
         <TextField
-          label="¿Qué haces?"
+          label="Sobre ti"
           required
           fullWidth
           multiline
@@ -197,18 +197,21 @@ const BookClubIntroduction = () => {
           error={Boolean(errors.intro_description)}
           helperText={
             errors.intro_description?.message ||
-            `${descriptionLength}/1000 · Cuéntanos a qué te dedicas o qué te interesa.`
+            `${descriptionLength}/1000 · Se guarda en tu perfil.`
           }
           sx={CLUB_TEXT_FIELD_SX}
         />
         <TextField
-          label="Link a red social"
+          label="Enlace de tu perfil"
           fullWidth
           placeholder="https://..."
           InputLabelProps={{ shrink: true }}
           {...register('social_url')}
           error={Boolean(errors.social_url)}
-          helperText={errors.social_url?.message || 'Opcional.'}
+          helperText={
+            errors.social_url?.message ||
+            'Opcional. Corresponde al enlace externo de tu perfil.'
+          }
           sx={CLUB_TEXT_FIELD_SX}
         />
         <TextField
@@ -218,7 +221,10 @@ const BookClubIntroduction = () => {
           InputLabelProps={{ shrink: true }}
           {...register('additional_url')}
           error={Boolean(errors.additional_url)}
-          helperText={errors.additional_url?.message || 'Opcional: web, proyecto, newsletter…'}
+          helperText={
+            errors.additional_url?.message ||
+            'Opcional y solo para este club: web, proyecto, newsletter…'
+          }
           sx={CLUB_TEXT_FIELD_SX}
         />
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>

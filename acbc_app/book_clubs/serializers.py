@@ -27,58 +27,98 @@ class BookClubMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class BookClubMemberIntroductionSerializer(serializers.ModelSerializer):
+def _normalize_optional_url(value):
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.core.validators import URLValidator
+
+    value = (value or '').strip()
+    if not value:
+        return ''
+    if not value.lower().startswith(('http://', 'https://')):
+        value = f'https://{value}'
+    try:
+        URLValidator()(value)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError(
+            'Introduce un enlace válido, por ejemplo https://linkedin.com/in/usuario'
+        ) from exc
+    return value
+
+
+def _profile_for(user):
+    from profiles.models import Profile
+
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile
+
+
+class BookClubMemberIntroductionSerializer(serializers.Serializer):
+    """
+    Club presentation form backed by Profile (source of truth).
+
+    - intro_description → Profile.profile_description
+    - social_url → Profile.external_url
+    - additional_url → BookClubMembership.additional_url (extra optional link)
+    Membership.intro_updated_at marks that the user presented themselves in this club.
+    """
+
+    intro_description = serializers.CharField(
+        required=True, allow_blank=False, max_length=1000
+    )
     social_url = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
     additional_url = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
-
-    class Meta:
-        model = BookClubMembership
-        fields = [
-            'intro_description',
-            'social_url',
-            'additional_url',
-            'intro_updated_at',
-        ]
-        read_only_fields = ['intro_updated_at']
-        extra_kwargs = {
-            'intro_description': {
-                'required': True,
-                'allow_blank': False,
-                'max_length': 1000,
-            },
-        }
-
-    @staticmethod
-    def _normalize_url(value):
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        from django.core.validators import URLValidator
-
-        value = (value or '').strip()
-        if not value:
-            return ''
-        if not value.lower().startswith(('http://', 'https://')):
-            value = f'https://{value}'
-        try:
-            URLValidator()(value)
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(
-                'Introduce un enlace válido, por ejemplo https://linkedin.com/in/usuario'
-            ) from exc
-        return value
+    intro_updated_at = serializers.DateTimeField(read_only=True)
+    sourced_from_profile = serializers.BooleanField(read_only=True)
 
     def validate_social_url(self, value):
-        return self._normalize_url(value)
+        return _normalize_optional_url(value)
 
     def validate_additional_url(self, value):
-        return self._normalize_url(value)
+        return _normalize_optional_url(value)
 
-    def update(self, instance, validated_data):
-        validated_data['intro_updated_at'] = timezone.now()
-        return super().update(instance, validated_data)
+    def to_representation(self, membership):
+        profile = getattr(membership.user, 'profile', None)
+        profile_description = (getattr(profile, 'profile_description', None) or '').strip()
+        profile_url = (getattr(profile, 'external_url', None) or '').strip()
+        # Prefer Profile; fall back to legacy membership copies if profile empty.
+        intro = profile_description or (membership.intro_description or '').strip()
+        social = profile_url or (membership.social_url or '').strip()
+        return {
+            'intro_description': intro,
+            'social_url': social,
+            'additional_url': membership.additional_url or '',
+            'intro_updated_at': membership.intro_updated_at,
+            'sourced_from_profile': bool(profile_description or profile_url),
+        }
+
+    def update(self, membership, validated_data):
+        profile = _profile_for(membership.user)
+        intro = validated_data['intro_description'].strip()
+        social = validated_data.get('social_url', '') or ''
+        additional = validated_data.get('additional_url', '') or ''
+
+        profile.profile_description = intro
+        profile.external_url = social
+        profile.save(update_fields=['profile_description', 'external_url'])
+
+        # Keep membership mirrors for roster fallback / admin, and mark presented.
+        membership.intro_description = intro
+        membership.social_url = social
+        membership.additional_url = additional
+        membership.intro_updated_at = timezone.now()
+        membership.save(
+            update_fields=[
+                'intro_description',
+                'social_url',
+                'additional_url',
+                'intro_updated_at',
+            ]
+        )
+        return membership
 
 
 class BookClubMemberPublicSerializer(serializers.ModelSerializer):
@@ -86,6 +126,8 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     is_me = serializers.SerializerMethodField()
     has_introduced = serializers.BooleanField(read_only=True)
+    intro_description = serializers.SerializerMethodField()
+    social_url = serializers.SerializerMethodField()
 
     class Meta:
         model = BookClubMembership
@@ -103,6 +145,19 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
             'is_me',
         ]
         read_only_fields = fields
+
+    def _profile(self, obj):
+        return getattr(obj.user, 'profile', None)
+
+    def get_intro_description(self, obj):
+        profile = self._profile(obj)
+        description = (getattr(profile, 'profile_description', None) or '').strip()
+        return description or (obj.intro_description or '').strip()
+
+    def get_social_url(self, obj):
+        profile = self._profile(obj)
+        url = (getattr(profile, 'external_url', None) or '').strip()
+        return url or (obj.social_url or '').strip()
 
     def get_is_me(self, obj):
         request = self.context.get('request')

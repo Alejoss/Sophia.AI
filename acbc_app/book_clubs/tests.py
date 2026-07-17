@@ -105,13 +105,27 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
 
     def test_member_can_save_introduction_and_view_roster(self):
+        from profiles.models import Profile
+
         membership = BookClubMembership.objects.create(
             book_club=self.club,
             user=self.member,
             role=MembershipRole.MEMBER,
         )
-        # Admin is a member without introduction — should not appear in roster.
+        # Prefill comes from Profile when present.
+        Profile.objects.create(
+            user=self.member,
+            profile_description='Ya tenía bio en mi perfil.',
+            external_url='https://example.com/me',
+        )
         self.auth(self.member)
+
+        prefill = self.client.get('/api/book_clubs/cypherpunk/membership/introduction/')
+        self.assertEqual(prefill.status_code, status.HTTP_200_OK, prefill.data)
+        self.assertEqual(prefill.data['intro_description'], 'Ya tenía bio en mi perfil.')
+        self.assertEqual(prefill.data['social_url'], 'https://example.com/me')
+        self.assertTrue(prefill.data['sourced_from_profile'])
+
         empty_roster = self.client.get('/api/book_clubs/cypherpunk/members/')
         self.assertEqual(empty_roster.status_code, status.HTTP_200_OK, empty_roster.data)
         self.assertEqual(empty_roster.data, [])
@@ -127,14 +141,10 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(update.status_code, status.HTTP_200_OK, update.data)
         membership.refresh_from_db()
-        self.assertEqual(
-            membership.intro_description,
-            'Construyo productos educativos.',
-        )
-        self.assertEqual(
-            membership.social_url,
-            'https://linkedin.com/in/member',
-        )
+        profile = Profile.objects.get(user=self.member)
+        self.assertEqual(profile.profile_description, 'Construyo productos educativos.')
+        self.assertEqual(profile.external_url, 'https://linkedin.com/in/member')
+        self.assertEqual(membership.additional_url, 'https://member.example.com')
         self.assertIsNotNone(membership.intro_updated_at)
         self.assertTrue(membership.has_introduced)
 
@@ -143,10 +153,10 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(len(roster.data), 1)
         own = roster.data[0]
         self.assertEqual(own['user_id'], self.member.id)
-        self.assertEqual(own['intro_description'], membership.intro_description)
+        self.assertEqual(own['intro_description'], profile.profile_description)
+        self.assertEqual(own['social_url'], profile.external_url)
         self.assertTrue(own['has_introduced'])
         self.assertTrue(own['is_me'])
-        # Members without intro_description stay hidden
         self.assertFalse(
             any(item['user_id'] == self.admin.id for item in roster.data)
         )

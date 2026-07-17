@@ -141,8 +141,8 @@ class BookClubMembership(models.Model):
 
     @property
     def has_introduced(self):
-        """True once the member saved a non-empty club presentation."""
-        return bool((self.intro_description or '').strip())
+        """True once the member completed Preséntate for this club."""
+        return self.intro_updated_at is not None
 
 
 class BookClubEvent(models.Model):
