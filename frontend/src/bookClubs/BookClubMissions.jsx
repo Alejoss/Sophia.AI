@@ -103,7 +103,7 @@ const BookClubMissions = () => {
           )}
         </Box>
       ) : hub.progress.is_completed ? (
-        <Alert severity="success">Completaste todas las misiones de este ciclo. Usa Debates o tu cuaderno mientras llega el siguiente.</Alert>
+        <Alert severity="success">Completaste todas las misiones de este ciclo. Usa Debates o Comunidad mientras llega el siguiente.</Alert>
       ) : (
         <Box>
           <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>

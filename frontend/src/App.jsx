@@ -19,7 +19,7 @@ import BookClubLayout from './bookClubs/BookClubLayout.jsx';
 import BookClubOverview from './bookClubs/BookClubOverview.jsx';
 import BookClubMissions from './bookClubs/BookClubMissions.jsx';
 import BookClubCommunity from './bookClubs/BookClubCommunity.jsx';
-import BookClubNotebook from './bookClubs/BookClubNotebook.jsx';
+import BookClubIntroduction from './bookClubs/BookClubIntroduction.jsx';
 import DiscussionQuestionsList from './bookClubs/DiscussionQuestionsList.jsx';
 import DiscussionQuestionDetail from './bookClubs/DiscussionQuestionDetail.jsx';
 import BookClubMeetings from './bookClubs/BookClubMeetings.jsx';
@@ -159,10 +159,10 @@ const AppContent = () => {
             <Route index element={<BookClubOverview />} />
             <Route path="misiones" element={<BookClubMissions />} />
             <Route path="comunidad" element={<BookClubCommunity />} />
+            <Route path="presentate" element={<BookClubIntroduction />} />
             <Route path="preguntas" element={<DiscussionQuestionsList />} />
             <Route path="preguntas/:questionId" element={<DiscussionQuestionDetail />} />
             <Route path="reuniones" element={<BookClubMeetings />} />
-            <Route path="cuaderno" element={<BookClubNotebook />} />
           </Route>
           <Route element={<MainLayout />}>
             <Route

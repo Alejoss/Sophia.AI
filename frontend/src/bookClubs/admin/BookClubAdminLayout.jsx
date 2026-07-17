@@ -18,17 +18,19 @@ const BookClubAdminLayout = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const data = await bookClubsApi.getClub(slug);
       setClub(data);
       setError(null);
+      return data;
     } catch (err) {
       setError(extractApiError(err, 'No se pudo cargar el club.'));
-      setClub(null);
+      if (!silent) setClub(null);
+      return null;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [slug]);
 

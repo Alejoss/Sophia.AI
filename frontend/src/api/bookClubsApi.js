@@ -60,6 +60,26 @@ const bookClubsApi = {
     return response.data;
   },
 
+  getMemberIntroduction: async (slug) => {
+    const response = await axiosInstance.get(
+      `/book_clubs/${slug}/membership/introduction/`
+    );
+    return response.data;
+  },
+
+  updateMemberIntroduction: async (slug, payload) => {
+    const response = await axiosInstance.patch(
+      `/book_clubs/${slug}/membership/introduction/`,
+      payload
+    );
+    return response.data;
+  },
+
+  listMembers: async (slug) => {
+    const response = await axiosInstance.get(`/book_clubs/${slug}/members/`);
+    return response.data;
+  },
+
   requestGuestAccess: async (slug, email) => {
     const response = await axiosInstance.post(`/book_clubs/${slug}/guest-access/`, { email });
     return response.data;

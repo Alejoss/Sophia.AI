@@ -27,6 +27,90 @@ class BookClubMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class BookClubMemberIntroductionSerializer(serializers.ModelSerializer):
+    social_url = serializers.CharField(
+        required=False, allow_blank=True, max_length=500
+    )
+    additional_url = serializers.CharField(
+        required=False, allow_blank=True, max_length=500
+    )
+
+    class Meta:
+        model = BookClubMembership
+        fields = [
+            'intro_description',
+            'social_url',
+            'additional_url',
+            'intro_updated_at',
+        ]
+        read_only_fields = ['intro_updated_at']
+        extra_kwargs = {
+            'intro_description': {
+                'required': True,
+                'allow_blank': False,
+                'max_length': 1000,
+            },
+        }
+
+    @staticmethod
+    def _normalize_url(value):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import URLValidator
+
+        value = (value or '').strip()
+        if not value:
+            return ''
+        if not value.lower().startswith(('http://', 'https://')):
+            value = f'https://{value}'
+        try:
+            URLValidator()(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                'Introduce un enlace válido, por ejemplo https://linkedin.com/in/usuario'
+            ) from exc
+        return value
+
+    def validate_social_url(self, value):
+        return self._normalize_url(value)
+
+    def validate_additional_url(self, value):
+        return self._normalize_url(value)
+
+    def update(self, instance, validated_data):
+        validated_data['intro_updated_at'] = timezone.now()
+        return super().update(instance, validated_data)
+
+
+class BookClubMemberPublicSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    is_me = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BookClubMembership
+        fields = [
+            'id',
+            'user_id',
+            'username',
+            'role',
+            'intro_description',
+            'social_url',
+            'additional_url',
+            'joined_at',
+            'intro_updated_at',
+            'is_me',
+        ]
+        read_only_fields = fields
+
+    def get_is_me(self, obj):
+        request = self.context.get('request')
+        return bool(
+            request
+            and request.user.is_authenticated
+            and request.user.id == obj.user_id
+        )
+
+
 class BookClubListSerializer(serializers.ModelSerializer):
     member_count = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
@@ -41,6 +125,7 @@ class BookClubListSerializer(serializers.ModelSerializer):
             'slug',
             'description',
             'cover_image',
+            'telegram_group_url',
             'status',
             'starts_at',
             'ends_at',
@@ -92,12 +177,18 @@ class BookClubDetailSerializer(BookClubListSerializer):
 
 
 class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
+    # CharField so we can normalize t.me/... → https:// before URL validation.
+    telegram_group_url = serializers.CharField(
+        required=False, allow_blank=True, max_length=500
+    )
+
     class Meta:
         model = BookClub
         fields = [
             'title',
             'description',
             'cover_image',
+            'telegram_group_url',
             'knowledge_path',
             'topic',
             'starts_at',
@@ -126,6 +217,30 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
     def validate_topic(self, value):
         if value is not None and not isinstance(value, Topic):
             raise serializers.ValidationError('Invalid topic.')
+        return value
+
+    def validate_telegram_group_url(self, value):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import URLValidator
+
+        if value is None:
+            return ''
+        value = str(value).strip()
+        if not value:
+            return ''
+        if value.startswith('@'):
+            value = f'https://t.me/{value[1:]}'
+        elif value.lower().startswith(('t.me/', 'telegram.me/')):
+            value = f'https://{value}'
+        elif not value.lower().startswith(('http://', 'https://')):
+            if '/' not in value and value.replace('_', '').isalnum():
+                value = f'https://t.me/{value}'
+        try:
+            URLValidator()(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                'URL de Telegram no válida. Usa https://t.me/tu-grupo'
+            ) from exc
         return value
 
     def _ensure_knowledge_path(self, club, user):

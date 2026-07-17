@@ -29,6 +29,8 @@ from book_clubs.serializers import (
     BookClubEventCreateSerializer,
     BookClubEventSerializer,
     BookClubListSerializer,
+    BookClubMemberIntroductionSerializer,
+    BookClubMemberPublicSerializer,
     BookClubMembershipSerializer,
     DiscussionQuestionSerializer,
     DiscussionQuestionWriteSerializer,
@@ -320,6 +322,71 @@ class BookClubJoinView(APIView):
                 'club': BookClubDetailSerializer(club, context={'request': request}).data,
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class BookClubMemberIntroductionView(APIView):
+    """Read or update the authenticated member's club-specific introduction."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_membership(self, request, slug):
+        club = _get_club(slug)
+        membership = BookClubMembership.objects.filter(
+            book_club=club,
+            user=request.user,
+        ).first()
+        return club, membership
+
+    def get(self, request, slug):
+        _club, membership = self.get_membership(request, slug)
+        if not membership:
+            return Response(
+                {'detail': 'Debes unirte al club antes de presentarte.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(
+            BookClubMemberIntroductionSerializer(membership).data
+        )
+
+    def patch(self, request, slug):
+        _club, membership = self.get_membership(request, slug)
+        if not membership:
+            return Response(
+                {'detail': 'Debes unirte al club antes de presentarte.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = BookClubMemberIntroductionSerializer(
+            membership,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class BookClubMemberListView(APIView):
+    """Member-only roster with club-specific introductions."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug):
+        club = _get_club(slug)
+        if not club.user_is_member(request.user):
+            return Response(
+                {'detail': 'Debes ser miembro para ver la comunidad del club.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        memberships = club.memberships.select_related('user').order_by(
+            'joined_at'
+        )
+        return Response(
+            BookClubMemberPublicSerializer(
+                memberships,
+                many=True,
+                context={'request': request},
+            ).data
         )
 
 

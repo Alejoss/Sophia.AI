@@ -59,29 +59,3 @@ export const daysUntil = (iso, now = new Date()) => {
   if (Number.isNaN(target.getTime())) return null;
   return Math.ceil((target - now) / (24 * 60 * 60 * 1000));
 };
-
-const NOTEBOOK_KEY = (userId, slug) => `bookclub-notebook:${userId || 'anon'}:${slug}`;
-
-export const loadNotebook = (userId, slug) => {
-  try {
-    const raw = localStorage.getItem(NOTEBOOK_KEY(userId, slug));
-    if (!raw) return { notes: [] };
-    const parsed = JSON.parse(raw);
-    return { notes: Array.isArray(parsed.notes) ? parsed.notes : [] };
-  } catch {
-    return { notes: [] };
-  }
-};
-
-export const saveNotebook = (userId, slug, notes) => {
-  localStorage.setItem(NOTEBOOK_KEY(userId, slug), JSON.stringify({ notes }));
-};
-
-export const notebookStats = (notes) => {
-  const byType = { idea: 0, reflection: 0, quote: 0, question: 0, other: 0 };
-  notes.forEach((n) => {
-    const t = byType[n.type] != null ? n.type : 'other';
-    byType[t] += 1;
-  });
-  return byType;
-};

@@ -15,6 +15,7 @@ import {
 import bookClubsApi from '../../api/bookClubsApi';
 import {
   extractApiError,
+  normalizeTelegramUrl,
   STATUS_LABELS,
   toDatetimeLocal,
   toIsoOrNull,
@@ -36,6 +37,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
     status: 'draft',
     starts_at: '',
     ends_at: '',
+    telegram_group_url: '',
     cover_image: null,
   });
   const [saving, setSaving] = useState(false);
@@ -50,6 +52,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         status: club.status || 'draft',
         starts_at: toDatetimeLocal(club.starts_at),
         ends_at: toDatetimeLocal(club.ends_at),
+        telegram_group_url: club.telegram_group_url || '',
         cover_image: null,
       });
     }
@@ -73,9 +76,28 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         title: form.title.trim(),
         description: form.description,
         status: form.status,
-        starts_at: toIsoOrNull(form.starts_at),
-        ends_at: toIsoOrNull(form.ends_at),
+        telegram_group_url: normalizeTelegramUrl(form.telegram_group_url),
       };
+      // Only send dates when filled. Empty fields omit the key so a partial
+      // save (e.g. editing Telegram) cannot wipe existing starts_at/ends_at.
+      if (form.starts_at) {
+        const iso = toIsoOrNull(form.starts_at);
+        if (!iso) {
+          setError('La fecha de inicio no es válida.');
+          setSaving(false);
+          return;
+        }
+        payload.starts_at = iso;
+      }
+      if (form.ends_at) {
+        const iso = toIsoOrNull(form.ends_at);
+        if (!iso) {
+          setError('La fecha de fin no es válida.');
+          setSaving(false);
+          return;
+        }
+        payload.ends_at = iso;
+      }
       if (form.cover_image instanceof File) {
         payload.cover_image = form.cover_image;
       }
@@ -83,9 +105,18 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         const created = await bookClubsApi.createClub(payload);
         navigate(`/dashboard/book-clubs/${created.slug}/conexiones`, { replace: true });
       } else {
-        await bookClubsApi.updateClub(slug, payload);
+        const updated = await bookClubsApi.updateClub(slug, payload);
+        setForm({
+          title: updated.title || '',
+          description: updated.description || '',
+          status: updated.status || 'draft',
+          starts_at: toDatetimeLocal(updated.starts_at),
+          ends_at: toDatetimeLocal(updated.ends_at),
+          telegram_group_url: updated.telegram_group_url || '',
+          cover_image: null,
+        });
         setSuccess('Cambios guardados.');
-        await reload?.();
+        await reload?.({ silent: true });
       }
     } catch (err) {
       setError(extractApiError(err, 'No se pudo guardar.'));
@@ -137,6 +168,14 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           value={form.description}
           onChange={handleField('description')}
         />
+        <TextField
+          label="Link del grupo de Telegram"
+          fullWidth
+          placeholder="https://t.me/tu-grupo"
+          value={form.telegram_group_url}
+          onChange={handleField('telegram_group_url')}
+          helperText="Acepta https://t.me/..., t.me/... o @usuario. Se muestra en Comunidad e Inicio."
+        />
         <FormControl fullWidth>
           <InputLabel id="status-label">Estado</InputLabel>
           <Select
@@ -153,15 +192,16 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           </Select>
         </FormControl>
         <TextField
-          label="Inicio"
+          label="Inicio del ciclo"
           type="datetime-local"
           fullWidth
           InputLabelProps={{ shrink: true }}
           value={form.starts_at}
           onChange={handleField('starts_at')}
+          helperText="Se muestra en el hub del club (semana / fase del ciclo)."
         />
         <TextField
-          label="Fin"
+          label="Fin del ciclo"
           type="datetime-local"
           fullWidth
           InputLabelProps={{ shrink: true }}

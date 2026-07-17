@@ -31,6 +31,11 @@ class BookClub(models.Model):
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     description = models.TextField(blank=True)
     cover_image = models.ImageField(upload_to='book_club_covers/', null=True, blank=True)
+    telegram_group_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text='Link al grupo de Telegram del ciclo (t.me/...).',
+    )
     knowledge_path = models.ForeignKey(
         'knowledge_paths.KnowledgePath',
         on_delete=models.PROTECT,
@@ -111,7 +116,14 @@ class BookClubMembership(models.Model):
         choices=MembershipRole.choices,
         default=MembershipRole.MEMBER,
     )
+    intro_description = models.TextField(
+        blank=True,
+        help_text='Presentación del miembro: qué hace.',
+    )
+    social_url = models.URLField(max_length=500, blank=True)
+    additional_url = models.URLField(max_length=500, blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
+    intro_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = [('book_club', 'user')]

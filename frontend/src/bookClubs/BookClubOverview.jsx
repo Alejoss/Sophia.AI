@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -8,13 +8,10 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
 import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, CLUB_ACCENT_HOVER, formatClubDate } from './clubTheme';
 import {
   daysUntil,
-  loadNotebook,
-  notebookStats,
   resolveExperiencePhase,
   resolveWeekLabel,
 } from './clubExperience';
@@ -35,11 +32,14 @@ const SectionLabel = ({ children }) => (
   </Typography>
 );
 
-const PrimaryCta = ({ to, children, onClick }) => (
+const PrimaryCta = ({ to, href, children, onClick }) => (
   <Button
     variant="contained"
-    component={to ? RouterLink : 'button'}
-    to={to}
+    component={href ? 'a' : to ? RouterLink : 'button'}
+    to={href ? undefined : to}
+    href={href}
+    target={href ? '_blank' : undefined}
+    rel={href ? 'noopener noreferrer' : undefined}
     onClick={onClick}
     size="large"
     sx={{
@@ -57,7 +57,6 @@ const PrimaryCta = ({ to, children, onClick }) => (
 
 const BookClubOverview = () => {
   const { slug, hub, club, isGuest, canParticipate } = useBookClub();
-  const { authState } = useContext(AuthContext);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const guest = getGuestSession(slug);
@@ -82,11 +81,9 @@ const BookClubOverview = () => {
   const nextMission = hub.next_mission;
   const weeklyQuestion = hub.open_questions?.[0];
   const progressPct = Math.round(hub.progress?.percentage || 0);
-  const notebook = loadNotebook(authState.user?.id, slug);
-  const notesStats = notebookStats(notebook.notes);
-  const lastNote = notebook.notes[0];
   const daysToStart = daysUntil(club.starts_at);
   const daysToEvent = daysUntil(hub.next_event?.date_start);
+  const telegramUrl = club.telegram_group_url;
 
   const missionHref = nextMission
     ? `/knowledge_path/${nextMission.path_id}/nodes/${nextMission.node_id}`
@@ -110,17 +107,15 @@ const BookClubOverview = () => {
           pulse.member_count > 1
             ? `${pulse.member_count} lectores ya se han unido. Presenta quién eres y prepárate para la primera misión.`
             : 'Prepárate: pronto abrimos la primera misión y el debate colectivo.',
-        cta: club.topic
-          ? { label: 'Preséntate al club →', to: `/content/topics/${club.topic}` }
-          : { label: 'Ver misiones →', to: 'misiones' },
+        cta: { label: 'Preséntate al club →', to: 'presentate' },
       };
     }
     if (phase === 'finished') {
       return {
         eyebrow: 'Ciclo completado',
         title: `Terminaste ${club.title}`,
-        body: `Durante este ciclo completaste ${hub.progress.completed_nodes} misiones${notesStats.reflection + notesStats.idea ? ` y guardaste ${notesStats.reflection + notesStats.idea} notas en tu cuaderno` : ''}.`,
-        cta: { label: 'Ver mi viaje de lectura →', to: 'cuaderno' },
+        body: `Durante este ciclo completaste ${hub.progress.completed_nodes} misiones.`,
+        cta: { label: 'Ver debates →', to: 'preguntas' },
       };
     }
     if (phase === 'between') {
@@ -129,13 +124,15 @@ const BookClubOverview = () => {
         title: 'Mientras llega lo siguiente…',
         body: weeklyQuestion
           ? 'Descubre qué están pensando otros lectores en el debate abierto.'
-          : 'Usa el cuaderno o la comunidad mientras se abre la próxima misión.',
+          : 'Entra a la comunidad o al grupo de Telegram mientras se abre la próxima misión.',
         cta: weeklyQuestion
           ? {
               label: 'Entrar al debate →',
               to: `/club-de-lectura/${slug}/preguntas/${weeklyQuestion.id}`,
             }
-          : { label: 'Abrir mi cuaderno →', to: 'cuaderno' },
+          : telegramUrl
+            ? { label: 'Ir al grupo de Telegram →', to: telegramUrl, external: true }
+            : { label: 'Ver comunidad →', to: 'comunidad' },
       };
     }
     // active
@@ -205,7 +202,12 @@ const BookClubOverview = () => {
         <Typography sx={{ color: 'rgba(255,255,255,0.72)', mt: 1.5, maxWidth: 560 }}>
           {hero.body}
         </Typography>
-        <PrimaryCta to={hero.cta.to}>{hero.cta.label}</PrimaryCta>
+        <PrimaryCta
+          to={hero.cta.external ? undefined : hero.cta.to}
+          href={hero.cta.external ? hero.cta.to : undefined}
+        >
+          {hero.cta.label}
+        </PrimaryCta>
       </Box>
 
       {/* Nivel 1b — Tu misión actual (solo si hay misión accionable y no es solo el hero) */}
@@ -368,54 +370,24 @@ const BookClubOverview = () => {
         )}
       </Box>
 
-      {/* Nivel 2 — Mi cuaderno */}
-      <Box>
-        <SectionLabel>Mi cuaderno</SectionLabel>
-        {notebook.notes.length ? (
-          <Box>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>
-              {notesStats.idea} ideas · {notesStats.reflection} reflexiones · {notesStats.quote}{' '}
-              citas · {notesStats.question} preguntas
-            </Typography>
-            {lastNote && (
-              <Typography
-                sx={{
-                  mt: 1.5,
-                  fontStyle: 'italic',
-                  color: 'rgba(255,255,255,0.85)',
-                  maxWidth: 480,
-                }}
-              >
-                “{lastNote.body.length > 160 ? `${lastNote.body.slice(0, 157)}…` : lastNote.body}”
-              </Typography>
-            )}
-            <Button
-              component={RouterLink}
-              to="cuaderno"
-              sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
-            >
-              Abrir mi cuaderno →
-            </Button>
-          </Box>
-        ) : (
-          <Box>
-            <Typography sx={{ color: 'rgba(255,255,255,0.75)' }}>
-              Aquí vivirán tus ideas sobre este libro.
-            </Typography>
-            <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75, maxWidth: 480 }}>
-              Guarda citas, preguntas y reflexiones mientras lees. Es tu espacio personal dentro del
-              club.
-            </Typography>
-            <Button
-              component={RouterLink}
-              to="cuaderno"
-              sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
-            >
-              Empezar mi cuaderno →
-            </Button>
-          </Box>
-        )}
-      </Box>
+      {/* Nivel 2 — Grupo de Telegram */}
+      {telegramUrl && (
+        <Box>
+          <SectionLabel>Grupo de Telegram</SectionLabel>
+          <Typography sx={{ color: 'rgba(255,255,255,0.75)' }}>
+            Conversación rápida del ciclo: avisos, dudas y compañía mientras lees.
+          </Typography>
+          <Button
+            component="a"
+            href={telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
+          >
+            Unirme al grupo →
+          </Button>
+        </Box>
+      )}
 
       {/* Nivel 2 — Próximo encuentro */}
       <Box>
@@ -451,7 +423,7 @@ const BookClubOverview = () => {
               El próximo encuentro vivo aún no está en el calendario.
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75 }}>
-              Mientras tanto, avanza en tu misión y deja una huella en el debate o en tu cuaderno.
+              Mientras tanto, avanza en tu misión y participa en el debate.
             </Typography>
             <Button
               component={RouterLink}
@@ -521,7 +493,7 @@ const BookClubOverview = () => {
             {club.description || 'Sin descripción adicional.'}
           </Typography>
           {(club.starts_at || club.ends_at) && (
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', mt: 1 }}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mt: 1 }}>
               {club.starts_at ? `Inicio: ${formatClubDate(club.starts_at)}` : ''}
               {club.starts_at && club.ends_at ? ' · ' : ''}
               {club.ends_at ? `Cierre: ${formatClubDate(club.ends_at)}` : ''}

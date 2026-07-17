@@ -10,11 +10,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles';
+import createThemeConfig from '../theme/theme';
 import { AuthContext } from '../context/AuthContext';
 import GoogleOAuthInitializer from '../components/GoogleOAuthInitializer';
 import SocialLogin from '../components/SocialLogin';
 import bookClubsApi from '../api/bookClubsApi';
-import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_BG } from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_BG, CLUB_TEXT_FIELD_SX, formatClubDateRange } from './clubTheme';
 import { resolveWeekLabel, shortTagline } from './clubExperience';
 import {
   clearGuestSession,
@@ -37,7 +39,6 @@ const NAV_ITEMS = [
   { to: 'preguntas', label: 'Debates' },
   { to: 'comunidad', label: 'Comunidad' },
   { to: 'reuniones', label: 'Reuniones' },
-  { to: 'cuaderno', label: 'Mi cuaderno' },
 ];
 
 const WeekDots = ({ total, completed }) => {
@@ -107,11 +108,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            sx={{
-              '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.06)', color: '#fff' },
-              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.6)' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,107,53,0.4)' },
-            }}
+            sx={CLUB_TEXT_FIELD_SX}
           />
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -178,7 +175,12 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
   );
 };
 
-const BookClubLayout = () => {
+// The club always renders on a dark background, regardless of the user's
+// global light/dark preference, so it needs its own dark MUI theme (otherwise
+// Typography defaults to the light theme's near-black text.primary).
+const clubDarkTheme = createTheme(createThemeConfig('dark'));
+
+const BookClubLayoutInner = () => {
   const { slug } = useParams();
   const { authState, authInitialized } = useContext(AuthContext);
   const [hub, setHub] = useState(null);
@@ -320,6 +322,7 @@ const BookClubLayout = () => {
   const week = resolveWeekLabel({ club, progress: hub.progress });
   const tagline = shortTagline(club.description);
   const coverUrl = club.cover_image;
+  const cycleDates = formatClubDateRange(club.starts_at, club.ends_at);
   const showGuestBanner = hub.is_guest && !hub.can_participate;
   const completeUrl = guestToken
     ? guestCompleteAccountUrl(slug, guestToken)
@@ -430,6 +433,14 @@ const BookClubLayout = () => {
                 <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, maxWidth: 520 }}>
                   {tagline}
                 </Typography>
+                {cycleDates && (
+                  <Typography
+                    variant="body2"
+                    sx={{ color: 'rgba(255,255,255,0.55)', mt: 1, fontWeight: 600 }}
+                  >
+                    Ciclo: {cycleDates}
+                  </Typography>
+                )}
                 {(hub.is_member || hub.is_guest) && (
                   <>
                     <Typography
@@ -461,7 +472,7 @@ const BookClubLayout = () => {
                 px: { xs: 1, sm: 0 },
               }}
             >
-              {NAV_ITEMS.filter((item) => !(item.to === 'cuaderno' && hub.is_guest)).map((item) => (
+              {NAV_ITEMS.map((item) => (
                 <Box
                   key={item.label}
                   component={NavLink}
@@ -498,5 +509,11 @@ const BookClubLayout = () => {
     </BookClubContext.Provider>
   );
 };
+
+const BookClubLayout = () => (
+  <MuiThemeProvider theme={clubDarkTheme}>
+    <BookClubLayoutInner />
+  </MuiThemeProvider>
+);
 
 export default BookClubLayout;

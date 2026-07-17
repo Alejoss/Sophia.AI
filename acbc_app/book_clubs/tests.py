@@ -104,6 +104,52 @@ class BookClubAPITestCase(APITestCase):
         response2 = self.client.post('/api/book_clubs/cypherpunk/join/')
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
 
+    def test_member_can_save_introduction_and_view_roster(self):
+        membership = BookClubMembership.objects.create(
+            book_club=self.club,
+            user=self.member,
+            role=MembershipRole.MEMBER,
+        )
+        self.auth(self.member)
+
+        update = self.client.patch(
+            '/api/book_clubs/cypherpunk/membership/introduction/',
+            {
+                'intro_description': 'Construyo productos educativos.',
+                'social_url': 'linkedin.com/in/member',
+                'additional_url': 'https://member.example.com',
+            },
+            format='json',
+        )
+        self.assertEqual(update.status_code, status.HTTP_200_OK, update.data)
+        membership.refresh_from_db()
+        self.assertEqual(
+            membership.intro_description,
+            'Construyo productos educativos.',
+        )
+        self.assertEqual(
+            membership.social_url,
+            'https://linkedin.com/in/member',
+        )
+        self.assertIsNotNone(membership.intro_updated_at)
+
+        roster = self.client.get('/api/book_clubs/cypherpunk/members/')
+        self.assertEqual(roster.status_code, status.HTTP_200_OK, roster.data)
+        own = next(item for item in roster.data if item['user_id'] == self.member.id)
+        self.assertEqual(own['intro_description'], membership.intro_description)
+        self.assertTrue(own['is_me'])
+
+    def test_non_member_cannot_edit_introduction_or_view_roster(self):
+        self.auth(self.outsider)
+        update = self.client.patch(
+            '/api/book_clubs/cypherpunk/membership/introduction/',
+            {'intro_description': 'No soy miembro.'},
+            format='json',
+        )
+        self.assertEqual(update.status_code, status.HTTP_403_FORBIDDEN)
+        roster = self.client.get('/api/book_clubs/cypherpunk/members/')
+        self.assertEqual(roster.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_hub_requires_auth(self):
         response = self.client.get('/api/book_clubs/cypherpunk/hub/')
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
