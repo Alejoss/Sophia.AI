@@ -85,6 +85,7 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     is_me = serializers.SerializerMethodField()
+    has_introduced = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = BookClubMembership
@@ -98,6 +99,7 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
             'additional_url',
             'joined_at',
             'intro_updated_at',
+            'has_introduced',
             'is_me',
         ]
         read_only_fields = fields

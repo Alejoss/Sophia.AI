@@ -101,6 +101,10 @@ const BookClubCommunity = () => {
           </Box>
         ) : membersError ? (
           <Alert severity="error">{membersError}</Alert>
+        ) : members.length === 0 ? (
+          <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
+            Todavía nadie se ha presentado. Sé el primero con «Editar mi presentación».
+          </Alert>
         ) : (
           <Box
             sx={{
@@ -135,14 +139,12 @@ const BookClubCommunity = () => {
                 </Typography>
                 <Typography
                   sx={{
-                    color: member.intro_description
-                      ? 'rgba(255,255,255,0.78)'
-                      : 'rgba(255,255,255,0.45)',
+                    color: 'rgba(255,255,255,0.78)',
                     mt: 1.25,
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {member.intro_description || 'Aún no se ha presentado.'}
+                  {member.intro_description}
                 </Typography>
                 {(member.social_url || member.additional_url) && (
                   <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>

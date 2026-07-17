@@ -110,7 +110,11 @@ class BookClubAPITestCase(APITestCase):
             user=self.member,
             role=MembershipRole.MEMBER,
         )
+        # Admin is a member without introduction — should not appear in roster.
         self.auth(self.member)
+        empty_roster = self.client.get('/api/book_clubs/cypherpunk/members/')
+        self.assertEqual(empty_roster.status_code, status.HTTP_200_OK, empty_roster.data)
+        self.assertEqual(empty_roster.data, [])
 
         update = self.client.patch(
             '/api/book_clubs/cypherpunk/membership/introduction/',
@@ -132,12 +136,20 @@ class BookClubAPITestCase(APITestCase):
             'https://linkedin.com/in/member',
         )
         self.assertIsNotNone(membership.intro_updated_at)
+        self.assertTrue(membership.has_introduced)
 
         roster = self.client.get('/api/book_clubs/cypherpunk/members/')
         self.assertEqual(roster.status_code, status.HTTP_200_OK, roster.data)
-        own = next(item for item in roster.data if item['user_id'] == self.member.id)
+        self.assertEqual(len(roster.data), 1)
+        own = roster.data[0]
+        self.assertEqual(own['user_id'], self.member.id)
         self.assertEqual(own['intro_description'], membership.intro_description)
+        self.assertTrue(own['has_introduced'])
         self.assertTrue(own['is_me'])
+        # Members without intro_description stay hidden
+        self.assertFalse(
+            any(item['user_id'] == self.admin.id for item in roster.data)
+        )
 
     def test_non_member_cannot_edit_introduction_or_view_roster(self):
         self.auth(self.outsider)

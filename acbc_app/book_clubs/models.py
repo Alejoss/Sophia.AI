@@ -139,6 +139,11 @@ class BookClubMembership(models.Model):
     def can_manage(self):
         return self.role in (MembershipRole.MENTOR, MembershipRole.ADMIN)
 
+    @property
+    def has_introduced(self):
+        """True once the member saved a non-empty club presentation."""
+        return bool((self.intro_description or '').strip())
+
 
 class BookClubEvent(models.Model):
     """Links live sessions to a book club without altering the Event model."""

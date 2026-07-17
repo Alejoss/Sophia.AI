@@ -378,8 +378,11 @@ class BookClubMemberListView(APIView):
                 {'detail': 'Debes ser miembro para ver la comunidad del club.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        memberships = club.memberships.select_related('user').order_by(
-            'joined_at'
+        # Only members who completed "Preséntate al club" appear in the roster.
+        memberships = (
+            club.memberships.select_related('user')
+            .exclude(intro_description='')
+            .order_by('joined_at')
         )
         return Response(
             BookClubMemberPublicSerializer(
