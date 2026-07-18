@@ -7,7 +7,6 @@ from book_clubs.models import (
     BookClub,
     BookClubMembership,
     BookClubStatus,
-    MembershipRole,
 )
 from content.models import Topic
 from knowledge_paths.models import KnowledgePath
@@ -16,7 +15,8 @@ from knowledge_paths.models import KnowledgePath
 class Command(BaseCommand):
     help = (
         'Create or update a BookClub linked to an existing KnowledgePath '
-        '(and optionally a Topic). Creator becomes club admin.'
+        '(and optionally a Topic). Creator is enrolled as a member; '
+        'club management remains staff-only.'
     )
 
     def add_arguments(self, parser):
@@ -65,7 +65,6 @@ class Command(BaseCommand):
         BookClubMembership.objects.get_or_create(
             book_club=club,
             user=user,
-            defaults={'role': MembershipRole.ADMIN},
         )
         action = 'Created' if created else 'Updated'
         self.stdout.write(

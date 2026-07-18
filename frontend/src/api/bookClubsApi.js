@@ -86,14 +86,6 @@ const bookClubsApi = {
     return response.data;
   },
 
-  updateMemberRole: async (slug, membershipId, role) => {
-    const response = await axiosInstance.patch(
-      `/book_clubs/${slug}/members/${membershipId}/`,
-      { role }
-    );
-    return response.data;
-  },
-
   requestGuestAccess: async (slug, email) => {
     const response = await axiosInstance.post(`/book_clubs/${slug}/guest-access/`, { email });
     return response.data;

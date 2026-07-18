@@ -10,12 +10,6 @@ class BookClubStatus(models.TextChoices):
     CLOSED = 'closed', 'Closed'
 
 
-class MembershipRole(models.TextChoices):
-    MEMBER = 'member', 'Member'
-    MENTOR = 'mentor', 'Mentor'
-    ADMIN = 'admin', 'Admin'
-
-
 class DiscussionQuestionStatus(models.TextChoices):
     DRAFT = 'draft', 'Draft'
     OPEN = 'open', 'Open'
@@ -96,14 +90,10 @@ class BookClub(models.Model):
         return self.memberships.filter(user=user).exists()
 
     def user_can_manage(self, user):
+        """Club management is staff-only (no per-club mentor/admin roles)."""
         if not user or not user.is_authenticated:
             return False
-        if user.is_staff or user.is_superuser:
-            return True
-        return self.memberships.filter(
-            user=user,
-            role__in=[MembershipRole.MENTOR, MembershipRole.ADMIN],
-        ).exists()
+        return user.is_staff or user.is_superuser
 
 
 class BookClubMembership(models.Model):
@@ -112,11 +102,6 @@ class BookClubMembership(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='book_club_memberships',
-    )
-    role = models.CharField(
-        max_length=20,
-        choices=MembershipRole.choices,
-        default=MembershipRole.MEMBER,
     )
     intro_description = models.TextField(
         blank=True,
@@ -135,11 +120,7 @@ class BookClubMembership(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.user.username} @ {self.book_club.slug} ({self.role})'
-
-    @property
-    def can_manage(self):
-        return self.role in (MembershipRole.MENTOR, MembershipRole.ADMIN)
+        return f'{self.user.username} @ {self.book_club.slug}'
 
     @property
     def has_introduced(self):

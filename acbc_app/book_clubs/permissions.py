@@ -2,7 +2,7 @@ from rest_framework.permissions import BasePermission
 
 from django.contrib.contenttypes.models import ContentType
 
-from book_clubs.models import BookClub, BookClubMembership, DiscussionQuestion, MembershipRole
+from book_clubs.models import BookClub, BookClubMembership, DiscussionQuestion
 from comments.models import Comment
 
 
@@ -16,14 +16,18 @@ class IsBookClubMember(BasePermission):
         return club.user_is_member(request.user)
 
 
-class IsBookClubMentorOrAdmin(BasePermission):
-    """Object-level: mentor/admin of the club (or staff)."""
+class IsBookClubStaffManager(BasePermission):
+    """Object-level: Django staff/superuser can manage the club."""
 
     def has_object_permission(self, request, view, obj):
         club = obj if isinstance(obj, BookClub) else getattr(obj, 'book_club', None)
         if club is None:
             return False
         return club.user_can_manage(request.user)
+
+
+# Backward-compatible alias (old mentor/admin naming).
+IsBookClubMentorOrAdmin = IsBookClubStaffManager
 
 
 def get_membership(club, user):
@@ -33,7 +37,7 @@ def get_membership(club, user):
 
 
 def user_can_view_question(question, user):
-    """Members see open/closed; mentors also see drafts."""
+    """Members see open/closed; staff also see drafts."""
     club = question.book_club
     if not club.user_is_member(user):
         return False
@@ -66,7 +70,7 @@ def user_has_answered(question, user):
 def user_can_see_answers(question, user):
     """
     Post-to-see: members see others' answers only after posting their own.
-    Mentors/admins/staff can see without answering.
+    Staff can see without answering.
     Soft-deleting your answer re-locks the thread.
     """
     if not user or not user.is_authenticated:

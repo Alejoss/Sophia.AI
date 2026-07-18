@@ -133,12 +133,6 @@ const BookClubCommunity = () => {
                   {member.is_me ? ' · Tú' : ''}
                 </Typography>
                 <Typography
-                  variant="caption"
-                  sx={{ color: 'rgba(255,255,255,0.45)', textTransform: 'capitalize' }}
-                >
-                  {member.role}
-                </Typography>
-                <Typography
                   sx={{
                     color: 'rgba(255,255,255,0.78)',
                     mt: 1.25,

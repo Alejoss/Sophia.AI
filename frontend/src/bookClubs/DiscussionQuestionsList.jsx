@@ -159,7 +159,7 @@ const DiscussionQuestionsList = () => {
           }}
         >
           <Typography variant="subtitle2" sx={{ mb: 1, color: 'rgba(255,255,255,0.9)' }}>
-            Iniciar una conversación (mentores)
+            Iniciar una conversación (staff)
           </Typography>
           <TextField
             fullWidth

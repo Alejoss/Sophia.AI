@@ -17,7 +17,6 @@ from book_clubs.models import (
     BookClubStatus,
     DiscussionQuestion,
     DiscussionQuestionStatus,
-    MembershipRole,
 )
 from comments.models import Comment
 from content.models import Topic
@@ -30,7 +29,10 @@ class BookClubAPITestCase(APITestCase):
         self.admin = User.objects.create_user(
             username='clubadmin', password='pass123', is_staff=True
         )
-        self.mentor = User.objects.create_user(username='mentor', password='pass123')
+        # Second staff actor used by older tests as "mentor"; management is staff-only.
+        self.mentor = User.objects.create_user(
+            username='mentor', password='pass123', is_staff=True
+        )
         self.member = User.objects.create_user(username='member', password='pass123')
         self.outsider = User.objects.create_user(username='outsider', password='pass123')
 
@@ -80,10 +82,10 @@ class BookClubAPITestCase(APITestCase):
             ends_at=timezone.now() + timezone.timedelta(days=60),
         )
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.admin, role=MembershipRole.ADMIN
+            book_club=self.club, user=self.admin
         )
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.mentor, role=MembershipRole.MENTOR
+            book_club=self.club, user=self.mentor
         )
         BookClubEvent.objects.create(book_club=self.club, event=self.event)
 
@@ -110,8 +112,7 @@ class BookClubAPITestCase(APITestCase):
         membership = BookClubMembership.objects.create(
             book_club=self.club,
             user=self.member,
-            role=MembershipRole.MEMBER,
-        )
+                    )
         # Prefill comes from Profile when present.
         Profile.objects.create(
             user=self.member,
@@ -178,7 +179,7 @@ class BookClubAPITestCase(APITestCase):
 
     def test_hub_payload_for_member(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         self.auth(self.member)
         response = self.client.get('/api/book_clubs/cypherpunk/hub/')
@@ -196,7 +197,7 @@ class BookClubAPITestCase(APITestCase):
 
     def test_discussion_question_crud_and_comments(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         self.auth(self.mentor)
         create = self.client.post(
@@ -274,7 +275,7 @@ class BookClubAPITestCase(APITestCase):
 
     def test_schedule_auto_open(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         q = DiscussionQuestion.objects.create(
             book_club=self.club,
@@ -293,7 +294,7 @@ class BookClubAPITestCase(APITestCase):
 
     def test_member_cannot_create_question(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         self.auth(self.member)
         response = self.client.post(
@@ -319,18 +320,16 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(BookClubEvent.objects.filter(book_club=self.club).count(), 2)
 
-    def test_unlink_event_and_admin_member_management(self):
-        membership = BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
-        )
-        self.auth(self.mentor)
+    def test_member_roster_include_all_is_staff_only(self):
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+        self.auth(self.admin)
 
         # Public roster empty until presentation
         public_roster = self.client.get('/api/book_clubs/cypherpunk/members/')
         self.assertEqual(public_roster.status_code, status.HTTP_200_OK)
         self.assertEqual(public_roster.data, [])
 
-        # Admin roster includes everyone
+        # Staff roster includes everyone
         admin_roster = self.client.get(
             '/api/book_clubs/cypherpunk/members/', {'include_all': 1}
         )
@@ -338,43 +337,36 @@ class BookClubAPITestCase(APITestCase):
         ids = {item['user_id'] for item in admin_roster.data}
         self.assertIn(self.member.id, ids)
         self.assertIn(self.admin.id, ids)
+        self.assertNotIn('role', admin_roster.data[0])
 
-        role_update = self.client.patch(
-            f'/api/book_clubs/cypherpunk/members/{membership.id}/',
-            {'role': MembershipRole.MENTOR},
+        # Role assignment endpoint no longer exists
+        gone = self.client.patch(
+            f'/api/book_clubs/cypherpunk/members/{self.club.memberships.first().id}/',
+            {'role': 'mentor'},
             format='json',
         )
-        self.assertEqual(role_update.status_code, status.HTTP_200_OK, role_update.data)
-        membership.refresh_from_db()
-        self.assertEqual(membership.role, MembershipRole.MENTOR)
+        self.assertEqual(gone.status_code, status.HTTP_404_NOT_FOUND)
 
-        unlink = self.client.delete(
-            '/api/book_clubs/cypherpunk/events/',
-            {'event_id': self.event.id},
-            format='json',
-        )
-        self.assertEqual(unlink.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            BookClubEvent.objects.filter(book_club=self.club, event=self.event).exists()
-        )
-
-        # Plain member cannot change roles; include_all is ignored without manage perms.
+        # Plain member: include_all is ignored without staff perms.
         reader = User.objects.create_user(username='reader', password='pass123')
-        reader_membership = BookClubMembership.objects.create(
-            book_club=self.club, user=reader, role=MembershipRole.MEMBER
-        )
+        BookClubMembership.objects.create(book_club=self.club, user=reader)
         self.auth(reader)
         public_as_reader = self.client.get(
             '/api/book_clubs/cypherpunk/members/', {'include_all': 1}
         )
         self.assertEqual(public_as_reader.status_code, status.HTTP_200_OK)
         self.assertEqual(public_as_reader.data, [])
-        denied_role = self.client.patch(
-            f'/api/book_clubs/cypherpunk/members/{reader_membership.id}/',
-            {'role': MembershipRole.ADMIN},
+
+    def test_non_staff_member_cannot_manage_club(self):
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+        self.auth(self.member)
+        self.assertFalse(self.club.user_can_manage(self.member))
+        denied = self.client.post(
+            '/api/book_clubs/cypherpunk/discussion-questions/',
+            {'body': 'No debería poder publicar', 'status': 'open'},
             format='json',
         )
-        self.assertEqual(denied_role.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_unlink_event_by_link_id(self):
         link = BookClubEvent.objects.get(book_club=self.club, event=self.event)
@@ -410,7 +402,7 @@ class BookClubAPITestCase(APITestCase):
 
     def _open_question_with_member_answer(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         question = DiscussionQuestion.objects.create(
             book_club=self.club,
@@ -447,7 +439,7 @@ class BookClubAPITestCase(APITestCase):
         question, answer = self._open_question_with_member_answer()
         other = User.objects.create_user(username='member2', password='pass123')
         BookClubMembership.objects.create(
-            book_club=self.club, user=other, role=MembershipRole.MEMBER
+            book_club=self.club, user=other
         )
         self.auth(other)
         # Post-to-see: must answer before reading/replying to others.
@@ -475,11 +467,11 @@ class BookClubAPITestCase(APITestCase):
 
     def test_forum_post_to_see_answers(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         other = User.objects.create_user(username='member2', password='pass123')
         BookClubMembership.objects.create(
-            book_club=self.club, user=other, role=MembershipRole.MEMBER
+            book_club=self.club, user=other
         )
         question = DiscussionQuestion.objects.create(
             book_club=self.club,
@@ -614,7 +606,7 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         self.auth(self.member)
         ok = self.client.get('/api/book_clubs/cypherpunk/events/')
@@ -662,7 +654,7 @@ class BookClubCreateUpdateAPITestCase(APITestCase):
         self.assertEqual(club.created_by_id, self.staff.id)
         self.assertTrue(
             BookClubMembership.objects.filter(
-                book_club=club, user=self.staff, role=MembershipRole.ADMIN
+                book_club=club, user=self.staff
             ).exists()
         )
 
@@ -764,7 +756,7 @@ class BookClubGuestOnboardingTests(BookClubAPITestCase):
 
     def test_hub_member_can_participate(self):
         BookClubMembership.objects.create(
-            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+            book_club=self.club, user=self.member
         )
         self.auth(self.member)
         response = self.client.get('/api/book_clubs/cypherpunk/hub/')

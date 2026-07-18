@@ -20,7 +20,6 @@ from book_clubs.models import (
     BookClubStatus,
     DiscussionQuestion,
     DiscussionQuestionStatus,
-    MembershipRole,
 )
 from book_clubs.permissions import (
     user_can_answer_question,
@@ -318,7 +317,6 @@ class BookClubJoinView(APIView):
         membership, created = BookClubMembership.objects.get_or_create(
             book_club=club,
             user=request.user,
-            defaults={'role': MembershipRole.MEMBER},
         )
         return Response(
             {
@@ -385,7 +383,7 @@ class BookClubMemberListView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         # Public community: only members who completed "Preséntate".
-        # Managers can pass ?include_all=1 to see everyone (roles / pending intros).
+        # Staff can pass ?include_all=1 to see everyone (including pending intros).
         include_all = (
             can_manage
             and request.query_params.get('include_all', '').lower() in ('1', 'true', 'yes')
@@ -400,49 +398,6 @@ class BookClubMemberListView(APIView):
                 memberships,
                 many=True,
                 context={'request': request},
-            ).data
-        )
-
-
-class BookClubMemberRoleUpdateView(APIView):
-    """Mentor/admin can change a member's role in the club."""
-
-    permission_classes = [IsAuthenticated]
-
-    def patch(self, request, slug, membership_id):
-        club = _get_club(slug)
-        if not club.user_can_manage(request.user):
-            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
-        membership = get_object_or_404(
-            BookClubMembership.objects.select_related('user', 'user__profile'),
-            pk=membership_id,
-            book_club=club,
-        )
-        role = request.data.get('role')
-        valid_roles = {c.value for c in MembershipRole}
-        if role not in valid_roles:
-            return Response(
-                {'detail': f'Invalid role. Choose one of: {", ".join(sorted(valid_roles))}.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # Prevent demoting the last admin accidentally.
-        if (
-            membership.role == MembershipRole.ADMIN
-            and role != MembershipRole.ADMIN
-            and not club.memberships.filter(role=MembershipRole.ADMIN)
-            .exclude(pk=membership.pk)
-            .exists()
-            and not (request.user.is_staff or request.user.is_superuser)
-        ):
-            return Response(
-                {'detail': 'No puedes quitar el último admin del club.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        membership.role = role
-        membership.save(update_fields=['role'])
-        return Response(
-            BookClubMemberPublicSerializer(
-                membership, context={'request': request}
             ).data
         )
 
@@ -477,7 +432,6 @@ class BookClubHubView(APIView):
             BookClubMembership.objects.get_or_create(
                 book_club=club,
                 user=user,
-                defaults={'role': MembershipRole.ADMIN},
             )
             is_member = True
 

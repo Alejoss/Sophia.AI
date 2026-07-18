@@ -4,7 +4,6 @@ from book_clubs.models import (
     BookClub,
     BookClubEvent,
     BookClubMembership,
-    MembershipRole,
     DiscussionQuestion,
 )
 from knowledge_paths.models import KnowledgePath
@@ -54,14 +53,12 @@ class BookClubAdmin(admin.ModelAdmin):
             BookClubMembership.objects.get_or_create(
                 book_club=obj,
                 user=request.user,
-                defaults={'role': MembershipRole.ADMIN},
             )
 
 
 @admin.register(BookClubMembership)
 class BookClubMembershipAdmin(admin.ModelAdmin):
-    list_display = ('user', 'book_club', 'role', 'joined_at')
-    list_filter = ('role',)
+    list_display = ('user', 'book_club', 'joined_at', 'intro_updated_at')
     raw_id_fields = ('user', 'book_club')
 
 

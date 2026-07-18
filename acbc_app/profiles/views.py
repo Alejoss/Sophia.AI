@@ -812,7 +812,7 @@ class CompleteFromInviteView(APIView):
     def post(self, request, format=None):
         from django.core import signing
         from book_clubs.guest_tokens import load_guest_token
-        from book_clubs.models import BookClub, BookClubMembership, MembershipRole
+        from book_clubs.models import BookClub, BookClubMembership
 
         token = (request.data.get('token') or '').strip()
         username = (request.data.get('username') or '').strip()
@@ -867,7 +867,6 @@ class CompleteFromInviteView(APIView):
             BookClubMembership.objects.get_or_create(
                 book_club=club,
                 user=user,
-                defaults={'role': MembershipRole.MEMBER},
             )
 
         try:

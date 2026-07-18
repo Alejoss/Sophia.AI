@@ -8,7 +8,6 @@ from book_clubs.models import (
     BookClubMembership,
     DiscussionQuestion,
     DiscussionQuestionStatus,
-    MembershipRole,
 )
 from comments.models import Comment
 from events.models import Event
@@ -23,7 +22,7 @@ class BookClubMembershipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BookClubMembership
-        fields = ['id', 'user_id', 'username', 'role', 'joined_at']
+        fields = ['id', 'user_id', 'username', 'joined_at']
         read_only_fields = fields
 
 
@@ -135,7 +134,6 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
             'id',
             'user_id',
             'username',
-            'role',
             'intro_description',
             'social_url',
             'additional_url',
@@ -216,21 +214,11 @@ class BookClubListSerializer(serializers.ModelSerializer):
 
 
 class BookClubDetailSerializer(BookClubListSerializer):
-    my_role = serializers.SerializerMethodField()
-
     class Meta(BookClubListSerializer.Meta):
         fields = BookClubListSerializer.Meta.fields + [
-            'my_role',
             'created_by',
             'updated_at',
         ]
-
-    def get_my_role(self, obj):
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return None
-        membership = obj.memberships.filter(user=request.user).first()
-        return membership.role if membership else None
 
 
 class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
@@ -319,7 +307,6 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
         BookClubMembership.objects.create(
             book_club=club,
             user=request.user,
-            role=MembershipRole.ADMIN,
         )
         return club
 

@@ -1000,7 +1000,7 @@ class DiscussionQuestionCommentsView(APIView):
             if not user_can_view_question(question, request.user):
                 return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Post-to-see: empty list until the member has answered (or is mentor).
+            # Post-to-see: empty list until the member has answered (or is staff).
             if not user_can_see_answers(question, request.user):
                 return Response([])
 
