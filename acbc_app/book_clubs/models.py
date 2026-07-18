@@ -25,7 +25,8 @@ class DiscussionQuestionStatus(models.TextChoices):
 class BookClub(models.Model):
     """
     Cohort container for a reading club cycle.
-    Orchestrates a KnowledgePath (missions), Topic (community), and Events (lives).
+    Orchestrates a KnowledgePath (missions), Topic (Investigación / timeline),
+    and Events (lives).
     """
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
@@ -50,6 +51,7 @@ class BookClub(models.Model):
         null=True,
         blank=True,
         related_name='book_clubs',
+        help_text='Tema de Investigación: timeline y biblioteca de media en el hub.',
     )
     starts_at = models.DateTimeField(null=True, blank=True)
     ends_at = models.DateTimeField(null=True, blank=True)

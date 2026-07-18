@@ -209,6 +209,46 @@ Full spec: [topic-timeline-entry-content-suggestions.md](../architecture/topic-t
 - **PATCH** `/api/knowledge_paths/{id}/`
 - **Auth**: Required (must be creator)
 
+## Book Clubs (Club de Lectura)
+
+Full product docs: [book-clubs.md](../architecture/book-clubs.md).
+
+### List / Create Clubs
+- **GET** `/api/book_clubs/`
+- **POST** `/api/book_clubs/` (staff)
+- **Auth**: GET public/auth-aware; POST staff
+
+### Club Detail / Update
+- **GET/PATCH** `/api/book_clubs/{slug}/`
+- **Auth**: Required for PATCH (mentor/admin/staff)
+
+### Hub Payload
+- **GET** `/api/book_clubs/{slug}/hub/`
+- **Auth**: Member, guest token (`X-Book-Club-Guest`), or staff
+- **Response**: Progress, next mission/event, open/past questions, `quick_links.topic_id`, etc.
+
+### Join / Guest Access
+- **POST** `/api/book_clubs/{slug}/join/`
+- **POST** `/api/book_clubs/{slug}/guest-access/` — body `{ "email" }`
+
+### Membership Introduction (Preséntate)
+- **GET/PATCH** `/api/book_clubs/{slug}/membership/introduction/`
+- Writes `Profile.profile_description` / `external_url`; sets `intro_updated_at`
+
+### Members
+- **GET** `/api/book_clubs/{slug}/members/` — presented members; managers may pass `?include_all=1`
+- **PATCH** `/api/book_clubs/{slug}/members/{membership_id}/` — body `{ "role" }`
+
+### Events
+- **GET/POST/DELETE** `/api/book_clubs/{slug}/events/` — DELETE body `{ "event_id" }`
+
+### Discussion Questions
+- **GET/POST** `/api/book_clubs/{slug}/discussion-questions/`
+- **GET/PATCH/DELETE** `/api/book_clubs/{slug}/discussion-questions/{id}/`
+- Answers: **GET/POST** `/api/comments/discussion-question/{id}/`
+
+Investigación in the hub uses existing Topic APIs (`/api/content/topics/{id}/basic/`, `…/timeline/`, `…/content/{media_type}/`), not a separate book-club media endpoint.
+
 ## Quizzes
 
 ### List Quizzes
