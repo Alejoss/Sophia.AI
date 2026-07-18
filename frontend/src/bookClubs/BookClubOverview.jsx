@@ -95,7 +95,7 @@ const BookClubOverview = () => {
         eyebrow: phase === 'pre' ? 'Próximamente' : `Semana ${week.weekNum}`,
         title: nextMission?.title || club.title,
         body:
-          'Explora el club en solo lectura. Crea tu cuenta para completar misiones y unirte al debate.',
+          'Explora el club en solo lectura. Crea tu cuenta para completar misiones y unirte al foro.',
         cta: accountCta,
       };
     }
@@ -106,7 +106,7 @@ const BookClubOverview = () => {
         body:
           pulse.member_count > 1
             ? `${pulse.member_count} lectores ya se han unido. Presenta quién eres y prepárate para la primera misión.`
-            : 'Prepárate: pronto abrimos la primera misión y el debate colectivo.',
+            : 'Prepárate: pronto abrimos la primera misión y el foro colectivo.',
         cta: { label: 'Preséntate al club →', to: 'presentate' },
       };
     }
@@ -115,7 +115,7 @@ const BookClubOverview = () => {
         eyebrow: 'Ciclo completado',
         title: `Terminaste ${club.title}`,
         body: `Durante este ciclo completaste ${hub.progress.completed_nodes} misiones.`,
-        cta: { label: 'Ver debates →', to: 'preguntas' },
+        cta: { label: 'Ver foro →', to: 'foro' },
       };
     }
     if (phase === 'between') {
@@ -123,12 +123,12 @@ const BookClubOverview = () => {
         eyebrow: 'Vas al día',
         title: 'Mientras llega lo siguiente…',
         body: weeklyQuestion
-          ? 'Descubre qué están pensando otros lectores en el debate abierto.'
+          ? 'Descubre qué están pensando otros lectores en el foro abierto.'
           : 'Entra a la comunidad o al grupo de Telegram mientras se abre la próxima misión.',
         cta: weeklyQuestion
           ? {
-              label: 'Entrar al debate →',
-              to: `/club-de-lectura/${slug}/preguntas/${weeklyQuestion.id}`,
+              label: 'Entrar al foro →',
+              to: `/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`,
             }
           : telegramUrl
             ? { label: 'Ir al grupo de Telegram →', to: telegramUrl, external: true }
@@ -143,7 +143,7 @@ const BookClubOverview = () => {
         title: nextMission.title,
         body:
           nextMission.description?.trim() ||
-          'Sigue la lectura de esta misión y vuelve para el debate.',
+          'Sigue la lectura de esta misión y vuelve al foro.',
         cta: {
           label: first
             ? `Comenzar misión ${nextMission.order} →`
@@ -156,11 +156,11 @@ const BookClubOverview = () => {
       return {
         eyebrow: 'Próxima misión',
         title: nextMission.title,
-        body: 'Todavía bloqueada. Completa la misión anterior o entra al debate mientras esperas.',
+        body: 'Todavía bloqueada. Completa la misión anterior o entra al foro mientras esperas.',
         cta: weeklyQuestion
           ? {
-              label: 'Entrar al debate →',
-              to: `/club-de-lectura/${slug}/preguntas/${weeklyQuestion.id}`,
+              label: 'Entrar al foro →',
+              to: `/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`,
             }
           : { label: 'Ver misiones →', to: 'misiones' },
       };
@@ -174,7 +174,7 @@ const BookClubOverview = () => {
   })();
 
   const activityLabel = (item) => {
-    if (item.type === 'discussion_answer') return 'respondió al debate';
+    if (item.type === 'discussion_answer') return 'respondió en el foro';
     return 'compartió en la comunidad';
   };
 
@@ -299,11 +299,11 @@ const BookClubOverview = () => {
               </Typography>
               <Typography variant="body2">
                 {pulse.total_answers}{' '}
-                {pulse.total_answers === 1 ? 'respuesta' : 'respuestas'} en debates abiertos
+                {pulse.total_answers === 1 ? 'respuesta' : 'respuestas'} en hilos abiertos
               </Typography>
               <Typography variant="body2">
                 {pulse.open_debates}{' '}
-                {pulse.open_debates === 1 ? 'debate activo' : 'debates activos'}
+                {pulse.open_debates === 1 ? 'hilo activo' : 'hilos activos'}
               </Typography>
             </Stack>
           </>
@@ -332,21 +332,21 @@ const BookClubOverview = () => {
             </Typography>
             <Button
               component={RouterLink}
-              to={`/club-de-lectura/${slug}/preguntas/${weeklyQuestion.id}`}
+              to={`/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`}
               sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              {canParticipate ? 'Entrar al debate →' : 'Leer el debate →'}
+              {canParticipate ? 'Entrar al foro →' : 'Leer la pregunta →'}
             </Button>
           </Box>
         ) : (
           <Box>
             <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
-              El debate todavía no está disponible
+              El foro todavía no está disponible
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.75, maxWidth: 480 }}>
               {nextMission
-                ? `La primera pregunta se abrirá después de avanzar en la Misión ${nextMission.order}. Completa tu lectura para entrar al debate.`
-                : 'Cuando el mentor abra la primera pregunta de debate, aparecerá aquí.'}
+                ? `La primera pregunta se abrirá después de avanzar en la Misión ${nextMission.order}. Completa tu lectura para entrar al foro.`
+                : 'Cuando el mentor abra la primera pregunta del foro, aparecerá aquí.'}
             </Typography>
             {nextMission && !nextMission.locked && (
               <Button
@@ -361,9 +361,9 @@ const BookClubOverview = () => {
         )}
         {club.can_manage && (
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', mt: 2 }}>
-            ¿Quieres abrir un debate? Hazlo desde{' '}
-            <Box component={RouterLink} to="preguntas" sx={{ color: CLUB_ACCENT }}>
-              Debates
+            ¿Quieres abrir una pregunta? Hazlo desde{' '}
+            <Box component={RouterLink} to="foro" sx={{ color: CLUB_ACCENT }}>
+              Foro
             </Box>
             .
           </Typography>
@@ -423,7 +423,7 @@ const BookClubOverview = () => {
               El próximo encuentro vivo aún no está en el calendario.
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75 }}>
-              Mientras tanto, avanza en tu misión y participa en el debate.
+              Mientras tanto, avanza en tu misión y participa en el foro.
             </Typography>
             <Button
               component={RouterLink}

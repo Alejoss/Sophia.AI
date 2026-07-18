@@ -18,15 +18,15 @@ import knowledgePathsApi from '../../api/knowledgePathsApi';
 import {
   extractApiError,
   formatClubDate,
+  QUESTION_STATUS_LABELS,
   toDatetimeLocal,
   toIsoOrNull,
 } from '../clubTheme';
 
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Borrador' },
-  { value: 'open', label: 'Abierta' },
-  { value: 'closed', label: 'Cerrada' },
-];
+const STATUS_OPTIONS = Object.entries(QUESTION_STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 const emptyForm = {
   body: '',
@@ -177,7 +177,7 @@ const BookClubAdminQuestions = () => {
   };
 
   const handleDelete = async (q) => {
-    if (!window.confirm('¿Eliminar esta pregunta de debate?')) return;
+    if (!window.confirm('¿Eliminar esta pregunta del foro? No se puede deshacer.')) return;
     setError(null);
     try {
       await bookClubsApi.deleteDiscussionQuestion(slug, q.id);
@@ -185,18 +185,22 @@ const BookClubAdminQuestions = () => {
       setSuccess('Pregunta eliminada.');
       await load();
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo eliminar.'));
+      setError(extractApiError(err, 'No se pudo eliminar la pregunta.'));
     }
   };
+
+  const statusLabel = (q) =>
+    QUESTION_STATUS_LABELS[q.effective_status || q.status] || q.effective_status || q.status;
 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Preguntas de debate
+        Preguntas del foro
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Crea, programa y cierra preguntas ligadas a misiones o reuniones. Se muestran en el hub
-        (Debates) según su estado y fechas.
+        (Foro) según su estado y fechas. Los miembros solo ven las respuestas de otros después de
+        publicar la suya.
       </Typography>
 
       {error && (
@@ -347,7 +351,7 @@ const BookClubAdminQuestions = () => {
                 <Box>
                   <Typography fontWeight={600}>{q.body}</Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 0.75 }} flexWrap="wrap" useFlexGap>
-                    <Chip size="small" label={q.effective_status || q.status} />
+                    <Chip size="small" label={statusLabel(q)} />
                     {q.mission_label && (
                       <Chip size="small" variant="outlined" label={q.mission_label} />
                     )}
@@ -378,9 +382,9 @@ const BookClubAdminQuestions = () => {
                   <Button
                     size="small"
                     component={RouterLink}
-                    to={`/club-de-lectura/${club.slug}/preguntas/${q.id}`}
+                    to={`/club-de-lectura/${club.slug}/foro/${q.id}`}
                   >
-                    Ver
+                    Ver en foro
                   </Button>
                   <Button size="small" color="error" onClick={() => handleDelete(q)}>
                     Eliminar

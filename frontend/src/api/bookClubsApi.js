@@ -1,11 +1,5 @@
 import axiosInstance from './axiosConfig';
 
-const appendIfPresent = (formData, key, value) => {
-  if (value === undefined || value === null || value === '') return;
-  formData.append(key, value);
-};
-
-/** Fields that may be intentionally cleared with an empty string. */
 const CLEARABLE_STRING_FIELDS = new Set(['telegram_group_url', 'description']);
 
 /** Prefer JSON; use FormData only when uploading a cover image. */
@@ -13,7 +7,8 @@ const toRequestBody = (payload) => {
   const hasFile = payload?.cover_image instanceof File;
   if (!hasFile) {
     const body = { ...payload };
-    delete body.cover_image;
+    // Drop undefined only. Keep null / '' so admins can clear fields
+    // (Telegram, dates, cover, topic). Empty strings only for clearable fields.
     Object.keys(body).forEach((key) => {
       if (body[key] === undefined) {
         delete body[key];
@@ -25,12 +20,14 @@ const toRequestBody = (payload) => {
   }
   const formData = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined) return;
     if (value instanceof File) {
       formData.append(key, value);
-    } else if (value === '' && CLEARABLE_STRING_FIELDS.has(key)) {
+    } else if (value === null || (value === '' && CLEARABLE_STRING_FIELDS.has(key))) {
+      // Empty string clears nullable / clearable fields in multipart.
       formData.append(key, '');
-    } else {
-      appendIfPresent(formData, key, value);
+    } else if (value !== '') {
+      formData.append(key, value);
     }
   });
   return formData;
@@ -130,18 +127,8 @@ const bookClubsApi = {
     return response.data;
   },
 
-  unlinkEvent: async (slug, eventId) => {
-    const response = await axiosInstance.delete(`/book_clubs/${slug}/events/`, {
-      data: { event_id: eventId },
-    });
-    return response.data;
-  },
-
-  deleteDiscussionQuestion: async (slug, questionId) => {
-    const response = await axiosInstance.delete(
-      `/book_clubs/${slug}/discussion-questions/${questionId}/`
-    );
-    return response.data;
+  unlinkEvent: async (slug, linkId) => {
+    await axiosInstance.delete(`/book_clubs/${slug}/events/${linkId}/`);
   },
 
   listDiscussionQuestions: async (slug, status, { guestToken } = {}) => {
@@ -175,6 +162,10 @@ const bookClubsApi = {
       payload
     );
     return response.data;
+  },
+
+  deleteDiscussionQuestion: async (slug, questionId) => {
+    await axiosInstance.delete(`/book_clubs/${slug}/discussion-questions/${questionId}/`);
   },
 };
 

@@ -97,6 +97,11 @@ const ContentIdRedirect = () => {
   return <Navigate to={`/content/${contentId}/library`} replace />;
 };
 
+const BookClubForoQuestionRedirect = () => {
+  const { slug, questionId } = useParams();
+  return <Navigate to={`/club-de-lectura/${slug}/foro/${questionId}`} replace />;
+};
+
 const isTelegramInAppBrowser = () => {
   if (typeof window === 'undefined') {
     return false;
@@ -161,8 +166,10 @@ const AppContent = () => {
             <Route path="misiones" element={<BookClubMissions />} />
             <Route path="comunidad" element={<BookClubCommunity />} />
             <Route path="presentate" element={<BookClubIntroduction />} />
-            <Route path="preguntas" element={<DiscussionQuestionsList />} />
-            <Route path="preguntas/:questionId" element={<DiscussionQuestionDetail />} />
+            <Route path="foro" element={<DiscussionQuestionsList />} />
+            <Route path="foro/:questionId" element={<DiscussionQuestionDetail />} />
+            <Route path="preguntas" element={<Navigate to="foro" replace />} />
+            <Route path="preguntas/:questionId" element={<BookClubForoQuestionRedirect />} />
             <Route path="reuniones" element={<BookClubMeetings />} />
           </Route>
           <Route element={<MainLayout />}>

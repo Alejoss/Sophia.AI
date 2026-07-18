@@ -648,6 +648,11 @@ class CommentView(APIView):
             })
             
             comment = get_object_or_404(Comment, pk=pk, is_active=True)
+            denied = _discussion_question_access_denied(
+                request, comment, writing=False
+            )
+            if denied is not None:
+                return denied
             serializer = CommentSerializer(comment, context={'request': request})
             
             comments_logger.debug("Comment detail retrieved successfully", extra={
@@ -776,11 +781,15 @@ class CommentView(APIView):
 def _discussion_question_access_denied(request, parent_comment, *, writing=False):
     """
     When a comment (or its ancestor) belongs to a DiscussionQuestion, enforce
-    club membership and open/closed rules. Returns a Response if access should
-    be denied, otherwise None.
+    club membership, open/closed rules, and post-to-see for reading replies.
+    Returns a Response if access should be denied, otherwise None.
     """
     from book_clubs.models import DiscussionQuestion
-    from book_clubs.permissions import user_can_answer_question, user_can_view_question
+    from book_clubs.permissions import (
+        user_can_answer_question,
+        user_can_see_answers,
+        user_can_view_question,
+    )
 
     dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
     if parent_comment.content_type_id != dq_type.id:
@@ -803,10 +812,27 @@ def _discussion_question_access_denied(request, parent_comment, *, writing=False
                 {'detail': 'You cannot reply to this discussion right now.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # Nested replies require the thread to be unlocked (own answer posted).
+        if not user_can_see_answers(question, request.user):
+            return Response(
+                {
+                    'detail': 'Publica tu respuesta para ver y responder a las de los demás.',
+                    'code': 'answer_required',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return None
 
     if not user_can_view_question(question, request.user):
         return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if not user_can_see_answers(question, request.user):
+        return Response(
+            {
+                'detail': 'Publica tu respuesta para ver las de los demás.',
+                'code': 'answer_required',
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
     return None
 
 
@@ -967,12 +993,16 @@ class DiscussionQuestionCommentsView(APIView):
 
     def get(self, request, pk):
         from book_clubs.models import DiscussionQuestion
-        from book_clubs.permissions import user_can_view_question
+        from book_clubs.permissions import user_can_see_answers, user_can_view_question
 
         try:
             question = self._get_question(pk)
             if not user_can_view_question(question, request.user):
                 return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Post-to-see: empty list until the member has answered (or is mentor).
+            if not user_can_see_answers(question, request.user):
+                return Response([])
 
             dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
             comments = Comment.objects.filter(
@@ -1001,7 +1031,7 @@ class DiscussionQuestionCommentsView(APIView):
             question = self._get_question(pk)
             if not user_can_answer_question(question, request.user):
                 return Response(
-                    {'detail': 'You cannot answer this question right now.'},
+                    {'detail': 'No puedes responder esta pregunta en este momento.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -1016,7 +1046,7 @@ class DiscussionQuestionCommentsView(APIView):
             ).first()
             if existing and not request.data.get('parent'):
                 return Response(
-                    {'detail': 'You already answered this question. Edit your answer or reply to others.'},
+                    {'detail': 'Ya publicaste tu respuesta. Puedes editarla o responder a otros miembros.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

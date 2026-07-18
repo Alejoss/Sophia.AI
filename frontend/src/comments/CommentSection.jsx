@@ -31,8 +31,15 @@ const CommentSection = ({
     knowledgePathId = null,
     discussionQuestionId = null,
     readOnly = false,
+    hideComments = false,
+    hideForm = false,
+    hideFormNotice = null,
+    onAfterMutate = null,
     title = 'Comentarios',
     placeholder = 'Escriba un comentario...',
+    submitLabel = 'Publicar Comentario',
+    emptyLabel = 'No hay comentarios todavía.',
+    lockedEmptyLabel = null,
 }) => {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -52,8 +59,13 @@ const CommentSection = ({
     });
 
     useEffect(() => {
+        if (hideComments) {
+            setComments([]);
+            setLoading(false);
+            return;
+        }
         loadComments();
-    }, [topicId, contentId, knowledgePathId, discussionQuestionId]);
+    }, [topicId, contentId, knowledgePathId, discussionQuestionId, hideComments]);
 
     const loadComments = async () => {
         try {
@@ -83,6 +95,12 @@ const CommentSection = ({
         }
     };
 
+    const notifyMutate = async () => {
+        if (typeof onAfterMutate === 'function') {
+            await onAfterMutate();
+        }
+    };
+
     const onSubmit = async ({ body }) => {
         if (!authState.user) {
             setError('Debe iniciar sesión para comentar');
@@ -103,7 +121,10 @@ const CommentSection = ({
             }
 
             reset({ body: '' });
-            await loadComments();
+            await notifyMutate();
+            if (!hideComments) {
+                await loadComments();
+            }
         } catch (err) {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
@@ -120,6 +141,7 @@ const CommentSection = ({
     const handleDeleteComment = async (commentId) => {
         try {
             await commentsApi.deleteComment(commentId);
+            await notifyMutate();
             await loadComments();
         } catch {
             setError('Error al eliminar el comentario');
@@ -149,7 +171,7 @@ const CommentSection = ({
         }
     };
 
-    if (loading) return <Typography>Cargando comentarios...</Typography>;
+    if (loading && !hideComments) return <Typography>Cargando comentarios...</Typography>;
 
     return (
         <Paper sx={{ p: 3, mt: 3 }}>
@@ -157,7 +179,13 @@ const CommentSection = ({
                 {title}
             </Typography>
 
-            {authState.isAuthenticated && !readOnly ? (
+            {authState.isAuthenticated && !readOnly && hideForm ? (
+                hideFormNotice ? (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        {hideFormNotice}
+                    </Alert>
+                ) : null
+            ) : authState.isAuthenticated && !readOnly ? (
                 <Box
                     component="form"
                     onSubmit={handleSubmit(onSubmit)}
@@ -186,12 +214,15 @@ const CommentSection = ({
                         disabled={isSubmitting}
                         startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : null}
                     >
-                        {isSubmitting ? 'Publicando...' : 'Publicar Comentario'}
+                        {isSubmitting ? 'Publicando...' : submitLabel}
                     </Button>
                 </Box>
             ) : readOnly ? (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    Esta conversación está cerrada. Puedes leer las respuestas.
+                    Esta conversación está cerrada.
+                    {hideComments
+                        ? ' Publica tu respuesta cuando esté abierta para ver las de los demás.'
+                        : ' Puedes leer las respuestas.'}
                 </Typography>
             ) : (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -201,7 +232,12 @@ const CommentSection = ({
 
             <Divider sx={{ my: 2 }} />
 
-            {comments.length > 0 ? (
+            {hideComments ? (
+                <Typography color="text.secondary">
+                    {lockedEmptyLabel ||
+                        'Publica tu respuesta para ver las de los demás miembros.'}
+                </Typography>
+            ) : comments.length > 0 ? (
                 <Box>
                     {comments.map(comment => (
                         <Comment
@@ -217,9 +253,7 @@ const CommentSection = ({
                     ))}
                 </Box>
             ) : (
-                <Typography color="text.secondary">
-                    Aún no hay comentarios. ¡Sé el primero en comentar!
-                </Typography>
+                <Typography color="text.secondary">{emptyLabel}</Typography>
             )}
 
             <Snackbar

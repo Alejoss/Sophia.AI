@@ -23,6 +23,7 @@ const BookClubAdminMeetings = () => {
   const [eventId, setEventId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [unlinkingId, setUnlinkingId] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -66,20 +67,20 @@ const BookClubAdminMeetings = () => {
     }
   };
 
-  const handleUnlink = async (linkedEventId) => {
+  const handleUnlink = async (linkId) => {
     if (!window.confirm('¿Desvincular esta reunión del club?')) return;
-    setSaving(true);
+    setUnlinkingId(linkId);
     setError(null);
     setSuccess(null);
     try {
-      await bookClubsApi.unlinkEvent(slug, linkedEventId);
+      await bookClubsApi.unlinkEvent(slug, linkId);
       setSuccess('Reunión desvinculada.');
       await load();
       await reload?.();
     } catch (err) {
       setError(extractApiError(err, 'No se pudo desvincular el evento.'));
     } finally {
-      setSaving(false);
+      setUnlinkingId(null);
     }
   };
 
@@ -143,22 +144,36 @@ const BookClubAdminMeetings = () => {
       ) : (
         <Stack spacing={1.5}>
           {linked.map((ev) => (
-            <Box key={ev.id} sx={{ py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
-              <Typography fontWeight={600}>{ev.title}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {formatClubDate(ev.date_start) || 'Sin fecha'}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+            <Box
+              key={ev.id}
+              sx={{
+                py: 1.5,
+                borderBottom: 1,
+                borderColor: 'divider',
+                display: 'flex',
+                gap: 2,
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Box>
+                <Typography fontWeight={600}>{ev.title}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {formatClubDate(ev.date_start) || 'Sin fecha'}
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1}>
                 <Button size="small" component={RouterLink} to={`/events/${ev.event_id}`}>
                   Abrir evento
                 </Button>
                 <Button
                   size="small"
                   color="error"
-                  disabled={saving}
-                  onClick={() => handleUnlink(ev.event_id)}
+                  disabled={unlinkingId === ev.id}
+                  onClick={() => handleUnlink(ev.id)}
                 >
-                  Desvincular
+                  {unlinkingId === ev.id ? 'Quitando…' : 'Desvincular'}
                 </Button>
               </Stack>
             </Box>

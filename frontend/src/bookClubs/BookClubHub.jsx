@@ -15,8 +15,9 @@ import {
 } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
+import { CLUB_ACCENT, CLUB_TEXT_FIELD_SX } from './clubTheme';
 
-const accent = '#FF6B35';
+const accent = CLUB_ACCENT;
 
 const Section = ({ title, children, action }) => (
   <Box
@@ -317,7 +318,7 @@ const BookClubHub = () => {
                 <Button
                   size="small"
                   component={RouterLink}
-                  to={`/club-de-lectura/${slug}/preguntas`}
+                  to={`/club-de-lectura/${slug}/foro`}
                   sx={{ color: accent }}
                 >
                   Ver todas
@@ -333,7 +334,7 @@ const BookClubHub = () => {
                         cursor: 'pointer',
                         '&:hover': { opacity: 0.9 },
                       }}
-                      onClick={() => navigate(`/club-de-lectura/${slug}/preguntas/${q.id}`)}
+                      onClick={() => navigate(`/club-de-lectura/${slug}/foro/${q.id}`)}
                     >
                       {q.mission_label && (
                         <Typography variant="caption" sx={{ color: accent, fontWeight: 600 }}>
@@ -356,7 +357,7 @@ const BookClubHub = () => {
               {canManage && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, color: 'rgba(255,255,255,0.8)' }}>
-                    Publicar pregunta de debate
+                    Publicar pregunta en el foro
                   </Typography>
                   <TextField
                     fullWidth
@@ -365,16 +366,7 @@ const BookClubHub = () => {
                     value={newQuestion}
                     onChange={(e) => setNewQuestion(e.target.value)}
                     placeholder="¿Qué concepto aplicarías mañana?"
-                    sx={{
-                      mb: 1,
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'rgba(255,255,255,0.06)',
-                        color: '#fff',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255,107,53,0.4)',
-                      },
-                    }}
+                    sx={{ mb: 1, ...CLUB_TEXT_FIELD_SX }}
                   />
                   <Button
                     variant="contained"
@@ -395,7 +387,7 @@ const BookClubHub = () => {
                     <Box
                       key={q.id}
                       sx={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/club-de-lectura/${slug}/preguntas/${q.id}`)}
+                      onClick={() => navigate(`/club-de-lectura/${slug}/foro/${q.id}`)}
                     >
                       {q.mission_label && (
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)' }}>
@@ -423,7 +415,7 @@ const BookClubHub = () => {
                         {item.body_preview?.length >= 120 ? '…' : ''}
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
-                        {item.type === 'discussion_answer' ? 'Respuesta de debate' : 'Comunidad'} ·{' '}
+                        {item.type === 'discussion_answer' ? 'Respuesta en el foro' : 'Comunidad'} ·{' '}
                         {formatDate(item.created_at)}
                       </Typography>
                     </Box>
@@ -461,10 +453,10 @@ const BookClubHub = () => {
                 <Button
                   variant="outlined"
                   component={RouterLink}
-                  to={`/club-de-lectura/${slug}/preguntas`}
+                  to={`/club-de-lectura/${slug}/foro`}
                   sx={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}
                 >
-                  Preguntas
+                  Foro
                 </Button>
                 <Button
                   variant="outlined"

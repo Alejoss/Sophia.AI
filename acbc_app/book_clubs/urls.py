@@ -28,6 +28,11 @@ urlpatterns = [
     path('<slug:slug>/hub/', views.BookClubHubView.as_view(), name='book-club-hub'),
     path('<slug:slug>/events/', views.BookClubEventListCreateView.as_view(), name='book-club-events'),
     path(
+        '<slug:slug>/events/<int:pk>/',
+        views.BookClubEventUnlinkView.as_view(),
+        name='book-club-event-unlink',
+    ),
+    path(
         '<slug:slug>/discussion-questions/',
         views.DiscussionQuestionListCreateView.as_view(),
         name='discussion-question-list',

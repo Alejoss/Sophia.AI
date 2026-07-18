@@ -2,7 +2,12 @@ export const CLUB_ACCENT = '#FF6B35';
 export const CLUB_ACCENT_HOVER = '#E55A2B';
 export const CLUB_BG = '#0d0d0d';
 
-/** Shared TextField styles for club dark surfaces (readable labels + orange focus). */
+/**
+ * Shared TextField styles for club dark surfaces.
+ * Also counters global index.css rules that force --input-bg on textarea
+ * (which makes MUI multiline look white with zero inner padding — MUI puts
+ * padding on the root, and padding:0 on the textarea itself).
+ */
 export const CLUB_TEXT_FIELD_SX = {
   '& .MuiOutlinedInput-root': {
     bgcolor: 'rgba(255,255,255,0.06)',
@@ -17,6 +22,16 @@ export const CLUB_TEXT_FIELD_SX = {
       borderColor: CLUB_ACCENT,
       borderWidth: 1,
     },
+    '&.MuiInputBase-multiline': {
+      padding: '12px 14px',
+    },
+  },
+  '& .MuiInputBase-input': {
+    color: '#fff !important',
+    backgroundColor: 'transparent !important',
+  },
+  '& .MuiInputBase-inputMultiline': {
+    padding: '0 !important',
   },
   '& .MuiInputLabel-root': {
     color: 'rgba(255,255,255,0.65)',
@@ -36,15 +51,35 @@ export const CLUB_TEXT_FIELD_SX = {
   '& .MuiFormHelperText-root.Mui-error': {
     color: '#ef9a9a',
   },
+  // !important to beat the global index.css placeholder rule (also !important).
   '& .MuiInputBase-input::placeholder': {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.45) !important',
     opacity: 1,
   },
+};
+
+/** Apply CLUB_TEXT_FIELD_SX to every TextField nested under a club surface. */
+export const CLUB_NESTED_FIELDS_SX = {
+  '& .MuiTextField-root .MuiOutlinedInput-root': CLUB_TEXT_FIELD_SX['& .MuiOutlinedInput-root'],
+  '& .MuiTextField-root .MuiInputBase-input': CLUB_TEXT_FIELD_SX['& .MuiInputBase-input'],
+  '& .MuiTextField-root .MuiInputBase-inputMultiline':
+    CLUB_TEXT_FIELD_SX['& .MuiInputBase-inputMultiline'],
+  '& .MuiTextField-root .MuiInputBase-input::placeholder':
+    CLUB_TEXT_FIELD_SX['& .MuiInputBase-input::placeholder'],
+  '& .MuiTextField-root .MuiFormHelperText-root': CLUB_TEXT_FIELD_SX['& .MuiFormHelperText-root'],
+  '& .MuiTextField-root .MuiFormHelperText-root.Mui-error':
+    CLUB_TEXT_FIELD_SX['& .MuiFormHelperText-root.Mui-error'],
 };
 export const STATUS_LABELS = {
   draft: 'Borrador',
   active: 'Activo',
   closed: 'Cerrado',
+};
+
+export const QUESTION_STATUS_LABELS = {
+  draft: 'Borrador',
+  open: 'Abierta',
+  closed: 'Cerrada',
 };
 
 export const formatClubDate = (value, opts = { dateStyle: 'medium', timeStyle: 'short' }) => {

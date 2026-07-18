@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -9,16 +9,14 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
 import CommentSection from '../comments/CommentSection';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT } from './clubTheme';
+import { CLUB_ACCENT, CLUB_NESTED_FIELDS_SX, QUESTION_STATUS_LABELS } from './clubTheme';
 import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const DiscussionQuestionDetail = () => {
   const { slug, questionId } = useParams();
-  const { authState } = useContext(AuthContext);
   const { guestToken, canParticipate } = useBookClub();
   const [question, setQuestion] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -70,20 +68,21 @@ const DiscussionQuestionDetail = () => {
   }
 
   const canAnswer = Boolean(question.can_answer && canParticipate);
+  const canSeeAnswers = Boolean(question.can_see_answers);
   const closed = question.status === 'closed' || question.effective_status === 'closed';
   const guest = getGuestSession(slug);
   const accountUrl = guest?.token
     ? guestCompleteAccountUrl(slug, guest.token)
-    : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}/preguntas/${questionId}`)}`;
+    : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}/foro/${questionId}`)}`;
 
   return (
     <Box>
       <Button
         component={RouterLink}
-        to={`/club-de-lectura/${slug}/preguntas`}
+        to={`/club-de-lectura/${slug}/foro`}
         sx={{ color: CLUB_ACCENT, mb: 2 }}
       >
-        ← Todas las preguntas
+        ← Todas las preguntas del foro
       </Button>
 
       {error && (
@@ -102,9 +101,16 @@ const DiscussionQuestionDetail = () => {
             </Button>
           }
         >
-          Puedes leer el debate. Para responder, crea tu cuenta.
+          Puedes leer la pregunta. Para responder y ver las respuestas de los demás, crea tu cuenta.
         </Alert>
       )}
+
+      {canParticipate && !canSeeAnswers && canAnswer && (
+        <Alert severity="info" sx={{ mb: 2, bgcolor: 'rgba(255,107,53,0.1)', color: '#fff' }}>
+          Publica tu respuesta para desbloquear las respuestas de los demás miembros.
+        </Alert>
+      )}
+
       {question.mission_label && (
         <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
           Después de {question.mission_label}
@@ -115,16 +121,22 @@ const DiscussionQuestionDetail = () => {
       </Typography>
       <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap" useFlexGap>
         <Chip
-          label={question.effective_status || question.status}
+          label={
+            QUESTION_STATUS_LABELS[question.effective_status || question.status] ||
+            question.effective_status ||
+            question.status
+          }
           size="small"
           sx={{ bgcolor: 'rgba(255,107,53,0.2)', color: CLUB_ACCENT }}
         />
-        <Chip
-          label={`${question.answer_count} respuesta${question.answer_count === 1 ? '' : 's'}`}
-          size="small"
-          variant="outlined"
-          sx={{ borderColor: 'rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)' }}
-        />
+        {canSeeAnswers && question.answer_count != null && (
+          <Chip
+            label={`${question.answer_count} respuesta${question.answer_count === 1 ? '' : 's'}`}
+            size="small"
+            variant="outlined"
+            sx={{ borderColor: 'rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)' }}
+          />
+        )}
       </Stack>
 
       {question.can_manage && (
@@ -162,14 +174,25 @@ const DiscussionQuestionDetail = () => {
             backgroundImage: 'none',
           },
           '& .MuiTypography-root': { color: 'inherit' },
-          '& .MuiInputBase-root': { color: '#fff' },
+          '& .MuiAlert-root': {
+            bgcolor: 'rgba(255,255,255,0.06)',
+            color: 'rgba(255,255,255,0.9)',
+          },
+          ...CLUB_NESTED_FIELDS_SX,
         }}
       >
         <CommentSection
           discussionQuestionId={Number(questionId)}
           readOnly={!canAnswer || closed}
-          title="Respuestas de la comunidad"
-          placeholder="Comparte tu respuesta — todos en el club podrán leerla…"
+          hideComments={!canSeeAnswers}
+          hideForm={Boolean(question.has_answered)}
+          hideFormNotice="Ya publicaste tu respuesta. Puedes editarla abajo o responder a otros miembros."
+          onAfterMutate={load}
+          title="Respuestas del foro"
+          placeholder="Comparte tu respuesta. Las de los demás se desbloquean cuando publiques la tuya."
+          submitLabel="Publicar respuesta"
+          emptyLabel="Aún no hay respuestas. Sé el primero."
+          lockedEmptyLabel="Publica tu respuesta para ver las de los demás miembros."
         />
       </Box>
     </Box>

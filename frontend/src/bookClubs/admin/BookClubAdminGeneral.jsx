@@ -40,6 +40,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
     telegram_group_url: '',
     cover_image: null,
   });
+  const [clearCover, setClearCover] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -55,12 +56,18 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         telegram_group_url: club.telegram_group_url || '',
         cover_image: null,
       });
+      setClearCover(false);
     }
   }, [isCreate, club]);
 
   const handleField = (field) => (event) => {
-    const value = field === 'cover_image' ? event.target.files?.[0] || null : event.target.value;
-    setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === 'cover_image') {
+      const file = event.target.files?.[0] || null;
+      setForm((prev) => ({ ...prev, cover_image: file }));
+      if (file) setClearCover(false);
+      return;
+    }
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
   const handleSave = async () => {
@@ -72,35 +79,43 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
     setError(null);
     setSuccess(null);
     try {
-      const payload = {
-        title: form.title.trim(),
-        description: form.description,
-        status: form.status,
-        telegram_group_url: normalizeTelegramUrl(form.telegram_group_url),
-      };
-      // Only send dates when filled. Empty fields omit the key so a partial
-      // save (e.g. editing Telegram) cannot wipe existing starts_at/ends_at.
+      let startsAt = null;
+      let endsAt = null;
       if (form.starts_at) {
-        const iso = toIsoOrNull(form.starts_at);
-        if (!iso) {
+        startsAt = toIsoOrNull(form.starts_at);
+        if (!startsAt) {
           setError('La fecha de inicio no es válida.');
           setSaving(false);
           return;
         }
-        payload.starts_at = iso;
       }
       if (form.ends_at) {
-        const iso = toIsoOrNull(form.ends_at);
-        if (!iso) {
+        endsAt = toIsoOrNull(form.ends_at);
+        if (!endsAt) {
           setError('La fecha de fin no es válida.');
           setSaving(false);
           return;
         }
-        payload.ends_at = iso;
       }
+
+      const payload = {
+        title: form.title.trim(),
+        description: form.description,
+        status: form.status,
+        telegram_group_url: normalizeTelegramUrl(form.telegram_group_url) || '',
+      };
+
+      // On edit, always send dates (ISO or null) so clearing the inputs works.
+      // On create, only send when filled.
+      if (!isCreate || form.starts_at) payload.starts_at = startsAt;
+      if (!isCreate || form.ends_at) payload.ends_at = endsAt;
+
       if (form.cover_image instanceof File) {
         payload.cover_image = form.cover_image;
+      } else if (!isCreate && clearCover) {
+        payload.cover_image = null;
       }
+
       if (isCreate) {
         const created = await bookClubsApi.createClub(payload);
         navigate(`/dashboard/book-clubs/${created.slug}/conexiones`, { replace: true });
@@ -115,6 +130,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           telegram_group_url: updated.telegram_group_url || '',
           cover_image: null,
         });
+        setClearCover(false);
         setSuccess('Cambios guardados.');
         await reload?.({ silent: true });
       }
@@ -124,6 +140,9 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       setSaving(false);
     }
   };
+
+  const coverPreview =
+    !clearCover && !form.cover_image && club?.cover_image ? club.cover_image : null;
 
   return (
     <Box>
@@ -174,7 +193,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           placeholder="https://t.me/tu-grupo"
           value={form.telegram_group_url}
           onChange={handleField('telegram_group_url')}
-          helperText="Acepta https://t.me/..., t.me/... o @usuario. Se muestra en Comunidad e Inicio."
+          helperText="Acepta https://t.me/..., t.me/... o @usuario. Déjalo vacío para quitarlo."
         />
         <FormControl fullWidth>
           <InputLabel id="status-label">Estado</InputLabel>
@@ -198,7 +217,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           InputLabelProps={{ shrink: true }}
           value={form.starts_at}
           onChange={handleField('starts_at')}
-          helperText="Se muestra en el hub del club (semana / fase del ciclo)."
+          helperText="Se muestra en el hub. Vacía el campo y guarda para quitar la fecha."
         />
         <TextField
           label="Fin del ciclo"
@@ -208,10 +227,44 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           value={form.ends_at}
           onChange={handleField('ends_at')}
         />
-        <Button variant="outlined" component="label" sx={{ alignSelf: 'flex-start' }}>
-          {form.cover_image ? form.cover_image.name : 'Portada (opcional)'}
-          <input hidden type="file" accept="image/*" onChange={handleField('cover_image')} />
-        </Button>
+
+        {(coverPreview || form.cover_image) && (
+          <Box>
+            {coverPreview && (
+              <Box
+                component="img"
+                src={coverPreview}
+                alt="Portada actual"
+                sx={{ maxWidth: 280, maxHeight: 160, objectFit: 'cover', display: 'block', mb: 1 }}
+              />
+            )}
+            {form.cover_image && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Nueva: {form.cover_image.name}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" component="label">
+            {form.cover_image ? 'Cambiar archivo' : coverPreview ? 'Reemplazar portada' : 'Portada (opcional)'}
+            <input hidden type="file" accept="image/*" onChange={handleField('cover_image')} />
+          </Button>
+          {!isCreate && (coverPreview || form.cover_image || club?.cover_image) && (
+            <Button
+              variant="text"
+              color="error"
+              onClick={() => {
+                setForm((prev) => ({ ...prev, cover_image: null }));
+                setClearCover(true);
+              }}
+            >
+              Quitar portada
+            </Button>
+          )}
+        </Stack>
+
         <Button variant="contained" onClick={handleSave} disabled={saving} sx={{ alignSelf: 'flex-start' }}>
           {saving ? 'Guardando…' : isCreate ? 'Crear y continuar' : 'Guardar cambios'}
         </Button>

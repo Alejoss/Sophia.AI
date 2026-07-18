@@ -382,6 +382,8 @@ class DiscussionQuestionSerializer(serializers.ModelSerializer):
     answer_count = serializers.SerializerMethodField()
     event_title = serializers.CharField(source='event.title', read_only=True, allow_null=True)
     effective_status = serializers.SerializerMethodField()
+    has_answered = serializers.SerializerMethodField()
+    can_see_answers = serializers.SerializerMethodField()
 
     class Meta:
         model = DiscussionQuestion
@@ -401,6 +403,8 @@ class DiscussionQuestionSerializer(serializers.ModelSerializer):
             'opens_at',
             'closes_at',
             'answer_count',
+            'has_answered',
+            'can_see_answers',
             'created_by',
             'created_at',
             'updated_at',
@@ -417,9 +421,17 @@ class DiscussionQuestionSerializer(serializers.ModelSerializer):
             'event_title',
             'answer_count',
             'effective_status',
+            'has_answered',
+            'can_see_answers',
         ]
 
     def get_answer_count(self, obj):
+        from book_clubs.permissions import user_can_see_answers
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user_can_see_answers(obj, user):
+            return None
         ct = ContentType.objects.get_for_model(DiscussionQuestion)
         return Comment.objects.filter(
             content_type=ct,
@@ -438,6 +450,19 @@ class DiscussionQuestionSerializer(serializers.ModelSerializer):
             status = DiscussionQuestionStatus.CLOSED
         return status
 
+    def get_has_answered(self, obj):
+        from book_clubs.permissions import user_has_answered
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return user_has_answered(obj, user)
+
+    def get_can_see_answers(self, obj):
+        from book_clubs.permissions import user_can_see_answers
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return user_can_see_answers(obj, user)
 
 class DiscussionQuestionWriteSerializer(serializers.ModelSerializer):
     class Meta:

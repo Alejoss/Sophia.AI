@@ -22,7 +22,12 @@ from book_clubs.models import (
     DiscussionQuestionStatus,
     MembershipRole,
 )
-from book_clubs.permissions import user_can_view_question
+from book_clubs.permissions import (
+    user_can_answer_question,
+    user_can_see_answers,
+    user_can_view_question,
+    user_has_answered,
+)
 from book_clubs.serializers import (
     BookClubCreateUpdateSerializer,
     BookClubDetailSerializer,
@@ -597,6 +602,7 @@ class BookClubHubView(APIView):
         if can_view_content:
             ct_dq = ContentType.objects.get_for_model(DiscussionQuestion)
             dq_ids = [q.id for q in visible if q.status != DiscussionQuestionStatus.DRAFT]
+            questions_by_id = {q.id: q for q in visible}
             dq_comments = (
                 Comment.objects.filter(
                     content_type=ct_dq,
@@ -608,6 +614,10 @@ class BookClubHubView(APIView):
                 .order_by('-created_at')[:8]
             )
             for c in dq_comments:
+                question = questions_by_id.get(c.object_id)
+                # Post-to-see: never leak answer previews until unlocked.
+                if not question or not user or not user_can_see_answers(question, user):
+                    continue
                 recent_activity.append(
                     {
                         'type': 'discussion_answer',
@@ -784,6 +794,20 @@ class BookClubEventListCreateView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class BookClubEventUnlinkView(APIView):
+    """DELETE a BookClubEvent link by its id (staff/mentor dashboard)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, slug, pk):
+        club = _get_club(slug)
+        if not club.user_can_manage(request.user):
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+        link = get_object_or_404(BookClubEvent, pk=pk, book_club=club)
+        link.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class DiscussionQuestionListCreateView(APIView):
     permission_classes = [AllowAny]
 
@@ -806,7 +830,7 @@ class DiscussionQuestionListCreateView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             return Response(
-                {'detail': 'Introduce tu correo para ver los debates.', 'code': 'email_required'},
+                {'detail': 'Introduce tu correo para ver el foro.', 'code': 'email_required'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -862,6 +886,7 @@ class DiscussionQuestionDetailView(APIView):
         club, question = self.get_object(slug, pk)
         user = request.user if request.user.is_authenticated else None
         is_member = bool(user and club.user_is_member(user))
+        can_manage = bool(user and club.user_can_manage(user))
         guest_result, _ = _resolve_guest_payload(request, slug)
         if guest_result in ('expired', 'invalid'):
             return Response(
@@ -869,21 +894,19 @@ class DiscussionQuestionDetailView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         is_guest = isinstance(guest_result, dict)
-        if not is_member and not is_guest:
+        if not is_member and not is_guest and not can_manage:
             if user:
                 return Response(
                     {'detail': 'Join the club to view this discussion.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             return Response(
-                {'detail': 'Introduce tu correo para ver este debate.', 'code': 'email_required'},
+                {'detail': 'Introduce tu correo para ver este hilo del foro.', 'code': 'email_required'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        if question.status == DiscussionQuestionStatus.DRAFT and not (
-            user and club.user_can_manage(user)
-        ):
+        if question.status == DiscussionQuestionStatus.DRAFT and not can_manage:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-        if user and not user_can_view_question(question, user) and not is_guest:
+        if user and not user_can_view_question(question, user) and not is_guest and not can_manage:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         data = DiscussionQuestionSerializer(question, context={'request': request}).data
@@ -891,6 +914,8 @@ class DiscussionQuestionDetailView(APIView):
             is_member and question.status == DiscussionQuestionStatus.OPEN
         )
         data['can_manage'] = bool(user and club.user_can_manage(user))
+        data['has_answered'] = user_has_answered(question, user) if user else False
+        data['can_see_answers'] = user_can_see_answers(question, user) if user else False
         return Response(data)
 
     def patch(self, request, slug, pk):

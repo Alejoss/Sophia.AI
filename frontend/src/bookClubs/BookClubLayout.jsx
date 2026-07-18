@@ -36,7 +36,7 @@ export const useBookClub = () => {
 const NAV_ITEMS = [
   { to: '.', end: true, label: 'Inicio' },
   { to: 'misiones', label: 'Misiones' },
-  { to: 'preguntas', label: 'Debates' },
+  { to: 'foro', label: 'Foro' },
   { to: 'comunidad', label: 'Comunidad' },
   { to: 'reuniones', label: 'Reuniones' },
 ];

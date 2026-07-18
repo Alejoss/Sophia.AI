@@ -161,8 +161,9 @@ class BookClubEvent(models.Model):
 
 class DiscussionQuestion(models.Model):
     """
-    Open discussion prompt after a mission (Node). Not a quiz —
-    answers are public Comment threads visible to all club members.
+    Guided forum prompt after a mission (Node) or live session.
+    Answers are Comment threads; members only see others' answers after
+    posting their own (mentors/admins can always see).
     """
     book_club = models.ForeignKey(
         BookClub,

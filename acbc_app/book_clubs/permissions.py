@@ -1,6 +1,9 @@
 from rest_framework.permissions import BasePermission
 
-from book_clubs.models import BookClub, BookClubMembership, MembershipRole
+from django.contrib.contenttypes.models import ContentType
+
+from book_clubs.models import BookClub, BookClubMembership, DiscussionQuestion, MembershipRole
+from comments.models import Comment
 
 
 class IsBookClubMember(BasePermission):
@@ -44,3 +47,30 @@ def user_can_answer_question(question, user):
         return False
     question.apply_schedule()
     return question.status == 'open'
+
+
+def user_has_answered(question, user):
+    """True if the user has an active top-level answer on this question."""
+    if not user or not user.is_authenticated:
+        return False
+    ct = ContentType.objects.get_for_model(DiscussionQuestion)
+    return Comment.objects.filter(
+        content_type=ct,
+        object_id=question.id,
+        author=user,
+        parent=None,
+        is_active=True,
+    ).exists()
+
+
+def user_can_see_answers(question, user):
+    """
+    Post-to-see: members see others' answers only after posting their own.
+    Mentors/admins/staff can see without answering.
+    Soft-deleting your answer re-locks the thread.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if question.book_club.user_can_manage(user):
+        return True
+    return user_has_answered(question, user)

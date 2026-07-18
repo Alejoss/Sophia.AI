@@ -13,7 +13,7 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_TEXT_FIELD_SX, QUESTION_STATUS_LABELS } from './clubTheme';
 
 const DiscussionQuestionsList = () => {
   const { slug } = useParams();
@@ -91,7 +91,7 @@ const DiscussionQuestionsList = () => {
           {items.map((q) => (
             <Box
               key={q.id}
-              onClick={() => navigate(`/club-de-lectura/${slug}/preguntas/${q.id}`)}
+              onClick={() => navigate(`/club-de-lectura/${slug}/foro/${q.id}`)}
               sx={{
                 cursor: 'pointer',
                 p: 2,
@@ -109,12 +109,23 @@ const DiscussionQuestionsList = () => {
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Chip
                   size="small"
-                  label={q.effective_status || q.status}
+                  label={
+                    QUESTION_STATUS_LABELS[q.effective_status || q.status] ||
+                    q.effective_status ||
+                    q.status
+                  }
                   sx={{ bgcolor: 'rgba(255,107,53,0.15)', color: CLUB_ACCENT }}
                 />
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>
-                  {q.answer_count} respuesta{q.answer_count === 1 ? '' : 's'}
-                </Typography>
+                {q.can_see_answers && q.answer_count != null && (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>
+                    {q.answer_count} respuesta{q.answer_count === 1 ? '' : 's'}
+                  </Typography>
+                )}
+                {!q.can_see_answers && q.effective_status !== 'draft' && q.status !== 'draft' && (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', alignSelf: 'center' }}>
+                    Responde para ver el hilo
+                  </Typography>
+                )}
               </Stack>
             </Box>
           ))}
@@ -126,10 +137,10 @@ const DiscussionQuestionsList = () => {
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-        Preguntas de debate
+        Foro
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
-        Preguntas abiertas después de misiones o reuniones. Las respuestas son visibles para todo el club.
+        Preguntas guiadas por el mentor. Publica tu respuesta para ver las de los demás miembros.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -157,16 +168,7 @@ const DiscussionQuestionsList = () => {
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
             placeholder="Escribe la pregunta que quieres abrir al club…"
-            sx={{
-              mb: 1.5,
-              '& .MuiOutlinedInput-root': {
-                bgcolor: 'rgba(255,255,255,0.06)',
-                color: '#fff',
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255,107,53,0.4)',
-              },
-            }}
+            sx={{ mb: 1.5, ...CLUB_TEXT_FIELD_SX }}
           />
           <Button
             variant="contained"

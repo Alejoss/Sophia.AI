@@ -376,6 +376,38 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(denied_role.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_unlink_event_by_link_id(self):
+        link = BookClubEvent.objects.get(book_club=self.club, event=self.event)
+        self.auth(self.mentor)
+        response = self.client.delete(f'/api/book_clubs/cypherpunk/events/{link.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BookClubEvent.objects.filter(pk=link.id).exists())
+
+    def test_staff_can_list_events_without_membership(self):
+        staff = User.objects.create_user(
+            username='dashboardstaff', password='pass123', is_staff=True
+        )
+        self.auth(staff)
+        response = self.client.get('/api/book_clubs/cypherpunk/events/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_staff_can_list_questions_without_membership(self):
+        DiscussionQuestion.objects.create(
+            book_club=self.club,
+            body='¿Hilo del foro?',
+            status=DiscussionQuestionStatus.OPEN,
+            created_by=self.mentor,
+            order=1,
+        )
+        staff = User.objects.create_user(
+            username='forumstaff', password='pass123', is_staff=True
+        )
+        self.auth(staff)
+        response = self.client.get('/api/book_clubs/cypherpunk/discussion-questions/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
     def _open_question_with_member_answer(self):
         BookClubMembership.objects.create(
             book_club=self.club, user=self.member, role=MembershipRole.MEMBER
@@ -418,6 +450,21 @@ class BookClubAPITestCase(APITestCase):
             book_club=self.club, user=other, role=MembershipRole.MEMBER
         )
         self.auth(other)
+        # Post-to-see: must answer before reading/replying to others.
+        locked = self.client.post(
+            f'/api/comments/replies/{answer.id}/',
+            {'body': 'Buen punto'},
+            format='json',
+        )
+        self.assertEqual(locked.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(locked.data.get('code'), 'answer_required')
+
+        own = self.client.post(
+            f'/api/comments/discussion-question/{question.id}/',
+            {'body': 'Mi respuesta primero'},
+            format='json',
+        )
+        self.assertEqual(own.status_code, status.HTTP_201_CREATED)
         response = self.client.post(
             f'/api/comments/replies/{answer.id}/',
             {'body': 'Buen punto'},
@@ -425,6 +472,96 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Comment.objects.filter(parent=answer, author=other).exists())
+
+    def test_forum_post_to_see_answers(self):
+        BookClubMembership.objects.create(
+            book_club=self.club, user=self.member, role=MembershipRole.MEMBER
+        )
+        other = User.objects.create_user(username='member2', password='pass123')
+        BookClubMembership.objects.create(
+            book_club=self.club, user=other, role=MembershipRole.MEMBER
+        )
+        question = DiscussionQuestion.objects.create(
+            book_club=self.club,
+            node=self.node1,
+            body='¿Pregunta del foro?',
+            status=DiscussionQuestionStatus.OPEN,
+            created_by=self.mentor,
+            order=1,
+        )
+        dq_type = ContentType.objects.get_for_model(DiscussionQuestion)
+        Comment.objects.create(
+            author=self.member,
+            body='Respuesta secreta del miembro',
+            content_type=dq_type,
+            object_id=question.id,
+            parent=None,
+        )
+
+        # Other member cannot list answers until they post.
+        self.auth(other)
+        locked = self.client.get(f'/api/comments/discussion-question/{question.id}/')
+        self.assertEqual(locked.status_code, status.HTTP_200_OK)
+        self.assertEqual(locked.data, [])
+
+        detail = self.client.get(
+            f'/api/book_clubs/cypherpunk/discussion-questions/{question.id}/'
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertFalse(detail.data['can_see_answers'])
+        self.assertFalse(detail.data['has_answered'])
+        self.assertIsNone(detail.data['answer_count'])
+
+        hub = self.client.get('/api/book_clubs/cypherpunk/hub/')
+        self.assertFalse(
+            any(
+                item.get('type') == 'discussion_answer'
+                and 'secreta' in (item.get('body_preview') or '')
+                for item in hub.data.get('recent_activity', [])
+            )
+        )
+
+        # After answering, they unlock the thread.
+        posted = self.client.post(
+            f'/api/comments/discussion-question/{question.id}/',
+            {'body': 'Ya respondí yo también'},
+            format='json',
+        )
+        self.assertEqual(posted.status_code, status.HTTP_201_CREATED)
+        unlocked = self.client.get(f'/api/comments/discussion-question/{question.id}/')
+        self.assertEqual(unlocked.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(unlocked.data), 2)
+        detail2 = self.client.get(
+            f'/api/book_clubs/cypherpunk/discussion-questions/{question.id}/'
+        )
+        self.assertTrue(detail2.data['can_see_answers'])
+        self.assertEqual(detail2.data['answer_count'], 2)
+
+        # Soft-delete own answer re-locks.
+        Comment.objects.logic_delete(
+            Comment.objects.get(author=other, object_id=question.id, parent=None)
+        )
+        relocked = self.client.get(f'/api/comments/discussion-question/{question.id}/')
+        self.assertEqual(relocked.status_code, status.HTTP_200_OK)
+        self.assertEqual(relocked.data, [])
+        detail3 = self.client.get(
+            f'/api/book_clubs/cypherpunk/discussion-questions/{question.id}/'
+        )
+        self.assertFalse(detail3.data['can_see_answers'])
+        self.assertIsNone(detail3.data['answer_count'])
+
+        # Mentor sees all without answering.
+        self.auth(self.mentor)
+        mentor_list = self.client.get(
+            f'/api/comments/discussion-question/{question.id}/'
+        )
+        self.assertEqual(mentor_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mentor_list.data), 1)
+        mentor_detail = self.client.get(
+            f'/api/book_clubs/cypherpunk/discussion-questions/{question.id}/'
+        )
+        self.assertTrue(mentor_detail.data['can_see_answers'])
+        self.assertFalse(mentor_detail.data['has_answered'])
 
     def test_closed_question_blocks_generic_reply(self):
         question, answer = self._open_question_with_member_answer()
@@ -545,6 +682,38 @@ class BookClubCreateUpdateAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data['status'], 'active')
         self.assertEqual(response.data['description'], 'Actualizado')
+
+    def test_staff_can_clear_telegram_and_dates(self):
+        self.auth(self.staff)
+        created = self.client.post(
+            '/api/book_clubs/',
+            {
+                'title': 'Club con fechas',
+                'status': 'draft',
+                'telegram_group_url': 'https://t.me/ejemplo',
+                'starts_at': timezone.now().isoformat(),
+                'ends_at': (timezone.now() + timezone.timedelta(days=30)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        slug = created.data['slug']
+        self.assertTrue(created.data['telegram_group_url'])
+        self.assertIsNotNone(created.data['starts_at'])
+
+        cleared = self.client.patch(
+            f'/api/book_clubs/{slug}/',
+            {
+                'telegram_group_url': '',
+                'starts_at': None,
+                'ends_at': None,
+            },
+            format='json',
+        )
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.data)
+        self.assertEqual(cleared.data['telegram_group_url'], '')
+        self.assertIsNone(cleared.data['starts_at'])
+        self.assertIsNone(cleared.data['ends_at'])
 
 
 class BookClubGuestOnboardingTests(BookClubAPITestCase):

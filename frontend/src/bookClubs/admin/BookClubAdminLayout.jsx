@@ -132,7 +132,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Preguntas
+          Foro
         </Box>
         <Box
           component={NavLink}
