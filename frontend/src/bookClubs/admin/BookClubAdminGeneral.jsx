@@ -136,7 +136,8 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
             Nuevo club de lectura
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Empieza con lo esencial. Luego podrás vincular path, topic y reuniones.
+            Empieza con lo esencial. Luego, en Conexiones, vinculas el knowledge path (misiones) y
+            el tema de Investigación; después reuniones y preguntas.
           </Typography>
         </>
       )}

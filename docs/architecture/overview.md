@@ -67,10 +67,11 @@ graph TB
 
 **Main Django Apps**:
 - `profiles` - User profiles and authentication
-- `content` - Content management (videos, audio, text, images)
+- `content` - Content management (videos, audio, text, images) and Topics/timelines
 - `certificates` - Certificate generation and management
 - `events` - Event management
 - `knowledge_paths` - Learning paths and nodes
+- `book_clubs` - Club de Lectura hub (cohorts over paths, topics, events, debates)
 - `quizzes` - Quiz system
 - `comments` - Comment system
 - `votes` - Voting system
@@ -78,6 +79,8 @@ graph TB
 - `user_messages` - Messaging system
 - `search` - Search functionality
 - `notifications` - Notification storage (django-notifications-hq; API exposed via `profiles`)
+
+See also: [Club de Lectura](book-clubs.md), [Topics & Knowledge Paths](topics-and-knowledge-paths.md).
 
 ### 3. Data Layer
 

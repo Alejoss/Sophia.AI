@@ -306,6 +306,8 @@ Cada **Topic** puede tener una línea de tiempo editorial: una narrativa curada 
 
 La línea de tiempo se crea de forma implícita al agregar la primera entrada; no requiere un paso de configuración previo.
 
+**Uso en Club de Lectura:** un `BookClub` puede vincular un `Topic` como tema de **Investigación**. El hub embebe el timeline en solo lectura y muestra conteos por tipo de media; el detalle completo del tema se abre en otra pestaña. Ver [book-clubs.md](book-clubs.md).
+
 ### Modelo de dominio
 
 Backend: `content/models.py`.

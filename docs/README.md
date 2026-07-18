@@ -9,6 +9,8 @@ System design, data models, API architecture, and blockchain integration:
 - [Overview](architecture/overview.md) - System architecture and high-level design
 - [Data Models](architecture/data-models.md) - Database schema and entity relationships
 - [API Design](architecture/api-design.md) - API architecture and design principles
+- [Topics & Knowledge Paths](architecture/topics-and-knowledge-paths.md) - Topics, timelines, and learning paths
+- [Club de Lectura](architecture/book-clubs.md) - Book club hub, Investigación, debates, and dashboard admin
 - [Blockchain Integration](architecture/blockchain-integration.md) - Web3 and smart contract integration
 
 ### [API Documentation](api/)
