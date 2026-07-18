@@ -2,9 +2,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import signing
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,6 +17,7 @@ from book_clubs.guest_tokens import dump_guest_token, load_guest_token
 from book_clubs.models import (
     BookClub,
     BookClubEvent,
+    BookClubMissionRelease,
     BookClubMembership,
     BookClubStatus,
     DiscussionQuestion,
@@ -402,6 +404,125 @@ class BookClubMemberListView(APIView):
         )
 
 
+class BookClubMissionScheduleView(APIView):
+    """Staff-managed collective release dates for a club's missions."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _club(self, request, slug):
+        club = _get_club(slug)
+        if not club.user_can_manage(request.user):
+            return club, Response(
+                {'detail': 'Solo el staff puede editar el calendario de misiones.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return club, None
+
+    def _payload(self, club):
+        if not club.knowledge_path_id:
+            return []
+        releases = {
+            release.node_id: release
+            for release in club.mission_releases.select_related('node')
+        }
+        now = timezone.now()
+        payload = []
+        nodes = club.knowledge_path.nodes.order_by('order')
+        for index, node in enumerate(nodes):
+            release = releases.get(node.id)
+            opens_at = release.opens_at if release else (
+                (club.starts_at or club.created_at) if index == 0 else None
+            )
+            is_released = bool(opens_at and opens_at <= now)
+            payload.append({
+                'node_id': node.id,
+                'title': node.title,
+                'order': node.order,
+                'opens_at': opens_at,
+                'is_released': is_released,
+            })
+        return payload
+
+    def get(self, request, slug):
+        club, denied = self._club(request, slug)
+        if denied:
+            return denied
+        return Response(self._payload(club))
+
+    def patch(self, request, slug):
+        club, denied = self._club(request, slug)
+        if denied:
+            return denied
+        if not club.knowledge_path_id:
+            return Response(
+                {'detail': 'El club no tiene un camino del conocimiento vinculado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        releases = request.data.get('releases')
+        if not isinstance(releases, list):
+            return Response(
+                {'detail': 'Envía una lista en el campo releases.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        date_field = serializers.DateTimeField(allow_null=True)
+        nodes = list(club.knowledge_path.nodes.order_by('order'))
+        node_ids = {node.id for node in nodes}
+        seen = set()
+        normalized = []
+        for item in releases:
+            node_id = item.get('node_id') if isinstance(item, dict) else None
+            if node_id not in node_ids or node_id in seen:
+                return Response(
+                    {'detail': 'El calendario contiene una misión inválida o duplicada.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            seen.add(node_id)
+            try:
+                opens_at = date_field.run_validation(item.get('opens_at'))
+            except serializers.ValidationError as exc:
+                return Response(
+                    {'opens_at': exc.detail},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            normalized.append((node_id, opens_at))
+
+        proposed = {
+            release.node_id: release.opens_at
+            for release in club.mission_releases.all()
+        }
+        if nodes and nodes[0].id not in proposed:
+            proposed[nodes[0].id] = club.starts_at or club.created_at
+        proposed.update(dict(normalized))
+        dates_in_order = [proposed.get(node.id) for node in nodes]
+        seen_unscheduled = False
+        for opens_at in dates_in_order:
+            if opens_at is None:
+                seen_unscheduled = True
+            elif seen_unscheduled:
+                return Response(
+                    {'detail': 'No puedes programar una misión si una anterior sigue sin fecha.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        dated = [opens_at for opens_at in dates_in_order if opens_at is not None]
+        if dated != sorted(dated):
+            return Response(
+                {'detail': 'Las fechas deben avanzar en el mismo orden que las misiones.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            for node_id, opens_at in normalized:
+                BookClubMissionRelease.objects.update_or_create(
+                    book_club=club,
+                    node_id=node_id,
+                    defaults={'opens_at': opens_at},
+                )
+
+        return Response(self._payload(club))
+
+
 class BookClubHubView(APIView):
     permission_classes = [AllowAny]
 
@@ -458,7 +579,11 @@ class BookClubHubView(APIView):
         }
         next_mission = None
         if is_member and club.knowledge_path_id:
-            progress = get_knowledge_path_progress(user, club.knowledge_path)
+            progress = get_knowledge_path_progress(
+                user,
+                club.knowledge_path,
+                book_club=club,
+            )
             nodes_by_id = {n.id: n for n in club.knowledge_path.nodes.all()}
             for node_data in progress.get('nodes_progress', []):
                 if not node_data.get('is_completed') and node_data.get('is_available'):
@@ -483,6 +608,10 @@ class BookClubHubView(APIView):
                             'path_id': club.knowledge_path_id,
                             'description': (node.description or '') if node else '',
                             'locked': not node_data.get('is_available', False),
+                            'club_schedule_locked': node_data.get(
+                                'club_schedule_locked', False
+                            ),
+                            'opens_at': node_data.get('club_opens_at'),
                         }
                         break
         elif is_guest and club.knowledge_path_id:
@@ -749,7 +878,7 @@ class BookClubEventListCreateView(APIView):
 
 
 class BookClubEventUnlinkView(APIView):
-    """DELETE a BookClubEvent link by its id (staff/mentor dashboard)."""
+    """DELETE a BookClubEvent link by its id (staff dashboard)."""
 
     permission_classes = [IsAuthenticated]
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
+import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
 import { Box, Typography, Alert, Chip, CircularProgress, Button, Stack, Paper, Container, Link as MuiLink } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
@@ -12,6 +13,11 @@ import AudioFileIcon from '@mui/icons-material/AudioFile';
 const NodeDetail = () => {
   const { pathId, nodeId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Book-club context: keep ?club=<slug> across node navigation so members
+  // can always return to the club hub.
+  const clubSlug = searchParams.get('club');
+  const clubQS = clubSlug ? `?club=${encodeURIComponent(clubSlug)}` : '';
   const [node, setNode] = useState(null);
   const [nodeContent, setNodeContent] = useState(null);
   const [knowledgePath, setKnowledgePath] = useState(null);
@@ -30,8 +36,8 @@ const NodeDetail = () => {
       try {
         // Fetch node and path data first
         const [nodeData, pathData] = await Promise.all([
-        knowledgePathsApi.getNode(pathId, nodeId),
-        knowledgePathsApi.getKnowledgePath(pathId)]
+        knowledgePathsApi.getNode(pathId, nodeId, { club: clubSlug }),
+        knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug })]
         );
 
         if (!isMounted) return;
@@ -70,7 +76,16 @@ const NodeDetail = () => {
       } catch (err) {
         console.error('❌ Error fetching data:', err);
         if (isMounted) {
-          setError('Error al cargar el nodo');
+          if (err?.response?.data?.code === 'club_mission_not_released') {
+            const opensAt = err.response.data.opens_at;
+            setError(
+              opensAt
+                ? `Esta misión se desbloqueará para todo el club el ${new Date(opensAt).toLocaleString('es-ES')}.`
+                : 'Esta misión aún no tiene fecha de apertura para el club.'
+            );
+          } else {
+            setError('Error al cargar el nodo');
+          }
         }
       } finally {
         if (isMounted) {
@@ -87,13 +102,13 @@ const NodeDetail = () => {
 
       isMounted = false;
     };
-  }, [pathId, nodeId]);
+  }, [pathId, nodeId, clubSlug]);
 
   const handleComplete = async () => {
 
     let response;
     try {
-      response = await knowledgePathsApi.markNodeCompleted(pathId, nodeId);
+      response = await knowledgePathsApi.markNodeCompleted(pathId, nodeId, { club: clubSlug });
 
 
       // Backend returns {"message": "Node completed successfully"}
@@ -111,9 +126,9 @@ const NodeDetail = () => {
       return;
     }
     if (nextNode) {
-      navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}`);
+      navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}${clubQS}`);
     } else {
-      navigate(`/knowledge_path/${pathId}`);
+      navigate(`/knowledge_path/${pathId}${clubQS}`);
     }
   };
 
@@ -122,6 +137,7 @@ const NodeDetail = () => {
   if (error) {
     return (
       <Container maxWidth="md" sx={{ py: 3 }}>
+        <BookClubReturnLink sx={{ mb: 2.5 }} />
         <Alert severity="error">{error}</Alert>
       </Container>);
 
@@ -150,11 +166,13 @@ const NodeDetail = () => {
   return (
     <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
       <Box sx={{ maxWidth: 672, mx: 'auto' }}>
+        <BookClubReturnLink sx={{ mb: 2.5 }} />
+
         {/* Breadcrumb Navigation */}
         <Typography variant="body2" sx={{ mb: 2 }}>
           <MuiLink
             component={Link}
-            to={`/knowledge_path/${pathId}`}
+            to={`/knowledge_path/${pathId}${clubQS}`}
             underline="hover"
             color="primary"
             sx={{ fontWeight: 500 }}>
@@ -234,7 +252,7 @@ const NodeDetail = () => {
             {prevNode &&
             <Button
               variant="outlined"
-              onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}`)}
+              onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}${clubQS}`)}
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
                 ← Anterior
@@ -252,7 +270,7 @@ const NodeDetail = () => {
             }
             <Button
               component={Link}
-              to={`/knowledge_path/${pathId}`}
+              to={`/knowledge_path/${pathId}${clubQS}`}
               variant="outlined"
               color="inherit"
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
@@ -267,7 +285,7 @@ const NodeDetail = () => {
                 if (node.quizzes && node.quizzes.length > 0) {
                   navigate(`/quizzes/${node.quizzes[0].id}`);
                 } else if (nextNode) {
-                  navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}`);
+                  navigate(`/knowledge_path/${pathId}/nodes/${nextNode.id}${clubQS}`);
                 }
               }}
               disabled={!nextNode && !node.quizzes?.length}

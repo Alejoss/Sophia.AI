@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Avatar,
   Container,
@@ -43,11 +43,17 @@ import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
+import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Book-club context: propagate ?club=<slug> into node links so members
+  // keep the "back to club" navigation while working through missions.
+  const clubSlug = searchParams.get('club');
+  const clubQS = clubSlug ? `?club=${encodeURIComponent(clubSlug)}` : '';
   const { authState } = useContext(AuthContext);
   const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
     strategy: AUTH_ERROR_STRATEGY.REDIRECT,
@@ -107,7 +113,7 @@ const KnowledgePathDetail = () => {
       setError(null);
 
       try {
-        const data = await knowledgePathsApi.getKnowledgePath(pathId);
+        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
         if (cancelled) return;
 
         setKnowledgePath(data);
@@ -132,7 +138,7 @@ const KnowledgePathDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [pathId, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage]);
+  }, [pathId, clubSlug, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage]);
 
   const handleAddComment = async (e) => {
     e.preventDefault();
@@ -387,6 +393,8 @@ const KnowledgePathDetail = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+      <BookClubReturnLink sx={{ mb: 3 }} />
+
       {/* Hero Header Section */}
       <Paper 
         elevation={3} 
@@ -666,7 +674,7 @@ const KnowledgePathDetail = () => {
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         {node.is_available ? (
                           <Link 
-                            to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                            to={`/knowledge_path/${pathId}/nodes/${node.id}${clubQS}`}
                             style={{ 
                               textDecoration: 'none',
                               color: 'inherit'
@@ -702,12 +710,30 @@ const KnowledgePathDetail = () => {
                             {node.title}
                           </Typography>
                         )}
-                        <Chip 
-                          label={node.media_type} 
-                          size="small" 
-                          variant="outlined"
-                          sx={{ mt: 0.5 }}
-                        />
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                          <Chip
+                            label={node.media_type}
+                            size="small"
+                            variant="outlined"
+                          />
+                          {node.club_schedule_locked && (
+                            <Chip
+                              label={
+                                node.club_opens_at
+                                  ? `Disponible ${new Date(node.club_opens_at).toLocaleString('es-ES', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}`
+                                  : 'Fecha por confirmar'
+                              }
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                            />
+                          )}
+                        </Stack>
                       </Box>
                       <Stack direction="row" spacing={1} alignItems="center">
                         {isCompleted && (
@@ -728,7 +754,7 @@ const KnowledgePathDetail = () => {
                         {node.is_available && (
                           <IconButton
                             component={Link}
-                            to={`/knowledge_path/${pathId}/nodes/${node.id}`}
+                            to={`/knowledge_path/${pathId}/nodes/${node.id}${clubQS}`}
                             color="primary"
                             size="small"
                           >

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -10,7 +10,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
 import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_TEXT_FIELD_SX, QUESTION_STATUS_LABELS } from './clubTheme';
@@ -18,7 +17,6 @@ import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_TEXT_FIELD_SX, QUESTION_STATUS_LAB
 const DiscussionQuestionsList = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { authState } = useContext(AuthContext);
   const { hub, reload, club, guestToken, canParticipate } = useBookClub();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +138,7 @@ const DiscussionQuestionsList = () => {
         Foro
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
-        Preguntas guiadas por el mentor. Publica tu respuesta para ver las de los demás miembros.
+        Preguntas guiadas por el staff. Publica tu respuesta para ver las de los demás miembros.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>

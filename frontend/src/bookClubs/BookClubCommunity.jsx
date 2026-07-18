@@ -10,13 +10,12 @@ import {
 } from '@mui/material';
 import bookClubsApi from '../api/bookClubsApi';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, CLUB_ACCENT_HOVER, formatClubDate } from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
 
 const BookClubCommunity = () => {
   const { hub, club, slug, canParticipate } = useBookClub();
   const topicId = hub.quick_links?.topic_id;
   const telegramUrl = club?.telegram_group_url;
-  const communityActivity = (hub.recent_activity || []).filter((a) => a.type !== 'discussion_answer');
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(canParticipate);
   const [membersError, setMembersError] = useState('');
@@ -64,6 +63,41 @@ const BookClubCommunity = () => {
           del tema están en la pestaña Investigación.
         </Typography>
       </Box>
+
+      {telegramUrl ? (
+        <Box
+          sx={{
+            p: 3,
+            border: `1px solid ${CLUB_ACCENT}`,
+            borderRadius: 1,
+            bgcolor: 'rgba(255,107,53,0.08)',
+          }}
+        >
+          <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
+            Telegram
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
+            Grupo del club
+          </Typography>
+          <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
+            Avisos, dudas rápidas y compañía mientras lees. Es el canal vivo del ciclo.
+          </Typography>
+          <Button
+            variant="contained"
+            component="a"
+            href={telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
+          >
+            Abrir grupo de Telegram
+          </Button>
+        </Box>
+      ) : (
+        <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
+          Aún no hay un grupo de Telegram vinculado a este club.
+        </Alert>
+      )}
 
       <Box>
         <Stack
@@ -175,41 +209,6 @@ const BookClubCommunity = () => {
         )}
       </Box>
 
-      {telegramUrl ? (
-        <Box
-          sx={{
-            p: 3,
-            border: `1px solid ${CLUB_ACCENT}`,
-            borderRadius: 1,
-            bgcolor: 'rgba(255,107,53,0.08)',
-          }}
-        >
-          <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-            Telegram
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
-            Grupo del club
-          </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
-            Avisos, dudas rápidas y compañía mientras lees. Es el canal vivo del ciclo.
-          </Typography>
-          <Button
-            variant="contained"
-            component="a"
-            href={telegramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
-          >
-            Abrir grupo de Telegram
-          </Button>
-        </Box>
-      ) : (
-        <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-          Aún no hay un grupo de Telegram vinculado a este club.
-        </Alert>
-      )}
-
       {topicId && (
         <Box
           sx={{
@@ -236,30 +235,6 @@ const BookClubCommunity = () => {
         </Box>
       )}
 
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-          Eco reciente
-        </Typography>
-        {communityActivity.length ? (
-          <Stack spacing={1.5}>
-            {communityActivity.map((item) => (
-              <Box key={`c-${item.comment_id}`}>
-                <Typography variant="body2">
-                  <strong>{item.author}</strong>: {item.body_preview}
-                  {item.body_preview?.length >= 120 ? '…' : ''}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
-                  {formatClubDate(item.created_at)}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        ) : (
-          <Typography sx={{ color: 'rgba(255,255,255,0.6)' }}>
-            Aún no hay actividad de comunidad. Cuando el topic esté activo, aquí verás un anticipo.
-          </Typography>
-        )}
-      </Box>
     </Stack>
   );
 };

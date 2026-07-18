@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   Button,
-  Collapse,
   LinearProgress,
   Stack,
   Typography,
@@ -57,8 +56,6 @@ const PrimaryCta = ({ to, href, children, onClick }) => (
 
 const BookClubOverview = () => {
   const { slug, hub, club, isGuest, canParticipate } = useBookClub();
-  const [aboutOpen, setAboutOpen] = useState(false);
-
   const guest = getGuestSession(slug);
   const accountCta = {
     label: 'Crear cuenta para participar →',
@@ -85,8 +82,9 @@ const BookClubOverview = () => {
   const daysToEvent = daysUntil(hub.next_event?.date_start);
   const telegramUrl = club.telegram_group_url;
 
+  // ?club= keeps the "back to club" navigation on knowledge-path pages.
   const missionHref = nextMission
-    ? `/knowledge_path/${nextMission.path_id}/nodes/${nextMission.node_id}`
+    ? `/knowledge_path/${nextMission.path_id}/nodes/${nextMission.node_id}?club=${encodeURIComponent(slug)}`
     : 'misiones';
 
   const hero = (() => {
@@ -153,10 +151,21 @@ const BookClubOverview = () => {
       };
     }
     if (nextMission?.locked) {
+      const collectiveMessage = nextMission.club_schedule_locked
+        ? nextMission.opens_at
+          ? `Se desbloquea para todo el club el ${formatClubDate(nextMission.opens_at, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}.`
+          : 'El staff todavía no ha definido la fecha de apertura.'
+        : 'Completa la misión anterior para continuar.';
       return {
         eyebrow: 'Próxima misión',
         title: nextMission.title,
-        body: 'Todavía bloqueada. Completa la misión anterior o entra al foro mientras esperas.',
+        body: collectiveMessage,
         cta: weeklyQuestion
           ? {
               label: 'Entrar al foro →',
@@ -168,15 +177,16 @@ const BookClubOverview = () => {
     return {
       eyebrow: 'El club está activo',
       title: 'Las misiones se están preparando',
-      body: 'Cuando el mentor publique la primera lectura, aparecerá aquí como tu acción principal.',
+      body: 'Cuando el staff publique la primera lectura, aparecerá aquí como tu acción principal.',
       cta: { label: 'Explorar el club →', to: 'comunidad' },
     };
   })();
 
-  const activityLabel = (item) => {
-    if (item.type === 'discussion_answer') return 'respondió en el foro';
-    return 'compartió en la comunidad';
-  };
+  // Only topic comments are public/open; forum answers are gated (post-to-see),
+  // so they don't belong in this open feed.
+  const topicActivity = (hub.recent_activity || []).filter(
+    (item) => item.type === 'topic_comment'
+  );
 
   return (
     <Stack spacing={5}>
@@ -346,7 +356,7 @@ const BookClubOverview = () => {
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.75, maxWidth: 480 }}>
               {nextMission
                 ? `La primera pregunta se abrirá después de avanzar en la Misión ${nextMission.order}. Completa tu lectura para entrar al foro.`
-                : 'Cuando el mentor abra la primera pregunta del foro, aparecerá aquí.'}
+                : 'Cuando el staff abra la primera pregunta del foro, aparecerá aquí.'}
             </Typography>
             {nextMission && !nextMission.locked && (
               <Button
@@ -436,27 +446,28 @@ const BookClubOverview = () => {
         )}
       </Box>
 
-      {/* Nivel 3 — Actividad */}
+      {/* Nivel 3 — Eco reciente (comentarios abiertos del tema vinculado) */}
       <Box>
-        <SectionLabel>Actividad del club</SectionLabel>
-        {hub.recent_activity?.length ? (
+        <SectionLabel>Eco reciente</SectionLabel>
+        {topicActivity.length ? (
           <Stack spacing={1.5}>
-            {hub.recent_activity.slice(0, 5).map((item) => (
-              <Typography
-                key={`${item.type}-${item.comment_id}`}
-                variant="body2"
-                sx={{ color: 'rgba(255,255,255,0.8)' }}
-              >
-                <strong>{item.author}</strong> {activityLabel(item)}
-                {item.body_preview ? `: “${item.body_preview.slice(0, 80)}${item.body_preview.length > 80 ? '…' : ''}”` : ''}
-              </Typography>
+            {topicActivity.slice(0, 5).map((item) => (
+              <Box key={`${item.type}-${item.comment_id}`}>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                  <strong>{item.author}</strong> comentó en el tema
+                  {item.body_preview ? `: “${item.body_preview.slice(0, 80)}${item.body_preview.length > 80 ? '…' : ''}”` : ''}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {formatClubDate(item.created_at)}
+                </Typography>
+              </Box>
             ))}
             <Button
               component={RouterLink}
-              to="comunidad"
+              to="investigacion"
               sx={{ alignSelf: 'flex-start', color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              Ver comunidad →
+              Ver investigación →
             </Button>
           </Stack>
         ) : (
@@ -465,7 +476,7 @@ const BookClubOverview = () => {
               La conversación está por comenzar
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75, maxWidth: 480 }}>
-              Cuando los lectores compartan sus primeras reflexiones, aparecerán aquí.
+              Cuando los lectores comenten en el tema de investigación, sus aportes aparecerán aquí.
             </Typography>
             {nextMission && !nextMission.locked && (
               <Button
@@ -480,26 +491,15 @@ const BookClubOverview = () => {
         )}
       </Box>
 
-      {/* Acerca del club — secundario */}
+      {/* Enlace secundario al sitio principal */}
       <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.08)', pt: 3 }}>
         <Button
-          onClick={() => setAboutOpen((v) => !v)}
+          component={RouterLink}
+          to="/"
           sx={{ color: 'rgba(255,255,255,0.55)', px: 0 }}
         >
-          {aboutOpen ? 'Ocultar acerca del club' : 'Acerca del club'}
+          Acerca de Academia Blockchain
         </Button>
-        <Collapse in={aboutOpen}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1.5, whiteSpace: 'pre-wrap' }}>
-            {club.description || 'Sin descripción adicional.'}
-          </Typography>
-          {(club.starts_at || club.ends_at) && (
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mt: 1 }}>
-              {club.starts_at ? `Inicio: ${formatClubDate(club.starts_at)}` : ''}
-              {club.starts_at && club.ends_at ? ' · ' : ''}
-              {club.ends_at ? `Cierre: ${formatClubDate(club.ends_at)}` : ''}
-            </Typography>
-          )}
-        </Collapse>
       </Box>
     </Stack>
   );

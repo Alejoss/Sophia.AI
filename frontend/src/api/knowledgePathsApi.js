@@ -40,9 +40,11 @@ const knowledgePathsApi = {
     }
   },
 
-  getKnowledgePath: async (pathId) => {
+  getKnowledgePath: async (pathId, { club } = {}) => {
     try {
-      const response = await axiosInstance.get(`/knowledge_paths/${pathId}/`);
+      const response = await axiosInstance.get(`/knowledge_paths/${pathId}/`, {
+        params: club ? { club } : undefined,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching knowledge path:', error);
@@ -198,9 +200,11 @@ const knowledgePathsApi = {
     }
   },
 
-  getNode: async (pathId, nodeId) => {
+  getNode: async (pathId, nodeId, { club } = {}) => {
     try {
-      const response = await axiosInstance.get(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+      const response = await axiosInstance.get(`/knowledge_paths/${pathId}/nodes/${nodeId}/`, {
+        params: club ? { club } : undefined,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching node:', error);
@@ -244,10 +248,14 @@ const knowledgePathsApi = {
     }
   },
 
-  markNodeCompleted: async (pathId, nodeId) => {
+  markNodeCompleted: async (pathId, nodeId, { club } = {}) => {
     try {
 
-      const response = await axiosInstance.post(`/knowledge_paths/${pathId}/nodes/${nodeId}/`);
+      const response = await axiosInstance.post(
+        `/knowledge_paths/${pathId}/nodes/${nodeId}/`,
+        undefined,
+        { params: club ? { club } : undefined }
+      );
 
       return response.data;
     } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -8,14 +8,12 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
 import bookClubsApi from '../api/bookClubsApi';
 import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, formatClubDate } from './clubTheme';
 
 const BookClubMeetings = () => {
   const { slug } = useParams();
-  const { authState } = useContext(AuthContext);
   const { guestToken } = useBookClub();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);

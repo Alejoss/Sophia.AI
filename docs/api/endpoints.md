@@ -220,34 +220,56 @@ Full product docs: [book-clubs.md](../architecture/book-clubs.md).
 
 ### Club Detail / Update
 - **GET/PATCH** `/api/book_clubs/{slug}/`
-- **Auth**: Required for PATCH (mentor/admin/staff)
+- **Auth**: Required; PATCH is restricted to Django staff/superusers
 
 ### Hub Payload
 - **GET** `/api/book_clubs/{slug}/hub/`
 - **Auth**: Member, guest token (`X-Book-Club-Guest`), or staff
 - **Response**: Progress, next mission/event, open/past questions, `quick_links.topic_id`, etc.
 
+### Mission Schedule
+- **GET/PATCH** `/api/book_clubs/{slug}/mission-schedule/`
+- **Auth**: Django staff/superusers
+- **PATCH body**: `{ "releases": [{ "node_id": 1, "opens_at": "2026-07-20T18:00:00Z" }] }`
+- Dates must follow node order; `null` leaves a mission unscheduled/locked.
+- Knowledge Path and Node endpoints accept `?club={slug}` and return
+  `club_opens_at` / `club_schedule_locked`. For club members the schedule is
+  also enforced server-side when the parameter is absent.
+
 ### Join / Guest Access
 - **POST** `/api/book_clubs/{slug}/join/`
 - **POST** `/api/book_clubs/{slug}/guest-access/` — body `{ "email" }`
+- **GET** `/api/book_clubs/invite-preview/?token=…` — preview público del invite (usado al completar cuenta)
 
 ### Membership Introduction (Preséntate)
 - **GET/PATCH** `/api/book_clubs/{slug}/membership/introduction/`
 - Writes `Profile.profile_description` / `external_url`; sets `intro_updated_at`
+- Membership stores presentation state only; it has no per-club role
 
 ### Members
-- **GET** `/api/book_clubs/{slug}/members/` — presented members; managers may pass `?include_all=1`
-- **PATCH** `/api/book_clubs/{slug}/members/{membership_id}/` — body `{ "role" }`
+- **GET** `/api/book_clubs/{slug}/members/` — by default, only memberships with `intro_updated_at` set
+- **Auth**: Club member or staff; only staff/superusers may use `?include_all=1` for the full roster
 
 ### Events
-- **GET/POST/DELETE** `/api/book_clubs/{slug}/events/` — DELETE body `{ "event_id" }`
+- **GET/POST** `/api/book_clubs/{slug}/events/`
+- **DELETE** `/api/book_clubs/{slug}/events/` — body `{ "event_id": N }`
+- **DELETE** `/api/book_clubs/{slug}/events/{link_id}/` — unlink by `BookClubEvent` id
+- **Auth**: Members/guests/staff may list; link and unlink operations require staff/superuser
 
-### Discussion Questions
+### Foro (Discussion Questions)
 - **GET/POST** `/api/book_clubs/{slug}/discussion-questions/`
 - **GET/PATCH/DELETE** `/api/book_clubs/{slug}/discussion-questions/{id}/`
 - Answers: **GET/POST** `/api/comments/discussion-question/{id}/`
+- Canonical frontend routes: `/club-de-lectura/{slug}/foro` and `/club-de-lectura/{slug}/foro/{id}`; old `/preguntas` routes redirect
+- Post-to-see: members receive no other answers until publishing their own; staff/superusers always see answers
+- One active top-level answer per user; authors may edit/delete their own answer through **PATCH/DELETE** `/api/comments/{comment_id}/`
+- Deleting the member's top-level answer makes it inactive and locks the other answers again
 
-Investigación in the hub uses existing Topic APIs (`/api/content/topics/{id}/basic/`, `…/timeline/`, `…/content/{media_type}/`), not a separate book-club media endpoint.
+### Investigación
+- Frontend route: `/club-de-lectura/{slug}/investigacion`
+- Uses the club's linked `Topic` and existing Topic APIs (`/api/content/topics/{id}/basic/`, `…/timeline/`, `…/content/{media_type}/`), not a separate book-club media endpoint
+- Shows VIDEO/IMAGE/AUDIO/TEXT counts and the timeline in read-only mode
+- Topic and timeline data require authentication; guests are prompted to sign in or create an account
 
 ## Quizzes
 

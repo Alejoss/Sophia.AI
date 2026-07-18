@@ -105,6 +105,18 @@ const bookClubsApi = {
     return response.data;
   },
 
+  getMissionSchedule: async (slug) => {
+    const response = await axiosInstance.get(`/book_clubs/${slug}/mission-schedule/`);
+    return response.data;
+  },
+
+  updateMissionSchedule: async (slug, releases) => {
+    const response = await axiosInstance.patch(`/book_clubs/${slug}/mission-schedule/`, {
+      releases,
+    });
+    return response.data;
+  },
+
   listEvents: async (slug, { guestToken } = {}) => {
     const response = await axiosInstance.get(`/book_clubs/${slug}/events/`, {
       headers: guestHeaders(guestToken),

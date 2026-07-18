@@ -89,13 +89,17 @@ const BookClubMissions = () => {
             </Button>
           ) : next.locked ? (
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 1 }}>
-              Esta misión está bloqueada hasta completar la anterior.
+              {next.club_schedule_locked
+                ? next.opens_at
+                  ? `Esta misión se abrirá para todo el club el ${new Date(next.opens_at).toLocaleString('es-ES')}.`
+                  : 'Esta misión sigue bloqueada hasta que el staff defina su fecha.'
+                : 'Esta misión está bloqueada hasta completar la anterior.'}
             </Typography>
           ) : (
             <Button
               variant="contained"
               component={RouterLink}
-              to={`/knowledge_path/${next.path_id}/nodes/${next.node_id}`}
+              to={`/knowledge_path/${next.path_id}/nodes/${next.node_id}?club=${encodeURIComponent(slug)}`}
               sx={{ mt: 2, bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
             >
               Abrir misión
@@ -110,7 +114,7 @@ const BookClubMissions = () => {
             Las misiones se están preparando
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.75 }}>
-            Cuando el mentor publique la primera lectura, aparecerá aquí como tu acción principal.
+            Cuando el staff publique la primera lectura, aparecerá aquí como tu acción principal.
           </Typography>
         </Box>
       )}
@@ -119,7 +123,7 @@ const BookClubMissions = () => {
         <Button
           variant="outlined"
           component={RouterLink}
-          to={`/knowledge_path/${pathId}`}
+          to={`/knowledge_path/${pathId}?club=${encodeURIComponent(slug)}`}
           sx={{ alignSelf: 'flex-start', borderColor: CLUB_ACCENT, color: CLUB_ACCENT }}
         >
           Ver path completo

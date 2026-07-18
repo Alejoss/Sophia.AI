@@ -28,7 +28,7 @@ def has_completed_quiz(user, quiz):
     ).exists()
 
 
-def is_node_available_for_user(node, user):
+def is_node_available_for_user(node, user, book_club=None):
     """
     Check if a node is available for a user based on completion of preceding nodes and quizzes,
     or if the user is the creator of the knowledge path.
@@ -40,9 +40,19 @@ def is_node_available_for_user(node, user):
     Returns:
         bool: True if the node is available, False otherwise.
     """
-    # Check if the user is the creator of the knowledge path
-    if node.knowledge_path.author == user:
+    # Staff managing a club can preview all missions. Path authors retain the
+    # existing unrestricted behavior outside a club context.
+    if book_club and book_club.user_can_manage(user):
         return True
+    if book_club is None and node.knowledge_path.author == user:
+        return True
+
+    if book_club:
+        from book_clubs.services import is_node_released_for_club
+
+        released, _ = is_node_released_for_club(node, book_club, user)
+        if not released:
+            return False
 
     # Get the preceding node
     preceding_node = node.get_preceding_node()
@@ -147,7 +157,7 @@ def is_knowledge_path_completed(user, knowledge_path):
     return True
 
 
-def get_knowledge_path_progress(user, knowledge_path):
+def get_knowledge_path_progress(user, knowledge_path, book_club=None):
     """
     Get detailed progress information for a knowledge path.
     
@@ -181,9 +191,17 @@ def get_knowledge_path_progress(user, knowledge_path):
             'node_id': node.id,
             'title': node.title,
             'is_completed': is_node_completed_by_user(node, user),
-            'is_available': is_node_available_for_user(node, user),
+            'is_available': is_node_available_for_user(node, user, book_club=book_club),
             'order': node.order
         }
+        if book_club:
+            from book_clubs.services import is_node_released_for_club
+
+            released, opens_at = is_node_released_for_club(node, book_club, user)
+            node_data.update({
+                'club_schedule_locked': not released,
+                'club_opens_at': opens_at,
+            })
         
         if quiz:
             best_attempt = UserQuizAttempt.objects.filter(

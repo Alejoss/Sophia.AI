@@ -22,7 +22,7 @@ python manage.py runserver 0.0.0.0:8000
 
 - **PostgreSQL is installed natively (not Docker) and must be started manually** if not already running: `sudo pg_ctlcluster 16 main start`. Dev DB is `acbc_db`, user/password `postgres`/`postgres` on `localhost:5432`.
 - Superuser seeded by `python manage.py create_admin` is **`admin` / `admin`**.
-- Seed data commands (run in order, see `acbc_app/README.md`): `populate_cryptocurrencies`, `populate_users`, `populate_content`, `populate_knowledge_paths`, `populate_interactions`.
+- Seed data commands (run in order, see `acbc_app/README.md`): `populate_cryptocurrencies`, `populate_users`, `populate_content`, `populate_knowledge_paths`, `populate_interactions`, `populate_book_club`.
 
 ### Backend tests
 

@@ -41,19 +41,46 @@ class NodeSerializer(serializers.ModelSerializer):
     content_profile_id = serializers.PrimaryKeyRelatedField(source='content_profile', read_only=True)
     is_available = serializers.SerializerMethodField()
     is_completed = serializers.SerializerMethodField()
+    club_opens_at = serializers.SerializerMethodField()
+    club_schedule_locked = serializers.SerializerMethodField()
     quizzes = QuizSerializer(many=True, read_only=True)
     
     class Meta:
         model = Node
-        fields = ['id', 'title', 'description', 'order', 'media_type', 
-                 'is_available', 'is_completed', 'content_profile_id', 'quizzes']
+        fields = ['id', 'title', 'description', 'order', 'media_type',
+                 'is_available', 'is_completed', 'club_opens_at',
+                 'club_schedule_locked', 'content_profile_id', 'quizzes']
         read_only_fields = ['id', 'order', 'content_profile_id', 'knowledge_path', 'media_type']
 
     def get_is_available(self, obj):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
-        return is_node_available_for_user(obj, request.user)
+        return is_node_available_for_user(
+            obj,
+            request.user,
+            book_club=self.context.get('book_club'),
+        )
+
+    def get_club_opens_at(self, obj):
+        club = self.context.get('book_club')
+        request = self.context.get('request')
+        if not club or not request or not request.user.is_authenticated:
+            return None
+        from book_clubs.services import is_node_released_for_club
+
+        _, opens_at = is_node_released_for_club(obj, club, request.user)
+        return opens_at
+
+    def get_club_schedule_locked(self, obj):
+        club = self.context.get('book_club')
+        request = self.context.get('request')
+        if not club or not request or not request.user.is_authenticated:
+            return False
+        from book_clubs.services import is_node_released_for_club
+
+        released, _ = is_node_released_for_club(obj, club, request.user)
+        return not released
 
     def get_is_completed(self, obj):
         request = self.context.get('request')
@@ -91,7 +118,11 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             return None
             
         # Use the service function to get detailed progress
-        progress_data = get_knowledge_path_progress(request.user, obj)
+        progress_data = get_knowledge_path_progress(
+            request.user,
+            obj,
+            book_club=self.context.get('book_club'),
+        )
         
         return {
             'completed_nodes': progress_data['completed_nodes'],

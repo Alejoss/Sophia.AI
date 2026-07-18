@@ -17,6 +17,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
 from votes.models import VoteCount, Vote
 from profiles.models import UserNodeCompletion
+from book_clubs.services import resolve_book_club_context, is_node_released_for_club
 import json
 import logging
 from utils.logging_utils import knowledge_paths_logger, log_error, log_business_event, log_performance_metric
@@ -365,7 +366,15 @@ class KnowledgePathDetailView(APIView):
         """Allow anonymous users to view knowledge paths"""
         try:
             knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
-            serializer = KnowledgePathSerializer(knowledge_path, context={'request': request})
+            book_club = resolve_book_club_context(
+                knowledge_path,
+                request.user,
+                request.query_params.get('club'),
+            )
+            serializer = KnowledgePathSerializer(
+                knowledge_path,
+                context={'request': request, 'book_club': book_club},
+            )
             
             knowledge_paths_logger.debug("Knowledge path detail retrieved", extra={
                 'user_id': request.user.id if request.user.is_authenticated else None,
@@ -671,7 +680,28 @@ class NodeDetailView(APIView):
         try:
             knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
             node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
-            serializer = NodeSerializer(node, context={'request': request})
+            book_club = resolve_book_club_context(
+                knowledge_path,
+                request.user,
+                request.query_params.get('club'),
+            )
+            if book_club:
+                released, opens_at = is_node_released_for_club(
+                    node, book_club, request.user
+                )
+                if not released:
+                    return Response(
+                        {
+                            'detail': 'Esta misión todavía no ha sido desbloqueada para el club.',
+                            'code': 'club_mission_not_released',
+                            'opens_at': opens_at,
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            serializer = NodeSerializer(
+                node,
+                context={'request': request, 'book_club': book_club},
+            )
             
             knowledge_paths_logger.debug("Node detail retrieved", extra={
                 'user_id': request.user.id if request.user.is_authenticated else None,
@@ -705,6 +735,11 @@ class NodeDetailView(APIView):
                 
             knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
             node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+            book_club = resolve_book_club_context(
+                knowledge_path,
+                request.user,
+                request.query_params.get('club'),
+            )
             
             knowledge_paths_logger.info("Node completion request", extra={
                 'user_id': request.user.id,
@@ -714,14 +749,19 @@ class NodeDetailView(APIView):
             })
             
             # Check if the node is available for the user
-            if not is_node_available_for_user(node, request.user):
+            if not is_node_available_for_user(
+                node, request.user, book_club=book_club
+            ):
                 knowledge_paths_logger.warning("Node completion denied - node not available", extra={
                     'user_id': request.user.id,
                     'knowledge_path_id': path_id,
                     'node_id': node_id,
                 })
                 return Response(
-                    {"error": "This node is not available for completion"},
+                    {
+                        "detail": "Esta misión todavía no está disponible.",
+                        "code": "node_not_available",
+                    },
                     status=status.HTTP_403_FORBIDDEN
                 )
             

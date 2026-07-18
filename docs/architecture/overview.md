@@ -71,7 +71,7 @@ graph TB
 - `certificates` - Certificate generation and management
 - `events` - Event management
 - `knowledge_paths` - Learning paths and nodes
-- `book_clubs` - Club de Lectura hub (cohorts over paths, topics, events, debates)
+- `book_clubs` - Club de Lectura hub (cohorts over paths, topics, events, Foro, and Investigación)
 - `quizzes` - Quiz system
 - `comments` - Comment system
 - `votes` - Voting system

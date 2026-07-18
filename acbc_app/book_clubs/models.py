@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -128,6 +129,49 @@ class BookClubMembership(models.Model):
         return self.intro_updated_at is not None
 
 
+class BookClubMissionRelease(models.Model):
+    """Collective release date for one mission in a club's knowledge path."""
+
+    book_club = models.ForeignKey(
+        BookClub,
+        on_delete=models.CASCADE,
+        related_name='mission_releases',
+    )
+    node = models.ForeignKey(
+        'knowledge_paths.Node',
+        on_delete=models.CASCADE,
+        related_name='book_club_releases',
+    )
+    opens_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Null keeps the mission locked until staff schedules it.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['node__order']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['book_club', 'node'],
+                name='unique_book_club_mission_release',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.book_club.slug} · mission {self.node.order}'
+
+    def clean(self):
+        if (
+            self.book_club_id
+            and self.node_id
+            and self.book_club.knowledge_path_id != self.node.knowledge_path_id
+        ):
+            raise ValidationError(
+                {'node': 'La misión debe pertenecer al camino vinculado al club.'}
+            )
+
+
 class BookClubEvent(models.Model):
     """Links live sessions to a book club without altering the Event model."""
     book_club = models.ForeignKey(BookClub, on_delete=models.CASCADE, related_name='club_events')
@@ -146,7 +190,7 @@ class DiscussionQuestion(models.Model):
     """
     Guided forum prompt after a mission (Node) or live session.
     Answers are Comment threads; members only see others' answers after
-    posting their own (mentors/admins can always see).
+    posting their own (staff can always see).
     """
     book_club = models.ForeignKey(
         BookClub,

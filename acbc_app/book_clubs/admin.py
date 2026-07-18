@@ -3,6 +3,7 @@ from django.contrib import admin
 from book_clubs.models import (
     BookClub,
     BookClubEvent,
+    BookClubMissionRelease,
     BookClubMembership,
     DiscussionQuestion,
 )
@@ -21,6 +22,12 @@ class BookClubEventInline(admin.TabularInline):
     raw_id_fields = ('event',)
 
 
+class BookClubMissionReleaseInline(admin.TabularInline):
+    model = BookClubMissionRelease
+    extra = 0
+    raw_id_fields = ('node',)
+
+
 class DiscussionQuestionInline(admin.TabularInline):
     model = DiscussionQuestion
     extra = 0
@@ -36,7 +43,12 @@ class BookClubAdmin(admin.ModelAdmin):
     search_fields = ('title', 'slug', 'description')
     raw_id_fields = ('knowledge_path', 'topic')
     readonly_fields = ('created_by', 'created_at', 'updated_at')
-    inlines = [BookClubMembershipInline, BookClubEventInline, DiscussionQuestionInline]
+    inlines = [
+        BookClubMembershipInline,
+        BookClubMissionReleaseInline,
+        BookClubEventInline,
+        DiscussionQuestionInline,
+    ]
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by_id:
@@ -66,6 +78,13 @@ class BookClubMembershipAdmin(admin.ModelAdmin):
 class BookClubEventAdmin(admin.ModelAdmin):
     list_display = ('book_club', 'event', 'created_at')
     raw_id_fields = ('book_club', 'event')
+
+
+@admin.register(BookClubMissionRelease)
+class BookClubMissionReleaseAdmin(admin.ModelAdmin):
+    list_display = ('book_club', 'node', 'opens_at', 'updated_at')
+    list_filter = ('book_club',)
+    raw_id_fields = ('book_club', 'node')
 
 
 @admin.register(DiscussionQuestion)

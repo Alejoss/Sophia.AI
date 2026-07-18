@@ -8,10 +8,22 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import contentApi from '../api/contentApi';
 import TopicTimeline from '../topics/timeline/TopicTimeline';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_BG } from './clubTheme';
+
+// TopicTimeline colors dots/chips with `primary` from the ambient MUI theme
+// (indigo). Re-theme it locally so everything uses the club accent instead.
+const clubTimelineTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: { main: CLUB_ACCENT },
+    background: { default: CLUB_BG, paper: '#161616' },
+    divider: 'rgba(255,255,255,0.12)',
+  },
+});
 
 const MEDIA_TYPES = [
   { key: 'VIDEO', label: 'Videos' },
@@ -219,7 +231,7 @@ const BookClubInvestigation = () => {
 
       <Box
         sx={{
-          // Adapt TopicTimeline (default theme surfaces) to the dark club chrome.
+          // Adapt TopicTimeline surfaces to the dark club chrome.
           '& .MuiTypography-root': { color: 'inherit' },
           '& .MuiTypography-colorTextSecondary, & .MuiTypography-body2': {
             color: 'rgba(255,255,255,0.6) !important',
@@ -230,9 +242,16 @@ const BookClubInvestigation = () => {
             backgroundImage: 'none',
             borderColor: 'rgba(255,255,255,0.12)',
           },
-          '& .MuiChip-root': {
+          // Date pills: soft accent tint instead of a solid primary block.
+          '& .MuiChip-filledPrimary': {
+            bgcolor: 'rgba(255,107,53,0.16)',
+            color: CLUB_ACCENT,
+            '& .MuiChip-icon': { color: CLUB_ACCENT },
+          },
+          '& .MuiChip-outlined': {
             borderColor: 'rgba(255,107,53,0.45)',
             color: CLUB_ACCENT,
+            '& .MuiChip-icon': { color: CLUB_ACCENT },
           },
           '& .MuiSvgIcon-colorPrimary': { color: `${CLUB_ACCENT} !important` },
           '& .MuiSvgIcon-colorDisabled': { color: 'rgba(255,255,255,0.35) !important' },
@@ -240,7 +259,9 @@ const BookClubInvestigation = () => {
           '& .MuiAlert-root': { color: '#fff' },
         }}
       >
-        <TopicTimeline topicId={topicId} canEdit={false} canSuggest={false} />
+        <ThemeProvider theme={clubTimelineTheme}>
+          <TopicTimeline topicId={topicId} canEdit={false} canSuggest={false} />
+        </ThemeProvider>
       </Box>
     </Stack>
   );

@@ -110,6 +110,19 @@ const BookClubAdminLayout = () => {
         </Box>
         <Box
           component={NavLink}
+          to="misiones"
+          style={({ isActive }) => ({
+            color: isActive ? 'inherit' : '#666',
+            borderBottom: isActive ? '2px solid' : '2px solid transparent',
+            fontWeight: isActive ? 700 : 500,
+            textDecoration: 'none',
+          })}
+          sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
+        >
+          Misiones
+        </Box>
+        <Box
+          component={NavLink}
           to="reuniones"
           style={({ isActive }) => ({
             color: isActive ? 'inherit' : '#666',

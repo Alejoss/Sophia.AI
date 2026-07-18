@@ -21,6 +21,11 @@ urlpatterns = [
         name='book-club-members',
     ),
     path('<slug:slug>/hub/', views.BookClubHubView.as_view(), name='book-club-hub'),
+    path(
+        '<slug:slug>/mission-schedule/',
+        views.BookClubMissionScheduleView.as_view(),
+        name='book-club-mission-schedule',
+    ),
     path('<slug:slug>/events/', views.BookClubEventListCreateView.as_view(), name='book-club-events'),
     path(
         '<slug:slug>/events/<int:pk>/',

@@ -12,7 +12,6 @@ from book_clubs.models import (
 from comments.models import Comment
 from events.models import Event
 from knowledge_paths.models import KnowledgePath, Node
-from knowledge_paths.services.node_user_activity_service import get_knowledge_path_progress
 from content.models import Topic
 
 
@@ -497,16 +496,3 @@ class DiscussionQuestionWriteSerializer(serializers.ModelSerializer):
             created_by=request.user,
             **validated_data,
         )
-
-
-class HubSerializer(serializers.Serializer):
-    """Assembled in the view; this documents the shape."""
-
-    club = BookClubDetailSerializer()
-    progress = serializers.DictField()
-    next_mission = serializers.DictField(allow_null=True)
-    next_event = BookClubEventSerializer(allow_null=True)
-    open_questions = DiscussionQuestionSerializer(many=True)
-    past_questions = DiscussionQuestionSerializer(many=True)
-    recent_activity = serializers.ListField()
-    quick_links = serializers.DictField()

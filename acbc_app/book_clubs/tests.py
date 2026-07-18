@@ -13,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from book_clubs.models import (
     BookClub,
     BookClubEvent,
+    BookClubMissionRelease,
     BookClubMembership,
     BookClubStatus,
     DiscussionQuestion,
@@ -194,6 +195,89 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(data['next_event']['event_id'], self.event.id)
         self.assertEqual(data['quick_links']['knowledge_path_id'], self.path.id)
         self.assertEqual(data['quick_links']['topic_id'], self.topic.id)
+
+    def test_staff_can_schedule_collective_mission_releases(self):
+        self.auth(self.admin)
+        future = timezone.now() + timezone.timedelta(days=7)
+        response = self.client.patch(
+            '/api/book_clubs/cypherpunk/mission-schedule/',
+            {
+                'releases': [
+                    {'node_id': self.node1.id, 'opens_at': timezone.now().isoformat()},
+                    {'node_id': self.node2.id, 'opens_at': future.isoformat()},
+                ],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(len(response.data), 2)
+        self.assertTrue(response.data[0]['is_released'])
+        self.assertFalse(response.data[1]['is_released'])
+        self.assertEqual(
+            BookClubMissionRelease.objects.filter(book_club=self.club).count(),
+            2,
+        )
+
+    def test_club_schedule_blocks_member_but_not_outsider(self):
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+        BookClubMissionRelease.objects.create(
+            book_club=self.club,
+            node=self.node1,
+            opens_at=timezone.now() - timezone.timedelta(days=1),
+        )
+        BookClubMissionRelease.objects.create(
+            book_club=self.club,
+            node=self.node2,
+            opens_at=timezone.now() + timezone.timedelta(days=7),
+        )
+
+        self.auth(self.member)
+        path = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/?club={self.club.slug}'
+        )
+        self.assertEqual(path.status_code, status.HTTP_200_OK, path.data)
+        second = next(item for item in path.data['nodes'] if item['id'] == self.node2.id)
+        self.assertTrue(second['club_schedule_locked'])
+        self.assertFalse(second['is_available'])
+
+        locked = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+            f'?club={self.club.slug}'
+        )
+        self.assertEqual(locked.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(locked.data['code'], 'club_mission_not_released')
+
+        # Removing ?club= cannot bypass the schedule for a club member.
+        still_locked = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(still_locked.status_code, status.HTTP_403_FORBIDDEN)
+        completed_first = self.client.post(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node1.id}/'
+        )
+        self.assertEqual(completed_first.status_code, status.HTTP_200_OK)
+        completion_bypass = self.client.post(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(completion_bypass.status_code, status.HTTP_403_FORBIDDEN)
+
+        # A non-member retains the normal knowledge-path experience.
+        self.auth(self.outsider)
+        outsider = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+            f'?club={self.club.slug}'
+        )
+        self.assertEqual(outsider.status_code, status.HTTP_200_OK, outsider.data)
+
+    def test_member_cannot_edit_mission_schedule(self):
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+        self.auth(self.member)
+        response = self.client.patch(
+            '/api/book_clubs/cypherpunk/mission-schedule/',
+            {'releases': []},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_discussion_question_crud_and_comments(self):
         BookClubMembership.objects.create(

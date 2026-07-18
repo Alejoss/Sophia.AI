@@ -1,39 +1,7 @@
-from rest_framework.permissions import BasePermission
-
 from django.contrib.contenttypes.models import ContentType
 
-from book_clubs.models import BookClub, BookClubMembership, DiscussionQuestion
+from book_clubs.models import DiscussionQuestion
 from comments.models import Comment
-
-
-class IsBookClubMember(BasePermission):
-    """Object-level: user must be a member of the book club."""
-
-    def has_object_permission(self, request, view, obj):
-        club = obj if isinstance(obj, BookClub) else getattr(obj, 'book_club', None)
-        if club is None:
-            return False
-        return club.user_is_member(request.user)
-
-
-class IsBookClubStaffManager(BasePermission):
-    """Object-level: Django staff/superuser can manage the club."""
-
-    def has_object_permission(self, request, view, obj):
-        club = obj if isinstance(obj, BookClub) else getattr(obj, 'book_club', None)
-        if club is None:
-            return False
-        return club.user_can_manage(request.user)
-
-
-# Backward-compatible alias (old mentor/admin naming).
-IsBookClubMentorOrAdmin = IsBookClubStaffManager
-
-
-def get_membership(club, user):
-    if not user or not user.is_authenticated:
-        return None
-    return BookClubMembership.objects.filter(book_club=club, user=user).first()
 
 
 def user_can_view_question(question, user):

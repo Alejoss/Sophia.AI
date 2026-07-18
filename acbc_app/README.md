@@ -77,6 +77,13 @@ docker-compose exec backend python manage.py populate_knowledge_paths
 # 7. Populate user interactions (comments, votes, bookmarks)
 docker-compose exec backend python manage.py populate_interactions
 
+# 8. Populate a Book Club with demo members, forum, missions and meetings
+#    (reuses existing Topics / Knowledge Paths; default slug: el-secuestro-de-bitcoin)
+docker-compose exec backend python manage.py populate_book_club
+# Optional:
+# docker-compose exec backend python manage.py populate_book_club --reset --members 10
+# docker-compose exec backend python manage.py populate_book_club --path-id 1 --topic-id 1
+
 *Note: Run these commands in order as they have dependencies on each other. You can add --clear flag to any command to clear existing data before populating, or --skip-existing to skip objects that already exist.*
 
 *To run the Django tests, ensure the stack is up, then from the **project root** (where docker-compose.yml is):*
