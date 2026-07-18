@@ -60,7 +60,8 @@ const BookClubCommunity = () => {
           Comunidad
         </Typography>
         <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-          Conversación del ciclo: Telegram para el día a día, y el topic para hilos más largos.
+          Conversación del ciclo: Telegram para el día a día. La investigación y la línea de tiempo
+          del tema están en la pestaña Investigación.
         </Typography>
       </Box>
 
@@ -213,33 +214,28 @@ const BookClubCommunity = () => {
         </Alert>
       )}
 
-      {!topicId ? (
-        <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-          Este club todavía no tiene un topic de comunidad vinculado. El equipo lo asignará desde el panel
-          de administración.
-        </Alert>
-      ) : (
+      {topicId && (
         <Box
           sx={{
             p: 3,
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 1,
-            background: 'linear-gradient(135deg, rgba(255,107,53,0.1), rgba(255,255,255,0.02))',
+            bgcolor: 'rgba(255,255,255,0.03)',
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Espacio del club
+            Investigación del ciclo
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
-            Entra al topic para seguir hilos, compartir recursos y conversar con el resto del grupo.
+            La línea de tiempo y el material del tema están en la pestaña Investigación, sin salir del hub.
           </Typography>
           <Button
             variant="contained"
             component={RouterLink}
-            to={`/content/topics/${topicId}`}
+            to={`/club-de-lectura/${slug}/investigacion`}
             sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
           >
-            Ir a la comunidad
+            Ir a Investigación
           </Button>
         </Box>
       )}

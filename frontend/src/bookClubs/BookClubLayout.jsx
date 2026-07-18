@@ -38,6 +38,7 @@ const NAV_ITEMS = [
   { to: 'misiones', label: 'Misiones' },
   { to: 'preguntas', label: 'Debates' },
   { to: 'comunidad', label: 'Comunidad' },
+  { to: 'investigacion', label: 'Investigación' },
   { to: 'reuniones', label: 'Reuniones' },
 ];
 
@@ -264,6 +265,7 @@ const BookClubLayoutInner = () => {
       club: hub?.club,
       guestToken: isAuthenticated ? null : guestToken,
       isGuest: Boolean(hub?.is_guest),
+      isAuthenticated,
       canParticipate: Boolean(hub?.can_participate),
       reload: loadHub,
       setError,
