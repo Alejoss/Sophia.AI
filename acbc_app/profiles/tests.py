@@ -971,7 +971,8 @@ class NotificationTests(APITestCase):
         knowledge_path = KnowledgePath.objects.create(
             title='Test Knowledge Path',
             description='Test Description',
-            author=teacher
+            author=teacher,
+            certificates_enabled=True,
         )
         
         # Student requests a certificate
@@ -1122,7 +1123,8 @@ class NotificationTests(APITestCase):
         knowledge_path = KnowledgePath.objects.create(
             title='Test Knowledge Path',
             description='Test Description',
-            author=teacher
+            author=teacher,
+            certificates_enabled=True,
         )
         
         # Student requests a certificate
@@ -1169,7 +1171,8 @@ class NotificationTests(APITestCase):
         knowledge_path = KnowledgePath.objects.create(
             title='Test Knowledge Path',
             description='Test Description',
-            author=self.user  # Current user is the author
+            author=self.user,  # Current user is the author
+            certificates_enabled=True,
         )
         
         # User requests a certificate for their own knowledge path

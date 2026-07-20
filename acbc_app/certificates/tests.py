@@ -185,17 +185,20 @@ class CertificateRequestFlowTest(TestCase):
         path1 = KnowledgePath.objects.create(
             title="Test Path 1",
             description="Test Description 1",
-            author=self.teacher
+            author=self.teacher,
+            certificates_enabled=True,
         )
         path2 = KnowledgePath.objects.create(
             title="Test Path 2",
             description="Test Description 2",
-            author=self.teacher
+            author=self.teacher,
+            certificates_enabled=True,
         )
         path3 = KnowledgePath.objects.create(
             title="Test Path 3",
             description="Test Description 3",
-            author=self.teacher
+            author=self.teacher,
+            certificates_enabled=True,
         )
 
         # Create and approve first request
