@@ -82,8 +82,8 @@ class KnowledgePath(models.Model):
         return vote.value if vote else 0
 
     def can_be_visible(self):
-        """Check if the knowledge path can be made visible (needs at least 2 nodes)"""
-        return self.nodes.count() >= 2
+        """Check if the knowledge path can be made visible (needs at least 1 node)"""
+        return self.nodes.count() >= 1
 
     def ensure_visibility_consistency(self):
         """Ensure visibility is consistent with node count"""

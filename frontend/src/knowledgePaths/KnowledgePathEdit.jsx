@@ -85,9 +85,9 @@ const KnowledgePathEdit = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const canBePublic = useMemo(() => {
-    // Prefer backend signal if present; also enforce at least 2 nodes client-side.
+    // Prefer backend signal if present; also enforce at least 1 node client-side.
     const backendCan = Boolean(knowledgePath?.can_be_visible);
-    return backendCan && (nodes?.length || 0) >= 2;
+    return backendCan && (nodes?.length || 0) >= 1;
   }, [knowledgePath?.can_be_visible, nodes?.length]);
 
   const statusChips = useMemo(() => {
@@ -559,7 +559,7 @@ const KnowledgePathEdit = () => {
             <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ borderRadius: 2 }}>
               <AlertTitle sx={{ fontWeight: 700 }}>Aún no puedes publicarlo</AlertTitle>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Para que sea público necesitas <strong>al menos 2 nodos</strong>.
+                Para que sea público necesitas <strong>al menos 1 nodo</strong>.
               </Typography>
               <Button size="small" variant="outlined" onClick={() => setActiveTab(1)} sx={{ textTransform: "none", borderRadius: 2 }}>
                 Ir a Currículum
@@ -628,7 +628,7 @@ const KnowledgePathEdit = () => {
 
                 {/* Visibility */}
                 <Tooltip
-                  title={!canBePublic && !isVisible ? "Necesitas al menos 2 nodos para hacerlo público." : ""}
+                  title={!canBePublic && !isVisible ? "Necesitas al menos 1 nodo para hacerlo público." : ""}
                   disableHoverListener={canBePublic || isVisible}
                 >
                   <span>

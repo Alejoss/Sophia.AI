@@ -164,6 +164,7 @@ const NodeCreate = () => {
                         previewVariant="detailed"
                         onUploadingChange={handleUploadingChange}
                         onPendingContentChange={setHasPendingContent}
+                        optional={false}
                     />
 
                     {errors.content_profile_id && (

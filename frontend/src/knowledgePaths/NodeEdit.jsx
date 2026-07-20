@@ -197,6 +197,7 @@ const NodeEdit = () => {
                         onContentRemoved={handleContentRemoved}
                         previewVariant="detailed"
                         onPendingContentChange={setHasPendingContent}
+                        optional={false}
                     />
 
                     {nodeQuiz && (

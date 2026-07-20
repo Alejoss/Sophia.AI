@@ -12,7 +12,8 @@ const ContentSelector = ({
   showPreview = true,
   previewVariant = "detailed",
   onUploadingChange,
-  onPendingContentChange
+  onPendingContentChange,
+  optional = true,
 }) => {
   const [showContentOptions, setShowContentOptions] = useState(
     !selectedContent
@@ -97,7 +98,7 @@ const ContentSelector = ({
             mb: 3
           }}>
           
-            Elegir fuente de contenido (Opcional)
+            {optional ? 'Elegir fuente de contenido (Opcional)' : 'Elegir fuente de contenido'}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Button
