@@ -1,54 +1,38 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import * as yup from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
-import { Alert, Box, Button, CircularProgress, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
-import { submitNewsletterSubscription } from '../api/profilesApi';
 import bookClubsApi from '../api/bookClubsApi';
-import { trackMetaLead } from '../utils/metaPixel';
-import { applyApiErrorsToForm } from '../utils/apiFormErrors';
-import { emailField } from '../utils/formSchemas';
 
-const schema = yup.object({
-  email: emailField(),
-});
+const CLUB_ACCENT = '#FF6B35';
+const CLUB_ACCENT_HOVER = '#E55A2B';
+
+/** Prefer the most recently created active cycle. */
+const pickLatestActiveClub = (clubs = []) => {
+  const active = clubs.filter((club) => club.status === 'active');
+  if (!active.length) return null;
+  return [...active].sort((a, b) => {
+    const aTime = new Date(a.created_at || a.starts_at || 0).getTime();
+    const bTime = new Date(b.created_at || b.starts_at || 0).getTime();
+    return bTime - aTime;
+  })[0];
+};
 
 const ClubDeLectura = () => {
   const { authState, authInitialized } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [successMessage, setSuccessMessage] = useState('');
-  const [generalError, setGeneralError] = useState('');
   const [activeClub, setActiveClub] = useState(null);
-  const [clubsLoading, setClubsLoading] = useState(false);
+  const [clubsLoading, setClubsLoading] = useState(true);
   const [joining, setJoining] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: yupResolver(schema),
-    defaultValues: { email: '' },
-  });
-
   useEffect(() => {
-    if (!authInitialized) return;
+    if (!authInitialized) return undefined;
     let cancelled = false;
     setClubsLoading(true);
     bookClubsApi
       .listClubs()
       .then((clubs) => {
-        if (cancelled) return;
-        const preferred =
-          clubs.find((c) => c.status === 'active') ||
-          clubs.find((c) => c.is_member) ||
-          clubs[0] ||
-          null;
-        setActiveClub(preferred);
+        if (!cancelled) setActiveClub(pickLatestActiveClub(clubs));
       })
       .catch(() => {
         if (!cancelled) setActiveClub(null);
@@ -61,46 +45,28 @@ const ClubDeLectura = () => {
     };
   }, [authInitialized, authState.isAuthenticated]);
 
-  const onSubmit = async ({ email }) => {
-    setSuccessMessage('');
-    setGeneralError('');
-
-    try {
-      await submitNewsletterSubscription(email.trim(), 'club_de_lectura');
-      trackMetaLead();
-      setSuccessMessage('¡Gracias! Te avisaremos sobre el Club de Lectura.');
-      reset({ email: '' });
-      if (activeClub?.slug) {
-        navigate(`/club-de-lectura/${activeClub.slug}`);
-      }
-    } catch (err) {
-      const { generalError: parsed } = applyApiErrorsToForm(
-        err,
-        setError,
-        'No se ha podido registrar tu email. Inténtalo de nuevo más tarde.',
-      );
-      if (parsed) {
-        setGeneralError(parsed);
-      }
-    }
-  };
-
   const handleEnterClub = async () => {
     if (!activeClub) return;
     setJoining(true);
-    setGeneralError('');
     try {
       if (authState.isAuthenticated && !activeClub.is_member) {
         await bookClubsApi.joinClub(activeClub.slug);
       }
       navigate(`/club-de-lectura/${activeClub.slug}`);
-    } catch (err) {
-      // Still navigate — layout will show email gate if needed
+    } catch {
+      // Layout shows the email gate if join fails for guests / outsiders.
       navigate(`/club-de-lectura/${activeClub.slug}`);
     } finally {
       setJoining(false);
     }
   };
+
+  const ctaLabel = (() => {
+    if (joining) return 'Entrando…';
+    if (!authState.isAuthenticated) return 'Entrar al club';
+    if (activeClub?.is_member) return 'Ir al hub del club';
+    return 'Unirme al club';
+  })();
 
   return (
     <Box
@@ -127,161 +93,60 @@ const ClubDeLectura = () => {
         }}
       />
 
-      {authState.isAuthenticated && (
-        <Box sx={{ width: '100%', maxWidth: 480, mb: 3, textAlign: 'center' }}>
-          {clubsLoading ? (
-            <CircularProgress size={28} sx={{ color: '#FF6B35' }} />
-          ) : activeClub ? (
-            <>
-              <Typography sx={{ color: '#fff', mb: 1.5 }}>
-                {activeClub.is_member
-                  ? `Ya formas parte de «${activeClub.title}».`
-                  : `El club «${activeClub.title}» ya está activo.`}
-              </Typography>
-              <Button
-                variant="contained"
-                onClick={handleEnterClub}
-                disabled={joining}
-                sx={{
-                  bgcolor: '#FF6B35',
-                  '&:hover': { bgcolor: '#E55A2B' },
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  py: 1.2,
-                  mb: 1,
-                }}
-                fullWidth
-              >
-                {joining
-                  ? 'Entrando…'
-                  : activeClub.is_member
-                    ? 'Ir al hub del club'
-                    : 'Unirme y entrar al hub'}
-              </Button>
-            </>
-          ) : (
-            <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 1 }}>
-              Aún no hay un ciclo activo. Deja tu email y te avisamos.
+      <Box sx={{ width: '100%', maxWidth: 520, textAlign: 'center' }}>
+        {clubsLoading ? (
+          <CircularProgress size={28} sx={{ color: CLUB_ACCENT }} />
+        ) : activeClub ? (
+          <>
+            <Typography
+              variant="h5"
+              component="h1"
+              sx={{ color: '#fff', fontWeight: 700, mb: 1.5 }}
+            >
+              El Club de Lectura ya comenzó
             </Typography>
-          )}
-        </Box>
-      )}
+            <Typography sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
+              El ciclo «{activeClub.title}» inició el 20 de Julio.
+            </Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
+              Todavía puedes unirte: entra al hub para sumarte a las misiones, el foro y la
+              comunidad.
+            </Typography>
 
-      {!authState.isAuthenticated && (
-        <Box sx={{ width: '100%', maxWidth: 480, mb: 3, textAlign: 'center' }}>
-          {clubsLoading ? (
-            <CircularProgress size={28} sx={{ color: '#FF6B35' }} />
-          ) : activeClub ? (
-            <>
-              <Typography sx={{ color: '#fff', mb: 1.5 }}>
-                El club «{activeClub.title}» ya está activo. Entra con tu correo para explorarlo.
-              </Typography>
+            <Button
+              variant="contained"
+              onClick={handleEnterClub}
+              disabled={joining}
+              sx={{
+                bgcolor: CLUB_ACCENT,
+                '&:hover': { bgcolor: CLUB_ACCENT_HOVER },
+                textTransform: 'none',
+                fontWeight: 600,
+                py: 1.2,
+                mb: 1.5,
+              }}
+              fullWidth
+            >
+              {ctaLabel}
+            </Button>
+
+            {!authState.isAuthenticated && (
               <Button
-                variant="contained"
-                onClick={handleEnterClub}
-                disabled={joining}
-                sx={{
-                  bgcolor: '#FF6B35',
-                  '&:hover': { bgcolor: '#E55A2B' },
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  py: 1.2,
-                  mb: 1,
-                }}
-                fullWidth
+                component={RouterLink}
+                to={`/profiles/login?next=${encodeURIComponent(
+                  `/club-de-lectura/${activeClub.slug}`
+                )}`}
+                sx={{ color: CLUB_ACCENT, textTransform: 'none' }}
               >
-                {joining ? 'Entrando…' : 'Entrar al club'}
+                ¿Ya tienes cuenta? Inicia sesión
               </Button>
-            </>
-          ) : null}
-          <Button
-            component={RouterLink}
-            to={
-              activeClub
-                ? `/profiles/login?next=${encodeURIComponent(`/club-de-lectura/${activeClub.slug}`)}`
-                : '/profiles/login'
-            }
-            sx={{ color: '#FF6B35', textTransform: 'none' }}
-          >
-            ¿Ya tienes cuenta? Inicia sesión
-          </Button>
-        </Box>
-      )}
-
-      <Box
-        component="form"
-        onSubmit={handleSubmit(onSubmit)}
-        noValidate
-        sx={{
-          width: '100%',
-          maxWidth: 480,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}
-      >
-        <Typography
-          variant="h6"
-          component="h2"
-          sx={{ color: '#FF6B35', fontWeight: 600, textAlign: 'center' }}
-        >
-          Apúntate al Club de Lectura
-        </Typography>
-
-        <TextField
-          type="email"
-          label="Email"
-          {...register('email')}
-          error={!!errors.email}
-          helperText={errors.email?.message}
-          placeholder="tu@email.com"
-          fullWidth
-          variant="outlined"
-          size="medium"
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255,255,255,0.06)',
-              color: '#fff',
-            },
-            '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,107,53,0.5)' },
-            '& .MuiFormHelperText-root': { color: 'error.light' },
-          }}
-        />
-
-        {generalError && (
-          <Alert severity="error" variant="filled">
-            {generalError}
-          </Alert>
+            )}
+          </>
+        ) : (
+          <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
+            Por ahora no hay un ciclo activo publicado. Vuelve pronto.
+          </Typography>
         )}
-        {successMessage && (
-          <Alert severity="success" variant="filled">
-            {successMessage}
-          </Alert>
-        )}
-
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={isSubmitting}
-          sx={{
-            bgcolor: '#FF6B35',
-            '&:hover': { bgcolor: '#E55A2B' },
-            textTransform: 'none',
-            fontWeight: 600,
-            py: 1.2,
-          }}
-          fullWidth
-        >
-          {isSubmitting ? 'Enviando...' : 'Quiero participar'}
-        </Button>
-
-        <Typography
-          variant="caption"
-          sx={{ color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.5 }}
-        >
-          Solo usaremos tu correo para informarte sobre el Club de Lectura.
-        </Typography>
       </Box>
     </Box>
   );
