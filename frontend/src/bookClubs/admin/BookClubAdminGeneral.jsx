@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import bookClubsApi from '../../api/bookClubsApi';
+import { resolveMediaUrl } from '../../utils/fileUtils';
 import {
   extractApiError,
   normalizeTelegramUrl,
@@ -22,6 +23,7 @@ import {
 } from '../clubTheme';
 
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
+const MAX_COVER_BYTES = 3 * 1024 * 1024;
 
 const BookClubAdminGeneral = ({ mode = 'edit' }) => {
   const isCreate = mode === 'create';
@@ -41,33 +43,96 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
     cover_image: null,
   });
   const [clearCover, setClearCover] = useState(false);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const localPreviewRef = useRef(null);
 
-  useEffect(() => {
-    if (!isCreate && club) {
-      setForm({
-        title: club.title || '',
-        description: club.description || '',
-        status: club.status || 'draft',
-        starts_at: toDatetimeLocal(club.starts_at),
-        ends_at: toDatetimeLocal(club.ends_at),
-        telegram_group_url: club.telegram_group_url || '',
-        cover_image: null,
-      });
-      setClearCover(false);
+  const revokeLocalPreview = () => {
+    if (localPreviewRef.current) {
+      URL.revokeObjectURL(localPreviewRef.current);
+      localPreviewRef.current = null;
     }
-  }, [isCreate, club]);
+  };
+
+  // Sync server fields without wiping a pending local File selection.
+  useEffect(() => {
+    if (isCreate || !club) return undefined;
+    setForm((prev) => ({
+      title: club.title || '',
+      description: club.description || '',
+      status: club.status || 'draft',
+      starts_at: toDatetimeLocal(club.starts_at),
+      ends_at: toDatetimeLocal(club.ends_at),
+      telegram_group_url: club.telegram_group_url || '',
+      cover_image: prev.cover_image instanceof File ? prev.cover_image : null,
+    }));
+    return undefined;
+  }, [
+    isCreate,
+    club?.id,
+    club?.updated_at,
+    club?.title,
+    club?.description,
+    club?.status,
+    club?.starts_at,
+    club?.ends_at,
+    club?.telegram_group_url,
+    club?.cover_image,
+  ]);
+
+  useEffect(() => () => revokeLocalPreview(), []);
 
   const handleField = (field) => (event) => {
-    if (field === 'cover_image') {
-      const file = event.target.files?.[0] || null;
-      setForm((prev) => ({ ...prev, cover_image: file }));
-      if (file) setClearCover(false);
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleCoverSelect = async (event) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('El archivo debe ser una imagen (JPEG, PNG, GIF o WebP).');
       return;
     }
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    if (file.size > MAX_COVER_BYTES) {
+      setError('La portada no debe superar 3 MB.');
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setClearCover(false);
+    revokeLocalPreview();
+    const localUrl = URL.createObjectURL(file);
+    localPreviewRef.current = localUrl;
+    setCoverPreviewUrl(localUrl);
+    setForm((prev) => ({ ...prev, cover_image: file }));
+
+    // Edit mode: upload immediately (same pattern as KnowledgePathEdit cover).
+    if (!isCreate && slug) {
+      setUploadingCover(true);
+      try {
+        const updated = await bookClubsApi.updateClub(slug, { cover_image: file });
+        setForm((prev) => ({ ...prev, cover_image: null }));
+        revokeLocalPreview();
+        setCoverPreviewUrl(null);
+        setSuccess('Portada actualizada.');
+        await reload?.({ silent: true });
+        if (updated?.cover_image) {
+          setCoverPreviewUrl(resolveMediaUrl(updated.cover_image));
+        }
+      } catch (err) {
+        const coverErr = err?.response?.data?.cover_image;
+        const coverMsg = Array.isArray(coverErr) ? coverErr.join(' ') : coverErr;
+        setError(coverMsg || extractApiError(err, 'No se pudo subir la portada.'));
+      } finally {
+        setUploadingCover(false);
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -110,7 +175,8 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       if (!isCreate || form.starts_at) payload.starts_at = startsAt;
       if (!isCreate || form.ends_at) payload.ends_at = endsAt;
 
-      if (form.cover_image instanceof File) {
+      // Create: include pending cover. Edit: cover uploads on select; only send clear.
+      if (isCreate && form.cover_image instanceof File) {
         payload.cover_image = form.cover_image;
       } else if (!isCreate && clearCover) {
         payload.cover_image = null;
@@ -131,18 +197,22 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           cover_image: null,
         });
         setClearCover(false);
+        revokeLocalPreview();
+        setCoverPreviewUrl(null);
         setSuccess('Cambios guardados.');
         await reload?.({ silent: true });
       }
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo guardar.'));
+      const coverErr = err?.response?.data?.cover_image;
+      const coverMsg = Array.isArray(coverErr) ? coverErr.join(' ') : coverErr;
+      setError(coverMsg || extractApiError(err, 'No se pudo guardar.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const coverPreview =
-    !clearCover && !form.cover_image && club?.cover_image ? club.cover_image : null;
+  const serverCover = club?.cover_image ? resolveMediaUrl(club.cover_image) : null;
+  const displayCover = clearCover ? null : coverPreviewUrl || serverCover;
 
   return (
     <Box>
@@ -229,44 +299,66 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           onChange={handleField('ends_at')}
         />
 
-        {(coverPreview || form.cover_image) && (
+        {displayCover && (
           <Box>
-            {coverPreview && (
-              <Box
-                component="img"
-                src={coverPreview}
-                alt="Portada actual"
-                sx={{ maxWidth: 280, maxHeight: 160, objectFit: 'cover', display: 'block', mb: 1 }}
-              />
-            )}
-            {form.cover_image && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Nueva: {form.cover_image.name}
-              </Typography>
-            )}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {form.cover_image instanceof File
+                ? `Nueva: ${form.cover_image.name}`
+                : coverPreviewUrl && !serverCover
+                  ? 'Vista previa'
+                  : 'Portada actual'}
+            </Typography>
+            <Box
+              component="img"
+              src={displayCover}
+              alt="Portada del club"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+              sx={{ maxWidth: 280, maxHeight: 160, objectFit: 'cover', display: 'block', mb: 1 }}
+            />
           </Box>
         )}
 
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Button variant="outlined" component="label">
-            {form.cover_image ? 'Cambiar archivo' : coverPreview ? 'Reemplazar portada' : 'Portada (opcional)'}
-            <input hidden type="file" accept="image/*" onChange={handleField('cover_image')} />
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+          <Button variant="outlined" component="label" disabled={uploadingCover || saving}>
+            {uploadingCover
+              ? 'Subiendo portada…'
+              : form.cover_image
+                ? 'Cambiar archivo'
+                : displayCover
+                  ? 'Reemplazar portada'
+                  : 'Portada (opcional)'}
+            <input hidden type="file" accept="image/*" onChange={handleCoverSelect} />
           </Button>
-          {!isCreate && (coverPreview || form.cover_image || club?.cover_image) && (
+          {!isCreate && (displayCover || club?.cover_image || clearCover) && (
             <Button
               variant="text"
               color="error"
+              disabled={uploadingCover || saving}
               onClick={() => {
                 setForm((prev) => ({ ...prev, cover_image: null }));
                 setClearCover(true);
+                revokeLocalPreview();
+                setCoverPreviewUrl(null);
               }}
             >
               Quitar portada
             </Button>
           )}
         </Stack>
+        <Typography variant="caption" color="text.secondary">
+          {isCreate
+            ? 'La portada se envía al crear el club (máx. 3 MB).'
+            : 'Al elegir un archivo se sube de inmediato (máx. 3 MB), como en caminos de conocimiento.'}
+        </Typography>
 
-        <Button variant="contained" onClick={handleSave} disabled={saving} sx={{ alignSelf: 'flex-start' }}>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={saving || uploadingCover}
+          sx={{ alignSelf: 'flex-start' }}
+        >
           {saving ? 'Guardando…' : isCreate ? 'Crear y continuar' : 'Guardar cambios'}
         </Button>
       </Stack>

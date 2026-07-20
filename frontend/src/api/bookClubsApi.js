@@ -2,7 +2,9 @@ import axiosInstance from './axiosConfig';
 
 const CLEARABLE_STRING_FIELDS = new Set(['telegram_group_url', 'description']);
 
-/** Prefer JSON; use FormData only when uploading a cover image. */
+const MULTIPART_HEADERS = { 'Content-Type': 'multipart/form-data' };
+
+/** JSON body when there is no file; FormData (platform standard) when uploading a cover. */
 const toRequestBody = (payload) => {
   const hasFile = payload?.cover_image instanceof File;
   if (!hasFile) {
@@ -16,21 +18,28 @@ const toRequestBody = (payload) => {
         delete body[key];
       }
     });
-    return body;
+    return { data: body, headers: undefined };
   }
+
+  // Same pattern as knowledgePathsApi / events: explicit multipart FormData.
   const formData = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
     if (value === undefined) return;
     if (value instanceof File) {
       formData.append(key, value);
-    } else if (value === null || (value === '' && CLEARABLE_STRING_FIELDS.has(key))) {
-      // Empty string clears nullable / clearable fields in multipart.
-      formData.append(key, '');
-    } else if (value !== '') {
-      formData.append(key, value);
+      return;
     }
+    if (value === null) {
+      // Empty string clears nullable ImageField / DateTime / clearable strings in multipart.
+      formData.append(key, '');
+      return;
+    }
+    if (value === '' && !CLEARABLE_STRING_FIELDS.has(key) && key !== 'cover_image') {
+      return;
+    }
+    formData.append(key, typeof value === 'boolean' || typeof value === 'number' ? String(value) : value);
   });
-  return formData;
+  return { data: formData, headers: MULTIPART_HEADERS };
 };
 
 const guestHeaders = (guestToken) =>
@@ -48,14 +57,18 @@ const bookClubsApi = {
   },
 
   createClub: async (payload) => {
-    const data = toRequestBody(payload);
-    const response = await axiosInstance.post('/book_clubs/', data);
+    const { data, headers } = toRequestBody(payload);
+    const response = await axiosInstance.post('/book_clubs/', data, headers ? { headers } : undefined);
     return response.data;
   },
 
   updateClub: async (slug, payload) => {
-    const data = toRequestBody(payload);
-    const response = await axiosInstance.patch(`/book_clubs/${slug}/`, data);
+    const { data, headers } = toRequestBody(payload);
+    const response = await axiosInstance.patch(
+      `/book_clubs/${slug}/`,
+      data,
+      headers ? { headers } : undefined
+    );
     return response.data;
   },
 

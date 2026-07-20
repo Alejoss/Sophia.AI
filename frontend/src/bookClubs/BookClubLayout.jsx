@@ -17,13 +17,18 @@ import GoogleOAuthInitializer from '../components/GoogleOAuthInitializer';
 import SocialLogin from '../components/SocialLogin';
 import bookClubsApi from '../api/bookClubsApi';
 import { CLUB_ACCENT, CLUB_ACCENT_HOVER, CLUB_BG, CLUB_TEXT_FIELD_SX, formatClubDateRange } from './clubTheme';
-import { resolveWeekLabel, shortTagline } from './clubExperience';
+import {
+  clubDescriptionNeedsExpand,
+  resolveWeekLabel,
+  shortTagline,
+} from './clubExperience';
 import {
   clearGuestSession,
   getGuestSession,
   guestCompleteAccountUrl,
   setGuestSession,
 } from './guestStorage';
+import { resolveMediaUrl } from '../utils/fileUtils';
 
 export const BookClubContext = createContext(null);
 
@@ -191,8 +196,15 @@ const BookClubLayoutInner = () => {
   const [gateLoading, setGateLoading] = useState(false);
   const [needsEmail, setNeedsEmail] = useState(false);
   const [guestToken, setGuestToken] = useState(() => getGuestSession(slug)?.token || null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [coverBroken, setCoverBroken] = useState(false);
 
   const isAuthenticated = Boolean(authState.isAuthenticated);
+
+  useEffect(() => {
+    setDescriptionExpanded(false);
+    setCoverBroken(false);
+  }, [slug, hub?.club?.cover_image]);
 
   const loadHub = useCallback(async () => {
     setLoading(true);
@@ -322,8 +334,14 @@ const BookClubLayoutInner = () => {
 
   const club = hub.club;
   const week = resolveWeekLabel({ club, progress: hub.progress });
-  const tagline = shortTagline(club.description);
-  const coverUrl = club.cover_image;
+  const fullDescription = (club.description || '').trim();
+  const descriptionNeedsExpand = clubDescriptionNeedsExpand(fullDescription);
+  const descriptionText =
+    descriptionExpanded || !descriptionNeedsExpand
+      ? fullDescription || shortTagline('')
+      : shortTagline(fullDescription);
+  const coverUrl = resolveMediaUrl(club.cover_image);
+  const showCover = Boolean(coverUrl) && !coverBroken;
   const cycleDates = formatClubDateRange(club.starts_at, club.ends_at);
   const showGuestBanner = hub.is_guest && !hub.can_participate;
   const completeUrl = guestToken
@@ -399,11 +417,12 @@ const BookClubLayoutInner = () => {
                   boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
                 }}
               >
-                {coverUrl ? (
+                {showCover ? (
                   <Box
                     component="img"
                     src={coverUrl}
                     alt={`Portada de ${club.title}`}
+                    onError={() => setCoverBroken(true)}
                     sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
                 ) : (
@@ -432,9 +451,33 @@ const BookClubLayoutInner = () => {
                 >
                   {club.title}
                 </Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, maxWidth: 520 }}>
-                  {tagline}
+                <Typography
+                  sx={{
+                    color: 'rgba(255,255,255,0.65)',
+                    mt: 1,
+                    maxWidth: 520,
+                    whiteSpace: descriptionExpanded ? 'pre-wrap' : 'normal',
+                  }}
+                >
+                  {descriptionText}
                 </Typography>
+                {descriptionNeedsExpand && (
+                  <Button
+                    size="small"
+                    onClick={() => setDescriptionExpanded((open) => !open)}
+                    sx={{
+                      mt: 0.5,
+                      px: 0,
+                      minWidth: 0,
+                      color: CLUB_ACCENT,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      '&:hover': { bgcolor: 'transparent', color: CLUB_ACCENT_HOVER },
+                    }}
+                  >
+                    {descriptionExpanded ? 'Ver menos' : 'Ver más'}
+                  </Button>
+                )}
                 {cycleDates && (
                   <Typography
                     variant="body2"

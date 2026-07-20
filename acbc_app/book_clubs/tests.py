@@ -759,6 +759,38 @@ class BookClubCreateUpdateAPITestCase(APITestCase):
         self.assertEqual(response.data['status'], 'active')
         self.assertEqual(response.data['description'], 'Actualizado')
 
+    def test_staff_can_upload_cover_via_multipart(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+        import io
+
+        self.auth(self.staff)
+        created = self.client.post(
+            '/api/book_clubs/',
+            {'title': 'Club con portada', 'status': 'draft'},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        slug = created.data['slug']
+
+        buffer = io.BytesIO()
+        Image.new('RGB', (40, 60), color=(255, 100, 50)).save(buffer, format='JPEG')
+        cover = SimpleUploadedFile(
+            'portada_club.jpg',
+            buffer.getvalue(),
+            content_type='image/jpeg',
+        )
+        response = self.client.patch(
+            f'/api/book_clubs/{slug}/',
+            {'cover_image': cover},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data.get('cover_image'), response.data)
+        club = BookClub.objects.get(slug=slug)
+        self.assertTrue(club.cover_image.name)
+        self.assertIn('book_club_covers/', club.cover_image.name)
+
     def test_staff_can_clear_telegram_and_dates(self):
         self.auth(self.staff)
         created = self.client.post(

@@ -46,12 +46,20 @@ export const resolveWeekLabel = ({ club, progress, now = new Date() }) => {
   return { weekNum: currentWeek, weeksTotal: total, missionIndex: currentWeek, missionsTotal: total };
 };
 
+export const CLUB_DESCRIPTION_PREVIEW_CHARS = 140;
+
+export const normalizeClubDescription = (description) =>
+  (description || '').trim().replace(/\s+/g, ' ');
+
 export const shortTagline = (description, fallback = 'Leemos, cuestionamos y debatimos juntos.') => {
-  if (!description?.trim()) return fallback;
-  const oneLine = description.trim().replace(/\s+/g, ' ');
-  if (oneLine.length <= 140) return oneLine;
-  return `${oneLine.slice(0, 137)}…`;
+  const oneLine = normalizeClubDescription(description);
+  if (!oneLine) return fallback;
+  if (oneLine.length <= CLUB_DESCRIPTION_PREVIEW_CHARS) return oneLine;
+  return `${oneLine.slice(0, CLUB_DESCRIPTION_PREVIEW_CHARS - 3)}…`;
 };
+
+export const clubDescriptionNeedsExpand = (description) =>
+  normalizeClubDescription(description).length > CLUB_DESCRIPTION_PREVIEW_CHARS;
 
 export const daysUntil = (iso, now = new Date()) => {
   if (!iso) return null;

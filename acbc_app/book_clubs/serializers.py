@@ -10,9 +10,17 @@ from book_clubs.models import (
     DiscussionQuestionStatus,
 )
 from comments.models import Comment
+from content.image_utils import validate_cover_image_size
+from content.models import Topic
+from content.utils import build_media_url
 from events.models import Event
 from knowledge_paths.models import KnowledgePath, Node
-from content.models import Topic
+
+
+def _cover_image_url(club, request):
+    if not club.cover_image:
+        return None
+    return build_media_url(club.cover_image, request)
 
 
 class BookClubMembershipSerializer(serializers.ModelSerializer):
@@ -170,6 +178,7 @@ class BookClubListSerializer(serializers.ModelSerializer):
     is_member = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
     knowledge_path_title = serializers.SerializerMethodField()
+    cover_image = serializers.SerializerMethodField()
 
     class Meta:
         model = BookClub
@@ -192,6 +201,9 @@ class BookClubListSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'slug', 'created_at']
+
+    def get_cover_image(self, obj):
+        return _cover_image_url(obj, self.context.get('request'))
 
     def get_knowledge_path_title(self, obj):
         return obj.knowledge_path.title if obj.knowledge_path_id else None
@@ -225,6 +237,13 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
     telegram_group_url = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
+    # Match topics / knowledge paths: explicit ImageField for multipart clears + size checks.
+    cover_image = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        allow_empty_file=True,
+        max_length=None,
+    )
 
     class Meta:
         model = BookClub
@@ -245,11 +264,19 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
             'knowledge_path': {'required': False, 'allow_null': True},
             'topic': {'required': False, 'allow_null': True},
             'description': {'required': False, 'allow_blank': True},
-            'cover_image': {'required': False, 'allow_null': True},
             'starts_at': {'required': False, 'allow_null': True},
             'ends_at': {'required': False, 'allow_null': True},
             'status': {'required': False},
         }
+
+    def validate_cover_image(self, value):
+        if value in (None, ''):
+            return None
+        try:
+            validate_cover_image_size(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value
 
     def validate_knowledge_path(self, value):
         if value is None:
@@ -310,6 +337,10 @@ class BookClubCreateUpdateSerializer(serializers.ModelSerializer):
         return club
 
     def update(self, instance, validated_data):
+        # Multipart clears send cover_image as "" → None via validate_cover_image.
+        if 'cover_image' in validated_data and validated_data['cover_image'] is None:
+            if instance.cover_image:
+                instance.cover_image.delete(save=False)
         club = super().update(instance, validated_data)
         request = self.context.get('request')
         user = request.user if request else club.created_by

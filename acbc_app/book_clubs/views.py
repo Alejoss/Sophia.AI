@@ -187,7 +187,9 @@ class BookClubGuestAccessView(APIView):
 
         cover = None
         if club.cover_image:
-            cover = request.build_absolute_uri(club.cover_image.url)
+            from content.utils import build_media_url
+
+            cover = build_media_url(club.cover_image, request)
 
         return Response(
             {
