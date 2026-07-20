@@ -25,7 +25,8 @@ class CertificateRequestFlowTest(TestCase):
         self.knowledge_path = KnowledgePath.objects.create(
             title='Test Knowledge Path',
             description='Test Description',
-            author=self.teacher
+            author=self.teacher,
+            certificates_enabled=True,
         )
         
         # Setup API client
@@ -249,6 +250,25 @@ class CertificateRequestFlowTest(TestCase):
         stored = CertificateRequest.objects.get(id=response.data['id'])
         self.assertEqual(stored.notes, note)
 
+    def test_certificate_request_blocked_when_disabled(self):
+        """Requests fail when the path author has not enabled certificates."""
+        self.knowledge_path.certificates_enabled = False
+        self.knowledge_path.save(update_fields=['certificates_enabled'])
+
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.request_url,
+            {'notes': 'Please review'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            CertificateRequest.objects.filter(
+                requester=self.student,
+                knowledge_path=self.knowledge_path,
+            ).exists()
+        )
+
 
 class CertificateRequestSerializerNotesTests(TestCase):
     def setUp(self):
@@ -266,6 +286,7 @@ class CertificateRequestSerializerNotesTests(TestCase):
             title='Test Knowledge Path',
             description='Test Description',
             author=self.teacher,
+            certificates_enabled=True,
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.student)

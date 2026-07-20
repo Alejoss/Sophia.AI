@@ -28,6 +28,17 @@ class CertificateRequestView(APIView):
             # Check if knowledge path exists
             knowledge_path = get_object_or_404(KnowledgePath, id=path_id)
             logger.debug(f"Found knowledge path: {knowledge_path.title} (ID: {knowledge_path.id})")
+
+            if not knowledge_path.certificates_enabled:
+                logger.warning(
+                    f"Certificate request blocked - certificates disabled for path {knowledge_path.id}"
+                )
+                return Response(
+                    {
+                        'error': 'Las solicitudes de certificado no están habilitadas para este camino de conocimiento',
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
             
             # Check if user has already requested a certificate for this path
             existing_request = CertificateRequest.objects.filter(

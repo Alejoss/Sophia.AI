@@ -107,6 +107,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'id', 'title', 'author', 'author_id', 'description', 'created_at',
             'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image',
             'image_preview', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
+            'certificates_enabled',
         ]
 
     def get_can_be_visible(self, obj):
@@ -161,6 +162,7 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'author', 'created_at', 'image', 'image_preview',
             'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
+            'certificates_enabled',
         ]
         read_only_fields = ['author', 'created_at', 'image_preview']
 
@@ -184,8 +186,9 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        """Override create to ensure visibility is False for new knowledge paths"""
+        """Override create to ensure visibility and certificates start disabled"""
         validated_data['is_visible'] = False  # New knowledge paths start as not visible
+        validated_data['certificates_enabled'] = False
         instance = super().create(validated_data)
         instance.refresh_from_db()
         if instance.image:
@@ -218,6 +221,9 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
                     'is_visible': "Los caminos de conocimiento necesitan al menos un nodo para ser visibles"
                 })
             instance.is_visible = new_visibility
+
+        if 'certificates_enabled' in validated_data:
+            instance.certificates_enabled = validated_data['certificates_enabled']
         
         instance.save()
 

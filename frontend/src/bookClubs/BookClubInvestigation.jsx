@@ -107,10 +107,6 @@ const BookClubInvestigation = () => {
             Aquí verás la línea de tiempo y el material del tema vinculado a este ciclo.
           </Typography>
         </Box>
-        <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-          Este club todavía no tiene un tema de investigación vinculado. El equipo lo asignará
-          desde Conexiones en el panel de administración.
-        </Alert>
       </Stack>
     );
   }

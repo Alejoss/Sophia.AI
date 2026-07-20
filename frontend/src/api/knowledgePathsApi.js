@@ -17,6 +17,9 @@ const knowledgePathsApi = {
         if (knowledgePathData.description !== undefined) formData.append('description', knowledgePathData.description);
         // Ensure visibility updates work even when uploading an image
         if (knowledgePathData.is_visible !== undefined) formData.append('is_visible', String(knowledgePathData.is_visible));
+        if (knowledgePathData.certificates_enabled !== undefined) {
+          formData.append('certificates_enabled', String(knowledgePathData.certificates_enabled));
+        }
         formData.append('image', knowledgePathData.image);
 
         response = await axiosInstance.post('/knowledge_paths/create/', formData, {
@@ -79,6 +82,9 @@ const knowledgePathsApi = {
         if (knowledgePathData.image_focal_x !== undefined) formData.append('image_focal_x', String(knowledgePathData.image_focal_x));
         if (knowledgePathData.image_focal_y !== undefined) formData.append('image_focal_y', String(knowledgePathData.image_focal_y));
         if (knowledgePathData.is_visible !== undefined) formData.append('is_visible', String(knowledgePathData.is_visible));
+        if (knowledgePathData.certificates_enabled !== undefined) {
+          formData.append('certificates_enabled', String(knowledgePathData.certificates_enabled));
+        }
 
         response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, formData, {
           headers: {

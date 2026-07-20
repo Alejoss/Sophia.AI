@@ -138,7 +138,7 @@ const DiscussionQuestionsList = () => {
         Foro
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
-        Preguntas guiadas por el staff. Publica tu respuesta para ver las de los demás miembros.
+        Preguntas guiadas por el moderador. Publica tu respuesta para ver las de los demás miembros.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>

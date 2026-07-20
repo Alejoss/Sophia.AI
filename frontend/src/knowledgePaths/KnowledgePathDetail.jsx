@@ -228,6 +228,14 @@ const KnowledgePathDetail = () => {
   const renderCertificateStatus = () => {
     if (!hasCompleted) return null;
 
+    const hasExistingRequest = Boolean(
+      certificateStatus?.has_certificate || certificateStatus?.certificate_request
+    );
+    const certificatesEnabled = Boolean(knowledgePath?.certificates_enabled);
+
+    // Hide entirely when certificates are off and the learner has no prior request/status.
+    if (!certificatesEnabled && !hasExistingRequest) return null;
+
     // If there's an approved request, treat it as having a certificate
     if (certificateStatus?.certificate_request?.status === 'APPROVED' || certificateStatus?.has_certificate) {
       return (
@@ -294,7 +302,29 @@ const KnowledgePathDetail = () => {
                     >
                       {requestingCertificate ? 'Aceptando...' : 'Aceptar Solicitud'}
                     </Button>
-                  ) : (
+                  ) : certificatesEnabled ? (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      onClick={handleOpenModal}
+                      disabled={requestingCertificate}
+                    >
+                      {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
+                    </Button>
+                  ) : null}
+                </Box>
+              </Alert>
+            </Box>
+          );
+        case 'CANCELLED':
+          return (
+            <Box sx={{ mt: 4 }}>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Cancelada</AlertTitle>
+                Tu solicitud de certificado fue cancelada
+                <Box sx={{ mt: 2 }}>
+                  {certificatesEnabled && (
                     <Button
                       variant="outlined"
                       color="primary"
@@ -309,30 +339,12 @@ const KnowledgePathDetail = () => {
               </Alert>
             </Box>
           );
-        case 'CANCELLED':
-          return (
-            <Box sx={{ mt: 4 }}>
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Cancelada</AlertTitle>
-                Tu solicitud de certificado fue cancelada
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    size="small"
-                    onClick={handleOpenModal}
-                    disabled={requestingCertificate}
-                  >
-                    {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
-                  </Button>
-                </Box>
-              </Alert>
-            </Box>
-          );
         default:
           return null;
       }
     }
+
+    if (!certificatesEnabled) return null;
 
     return (
       <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
@@ -362,7 +374,9 @@ const KnowledgePathDetail = () => {
   const certificateStatusSection = React.useMemo(() => renderCertificateStatus(), [
     hasCompleted,
     certificateStatus,
-    requestingCertificate
+    requestingCertificate,
+    knowledgePath?.certificates_enabled,
+    isCreator,
   ]);
 
   if (loading) {

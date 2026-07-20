@@ -55,6 +55,10 @@ class KnowledgePath(models.Model):
     image_focal_x = models.FloatField(default=0.5, blank=True)
     image_focal_y = models.FloatField(default=0.5, blank=True)
     is_visible = models.BooleanField(default=False, help_text="Whether this knowledge path is visible to other users")
+    certificates_enabled = models.BooleanField(
+        default=False,
+        help_text="Whether learners can request a completion certificate for this path",
+    )
 
     class Meta:
         app_label = 'knowledge_paths'

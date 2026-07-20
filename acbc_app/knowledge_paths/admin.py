@@ -4,9 +4,9 @@ from .models import KnowledgePath, Node
 
 @admin.register(KnowledgePath)
 class KnowledgePathAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'created_at', 'updated_at', 'vote_count')
+        list_display = ('title', 'author', 'is_visible', 'certificates_enabled', 'created_at', 'updated_at', 'vote_count')
     search_fields = ('title', 'description', 'author__username')
-    list_filter = ('created_at', 'updated_at')
+    list_filter = ('is_visible', 'certificates_enabled', 'created_at', 'updated_at')
     readonly_fields = ('vote_count',)
 
     def vote_count(self, obj):

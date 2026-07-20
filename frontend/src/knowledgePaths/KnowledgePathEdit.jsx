@@ -62,6 +62,7 @@ const KnowledgePathEdit = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isVisible, setIsVisible] = useState(false);
+  const [certificatesEnabled, setCertificatesEnabled] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -69,7 +70,13 @@ const KnowledgePathEdit = () => {
 
   // Autosave state
   const [saveState, setSaveState] = useState({ status: "idle", message: null, updatedAt: null });
-  const lastSavedRef = useRef({ title: "", description: "", isVisible: false, imageUrl: null });
+  const lastSavedRef = useRef({
+    title: "",
+    description: "",
+    isVisible: false,
+    certificatesEnabled: false,
+    imageUrl: null,
+  });
   const autosaveTimerRef = useRef(null);
   const isHydratingRef = useRef(true);
 
@@ -124,6 +131,7 @@ const KnowledgePathEdit = () => {
         setTitle(data.title || "");
         setDescription(data.description || "");
         setIsVisible(Boolean(data.is_visible));
+        setCertificatesEnabled(Boolean(data.certificates_enabled));
         setImageFile(null);
         setImagePreviewUrl(data.image || null);
 
@@ -131,6 +139,7 @@ const KnowledgePathEdit = () => {
           title: data.title || "",
           description: data.description || "",
           isVisible: Boolean(data.is_visible),
+          certificatesEnabled: Boolean(data.certificates_enabled),
           imageUrl: data.image || null,
         };
         isHydratingRef.current = false;
@@ -194,6 +203,7 @@ const KnowledgePathEdit = () => {
         title,
         description,
         is_visible: isVisible,
+        certificates_enabled: certificatesEnabled,
         image: file,
         image_focal_x: focalX,
         image_focal_y: focalY,
@@ -235,9 +245,13 @@ const KnowledgePathEdit = () => {
 
   const isDirty = useMemo(() => {
     const last = lastSavedRef.current;
-    const fieldsDirty = title !== last.title || description !== last.description || isVisible !== last.isVisible;
+    const fieldsDirty =
+      title !== last.title ||
+      description !== last.description ||
+      isVisible !== last.isVisible ||
+      certificatesEnabled !== last.certificatesEnabled;
     return fieldsDirty || Boolean(imageFile);
-  }, [title, description, isVisible, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, imageFile]);
 
   const runAutosave = async () => {
     if (isHydratingRef.current) return;
@@ -249,6 +263,7 @@ const KnowledgePathEdit = () => {
         title,
         description,
         is_visible: isVisible,
+        certificates_enabled: certificatesEnabled,
       };
       if (imageFile) payload.image = imageFile;
 
@@ -267,6 +282,10 @@ const KnowledgePathEdit = () => {
         title: updated?.title ?? title,
         description: updated?.description ?? description,
         isVisible: typeof updated?.is_visible === "boolean" ? updated.is_visible : isVisible,
+        certificatesEnabled:
+          typeof updated?.certificates_enabled === "boolean"
+            ? updated.certificates_enabled
+            : certificatesEnabled,
         imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
       };
 
@@ -294,7 +313,7 @@ const KnowledgePathEdit = () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, isVisible, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, imageFile]);
 
   const refreshPath = async () => {
     try {
@@ -655,6 +674,30 @@ const KnowledgePathEdit = () => {
                   </span>
                 </Tooltip>
               </Stack>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={certificatesEnabled}
+                    onChange={(e) => setCertificatesEnabled(e.target.checked)}
+                  />
+                }
+                label={
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <SchoolIcon fontSize="small" color={certificatesEnabled ? "success" : "disabled"} />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Permitir solicitar certificado
+                      </Typography>
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+                      Actívalo cuando el camino esté completo. En cursos o clubes en vivo, déjalo apagado hasta
+                      publicar todos los nodos.
+                    </Typography>
+                  </Box>
+                }
+                sx={{ alignItems: "flex-start", mt: 1, ml: 0 }}
+              />
 
               <TextField
                 label="Título"
