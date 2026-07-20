@@ -142,6 +142,14 @@ const BookClubOverview = () => {
         body:
           nextMission.description?.trim() ||
           'Sigue la lectura de esta misión y vuelve al foro.',
+        preserveBodyWhitespace: Boolean(nextMission.description?.trim()),
+        missionMeta: canParticipate
+          ? {
+              order: nextMission.order,
+              total: hub.progress?.total_nodes || null,
+              progressPct,
+            }
+          : null,
         cta: {
           label: first
             ? `Comenzar misión ${nextMission.order} →`
@@ -209,9 +217,35 @@ const BookClubOverview = () => {
         <Typography variant="h4" sx={{ fontWeight: 800, mt: 0.5, lineHeight: 1.2 }}>
           {hero.title}
         </Typography>
-        <Typography sx={{ color: 'rgba(255,255,255,0.72)', mt: 1.5, maxWidth: 560 }}>
+        <Typography
+          sx={{
+            color: 'rgba(255,255,255,0.72)',
+            mt: 1.5,
+            maxWidth: 560,
+            whiteSpace: hero.preserveBodyWhitespace ? 'pre-wrap' : 'normal',
+          }}
+        >
           {hero.body}
         </Typography>
+        {hero.missionMeta && (
+          <Box sx={{ mt: 2, maxWidth: 280 }}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.45)' }}>
+              Misión {hero.missionMeta.order} de {hero.missionMeta.total || '—'} · tu progreso{' '}
+              {hero.missionMeta.progressPct}%
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={hero.missionMeta.progressPct}
+              sx={{
+                mt: 1,
+                height: 6,
+                borderRadius: 1,
+                bgcolor: 'rgba(255,255,255,0.08)',
+                '& .MuiLinearProgress-bar': { bgcolor: CLUB_ACCENT },
+              }}
+            />
+          </Box>
+        )}
         <PrimaryCta
           to={hero.cta.external ? undefined : hero.cta.to}
           href={hero.cta.external ? hero.cta.to : undefined}
@@ -219,65 +253,6 @@ const BookClubOverview = () => {
           {hero.cta.label}
         </PrimaryCta>
       </Box>
-
-      {/* Nivel 1b — Tu misión actual (solo si hay misión accionable y no es solo el hero) */}
-      {phase === 'active' && nextMission && !nextMission.locked && canParticipate && (
-        <Box>
-          <SectionLabel>Tu misión actual</SectionLabel>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: 'auto 1fr', sm: '64px 1fr' },
-              gap: 2,
-              alignItems: 'start',
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: '2rem',
-                fontWeight: 800,
-                color: CLUB_ACCENT,
-                lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {String(nextMission.order).padStart(2, '0')}
-            </Typography>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {nextMission.title}
-              </Typography>
-              <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.75, maxWidth: 520 }}>
-                {nextMission.description?.trim() ||
-                  'Lee con atención y vuelve para compartir lo que te dejó pensando.'}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.45)', mt: 1.25 }}>
-                Misión {nextMission.order} de {hub.progress.total_nodes || '—'} · tu progreso{' '}
-                {progressPct}%
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={progressPct}
-                sx={{
-                  mt: 1,
-                  height: 6,
-                  borderRadius: 1,
-                  maxWidth: 280,
-                  bgcolor: 'rgba(255,255,255,0.08)',
-                  '& .MuiLinearProgress-bar': { bgcolor: CLUB_ACCENT },
-                }}
-              />
-              <Button
-                component={RouterLink}
-                to={missionHref}
-                sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
-              >
-                Comenzar misión →
-              </Button>
-            </Box>
-          </Box>
-        </Box>
-      )}
 
       {/* Nivel 2 — El club esta semana */}
       <Box>
