@@ -7,12 +7,20 @@ from utils.db_encoding import (
     prepare_json_for_db,
     to_ascii_safe,
     to_ascii_safe_json,
+    verb_key,
 )
 
 
 class DbEncodingUtilsTests(SimpleTestCase):
     def test_to_ascii_safe_strips_accents(self):
         self.assertEqual(to_ascii_safe('Filosofía Cypherpunk'), 'Filosofia Cypherpunk')
+
+    def test_verb_key_matches_accented_and_ascii(self):
+        self.assertEqual(
+            verb_key('votó positivamente tu camino de conocimiento'),
+            verb_key('voto positivamente tu camino de conocimiento'),
+        )
+        self.assertEqual(verb_key('respondió a'), 'respondio a')
 
     def test_to_ascii_safe_json_strips_unicode_in_dict(self):
         payload = {'order_description': 'Registro: Filosofía'}

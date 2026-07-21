@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from content.utils import build_media_url
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile, Suggestion
 from notifications.models import Notification
+from utils.db_encoding import verb_key
 
 # Verbs that use the topic as notification target (title + navigation).
 TOPIC_TARGET_VERBS = (
@@ -44,6 +45,38 @@ KNOWLEDGE_PATH_VERBS = (
     'rechazó tu solicitud de certificado para',
     'votó positivamente tu camino de conocimiento',
 )
+
+MODERATOR_ACTION_VERBS = (
+    'te invitó a moderar',
+    'aceptó tu invitación para moderar',
+    'rechazó tu invitación para moderar',
+    'te removió como moderador de',
+)
+
+EVENT_TARGET_VERBS = (
+    'se registró en tu evento',
+    'aceptó tu pago para',
+    'te envió un certificado para',
+)
+
+CERTIFICATE_DECISION_VERBS = (
+    'aprobó tu solicitud de certificado para',
+    'rechazó tu solicitud de certificado para',
+)
+
+TOPIC_REQUEST_DECISION_VERBS = (
+    'aprobó tu solicitud de tema',
+    'rechazó tu solicitud de tema',
+)
+
+# Precomputed ASCII keys so matching works for SQL_ASCII-stored verbs.
+TOPIC_TARGET_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_TARGET_VERBS)
+TOPIC_MODERATION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_MODERATION_VERBS)
+KNOWLEDGE_PATH_VERB_KEYS = frozenset(verb_key(v) for v in KNOWLEDGE_PATH_VERBS)
+MODERATOR_ACTION_VERB_KEYS = frozenset(verb_key(v) for v in MODERATOR_ACTION_VERBS)
+EVENT_TARGET_VERB_KEYS = frozenset(verb_key(v) for v in EVENT_TARGET_VERBS)
+CERTIFICATE_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_DECISION_VERBS)
+TOPIC_REQUEST_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_REQUEST_DECISION_VERBS)
 
 # Get logger for profiles serializers
 logger = logging.getLogger('academia_blockchain.profiles.serializers')
@@ -224,80 +257,92 @@ class NotificationSerializer(serializers.ModelSerializer):
                 title = target.title
             elif hasattr(target, 'original_title'):
                 title = getattr(target, 'original_title', None) or None
+            elif hasattr(target, 'display_title'):
+                title = getattr(target, 'display_title', None) or None
             return {
                 'id': target.id,
                 'title': title,
             }
         return None
 
+    def _verb_is(self, verb, expected):
+        return verb_key(verb) == verb_key(expected)
+
+    def _verb_in(self, verb, expected_keys):
+        return verb_key(verb) in expected_keys
+
     def get_context_title(self, obj):
         try:
+            verb = obj.verb
+
             # For knowledge path comments
-            if obj.verb == 'comentó en tu camino de conocimiento' and obj.target:
+            if self._verb_is(verb, 'comentó en tu camino de conocimiento') and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
-            
+
             # For comment replies
-            if obj.verb == 'respondió a' and obj.action_object:
+            if self._verb_is(verb, 'respondió a') and obj.action_object:
                 comment = obj.action_object
                 if comment and comment.content_object:
-                    if hasattr(comment.content_object, 'title'):
-                        return comment.content_object.title
-                    elif hasattr(comment.content_object, 'name'):
-                        return comment.content_object.name
-            
+                    content_object = comment.content_object
+                    if hasattr(content_object, 'display_title'):
+                        return content_object.display_title or None
+                    if hasattr(content_object, 'title'):
+                        return content_object.title
+                    if hasattr(content_object, 'name'):
+                        return content_object.name
+
             # For event registrations
-            if obj.verb == 'se registró en tu evento' and obj.target:
+            if self._verb_is(verb, 'se registró en tu evento') and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
-            
+
             # For payment accepted
-            if obj.verb == 'aceptó tu pago para' and obj.target:
+            if self._verb_is(verb, 'aceptó tu pago para') and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
-            
+
             # For certificate sent
-            if obj.verb == 'te envió un certificado para' and obj.target:
+            if self._verb_is(verb, 'te envió un certificado para') and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
-            
+
             # For topic moderator invitations and related actions
-            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar', 
-                           'rechazó tu invitación para moderar', 'te removió como moderador de'] and obj.target:
+            if self._verb_in(verb, MODERATOR_ACTION_VERB_KEYS) and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
-            
+
             # For content suggestions and timeline suggestions
-            if obj.verb in TOPIC_TARGET_VERBS and obj.target:
+            if self._verb_in(verb, TOPIC_TARGET_VERB_KEYS) and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
             # For content comments (target is ContentProfile)
-            if obj.verb == 'comentó en tu contenido' and obj.target:
+            if self._verb_is(verb, 'comentó en tu contenido') and obj.target:
                 if hasattr(obj.target, 'display_title'):
                     return obj.target.display_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
             # File suggestion for URL content (target is Content)
-            if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
+            if self._verb_is(verb, 'sugirió un archivo para tu contenido') and obj.target:
                 if hasattr(obj.target, 'original_title'):
                     return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
-                
+
             # For topic creation requests
-            if obj.verb == 'solicitó crear un tema' and obj.target:
+            if self._verb_is(verb, 'solicitó crear un tema') and obj.target:
                 return getattr(obj.target, 'proposed_title', None)
-            if obj.verb in ['aprobó tu solicitud de tema', 'rechazó tu solicitud de tema'] and obj.target:
+            if self._verb_in(verb, TOPIC_REQUEST_DECISION_VERB_KEYS) and obj.target:
                 return (
                     getattr(obj.target, 'approved_title', None)
                     or getattr(obj.target, 'proposed_title', None)
                 )
 
-            if obj.verb == 'aprobó tu solicitud de tema' and obj.action_object:
+            if self._verb_is(verb, 'aprobó tu solicitud de tema') and obj.action_object:
                 request = obj.action_object
                 if getattr(request, 'topic_id', None):
                     return getattr(request, 'approved_title', None) or getattr(request, 'proposed_title', None)
 
             # For knowledge path certificate and engagement actions
-            if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
+            if self._verb_in(verb, KNOWLEDGE_PATH_VERB_KEYS) and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
             # For content upvotes
-            if obj.verb == 'votó positivamente tu contenido' and obj.target:
+            if self._verb_is(verb, 'votó positivamente tu contenido') and obj.target:
                 if hasattr(obj.target, 'original_title'):
                     return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
@@ -311,50 +356,73 @@ class NotificationSerializer(serializers.ModelSerializer):
             }, exc_info=True)
             return None
 
+    def _reply_target_url(self, comment):
+        """Build SPA URL for a comment reply from the commented object."""
+        content_object = getattr(comment, 'content_object', None)
+        if not content_object or not hasattr(content_object, 'id'):
+            return None
+
+        model_name = None
+        if getattr(comment, 'content_type', None):
+            model_name = comment.content_type.model
+        else:
+            model_name = content_object.__class__.__name__.lower()
+
+        if model_name == 'contentprofile':
+            content_id = getattr(content_object, 'content_id', None)
+            return f'/content/{content_id}/library' if content_id else None
+        if model_name == 'content':
+            return f'/content/{content_object.id}/library'
+        if model_name == 'knowledgepath':
+            return f'/knowledge_path/{content_object.id}'
+        if model_name == 'topic':
+            return f'/content/topics/{content_object.id}'
+
+        # Fallback for unexpected related models with a content_id FK
+        content_id = getattr(content_object, 'content_id', None)
+        if content_id:
+            return f'/content/{content_id}/library'
+        return None
+
     def get_target_url(self, obj):
         try:
+            verb = obj.verb
+
             # Certificate request notifications link to the certificates section
-            if obj.verb == 'solicitó un certificado para tu camino de conocimiento':
+            if self._verb_is(verb, 'solicitó un certificado para tu camino de conocimiento'):
                 request = self.context.get('request')
                 recipient = obj.recipient
                 if request and request.user.is_authenticated and request.user.id == recipient.id:
                     return '/profiles/my_profile?section=certificates&tab=requests'
                 return f'/profiles/user_profile/{recipient.id}?section=certificates&tab=requests' if recipient else None
 
-            if obj.verb in ['aprobó tu solicitud de certificado para', 'rechazó tu solicitud de certificado para']:
+            if self._verb_in(verb, CERTIFICATE_DECISION_VERB_KEYS):
                 request = self.context.get('request')
                 recipient = obj.recipient
                 if request and request.user.is_authenticated and request.user.id == recipient.id:
                     return '/profiles/my_profile?section=certificates'
                 return f'/profiles/user_profile/{recipient.id}?section=certificates' if recipient else None
 
-            if obj.verb in KNOWLEDGE_PATH_VERBS and obj.target:
+            if self._verb_in(verb, KNOWLEDGE_PATH_VERB_KEYS) and obj.target:
                 return f'/knowledge_path/{obj.target.id}' if hasattr(obj.target, 'id') else None
 
             # For comment replies
-            if obj.verb == 'respondió a' and obj.action_object:
-                comment = obj.action_object
-                if comment and comment.content_object:
-                    content_object = comment.content_object
-                    if hasattr(content_object, 'id'):
-                        if hasattr(content_object, 'display_title'):
-                            return f'/content/{content_object.id}/library'
-                        return f'/knowledge_path/{content_object.id}'
+            if self._verb_is(verb, 'respondió a') and obj.action_object:
+                return self._reply_target_url(obj.action_object)
 
-            if obj.verb == 'comentó en tu contenido' and obj.target:
+            if self._verb_is(verb, 'comentó en tu contenido') and obj.target:
                 content_id = getattr(obj.target, 'content_id', None)
                 return f'/content/{content_id}/library' if content_id else None
 
-            if obj.verb == 'votó positivamente tu contenido' and obj.target:
+            if self._verb_is(verb, 'votó positivamente tu contenido') and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
 
             # For event registrations
-            if obj.verb in ['se registró en tu evento', 'aceptó tu pago para', 'te envió un certificado para'] and obj.target:
+            if self._verb_in(verb, EVENT_TARGET_VERB_KEYS) and obj.target:
                 return f'/events/{obj.target.id}' if hasattr(obj.target, 'id') else None
 
             # For topic moderator invitations and related actions
-            if obj.verb in ['te invitó a moderar', 'aceptó tu invitación para moderar',
-                           'rechazó tu invitación para moderar', 'te removió como moderador de']:
+            if self._verb_in(verb, MODERATOR_ACTION_VERB_KEYS):
                 request = self.context.get('request')
                 recipient = obj.recipient
 
@@ -362,19 +430,19 @@ class NotificationSerializer(serializers.ModelSerializer):
                     return '/profiles/my_profile?section=topics'
                 return f'/profiles/user_profile/{recipient.id}?section=topics' if recipient else None
 
-            if obj.verb in TOPIC_MODERATION_VERBS and obj.target:
+            if self._verb_in(verb, TOPIC_MODERATION_VERB_KEYS) and obj.target:
                 return f'/content/topics/{obj.target.id}/edit?tab=suggestions' if hasattr(obj.target, 'id') else None
 
-            if obj.verb in TOPIC_TARGET_VERBS and obj.target:
+            if self._verb_in(verb, TOPIC_TARGET_VERB_KEYS) and obj.target:
                 return f'/content/topics/{obj.target.id}' if hasattr(obj.target, 'id') else None
 
-            if obj.verb == 'sugirió un archivo para tu contenido' and obj.target:
+            if self._verb_is(verb, 'sugirió un archivo para tu contenido') and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
 
-            if obj.verb == 'solicitó crear un tema':
+            if self._verb_is(verb, 'solicitó crear un tema'):
                 return '/dashboard'
 
-            if obj.verb in ['aprobó tu solicitud de tema', 'rechazó tu solicitud de tema']:
+            if self._verb_in(verb, TOPIC_REQUEST_DECISION_VERB_KEYS):
                 topic_id = None
                 if obj.target and obj.target_content_type:
                     model_name = obj.target_content_type.model
@@ -382,9 +450,9 @@ class NotificationSerializer(serializers.ModelSerializer):
                         topic_id = obj.target.id
                     elif model_name == 'topiccreationrequest' and getattr(obj.target, 'topic_id', None):
                         topic_id = obj.target.topic_id
-                if obj.verb == 'aprobó tu solicitud de tema' and topic_id:
+                if self._verb_is(verb, 'aprobó tu solicitud de tema') and topic_id:
                     return f'/content/topics/{topic_id}'
-                if obj.verb == 'rechazó tu solicitud de tema':
+                if self._verb_is(verb, 'rechazó tu solicitud de tema'):
                     return '/content/create_topic'
 
             return None

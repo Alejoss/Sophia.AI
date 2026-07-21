@@ -16,9 +16,11 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from content.models import Content, Topic
+from content.models import Content, ContentProfile, Topic
+from comments.models import Comment
 from gamification.models import Badge, UserBadge
 from profiles.email_service import EmailService, EmailServiceError, EmailValidationError, EmailConfigurationError
+from utils.db_encoding import to_ascii_safe
 
 
 class ProfileModelTests(TestCase):
@@ -1368,6 +1370,149 @@ class NotificationTests(APITestCase):
         upvote_notifications = [n for n in notifications if n['verb'] == 'votó positivamente tu contenido']
         self.assertEqual(len(upvote_notifications), 1)
 
+    def test_ascii_verbs_still_resolve_target_url(self):
+        """SQL_ASCII DBs store verbs without accents; target_url must still resolve."""
+        author = User.objects.create_user(
+            username='pathauthor_ascii',
+            email='pathauthor_ascii@example.com',
+            password='testpass123'
+        )
+        actor = User.objects.create_user(
+            username='voter_ascii',
+            email='voter_ascii@example.com',
+            password='testpass123'
+        )
+        knowledge_path = KnowledgePath.objects.create(
+            title='Ucronia',
+            description='Test',
+            author=author
+        )
+        content = Content.objects.create(
+            original_title='Documental Test',
+            uploaded_by=author
+        )
+        kp_ct = ContentType.objects.get_for_model(KnowledgePath)
+        content_ct = ContentType.objects.get_for_model(Content)
+        actor_ct = ContentType.objects.get_for_model(User)
+
+        Notification.objects.create(
+            recipient=author,
+            actor_content_type=actor_ct,
+            actor_object_id=actor.id,
+            verb=to_ascii_safe('votó positivamente tu camino de conocimiento'),
+            target_content_type=kp_ct,
+            target_object_id=knowledge_path.id,
+            description=f'{actor.username} voto positivamente tu camino de conocimiento "Ucronia"',
+        )
+        Notification.objects.create(
+            recipient=author,
+            actor_content_type=actor_ct,
+            actor_object_id=actor.id,
+            verb=to_ascii_safe('votó positivamente tu contenido'),
+            target_content_type=content_ct,
+            target_object_id=content.id,
+            description=f'{actor.username} voto positivamente tu contenido "Documental Test"',
+        )
+        Notification.objects.create(
+            recipient=author,
+            actor_content_type=actor_ct,
+            actor_object_id=actor.id,
+            verb=to_ascii_safe('completó tu camino de conocimiento'),
+            target_content_type=kp_ct,
+            target_object_id=knowledge_path.id,
+            description=f'{actor.username} completo tu camino de conocimiento "Ucronia"',
+        )
+        Notification.objects.create(
+            recipient=author,
+            actor_content_type=actor_ct,
+            actor_object_id=actor.id,
+            verb=to_ascii_safe('solicitó un certificado para tu camino de conocimiento'),
+            target_content_type=kp_ct,
+            target_object_id=knowledge_path.id,
+            description=f'{actor.username} solicito un certificado para tu camino de conocimiento "Ucronia"',
+        )
+
+        self.client.force_authenticate(user=author)
+        response = self.client.get(reverse('profiles:notifications'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_verb = {n['verb']: n for n in response.data['notifications']}
+
+        self.assertEqual(
+            by_verb[to_ascii_safe('votó positivamente tu camino de conocimiento')]['target_url'],
+            f'/knowledge_path/{knowledge_path.id}',
+        )
+        self.assertEqual(
+            by_verb[to_ascii_safe('votó positivamente tu contenido')]['target_url'],
+            f'/content/{content.id}/library',
+        )
+        self.assertEqual(
+            by_verb[to_ascii_safe('completó tu camino de conocimiento')]['target_url'],
+            f'/knowledge_path/{knowledge_path.id}',
+        )
+        self.assertEqual(
+            by_verb[to_ascii_safe('solicitó un certificado para tu camino de conocimiento')]['target_url'],
+            '/profiles/my_profile?section=certificates&tab=requests',
+        )
+        self.assertEqual(
+            by_verb[to_ascii_safe('votó positivamente tu camino de conocimiento')]['target']['id'],
+            knowledge_path.id,
+        )
+
+    def test_reply_notification_target_url_for_content_profile(self):
+        """Replies on content comments must link to Content.id, not ContentProfile.id."""
+        owner = User.objects.create_user(
+            username='content_owner_reply',
+            email='content_owner_reply@example.com',
+            password='testpass123'
+        )
+        replier = User.objects.create_user(
+            username='replier',
+            email='replier@example.com',
+            password='testpass123'
+        )
+        content = Content.objects.create(
+            original_title='Reply Target Content',
+            uploaded_by=owner
+        )
+        profile = ContentProfile.objects.create(
+            content=content,
+            user=owner,
+            title='Reply Target Content'
+        )
+        content_profile_ct = ContentType.objects.get_for_model(ContentProfile)
+        parent = Comment.objects.create(
+            author=owner,
+            body='Parent comment',
+            content_type=content_profile_ct,
+            object_id=profile.id,
+        )
+        reply = Comment.objects.create(
+            author=replier,
+            body='Reply comment',
+            content_type=content_profile_ct,
+            object_id=profile.id,
+            parent=parent,
+        )
+        actor_ct = ContentType.objects.get_for_model(User)
+        comment_ct = ContentType.objects.get_for_model(Comment)
+        Notification.objects.create(
+            recipient=owner,
+            actor_content_type=actor_ct,
+            actor_object_id=replier.id,
+            verb=to_ascii_safe('respondió a'),
+            action_object_content_type=comment_ct,
+            action_object_object_id=reply.id,
+            target_content_type=comment_ct,
+            target_object_id=parent.id,
+            description=f'{replier.username} respondio a tu comentario',
+        )
+
+        self.client.force_authenticate(user=owner)
+        response = self.client.get(reverse('profiles:notifications'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notification = response.data['notifications'][0]
+        self.assertEqual(notification['target_url'], f'/content/{content.id}/library')
+
 
 class SuggestionModelTests(TestCase):
     """Tests for the Suggestion model"""
@@ -1812,8 +1957,9 @@ class NewsletterSubscriptionApiTests(APITestCase):
         self.assertTrue(response.data['created'])
         mock_send_to_admins.assert_called_once()
         call_kwargs = mock_send_to_admins.call_args[1]
-        self.assertIn('nuevo@example.com', call_kwargs['html_message'])
-        self.assertIn('Club de Lectura', call_kwargs['html_message'])
+        self.assertEqual(call_kwargs['template_name'], 'newsletter_subscription')
+        self.assertEqual(call_kwargs['context']['subscriber_email'], 'nuevo@example.com')
+        self.assertEqual(call_kwargs['context']['source_label'], 'Club de Lectura')
 
     @patch('profiles.views.EmailService.send_to_admins')
     def test_newsletter_subscription_duplicate_does_not_notify(self, mock_send_to_admins):

@@ -78,6 +78,17 @@ def to_ascii_safe(text: str) -> str:
     return normalized.encode('ascii', 'ignore').decode('ascii').strip()
 
 
+def verb_key(verb: str | None) -> str:
+    """
+    Canonical key for notification verb comparisons.
+
+    Production may store verbs without accents when PostgreSQL is SQL_ASCII
+    (see prepare_text_for_db). Matching must treat accented and ASCII forms
+    as the same verb.
+    """
+    return to_ascii_safe(verb or '')
+
+
 def to_ascii_safe_json(obj: Any) -> Any:
     """Recursively strip non-ASCII from strings inside JSON-like structures."""
     return _ascii_safe_structure(obj)

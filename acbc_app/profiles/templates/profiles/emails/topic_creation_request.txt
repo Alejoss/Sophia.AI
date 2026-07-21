@@ -1,0 +1,16 @@
+Solicitud de tema — Academia Blockchain
+
+Nueva solicitud de creación de tema
+
+Solicitante: {{ requester_username }}{% if requester_email %} ({{ requester_email }}){% endif %}
+Título propuesto: {{ proposed_title %}
+
+Descripción:
+{{ proposed_description }}
+
+---
+Revisar en el dashboard: {{ dashboard_url }}
+
+---
+Academia Blockchain
+Este es un mensaje automático. Por favor, no respondas a este correo.

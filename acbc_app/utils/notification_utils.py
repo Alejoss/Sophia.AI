@@ -2282,40 +2282,21 @@ def _send_topic_creation_request_email_to_admins(creation_request):
     from profiles.email_service import EmailService, EmailServiceError
 
     requester = creation_request.requested_by
-    site_url = 'http://localhost:5173'
-    try:
-        from django.contrib.sites.models import Site
-        site = Site.objects.get_current()
-        if site.domain:
-            site_url = f'https://{site.domain}'
-    except Exception:
-        pass
-
-    dashboard_url = f'{site_url.rstrip("/")}/dashboard'
+    brand = EmailService.get_brand_context()
+    dashboard_url = f"{brand['frontend_url']}/dashboard"
     description = creation_request.proposed_description or 'Sin descripción.'
-    subject = f'Nueva solicitud de tema: {creation_request.proposed_title}'
-    html_message = (
-        '<p>Hay una nueva solicitud de creación de tema en Academia Blockchain.</p>'
-        f'<p><strong>Solicitante:</strong> {requester.username}'
-        f' ({requester.email or "sin email"})</p>'
-        f'<p><strong>Título propuesto:</strong> {creation_request.proposed_title}</p>'
-        f'<p><strong>Descripción:</strong></p>'
-        f'<p style="white-space: pre-wrap;">{description}</p>'
-        f'<p><a href="{dashboard_url}">Revisar en el dashboard</a></p>'
-    )
-    text_message = (
-        'Hay una nueva solicitud de creación de tema en Academia Blockchain.\n'
-        f'Solicitante: {requester.username} ({requester.email or "sin email"})\n'
-        f'Título propuesto: {creation_request.proposed_title}\n'
-        f'Descripción:\n{description}\n'
-        f'Revisar en el dashboard: {dashboard_url}'
-    )
 
     try:
         EmailService.send_to_admins(
-            subject=subject,
-            html_message=html_message,
-            text_message=text_message,
+            subject=f'Nueva solicitud de tema: {creation_request.proposed_title}',
+            template_name='topic_creation_request',
+            context={
+                'requester_username': requester.username,
+                'requester_email': requester.email or '',
+                'proposed_title': creation_request.proposed_title,
+                'proposed_description': description,
+                'dashboard_url': dashboard_url,
+            },
             tags=['topic-creation-request', 'admin', 'notification'],
         )
         logger.info(

@@ -15,7 +15,7 @@ Mensaje:
 {{ suggestion.message }}
 
 ---
-Ver en el panel de administración: {{ site_url }}/admin/profiles/suggestion/{{ suggestion.id }}/
+Ver en el panel de administración: {{ backend_url|default:site_url }}/admin/profiles/suggestion/{{ suggestion.id }}/
 
 ---
 Academia Blockchain

@@ -54,6 +54,15 @@ In production, `EMAIL_HOST`, `EMAIL_HOST_USER`, and `EMAIL_HOST_PASSWORD` are re
 
 `EMAIL_FROM` must use a domain verified in SMTP2GO (e.g. `noreply@academiablockchain.com`).
 
+### Branding (logo and colors)
+
+Transactional HTML is rendered by Django templates under `acbc_app/profiles/templates/profiles/emails/`:
+
+- `base_email.html` — shared layout (logo, brand orange `#E86A00`, footer)
+- Feature templates extend the base (`suggestion_notification`, `newsletter_subscription`, `topic_creation_request`, `book_club_invite`)
+
+The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
+
 ### Smoke test after deploy
 
 ```bash

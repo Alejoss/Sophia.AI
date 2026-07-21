@@ -26,6 +26,15 @@ const Notifications = ({
     'rechazó tu sugerencia de vincular contenido a una entrada en',
   ];
 
+  // SQL_ASCII DBs store verbs without accents; match both forms.
+  const normalizeVerb = (verb = '') =>
+    String(verb).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const verbIs = (verb, expected) => normalizeVerb(verb) === normalizeVerb(expected);
+
+  const verbIn = (verb, expectedVerbs) =>
+    expectedVerbs.some((expected) => verbIs(verb, expected));
+
   const stripActorFromDescription = (description, actor) => {
     if (!description || !actor) return description;
     const prefix = `${actor} `;
@@ -36,31 +45,40 @@ const Notifications = ({
     typeof targetUrl === 'string' && targetUrl.includes('tab=suggestions');
 
   const getNotificationDescription = (notification) => {
-    if (notification.verb === 'comentó en tu camino de conocimiento') {
+    if (verbIs(notification.verb, 'comentó en tu camino de conocimiento')) {
       return `${notification.actor} comentó en tu camino de conocimiento ${notification.context_title}`;
-    } else if (notification.verb === 'respondió a') {
-      return `${notification.actor} respondió a tu comentario en ${notification.context_title}`;
-    } else if (notification.verb === 'completó tu camino de conocimiento') {
+    } else if (verbIs(notification.verb, 'respondió a')) {
+      if (notification.context_title) {
+        return `${notification.actor} respondió a tu comentario en ${notification.context_title}`;
+      }
+      return notification.description || `${notification.actor} respondió a tu comentario`;
+    } else if (verbIs(notification.verb, 'completó tu camino de conocimiento')) {
       return notification.description;
-    } else if (notification.verb === 'solicitó un certificado para tu camino de conocimiento') {
+    } else if (verbIs(notification.verb, 'solicitó un certificado para tu camino de conocimiento')) {
       return notification.description;
-    } else if (notification.verb === 'aprobó tu solicitud de certificado para') {
+    } else if (verbIs(notification.verb, 'aprobó tu solicitud de certificado para')) {
       return notification.description;
-    } else if (notification.verb === 'rechazó tu solicitud de certificado para') {
+    } else if (verbIs(notification.verb, 'rechazó tu solicitud de certificado para')) {
       return notification.description;
-    } else if (notification.verb === 'votó positivamente tu contenido' || notification.verb === 'votó a favor de tu contenido') {
+    } else if (
+      verbIs(notification.verb, 'votó positivamente tu contenido') ||
+      verbIs(notification.verb, 'votó a favor de tu contenido')
+    ) {
       return notification.description;
-    } else if (notification.verb === 'votó positivamente tu camino de conocimiento' || notification.verb === 'votó a favor de tu camino de conocimiento') {
+    } else if (
+      verbIs(notification.verb, 'votó positivamente tu camino de conocimiento') ||
+      verbIs(notification.verb, 'votó a favor de tu camino de conocimiento')
+    ) {
       return notification.description;
-    } else if (notification.verb === 'comentó en tu contenido') {
+    } else if (verbIs(notification.verb, 'comentó en tu contenido')) {
       return notification.description;
-    } else if (notification.verb === 'se registró en tu evento') {
+    } else if (verbIs(notification.verb, 'se registró en tu evento')) {
       return notification.description;
-    } else if (notification.verb === 'aceptó tu pago para') {
+    } else if (verbIs(notification.verb, 'aceptó tu pago para')) {
       return notification.description;
-    } else if (notification.verb === 'te envió un certificado para') {
+    } else if (verbIs(notification.verb, 'te envió un certificado para')) {
       return notification.description;
-    } else if (notification.verb === 'te invitó a moderar') {
+    } else if (verbIs(notification.verb, 'te invitó a moderar')) {
       if (notification.description) {
         // Si hay un mensaje opcional después de los dos puntos, dividirlo
         // Formato esperado: "usuario te invitó a moderar el tema "título": mensaje opcional"
@@ -98,15 +116,15 @@ const Notifications = ({
         return notification.description;
       }
       return `${notification.actor} te invitó a moderar`;
-    } else if (notification.verb === 'aceptó tu invitación para moderar') {
+    } else if (verbIs(notification.verb, 'aceptó tu invitación para moderar')) {
       return notification.description || `${notification.actor} aceptó tu invitación para moderar`;
-    } else if (notification.verb === 'rechazó tu invitación para moderar') {
+    } else if (verbIs(notification.verb, 'rechazó tu invitación para moderar')) {
       return notification.description || `${notification.actor} rechazó tu invitación para moderar`;
-    } else if (notification.verb === 'te removió como moderador de') {
+    } else if (verbIs(notification.verb, 'te removió como moderador de')) {
       return notification.description || `${notification.actor} te removió como moderador`;
-    } else if (notification.verb === 'sugirió un archivo para tu contenido') {
+    } else if (verbIs(notification.verb, 'sugirió un archivo para tu contenido')) {
       return notification.description || `${notification.actor} sugirió un archivo para tu contenido`;
-    } else if (TOPIC_SUGGESTION_VERBS.includes(notification.verb)) {
+    } else if (verbIn(notification.verb, TOPIC_SUGGESTION_VERBS)) {
       return stripActorFromDescription(
         notification.description || `${notification.actor} ${notification.verb}`,
         notification.actor

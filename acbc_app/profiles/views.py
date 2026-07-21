@@ -115,22 +115,14 @@ NEWSLETTER_SOURCE_LABELS = {
 def _notify_admins_newsletter_subscription(email: str, source: str = '') -> None:
     """Notify administrators about a new newsletter subscription."""
     source_label = NEWSLETTER_SOURCE_LABELS.get(source) or (source or 'No especificada')
-    subject = 'Nueva suscripción a la newsletter'
-    html_message = (
-        '<p>Hay una nueva suscripción a la newsletter.</p>'
-        f'<p><strong>Email:</strong> {email}</p>'
-        f'<p><strong>Origen:</strong> {source_label}</p>'
-    )
-    text_message = (
-        'Hay una nueva suscripción a la newsletter.\n'
-        f'Email: {email}\n'
-        f'Origen: {source_label}'
-    )
     try:
         EmailService.send_to_admins(
-            subject=subject,
-            html_message=html_message,
-            text_message=text_message,
+            subject='Nueva suscripción a la newsletter',
+            template_name='newsletter_subscription',
+            context={
+                'subscriber_email': email,
+                'source_label': source_label,
+            },
             tags=['newsletter', 'subscription'],
         )
     except EmailServiceError as e:
@@ -1578,36 +1570,15 @@ class SuggestionCreateView(APIView):
             request: HttpRequest object (optional, for getting site URL)
         """
         from profiles.email_service import EmailService, EmailServiceError
-        from django.contrib.sites.shortcuts import get_current_site
-        from django.conf import settings
-        
-        try:
-            # Get site URL for template context
-            try:
-                if request:
-                    current_site = get_current_site(request)
-                else:
-                    # Fallback: try to get site without request
-                    from django.contrib.sites.models import Site
-                    current_site = Site.objects.get_current()
-                site_url = f"https://{current_site.domain}" if current_site else "https://sophia-ai.algobeat.com"
-            except Exception:
-                site_url = "https://sophia-ai.algobeat.com"
-            
-            # Prepare email subject
-            subject = f"Nueva sugerencia de {user.username}"
-            
-            # Prepare template context
-            context = {
-                'user': user,
-                'suggestion': suggestion,
-                'site_url': site_url,
-            }
 
+        try:
             EmailService.send_to_admins(
-                subject=subject,
+                subject=f"Nueva sugerencia de {user.username}",
                 template_name='suggestion_notification',
-                context=context,
+                context={
+                    'user': user,
+                    'suggestion': suggestion,
+                },
                 tags=['suggestion', 'notification', 'admin'],
             )
 

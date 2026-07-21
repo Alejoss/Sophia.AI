@@ -1,0 +1,10 @@
+Nueva suscripción — Academia Blockchain
+
+Hay una nueva suscripción a la newsletter.
+
+Email: {{ subscriber_email }}
+Origen: {{ source_label }}
+
+---
+Academia Blockchain
+Este es un mensaje automático. Por favor, no respondas a este correo.

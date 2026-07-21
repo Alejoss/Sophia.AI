@@ -1,176 +1,56 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Nueva Sugerencia - Academia Blockchain</title>
-    <style>
-        body, table, td, p, a, li, blockquote {
-            -webkit-text-size-adjust: 100%;
-            -ms-text-size-adjust: 100%;
-        }
-        table, td {
-            mso-table-lspace: 0pt;
-            mso-table-rspace: 0pt;
-        }
-        img {
-            -ms-interpolation-mode: bicubic;
-            border: 0;
-            outline: none;
-            text-decoration: none;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100% !important;
-            height: 100% !important;
-            background-color: #f4f4f4;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 16px;
-            line-height: 1.6;
-            color: #333333;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-        }
-        .email-header {
-            background-color: #1976d2;
-            color: #ffffff;
-            padding: 30px 20px;
-            text-align: center;
-        }
-        .email-header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        .email-content {
-            padding: 30px 20px;
-        }
-        .email-content h2 {
-            color: #1976d2;
-            font-size: 20px;
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-        .email-content h3 {
-            color: #333333;
-            font-size: 18px;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-        .email-content p {
-            margin: 0 0 15px 0;
-        }
-        .email-content a {
-            color: #1976d2;
-            text-decoration: none;
-        }
-        .email-content a:hover {
-            text-decoration: underline;
-        }
-        .info-box {
-            background-color: #f5f5f5;
-            border-left: 4px solid #1976d2;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .info-box p {
-            margin: 5px 0;
-        }
-        .info-box strong {
-            color: #1976d2;
-        }
-        .message-box {
-            background-color: #ffffff;
-            border: 1px solid #e0e0e0;
-            padding: 15px;
-            margin: 20px 0;
-            white-space: pre-wrap;
-        }
-        .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background-color: #1976d2;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 4px;
-            margin-top: 20px;
-        }
-        .email-footer {
-            background-color: #f9f9f9;
-            padding: 20px;
-            text-align: center;
-            font-size: 14px;
-            color: #666666;
-            border-top: 1px solid #e0e0e0;
-        }
-        .email-footer p {
-            margin: 5px 0;
-        }
-        @media only screen and (max-width: 600px) {
-            .email-container {
-                width: 100% !important;
-            }
-            .email-content {
-                padding: 20px 15px !important;
-            }
-            .email-header {
-                padding: 20px 15px !important;
-            }
-            .email-header h1 {
-                font-size: 20px !important;
-            }
-        }
-    </style>
-</head>
-<body>
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" class="email-container" cellspacing="0" cellpadding="0" border="0" width="600">
-                    <tr>
-                        <td class="email-header">
-                            <h1>Nueva Sugerencia</h1>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="email-content">
-                            <h2>Se ha recibido una nueva sugerencia</h2>
-                            
-                            <p>Un usuario ha enviado una sugerencia o comentario sobre la plataforma Academia Blockchain.</p>
-                            
-                            <div class="info-box">
-                                <p><strong>Usuario:</strong> {{ user.username }}</p>
-                                <p><strong>Email:</strong> {{ user.email }}</p>
-                                <p><strong>Fecha:</strong> {{ suggestion.created_at|date:"d/m/Y H:i" }}</p>
-                            </div>
-                            
-                            <h3>Mensaje:</h3>
-                            <div class="message-box">
-                                {{ suggestion.message }}
-                            </div>
-                            
-                            <p style="margin-top: 30px;">
-                                <a href="{{ site_url }}/admin/profiles/suggestion/{{ suggestion.id }}/" class="button">
-                                    Ver en el panel de administración
-                                </a>
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="email-footer">
-                            <p><strong>Academia Blockchain</strong></p>
-                            <p>Este es un mensaje automático del sistema de notificaciones.</p>
-                            <p>Por favor, no respondas directamente a este correo.</p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+{% extends "profiles/emails/base_email.html" %}
+
+{% block email_title %}Nueva sugerencia — {{ brand_name|default:"Academia Blockchain" }}{% endblock %}
+
+{% block preheader %}Nueva sugerencia de {{ user.username }}{% endblock %}
+
+{% block header_subtitle %}
+<p style="margin:10px 0 0 0;font-size:14px;font-weight:600;color:{{ brand_color|default:'#E86A00' }};">
+    Nueva sugerencia
+</p>
+{% endblock %}
+
+{% block email_content %}
+<h2 style="margin:0 0 12px 0;font-size:20px;line-height:1.3;color:#213547;font-weight:700;">
+    Se ha recibido una nueva sugerencia
+</h2>
+
+<p style="margin:0 0 16px 0;color:#374151;">
+    Un usuario ha enviado una sugerencia o comentario sobre la plataforma Academia Blockchain.
+</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 20px 0;background-color:#fff7ed;border-left:4px solid {{ brand_color|default:'#E86A00' }};border-radius:0 6px 6px 0;">
+    <tr>
+        <td style="padding:14px 16px;font-size:15px;color:#213547;">
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Usuario:</strong> {{ user.username }}</p>
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Email:</strong> {{ user.email }}</p>
+            <p style="margin:0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Fecha:</strong> {{ suggestion.created_at|date:"d/m/Y H:i" }}</p>
+        </td>
+    </tr>
+</table>
+
+<p style="margin:0 0 8px 0;font-weight:700;color:#213547;">Mensaje:</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;border:1px solid #e5e7eb;border-radius:6px;background-color:#ffffff;">
+    <tr>
+        <td style="padding:14px 16px;white-space:pre-wrap;color:#374151;">{{ suggestion.message }}</td>
+    </tr>
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+    <tr>
+        <td align="center" bgcolor="{{ brand_color|default:'#E86A00' }}" style="border-radius:6px;background-color:{{ brand_color|default:'#E86A00' }};">
+            <a href="{{ backend_url|default:site_url }}/admin/profiles/suggestion/{{ suggestion.id }}/"
+               target="_blank"
+               style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff !important;text-decoration:none;border-radius:6px;mso-padding-alt:0;">
+                <!--[if mso]>
+                <i style="letter-spacing:22px;mso-font-width:-100%;mso-text-raise:18pt;">&nbsp;</i>
+                <![endif]-->
+                <span style="color:#ffffff !important;">Ver en el panel de administración</span>
+                <!--[if mso]>
+                <i style="letter-spacing:22px;mso-font-width:-100%;">&nbsp;</i>
+                <![endif]-->
+            </a>
+        </td>
+    </tr>
+</table>
+{% endblock %}

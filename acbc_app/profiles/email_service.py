@@ -39,7 +39,48 @@ class EmailService:
     - Configuration validation (SMTP credentials when enabled)
     - Email address validation
     - HTML and plain text support
+    - Shared brand context (logo URL, colors) for Django email templates
     """
+
+    # Brand orange sampled from frontend/public/images/logo.png
+    BRAND_COLOR = '#E86A00'
+    BRAND_COLOR_DARK = '#C45A00'
+    LOGO_PATH = '/images/logo.png'
+
+    @staticmethod
+    def get_brand_context() -> Dict[str, Any]:
+        """
+        Shared template context for branded transactional emails.
+        Logo must be an absolute HTTPS URL (email clients reject relative paths).
+        """
+        environment = getattr(settings, 'ENVIRONMENT', 'DEVELOPMENT')
+        frontend = (getattr(settings, 'FRONTEND_PUBLIC_URL', '') or '').rstrip('/')
+        backend = (getattr(settings, 'ACADEMIA_PUBLIC_URL', '') or '').rstrip('/')
+
+        def _is_local(url: str) -> bool:
+            return (not url) or ('localhost' in url) or ('127.0.0.1' in url)
+
+        if environment == 'PRODUCTION' and _is_local(frontend):
+            frontend = 'https://www.academiablockchain.com'
+        elif not frontend:
+            frontend = 'http://localhost:5173'
+
+        if environment == 'PRODUCTION' and _is_local(backend):
+            backend = 'https://www.academiablockchain.com'
+        elif not backend:
+            backend = frontend
+
+        brand_name = getattr(settings, 'EMAIL_FROM_NAME', 'Academia Blockchain')
+        return {
+            'brand_name': brand_name,
+            'brand_color': EmailService.BRAND_COLOR,
+            'brand_color_dark': EmailService.BRAND_COLOR_DARK,
+            'frontend_url': frontend,
+            'backend_url': backend,
+            # Backward-compatible alias used by older templates / admin links
+            'site_url': backend,
+            'logo_url': f'{frontend}{EmailService.LOGO_PATH}',
+        }
 
     @staticmethod
     def _validate_configuration() -> None:
@@ -170,16 +211,18 @@ class EmailService:
         """
         Send an email using a Django template.
         Renders profiles/emails/{template_name}.html and optionally .txt.
+        Merges get_brand_context() into the template context (caller values win).
         """
         import re
         from html import unescape
 
+        merged_context = {**EmailService.get_brand_context(), **(context or {})}
         html_template = f"profiles/emails/{template_name}.html"
-        html_message = render_to_string(html_template, context)
+        html_message = render_to_string(html_template, merged_context)
 
         try:
             text_template = f"profiles/emails/{template_name}.txt"
-            text_message = render_to_string(text_template, context)
+            text_message = render_to_string(text_template, merged_context)
         except Exception:
             text_message = re.sub(r'<[^>]+>', '', html_message)
             text_message = unescape(text_message).strip()

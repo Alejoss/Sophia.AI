@@ -1,0 +1,10 @@
+Confirma tu correo y únete a {{ club_title }}
+
+Gracias por interesarte en el Club de Lectura «{{ club_title }}».
+
+Ya puedes explorar el club en el navegador donde dejaste tu correo.
+
+Para participar (comentar, completar misiones), crea tu cuenta aquí:
+{{ complete_url }}
+
+— Academia Blockchain

@@ -196,6 +196,11 @@ Uses the same AWS credentials as media storage. Upload is automatic when `AWS_AC
 - **Description**: Default From address and display name. Address must be on a verified SMTP2GO domain.
 - **Required**: No
 - **Defaults**: `noreply@academiablockchain.com` / `Academia Blockchain`
+
+#### `FRONTEND_PUBLIC_URL` / `ACADEMIA_PUBLIC_URL`
+- **Description**: Public site URLs used in email branding. Logo images use `{FRONTEND_PUBLIC_URL}/images/logo.png`. Django admin links in emails use `ACADEMIA_PUBLIC_URL`.
+- **Required**: Recommended in production when `SEND_EMAILS=true`
+- **Example**: `FRONTEND_PUBLIC_URL=https://www.academiablockchain.com`
 ### Monitoring (Optional)
 
 #### `SENTRY_DSN`

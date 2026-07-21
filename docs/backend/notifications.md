@@ -36,7 +36,7 @@ All endpoints require authentication (`IsAuthenticated`).
 }
 ```
 
-`target_url` and `context_title` are computed in `NotificationSerializer` (`profiles/serializers.py`).
+`target_url` and `context_title` are computed in `NotificationSerializer` (`profiles/serializers.py`). Verb matching is ASCII-normalized so links still resolve when PostgreSQL `SQL_ASCII` has stored verbs without accents.
 
 ## Frontend
 
