@@ -78,7 +78,8 @@ const Login = () => {
     const localStorageAuth = isAuthenticated();
 
     // Check if the user is authenticated with the backend and sync with localStorage
-    checkAuth().then((isBackendAuthenticated) => {
+    checkAuth().then((backendAuth) => {
+      const isBackendAuthenticated = Boolean(backendAuth?.isAuthenticated);
       setBackendAuthStatus(isBackendAuthenticated);
 
 
@@ -94,6 +95,13 @@ const Login = () => {
             return;
           }
           setAccessTokenInLocalStorage(access_token);
+          const serverUser = backendAuth?.user;
+          if (serverUser?.id != null) {
+            updateAuthState(serverUser, access_token);
+            const from = location.state?.from?.pathname || "/profiles/my_profile";
+            navigate(from, { replace: true });
+            return;
+          }
           return getUserProfile().then((profile) => {
             if (!profile?.user) {
               setIsRestoringSession(false);
@@ -112,7 +120,7 @@ const Login = () => {
         setAuthenticationStatus(true);
         setAuthState({
           isAuthenticated: true,
-          user: storedUser
+          user: backendAuth?.user || storedUser
         });
       } else if (!isBackendAuthenticated && localStorageAuth) {
 

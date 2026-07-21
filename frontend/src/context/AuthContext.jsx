@@ -68,25 +68,33 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const restoreAuthenticatedSession = useCallback(async () => {
+  const restoreAuthenticatedSession = useCallback(async (freshUser = null) => {
     const storedAccessToken = getAccessTokenFromLocalStorage();
     if (!storedAccessToken) {
       return false;
     }
 
-    let userToUse = getUserFromLocalStorage();
-    if (!userToUse || userToUse.id == null) {
-      const profile = await getUserProfile();
-      if (profile?.user) {
-        userToUse = profile.user;
-        setUserInLocalStorage(userToUse);
+    // Prefer server user (check_auth / profile) so staff flags stay current.
+    let userToUse = freshUser?.id != null ? freshUser : null;
+    if (!userToUse) {
+      try {
+        const profile = await getUserProfile();
+        if (profile?.user) {
+          userToUse = profile.user;
+        }
+      } catch {
+        /* fall through to localStorage */
       }
+    }
+    if (!userToUse) {
+      userToUse = getUserFromLocalStorage();
     }
 
     if (!userToUse) {
       return false;
     }
 
+    setUserInLocalStorage(userToUse);
     setAuthenticationStatus(true);
     setAuthState({
       isAuthenticated: true,
@@ -98,10 +106,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const backendAuthStatus = await checkAuth();
+        const backendAuth = await checkAuth();
 
-        if (backendAuthStatus) {
-          const restored = await restoreAuthenticatedSession();
+        if (backendAuth.isAuthenticated) {
+          const restored = await restoreAuthenticatedSession(backendAuth.user);
           if (!restored) {
             clearAuthState();
           }

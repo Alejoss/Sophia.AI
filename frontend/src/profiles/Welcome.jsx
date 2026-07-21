@@ -17,18 +17,22 @@ const Welcome = () => {
 
     const verifyAndSetAuth = async () => {
       try {
-        const backendAuthenticated = await checkAuth();
+        const backendAuth = await checkAuth();
+        const backendAuthenticated = Boolean(backendAuth?.isAuthenticated);
 
         if (backendAuthenticated && userDataFromState) {
           // Backend confirms auth (cookie is set and valid)
           // and we have user data from registration step
-          setUserInLocalStorage(userDataFromState);
+          const user = backendAuth.user
+            ? { ...userDataFromState, ...backendAuth.user }
+            : userDataFromState;
+          setUserInLocalStorage(user);
           setAuthenticationStatus(true);
           setAuthState({
             isAuthenticated: true,
-            user: userDataFromState,
+            user,
           });
-          setMessage(`¡Bienvenido, ${userDataFromState.username}! Tu cuenta está activa y ya has iniciado sesión.`);
+          setMessage(`¡Bienvenido, ${user.username}! Tu cuenta está activa y ya has iniciado sesión.`);
           setIsVerified(true);
         } else if (backendAuthenticated && !userDataFromState && authState.isAuthenticated) {
           // This case might happen if user refreshes /welcome or navigates directly with a valid cookie

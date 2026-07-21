@@ -29,7 +29,7 @@ const Dashboard = () => {
     return <Navigate to="/profiles/login" replace />;
   }
 
-  if (!authState.user?.is_staff) {
+  if (!authState.user?.is_staff && !authState.user?.is_superuser) {
     return <Navigate to="/" replace />;
   }
 

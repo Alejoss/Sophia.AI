@@ -25,7 +25,7 @@ const checkAuth = async () => {
 
     if (response.status === 200) {
       if (response.data.is_authenticated === true) {
-        return true;
+        return { isAuthenticated: true, user: response.data.user || null };
       }
       // Access token missing/expired but HTTP-only refresh cookie still present: mint a new access token.
       if (response.data.reason === 'refresh_token_present_requires_refresh') {
@@ -37,17 +37,20 @@ const checkAuth = async () => {
             axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
           }
           const retry = await axiosInstance.get('/profiles/check_auth/');
-          return retry.status === 200 && retry.data.is_authenticated === true;
+          if (retry.status === 200 && retry.data.is_authenticated === true) {
+            return { isAuthenticated: true, user: retry.data.user || null };
+          }
+          return { isAuthenticated: false, user: null };
         } catch {
           await clearStaleSession();
-          return false;
+          return { isAuthenticated: false, user: null };
         }
       }
-      return false;
+      return { isAuthenticated: false, user: null };
     }
-    return false;
+    return { isAuthenticated: false, user: null };
   } catch (error) {
-    return false;
+    return { isAuthenticated: false, user: null };
   }
 };
 

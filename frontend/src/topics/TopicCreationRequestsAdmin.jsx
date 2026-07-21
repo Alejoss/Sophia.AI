@@ -105,7 +105,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
         defaultValues: { rejectionReason: '' },
     });
 
-    const isStaff = Boolean(authState.user?.is_staff);
+    const isStaff = Boolean(authState.user?.is_staff || authState.user?.is_superuser);
 
     const fetchRequests = async () => {
         try {

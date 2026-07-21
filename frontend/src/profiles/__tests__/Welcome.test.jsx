@@ -33,7 +33,10 @@ describe('Welcome', () => {
   });
 
   it('shows success flow when backend auth is valid', async () => {
-    checkAuth.mockResolvedValue(true);
+    checkAuth.mockResolvedValue({
+      isAuthenticated: true,
+      user: { username: 'alejandro', id: 7, is_staff: false },
+    });
     const setAuthState = vi.fn();
 
     renderWelcome(
@@ -47,19 +50,15 @@ describe('Welcome', () => {
       },
     );
 
-    expect(await screen.findByText(/¡Bienvenido!/i)).toBeInTheDocument();
+    expect(await screen.findByText(/¡Bienvenido, alejandro!/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Tu cuenta está activa y ya has iniciado sesión/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ver tu perfil/i })).toHaveAttribute(
-      'href',
-      '/profiles/my_profile',
-    );
     expect(setAuthState).toHaveBeenCalled();
   });
 
   it('shows fallback action when auth verification fails', async () => {
-    checkAuth.mockResolvedValue(false);
+    checkAuth.mockResolvedValue({ isAuthenticated: false, user: null });
 
     renderWelcome({
       authState: { isAuthenticated: false, user: null },

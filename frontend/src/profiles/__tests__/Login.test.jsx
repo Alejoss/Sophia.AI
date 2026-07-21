@@ -40,7 +40,7 @@ vi.mock('../../context/localStorageUtils.js', () => ({
 describe('Login form', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckAuth.mockResolvedValue(false);
+    mockCheckAuth.mockResolvedValue({ isAuthenticated: false, user: null });
   });
 
   it('shows field errors when submitting empty', async () => {
