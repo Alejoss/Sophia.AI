@@ -19,19 +19,8 @@ Crear Temas.
 Compartir tu Biblioteca.`;
 
 const isBubbleRoute = (pathname) => {
-  if (pathname.includes('/timeline/')) {
-    return false;
-  }
-  if (pathname === '/search' || pathname.startsWith('/content/search/')) {
-    return true;
-  }
-  if (pathname === '/content/topics') {
-    return true;
-  }
-  if (pathname === '/knowledge_path' || pathname.startsWith('/knowledge_path/')) {
-    return true;
-  }
-  return false;
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return path === '/content/topics' || path === '/knowledge_path';
 };
 
 const CommunityBubble = () => {
