@@ -77,13 +77,35 @@ const DiscussionQuestionDetail = () => {
 
   return (
     <Box>
-      <Button
-        component={RouterLink}
-        to={`/club-de-lectura/${slug}/foro`}
-        sx={{ color: CLUB_ACCENT, mb: 2 }}
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        justifyContent="space-between"
+        spacing={2}
+        sx={{ mb: 2 }}
       >
-        ← Todas las preguntas del foro
-      </Button>
+        <Button
+          component={RouterLink}
+          to={`/club-de-lectura/${slug}/foro`}
+          sx={{ color: CLUB_ACCENT, px: 0, minWidth: 0, flexShrink: 0 }}
+        >
+          ← Todas las preguntas del foro
+        </Button>
+        {question.mission_label && (
+          <Typography
+            variant="overline"
+            sx={{
+              color: CLUB_ACCENT,
+              fontWeight: 700,
+              textAlign: 'right',
+              lineHeight: 1.4,
+              pt: 0.75,
+            }}
+          >
+            Después de {question.mission_label}
+          </Typography>
+        )}
+      </Stack>
 
       {error && (
         <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -111,11 +133,6 @@ const DiscussionQuestionDetail = () => {
         </Alert>
       )}
 
-      {question.mission_label && (
-        <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-          Después de {question.mission_label}
-        </Typography>
-      )}
       <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
         {question.body}
       </Typography>
