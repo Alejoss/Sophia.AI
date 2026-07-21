@@ -1137,6 +1137,62 @@ class TopicAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Test Topic')
 
+    def test_public_topic_detail_visible_to_anonymous(self):
+        """Public topic detail can be viewed without authentication."""
+        self.client.force_authenticate(user=None)
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], 'Test Topic')
+
+    def test_public_topic_content_detail_visible_to_anonymous(self):
+        """Content in a public topic can be viewed without authentication."""
+        content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Public Topic Content',
+        )
+        ContentProfile.objects.create(
+            content=content,
+            user=self.user,
+            title='Public Topic Content',
+        )
+        self.topic.contents.add(content)
+        self.client.force_authenticate(user=None)
+        url = reverse('content:content-detail', args=[content.id])
+        response = self.client.get(f'{url}?context=topic&id={self.topic.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['original_title'], 'Public Topic Content')
+
+    def test_public_topic_media_type_visible_to_anonymous(self):
+        """Topic media-type listings are public for GET."""
+        content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Anon Media Content',
+        )
+        self.topic.contents.add(content)
+        self.client.force_authenticate(user=None)
+        url = reverse('content:topic-content-media-type', args=[self.topic.id, 'text'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_public_topic_timeline_visible_to_anonymous(self):
+        """Topic timeline can be viewed without authentication."""
+        self.client.force_authenticate(user=None)
+        url = reverse('content:topic-timeline', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_hidden_topic_detail_hidden_from_anonymous(self):
+        """Private topics remain hidden from anonymous users."""
+        self.topic.is_public = False
+        self.topic.save(update_fields=['is_public'])
+        self.client.force_authenticate(user=None)
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_hidden_topic_excluded_from_public_list(self):
         hidden_topic = Topic.objects.create(
             title='Hidden Topic',

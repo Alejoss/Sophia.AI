@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { getTopicDetailPath, normalizeTopicTab, TOPIC_TABS } from '../utils/urlUtils';
+import { getTopicContentPath, getTopicDetailPath, normalizeTopicTab, TOPIC_TABS } from '../utils/urlUtils';
 import { 
     Box, 
     Typography, 
     Button,
     Paper,
     Skeleton,
+    Snackbar,
+    Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ShareIcon from '@mui/icons-material/Share';
 import contentApi from '../api/contentApi';
-import { MEDIA_BASE_URL } from '../api/config';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
@@ -29,6 +31,11 @@ const ContentDetailsTopic = () => {
     const [topic, setTopic] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success',
+    });
 
     useEffect(() => {
         const fetchContentAndTopic = async () => {
@@ -55,6 +62,37 @@ const ContentDetailsTopic = () => {
 
         fetchContentAndTopic();
     }, [contentId, topicId]);
+
+    const showSnackbar = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = (_, reason) => {
+        if (reason === 'clickaway') return;
+        setSnackbar((prev) => ({ ...prev, open: false }));
+    };
+
+    const handleShareContent = async () => {
+        const shareUrl = `${window.location.origin}${getTopicContentPath(contentId, topicId)}`;
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            showSnackbar('URL copiada al portapapeles', 'success');
+        } catch (err) {
+            console.error('Failed to copy content URL:', err);
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = shareUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showSnackbar('URL copiada al portapapeles', 'success');
+            } catch (fallbackErr) {
+                console.error('Fallback copy failed:', fallbackErr);
+                showSnackbar('No se pudo copiar la URL', 'error');
+            }
+        }
+    };
 
     const handleAddToLibrarySuccess = () => {
         // Refresh content data after adding to library
@@ -136,6 +174,8 @@ const ContentDetailsTopic = () => {
                     display: 'flex', 
                     gap: 2, 
                     mb: 3,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
                     '& .MuiButton-root': {
                         color: 'primary.main',
                         borderColor: 'primary.main',
@@ -152,20 +192,22 @@ const ContentDetailsTopic = () => {
                         }
                     }
                 }}>
-                    {!isOwnContent && (
+                    {authState.isAuthenticated && !isOwnContent && (
                         <AddToLibraryModal
                             content={content}
                             onSuccess={handleAddToLibrarySuccess}
                         />
                     )}
-                    <BookmarkButton
-                        type="content"
-                        ids={{
-                            topicId: topicId,
-                            contentId: contentId
-                        }}
-                        initialIsBookmarked={content.is_bookmarked}
-                    />
+                    {authState.isAuthenticated && (
+                        <BookmarkButton
+                            type="content"
+                            ids={{
+                                topicId: topicId,
+                                contentId: contentId
+                            }}
+                            initialIsBookmarked={content.is_bookmarked}
+                        />
+                    )}
                     <VoteComponent
                         type="content"
                         ids={{
@@ -175,6 +217,14 @@ const ContentDetailsTopic = () => {
                         initialVoteCount={content.vote_count || 0}
                         initialUserVote={content.user_vote || 0}
                     />
+                    <Button
+                        variant="outlined"
+                        startIcon={<ShareIcon />}
+                        onClick={handleShareContent}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Compartir
+                    </Button>
                 </Box>
 
                 {/* Content Display */}
@@ -185,8 +235,24 @@ const ContentDetailsTopic = () => {
             </Paper>
 
             <CommentSection topicId={topicId} />
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2500}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };
 
-export default ContentDetailsTopic; 
+export default ContentDetailsTopic;

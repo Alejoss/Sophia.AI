@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from utils.permissions import IsAuthor
 from utils.notification_utils import notify_comment_reply, notify_knowledge_path_comment, notify_content_comment
 
@@ -249,15 +249,26 @@ class KnowledgePathCommentsView(APIView):
 class TopicCommentsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
+
     def get(self, request, pk):
         """Get all comments for a topic"""
+        user_id = request.user.id if request.user.is_authenticated else None
         try:
             comments_logger.debug("Topic comments request", extra={
-                'user_id': request.user.id,
+                'user_id': user_id,
                 'topic_id': pk,
             })
             
             topic = get_object_or_404(Topic, pk=pk)
+            if not topic.can_be_viewed_by(request.user):
+                return Response(
+                    {'error': 'Tema no encontrado.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
             topic_type = ContentType.objects.get_for_model(Topic)
             
             # Get comments that:
@@ -275,14 +286,14 @@ class TopicCommentsView(APIView):
             serializer = TopicCommentSerializer(comments, many=True, context={'request': request})
             
             comments_logger.debug("Topic comments retrieved successfully", extra={
-                'user_id': request.user.id,
+                'user_id': user_id,
                 'topic_id': pk,
                 'comment_count': len(comments),
             })
             
             return Response(serializer.data)
         except Exception as e:
-            log_error(e, "Error retrieving topic comments", request.user.id, {
+            log_error(e, "Error retrieving topic comments", user_id, {
                 'topic_id': pk,
             })
             return Response(

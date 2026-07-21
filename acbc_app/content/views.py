@@ -124,6 +124,11 @@ class ContentDetailView(APIView):
     """API view to retrieve, update, or delete a specific Content instance."""
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
+
     def get_content_profile(self, content, request):
         """
         Get the appropriate ContentProfile based on context parameters.
@@ -148,7 +153,10 @@ class ContentDetailView(APIView):
             
             elif context == 'library':
                 # Prevent profile data leaks across users in library context.
-                if context_id_int != request.user.id and not request.user.is_staff:
+                if (
+                    not request.user.is_authenticated
+                    or (context_id_int != request.user.id and not request.user.is_staff)
+                ):
                     return None
                 library_owner = User.objects.get(id=context_id_int)
                 return ContentProfile.objects.get(content=content, user=library_owner)
@@ -167,10 +175,11 @@ class ContentDetailView(APIView):
             pass
 
         # First fallback: try to get logged user's profile
-        try:
-            return ContentProfile.objects.get(content=content, user=request.user)
-        except ContentProfile.DoesNotExist:
-            pass
+        if request.user.is_authenticated:
+            try:
+                return ContentProfile.objects.get(content=content, user=request.user)
+            except ContentProfile.DoesNotExist:
+                pass
 
         # Final fallback: return None (serializer will use original content data)
         return None
@@ -190,14 +199,20 @@ class ContentDetailView(APIView):
         
         try:
             content = Content.objects.get(pk=pk)
-            selected_profile = self.get_content_profile(content, request)
-            
+
             # Get topic from context if available
             topic = None
             context = request.query_params.get('context')
             context_id = request.query_params.get('id')
             if context == 'topic' and context_id:
                 topic = Topic.objects.get(id=context_id)
+                if not topic.can_be_viewed_by(request.user):
+                    return Response(
+                        {'error': 'Contenido no encontrado'},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+            selected_profile = self.get_content_profile(content, request)
             
             # Always use the full serializer for ContentDetailView
             serializer = ContentWithSelectedProfileSerializer(
@@ -1602,23 +1617,25 @@ def get_topic_content_profile_for_display(
         if not profiles:
             return None
         creator_id = topic.creator_id
-        uid = request.user.id
+        uid = request.user.id if request.user.is_authenticated else None
         for p in profiles:
             if creator_id and p.user_id == creator_id:
                 return p
-        for p in profiles:
-            if p.user_id == uid:
-                return p
+        if uid is not None:
+            for p in profiles:
+                if p.user_id == uid:
+                    return p
         return min(profiles, key=lambda p: p.id)
 
     try:
         return ContentProfile.objects.get(content=content, user=topic.creator)
     except ContentProfile.DoesNotExist:
         pass
-    try:
-        return ContentProfile.objects.get(content=content, user=request.user)
-    except ContentProfile.DoesNotExist:
-        pass
+    if request.user.is_authenticated:
+        try:
+            return ContentProfile.objects.get(content=content, user=request.user)
+        except ContentProfile.DoesNotExist:
+            pass
     return (
         ContentProfile.objects.filter(content=content)
         .select_related("content")
@@ -1693,6 +1710,11 @@ class TopicView(APIView):
 class TopicDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get_content_profile(
         self, content, request, topic, prefetched_profiles=None
@@ -1917,6 +1939,11 @@ class TopicContentSimpleView(APIView):
 class TopicTimelineView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get_timeline_queryset(self):
         return TopicTimeline.objects.select_related(
@@ -2737,6 +2764,11 @@ class UserTopicInvitationsView(APIView):
 
 class TopicContentMediaTypeView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get(self, request, pk, media_type):
         topic, error_response = get_topic_or_not_found_response(request, pk)

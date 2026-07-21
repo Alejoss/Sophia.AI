@@ -240,6 +240,17 @@ class TopicCommentsAPITests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['body'], 'Test Comment')
 
+    def test_list_topic_comments_anonymous(self):
+        """Anonymous users can read topic comments but not create them."""
+        self.client.force_authenticate(user=None)
+        url = reverse('comments:topic_comments', args=[self.topic.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        create_response = self.client.post(url, {'body': 'Anon comment'}, format='json')
+        self.assertEqual(create_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_create_topic_comment(self):
         """Test creating a comment on a topic"""
         url = reverse('comments:topic_comments', args=[self.topic.id])

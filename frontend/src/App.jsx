@@ -212,9 +212,9 @@ const AppContent = () => {
               <Route path="topics/:topicId/timeline/:entryId/edit" element={<ProtectedRoute><TopicTimelineEntryPage /></ProtectedRoute>} />
               <Route path="topics/:topicId/add-content" element={<ProtectedRoute><TopicAddContent /></ProtectedRoute>} />
               <Route path="topics/:topicId/edit-content" element={<ProtectedRoute><TopicEditContent /></ProtectedRoute>} />
-              <Route path="topics/:topicId" element={<ProtectedRoute><TopicDetail /></ProtectedRoute>} />
+              <Route path="topics/:topicId" element={<TopicDetail />} />
               <Route path="topics/:topicId/suggestions" element={<ProtectedRoute><TopicContentSuggestionsPage /></ProtectedRoute>} />
-              <Route path="topics/:topicId/:mediaType" element={<ProtectedRoute><TopicContentMediaType /></ProtectedRoute>} />
+              <Route path="topics/:topicId/:mediaType" element={<TopicContentMediaType />} />
               <Route path=":contentId" element={<ContentIdRedirect />} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
