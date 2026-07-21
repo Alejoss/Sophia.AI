@@ -109,11 +109,34 @@ const BookClubOverview = () => {
       };
     }
     if (phase === 'finished') {
+      const hubLinkSx = {
+        color: CLUB_ACCENT,
+        fontWeight: 700,
+        textDecoration: 'underline',
+        textUnderlineOffset: 2,
+        '&:hover': { color: CLUB_ACCENT_HOVER },
+      };
       return {
         eyebrow: 'Ciclo completado',
-        title: `Terminaste ${club.title}`,
-        body: `Durante este ciclo completaste ${hub.progress.completed_nodes} misiones.`,
-        cta: { label: 'Ver foro →', to: 'foro' },
+        title: 'Terminaste con la lectura, excelente.',
+        body: (
+          <>
+            Ahora visita el{' '}
+            <Box component={RouterLink} to="foro" sx={hubLinkSx}>
+              Foro
+            </Box>
+            , o la{' '}
+            <Box component={RouterLink} to="investigacion" sx={hubLinkSx}>
+              Investigación Abierta
+            </Box>
+            , y si no lo has hecho, súmate al grupo de{' '}
+            <Box component={RouterLink} to="comunidad" sx={hubLinkSx}>
+              Telegram
+            </Box>
+            . Será un gusto conversar.
+          </>
+        ),
+        cta: null,
       };
     }
     if (phase === 'between') {
@@ -246,12 +269,14 @@ const BookClubOverview = () => {
             />
           </Box>
         )}
-        <PrimaryCta
-          to={hero.cta.external ? undefined : hero.cta.to}
-          href={hero.cta.external ? hero.cta.to : undefined}
-        >
-          {hero.cta.label}
-        </PrimaryCta>
+        {hero.cta && (
+          <PrimaryCta
+            to={hero.cta.external ? undefined : hero.cta.to}
+            href={hero.cta.external ? hero.cta.to : undefined}
+          >
+            {hero.cta.label}
+          </PrimaryCta>
+        )}
       </Box>
 
       {/* Nivel 2 — El club esta semana */}
