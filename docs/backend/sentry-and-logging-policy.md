@@ -19,7 +19,7 @@ See also: [logging-and-observability.md](./logging-and-observability.md), `acbc_
 | Permission denied (business rule) | `WARNING` | 403 | No |
 | Not found (expected business 404) | `WARNING` or `INFO` | 404 | No |
 | Optional enrichment failed (e.g. favicon, URL preview) | `DEBUG` or `WARNING` | 200 / partial | No |
-| **Dependency failure** (Postmark, S3, Google certs unreachable, etc.) | `ERROR` | 5xx / 503 | **Yes** |
+| **Dependency failure** (SMTP2GO / email, S3, Google certs unreachable, etc.) | `ERROR` | 5xx / 503 | **Yes** |
 | **Unexpected server error** | `ERROR` + `exc_info=True` | 500 | **Yes** |
 | Notification/email send failed after primary action succeeded | `ERROR` + `exc_info=True` | 200 | **Yes** (integration) |
 
@@ -46,7 +46,7 @@ Run in an environment with `SENTRY_DSN` set (e.g. staging) and confirm:
 
 1. **401 / 403 expected** (bad refresh token, missing cookie): no new Sentry issue; logs at WARNING if applicable.
 2. **400 validation** (bad body, missing fields): no Sentry issue.
-3. **Simulated Postmark / email failure** (or other mail integration error): **issue appears** in Sentry.
+3. **Simulated SMTP / email failure** (or other mail integration error): **issue appears** in Sentry.
 4. **Forced uncaught or logged ERROR** in a view (e.g. test endpoint): **issue appears**.
 5. **Google OAuth**: failure to fetch **signing keys** (503 path) still produces **ERROR** / Sentry; invalid client token messages stay **WARNING** / no issue.
 

@@ -1681,58 +1681,60 @@ class EmailServiceTests(TestCase):
             EmailService._validate_email('')
     
     @patch('profiles.email_service.settings')
-    def test_validate_configuration_missing_postmark_token(self, mock_settings):
-        """Test configuration validation when SEND_EMAILS is True but Postmark token is missing"""
+    def test_validate_configuration_missing_smtp_credentials(self, mock_settings):
+        """Test configuration validation when SEND_EMAILS is True but SMTP credentials missing"""
         mock_settings.SEND_EMAILS = True
-        mock_settings.POSTMARK = {'TOKEN': ''}
-        
+        mock_settings.EMAIL_HOST_USER = ''
+        mock_settings.EMAIL_HOST_PASSWORD = ''
+
         with self.assertRaises(EmailConfigurationError):
             EmailService._validate_configuration()
-    
+
     @patch('profiles.email_service.settings')
-    def test_validate_configuration_postmark_configured(self, mock_settings):
-        """Test configuration validation passes when Postmark token is set"""
+    def test_validate_configuration_smtp_configured(self, mock_settings):
+        """Test configuration validation passes when SMTP credentials are set"""
         mock_settings.SEND_EMAILS = True
-        mock_settings.POSTMARK = {'TOKEN': 'test-token'}
-        
+        mock_settings.EMAIL_HOST_USER = 'academiablockchain.com'
+        mock_settings.EMAIL_HOST_PASSWORD = 'test-password'
+
         # Should not raise
         EmailService._validate_configuration()
-    
+
     @patch('profiles.email_service.settings')
     def test_is_email_enabled(self, mock_settings):
         """Test email enabled check"""
         mock_settings.SEND_EMAILS = True
         self.assertTrue(EmailService._is_email_enabled())
-        
+
         mock_settings.SEND_EMAILS = False
         self.assertFalse(EmailService._is_email_enabled())
-    
+
     def test_get_admin_emails(self):
         """Test getting admin emails"""
         admin_emails = EmailService.get_admin_emails()
-        
+
         # Should include staff user email
         self.assertIn(self.admin_user.email, admin_emails)
         # Should not include regular user email
         self.assertNotIn(self.user.email, admin_emails)
-    
+
     @patch('profiles.email_service.settings')
     def test_get_admin_emails_with_setting(self, mock_settings):
         """Test getting admin emails includes ADMIN_EMAIL setting"""
         mock_settings.ADMIN_EMAIL = 'admin-setting@example.com'
-        
+
         admin_emails = EmailService.get_admin_emails()
-        
+
         # Should include both setting and staff user
         self.assertIn('admin-setting@example.com', admin_emails)
         self.assertIn(self.admin_user.email, admin_emails)
-    
+
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('postmarker.django.PostmarkEmailMultiAlternatives')
+    @patch('profiles.email_service.EmailMultiAlternatives')
     def test_send_email_success(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
-        """Test successful email sending via Django backend (Postmark when enabled)"""
+        """Test successful email sending via Django SMTP backend"""
         mock_is_enabled.return_value = True
         mock_ema_instance = mock_ema_class.return_value
 
@@ -1744,24 +1746,24 @@ class EmailServiceTests(TestCase):
 
         self.assertTrue(result)
         mock_ema_instance.send.assert_called_once_with(fail_silently=False)
-    
+
     @patch('profiles.email_service.EmailService._is_email_enabled')
     def test_send_email_disabled(self, mock_is_enabled):
         """Test email sending when disabled"""
         mock_is_enabled.return_value = False
-        
+
         result = EmailService.send_email(
             receiver_email='test@example.com',
             subject='Test Subject',
             text_message='Test message'
         )
-        
+
         self.assertFalse(result)
-    
+
     @patch('profiles.email_service.EmailService._is_email_enabled')
     @patch('profiles.email_service.EmailService._validate_configuration')
     @patch('profiles.email_service.EmailService._validate_email')
-    @patch('postmarker.django.PostmarkEmailMultiAlternatives')
+    @patch('profiles.email_service.EmailMultiAlternatives')
     def test_send_email_send_failure(self, mock_ema_class, mock_validate_email, mock_validate_config, mock_is_enabled):
         """Test email sending when backend send raises"""
         mock_is_enabled.return_value = True

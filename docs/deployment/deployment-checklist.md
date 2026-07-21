@@ -59,9 +59,13 @@ DB_PORT=5432
 
 **Opcionales (pero recomendados):**
 ```bash
-# Email: por defecto desactivado (SEND_EMAILS=false). Cuando Postmark esté aprobado:
+# Email: por defecto desactivado (SEND_EMAILS=false). Cuando SMTP2GO esté listo:
 # SEND_EMAILS=true
-# POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
+# EMAIL_HOST=mail.smtp2go.com
+# EMAIL_PORT=2525
+# EMAIL_HOST_USER=<smtp-username>
+# EMAIL_HOST_PASSWORD=<smtp-password>
+# EMAIL_USE_TLS=true
 EMAIL_FROM=noreply@academiablockchain.com
 ADMIN_EMAIL=admin@academiablockchain.com
 

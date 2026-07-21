@@ -1,6 +1,6 @@
 """
-Email service for sending emails via Django's email backend (Postmark when enabled).
-Uses postmarker.django.EmailBackend when SEND_EMAILS=True and POSTMARK_SERVER_TOKEN is set.
+Email service for sending emails via Django's email backend (SMTP2GO when enabled).
+Uses django.core.mail.backends.smtp.EmailBackend when SEND_EMAILS=True.
 Provides validation, SEND_EMAILS check, and logging.
 """
 import logging
@@ -32,32 +32,32 @@ class EmailValidationError(EmailServiceError):
 class EmailService:
     """
     Service class for sending emails via Django's email backend.
-    When SEND_EMAILS=True, the backend is Postmark (postmarker.django.EmailBackend).
+    When SEND_EMAILS=True, the backend is SMTP (SMTP2GO).
 
     Features:
     - Respects SEND_EMAILS setting
-    - Configuration validation (Postmark token when enabled)
+    - Configuration validation (SMTP credentials when enabled)
     - Email address validation
     - HTML and plain text support
-    - Optional Postmark tags via PostmarkEmailMultiAlternatives when available
     """
 
     @staticmethod
     def _validate_configuration() -> None:
         """
         Validate that email configuration is properly set up for sending.
-        When SEND_EMAILS is True, POSTMARK_SERVER_TOKEN must be set (Django already enforces in production).
+        When SEND_EMAILS is True, SMTP user/password must be set
+        (Django already enforces in production).
 
         Raises:
             EmailConfigurationError: If configuration is invalid
         """
         if not EmailService._is_email_enabled():
             return
-        postmark_config = getattr(settings, 'POSTMARK', {})
-        token = postmark_config.get('TOKEN', '') if isinstance(postmark_config, dict) else ''
-        if not token:
+        host_user = getattr(settings, 'EMAIL_HOST_USER', '') or ''
+        host_password = getattr(settings, 'EMAIL_HOST_PASSWORD', '') or ''
+        if not host_user or not host_password:
             raise EmailConfigurationError(
-                "POSTMARK_SERVER_TOKEN is not set. Set it in .env when SEND_EMAILS=true."
+                "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set when SEND_EMAILS=true."
             )
 
     @staticmethod
@@ -81,7 +81,7 @@ class EmailService:
     @staticmethod
     def _build_from_address(from_email: Optional[str] = None, from_name: Optional[str] = None) -> str:
         """Build 'Name <email>' from address."""
-        from_email = from_email or getattr(settings, 'EMAIL_FROM', 'academiablockchain@no-reply.com')
+        from_email = from_email or getattr(settings, 'EMAIL_FROM', 'noreply@academiablockchain.com')
         from_name = from_name or getattr(settings, 'EMAIL_FROM_NAME', 'Academia Blockchain')
         return f"{from_name} <{from_email}>"
 
@@ -96,7 +96,7 @@ class EmailService:
         tags: Optional[List[str]] = None,
     ) -> bool:
         """
-        Send an email via Django's email backend (Postmark when SEND_EMAILS=true).
+        Send an email via Django's email backend (SMTP2GO when SEND_EMAILS=true).
 
         Args:
             receiver_email: Recipient email address
@@ -105,13 +105,13 @@ class EmailService:
             text_message: Plain text content (optional)
             from_email: Sender email (defaults to EMAIL_FROM)
             from_name: Sender name (defaults to EMAIL_FROM_NAME)
-            tags: Optional list of tags for Postmark (used if PostmarkEmailMessage available)
+            tags: Optional labels for logging only (not sent via SMTP)
 
         Returns:
             bool: True if sent successfully, False if SEND_EMAILS is False
 
         Raises:
-            EmailConfigurationError: If Postmark token missing when SEND_EMAILS=True
+            EmailConfigurationError: If SMTP credentials missing when SEND_EMAILS=True
             EmailValidationError: If email address invalid
             EmailServiceError: For other send errors
         """
@@ -139,35 +139,18 @@ class EmailService:
         from_address = EmailService._build_from_address(from_email, from_name)
 
         try:
-            # Build a multi-alternative message so HTML bodies work consistently.
-            # If Postmarker is available, use its class to support Postmark fields (e.g. tags).
-            try:
-                from postmarker.django import PostmarkEmailMultiAlternatives
-                msg = PostmarkEmailMultiAlternatives(
-                    subject=subject,
-                    body=text_message,
-                    from_email=from_address,
-                    to=[receiver_email],
-                )
-                if tags:
-                    # Keep compatibility across postmarker versions
-                    if hasattr(msg, "tag"):
-                        msg.tag = tags[0]
-                    elif hasattr(msg, "tags"):
-                        msg.tags = tags
-            except ImportError:
-                # Fallback to Django standard class (tags ignored)
-                msg = EmailMultiAlternatives(
-                    subject=subject,
-                    body=text_message,
-                    from_email=from_address,
-                    to=[receiver_email],
-                )
-
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_message,
+                from_email=from_address,
+                to=[receiver_email],
+            )
             if html_message:
                 msg.attach_alternative(html_message, "text/html")
             msg.send(fail_silently=False)
 
+            if tags:
+                logger.debug("Email tags (local only): %s", tags)
             logger.info("Email sent successfully to %s", receiver_email)
             return True
         except Exception as e:

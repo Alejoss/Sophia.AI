@@ -155,20 +155,47 @@ Uses the same AWS credentials as media storage. Upload is automatic when `AWS_AC
 - **Default**: `7`
 - **Example**: `BACKUP_S3_RETENTION_DAYS=30`
 
-### Email (Optional – Postmark)
+### Email (Optional – SMTP2GO)
 
 #### `SEND_EMAILS`
-- **Description**: Enable sending of emails (password reset, confirmations, suggestions to admins). When `false` or unset, no emails are sent (dummy backend).
+- **Description**: Enable sending of emails (password reset, confirmations, suggestions to admins, book club invites). When `false` or unset, no emails are sent (dummy backend).
 - **Required**: No
 - **Default**: `false`
 - **Example**: `SEND_EMAILS=true`
-- **Note**: Keep `false` or unset until Postmark is approved; see [Email features](email-features.md).
+- **Note**: Keep `false` until the sending domain is verified in SMTP2GO; see [Email features](email-features.md).
 
-#### `POSTMARK_SERVER_TOKEN`
-- **Description**: Postmark server token (required when `SEND_EMAILS=true` in production).
+#### `EMAIL_HOST`
+- **Description**: SMTP server hostname.
 - **Required**: Yes if `SEND_EMAILS=true` in production
-- **Example**: `POSTMARK_SERVER_TOKEN=your-server-token`
+- **Default**: `mail.smtp2go.com`
+- **Example**: `EMAIL_HOST=mail.smtp2go.com`
 
+#### `EMAIL_PORT`
+- **Description**: SMTP port (SMTP2GO default `2525`; alternatives include `587` with TLS).
+- **Required**: No
+- **Default**: `2525`
+- **Example**: `EMAIL_PORT=2525`
+
+#### `EMAIL_HOST_USER`
+- **Description**: SMTP username from SMTP2GO → Sending → SMTP Users.
+- **Required**: Yes if `SEND_EMAILS=true` in production
+- **Example**: `EMAIL_HOST_USER=academiablockchain.com`
+
+#### `EMAIL_HOST_PASSWORD`
+- **Description**: SMTP password for the SMTP User.
+- **Required**: Yes if `SEND_EMAILS=true` in production
+- **Example**: `EMAIL_HOST_PASSWORD=your-smtp-password`
+
+#### `EMAIL_USE_TLS`
+- **Description**: Use STARTTLS (recommended for ports `2525` / `587`).
+- **Required**: No
+- **Default**: `true`
+- **Example**: `EMAIL_USE_TLS=true`
+
+#### `EMAIL_FROM` / `EMAIL_FROM_NAME`
+- **Description**: Default From address and display name. Address must be on a verified SMTP2GO domain.
+- **Required**: No
+- **Defaults**: `noreply@academiablockchain.com` / `Academia Blockchain`
 ### Monitoring (Optional)
 
 #### `SENTRY_DSN`

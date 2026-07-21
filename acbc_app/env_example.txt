@@ -94,24 +94,26 @@ GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-google-oauth-secret-key
 
 
 # ============================================================================
-# EMAIL CONFIGURATION (Optional - Postmark)
+# EMAIL CONFIGURATION (Optional - SMTP2GO)
 # ============================================================================
 # See docs/deployment/email-features.md for details.
 
 # Send Emails
 # Enable/disable email sending. When false or unset, no emails are sent.
-# Set to True to enable (requires POSTMARK_SERVER_TOKEN).
+# Set to True to enable (requires EMAIL_HOST_USER and EMAIL_HOST_PASSWORD).
 SEND_EMAILS=False
 
-# Postmark Server Token
-# Required when SEND_EMAILS=True. Get from Postmark: Server → API Tokens.
-# In production, the app will not start if SEND_EMAILS=True and this is missing.
-POSTMARK_SERVER_TOKEN=
+# SMTP2GO connection (Sending → SMTP Users in the SMTP2GO dashboard)
+EMAIL_HOST=mail.smtp2go.com
+EMAIL_PORT=2525
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+EMAIL_USE_TLS=true
 
 # Email From Address
-# Default sender email address
-# Default: academiablockchain@no-reply.com
-EMAIL_FROM=academiablockchain@no-reply.com
+# Must use a domain verified in SMTP2GO
+# Default: noreply@academiablockchain.com
+EMAIL_FROM=noreply@academiablockchain.com
 
 # Email From Name
 # Display name for sender
@@ -128,7 +130,7 @@ ADMIN_EMAIL=alejandro@academiablockchain.com
 EMAIL_TIMEOUT=10
 
 # Email Max Retries
-# Default: 3
+# Default: 3 (reserved; not used by the SMTP backend today)
 EMAIL_MAX_RETRIES=3
 
 
@@ -193,8 +195,13 @@ POSTGRES_PASSWORD=<strong-secure-password>
 GOOGLE_OAUTH_CLIENT_ID=your-production-client-id.apps.googleusercontent.com
 GOOGLE_OAUTH_SECRET_KEY=GOCSPX-your-production-secret-key
 
-POSTMARK_SERVER_TOKEN=your-postmark-server-token
+EMAIL_HOST=mail.smtp2go.com
+EMAIL_PORT=2525
+EMAIL_HOST_USER=your-smtp-username
+EMAIL_HOST_PASSWORD=your-smtp-password
+EMAIL_USE_TLS=true
 EMAIL_FROM=noreply@yourdomain.com
+EMAIL_FROM_NAME=Academia Blockchain
 SEND_EMAILS=True
 
 AWS_ACCESS_KEY_ID=your-aws-access-key
@@ -252,7 +259,7 @@ IMPORTANT NOTES
    - The application will raise errors if required production variables are missing
    - DEBUG=True will cause an error in PRODUCTION environment
    - ALLOWED_HOSTS is required in PRODUCTION environment
-   - If SEND_EMAILS=True in PRODUCTION, POSTMARK_SERVER_TOKEN is required
+   - If SEND_EMAILS=True in PRODUCTION, EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are required
 
 4. GENERATING SECRET KEY:
    Run this command to generate a secure secret key:

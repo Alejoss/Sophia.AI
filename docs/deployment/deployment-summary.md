@@ -60,8 +60,13 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=<tu-client-id>
 ### Opcionales (pero recomendadas)
 
 ```bash
-# Email (Postmark)
-POSTMARK_SERVER_TOKEN=<tu-server-token-postmark>
+# Email (SMTP2GO)
+# SEND_EMAILS=true
+EMAIL_HOST=mail.smtp2go.com
+EMAIL_PORT=2525
+EMAIL_HOST_USER=<smtp-username>
+EMAIL_HOST_PASSWORD=<smtp-password>
+EMAIL_USE_TLS=true
 EMAIL_FROM=noreply@academiablockchain.com
 ADMIN_EMAIL=admin@academiablockchain.com
 

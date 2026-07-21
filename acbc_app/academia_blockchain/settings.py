@@ -597,41 +597,50 @@ LOGIN_URL = "account_login"
 LOGIN_REDIRECT_URL = "profiles:set_jwt_token"
 LOGOUT_REDIRECT_URL = "http://localhost:5173/profiles/login"
 LANGUAGE_CODE = "en-us"
-# Set to True in .env when Postmark (or email) is ready; keeps all email features disabled until then
+# Set to True in .env when SMTP (SMTP2GO) is ready; keeps all email features disabled until then
 SEND_EMAILS = os.getenv("SEND_EMAILS", "false").lower() == "true"
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_EMAIL_REQUIRED = False
 SITE_ID = 1  # django-allauth
 
-# Email configuration (Postmark). When SEND_EMAILS=False, use dummy backend so no real emails are sent
-# (e.g. password reset and any Django send_mail() do not call Postmark).
+# Email via SMTP2GO (Django SMTP backend). When SEND_EMAILS=False, use dummy backend
+# so password reset and any Django send_mail() do not hit the network.
 if SEND_EMAILS:
-    EMAIL_BACKEND = "postmarker.django.EmailBackend"
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.dummy.EmailBackend"
 
-POSTMARK = {
-    "TOKEN": os.getenv("POSTMARK_SERVER_TOKEN", ""),
-    # In development, allow test mode; in production use real token (no test mode)
-    "TEST_MODE": ENVIRONMENT != "PRODUCTION",
-    "VERBOSITY": int(os.getenv("POSTMARK_VERBOSITY", "0")),
-}
+EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.smtp2go.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "2525"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 
-EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@academiablockchain.com')
-EMAIL_FROM_NAME = 'Academia Blockchain'
-# Django default from address (used by send_mail and Postmark backend)
+EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@academiablockchain.com")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Academia Blockchain")
 DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>"
 SERVER_EMAIL = EMAIL_FROM  # For error reports to admins
 # Primary admin/support email for notifications (suggestions, newsletter signups, etc.)
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'alejandro@academiablockchain.com')
-EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))  # Timeout in seconds
-EMAIL_MAX_RETRIES = int(os.getenv('EMAIL_MAX_RETRIES', '3'))
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "alejandro@academiablockchain.com")
+EMAIL_MAX_RETRIES = int(os.getenv("EMAIL_MAX_RETRIES", "3"))
 
-# Validate email configuration in production
+# Validate SMTP credentials in production when email is enabled
 if ENVIRONMENT == "PRODUCTION" and SEND_EMAILS:
-    if not POSTMARK["TOKEN"]:
+    _missing_email = [
+        name
+        for name, value in (
+            ("EMAIL_HOST", EMAIL_HOST),
+            ("EMAIL_HOST_USER", EMAIL_HOST_USER),
+            ("EMAIL_HOST_PASSWORD", EMAIL_HOST_PASSWORD),
+        )
+        if not value
+    ]
+    if _missing_email:
         raise ValueError(
-            "POSTMARK_SERVER_TOKEN must be set in production when SEND_EMAILS=True"
+            "Missing SMTP settings when SEND_EMAILS=True in production: "
+            + ", ".join(_missing_email)
         )
 
 _POSTGRES_DB = {
