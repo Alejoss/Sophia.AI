@@ -1,83 +1,133 @@
 """
-One-off command: import all VIDEO files from S3 folder "Ucronia Subtitlos Español/"
-into the library of user id=2. Creates Content/ContentProfile/FileDetails exactly
-as UploadContentConfirmView does (form flow).
+Import files already uploaded to S3 into a user's library/collection.
+
+Creates Content / ContentProfile / FileDetails the same way as
+UploadContentConfirmView, then sets FileDetails.file via queryset.update
+so Django never re-uploads the blob.
 """
 import os
-from django.core.management.base import BaseCommand
+import re
+
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand, CommandError
 
 from content.models import Library, Collection, Content, ContentProfile, FileDetails
 from content.s3_key_utils import is_unsafe_s3_key
 
-# Hardcoded for one-time use
-USER_ID = 2
-S3_PREFIX = "Ucronia Subtitlos Español/"
-COLLECTION_NAME = "Ucronia Subtitlos Español"
-VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v'}
-# PositiveIntegerField max (PostgreSQL); larger files store None
-MAX_FILE_SIZE = 2147483647
+EXTENSION_MAP = {
+    'VIDEO': {'mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v'},
+    'AUDIO': {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'},
+    'IMAGE': {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'},
+    'TEXT': {'pdf', 'txt', 'md', 'doc', 'docx', 'epub'},
+}
+
+MEDIA_TYPES = tuple(EXTENSION_MAP.keys())
 
 
-def is_video_key(key):
-    ext = key.split('.')[-1].lower() if '.' in key else ''
-    return ext in VIDEO_EXTENSIONS
+def extension_of(key):
+    ext = key.rsplit('.', 1)[-1].lower() if '.' in key.rsplit('/', 1)[-1] else ''
+    return ext
 
 
-def title_from_key(key):
-    """
-    Derive display title from S3 key. E.g. "01 - Datos_ES.mp4" -> "Ucronía 01 - Datos (subtítulos español)"
-    """
-    filename = key.split('/')[-1]
-    name_no_ext = os.path.splitext(filename)[0]  # "01 - Datos_ES" or "01 - Datos"
-    if name_no_ext.endswith('_ES'):
-        base = name_no_ext[:-3].strip()  # "01 - Datos"
-        suffix = " (subtítulos español)"
-    else:
-        base = name_no_ext
-        suffix = ""
-    return f"Ucronía {base}{suffix}"
+def matches_media_type(key, media_type):
+    return extension_of(key) in EXTENSION_MAP[media_type]
+
+
+def sanitize_title(raw, max_length=255):
+    """Basic display-title sanitize: collapse whitespace, strip, truncate."""
+    title = re.sub(r'\s+', ' ', str(raw or '').strip())
+    if not title:
+        title = 'untitled'
+    return title[:max_length]
+
+
+def title_from_key(key, title_from='filename'):
+    if title_from == 'key':
+        return sanitize_title(key)
+    filename = key.rsplit('/', 1)[-1]
+    name_no_ext = os.path.splitext(filename)[0]
+    return sanitize_title(name_no_ext)
 
 
 class Command(BaseCommand):
-    help = 'Import videos from S3 folder "Ucronia Subtitlos Español/" into library of user id=2 (one-off).'
+    help = (
+        'Import existing S3 objects under a prefix into a user library/collection '
+        'without re-uploading blobs.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Only list keys that would be imported, do not create anything.',
+            '--user-id',
+            type=int,
+            required=True,
+            help='User ID that owns Library / ContentProfile / uploaded_by.',
         )
         parser.add_argument(
-            '--fix-existing',
+            '--prefix',
+            type=str,
+            required=True,
+            help='S3 prefix to list (trailing slash will be added if missing).',
+        )
+        parser.add_argument(
+            '--collection-name',
+            type=str,
+            default=None,
+            help='Collection name; get_or_create under the user Library.',
+        )
+        parser.add_argument(
+            '--collection-id',
+            type=int,
+            default=None,
+            help='Existing Collection ID (must belong to the user Library). Takes priority over --collection-name.',
+        )
+        parser.add_argument(
+            '--media-type',
+            type=str,
+            required=True,
+            choices=MEDIA_TYPES,
+            help='Media type for created Content rows.',
+        )
+        parser.add_argument(
+            '--dry-run',
             action='store_true',
-            help='Fix titles of already-imported content with wrong "ES.mp4" names (run before re-import).',
+            help='List keys/titles that would be imported; do not write to the DB.',
+        )
+        parser.add_argument(
+            '--title-from',
+            type=str,
+            choices=['filename', 'key'],
+            default='filename',
+            help='How to derive original_title/title (default: filename).',
         )
 
     def handle(self, *args, **options):
-        user = User.objects.filter(pk=USER_ID).first()
-        if not user:
-            self.stderr.write(self.style.ERROR(f'User id={USER_ID} not found.'))
-            return
+        user_id = options['user_id']
+        prefix = options['prefix']
+        collection_id = options['collection_id']
+        collection_name = options['collection_name']
+        media_type = options['media_type']
+        dry_run = options['dry_run']
+        title_from = options['title_from']
 
-        if options.get('fix_existing'):
-            self._fix_existing_titles(user)
-            return
+        if not collection_id and not collection_name:
+            raise CommandError('Provide --collection-id or --collection-name.')
+
+        user = User.objects.filter(pk=user_id).first()
+        if not user:
+            raise CommandError(f'User id={user_id} not found.')
 
         if not getattr(settings, 'AWS_ACCESS_KEY_ID', None) or not getattr(settings, 'AWS_SECRET_ACCESS_KEY', None):
-            self.stderr.write(self.style.ERROR('AWS credentials not configured.'))
-            return
+            raise CommandError('AWS credentials not configured (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).')
 
         try:
             import boto3
-        except ImportError:
-            self.stderr.write(self.style.ERROR('boto3 required: pip install boto3'))
-            return
+        except ImportError as exc:
+            raise CommandError('boto3 required: pip install boto3') from exc
 
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'academiablockchain')
         region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-west-2')
-        prefix = S3_PREFIX if S3_PREFIX.endswith('/') else S3_PREFIX + '/'
+        prefix = prefix if prefix.endswith('/') else prefix + '/'
 
         s3_client = boto3.client(
             's3',
@@ -86,118 +136,139 @@ class Command(BaseCommand):
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         )
 
-        # List only video keys under prefix
+        # Validate collection target without writing when --dry-run
+        collection_label = self._validate_collection_target(
+            user_id=user_id,
+            collection_id=collection_id,
+            collection_name=collection_name,
+        )
+
         keys = []
         paginator = s3_client.get_paginator('list_objects_v2')
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for obj in page.get('Contents', []):
-                k = obj.get('Key')
-                if k and not k.endswith('/') and is_video_key(k):
-                    keys.append(k)
+                key = obj.get('Key')
+                if not key or key.endswith('/'):
+                    continue
+                if not matches_media_type(key, media_type):
+                    continue
+                keys.append(key)
 
         if not keys:
-            self.stdout.write(self.style.WARNING(f'No video files found under {prefix}'))
+            self.stdout.write(self.style.WARNING(
+                f'No {media_type} files found under {prefix}'
+            ))
             return
 
-        # Verify each key exists and get size (same as view: head_object)
-        validated = []
+        imported = 0
+        skipped = 0
+        collection = None
+
         for key in keys:
             key = key.strip()
+            title = title_from_key(key, title_from)
+
             if is_unsafe_s3_key(key):
+                self.stdout.write(self.style.WARNING(f'  Skip unsafe: {key}'))
+                skipped += 1
                 continue
+
+            if FileDetails.objects.filter(file=key).exists():
+                self.stdout.write(self.style.WARNING(f'  Skip already imported: {key}'))
+                skipped += 1
+                continue
+
             try:
                 head = s3_client.head_object(Bucket=bucket, Key=key)
-                validated.append((key, head.get('ContentLength')))
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f'Skip {key}: {e}'))
-
-        if not validated:
-            self.stderr.write(self.style.ERROR('No valid S3 keys.'))
-            return
-
-        if options['dry_run']:
-            self.stdout.write(self.style.SUCCESS(f'[DRY RUN] Would import {len(validated)} videos:'))
-            for key, size in validated:
-                self.stdout.write(f'  {key} -> "{title_from_key(key)}"')
-            return
-
-        # Library (one per user, same as view) and collection
-        library, _ = Library.objects.get_or_create(
-            user=user,
-            defaults={'name': f"{user.username}'s Library"},
-        )
-
-        collection, _ = Collection.objects.get_or_create(
-            library=library,
-            defaults={'name': COLLECTION_NAME},
-        )
-        if collection.name != COLLECTION_NAME:
-            collection.name = COLLECTION_NAME
-            collection.save()
-
-        # Create content exactly as UploadContentConfirmView (S3 confirm)
-        for key, file_size in validated:
-            if FileDetails.objects.filter(file=key).exists():
-                self.stdout.write(self.style.WARNING(f'  Skip (already imported): {key}'))
+                file_size = head.get('ContentLength')
+            except Exception as exc:
+                self.stdout.write(self.style.WARNING(f'  Skip head_object failed: {key} ({exc})'))
+                skipped += 1
                 continue
-            if file_size is not None and file_size > MAX_FILE_SIZE:
-                file_size = None  # PositiveIntegerField overflow for files > ~2GB
-            title = title_from_key(key)
-            # Same defaults as view: is_visible=True, is_producer=False, author=None, personal_note=None
+
+            if dry_run:
+                self.stdout.write(f'  [DRY RUN] {key} -> "{title}"')
+                imported += 1
+                continue
+
+            if collection is None:
+                library, _ = Library.objects.get_or_create(
+                    user=user,
+                    defaults={'name': f"{user.username}'s Library"},
+                )
+                collection = self._resolve_collection(
+                    library, user_id, collection_id, collection_name
+                )
+
             content = Content.objects.create(
                 uploaded_by=user,
-                media_type='VIDEO',
+                media_type=media_type,
                 original_title=title,
                 original_author=None,
             )
-            content_profile = ContentProfile.objects.create(
+            ContentProfile.objects.create(
                 content=content,
+                user=user,
+                collection=collection,
                 title=title,
                 author=None,
                 personal_note=None,
-                user=user,
                 is_visible=True,
-                is_producer=True,  # importer is the producer
-                collection=collection,
+                is_producer=True,
             )
             file_details = FileDetails.objects.create(
                 content=content,
                 file_size=file_size,
             )
+            # Set S3 key without triggering storage upload (blob already in S3)
             FileDetails.objects.filter(pk=file_details.pk).update(file=key)
-            self.stdout.write(self.style.SUCCESS(f'  Created: "{title}" (Content #{content.id})'))
 
-        self.stdout.write(self.style.SUCCESS(f'Done. Imported {len(validated)} videos into library "{library.name}" for user id={USER_ID}.'))
+            self.stdout.write(self.style.SUCCESS(
+                f'  Created: "{title}" (Content #{content.id}) <- {key}'
+            ))
+            imported += 1
 
-    def _fix_existing_titles(self, user):
-        """Fix Content/ContentProfile titles that were wrongly set to ES.mp4."""
-        library = Library.objects.filter(user=user).first()
-        if not library:
-            self.stdout.write(self.style.WARNING('No library found for user.'))
-            return
-        collection = Collection.objects.filter(library=library, name=COLLECTION_NAME).first()
-        if not collection:
-            self.stdout.write(self.style.WARNING(f'Collection "{COLLECTION_NAME}" not found.'))
-            return
-        profiles = ContentProfile.objects.filter(
-            collection=collection,
-            title='ES.mp4',
-        ).select_related('content')
-        count = 0
-        for profile in profiles:
-            try:
-                fd = profile.content.file_details
-            except FileDetails.DoesNotExist:
-                continue
-            key = fd.file.name if fd.file else None
-            if not key:
-                continue
-            new_title = title_from_key(key)
-            profile.content.original_title = new_title
-            profile.content.save(update_fields=['original_title'])
-            profile.title = new_title
-            profile.is_producer = True  # importer is the producer
-            profile.save(update_fields=['title', 'is_producer'])
-            count += 1
-            self.stdout.write(self.style.SUCCESS(f'  Fixed: "{key}" -> "{new_title}"'))
-        self.stdout.write(self.style.SUCCESS(f'Done. Fixed {count} titles.'))
+        mode = '[DRY RUN] ' if dry_run else ''
+        coll_part = (
+            f'collection_id={collection.id}'
+            if collection is not None
+            else f'collection={collection_label}'
+        )
+        self.stdout.write(self.style.SUCCESS(
+            f'{mode}Done. imported={imported} skipped={skipped} '
+            f'user_id={user_id} {coll_part} prefix={prefix}'
+        ))
+
+    def _validate_collection_target(self, user_id, collection_id, collection_name):
+        """Validate collection args. Read-only; safe for --dry-run."""
+        if collection_id is not None:
+            collection = Collection.objects.filter(pk=collection_id).select_related('library').first()
+            if not collection:
+                raise CommandError(f'Collection id={collection_id} not found.')
+            if collection.library.user_id != user_id:
+                raise CommandError(
+                    f'Collection id={collection_id} does not belong to user id={user_id}.'
+                )
+            return f'id={collection.id} name="{collection.name}"'
+        return f'name="{collection_name}" (get_or_create)'
+
+    def _resolve_collection(self, library, user_id, collection_id, collection_name):
+        if collection_id is not None:
+            collection = Collection.objects.filter(pk=collection_id).select_related('library').first()
+            if not collection:
+                raise CommandError(f'Collection id={collection_id} not found.')
+            if collection.library.user_id != user_id:
+                raise CommandError(
+                    f'Collection id={collection_id} does not belong to user id={user_id}.'
+                )
+            return collection
+
+        collection, created = Collection.objects.get_or_create(
+            library=library,
+            name=collection_name,
+        )
+        if created:
+            self.stdout.write(self.style.SUCCESS(
+                f'Created collection "{collection_name}" (id={collection.id})'
+            ))
+        return collection
