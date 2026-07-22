@@ -21,8 +21,10 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import {
+  createPathPurchasePayment,
   createRegistrationPayment,
   getPaymentStatus,
+  listPathPurchasePayments,
   listRegistrationPayments,
 } from '../api/paymentsApi';
 
@@ -65,7 +67,8 @@ const MSG = {
   payAddress: 'Direcci\u00F3n de pago',
   expired: 'Este pago expir\u00F3. Cierra y vuelve a intentarlo.',
   confirming: 'Pago detectado en la red. Esperando confirmaci\u00F3n final...',
-  paid: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
+  paidEvent: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
+  paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
   polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
   payLater: 'Pagar m\u00E1s tarde',
   initError: 'No se pudo iniciar el pago',
@@ -102,8 +105,11 @@ const CryptoPaymentModal = ({
   open,
   onClose,
   registrationId,
+  pathPurchaseId,
+  title,
   eventTitle,
   priceUsd,
+  productLabel = 'evento',
   onPaymentComplete,
 }) => {
   const [payment, setPayment] = useState(null);
@@ -111,6 +117,9 @@ const CryptoPaymentModal = ({
   const [error, setError] = useState(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedExtra, setCopiedExtra] = useState(false);
+  const displayTitle = title || eventTitle;
+  const isPathCheckout = Boolean(pathPurchaseId);
+  const entitlementId = pathPurchaseId || registrationId;
 
   const refreshPayment = useCallback(async (paymentId) => {
     const data = await getPaymentStatus(paymentId);
@@ -132,14 +141,16 @@ const CryptoPaymentModal = ({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !registrationId) return undefined;
+    if (!open || !entitlementId) return undefined;
 
     let cancelled = false;
     const initCheckout = async () => {
       try {
         setInitializing(true);
         setError(null);
-        const payments = await listRegistrationPayments(registrationId);
+        const payments = isPathCheckout
+          ? await listPathPurchasePayments(entitlementId)
+          : await listRegistrationPayments(entitlementId);
         if (cancelled) return;
 
         const openPayment = payments.find((p) => OPEN_PAYMENT_STATUSES.has(p.payment_status));
@@ -149,7 +160,9 @@ const CryptoPaymentModal = ({
           return;
         }
 
-        const data = await createRegistrationPayment(registrationId);
+        const data = isPathCheckout
+          ? await createPathPurchasePayment(entitlementId)
+          : await createRegistrationPayment(entitlementId);
         if (!cancelled) setPayment(data);
       } catch (err) {
         if (!cancelled) {
@@ -164,7 +177,7 @@ const CryptoPaymentModal = ({
     return () => {
       cancelled = true;
     };
-  }, [open, registrationId, refreshPayment]);
+  }, [open, entitlementId, isPathCheckout, refreshPayment]);
 
   useEffect(() => {
     if (!open || !payment?.id || payment.is_paid) return undefined;
@@ -211,10 +224,10 @@ const CryptoPaymentModal = ({
           <PaymentsIcon />
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              Pago del evento
+              {isPathCheckout ? 'Pago del camino' : `Pago del ${productLabel}`}
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              {eventTitle}
+              {displayTitle}
             </Typography>
           </Box>
         </Stack>
@@ -303,7 +316,7 @@ const CryptoPaymentModal = ({
             )}
             {payment.is_paid && (
               <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
-                {MSG.paid}
+                {isPathCheckout ? MSG.paidPath : MSG.paidEvent}
               </Alert>
             )}
 

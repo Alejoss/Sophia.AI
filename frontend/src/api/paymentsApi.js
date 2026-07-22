@@ -42,3 +42,21 @@ export const listRegistrationPayments = async (registrationId) => {
     throwApiError(error, 'No se pudo listar los pagos');
   }
 };
+
+export const createPathPurchasePayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago del camino');
+  }
+};
+
+export const listPathPurchasePayments = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/path-purchase/${purchaseId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo listar los pagos del camino');
+  }
+};

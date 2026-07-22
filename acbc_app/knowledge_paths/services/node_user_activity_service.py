@@ -1,5 +1,6 @@
 from profiles.models import UserNodeCompletion
 from knowledge_paths.models import Node, KnowledgePath
+from knowledge_paths.services.access_service import user_has_path_access
 from quizzes.models import UserQuizAttempt
 from django.utils import timezone
 from django.db.models import Count
@@ -46,6 +47,9 @@ def is_node_available_for_user(node, user, book_club=None):
         return True
     if book_club is None and node.knowledge_path.author == user:
         return True
+
+    if not user_has_path_access(user, node.knowledge_path, book_club=book_club):
+        return False
 
     if book_club:
         from book_clubs.services import is_node_released_for_club

@@ -6,13 +6,24 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import KnowledgePath, Node
-from .serializers import KnowledgePathSerializer, KnowledgePathCreateSerializer, NodeSerializer, KnowledgePathBasicSerializer, NodeReorderSerializer, KnowledgePathListSerializer, KnowledgePathEngagedSerializer
+from .serializers import (
+    KnowledgePathSerializer,
+    KnowledgePathCreateSerializer,
+    KnowledgePathPurchaseSerializer,
+    NodeSerializer,
+    KnowledgePathBasicSerializer,
+    NodeReorderSerializer,
+    KnowledgePathListSerializer,
+    KnowledgePathEngagedSerializer,
+)
 from utils.permissions import IsAuthor
 from content.models import Content, ContentProfile
 from django.db import IntegrityError, transaction
 from django.db import models
 from django.utils import timezone
+from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
+from payments.services import get_or_create_path_purchase
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
 from votes.models import VoteCount, Vote
@@ -356,6 +367,35 @@ class UserKnowledgePathsByUserIdView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class KnowledgePathPurchaseView(APIView):
+    """Create or fetch the current user's purchase entitlement for a path."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        from knowledge_paths.services.access_service import get_user_purchase
+
+        purchase = get_user_purchase(request.user, knowledge_path)
+        if purchase is None:
+            return Response({'error': 'No hay compra para este camino.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(KnowledgePathPurchaseSerializer(purchase).data)
+
+    def post(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        try:
+            purchase = get_or_create_path_purchase(
+                knowledge_path=knowledge_path,
+                user=request.user,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            KnowledgePathPurchaseSerializer(purchase).data,
+            status=status.HTTP_200_OK if purchase.payment_status == 'PAID' else status.HTTP_201_CREATED,
+        )
+
+
 class KnowledgePathDetailView(APIView):
     """
     Retrieve a knowledge path and allow updating if user is the author
@@ -685,6 +725,15 @@ class NodeDetailView(APIView):
                 request.user,
                 request.query_params.get('club'),
             )
+            if not user_has_path_access(request.user, knowledge_path, book_club=book_club):
+                return Response(
+                    {
+                        'detail': 'Este camino requiere pago para acceder a los nodos.',
+                        'code': 'path_payment_required',
+                        'reference_price': knowledge_path.reference_price,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             if book_club:
                 released, opens_at = is_node_released_for_club(
                     node, book_club, request.user

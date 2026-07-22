@@ -7,7 +7,8 @@ from payments.models import CryptoPayment
 class CryptoPaymentAdmin(admin.ModelAdmin):
     list_display = (
         'order_id',
-        'registration',
+        'event_registration',
+        'path_purchase',
         'pay_currency',
         'payment_status',
         'price_amount',
@@ -15,5 +16,10 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'created_at',
     )
     list_filter = ('payment_status', 'pay_currency')
-    search_fields = ('order_id', 'pay_address', 'registration__user__username')
+    search_fields = (
+        'order_id',
+        'pay_address',
+        'event_registration__user__username',
+        'path_purchase__user__username',
+    )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload')

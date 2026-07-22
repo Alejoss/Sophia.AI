@@ -63,6 +63,7 @@ const KnowledgePathEdit = () => {
   const [description, setDescription] = useState("");
   const [isVisible, setIsVisible] = useState(false);
   const [certificatesEnabled, setCertificatesEnabled] = useState(false);
+  const [referencePrice, setReferencePrice] = useState(0);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -75,6 +76,7 @@ const KnowledgePathEdit = () => {
     description: "",
     isVisible: false,
     certificatesEnabled: false,
+    referencePrice: 0,
     imageUrl: null,
   });
   const autosaveTimerRef = useRef(null);
@@ -132,6 +134,7 @@ const KnowledgePathEdit = () => {
         setDescription(data.description || "");
         setIsVisible(Boolean(data.is_visible));
         setCertificatesEnabled(Boolean(data.certificates_enabled));
+        setReferencePrice(Number(data.reference_price) || 0);
         setImageFile(null);
         setImagePreviewUrl(data.image || null);
 
@@ -140,6 +143,7 @@ const KnowledgePathEdit = () => {
           description: data.description || "",
           isVisible: Boolean(data.is_visible),
           certificatesEnabled: Boolean(data.certificates_enabled),
+          referencePrice: Number(data.reference_price) || 0,
           imageUrl: data.image || null,
         };
         isHydratingRef.current = false;
@@ -204,6 +208,7 @@ const KnowledgePathEdit = () => {
         description,
         is_visible: isVisible,
         certificates_enabled: certificatesEnabled,
+        reference_price: Number(referencePrice) || 0,
         image: file,
         image_focal_x: focalX,
         image_focal_y: focalY,
@@ -249,9 +254,10 @@ const KnowledgePathEdit = () => {
       title !== last.title ||
       description !== last.description ||
       isVisible !== last.isVisible ||
-      certificatesEnabled !== last.certificatesEnabled;
+      certificatesEnabled !== last.certificatesEnabled ||
+      Number(referencePrice) !== Number(last.referencePrice);
     return fieldsDirty || Boolean(imageFile);
-  }, [title, description, isVisible, certificatesEnabled, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, referencePrice, imageFile]);
 
   const runAutosave = async () => {
     if (isHydratingRef.current) return;
@@ -264,6 +270,7 @@ const KnowledgePathEdit = () => {
         description,
         is_visible: isVisible,
         certificates_enabled: certificatesEnabled,
+        reference_price: Number(referencePrice) || 0,
       };
       if (imageFile) payload.image = imageFile;
 
@@ -286,6 +293,10 @@ const KnowledgePathEdit = () => {
           typeof updated?.certificates_enabled === "boolean"
             ? updated.certificates_enabled
             : certificatesEnabled,
+        referencePrice:
+          updated?.reference_price !== undefined
+            ? Number(updated.reference_price) || 0
+            : Number(referencePrice) || 0,
         imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
       };
 
@@ -313,7 +324,7 @@ const KnowledgePathEdit = () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, isVisible, certificatesEnabled, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, referencePrice, imageFile]);
 
   const refreshPath = async () => {
     try {
@@ -697,6 +708,17 @@ const KnowledgePathEdit = () => {
                   </Box>
                 }
                 sx={{ alignItems: "flex-start", mt: 1, ml: 0 }}
+              />
+
+              <TextField
+                label="Precio (USD)"
+                type="number"
+                value={referencePrice}
+                onChange={(e) => setReferencePrice(e.target.value === "" ? 0 : Number(e.target.value))}
+                inputProps={{ min: 0, step: "0.01" }}
+                fullWidth
+                helperText="0 = gratuito. Si es mayor a 0, los alumnos pagan con cripto (NOWPayments) para desbloquear los nodos."
+                sx={{ mt: 1 }}
               />
 
               <TextField
