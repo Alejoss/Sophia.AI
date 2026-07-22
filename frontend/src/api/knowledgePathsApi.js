@@ -20,6 +20,9 @@ const knowledgePathsApi = {
         if (knowledgePathData.certificates_enabled !== undefined) {
           formData.append('certificates_enabled', String(knowledgePathData.certificates_enabled));
         }
+        if (knowledgePathData.reference_price !== undefined) {
+          formData.append('reference_price', String(knowledgePathData.reference_price));
+        }
         formData.append('image', knowledgePathData.image);
 
         response = await axiosInstance.post('/knowledge_paths/create/', formData, {
@@ -84,6 +87,9 @@ const knowledgePathsApi = {
         if (knowledgePathData.is_visible !== undefined) formData.append('is_visible', String(knowledgePathData.is_visible));
         if (knowledgePathData.certificates_enabled !== undefined) {
           formData.append('certificates_enabled', String(knowledgePathData.certificates_enabled));
+        }
+        if (knowledgePathData.reference_price !== undefined) {
+          formData.append('reference_price', String(knowledgePathData.reference_price));
         }
 
         response = await axiosInstance.put(`/knowledge_paths/${pathId}/`, formData, {
@@ -269,9 +275,27 @@ const knowledgePathsApi = {
       console.error('Error response:', error.response?.data);
       throw error;
     }
-  }
+  },
 
-  // Add other knowledge path-related API calls here as needed
+  createOrGetPurchase: async (pathId) => {
+    try {
+      const response = await axiosInstance.post(`/knowledge_paths/${pathId}/purchase/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating knowledge path purchase:', error);
+      throw error;
+    }
+  },
+
+  getPurchase: async (pathId) => {
+    try {
+      const response = await axiosInstance.get(`/knowledge_paths/${pathId}/purchase/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching knowledge path purchase:', error);
+      throw error;
+    }
+  },
 };
 
 export default knowledgePathsApi;

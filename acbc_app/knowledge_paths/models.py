@@ -59,9 +59,19 @@ class KnowledgePath(models.Model):
         default=False,
         help_text="Whether learners can request a completion certificate for this path",
     )
+    reference_price = models.FloatField(
+        default=0,
+        blank=True,
+        null=True,
+        help_text="Price in USD. 0 or null means the path is free.",
+    )
 
     class Meta:
         app_label = 'knowledge_paths'
+
+    @property
+    def is_paid_path(self):
+        return bool(self.reference_price and self.reference_price > 0)
 
     @property
     def vote_count(self):
@@ -196,3 +206,40 @@ class Node(models.Model):
         super().delete(*args, **kwargs)
         # Ensure visibility consistency after deletion
         knowledge_path.ensure_visibility_consistency()
+
+
+class KnowledgePathPurchase(models.Model):
+    """Entitlement for a user who buys access to a paid knowledge path."""
+
+    PAYMENT_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('REFUNDED', 'Refunded'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='knowledge_path_purchases')
+    knowledge_path = models.ForeignKey(
+        KnowledgePath,
+        on_delete=models.CASCADE,
+        related_name='purchases',
+    )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='PENDING',
+    )
+    price_amount = models.FloatField(help_text='USD price snapshot at purchase time')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        unique_together = [['user', 'knowledge_path']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → path {self.knowledge_path_id} ({self.payment_status})'
+
+    @property
+    def is_paid(self):
+        return self.payment_status == 'PAID'

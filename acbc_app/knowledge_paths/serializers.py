@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import KnowledgePath, Node
+from .models import KnowledgePath, KnowledgePathPurchase, Node
 from django.contrib.auth.models import User
 from content.models import FileDetails, ContentProfile
 from content.utils import build_media_url
@@ -9,6 +9,7 @@ from content.image_utils import (
     delete_knowledge_path_image_preview,
 )
 from profiles.models import UserNodeCompletion
+from knowledge_paths.services.access_service import get_user_purchase, user_has_path_access
 from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
 from quizzes.serializers import QuizSerializer
 
@@ -100,6 +101,10 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
+    is_paid_path = serializers.BooleanField(read_only=True)
+    user_has_access = serializers.SerializerMethodField()
+    user_purchase_status = serializers.SerializerMethodField()
+    user_purchase_id = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
@@ -107,8 +112,33 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'id', 'title', 'author', 'author_id', 'description', 'created_at',
             'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image',
             'image_preview', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
-            'certificates_enabled',
+            'certificates_enabled', 'reference_price', 'is_paid_path',
+            'user_has_access', 'user_purchase_status', 'user_purchase_id',
         ]
+
+    def get_user_has_access(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return not obj.is_paid_path
+        return user_has_path_access(
+            request.user,
+            obj,
+            book_club=self.context.get('book_club'),
+        )
+
+    def get_user_purchase_status(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        purchase = get_user_purchase(request.user, obj)
+        return purchase.payment_status if purchase else None
+
+    def get_user_purchase_id(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        purchase = get_user_purchase(request.user, obj)
+        return purchase.id if purchase else None
 
     def get_can_be_visible(self, obj):
         return obj.can_be_visible()
@@ -156,13 +186,14 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
     can_be_visible = serializers.SerializerMethodField()
     image_focal_x = serializers.FloatField(required=False, min_value=0, max_value=1)
     image_focal_y = serializers.FloatField(required=False, min_value=0, max_value=1)
+    reference_price = serializers.FloatField(required=False, min_value=0, allow_null=True)
     
     class Meta:
         model = KnowledgePath
         fields = [
             'id', 'title', 'description', 'author', 'created_at', 'image', 'image_preview',
             'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
-            'certificates_enabled',
+            'certificates_enabled', 'reference_price',
         ]
         read_only_fields = ['author', 'created_at', 'image_preview']
 
@@ -224,6 +255,10 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
 
         if 'certificates_enabled' in validated_data:
             instance.certificates_enabled = validated_data['certificates_enabled']
+
+        if 'reference_price' in validated_data:
+            price = validated_data['reference_price']
+            instance.reference_price = 0 if price is None else price
         
         instance.save()
 
@@ -241,13 +276,36 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         return data
 
 
+class KnowledgePathPurchaseSerializer(serializers.ModelSerializer):
+    knowledge_path_id = serializers.IntegerField(source='knowledge_path.id', read_only=True)
+    knowledge_path_title = serializers.CharField(source='knowledge_path.title', read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = KnowledgePathPurchase
+        fields = [
+            'id',
+            'knowledge_path_id',
+            'knowledge_path_title',
+            'payment_status',
+            'price_amount',
+            'is_paid',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+
 class KnowledgePathBasicSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     image_preview = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
-        fields = ['id', 'title', 'image', 'image_preview', 'image_focal_x', 'image_focal_y']
+        fields = [
+            'id', 'title', 'image', 'image_preview', 'image_focal_x', 'image_focal_y',
+            'reference_price',
+        ]
 
     def get_image(self, obj):
         image, _preview = _knowledge_path_image_urls(obj, self.context.get('request'))
@@ -288,6 +346,7 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
+    is_paid_path = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = KnowledgePath
@@ -295,6 +354,7 @@ class KnowledgePathListSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'author', 'author_id', 'created_at',
             'vote_count', 'user_vote', 'image', 'image_preview',
             'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
+            'reference_price', 'is_paid_path',
         ]
 
     def get_can_be_visible(self, obj):

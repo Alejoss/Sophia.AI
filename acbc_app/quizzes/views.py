@@ -158,6 +158,18 @@ class QuizSubmitView(APIView):
         try:
             quiz = get_object_or_404(Quiz, pk=quiz_id)
             logger.debug(f"Found quiz: {quiz.title}")
+
+            if quiz.node_id and quiz.node.knowledge_path_id:
+                from knowledge_paths.services.access_service import user_has_path_access
+
+                if not user_has_path_access(request.user, quiz.node.knowledge_path):
+                    return Response(
+                        {
+                            'error': 'Debes desbloquear este camino de conocimiento para responder el cuestionario',
+                            'code': 'path_payment_required',
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
             
             # Get today's date (midnight)
             today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)

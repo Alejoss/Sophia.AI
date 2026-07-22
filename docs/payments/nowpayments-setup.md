@@ -1,6 +1,9 @@
 # Pasarela de pagos (NOWPayments) — BCH y Monero
 
-Academia Blockchain usa [NOWPayments](https://nowpayments.io/) para aceptar pagos en cripto en el registro a eventos de pago.
+Academia Blockchain usa [NOWPayments](https://nowpayments.io/) para aceptar pagos en cripto en:
+
+1. **Registro a eventos de pago** (`EventRegistration`)
+2. **Compra de Caminos del Conocimiento** (`KnowledgePathPurchase`)
 
 ## Configuración en NOWPayments
 
@@ -31,15 +34,32 @@ FRONTEND_PUBLIC_URL=http://localhost:5173
 
 > Los webhooks IPN **no llegan a localhost** sin túnel (ngrok, cloudflared, etc.). En local puedes depender del polling del frontend o exponer el backend con un túnel.
 
+## Modelo de datos
+
+`CryptoPayment` apunta a **exactamente uno** de estos entitlements (constraint XOR):
+
+- `event_registration` → `events.EventRegistration`
+- `path_purchase` → `knowledge_paths.KnowledgePathPurchase`
+
+No hay FK directa a `Event` ni a `KnowledgePath`. El producto tiene `reference_price`; el entitlement guarda el estado `PENDING`/`PAID` y el snapshot del precio.
+
 ## Flujo (según [API NOWPayments](https://documenter.getpostman.com/view/7907941/2s93JusNJt))
 
+### Eventos
 1. El usuario se registra en un evento con precio > 0.
-2. `POST /v1/invoice` con `price_amount`, `price_currency`, `order_id`, `order_description`, `ipn_callback_url`, `success_url`, `cancel_url`.
+2. `POST /v1/invoice` con `price_amount`, `price_currency`, `order_id` (`evt-reg-...`), `order_description`, `ipn_callback_url`, `success_url`, `cancel_url`.
 3. La respuesta incluye `id` (invoice_id) e `invoice_url`. El usuario paga en la página hospedada de NOWPayments.
 4. NOWPayments crea un **payment** hijo con su propio `payment_id` cuando el usuario elige moneda y envía fondos.
 5. NOWPayments envía IPN (POST) a `/api/payments/ipn/` en cada cambio de estado del **payment**.
 6. El backend también consulta NOWPayments al hacer polling (`GET /api/payments/{id}/`) usando `GET /v1/invoice-payment` o `GET /v1/payment/?invoiceid=...` hasta obtener el `payment_id`.
-7. Cuando el estado es `finished` (fondos en la wallet del comercio), el backend marca el registro como `PAID` y ejecuta `on_crypto_payment_completed`. El estado `confirmed` solo indica confirmación on-chain; no se usa para marcar el registro como pagado.
+7. Cuando el estado es `finished`, el backend marca el `EventRegistration` como `PAID` y ejecuta `on_crypto_payment_completed`.
+
+### Caminos del Conocimiento
+1. El autor define `reference_price > 0` en el camino.
+2. El alumno llama `POST /api/knowledge_paths/<id>/purchase/` → crea `KnowledgePathPurchase` (`PENDING`).
+3. `POST /api/payments/path-purchase/<purchase_id>/` crea la invoice (`order_id` = `kp-purchase-...`).
+4. IPN/polling con status `finished` marca la compra `PAID` y desbloquea los nodos.
+5. Sin compra `PAID`, `is_node_available_for_user` y el GET de nodos bloquean el acceso (el autor y miembros de book club vía `?club=` siguen con acceso).
 
 Estados relevantes: `waiting` → `confirming` → `confirmed` → `sending` → `finished` (también `failed`, `expired`, `partially_paid`, `refunded`).
 
@@ -63,8 +83,8 @@ En `acbc_app/payments/handlers.py`:
 ```python
 from payments.handlers import crypto_payment_completed
 
-def my_handler(sender, crypto_payment, registration, **kwargs):
-    # tu lógica: certificado, email, etc.
+def my_handler(sender, crypto_payment, event_registration=None, path_purchase=None, **kwargs):
+    # tu lógica: certificado, email, unlock, etc.
     pass
 
 crypto_payment_completed.connect(my_handler)
@@ -77,9 +97,13 @@ También se llama `on_crypto_payment_completed()` desde `sync_payment_from_provi
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/api/payments/status/` | ¿Pasarela activa? Monedas soportadas |
-| POST | `/api/payments/registration/{id}/` | Crear invoice NOWPayments y devolver `invoice_url` |
+| POST | `/api/payments/registration/{id}/` | Crear invoice para registro de evento |
+| GET | `/api/payments/registration/{id}/list/` | Listar pagos de un registro |
+| POST | `/api/payments/path-purchase/{id}/` | Crear invoice para compra de camino |
+| GET | `/api/payments/path-purchase/{id}/list/` | Listar pagos de una compra |
 | GET | `/api/payments/{id}/` | Estado del pago (sincroniza con NOWPayments) |
 | POST | `/api/payments/ipn/` | Webhook NOWPayments (sin auth) |
+| POST | `/api/knowledge_paths/{id}/purchase/` | Crear/obtener `KnowledgePathPurchase` |
 
 ## Migración
 

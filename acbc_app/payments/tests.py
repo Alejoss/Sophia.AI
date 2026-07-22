@@ -8,10 +8,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase, Node
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
+    create_path_purchase_payment,
     fetch_remote_payment_payload,
+    get_or_create_path_purchase,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
@@ -53,7 +56,7 @@ class SyncPaymentFromProviderTests(TestCase):
             payment_status='PENDING',
         )
         self.crypto_payment = CryptoPayment.objects.create(
-            registration=self.registration,
+            event_registration=self.registration,
             order_id='evt-reg-test-order',
             pay_currency='bch',
             price_amount=50.0,
@@ -103,6 +106,57 @@ class SyncPaymentFromProviderTests(TestCase):
         self.assertEqual(self.registration.payment_status, 'PENDING')
 
 
+class PathPurchasePaymentFulfillmentTests(TestCase):
+    def setUp(self):
+        self.author = UserFactory()
+        self.buyer = UserFactory()
+        self.path = KnowledgePath.objects.create(
+            title='Paid Path',
+            author=self.author,
+            is_visible=True,
+            reference_price=20.0,
+        )
+        Node.objects.create(
+            knowledge_path=self.path,
+            title='Node 1',
+            media_type='TEXT',
+            order=1,
+        )
+        self.purchase = KnowledgePathPurchase.objects.create(
+            user=self.buyer,
+            knowledge_path=self.path,
+            payment_status='PENDING',
+            price_amount=20.0,
+        )
+        self.crypto_payment = CryptoPayment.objects.create(
+            path_purchase=self.purchase,
+            order_id='kp-purchase-test-order',
+            pay_currency='bch',
+            price_amount=20.0,
+            pay_amount='0.02',
+            pay_address='bitcoincash:qtest',
+            payment_status='waiting',
+        )
+
+    def test_finished_marks_path_purchase_paid(self):
+        sync_payment_from_provider(self.crypto_payment, {
+            'payment_status': 'finished',
+            'actually_paid': '0.02',
+            'pay_amount': '0.02',
+        })
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_confirmed_does_not_unlock_path(self):
+        sync_payment_from_provider(self.crypto_payment, {
+            'payment_status': 'confirmed',
+            'actually_paid': '0.02',
+            'pay_amount': '0.02',
+        })
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.payment_status, 'PENDING')
+
+
 class IPNLookupTests(TestCase):
     def setUp(self):
         self.event = EventFactory(reference_price=50.0)
@@ -111,7 +165,7 @@ class IPNLookupTests(TestCase):
             payment_status='PENDING',
         )
         self.crypto_payment = CryptoPayment.objects.create(
-            registration=self.registration,
+            event_registration=self.registration,
             order_id='evt-reg-invoice-order',
             nowpayments_payment_id=999888777,
             pay_currency='',
@@ -168,7 +222,7 @@ class InvoicePaymentSyncTests(TestCase):
             payment_status='PENDING',
         )
         self.crypto_payment = CryptoPayment.objects.create(
-            registration=self.registration,
+            event_registration=self.registration,
             order_id='evt-reg-invoice-sync',
             nowpayments_payment_id=999888777,
             pay_currency='',
@@ -244,6 +298,63 @@ class PaymentGatewayStatusTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['enabled'])
         self.assertIn('bch', response.data['currencies'])
+
+
+@override_settings(NOWPAYMENTS_API_KEY='test-key')
+class PathPurchaseApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.author = UserFactory()
+        self.buyer = UserFactory()
+        self.path = KnowledgePath.objects.create(
+            title='Crypto Path',
+            author=self.author,
+            is_visible=True,
+            reference_price=15.0,
+        )
+        self.node = Node.objects.create(
+            knowledge_path=self.path,
+            title='Intro',
+            media_type='TEXT',
+            order=1,
+        )
+
+    def test_purchase_creates_pending_entitlement(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(f'/api/knowledge_paths/{self.path.id}/purchase/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['payment_status'], 'PENDING')
+        self.assertEqual(response.data['price_amount'], 15.0)
+
+    def test_node_blocked_until_paid(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node.id}/'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'path_payment_required')
+
+        purchase = get_or_create_path_purchase(knowledge_path=self.path, user=self.buyer)
+        purchase.payment_status = 'PAID'
+        purchase.save(update_fields=['payment_status'])
+
+        response = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node.id}/'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_create_path_purchase_payment_invoice(self, mock_create_invoice):
+        mock_create_invoice.return_value = {
+            'id': 777,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=777',
+        }
+        purchase = get_or_create_path_purchase(knowledge_path=self.path, user=self.buyer)
+        payment = create_path_purchase_payment(path_purchase=purchase, user=self.buyer)
+        self.assertEqual(payment.path_purchase_id, purchase.id)
+        self.assertIsNone(payment.event_registration_id)
+        self.assertTrue(payment.invoice_url)
+        self.assertTrue(payment.order_id.startswith('kp-purchase-'))
 
 
 class AsciiSafeStorageTests(TestCase):

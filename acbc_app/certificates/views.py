@@ -39,6 +39,17 @@ class CertificateRequestView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN
                 )
+
+            from knowledge_paths.services.access_service import user_has_path_access
+
+            if not user_has_path_access(request.user, knowledge_path):
+                return Response(
+                    {
+                        'error': 'Debes desbloquear este camino de conocimiento antes de solicitar un certificado',
+                        'code': 'path_payment_required',
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             
             # Check if user has already requested a certificate for this path
             existing_request = CertificateRequest.objects.filter(

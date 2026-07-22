@@ -33,6 +33,7 @@ import {
   Description,
   ArrowForward,
   NotificationsActive,
+  Payments,
 } from '@mui/icons-material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import certificatesApi from '../api/certificatesApi';
@@ -44,6 +45,7 @@ import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
+import CryptoPaymentModal from '../events/CryptoPaymentModal';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
@@ -74,6 +76,10 @@ const KnowledgePathDetail = () => {
   const [certificateStatus, setCertificateStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [pendingRequests, setPendingRequests] = useState(0);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pathPurchaseId, setPathPurchaseId] = useState(null);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseError, setPurchaseError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +125,7 @@ const KnowledgePathDetail = () => {
         setKnowledgePath(data);
         setIsCreator(user?.username === data.author);
         setHasCompleted(data.progress?.is_completed || false);
+        setPathPurchaseId(data.user_purchase_id || null);
         setLoading(false);
 
         await loadSecondaryData(data);
@@ -220,6 +227,46 @@ const KnowledgePathDetail = () => {
       setRequestingCertificate(false);
     }
   };
+
+  const handleStartPurchase = async () => {
+    if (!authState.isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    try {
+      setPurchaseLoading(true);
+      setPurchaseError(null);
+      const purchase = await knowledgePathsApi.createOrGetPurchase(pathId);
+      setPathPurchaseId(purchase.id);
+      if (purchase.is_paid || purchase.payment_status === 'PAID') {
+        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
+        setKnowledgePath(data);
+        return;
+      }
+      setShowPaymentModal(true);
+    } catch (err) {
+      setPurchaseError(
+        err?.response?.data?.error || err?.error || 'No se pudo iniciar la compra',
+      );
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handlePaymentComplete = async () => {
+    try {
+      const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
+      setKnowledgePath(data);
+      setPathPurchaseId(data.user_purchase_id || pathPurchaseId);
+      setShowPaymentModal(false);
+    } catch (err) {
+      console.error('Error refreshing path after payment:', err);
+    }
+  };
+
+  const needsPurchase = Boolean(
+    knowledgePath?.is_paid_path && !knowledgePath?.user_has_access && !isCreator && !clubSlug,
+  );
 
   const handleViewCertificateRequests = () => {
     navigate('/profiles/certificate-requests');
@@ -628,6 +675,35 @@ const KnowledgePathDetail = () => {
         </Typography>
       </Paper>
 
+      {needsPurchase && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+          <Stack spacing={2}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Lock color="warning" />
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Camino de pago
+              </Typography>
+            </Stack>
+            <Typography variant="body1" color="text.secondary">
+              Desbloquea este camino por{' '}
+              <strong>${Number(knowledgePath.reference_price).toFixed(2)} USD</strong>{' '}
+              para acceder a los nodos y cuestionarios.
+            </Typography>
+            {purchaseError && <Alert severity="error">{purchaseError}</Alert>}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Payments />}
+              onClick={handleStartPurchase}
+              disabled={purchaseLoading}
+              sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
+            >
+              {purchaseLoading ? 'Preparando...' : 'Comprar y desbloquear'}
+            </Button>
+          </Stack>
+        </Paper>
+      )}
+
       {/* Nodes Section */}
       <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
@@ -650,7 +726,7 @@ const KnowledgePathDetail = () => {
         {knowledgePath.nodes?.length > 0 ? (
           <Stack spacing={2}>
             {knowledgePath.nodes.map((node, index) => {
-              const isLocked = !node.is_available && !isCreator;
+              const isLocked = (!node.is_available && !isCreator) || needsPurchase;
               const isCompleted = node.is_completed;
               
               return (
@@ -849,6 +925,16 @@ const KnowledgePathDetail = () => {
           />
         </Paper>
       )}
+
+      <CryptoPaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        pathPurchaseId={pathPurchaseId}
+        title={knowledgePath?.title}
+        priceUsd={knowledgePath?.reference_price}
+        productLabel="camino"
+        onPaymentComplete={handlePaymentComplete}
+      />
     </Container>
   );
 };

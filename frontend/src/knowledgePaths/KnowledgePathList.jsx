@@ -9,6 +9,7 @@ import {
   CardContent,
   CardMedia,
   Button,
+  Chip,
   CircularProgress,
   Alert,
   Stack } from
@@ -222,13 +223,22 @@ const KnowledgePathList = () => {
                       {path.description}
                     </Typography>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      {path.is_paid_path || Number(path.reference_price) > 0 ? (
+                        <Chip
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          label={`$${Number(path.reference_price).toFixed(2)} USD`}
+                        />
+                      ) : (
+                        <Chip size="small" variant="outlined" label="Gratis" />
+                      )}
                       <VoteComponent
                         type="knowledge_path"
                         ids={{ pathId: path.id }}
                         initialVoteCount={Number(path.vote_count) || 0}
                         initialUserVote={Number(path.user_vote) || 0} />
-                      
                     </Box>
                   </Box>
 

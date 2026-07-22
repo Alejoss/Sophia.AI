@@ -14,19 +14,33 @@ logger = logging.getLogger(__name__)
 crypto_payment_completed = Signal()
 
 
-def on_crypto_payment_completed(crypto_payment, registration):
+def on_crypto_payment_completed(crypto_payment, event_registration=None, path_purchase=None):
     """
-    Called once when a registration transitions to PAID via the crypto gateway.
-    Safe place for certificates, emails, analytics, etc.
+    Called once when an entitlement transitions to PAID via the crypto gateway.
+    Safe place for certificates, emails, analytics, unlocks, etc.
     """
-    logger.info(
-        'Crypto payment completed: order=%s registration=%s event=%s',
-        crypto_payment.order_id,
-        registration.id,
-        registration.event_id,
-    )
+    if event_registration is not None:
+        logger.info(
+            'Crypto payment completed: order=%s event_registration=%s event=%s',
+            crypto_payment.order_id,
+            event_registration.id,
+            event_registration.event_id,
+        )
+    elif path_purchase is not None:
+        logger.info(
+            'Crypto payment completed: order=%s path_purchase=%s knowledge_path=%s',
+            crypto_payment.order_id,
+            path_purchase.id,
+            path_purchase.knowledge_path_id,
+        )
+    else:
+        logger.info('Crypto payment completed: order=%s', crypto_payment.order_id)
+
     crypto_payment_completed.send(
         sender=type(crypto_payment),
         crypto_payment=crypto_payment,
-        registration=registration,
+        event_registration=event_registration,
+        path_purchase=path_purchase,
+        # Backwards-compatible kwarg for existing listeners
+        registration=event_registration,
     )
