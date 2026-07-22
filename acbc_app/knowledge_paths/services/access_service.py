@@ -39,3 +39,20 @@ def get_user_purchase(user, knowledge_path: KnowledgePath):
         .order_by('-created_at')
         .first()
     )
+
+
+def resolve_request_path_access(user, knowledge_path: KnowledgePath, request=None):
+    """
+    Resolve book-club context from the request (optional ``club`` query param)
+    and return whether the user may access the paid path.
+    """
+    book_club = None
+    if request is not None:
+        from book_clubs.services import resolve_book_club_context
+
+        book_club = resolve_book_club_context(
+            knowledge_path,
+            user,
+            request.query_params.get('club'),
+        )
+    return user_has_path_access(user, knowledge_path, book_club=book_club), book_club

@@ -40,9 +40,12 @@ class CertificateRequestView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            from knowledge_paths.services.access_service import user_has_path_access
+            from knowledge_paths.services.access_service import resolve_request_path_access
 
-            if not user_has_path_access(request.user, knowledge_path):
+            has_access, _book_club = resolve_request_path_access(
+                request.user, knowledge_path, request
+            )
+            if not has_access:
                 return Response(
                     {
                         'error': 'Debes desbloquear este camino de conocimiento antes de solicitar un certificado',

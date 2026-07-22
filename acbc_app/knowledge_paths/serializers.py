@@ -90,6 +90,20 @@ class NodeSerializer(serializers.ModelSerializer):
         is_completed = is_node_completed_by_user(obj, request.user)
         return is_completed
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        user = request.user if request else None
+        if not user_has_path_access(
+            user,
+            instance.knowledge_path,
+            book_club=self.context.get('book_club'),
+        ):
+            # Do not leak quiz answers or content IDs behind the paywall.
+            data['quizzes'] = []
+            data['content_profile_id'] = None
+        return data
+
 
 class KnowledgePathSerializer(serializers.ModelSerializer):
     nodes = NodeSerializer(many=True, read_only=True)

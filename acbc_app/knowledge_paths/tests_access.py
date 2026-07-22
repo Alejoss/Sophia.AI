@@ -96,3 +96,30 @@ class KnowledgePathSerializerAccessTests(TestCase):
         self.assertTrue(response.data['is_paid_path'])
         self.assertFalse(response.data['user_has_access'])
         self.assertIsNone(response.data['user_purchase_status'])
+
+    def test_detail_redacts_quizzes_without_access(self):
+        from quizzes.models import Quiz, Question, Option
+
+        node = self.path.nodes.first()
+        quiz = Quiz.objects.create(node=node, title='Secret quiz', max_attempts_per_day=3)
+        question = Question.objects.create(
+            quiz=quiz,
+            text='Answer?',
+            question_type='SINGLE',
+        )
+        Option.objects.create(question=question, text='Yes', is_correct=True)
+
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.get(f'/api/knowledge_paths/{self.path.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['nodes'][0]['quizzes'], [])
+        self.assertIsNone(response.data['nodes'][0]['content_profile_id'])
+
+        quiz_response = self.client.get(f'/api/quizzes/quiz-detail/{quiz.id}/')
+        self.assertEqual(quiz_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(quiz_response.data.get('code'), 'path_payment_required')
+
+        list_response = self.client.get(
+            f'/api/quizzes/knowledge-paths/{self.path.id}/quizzes/'
+        )
+        self.assertEqual(list_response.status_code, status.HTTP_403_FORBIDDEN)

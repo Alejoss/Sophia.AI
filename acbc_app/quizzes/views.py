@@ -62,6 +62,20 @@ class QuizDetailView(APIView):
         
         try:
             quiz = get_object_or_404(Quiz, pk=pk)
+            if quiz.node_id and quiz.node.knowledge_path_id:
+                from knowledge_paths.services.access_service import resolve_request_path_access
+
+                has_access, _book_club = resolve_request_path_access(
+                    request.user, quiz.node.knowledge_path, request
+                )
+                if not has_access:
+                    return Response(
+                        {
+                            'error': 'Debes desbloquear este camino de conocimiento para ver el cuestionario',
+                            'code': 'path_payment_required',
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
             serializer = QuizSerializer(quiz, context={'request': request})
             logger.debug(f"Quiz detail retrieved successfully - Quiz: {quiz.title}, User: {request.user.username}")
             return Response(serializer.data)
@@ -133,6 +147,20 @@ class QuizzesByKnowledgePathView(APIView):
             knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
             logger.debug(f"Found knowledge path: {knowledge_path.title}")
 
+            from knowledge_paths.services.access_service import resolve_request_path_access
+
+            has_access, _book_club = resolve_request_path_access(
+                request.user, knowledge_path, request
+            )
+            if not has_access:
+                return Response(
+                    {
+                        'error': 'Debes desbloquear este camino de conocimiento para ver los cuestionarios',
+                        'code': 'path_payment_required',
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             # Fetch quizzes associated with the knowledge path
             quizzes = Quiz.objects.filter(node__knowledge_path=knowledge_path)
             serializer = QuizSerializer(quizzes, many=True)
@@ -160,9 +188,12 @@ class QuizSubmitView(APIView):
             logger.debug(f"Found quiz: {quiz.title}")
 
             if quiz.node_id and quiz.node.knowledge_path_id:
-                from knowledge_paths.services.access_service import user_has_path_access
+                from knowledge_paths.services.access_service import resolve_request_path_access
 
-                if not user_has_path_access(request.user, quiz.node.knowledge_path):
+                has_access, _book_club = resolve_request_path_access(
+                    request.user, quiz.node.knowledge_path, request
+                )
+                if not has_access:
                     return Response(
                         {
                             'error': 'Debes desbloquear este camino de conocimiento para responder el cuestionario',
