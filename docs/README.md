@@ -18,6 +18,7 @@ Complete API reference and usage guides:
 - [API Index](api/README.md) - API documentation overview
 - [Authentication](api/authentication.md) - Authentication endpoints and flows
 - [Endpoints](api/endpoints.md) - Complete endpoint reference
+- [Transcript ingest](api/transcript-ingest.md) - External worker queue + transcript upsert (S3 / YouTube)
 - [Examples](api/examples.md) - API usage examples
 - [Errors](api/errors.md) - Error codes and handling
 

@@ -78,6 +78,16 @@ Objects must have `author` (FK to User). Used for:
 
 - **Gamification**: Admin-only action (e.g. grant badge) via `@action(..., permission_classes=[IsAdminUser])`.
 
+## Machine-to-machine (shared API key)
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/content/transcript-ingest/` | `TRANSCRIPT_INGEST_API_KEY` via `X-Transcript-Ingest-Key` or `Authorization: Bearer` |
+| GET | `/api/content/transcript-ingest/<content_id>/` | same |
+| PUT | `/api/content/transcript-ingest/<content_id>/` | same |
+
+Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcript-ingest.md](../api/transcript-ingest.md).
+
 ## OAuth / Google
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_SECRET_KEY`: server-side only.  

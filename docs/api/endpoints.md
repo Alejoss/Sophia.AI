@@ -88,6 +88,29 @@ See [Authentication Documentation](authentication.md) for detailed authenticatio
 - **DELETE** `/api/content/{id}/`
 - **Auth**: Required (must be owner)
 
+## Content — Transcript ingest (external workers)
+
+Machine-to-machine API for an external transcript worker (local Whisper, YouTube captions, S3 `file_key`). Not JWT-authenticated.
+
+Full contract: [transcript-ingest.md](transcript-ingest.md).
+
+### List transcript queue / topic manifest
+- **GET** `/api/content/transcript-ingest/`
+- **Auth**: `X-Transcript-Ingest-Key` or `Authorization: Bearer` (`TRANSCRIPT_INGEST_API_KEY`)
+- **Query**: `topic_id`, `include_completed`, `media_type`, `content_id`, `limit`, `offset`
+- **Response**: `{ count, limit, offset, include_completed, topic_id, items[] }` with YouTube/S3 hints per item
+
+### Get transcript job detail
+- **GET** `/api/content/transcript-ingest/{content_id}/`
+- **Auth**: Ingest API key
+- **Response**: `{ content, has_transcript, transcript }` (summary metadata only)
+
+### Upsert transcript
+- **PUT** `/api/content/transcript-ingest/{content_id}/`
+- **Auth**: Ingest API key
+- **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format`, `language`
+- **Response**: `{ content_id, created, transcript }` (201 create / 200 update)
+
 ## Topics — Timeline
 
 Editorial timeline attached to a topic. One timeline per topic; entries are ordered and can link topic content.

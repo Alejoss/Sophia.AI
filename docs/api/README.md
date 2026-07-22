@@ -36,6 +36,7 @@ The API uses JWT (JSON Web Tokens) for authentication. See [Authentication Guide
 - **[Certificates](endpoints.md#certificates)** - Certificate management
 - **[Search](endpoints.md#search)** - Search functionality
 - **[Notifications](endpoints.md#notifications)** - In-app notifications (`/api/profiles/notifications/`). See also [backend notifications](../backend/notifications.md).
+- **[Transcript ingest (workers)](transcript-ingest.md)** - Machine-to-machine queue + upsert for external Whisper/captions workers
 
 ## Request/Response Format
 
@@ -98,6 +99,7 @@ See [API Examples](examples.md) for code examples and common use cases.
 
 - [Authentication](authentication.md) - Authentication flows and endpoints
 - [Endpoints](endpoints.md) - Complete endpoint reference
+- [Transcript ingest](transcript-ingest.md) - External worker contract (S3 + YouTube)
 - [Examples](examples.md) - Usage examples
 - [Errors](errors.md) - Error codes and handling
 

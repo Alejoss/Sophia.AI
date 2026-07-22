@@ -296,9 +296,33 @@ try {
 }
 ```
 
+## Transcript ingest (external worker)
+
+Full contract: [transcript-ingest.md](transcript-ingest.md).
+
+### List pending items for a topic
+
+```bash
+curl -s "http://localhost:8000/api/content/transcript-ingest/?topic_id=12" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY"
+```
+
+### Upsert a transcript
+
+```bash
+curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
+  -H "Content-Type: application/json" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY" \
+  -d '{
+    "processed_plain": "Hola, bienvenidos al podcast.",
+    "language": "es"
+  }'
+```
+
 ## Related Documentation
 
 - [API Endpoints](endpoints.md)
+- [Transcript ingest](transcript-ingest.md)
 - [Authentication](authentication.md)
 - [Error Handling](errors.md)
 
