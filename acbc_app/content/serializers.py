@@ -1363,8 +1363,14 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
 
 
 class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
+    """Manifest row for an external transcript worker (S3 key + optional YouTube URL)."""
+
     has_file = serializers.SerializerMethodField()
     file_key = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
+    is_youtube = serializers.SerializerMethodField()
+    youtube_video_id = serializers.SerializerMethodField()
+    has_transcript = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -1374,20 +1380,50 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             'original_title',
             'original_author',
             'url',
+            'is_youtube',
+            'youtube_video_id',
             'has_file',
             'file_key',
+            'file_size',
+            'has_spanish_subtitles',
+            'has_spanish_dubbing',
+            'has_transcript',
             'created_at',
         ]
 
+    def _file_details(self, obj):
+        return getattr(obj, 'file_details', None)
+
     def get_has_file(self, obj):
-        file_details = getattr(obj, 'file_details', None)
+        file_details = self._file_details(obj)
         return bool(file_details and file_details.file)
 
     def get_file_key(self, obj):
-        file_details = getattr(obj, 'file_details', None)
+        file_details = self._file_details(obj)
         if not file_details or not file_details.file:
             return None
         return file_details.file.name
+
+    def get_file_size(self, obj):
+        file_details = self._file_details(obj)
+        if not file_details:
+            return None
+        return file_details.file_size
+
+    def get_is_youtube(self, obj):
+        from content.youtube_migration_utils import is_youtube_url
+        return is_youtube_url(obj.url)
+
+    def get_youtube_video_id(self, obj):
+        from content.youtube_migration_utils import extract_youtube_video_id
+        return extract_youtube_video_id(obj.url) if obj.url else None
+
+    def get_has_transcript(self, obj):
+        # OneToOne: select_related('transcript') leaves a reverse cache; missing row raises.
+        try:
+            return obj.transcript is not None
+        except ContentTranscript.DoesNotExist:
+            return False
 
 
 class TopicCreationRequestSerializer(serializers.ModelSerializer):

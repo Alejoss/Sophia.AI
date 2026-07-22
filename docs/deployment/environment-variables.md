@@ -112,6 +112,14 @@ Location: `acbc_app/.env`
 - **Example**: `GOOGLE_OAUTH_SECRET_KEY=GOCSPX-abcdefghijklmnop`
 - **Get from**: [Google Cloud Console](https://console.cloud.google.com/)
 
+### Transcript ingest (external workers)
+
+#### `TRANSCRIPT_INGEST_API_KEY`
+- **Description**: Shared secret for machine-to-machine access to `/api/content/transcript-ingest/`. External workers authenticate with header `X-Transcript-Ingest-Key: <key>` or `Authorization: Bearer <key>`. If unset/empty, all ingest endpoints return 403.
+- **Required**: No (required to run transcript workers against this API)
+- **Example**: `TRANSCRIPT_INGEST_API_KEY=long-random-secret`
+- **Note**: Workers with AWS credentials use the S3 `file_key` from the queue response to download media; this key only gates the Django ingest API.
+
 ### AWS Configuration (Production)
 
 #### `AWS_ACCESS_KEY_ID`

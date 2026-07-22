@@ -1,4 +1,27 @@
-"""API endpoints for external async transcript extraction workers."""
+"""API endpoints for external async transcript extraction workers.
+
+Contract (machine-to-machine, header ``X-Transcript-Ingest-Key`` or ``Authorization: Bearer``):
+
+* ``GET  /api/content/transcript-ingest/``
+  Work queue / topic manifest. Default: VIDEO/AUDIO without a transcript.
+  Query params:
+  - ``topic_id`` — only contents linked to this topic
+  - ``media_type`` — ``VIDEO`` or ``AUDIO``
+  - ``content_id`` — single content
+  - ``include_completed`` — ``true``/``1`` to also return items that already have a transcript
+  - ``limit`` / ``offset`` — pagination (default limit 100, max 500)
+
+* ``GET  /api/content/transcript-ingest/<content_id>/``
+  One-item manifest + transcript summary (if any).
+
+* ``PUT  /api/content/transcript-ingest/<content_id>/``
+  Idempotent upsert of transcript artifacts. Body may include any of
+  ``parsed_plain``, ``processed_plain``, ``obsidian_markdown`` (at least one required),
+  plus optional ``source_subtitles`` (SRT/VTT), ``format``, ``language``.
+
+Queue items expose ``file_key`` (S3 object key) for workers with bucket credentials;
+they do not return pre-signed download URLs.
+"""
 import logging
 
 from django.core.exceptions import ValidationError
@@ -7,7 +30,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import Content, ContentTranscript
+from content.models import Content, ContentTranscript, Topic
 from content.permissions import TranscriptIngestPermission
 from content.serializers import (
     ContentTranscriptIngestSerializer,
@@ -22,6 +45,12 @@ DEFAULT_QUEUE_LIMIT = 100
 MAX_QUEUE_LIMIT = 500
 
 
+def _parse_bool(value):
+    if value is None:
+        return False
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 class TranscriptIngestAPIView(APIView):
     """Shared auth for machine-to-machine transcript ingest."""
 
@@ -33,8 +62,8 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
     """
     GET /api/content/transcript-ingest/
 
-    List video/audio content that still has no transcript (work queue for external jobs).
-    Optional query params: media_type, content_id, limit, offset.
+    List video/audio content for an external transcript worker.
+    Optional query params: topic_id, media_type, content_id, include_completed, limit, offset.
     """
 
     def get(self, request):
@@ -44,6 +73,21 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
                 {'error': 'media_type debe ser VIDEO o AUDIO.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        topic_id = request.query_params.get('topic_id')
+        if topic_id is not None:
+            try:
+                topic_id = int(topic_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'topic_id debe ser un entero.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not Topic.objects.filter(pk=topic_id).exists():
+                return Response(
+                    {'error': f'No existe el tema {topic_id}.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         content_id = request.query_params.get('content_id')
         if content_id is not None:
@@ -73,14 +117,19 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
             )
         offset = max(0, offset)
 
+        include_completed = _parse_bool(request.query_params.get('include_completed'))
+
         queryset = (
             Content.objects.filter(media_type__in=TRANSCRIPT_MEDIA_TYPES)
-            .exclude(transcript__isnull=False)
-            .select_related('file_details')
+            .select_related('file_details', 'transcript')
             .order_by('id')
         )
+        if not include_completed:
+            queryset = queryset.filter(transcript__isnull=True)
         if media_type:
             queryset = queryset.filter(media_type=media_type)
+        if topic_id is not None:
+            queryset = queryset.filter(topics__id=topic_id).distinct()
         if content_id is not None:
             queryset = queryset.filter(pk=content_id)
 
@@ -92,6 +141,8 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
             'count': total,
             'limit': limit,
             'offset': offset,
+            'include_completed': include_completed,
+            'topic_id': topic_id,
             'items': serializer.data,
         })
 

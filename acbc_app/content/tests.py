@@ -4252,19 +4252,32 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             email='ingest@example.com',
             password='testpass123',
         )
+        self.topic = Topic.objects.create(
+            title='Tema transcripts',
+            description='Para worker externo',
+            creator=self.user,
+        )
+        self.other_topic = Topic.objects.create(
+            title='Otro tema',
+            description='Sin estos videos',
+            creator=self.user,
+        )
         self.video = Content.objects.create(
             uploaded_by=self.user,
             media_type='VIDEO',
             original_title='Video pendiente',
             url='https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            has_spanish_subtitles=True,
         )
-        FileDetails.objects.create(content=self.video)
+        FileDetails.objects.create(content=self.video, file_size=123456)
+        self.video.topics.add(self.topic)
         self.audio = Content.objects.create(
             uploaded_by=self.user,
             media_type='AUDIO',
             original_title='Podcast pendiente',
         )
-        FileDetails.objects.create(content=self.audio)
+        FileDetails.objects.create(content=self.audio, file_size=999)
+        self.audio.topics.add(self.topic)
 
     def test_queue_requires_api_key(self):
         response = self.client.get('/api/content/transcript-ingest/')
@@ -4274,8 +4287,97 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         response = self.client.get('/api/content/transcript-ingest/', **self.auth_header)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
+        self.assertFalse(response.data['include_completed'])
+        self.assertIsNone(response.data['topic_id'])
         content_ids = {item['id'] for item in response.data['items']}
         self.assertEqual(content_ids, {self.video.id, self.audio.id})
+
+    def test_queue_item_exposes_youtube_and_s3_hints(self):
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'content_id': self.video.id},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        item = response.data['items'][0]
+        self.assertTrue(item['is_youtube'])
+        self.assertEqual(item['youtube_video_id'], 'dQw4w9WgXcQ')
+        self.assertEqual(item['file_size'], 123456)
+        self.assertTrue(item['has_spanish_subtitles'])
+        self.assertFalse(item['has_transcript'])
+        self.assertIn('file_key', item)
+        self.assertIn('has_file', item)
+
+    def test_queue_filters_by_topic_id(self):
+        orphan = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Fuera del tema',
+        )
+        FileDetails.objects.create(content=orphan)
+
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'topic_id': self.topic.id},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['topic_id'], self.topic.id)
+        self.assertEqual(response.data['count'], 2)
+        content_ids = {item['id'] for item in response.data['items']}
+        self.assertEqual(content_ids, {self.video.id, self.audio.id})
+        self.assertNotIn(orphan.id, content_ids)
+
+        empty = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'topic_id': self.other_topic.id},
+            **self.auth_header,
+        )
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data['count'], 0)
+
+    def test_queue_unknown_topic_returns_404(self):
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'topic_id': 999999},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_queue_include_completed_returns_items_with_transcript(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        pending_only = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'topic_id': self.topic.id},
+            **self.auth_header,
+        )
+        self.assertEqual(pending_only.data['count'], 1)
+        self.assertEqual(pending_only.data['items'][0]['id'], self.audio.id)
+
+        with_done = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'topic_id': self.topic.id, 'include_completed': 'true'},
+            **self.auth_header,
+        )
+        self.assertEqual(with_done.status_code, status.HTTP_200_OK)
+        self.assertTrue(with_done.data['include_completed'])
+        self.assertEqual(with_done.data['count'], 2)
+        by_id = {item['id']: item for item in with_done.data['items']}
+        self.assertTrue(by_id[self.video.id]['has_transcript'])
+        self.assertFalse(by_id[self.audio.id]['has_transcript'])
+
+    def test_queue_accepts_bearer_auth(self):
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            HTTP_AUTHORIZATION='Bearer test-ingest-key',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
 
     def test_put_creates_transcript(self):
         response = self.client.put(
@@ -4355,6 +4457,9 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['has_transcript'])
         self.assertTrue(response.data['transcript']['has_processed_plain'])
+        self.assertTrue(response.data['content']['is_youtube'])
+        self.assertEqual(response.data['content']['youtube_video_id'], 'dQw4w9WgXcQ')
+        self.assertTrue(response.data['content']['has_transcript'])
 
     def test_put_requires_at_least_one_artifact(self):
         response = self.client.put(
