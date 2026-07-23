@@ -62,6 +62,7 @@ const NodeCreate = () => {
     });
 
     const contentProfileId = watch('content_profile_id');
+    const titleValue = watch('title');
 
     useEffect(() => {
         const fetchKnowledgePath = async () => {
@@ -89,7 +90,11 @@ const NodeCreate = () => {
                     contentProfile.title ||
                     contentProfile.content?.original_title ||
                     'Untitled';
-                setValue('title', defaultTitle);
+                setValue('title', defaultTitle, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                });
             }
         },
         [setValue, getValues],
@@ -189,6 +194,7 @@ const NodeCreate = () => {
                             error={!!errors.title}
                             helperText={errors.title?.message}
                             required
+                            InputLabelProps={{ shrink: Boolean(String(titleValue || '').trim()) }}
                         />
 
                         <TextField

@@ -53,6 +53,7 @@ const NodeEdit = () => {
         reset,
         setValue,
         getValues,
+        watch,
         setError,
         formState: { errors, isSubmitting },
     } = useForm({
@@ -63,6 +64,8 @@ const NodeEdit = () => {
             content_profile_id: null,
         },
     });
+
+    const titleValue = watch('title');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -127,7 +130,11 @@ const NodeEdit = () => {
                     contentProfile.title ||
                     contentProfile.content?.original_title ||
                     'Untitled';
-                setValue('title', defaultTitle);
+                setValue('title', defaultTitle, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                });
             }
         },
         [setValue, getValues],
@@ -244,6 +251,7 @@ const NodeEdit = () => {
                             error={!!errors.title}
                             helperText={errors.title?.message}
                             required
+                            InputLabelProps={{ shrink: Boolean(String(titleValue || '').trim()) }}
                         />
 
                         <TextField

@@ -16,6 +16,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -70,7 +71,6 @@ const MSG = {
   paidEvent: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
   paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
   polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
-  payLater: 'Pagar m\u00E1s tarde',
   initError: 'No se pudo iniciar el pago',
   copyError: 'No se pudo copiar al portapapeles',
   preparing: 'Preparando la pasarela de pago...',
@@ -215,12 +215,28 @@ const CryptoPaymentModal = ({
         sx={{
           px: 3,
           py: 2.5,
+          position: 'relative',
           background: (theme) =>
             `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
           color: 'primary.contrastText',
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <IconButton
+          onClick={onClose}
+          aria-label="Cerrar"
+          size="small"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            color: 'inherit',
+            opacity: 0.85,
+            '&:hover': { opacity: 1, bgcolor: 'rgba(255,255,255,0.12)' },
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ pr: 4 }}>
           <PaymentsIcon />
           <Box>
             <Typography variant="h6" fontWeight={700}>
@@ -341,14 +357,11 @@ const CryptoPaymentModal = ({
             Pagar en NOWPayments
           </Button>
         )}
-        <Button
-          onClick={onClose}
-          variant={payment?.is_paid ? 'contained' : 'outlined'}
-          fullWidth
-          disabled={busy && !payment}
-        >
-          {payment?.is_paid ? 'Listo' : MSG.payLater}
-        </Button>
+        {payment?.is_paid && (
+          <Button onClick={onClose} variant="contained" fullWidth>
+            Listo
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
