@@ -253,10 +253,25 @@ class ContentTranscript(models.Model):
     Stores the three artifacts produced by the external worker pipeline:
     parsed_plain → processed_plain → obsidian_markdown.
     Optional source_subtitles (SRT/VTT) enables timed segments for the player.
+
+    Embedding vectors live in an external vector DB; this model only tracks
+    whether the current text_hash still needs indexing (see embedding_status).
     """
     FORMAT_CHOICES = [
         ('SRT', 'SubRip (.srt)'),
         ('VTT', 'WebVTT (.vtt)'),
+    ]
+    EMBEDDING_STATUS_PENDING = 'pending'
+    EMBEDDING_STATUS_INDEXED = 'indexed'
+    EMBEDDING_STATUS_STALE = 'stale'
+    EMBEDDING_STATUS_FAILED = 'failed'
+    EMBEDDING_STATUS_SKIPPED = 'skipped'
+    EMBEDDING_STATUS_CHOICES = [
+        (EMBEDDING_STATUS_PENDING, 'Pending'),
+        (EMBEDDING_STATUS_INDEXED, 'Indexed'),
+        (EMBEDDING_STATUS_STALE, 'Stale'),
+        (EMBEDDING_STATUS_FAILED, 'Failed'),
+        (EMBEDDING_STATUS_SKIPPED, 'Skipped'),
     ]
 
     content = models.OneToOneField(
@@ -307,6 +322,43 @@ class ContentTranscript(models.Model):
         blank=True,
         help_text='ISO 639-1 language code, e.g. es or en.',
     )
+    embedding_status = models.CharField(
+        max_length=16,
+        choices=EMBEDDING_STATUS_CHOICES,
+        default=EMBEDDING_STATUS_PENDING,
+        db_index=True,
+        help_text='Whether current text_hash is indexed in the external vector DB.',
+    )
+    embedding_model = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Embedding model last used when status=indexed (set by embed worker ack).',
+    )
+    embedding_dims = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text='Vector dimensions for embedding_model.',
+    )
+    chunk_count = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text='Number of chunks upserted to the vector DB on last successful index.',
+    )
+    embedded_text_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text='text_hash that was indexed; compared to text_hash to detect stale.',
+    )
+    embedded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text='When the vector DB was last successfully updated for this transcript.',
+    )
+    embedding_error = models.TextField(
+        blank=True,
+        help_text='Last embed-worker error message when status=failed.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -314,6 +366,10 @@ class ContentTranscript(models.Model):
         indexes = [
             models.Index(fields=['text_hash'], name='content_transcript_hash_idx'),
             models.Index(fields=['language'], name='content_transcript_lang_idx'),
+            models.Index(
+                fields=['embedded_text_hash'],
+                name='content_tr_emb_hash_idx',
+            ),
         ]
 
     def __str__(self):

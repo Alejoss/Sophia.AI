@@ -4192,6 +4192,28 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         self.assertEqual(transcript.language, 'es')
         self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
         self.assertIn('blockchain', transcript.processed_plain)
+        self.assertEqual(transcript.embedding_status, 'pending')
+
+    def test_save_marks_stale_when_indexed_hash_drifts(self):
+        from content.models import ContentTranscript
+
+        transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto original indexado.',
+            language='es',
+        )
+        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.embedding_model = 'text-embedding-3-large'
+        transcript.chunk_count = 1
+        transcript.save()
+
+        transcript.processed_plain = 'Texto original indexado. Más contenido.'
+        transcript.save()
+
+        self.assertEqual(transcript.embedding_status, 'stale')
+        self.assertNotEqual(transcript.text_hash, transcript.embedded_text_hash)
+        self.assertEqual(transcript.embedding_model, 'text-embedding-3-large')
 
     def test_save_parses_vtt_segments_when_optional_source_provided(self):
         from content.models import ContentTranscript
@@ -4401,6 +4423,71 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         transcript = ContentTranscript.objects.get(content=self.video)
         self.assertEqual(transcript.language, 'es')
         self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
+        self.assertEqual(transcript.embedding_status, 'pending')
+        self.assertIsNone(transcript.embedded_text_hash)
+        self.assertEqual(response.data['transcript']['embedding_status'], 'pending')
+
+    def test_put_marks_stale_when_indexed_text_changes(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            parsed_plain=self.PARSED_PLAIN,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        transcript = ContentTranscript.objects.get(content=self.video)
+        transcript.embedding_status = 'indexed'
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.embedding_model = 'text-embedding-3-large'
+        transcript.embedding_dims = 3072
+        transcript.chunk_count = 3
+        transcript.save()
+
+        updated_processed = self.PROCESSED_PLAIN + ' Cierre del episodio.'
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'parsed_plain': self.PARSED_PLAIN,
+                'processed_plain': updated_processed,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        transcript.refresh_from_db()
+        self.assertEqual(transcript.embedding_status, 'stale')
+        self.assertNotEqual(transcript.text_hash, transcript.embedded_text_hash)
+        self.assertEqual(response.data['transcript']['embedding_status'], 'stale')
+        # Prior index metadata retained until embed worker acks again.
+        self.assertEqual(transcript.embedding_model, 'text-embedding-3-large')
+        self.assertEqual(transcript.chunk_count, 3)
+
+    def test_put_keeps_indexed_when_text_hash_unchanged(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        transcript = ContentTranscript.objects.get(content=self.video)
+        transcript.embedding_status = 'indexed'
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.chunk_count = 2
+        transcript.save()
+
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'processed_plain': self.PROCESSED_PLAIN,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        transcript.refresh_from_db()
+        self.assertEqual(transcript.embedding_status, 'indexed')
+        self.assertEqual(transcript.text_hash, transcript.embedded_text_hash)
+        self.assertEqual(response.data['transcript']['embedding_status'], 'indexed')
 
     def test_put_accepts_optional_source_subtitles_for_segments(self):
         response = self.client.put(
