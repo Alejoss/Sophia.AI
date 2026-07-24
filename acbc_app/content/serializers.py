@@ -1345,6 +1345,12 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
             'has_processed_plain',
             'has_obsidian_markdown',
             'obsidian_frontmatter',
+            'embedding_status',
+            'embedding_model',
+            'embedding_dims',
+            'chunk_count',
+            'embedded_text_hash',
+            'embedded_at',
             'created_at',
             'updated_at',
         ]
