@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0024_topic_activity_score'),
+        ('content', '0025_contenttranscript_embedding_status'),
     ]
 
     operations = [
