@@ -191,6 +191,25 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
 
 Invalid optional subtitles → **400**. Missing all three text artifacts → **400**.
 
+### Embedding status (Postgres only)
+
+Each transcript tracks whether its current `text_hash` still needs vector indexing later.
+Vectors themselves are **not** stored in Django; these fields prepare an embed worker:
+
+| Field | Meaning |
+|-------|---------|
+| `embedding_status` | `pending` \| `indexed` \| `stale` \| `failed` \| `skipped` |
+| `embedded_text_hash` | Hash that was last indexed (compare to `text_hash`) |
+| `embedding_model` / `embedding_dims` / `chunk_count` / `embedded_at` | Filled by a future embed-worker ack |
+
+On every successful PUT/save:
+
+- new transcript → `pending`
+- text changes while previously indexed → `stale` (keeps prior `embedding_model` / `chunk_count` until re-acked)
+- same `text_hash` as `embedded_text_hash` and already `indexed` → stays `indexed`
+
+The ingest summary returns these fields. Embed-queue / chat endpoints are out of scope for this API.
+
 ---
 
 ## Recommended worker flow

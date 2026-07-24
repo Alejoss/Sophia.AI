@@ -194,6 +194,35 @@ def resolve_hash_source_text(transcript):
     return extract_obsidian_body(transcript.obsidian_markdown)
 
 
+def sync_embedding_status_for_text_hash(transcript):
+    """
+    Keep embedding_status aligned with text_hash vs embedded_text_hash.
+
+    Called on transcript save (including transcript-ingest PUT). Does not write
+    vectors; only marks pending/stale so a later embed worker can pick work up.
+    """
+    status = (transcript.embedding_status or '').strip() or 'pending'
+    if status == 'skipped':
+        return
+
+    current_hash = (transcript.text_hash or '').strip()
+    embedded_hash = (transcript.embedded_text_hash or '').strip()
+
+    if not current_hash:
+        transcript.embedding_status = 'pending'
+        return
+
+    if embedded_hash and embedded_hash == current_hash:
+        # Corpus unchanged since last successful index (or same hash after failed retry).
+        return
+
+    if embedded_hash and embedded_hash != current_hash:
+        transcript.embedding_status = 'stale'
+        return
+
+    transcript.embedding_status = 'pending'
+
+
 def sync_transcript_derived_fields(transcript):
     """
     Populate segments (optional SRT/VTT), obsidian_frontmatter, text_length and text_hash.
@@ -240,3 +269,4 @@ def sync_transcript_derived_fields(transcript):
     normalized = normalize_plain_text_for_hash(hash_source)
     transcript.text_length = len(normalized) if normalized else None
     transcript.text_hash = compute_text_hash(hash_source)
+    sync_embedding_status_for_text_hash(transcript)

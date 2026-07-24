@@ -42,15 +42,30 @@ class FileDetailsAdmin(admin.ModelAdmin):
 @admin.register(ContentTranscript)
 class ContentTranscriptAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'content', 'format', 'language', 'text_length', 'text_hash', 'updated_at',
+        'id',
+        'content',
+        'format',
+        'language',
+        'text_length',
+        'text_hash',
+        'embedding_status',
+        'chunk_count',
+        'updated_at',
     ]
-    list_filter = ['format', 'language', 'updated_at']
-    search_fields = ['content__original_title', 'processed_plain', 'text_hash']
+    list_filter = ['format', 'language', 'embedding_status', 'updated_at']
+    search_fields = [
+        'content__original_title',
+        'processed_plain',
+        'text_hash',
+        'embedded_text_hash',
+    ]
     readonly_fields = [
         'segments',
         'obsidian_frontmatter',
         'text_length',
         'text_hash',
+        'embedded_text_hash',
+        'embedded_at',
         'created_at',
         'updated_at',
     ]
