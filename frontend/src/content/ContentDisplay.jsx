@@ -516,65 +516,112 @@ const ContentDisplay = ({
             </audio>
           </Box>);
 
-      case "TEXT":
-        if (contentExternalUrl && String(contentExternalUrl).trim()) {
-          const resolvedExternal = resolveMediaUrl(contentExternalUrl);
-          return (
-            <Box
-              sx={{
-                width: "100%",
-                maxWidth: "800px",
-                mx: "auto",
-                p: 2,
-                bgcolor: "grey.50",
-                borderRadius: 0.5,
-                border: "1px solid",
-                borderColor: "divider",
-                cursor: "pointer",
-                "&:hover": {
-                  boxShadow: 2,
-                  borderColor: "primary.main",
-                  bgcolor: "grey.100"
+      case "TEXT":{
+          const textPreviewSources = buildMediaPreviewThumbnailSources({
+            customThumbnailForDisplay,
+            ogImage: fileDetails?.og_image,
+            mediaType: mediaTypeUpper
+          });
+          const textOpenUrl = fileUrl ?
+          fileUrl :
+          contentExternalUrl && String(contentExternalUrl).trim() ?
+          resolveMediaUrl(contentExternalUrl) :
+          null;
+
+          // Prefer cover/thumbnail when present (file-based books, OG, etc.)
+          if (textPreviewSources.length > 0) {
+            return (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  width: "100%",
+                  maxHeight: maxImageHeight,
+                  overflow: "hidden",
+                  borderRadius: 0.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "grey.50",
+                  cursor: textOpenUrl ? "pointer" : "default",
+                  "&:hover": textOpenUrl ?
+                  {
+                    boxShadow: 2,
+                    borderColor: "primary.main"
+                  } :
+                  {}
+                }}
+                onClick={
+                textOpenUrl ?
+                () => window.open(textOpenUrl, "_blank", "noopener,noreferrer") :
+                undefined
                 }
-              }}
-              onClick={() => window.open(resolvedExternal, "_blank")}
-              title="Haz clic para abrir la URL en una nueva pestaña">
-              
-              <Typography variant="body1" color="text.primary">
-                Contenido URL:{" "}
-                <a
-                  href={resolvedExternal}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "primary.main",
-                    textDecoration: "none"
+                title={textOpenUrl ? "Haz clic para abrir el archivo" : undefined}>
+                
+                <SequentialThumbnail
+                  sources={textPreviewSources}
+                  loading={variant === "detailed" ? "eager" : "lazy"}
+                  fetchPriority={variant === "detailed" ? "high" : undefined}
+                  imgStyle={{
+                    width: "auto",
+                    height: "auto",
+                    maxWidth: "100%",
+                    maxHeight: maxImageHeight,
+                    objectFit: "contain",
+                    display: "block"
                   }}
-                  onClick={(e) => e.stopPropagation()}>
-                  
-                  {contentExternalUrl}
-                </a>
-              </Typography>
-            </Box>);
+                  fallback={null} />
+                
+              </Box>);
 
-        } else {
-          return (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                width: "100%",
-                height: 100,
-                bgcolor: "grey.100",
-                borderRadius: 0.5
-              }}>
-              
-              <Typography color="text.secondary">
-                No hay contenido de texto disponible
-              </Typography>
-            </Box>);
+          }
 
+          // URL-only text content without a thumbnail
+          if (contentExternalUrl && String(contentExternalUrl).trim()) {
+            const resolvedExternal = resolveMediaUrl(contentExternalUrl);
+            return (
+              <Box
+                sx={{
+                  width: "100%",
+                  maxWidth: "800px",
+                  mx: "auto",
+                  p: 2,
+                  bgcolor: "grey.50",
+                  borderRadius: 0.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  "&:hover": {
+                    boxShadow: 2,
+                    borderColor: "primary.main",
+                    bgcolor: "grey.100"
+                  }
+                }}
+                onClick={() => window.open(resolvedExternal, "_blank")}
+                title="Haz clic para abrir la URL en una nueva pestaña">
+                
+                <Typography variant="body1" color="text.primary">
+                  Contenido URL:{" "}
+                  <a
+                    href={resolvedExternal}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "primary.main",
+                      textDecoration: "none"
+                    }}
+                    onClick={(e) => e.stopPropagation()}>
+                    
+                    {contentExternalUrl}
+                  </a>
+                </Typography>
+              </Box>);
+
+          }
+
+          // File-based TEXT without thumbnail: no empty preview box
+          // (download / metadata live in Detalles del contenido)
+          return null;
         }
       default:
         return (

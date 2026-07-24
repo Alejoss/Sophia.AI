@@ -342,6 +342,32 @@ class PublicCollectionSummarySerializer(serializers.ModelSerializer):
         ]
 
 
+class FeaturedTextThumbnailSerializer(serializers.ModelSerializer):
+    """Compact card for search discovery: visible TEXT profiles with a cover image."""
+    content_id = serializers.IntegerField(read_only=True)
+    media_type = serializers.CharField(source='content.media_type', read_only=True)
+    owner_username = serializers.CharField(source='user.username', read_only=True)
+    thumbnail = serializers.ImageField(read_only=True)
+    thumbnail_preview = serializers.ImageField(read_only=True)
+
+    class Meta:
+        model = ContentProfile
+        fields = [
+            'id', 'content_id', 'title', 'author', 'thumbnail', 'thumbnail_preview',
+            'media_type', 'owner_username',
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        thumb, preview = _content_profile_thumbnail_urls(instance, request)
+        data['thumbnail'] = thumb
+        data['thumbnail_preview'] = preview
+        if not data.get('title') and instance.content_id:
+            data['title'] = instance.content.original_title
+        return data
+
+
 class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image = serializers.ImageField(max_length=None, allow_empty_file=True, required=False)
     creator_username = serializers.CharField(source='creator.username', read_only=True)

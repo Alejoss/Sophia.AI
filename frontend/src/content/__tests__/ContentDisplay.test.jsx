@@ -84,4 +84,47 @@ describe('ContentDisplay', () => {
       'noopener,noreferrer',
     );
   });
+
+  it('does not show the empty text preview box for file-based TEXT without thumbnail', () => {
+    const content = {
+      id: 12,
+      media_type: 'TEXT',
+      original_title: 'El Secuestro de Bitcoin',
+      file_details: {
+        file: '/media/docs/bitcoin.pdf',
+        url: '/media/docs/bitcoin.pdf',
+        file_size: 1260000,
+      },
+    };
+
+    renderContentDisplay(content);
+
+    expect(screen.queryByText(/no hay contenido de texto disponible/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /descargar archivo/i })).toBeInTheDocument();
+  });
+
+  it('shows the custom thumbnail for TEXT content when available', () => {
+    const content = {
+      id: 13,
+      media_type: 'TEXT',
+      original_title: 'Libro con portada',
+      selected_profile: {
+        title: 'Libro con portada',
+        thumbnail: 'https://cdn.example.com/cover.jpg',
+        thumbnail_preview: 'https://cdn.example.com/cover-preview.webp',
+      },
+      file_details: {
+        file: '/media/docs/libro.pdf',
+        url: '/media/docs/libro.pdf',
+        file_size: 2048,
+      },
+    };
+
+    renderContentDisplay(content);
+
+    const img = screen.getByAltText('Content thumbnail');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'https://cdn.example.com/cover-preview.webp');
+    expect(screen.queryByText(/no hay contenido de texto disponible/i)).not.toBeInTheDocument();
+  });
 });

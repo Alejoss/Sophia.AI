@@ -1,0 +1,159 @@
+{
+  "task": "assign_collection_thumbnails_from_local_images",
+  "goal": "Asignar miniaturas (ContentProfile.thumbnail + thumbnail_preview) a los libros de una Collection ya importada, matcheando imágenes locales por nombre de archivo ≈ título del content profile. No re-subir PDFs; solo portadas.",
+  "context": {
+    "app": "Academia Blockchain / Sophia.AI monorepo",
+    "backend": "acbc_app/ (Django 5)",
+    "why_separate_from_web_app_context": "Este chat se centra en la app web. El matching masivo imagen↔título es un problema de datos/lote y conviene delegarlo.",
+    "already_done": [
+      "PDFs de Biblioteca Acracia subidos a S3 en prefix root 'Biblioteca Acracia/'",
+      "Importados a DB vía management command import_s3_content (user_id=2, collection 'Biblioteca Acracia', media_type=TEXT)",
+      "Cada libro = Content + ContentProfile (user=2, collection=Biblioteca Acracia) + FileDetails.file = key S3 del PDF"
+    ],
+    "thumbnail_model": {
+      "field": "ContentProfile.thumbnail (ImageField)",
+      "preview_field": "ContentProfile.thumbnail_preview (ImageField, WebP listing size, auto-generated)",
+      "s3_upload_path_helper": "content.models.content_profile_thumbnail_upload_path → content_profile_thumbnails/<content_id>/<user_id>/<uuid>_<filename>",
+      "ui_equivalent": "frontend ContentProfileEdit.jsx sube thumbnail por perfil; para cientos de libros no escala",
+      "listing_uses": "selected_profile.thumbnail_preview || thumbnail (ver ContentDisplay / ContentListingThumbnail)"
+    }
+  },
+  "local_images": {
+    "path": "D:\\Documentos\\Acracia\\Biblioteca Acracia\\  😋 Libros FALTANTES",
+    "path_notes": "El nombre de carpeta puede incluir emoji/espacios; resolver por glob '*Libros FALTANTES*' bajo 'D:\\Documentos\\Acracia\\Biblioteca Acracia'. Confirmed accessible from the machine; ~520 image files recursively.",
+    "approx_image_count": 520,
+    "extensions": [".jpg", ".jpeg", ".png", ".webp", ".gif"],
+    "structure": {
+      "top_level_images": true,
+      "subfolders": [
+        "Unión Editorial",
+        "Deusto",
+        "En Inglés",
+        "Filosofía",
+        "fpp",
+        "INNISFREE",
+        "Más",
+        "Otros Idiomas"
+      ],
+      "recommendation": "Recorrer recursivo todas las subcarpetas; el match es por stem del archivo, no por ruta."
+    },
+    "filename_categories": {
+      "title_like": {
+        "examples": [
+          "Cripto Steven Levy.jpg",
+          "Agorismo_ Hacia una sociedad anarquista de mercado_.jpg",
+          "¿Anarquismo Gitano_.jpg",
+          "Capitalismo - Jeannette von Wolfersoorff.jpg"
+        ],
+        "notes": "Muchos terminan en '_'. Espacios, guiones, acentos, signos ¿?. Posibles typos vs título en DB (Wolfersoorff vs Wolfersdorff)."
+      },
+      "isbn_like": {
+        "examples": ["9788472099562D-267x431.jpg", "9788472099593D.jpg"],
+        "notes": "Match solo si se puede correlacionar ISBN con metadata/título; no asumir que FileDetails o Content tienen ISBN."
+      },
+      "camera_dumps": {
+        "examples": ["IMG_20250610_101040.jpg", "IMG_20250922_130901.jpg"],
+        "notes": "Sin título en el nombre; NO auto-matchear. Reportar como unmatched para rename manual o mapping JSON."
+      },
+      "opaque": {
+        "examples": ["G1YtaaWXwAAzZHk.jpeg", "anarkia-G.jpg"],
+        "notes": "Sin match confiable automático."
+      }
+    }
+  },
+  "db_target": {
+    "user_id": 2,
+    "collection_name": "Biblioteca Acracia",
+    "collection_resolution": "Collection where library.user_id=2 and name='Biblioteca Acracia' (confirm exact name in DB; may differ slightly)",
+    "profiles_query_hint": "ContentProfile.objects.filter(user_id=2, collection__name='Biblioteca Acracia').select_related('content')",
+    "title_fields": [
+      "ContentProfile.title",
+      "Content.original_title (fallback)",
+      "optionally derive from FileDetails.file basename (PDF stem) as secondary key"
+    ],
+    "note_on_titles": "Los títulos en DB vienen del import S3 (title-from=filename por defecto: basename del PDF sin extensión). Pueden NO coincidir 1:1 con nombres de portada (espacios vs '_', sufijos, typos)."
+  },
+  "codebase_references": {
+    "assign_pattern": "acbc_app/content/management/commands/import_knowledge_path_thumbnails.py",
+    "assign_pattern_notes": "Lee bytes locales → validate_image_bytes → ContentFile → profile.thumbnail.save(...) → generate_content_profile_thumbnail_preview(profile). Soporta --dry-run y --force. Matching allá es por número de capítulo; AQUÍ debe ser por título normalizado.",
+    "preview_helper": "content.image_utils.generate_content_profile_thumbnail_preview",
+    "delete_preview_helper": "content.image_utils.delete_content_profile_thumbnail_preview",
+    "validate_helper": "content.image_utils.validate_image_bytes",
+    "s3_content_import_command": "acbc_app/content/management/commands/import_s3_content.py (solo PDFs/keys; no thumbnails)",
+    "model": "acbc_app/content/models.py ContentProfile.thumbnail / thumbnail_preview"
+  },
+  "recommended_deliverable": {
+    "type": "Django management command",
+    "suggested_name": "import_collection_thumbnails",
+    "location": "acbc_app/content/management/commands/import_collection_thumbnails.py",
+    "arguments": {
+      "--user-id": { "type": "int", "required": true },
+      "--collection-id": { "type": "int", "required": false },
+      "--collection-name": { "type": "string", "required": false, "desc": "Mutually require id or name" },
+      "--images-dir": { "type": "string", "required": true, "desc": "Carpeta local con portadas (recurse)" },
+      "--dry-run": { "type": "flag", "desc": "Solo reportar matches/unmatched; no escribir DB ni S3" },
+      "--force": { "type": "flag", "desc": "Sobrescribir thumbnail existente" },
+      "--min-score": { "type": "float", "default": 0.85, "desc": "Umbral de similitud si se usa fuzzy match" },
+      "--report-json": { "type": "string", "required": false, "desc": "Path para volcar matched/unmatched/ambiguous" }
+    }
+  },
+  "matching_strategy": {
+    "normalize_fn_goals": [
+      "lowercase",
+      "NFD strip accents (or equivalent)",
+      "replace '_' and multiple punctuation/spaces with single space",
+      "strip trailing/leading underscores and spaces",
+      "remove extension",
+      "optional: remove leading ¿ ¡",
+      "collapse whitespace"
+    ],
+    "match_order": [
+      "1) exact normalized stem == normalized profile.title",
+      "2) exact vs Content.original_title",
+      "3) exact vs PDF basename stem from FileDetails.file",
+      "4) optional fuzzy (rapidfuzz/difflib) only if unique best score >= min-score; if two candidates close → ambiguous, do NOT assign"
+    ],
+    "one_image_one_profile": true,
+    "on_ambiguous": "No asignar; listar en report",
+    "on_unmatched_image": "Listar en report (IMG_*, ISBN, typos)",
+    "on_profile_without_image": "Listar en report (libros sin portada)"
+  },
+  "db_write_flow_per_match": [
+    "Validate image bytes",
+    "If profile.thumbnail and not --force: skip",
+    "If force and existing thumbnail: thumbnail.delete(save=False); delete_content_profile_thumbnail_preview(save=False)",
+    "profile.thumbnail.save(filename, ContentFile(bytes), save=True)",
+    "generate_content_profile_thumbnail_preview(profile)",
+    "Log: profile_id, title, image path"
+  ],
+  "out_of_scope": [
+    "No cambiar modelos",
+    "No construir UI nueva",
+    "No OCR / vision matching de portadas (fase 1); solo nombre↔título",
+    "No re-importar PDFs desde S3",
+    "No auto-asignar archivos IMG_* o hashes opacos sin mapping explícito",
+    "No mezclar con The Liberator salvo que se pida después con otro --collection-name"
+  ],
+  "acceptance_criteria": [
+    "dry-run produce conteos: matched, ambiguous, unmatched_images, profiles_without_image",
+    "dry-run no escribe DB ni sube a S3",
+    "import real asigna solo matches no ambiguos",
+    "tras assign, thumbnail_preview WebP existe (o se reporta error por imagen)",
+    "idempotente: re-run sin --force no duplica ni pisa thumbnails existentes",
+    "report-json (si se pide) permite al humano renombrar IMG_* y re-correr"
+  ],
+  "suggested_first_commands": [
+    "python manage.py import_collection_thumbnails --user-id 2 --collection-name \"Biblioteca Acracia\" --images-dir \"D:\\\\Documentos\\\\Acracia\\\\Biblioteca Acracia\\\\  😋 Libros FALTANTES\" --dry-run --report-json thumbnails_report.json",
+    "Revisar unmatched/ambiguous; renombrar imágenes problemáticas",
+    "python manage.py import_collection_thumbnails --user-id 2 --collection-name \"Biblioteca Acracia\" --images-dir \"...\" "
+  ],
+  "complexity_notes": [
+    "Escala: cientos de perfiles × ~520 imágenes → matching debe indexar títulos normalizados en dict O(n), no nested scan ingenuo O(n*m) pesado; fuzzy solo sobre candidatos residuales.",
+    "Nombres con encoding Windows (áéíóúñ¿) y posibles mojibake en consola; leer paths con pathlib y abrir en bytes.",
+    "Ejecutar en entorno con AWS credentials si DEFAULT_FILE_STORAGE es S3 (thumbnail.save sube a academiablockchain).",
+    "Confirmar collection exact name y user_id=2 en la DB del entorno (prod vs local)."
+  ],
+  "optional_phase_2": {
+    "desc": "Para unmatched IMG_*: generar CSV/JSON de profiles_without_image + galería; mapping manual image_path → profile_id; comando --mapping-file para assign sin fuzzy."
+  }
+}

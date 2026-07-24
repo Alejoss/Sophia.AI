@@ -54,6 +54,9 @@ const MainSearch = () => {
   const [publicCollections, setPublicCollections] = useState([]);
   const [publicLoading, setPublicLoading] = useState(false);
   const [publicError, setPublicError] = useState(null);
+  const [featuredTexts, setFeaturedTexts] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [featuredError, setFeaturedError] = useState(null);
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const isAuthenticated = authState.isAuthenticated;
@@ -74,29 +77,61 @@ const MainSearch = () => {
       setPublicCollections([]);
       setPublicLoading(false);
       setPublicError(null);
+      setFeaturedTexts([]);
+      setFeaturedLoading(false);
+      setFeaturedError(null);
       return;
     }
     let cancelled = false;
-    const loadPublic = async () => {
+    const loadDiscovery = async () => {
       setPublicLoading(true);
       setPublicError(null);
-      try {
-        const data = await contentApi.getPublicCollections({ page: 1, page_size: 12 });
-        if (!cancelled) {
-          setPublicCollections(Array.isArray(data?.results) ? data.results : []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setPublicError(
-            err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones',
-          );
-          setPublicCollections([]);
-        }
-      } finally {
-        if (!cancelled) setPublicLoading(false);
-      }
+      setFeaturedLoading(true);
+      setFeaturedError(null);
+
+      const collectionsPromise = contentApi
+        .getPublicCollections({ page: 1, page_size: 12 })
+        .then((data) => {
+          if (!cancelled) {
+            setPublicCollections(Array.isArray(data?.results) ? data.results : []);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setPublicError(
+              err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones',
+            );
+            setPublicCollections([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setPublicLoading(false);
+        });
+
+      const featuredPromise = contentApi
+        .getFeaturedTextThumbnails({ limit: 10 })
+        .then((data) => {
+          if (!cancelled) {
+            setFeaturedTexts(Array.isArray(data?.results) ? data.results : []);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setFeaturedError(
+              err.response?.data?.error ||
+                err.message ||
+                'No se pudieron cargar los textos destacados',
+            );
+            setFeaturedTexts([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setFeaturedLoading(false);
+        });
+
+      await Promise.all([collectionsPromise, featuredPromise]);
     };
-    loadPublic();
+    loadDiscovery();
     return () => {
       cancelled = true;
     };
@@ -350,6 +385,122 @@ const MainSearch = () => {
           </Box>
         )}
       </Box>
+
+      {!hasSearched && (
+        <Box component="section" aria-labelledby="search-featured-texts-heading" sx={{ mb: 3 }}>
+          <Typography id="search-featured-texts-heading" variant="h6">
+            Textos con portada
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Una selección aleatoria de textos visibles con miniatura
+          </Typography>
+          {!isAuthenticated && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              <MuiLink component={Link} to="/profiles/login" underline="hover">
+                Inicia sesión
+              </MuiLink>{' '}
+              para ver textos destacados.
+            </Typography>
+          )}
+          {isAuthenticated && featuredLoading && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Cargando textos…
+            </Typography>
+          )}
+          {isAuthenticated && featuredError && !featuredLoading && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {featuredError}
+            </Alert>
+          )}
+          {isAuthenticated && !featuredLoading && !featuredError && featuredTexts.length === 0 && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Aún no hay textos visibles con miniatura.
+            </Typography>
+          )}
+          {isAuthenticated && !featuredLoading && featuredTexts.length > 0 && (
+            <Box
+              sx={{
+                mt: 1.5,
+                display: 'grid',
+                gap: 1.5,
+                gridTemplateColumns: {
+                  xs: 'repeat(2, minmax(0, 1fr))',
+                  sm: 'repeat(3, minmax(0, 1fr))',
+                  md: 'repeat(5, minmax(0, 1fr))',
+                },
+              }}
+            >
+              {featuredTexts.map((item) => {
+                const cover = item.thumbnail_preview || item.thumbnail;
+                const title = item.title || 'Sin título';
+                return (
+                  <Card
+                    key={item.id}
+                    variant="outlined"
+                    sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}
+                  >
+                    <CardActionArea
+                      onClick={() =>
+                        navigate(`/content/search/${item.content_id}?profile=${item.id}`, {
+                          state: { from: '/search' },
+                        })
+                      }
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        height: '100%',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          aspectRatio: '2 / 3',
+                          bgcolor: 'grey.100',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {cover ? (
+                          <Box
+                            component="img"
+                            src={cover}
+                            alt={title}
+                            loading="lazy"
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              display: 'block',
+                            }}
+                          />
+                        ) : null}
+                      </Box>
+                      <CardContent sx={{ py: 1.25, px: 1.25, width: '100%' }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          component="div"
+                          sx={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            minHeight: '2.5em',
+                          }}
+                        >
+                          {title}
+                        </Typography>
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                );
+              })}
+            </Box>
+          )}
+        </Box>
+      )}
 
       {searchError && (
         <Alert severity="error" sx={{ mb: 2 }}>

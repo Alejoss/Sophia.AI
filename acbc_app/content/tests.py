@@ -1073,6 +1073,92 @@ class PublicCollectionsAPITests(APITestCase):
         self.assertEqual(self.collection.description, 'Una colección corta de prueba')
 
 
+class FeaturedTextWithThumbnailsAPITests(APITestCase):
+    """Search landing: random visible TEXT profiles that have a thumbnail."""
+
+    def setUp(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.owner = User.objects.create_user(
+            username='featured_owner',
+            email='featured_owner@example.com',
+            password='pass12345',
+        )
+        self.viewer = User.objects.create_user(
+            username='featured_viewer',
+            email='featured_viewer@example.com',
+            password='pass12345',
+        )
+        tiny_gif = (
+            b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00'
+            b'!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01'
+            b'\x00\x00\x02\x02D\x01\x00;'
+        )
+        self.with_thumb = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Book With Cover',
+            ),
+            user=self.owner,
+            title='Book With Cover',
+            is_visible=True,
+            thumbnail=SimpleUploadedFile('cover.gif', tiny_gif, content_type='image/gif'),
+        )
+        self.without_thumb = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Book Without Cover',
+            ),
+            user=self.owner,
+            title='Book Without Cover',
+            is_visible=True,
+        )
+        self.hidden_with_thumb = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Hidden Book',
+            ),
+            user=self.owner,
+            title='Hidden Book',
+            is_visible=False,
+            thumbnail=SimpleUploadedFile('hidden.gif', tiny_gif, content_type='image/gif'),
+        )
+        self.video_with_thumb = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='VIDEO',
+                original_title='Video Cover',
+            ),
+            user=self.owner,
+            title='Video Cover',
+            is_visible=True,
+            thumbnail=SimpleUploadedFile('video.gif', tiny_gif, content_type='image/gif'),
+        )
+
+    def test_returns_only_visible_text_with_thumbnail(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:featured-text-thumbnails')
+        response = self.client.get(url, {'limit': 10})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in response.data['results']}
+        self.assertIn(self.with_thumb.id, ids)
+        self.assertNotIn(self.without_thumb.id, ids)
+        self.assertNotIn(self.hidden_with_thumb.id, ids)
+        self.assertNotIn(self.video_with_thumb.id, ids)
+        row = next(r for r in response.data['results'] if r['id'] == self.with_thumb.id)
+        self.assertEqual(row['content_id'], self.with_thumb.content_id)
+        self.assertEqual(row['media_type'], 'TEXT')
+        self.assertTrue(row['thumbnail'])
+
+    def test_requires_authentication(self):
+        url = reverse('content:featured-text-thumbnails')
+        response = self.client.get(url)
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+
 class TopicAPITests(APITestCase):
     """Test suite for Topic API endpoints"""
     

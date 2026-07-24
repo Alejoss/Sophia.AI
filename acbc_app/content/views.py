@@ -52,6 +52,7 @@ from content.serializers import (
     LibrarySerializer,
     CollectionSerializer,
     PublicCollectionSummarySerializer,
+    FeaturedTextThumbnailSerializer,
     ContentSerializer,
     ContentWithSelectedProfileSerializer,
     TopicBasicSerializer,
@@ -1322,6 +1323,36 @@ class PublicCollectionsView(APIView):
         page = paginator.paginate_queryset(qs, request)
         serializer = PublicCollectionSummarySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+
+class FeaturedTextWithThumbnailsView(APIView):
+    """
+    Random sample of visible TEXT ContentProfiles that have a custom thumbnail.
+    Used on the search landing page under public collections.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get('limit', 10))
+        except (TypeError, ValueError):
+            limit = 10
+        limit = max(1, min(limit, 30))
+
+        qs = (
+            ContentProfile.objects.filter(
+                is_visible=True,
+                content__media_type='TEXT',
+            )
+            .exclude(thumbnail='')
+            .exclude(thumbnail__isnull=True)
+            .select_related('content', 'user')
+            .order_by('?')[:limit]
+        )
+        serializer = FeaturedTextThumbnailSerializer(
+            qs, many=True, context={'request': request}
+        )
+        return Response({'results': serializer.data})
 
 
 class CollectionDetailView(APIView):

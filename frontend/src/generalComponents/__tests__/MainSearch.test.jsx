@@ -6,6 +6,7 @@ import { renderWithProviders } from '../../test/formTestUtils';
 
 const mockSearch = vi.fn();
 const mockGetPublicCollections = vi.fn();
+const mockGetFeaturedTextThumbnails = vi.fn();
 
 vi.mock('../../api/generalApi', () => ({
   default: {
@@ -16,6 +17,7 @@ vi.mock('../../api/generalApi', () => ({
 vi.mock('../../api/contentApi', () => ({
   default: {
     getPublicCollections: (...args) => mockGetPublicCollections(...args),
+    getFeaturedTextThumbnails: (...args) => mockGetFeaturedTextThumbnails(...args),
   },
 }));
 
@@ -23,6 +25,7 @@ describe('MainSearch form', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetPublicCollections.mockResolvedValue({ results: [] });
+    mockGetFeaturedTextThumbnails.mockResolvedValue({ results: [] });
   });
 
   it('shows validation error on empty submit and does not call the search API', async () => {
@@ -67,5 +70,26 @@ describe('MainSearch form', () => {
     expect(
       await screen.findByText(/no se pudo completar la búsqueda/i),
     ).toBeInTheDocument();
+  });
+
+  it('shows featured TEXT covers under collections before searching', async () => {
+    mockGetFeaturedTextThumbnails.mockResolvedValue({
+      results: [
+        {
+          id: 7,
+          content_id: 54,
+          title: 'El Secuestro de Bitcoin',
+          thumbnail_preview: 'https://cdn.example.com/cover.webp',
+          thumbnail: 'https://cdn.example.com/cover.jpg',
+          media_type: 'TEXT',
+        },
+      ],
+    });
+
+    renderWithProviders(<MainSearch />);
+
+    expect(await screen.findByText(/textos con portada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
+    expect(mockGetFeaturedTextThumbnails).toHaveBeenCalledWith({ limit: 10 });
   });
 });
