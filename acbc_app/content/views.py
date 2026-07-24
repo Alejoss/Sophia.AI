@@ -1371,7 +1371,7 @@ class CollectionDetailView(APIView):
 
 
 class CollectionContentView(APIView):
-    """Get all content profiles for a specific collection"""
+    """Paginated content profiles for a specific collection."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, collection_id):
@@ -1394,12 +1394,14 @@ class CollectionContentView(APIView):
         if not is_owner:
             content_profiles = content_profiles.filter(is_visible=True)
 
+        paginator = UserLibraryPagination()
+        page = paginator.paginate_queryset(content_profiles, request)
         serializer = SimpleContentProfileSerializer(
-            content_profiles,
+            page,
             many=True,
             context={'request': request, 'collection_detail': True},
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request, collection_id):
         collection = get_object_or_404(

@@ -350,9 +350,15 @@ const contentApi = {
     }
   },
 
-  getCollectionContent: async (collectionId) => {
+  getCollectionContent: async (collectionId, params = {}) => {
     try {
-      const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`);
+      const query = {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 12,
+      };
+      const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`, {
+        params: query,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching collection content:', error.response || error);

@@ -1,10 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, Card, CardContent, Chip, IconButton, Button } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Card,
+    CardContent,
+    Chip,
+    IconButton,
+    Button,
+    TablePagination,
+} from '@mui/material';
 import NoteIcon from '@mui/icons-material/Note';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
 import { resolveMediaUrl } from '../utils/fileUtils';
+
+const DEFAULT_PAGE_SIZE = 12;
 
 const Collection = () => {
     const { collectionId } = useParams();
@@ -16,31 +27,70 @@ const Collection = () => {
     const [ownerUsername, setOwnerUsername] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
-        const fetchCollectionData = async () => {
+        const fetchCollectionMeta = async () => {
             try {
-                const [collectionInfo, contentData] = await Promise.all([
-                    contentApi.getCollection(collectionId),
-                    contentApi.getCollectionContent(collectionId)
-                ]);
-
+                const collectionInfo = await contentApi.getCollection(collectionId);
                 setCollectionName(collectionInfo.name || 'Colección sin título');
                 setIsOwner(!!collectionInfo.is_owner);
                 setOwnerUsername(collectionInfo.owner_username || '');
-                setContent(contentData || []);
-                setLoading(false);
             } catch (err) {
-                console.error('Error fetching collection data:', err);
-                setError(err.response?.data?.error || 'Error al obtener el contenido de la colección');
+                console.error('Error fetching collection metadata:', err);
+                setError(err.response?.data?.error || 'Error al obtener la colección');
                 setLoading(false);
             }
         };
 
-        fetchCollectionData();
+        fetchCollectionMeta();
     }, [collectionId]);
 
-    if (loading) return <Typography>Cargando contenido de la colección...</Typography>;
+    const loadContentPage = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const contentData = await contentApi.getCollectionContent(collectionId, {
+                page: page + 1,
+                page_size: rowsPerPage,
+            });
+            const results = Array.isArray(contentData?.results)
+                ? contentData.results
+                : Array.isArray(contentData)
+                  ? contentData
+                  : [];
+            setContent(results);
+            setTotalCount(
+                typeof contentData?.count === 'number' ? contentData.count : results.length
+            );
+        } catch (err) {
+            console.error('Error fetching collection content:', err);
+            setError(
+                err.response?.data?.error || 'Error al obtener el contenido de la colección'
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, [collectionId, page, rowsPerPage]);
+
+    useEffect(() => {
+        loadContentPage();
+    }, [loadContentPage]);
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    if (loading && content.length === 0 && !error) {
+        return <Typography>Cargando contenido de la colección...</Typography>;
+    }
     if (error) return <Typography color="error">{error}</Typography>;
 
     const handleBack = () => {
@@ -71,12 +121,21 @@ const Collection = () => {
                             Colección de {ownerUsername}
                         </Typography>
                     )}
+                    {totalCount > 0 && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {totalCount} elementos
+                        </Typography>
+                    )}
                 </Box>
                 {isOwner ? (
                     <Button
                         variant="contained"
                         color="primary"
-                        onClick={() => navigate(`/content/collections/${collectionId}/edit`, { state: location.state })}
+                        onClick={() =>
+                            navigate(`/content/collections/${collectionId}/edit`, {
+                                state: location.state,
+                            })
+                        }
                     >
                         Editar Colección
                     </Button>
@@ -93,31 +152,44 @@ const Collection = () => {
 
             <Box display="grid" gridTemplateColumns="repeat(12, 1fr)" gap={3}>
                 {content.map((contentProfile) => (
-                    <Box gridColumn={{ xs: "span 12", sm: "span 6", md: "span 4" }} key={contentProfile.id}>
-                        <Card 
+                    <Box
+                        gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 4' }}
+                        key={contentProfile.id}
+                    >
+                        <Card
                             sx={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/content/${contentProfile.content.id}/library?context=library&id=${contentProfile.user}`)}
+                            onClick={() =>
+                                navigate(
+                                    `/content/${contentProfile.content.id}/library?context=library&id=${contentProfile.user}`
+                                )
+                            }
                         >
-                            {contentProfile.content.media_type === 'IMAGE' && contentProfile.content.file_details?.file && (
-                                <Box sx={{ 
-                                    width: '100%', 
-                                    height: 200, 
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <img 
-                                        src={resolveMediaUrl(contentProfile.content.file_details.url ?? contentProfile.content.file_details.file)}
-                                        alt={contentProfile.title || 'Content image'}
-                                        style={{
+                            {contentProfile.content.media_type === 'IMAGE' &&
+                                contentProfile.content.file_details?.file && (
+                                    <Box
+                                        sx={{
                                             width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover'
+                                            height: 200,
+                                            overflow: 'hidden',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                         }}
-                                    />
-                                </Box>
-                            )}
+                                    >
+                                        <img
+                                            src={resolveMediaUrl(
+                                                contentProfile.content.file_details.url ??
+                                                    contentProfile.content.file_details.file
+                                            )}
+                                            alt={contentProfile.title || 'Content image'}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover',
+                                            }}
+                                        />
+                                    </Box>
+                                )}
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                     <Typography variant="h6">
@@ -129,25 +201,28 @@ const Collection = () => {
                                         </IconButton>
                                     )}
                                 </Box>
-                                
+
                                 <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                                    <Chip 
-                                        label={contentProfile.content.media_type} 
+                                    <Chip
+                                        label={contentProfile.content.media_type}
                                         size="small"
                                         color="primary"
                                     />
                                     {contentProfile.author && (
-                                        <Chip 
+                                        <Chip
                                             label={`Autor: ${contentProfile.author}`}
                                             size="small"
                                             variant="outlined"
                                         />
                                     )}
                                 </Box>
-                                
+
                                 <Typography variant="caption" color="text.secondary">
-                                    Agregado: {contentProfile.content.file_details?.uploaded_at 
-                                        ? new Date(contentProfile.content.file_details.uploaded_at).toLocaleDateString()
+                                    Agregado:{' '}
+                                    {contentProfile.content.file_details?.uploaded_at
+                                        ? new Date(
+                                              contentProfile.content.file_details.uploaded_at
+                                          ).toLocaleDateString()
                                         : 'Fecha no disponible'}
                                 </Typography>
                             </CardContent>
@@ -163,8 +238,25 @@ const Collection = () => {
                     </Box>
                 )}
             </Box>
+
+            {totalCount > 0 && (
+                <TablePagination
+                    component="div"
+                    count={totalCount}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    rowsPerPageOptions={[12, 24, 48]}
+                    labelRowsPerPage="Por página"
+                    labelDisplayedRows={({ from, to, count }) =>
+                        `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+                    }
+                    sx={{ mt: 2, borderTop: 1, borderColor: 'divider' }}
+                />
+            )}
         </Box>
     );
 };
 
-export default Collection; 
+export default Collection;

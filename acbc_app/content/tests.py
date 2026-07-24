@@ -1022,7 +1022,7 @@ class PublicCollectionsAPITests(APITestCase):
         url = reverse('content:collection-content', args=[self.collection.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = {row['id'] for row in response.data}
+        ids = {row['id'] for row in response.data['results']}
         self.assertIn(self.profile_visible.id, ids)
         self.assertNotIn(self.profile_hidden.id, ids)
 
@@ -1031,7 +1031,9 @@ class PublicCollectionsAPITests(APITestCase):
         url = reverse('content:collection-content', args=[self.collection.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        ids = {row['id'] for row in response.data}
+        self.assertIn('results', response.data)
+        self.assertIn('count', response.data)
+        ids = {row['id'] for row in response.data['results']}
         self.assertSetEqual(ids, {self.profile_visible.id, self.profile_hidden.id})
 
     def test_private_collection_not_visible_to_viewer(self):

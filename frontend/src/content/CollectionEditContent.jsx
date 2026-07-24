@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -18,8 +18,9 @@ import {
   Divider,
   TextField,
   FormControlLabel,
-  Switch } from
-'@mui/material';
+  Switch,
+  TablePagination,
+} from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AddIcon from '@mui/icons-material/Add';
@@ -29,11 +30,13 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 
+const DEFAULT_PAGE_SIZE = 12;
+
 const CollectionEditContent = () => {
   const { collectionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [collectionData, setCollectionData] = useState(null);
+  const [collectionData, setCollectionData] = useState([]);
   const [collectionName, setCollectionName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [tempCollectionName, setTempCollectionName] = useState('');
@@ -44,25 +47,26 @@ const CollectionEditContent = () => {
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [showAddContent, setShowAddContent] = useState(false);
+  const [metaReady, setMetaReady] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    const fetchCollectionData = async () => {
+    const fetchCollectionMeta = async () => {
       try {
-        const [collectionInfo, contentData] = await Promise.all([
-        contentApi.getCollection(collectionId),
-        contentApi.getCollectionContent(collectionId)]
-        );
-
+        const collectionInfo = await contentApi.getCollection(collectionId);
         if (collectionInfo.is_owner === false) {
-          navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state });
+          navigate(`/content/collections/${collectionId}`, {
+            replace: true,
+            state: location.state,
+          });
           setLoading(false);
           return;
         }
-
         setCollectionName(collectionInfo.name || '');
         setIsPublic(!!collectionInfo.is_public);
-        setCollectionData(contentData || []);
-        setLoading(false);
+        setMetaReady(true);
       } catch (err) {
         console.error('Error fetching collection data:', err);
         setError('Error al obtener los datos de la colección');
@@ -70,16 +74,58 @@ const CollectionEditContent = () => {
       }
     };
 
-    fetchCollectionData();
-  }, [collectionId, navigate]);
+    fetchCollectionMeta();
+  }, [collectionId, navigate, location.state]);
+
+  const loadContentPage = useCallback(async () => {
+    if (!metaReady) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const contentData = await contentApi.getCollectionContent(collectionId, {
+        page: page + 1,
+        page_size: rowsPerPage,
+      });
+      const results = Array.isArray(contentData?.results)
+        ? contentData.results
+        : Array.isArray(contentData)
+          ? contentData
+          : [];
+      setCollectionData(results);
+      setTotalCount(
+        typeof contentData?.count === 'number' ? contentData.count : results.length
+      );
+    } catch (err) {
+      console.error('Error fetching collection content:', err);
+      setError('Error al obtener los datos de la colección');
+    } finally {
+      setLoading(false);
+    }
+  }, [collectionId, metaReady, page, rowsPerPage]);
+
+  useEffect(() => {
+    loadContentPage();
+  }, [loadContentPage]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const handleContentRemove = async (contentProfileId) => {
-
     try {
       setSaving(true);
       await contentApi.removeContentFromCollection(contentProfileId);
-
-      setCollectionData((prev) => prev.filter((content) => content.id !== contentProfileId));
+      const remainingOnPage = collectionData.length - 1;
+      if (remainingOnPage === 0 && page > 0) {
+        setPage((prev) => prev - 1);
+      } else {
+        await loadContentPage();
+      }
       setSaving(false);
     } catch (err) {
       console.error('Error removing content:', err);
@@ -89,23 +135,30 @@ const CollectionEditContent = () => {
   };
 
   const handleCancelAdd = () => {
-
     setShowAddContent(false);
   };
 
   const handleSaveAdd = async (selectedContentProfileIds) => {
-
     try {
       setSaving(true);
-      // Make a single API call with all selected content profile IDs
       await contentApi.addContentToCollection(collectionId, selectedContentProfileIds);
-
-      // Refresh collection content
-      const data = await contentApi.getCollectionContent(collectionId);
-
-      setCollectionData(data);
       setShowAddContent(false);
+      setPage(0);
       setSaving(false);
+      // page=0 may already be current; force reload
+      const contentData = await contentApi.getCollectionContent(collectionId, {
+        page: 1,
+        page_size: rowsPerPage,
+      });
+      const results = Array.isArray(contentData?.results)
+        ? contentData.results
+        : Array.isArray(contentData)
+          ? contentData
+          : [];
+      setCollectionData(results);
+      setTotalCount(
+        typeof contentData?.count === 'number' ? contentData.count : results.length
+      );
     } catch (error) {
       console.error('Error adding content:', error);
       setError('Error al agregar contenido a la colección');
@@ -132,7 +185,7 @@ const CollectionEditContent = () => {
     try {
       setSavingName(true);
       const updatedCollection = await contentApi.updateCollection(collectionId, {
-        name: tempCollectionName.trim()
+        name: tempCollectionName.trim(),
       });
       setCollectionName(updatedCollection.name);
       setEditingName(false);
@@ -160,28 +213,18 @@ const CollectionEditContent = () => {
   };
 
   const filterContent = (content) => {
-    // Filter out content that's already in this collection
     const isInCollection = content.collection === parseInt(collectionId);
-
-
     return !isInCollection;
   };
 
-  if (loading) {
-
+  if (loading && collectionData.length === 0 && !error) {
     return <Typography>Cargando contenido de la colección...</Typography>;
   }
-  if (error) {
-
+  if (error && !metaReady) {
     return <Alert severity="error">{error}</Alert>;
-  }
-  if (!collectionData) {
-
-    return <Alert severity="error">Colección no encontrada</Alert>;
   }
 
   if (showAddContent) {
-
     return (
       <LibrarySelectMultiple
         title="Agregar contenido a la colección"
@@ -189,178 +232,185 @@ const CollectionEditContent = () => {
         onCancel={handleCancelAdd}
         onSave={handleSaveAdd}
         filterFunction={filterContent}
-        contextName={collectionName} />);
-
-
+        contextName={collectionName}
+      />
+    );
   }
-
 
   return (
     <Box sx={{ pt: 12, px: 3, maxWidth: 1200, mx: 'auto' }}>
-            <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                    <IconButton
+      <Paper sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          <IconButton
             onClick={() =>
-            navigate(`/content/collections/${collectionId}`, { replace: true, state: location.state })
+              navigate(`/content/collections/${collectionId}`, {
+                replace: true,
+                state: location.state,
+              })
             }
-            sx={{ mr: 1 }}>
-            
-                        <ArrowBackIcon />
-                    </IconButton>
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 1, minWidth: 300 }}>
-                        {editingName ?
-            <>
-                                <TextField
-                value={tempCollectionName}
-                onChange={(e) => setTempCollectionName(e.target.value)}
-                variant="outlined"
-                size="small"
-                sx={{ flexGrow: 1 }}
-                disabled={savingName}
-                autoFocus />
-              
-                                <IconButton
-                onClick={handleSaveName}
-                disabled={savingName}
-                color="primary">
-                
-                                    <SaveIcon />
-                                </IconButton>
-                                <IconButton
-                onClick={handleCancelEditName}
-                disabled={savingName}>
-                
-                                    <CancelIcon />
-                                </IconButton>
-                            </> :
-
-            <>
-                                <Typography variant="h4" sx={{ flexGrow: 1 }}>
-                                    {collectionName}
-                                </Typography>
-                                <IconButton
-                onClick={handleStartEditName}
-                size="small"
-                sx={{ ml: 1 }}>
-                
-                                    <EditIcon fontSize="small" />
-                                </IconButton>
-                            </>
-            }
-                    </Box>
-                    <Button
+            sx={{ mr: 1 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 1, minWidth: 300 }}>
+            {editingName ? (
+              <>
+                <TextField
+                  value={tempCollectionName}
+                  onChange={(e) => setTempCollectionName(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  sx={{ flexGrow: 1 }}
+                  disabled={savingName}
+                  autoFocus
+                />
+                <IconButton onClick={handleSaveName} disabled={savingName} color="primary">
+                  <SaveIcon />
+                </IconButton>
+                <IconButton onClick={handleCancelEditName} disabled={savingName}>
+                  <CancelIcon />
+                </IconButton>
+              </>
+            ) : (
+              <>
+                <Typography variant="h4" sx={{ flexGrow: 1 }}>
+                  {collectionName}
+                </Typography>
+                <IconButton onClick={handleStartEditName} size="small" sx={{ ml: 1 }}>
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </>
+            )}
+          </Box>
+          <Button
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
             onClick={() => setShowAddContent(true)}
-            sx={{ ml: 'auto' }}>
-            
-                        Agregar contenido de tu biblioteca
-                    </Button>
-                </Box>
+            sx={{ ml: 'auto' }}
+          >
+            Agregar contenido de tu biblioteca
+          </Button>
+        </Box>
 
-                <Box sx={{ mb: 2 }}>
-                    <FormControlLabel
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        <Box sx={{ mb: 2 }}>
+          <FormControlLabel
             control={
-            <Switch
-              checked={isPublic}
-              onChange={handleTogglePublic}
-              disabled={savingPrivacy}
-              color="primary" />
-
+              <Switch
+                checked={isPublic}
+                onChange={handleTogglePublic}
+                disabled={savingPrivacy}
+                color="primary"
+              />
             }
             label={
-            <Box>
-                                <Typography variant="body2" component="span" display="block">
-                                    Colección pública
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" display="block">
-                                    Visible en la biblioteca para otros usuarios (solo ítems con visibilidad en búsqueda).
-                                </Typography>
-                            </Box>
-            } />
-          
-                </Box>
-
-                <Divider sx={{ my: 3 }} />
-
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Contenido en la colección ({collectionData.length})
+              <Box>
+                <Typography variant="body2" component="span" display="block">
+                  Colección pública
                 </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Visible en la biblioteca para otros usuarios (solo ítems con visibilidad en
+                  búsqueda).
+                </Typography>
+              </Box>
+            }
+          />
+        </Box>
 
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Título</TableCell>
-                                <TableCell>Tipo</TableCell>
-                                <TableCell>Autor</TableCell>
-                                <TableCell>Ver</TableCell>
-                                <TableCell>Acciones</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {collectionData.map((content) =>
-              <TableRow
-                key={content.id}
-                hover
-                sx={{ cursor: 'pointer' }}>
-                
-                                    <TableCell>{content.title || 'Sin título'}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                    label={content.content.media_type}
-                    size="small"
-                    color="primary" />
-                  
-                                    </TableCell>
-                                    <TableCell>{content.author || 'Desconocido'}</TableCell>
-                                    <TableCell>
-                                        <MuiLink
-                    href={`/content/${content.content.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': {
-                        textDecoration: 'underline'
-                      }
-                    }}>
-                    
-                                            Ver
-                                            <OpenInNewIcon fontSize="small" />
-                                        </MuiLink>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => handleContentRemove(content.id)}
-                    disabled={saving}>
-                    
-                                            Eliminar
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-              )}
-                            {collectionData.length === 0 &&
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Contenido en la colección ({totalCount})
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
               <TableRow>
-                                    <TableCell colSpan={5} align="center">
-                                        No hay contenido en esta colección
-                                    </TableCell>
-                                </TableRow>
-              }
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-        </Box>);
+                <TableCell>Título</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Autor</TableCell>
+                <TableCell>Ver</TableCell>
+                <TableCell>Acciones</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {collectionData.map((content) => (
+                <TableRow key={content.id} hover sx={{ cursor: 'pointer' }}>
+                  <TableCell>{content.title || 'Sin título'}</TableCell>
+                  <TableCell>
+                    <Chip label={content.content.media_type} size="small" color="primary" />
+                  </TableCell>
+                  <TableCell>{content.author || 'Desconocido'}</TableCell>
+                  <TableCell>
+                    <MuiLink
+                      href={`/content/${content.content.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        color: 'primary.main',
+                        textDecoration: 'none',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                        },
+                      }}
+                    >
+                      Ver
+                      <OpenInNewIcon fontSize="small" />
+                    </MuiLink>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      size="small"
+                      onClick={() => handleContentRemove(content.id)}
+                      disabled={saving}
+                    >
+                      Eliminar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {collectionData.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    No hay contenido en esta colección
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
+        {totalCount > 0 && (
+          <TablePagination
+            component="div"
+            count={totalCount}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[12, 24, 48]}
+            labelRowsPerPage="Por página"
+            labelDisplayedRows={({ from, to, count }) =>
+              `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+            }
+            sx={{ mt: 1, borderTop: 1, borderColor: 'divider' }}
+          />
+        )}
+      </Paper>
+    </Box>
+  );
 };
 
 export default CollectionEditContent;
