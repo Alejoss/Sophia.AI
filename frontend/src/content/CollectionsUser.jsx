@@ -83,6 +83,21 @@ const CollectionsUser = () => {
                                         <Chip label="Pública" size="small" color="secondary" variant="outlined" />
                                     )}
                                 </Box>
+                                {collection.description && (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{
+                                            mb: 1,
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        {collection.description}
+                                    </Typography>
+                                )}
                                 <Typography color="text.secondary">
                                     {collection.content_count} {collection.content_count === 1 ? 'elemento' : 'elementos'}
                                 </Typography>

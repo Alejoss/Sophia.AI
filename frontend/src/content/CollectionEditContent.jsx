@@ -38,12 +38,16 @@ const CollectionEditContent = () => {
   const location = useLocation();
   const [collectionData, setCollectionData] = useState([]);
   const [collectionName, setCollectionName] = useState('');
+  const [collectionDescription, setCollectionDescription] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [tempCollectionName, setTempCollectionName] = useState('');
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [tempDescription, setTempDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savingName, setSavingName] = useState(false);
+  const [savingDescription, setSavingDescription] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [showAddContent, setShowAddContent] = useState(false);
@@ -65,6 +69,7 @@ const CollectionEditContent = () => {
           return;
         }
         setCollectionName(collectionInfo.name || '');
+        setCollectionDescription(collectionInfo.description || '');
         setIsPublic(!!collectionInfo.is_public);
         setMetaReady(true);
       } catch (err) {
@@ -197,6 +202,39 @@ const CollectionEditContent = () => {
     }
   };
 
+  const handleStartEditDescription = () => {
+    setTempDescription(collectionDescription);
+    setEditingDescription(true);
+  };
+
+  const handleCancelEditDescription = () => {
+    setEditingDescription(false);
+    setTempDescription('');
+  };
+
+  const handleSaveDescription = async () => {
+    const next = (tempDescription || '').trim();
+    if (next.length > 300) {
+      setError('La descripción no debe exceder 300 caracteres');
+      return;
+    }
+
+    try {
+      setSavingDescription(true);
+      setError(null);
+      const updatedCollection = await contentApi.updateCollection(collectionId, {
+        description: next,
+      });
+      setCollectionDescription(updatedCollection.description || '');
+      setEditingDescription(false);
+      setSavingDescription(false);
+    } catch (err) {
+      console.error('Error updating collection description:', err);
+      setError('Error al actualizar la descripción de la colección');
+      setSavingDescription(false);
+    }
+  };
+
   const handleTogglePublic = async (event) => {
     const next = event.target.checked;
     try {
@@ -298,6 +336,56 @@ const CollectionEditContent = () => {
             {error}
           </Alert>
         )}
+
+        <Box sx={{ mb: 2 }}>
+          {editingDescription ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <TextField
+                label="Descripción corta"
+                value={tempDescription}
+                onChange={(e) => setTempDescription(e.target.value)}
+                multiline
+                minRows={2}
+                maxRows={4}
+                fullWidth
+                disabled={savingDescription}
+                inputProps={{ maxLength: 300 }}
+                helperText={`${(tempDescription || '').length}/300`}
+                autoFocus
+              />
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                  onClick={handleSaveDescription}
+                  disabled={savingDescription}
+                  color="primary"
+                  size="small"
+                >
+                  <SaveIcon />
+                </IconButton>
+                <IconButton
+                  onClick={handleCancelEditDescription}
+                  disabled={savingDescription}
+                  size="small"
+                >
+                  <CancelIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <Typography
+                variant="body2"
+                color={collectionDescription ? 'text.secondary' : 'text.disabled'}
+                sx={{ flexGrow: 1 }}
+              >
+                {collectionDescription || 'Sin descripción. Añade una descripción corta.'}
+              </Typography>
+              <IconButton onClick={handleStartEditDescription} size="small">
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          )}
+        </Box>
 
         <Box sx={{ mb: 2 }}>
           <FormControlLabel

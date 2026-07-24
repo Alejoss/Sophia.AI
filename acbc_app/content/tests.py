@@ -1059,6 +1059,19 @@ class PublicCollectionsAPITests(APITestCase):
         self.collection.refresh_from_db()
         self.assertFalse(self.collection.is_public)
 
+    def test_owner_can_update_description(self):
+        self.client.force_authenticate(user=self.owner)
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.patch(
+            url,
+            {'description': 'Una colección corta de prueba'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['description'], 'Una colección corta de prueba')
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.description, 'Una colección corta de prueba')
+
 
 class TopicAPITests(APITestCase):
     """Test suite for Topic API endpoints"""

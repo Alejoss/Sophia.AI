@@ -226,6 +226,14 @@ const ContentDisplay = ({
     }
   };
 
+  /** File URL when available; otherwise external page URL. */
+  const getOpenableContentUrl = () => getFileUrlFromContent();
+
+  const openContentInNewTab = () => {
+    const url = getOpenableContentUrl();
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const getMediaTypeIcon = (content) => {
     const iconProps = {
       fontSize: "large",
@@ -1466,9 +1474,47 @@ const ContentDisplay = ({
               sx={{ p: 2, bgcolor: "background.default", position: "relative" }}>
               
               <Box>
-                <Typography variant="h6" gutterBottom color="text.primary">
-                  {title}
-                </Typography>
+                {(() => {
+                  const openableUrl = getOpenableContentUrl();
+                  const titleIsClickable = Boolean(openableUrl);
+                  return (
+                    <Typography
+                      variant="h6"
+                      gutterBottom
+                      color="text.primary"
+                      component={titleIsClickable ? "button" : "h6"}
+                      type={titleIsClickable ? "button" : undefined}
+                      onClick={titleIsClickable ? openContentInNewTab : undefined}
+                      title={
+                        titleIsClickable
+                          ? "Abrir archivo en una nueva pestaña"
+                          : undefined
+                      }
+                      sx={{
+                        textAlign: "left",
+                        font: "inherit",
+                        bgcolor: "transparent",
+                        border: "none",
+                        p: 0,
+                        m: 0,
+                        mb: 0.5,
+                        display: "block",
+                        width: "100%",
+                        cursor: titleIsClickable ? "pointer" : "default",
+                        ...(titleIsClickable
+                          ? {
+                              "&:hover": {
+                                color: "primary.main",
+                                textDecoration: "underline",
+                              },
+                            }
+                          : {}),
+                      }}
+                    >
+                      {title}
+                    </Typography>
+                  );
+                })()}
                 {showAuthor && author &&
                 <Typography
                   variant="body2"

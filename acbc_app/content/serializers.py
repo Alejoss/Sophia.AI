@@ -302,11 +302,17 @@ class CollectionSerializer(serializers.ModelSerializer):
     owner_username = serializers.CharField(source='library.user.username', read_only=True)
     content_count = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
+    description = serializers.CharField(
+        max_length=300,
+        required=False,
+        allow_blank=True,
+        default='',
+    )
 
     class Meta:
         model = Collection
         fields = [
-            'id', 'name', 'library', 'library_name', 'is_public',
+            'id', 'name', 'description', 'library', 'library_name', 'is_public',
             'content_count', 'owner_id', 'owner_username', 'is_owner',
         ]
         extra_kwargs = {
@@ -331,7 +337,9 @@ class PublicCollectionSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Collection
-        fields = ['id', 'name', 'owner_id', 'owner_username', 'visible_item_count']
+        fields = [
+            'id', 'name', 'description', 'owner_id', 'owner_username', 'visible_item_count',
+        ]
 
 
 class TopicBasicSerializer(serializers.ModelSerializer):

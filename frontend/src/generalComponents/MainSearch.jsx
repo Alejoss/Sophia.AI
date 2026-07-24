@@ -321,6 +321,21 @@ const MainSearch = () => {
                     <Typography variant="subtitle1" fontWeight={600} gutterBottom component="div">
                       {c.name}
                     </Typography>
+                    {c.description && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 1,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {c.description}
+                      </Typography>
+                    )}
                     <Typography variant="body2" color="text.secondary">
                       Por {c.owner_username}
                     </Typography>

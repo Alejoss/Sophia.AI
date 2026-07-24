@@ -1281,7 +1281,7 @@ class PublicCollectionsView(APIView):
     Only includes collections with at least one visible content profile.
 
     Query params:
-    - search: filter by collection name (icontains)
+    - search: filter by collection name or description (icontains)
     - owner: user id of the library owner (only their public collections with visible items)
     """
     permission_classes = [IsAuthenticated]
@@ -1301,7 +1301,9 @@ class PublicCollectionsView(APIView):
         )
         search = (request.query_params.get('search') or '').strip()
         if search:
-            qs = qs.filter(name__icontains=search)
+            qs = qs.filter(
+                Q(name__icontains=search) | Q(description__icontains=search)
+            )
 
         owner_raw = (request.query_params.get('owner') or '').strip()
         if owner_raw:
@@ -1351,6 +1353,8 @@ class CollectionDetailView(APIView):
         payload = {}
         if 'name' in request.data:
             payload['name'] = request.data['name']
+        if 'description' in request.data:
+            payload['description'] = request.data['description'] or ''
         if 'is_public' in request.data:
             payload['is_public'] = bool(request.data['is_public'])
         if not payload:

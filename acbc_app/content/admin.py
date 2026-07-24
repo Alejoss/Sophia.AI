@@ -12,9 +12,9 @@ class LibraryAdmin(admin.ModelAdmin):
 
 @admin.register(Collection)
 class GroupAdmin(admin.ModelAdmin):
-    list_display = ['name', 'library']
-    list_filter = ['library']
-    search_fields = ['name']
+    list_display = ['name', 'library', 'is_public']
+    list_filter = ['library', 'is_public']
+    search_fields = ['name', 'description']
 
 
 @admin.register(Content)

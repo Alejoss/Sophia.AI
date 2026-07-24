@@ -51,6 +51,7 @@ describe('CreateCollectionForm', () => {
     await waitFor(() => {
       expect(mockCreateCollection).toHaveBeenCalledWith({
         name: 'Mi colección',
+        description: '',
         is_public: true,
       });
       expect(mockNavigate).toHaveBeenCalledWith('/content/collections');

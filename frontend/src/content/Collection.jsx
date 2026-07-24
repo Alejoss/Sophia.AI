@@ -23,6 +23,7 @@ const Collection = () => {
     const location = useLocation();
     const [content, setContent] = useState([]);
     const [collectionName, setCollectionName] = useState('');
+    const [collectionDescription, setCollectionDescription] = useState('');
     const [isOwner, setIsOwner] = useState(false);
     const [ownerUsername, setOwnerUsername] = useState('');
     const [loading, setLoading] = useState(true);
@@ -36,6 +37,7 @@ const Collection = () => {
             try {
                 const collectionInfo = await contentApi.getCollection(collectionId);
                 setCollectionName(collectionInfo.name || 'Colección sin título');
+                setCollectionDescription(collectionInfo.description || '');
                 setIsOwner(!!collectionInfo.is_owner);
                 setOwnerUsername(collectionInfo.owner_username || '');
             } catch (err) {
@@ -116,6 +118,11 @@ const Collection = () => {
                     <Typography variant="h1" sx={{ fontSize: '2.5rem' }}>
                         {collectionName}
                     </Typography>
+                    {collectionDescription && (
+                        <Typography variant="body1" color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
+                            {collectionDescription}
+                        </Typography>
+                    )}
                     {!isOwner && ownerUsername && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             Colección de {ownerUsername}

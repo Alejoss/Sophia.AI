@@ -22,6 +22,12 @@ class Collection(models.Model):
     # Organizes content within a library into distinct categories or themes.
     library = models.ForeignKey(Library, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    description = models.CharField(
+        max_length=300,
+        blank=True,
+        default='',
+        help_text="Short description of the collection (max 300 characters).",
+    )
     is_public = models.BooleanField(
         default=False,
         help_text="When true, authenticated users can discover this collection and view visible items.",

@@ -61,4 +61,27 @@ describe('ContentDisplay', () => {
       '_blank',
     );
   });
+
+  it('opens the file in a new tab when clicking the title in detailed view', () => {
+    const content = {
+      id: 11,
+      media_type: 'TEXT',
+      original_title: 'Documento importante',
+      file_details: {
+        file: '/media/docs/documento.pdf',
+        url: '/media/docs/documento.pdf',
+        file_size: 2048,
+      },
+    };
+
+    renderContentDisplay(content);
+
+    fireEvent.click(screen.getByRole('button', { name: /documento importante/i }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'http://localhost:8000/media/docs/documento.pdf',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
 });

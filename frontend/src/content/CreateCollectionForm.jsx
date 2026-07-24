@@ -13,6 +13,10 @@ const schema = yup.object().shape({
         .required('El nombre de la colección es requerido')
         .min(3, 'El nombre de la colección debe tener al menos 3 caracteres')
         .max(100, 'El nombre de la colección no debe exceder 100 caracteres'),
+    description: yup
+        .string()
+        .max(300, 'La descripción no debe exceder 300 caracteres')
+        .default(''),
     is_public: yup.boolean().default(false),
 });
 
@@ -24,17 +28,21 @@ const CreateCollectionForm = () => {
         handleSubmit,
         control,
         setError,
+        watch,
         formState: { errors, isSubmitting },
     } = useForm({
         resolver: yupResolver(schema),
-        defaultValues: { name: '', is_public: false },
+        defaultValues: { name: '', description: '', is_public: false },
     });
+
+    const descriptionValue = watch('description') || '';
 
     const onSubmit = async (data) => {
         setGeneralError('');
         try {
             await contentApi.createCollection({
                 name: data.name,
+                description: (data.description || '').trim(),
                 is_public: !!data.is_public,
             });
             navigate('/content/collections');
@@ -71,6 +79,22 @@ const CreateCollectionForm = () => {
                         {...register('name')}
                         error={!!errors.name}
                         helperText={errors.name?.message}
+                        sx={{ mb: 2 }}
+                    />
+
+                    <TextField
+                        fullWidth
+                        label="Descripción corta"
+                        multiline
+                        minRows={2}
+                        maxRows={4}
+                        {...register('description')}
+                        error={!!errors.description}
+                        helperText={
+                            errors.description?.message ||
+                            `${descriptionValue.length}/300 · Opcional`
+                        }
+                        inputProps={{ maxLength: 300 }}
                         sx={{ mb: 2 }}
                     />
 
