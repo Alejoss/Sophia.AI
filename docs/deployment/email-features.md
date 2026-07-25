@@ -8,7 +8,7 @@ Official setup guide: [SMTP2GO + Django](https://www.smtp2go.com/setupguide/djan
 
 | Feature | Backend | When it runs | Controlled by |
 |--------|---------|----------------|----------------|
-| **Password reset** | dj-rest-auth (`POST /api/rest-auth/password/reset/`) | User requests reset; Django sends email via `EMAIL_BACKEND` | `SEND_EMAILS` |
+| **Password reset** | dj-rest-auth (`POST /api/rest-auth/password/reset/`) + SPA `/profiles/forgot-password` | User requests reset; email link opens `/profiles/password-reset/confirm/:uid/:token` | `SEND_EMAILS` |
 | **Account confirmation (verify email)** | `send_confirmation_email()` + `activate_account` | Not triggered on registration (TODO in `RegisterView`). Only `activate_account` is used if user has a link. | `EmailService` → `SEND_EMAILS` |
 | **Suggestions to admins** | `SuggestionCreateView` → `_send_email_to_admins()` | When a user submits a suggestion | `EmailService` → `SEND_EMAILS` |
 | **Book club invite** | `book_clubs.emailing.send_book_club_invite_email` | Guest leaves email / invite flow | `EmailService` → `SEND_EMAILS` |

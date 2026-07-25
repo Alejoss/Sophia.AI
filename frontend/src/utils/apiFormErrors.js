@@ -10,6 +10,13 @@ const API_ERROR_TRANSLATIONS = {
   'user with this username already exists.': 'Ya existe un usuario con ese nombre de usuario.',
   'user with this email already exists.': 'Ya existe un usuario con ese correo electrónico.',
   'Unable to log in with provided credentials.': 'Credenciales inválidas.',
+  'Invalid value': 'El enlace no es válido o ha caducado.',
+  'Invalid token.': 'El enlace no es válido o ha caducado.',
+  "The password is too similar to the username.": 'La contraseña es demasiado similar al nombre de usuario.',
+  'This password is too common.': 'Esta contraseña es demasiado común.',
+  'This password is entirely numeric.': 'La contraseña no puede ser solo numérica.',
+  'This password is too short. It must contain at least 8 characters.':
+    'La contraseña es demasiado corta. Debe tener al menos 8 caracteres.',
 };
 
 const RESERVED_KEYS = new Set(['detail', 'error', 'non_field_errors']);

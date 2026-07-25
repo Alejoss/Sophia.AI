@@ -111,4 +111,14 @@ describe('Login form', () => {
     expect(await screen.findByText(/credenciales inválidas/i)).toBeInTheDocument();
     expect(mockUpdateAuthState).not.toHaveBeenCalled();
   });
+
+  it('links to forgot password page', async () => {
+    renderWithProviders(<Login />, {
+      auth: { ...unauthenticatedAuth(), updateAuthState: mockUpdateAuthState },
+      route: '/profiles/login',
+    });
+
+    const link = await screen.findByRole('link', { name: /olvidaste tu contraseña/i });
+    expect(link).toHaveAttribute('href', '/profiles/forgot-password');
+  });
 });

@@ -286,6 +286,21 @@ const changePassword = async (oldPassword, newPassword, confirmPassword) => {
   }
 };
 
+const requestPasswordReset = async (email) => {
+  const response = await axiosInstance.post('/rest-auth/password/reset/', { email });
+  return response.data;
+};
+
+const confirmPasswordReset = async ({ uid, token, newPassword1, newPassword2 }) => {
+  const response = await axiosInstance.post('/rest-auth/password/reset/confirm/', {
+    uid,
+    token,
+    new_password1: newPassword1,
+    new_password2: newPassword2,
+  });
+  return response.data;
+};
+
 const submitNewsletterSubscription = async (email, source = 'frontend_subscribe') => {
   try {
     const response = await axiosInstance.post('/profiles/newsletter/subscribe/', {
@@ -330,4 +345,6 @@ export {
   deleteAcceptedCrypto,
   submitSuggestion,
   changePassword,
+  requestPasswordReset,
+  confirmPasswordReset,
   submitNewsletterSubscription };

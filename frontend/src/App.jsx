@@ -43,6 +43,8 @@ import Login from './profiles/Login.jsx';
 import LoginSuccessful from './profiles/LoginSuccessful.jsx';
 import Logout from './profiles/Logout.jsx';
 import Register from './profiles/Register.jsx';
+import ForgotPassword from './profiles/ForgotPassword.jsx';
+import PasswordResetConfirm from './profiles/PasswordResetConfirm.jsx';
 import Welcome from './profiles/Welcome.jsx';
 import LibraryUploadContent from './content/LibraryUploadContent.jsx';
 import LibraryFolderUpload from './content/LibraryFolderUpload.jsx';
@@ -192,6 +194,11 @@ const AppContent = () => {
                   <Register />
                 </GoogleOAuthInitializer>
               } />
+              <Route path="forgot-password" element={<ForgotPassword />} />
+              <Route
+                path="password-reset/confirm/:uid/:token"
+                element={<PasswordResetConfirm />}
+              />
               <Route path="completar-cuenta" element={<CompletarCuenta />} />
               <Route path="login_successful" element={<LoginSuccessful />} />
               <Route path="logout" element={<Logout />} />

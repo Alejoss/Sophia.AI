@@ -554,6 +554,69 @@ class AuthenticationTests(APITestCase):
             self.assertTrue(True)
 
 
+class PasswordResetFlowTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='resetuser',
+            email='reset@example.com',
+            password='OldPass123!',
+        )
+
+    def test_spa_password_reset_url_points_to_frontend(self):
+        from allauth.account.utils import user_pk_to_url_str
+        from profiles.serializers import spa_password_reset_url_generator
+
+        url = spa_password_reset_url_generator(None, self.user, 'demo-token')
+        uid = user_pk_to_url_str(self.user)
+        self.assertTrue(url.endswith(f'/profiles/password-reset/confirm/{uid}/demo-token'))
+        self.assertIn('http', url)
+
+    @patch('allauth.account.adapter.DefaultAccountAdapter.send_mail')
+    def test_password_reset_request_accepts_email(self, mock_send_mail):
+        response = self.client.post(
+            '/api/rest-auth/password/reset/',
+            {'email': self.user.email},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(mock_send_mail.called)
+        context = mock_send_mail.call_args[0][2]
+        self.assertIn('/profiles/password-reset/confirm/', context['password_reset_url'])
+
+    @patch('allauth.account.adapter.DefaultAccountAdapter.send_mail')
+    def test_password_reset_request_unknown_email_still_ok(self, mock_send_mail):
+        response = self.client.post(
+            '/api/rest-auth/password/reset/',
+            {'email': 'nobody@example.com'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(mock_send_mail.called)
+
+    def test_password_reset_confirm_sets_new_password(self):
+        from allauth.account.forms import default_token_generator
+        from allauth.account.utils import user_pk_to_url_str
+
+        uid = user_pk_to_url_str(self.user)
+        token = default_token_generator.make_token(self.user)
+        new_password = 'NewSecurePass1!'
+
+        response = self.client.post(
+            '/api/rest-auth/password/reset/confirm/',
+            {
+                'uid': uid,
+                'token': token,
+                'new_password1': new_password,
+                'new_password2': new_password,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+
+
 class TokenRefreshTest(TestCase):
     """
     Test cases for JWT token refresh functionality.

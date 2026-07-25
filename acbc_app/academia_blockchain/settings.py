@@ -539,9 +539,12 @@ REST_AUTH = {
     'JWT_AUTH_SAMESITE': 'Lax',
     'JWT_AUTH_SECURE': _USE_SECURE_COOKIES,
     'TOKEN_MODEL': None,  # We're using JWT, not token authentication
+    # Link in reset emails opens the SPA confirm page (not Django/allauth HTML views).
+    'PASSWORD_RESET_SERIALIZER': 'profiles.serializers.CustomPasswordResetSerializer',
 }
 
 # Allauth settings (already present, but adding some additional settings)
+ACCOUNT_ADAPTER = 'profiles.adapters.AcademiaAccountAdapter'
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_REQUIRED = True

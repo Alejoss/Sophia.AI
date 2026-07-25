@@ -264,7 +264,17 @@ const Login = () => {
                       </InputAdornment>
 
                   }} />
-                
+
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: -1 }}>
+                  <MuiLink
+                    component={Link}
+                    to="/profiles/forgot-password"
+                    underline="hover"
+                    variant="body2"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </MuiLink>
+                </Box>
 
                 {generalError && <Alert severity="error">{generalError}</Alert>}
 

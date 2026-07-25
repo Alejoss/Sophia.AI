@@ -2,6 +2,7 @@ from rest_framework import serializers
 import logging
 
 from django.contrib.auth.models import User
+from dj_rest_auth.serializers import PasswordResetSerializer as DefaultPasswordResetSerializer
 
 from content.utils import build_media_url
 from profiles.models import CryptoCurrency, AcceptedCrypto, ContactMethod, Profile, Suggestion
@@ -523,3 +524,20 @@ class ChangePasswordSerializer(serializers.Serializer):
                 'confirm_password': "Las contraseñas no coinciden."
             })
         return attrs
+
+
+def spa_password_reset_url_generator(request, user, temp_key):
+    """Build a frontend SPA URL for the password-reset confirm page."""
+    from allauth.account.utils import user_pk_to_url_str
+    from profiles.email_service import EmailService
+
+    frontend = EmailService.get_brand_context()['frontend_url'].rstrip('/')
+    uid = user_pk_to_url_str(user)
+    return f'{frontend}/profiles/password-reset/confirm/{uid}/{temp_key}'
+
+
+class CustomPasswordResetSerializer(DefaultPasswordResetSerializer):
+    """Password reset email links point at the React confirm page."""
+
+    def get_email_options(self):
+        return {'url_generator': spa_password_reset_url_generator}
