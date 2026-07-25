@@ -217,6 +217,26 @@ class ContentTranscriptIngestDetailView(TranscriptIngestAPIView):
             transcript.save()
         except ValidationError as exc:
             return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            # Prefer UTF8 migration; ContentTranscript.save degrades on SQL_ASCII.
+            # If something still slips through, return a clear machine-readable error.
+            message = str(exc)
+            if 'SQL_ASCII' in message or 'conversion between UTF8' in message:
+                logger.exception(
+                    'Transcript ingest blocked by PostgreSQL encoding content_id=%s',
+                    content_id,
+                )
+                return Response(
+                    {
+                        'error': (
+                            'La base de datos no soporta Unicode (SERVER_ENCODING=SQL_ASCII). '
+                            'Migrar a UTF8: ./scripts/migrate-db-to-utf8.sh'
+                        ),
+                        'detail': message,
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            raise
 
         logger.info(
             'Transcript ingest %s for content_id=%s segments=%s',

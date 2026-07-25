@@ -383,7 +383,25 @@ class ContentTranscript(models.Model):
         return f"Transcript for {title}"
 
     def save(self, *args, **kwargs):
+        # Legacy SQL_ASCII clusters reject UTF-8 (accents in Spanish transcripts /
+        # SRT). prepare_* is a no-op on UTF8; on SQL_ASCII it degrades before
+        # sync so text_hash matches what is actually persisted.
+        from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
+
+        self.parsed_plain = prepare_text_for_db(self.parsed_plain)
+        self.processed_plain = prepare_text_for_db(self.processed_plain)
+        self.obsidian_markdown = prepare_text_for_db(self.obsidian_markdown)
+        self.source_subtitles = prepare_text_for_db(self.source_subtitles)
+        self.language = prepare_text_for_db(self.language)
+        self.embedding_model = prepare_text_for_db(self.embedding_model)
+        self.embedding_error = prepare_text_for_db(self.embedding_error)
+        self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
+        self.segments = prepare_json_for_db(self.segments or [])
+
         sync_transcript_derived_fields(self)
+
+        self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
+        self.segments = prepare_json_for_db(self.segments or [])
         super().save(*args, **kwargs)
 
 

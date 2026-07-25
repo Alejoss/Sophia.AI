@@ -4352,6 +4352,29 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         with self.assertRaises(ValidationError):
             transcript.save()
 
+    def test_save_degrades_unicode_on_sql_ascii_database(self):
+        """Legacy SQL_ASCII clusters must not 500 on Spanish transcripts."""
+        from unittest.mock import patch
+
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        accented = 'Qué también: filosofía cypherpunk en español.'
+        ascii_safe = 'Que tambien: filosofia cypherpunk en espanol.'
+
+        with patch('utils.db_encoding.is_sql_ascii_database', return_value=True):
+            transcript = ContentTranscript.objects.create(
+                content=self.content,
+                processed_plain=accented,
+                parsed_plain=accented,
+                language='es',
+            )
+
+        transcript.refresh_from_db()
+        self.assertEqual(transcript.processed_plain, ascii_safe)
+        self.assertEqual(transcript.parsed_plain, ascii_safe)
+        self.assertEqual(transcript.text_hash, compute_text_hash(ascii_safe))
+
 
 @override_settings(TRANSCRIPT_INGEST_API_KEY='test-ingest-key')
 class ContentTranscriptIngestAPITests(APITestCase):
