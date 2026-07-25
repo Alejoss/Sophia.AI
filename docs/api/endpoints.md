@@ -105,6 +105,13 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 - **Auth**: Ingest API key
 - **Response**: `{ content, has_transcript, transcript }` (summary metadata only)
 
+### Get content transcript (user-facing)
+- **GET** `/api/content/content_details/{content_id}/transcript/`
+- **Auth**: Optional (AllowAny)
+- **Query**: `summary=1` — metadata only (`has_transcript`, `language`, `text_length`, `segment_count`, `updated_at`) for detail-page teasers
+- **Response (full)**: `{ language, format, text_length, text, segments[], segment_count, updated_at }`
+- **404** when the content has no transcript yet
+
 ### Upsert transcript
 - **PUT** `/api/content/transcript-ingest/{content_id}/`
 - **Auth**: Ingest API key

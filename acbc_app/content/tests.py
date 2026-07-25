@@ -4706,3 +4706,57 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ContentTranscriptPublicAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='transcriptreader',
+            email='transcriptreader@example.com',
+            password='testpass123',
+        )
+        self.video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video con transcript',
+        )
+
+    def test_get_transcript_returns_display_text(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            parsed_plain='Texto parseado con acentos: qué.',
+            processed_plain='Texto procesado con acentos: qué.',
+            language='es',
+            source_subtitles=ContentTranscriptModelTests.SAMPLE_SRT,
+            format='SRT',
+        )
+
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['language'], 'es')
+        self.assertEqual(response.data['text'], 'Texto procesado con acentos: qué.')
+        self.assertEqual(response.data['segment_count'], 2)
+        self.assertEqual(len(response.data['segments']), 2)
+
+    def test_get_transcript_404_when_missing(self):
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_transcript_summary_omits_body(self):
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Texto largo que no debe viajar en el summary.',
+            language='es',
+        )
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/?summary=1',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_transcript'])
+        self.assertEqual(response.data['language'], 'es')
+        self.assertNotIn('text', response.data)
+        self.assertNotIn('segments', response.data)

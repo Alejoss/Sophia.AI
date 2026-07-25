@@ -13,6 +13,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import contentApi from "../api/contentApi";
 import VoteComponent from "../votes/VoteComponent";
 import ContentDisplay from "./ContentDisplay";
+import ContentTranscriptLink from "./ContentTranscriptLink";
 import ContentReferences from "./ContentReferences";
 
 // ContentDisplay Mode: "detailed" - Full content detail view from search results
@@ -136,6 +137,8 @@ const ContentDetailsSearch = () => {
           variant="detailed"
           showAuthor={true}
         />
+
+        <ContentTranscriptLink contentId={contentId} context="search" />
       </Paper>
 
       {/* Content References Section */}

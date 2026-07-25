@@ -17,6 +17,7 @@ import {
 import { requestPasswordReset } from "../api/profilesApi.js";
 import { applyApiErrorsToForm } from "../utils/apiFormErrors.js";
 import { emailField } from "../utils/formSchemas.js";
+import { bindMuiRhfField } from "../utils/muiRhfField.js";
 
 const schema = yup.object({
   email: emailField(),
@@ -31,11 +32,14 @@ const ForgotPassword = () => {
     handleSubmit,
     getValues,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { email: "" },
   });
+
+  const emailValue = watch("email");
 
   const onSubmit = async ({ email }) => {
     setGeneralError("");
@@ -91,7 +95,7 @@ const ForgotPassword = () => {
               <TextField
                 label="Correo electrónico"
                 type="email"
-                {...register("email")}
+                {...bindMuiRhfField(register("email"), emailValue)}
                 error={!!errors.email}
                 helperText={errors.email?.message}
                 fullWidth

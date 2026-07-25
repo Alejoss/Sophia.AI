@@ -272,6 +272,22 @@ const contentApi = {
     }
   },
 
+  getContentTranscript: async (contentId, { summary = false } = {}) => {
+    try {
+      const response = await axiosInstance.get(
+        `/content/content_details/${contentId}/transcript/`,
+        summary ? { params: { summary: '1' } } : undefined,
+      );
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      console.error('Error fetching content transcript:', error);
+      throw error;
+    }
+  },
+
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {
       let url = `/content/content_preview/${contentId}/`;

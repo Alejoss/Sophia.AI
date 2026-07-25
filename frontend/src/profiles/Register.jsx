@@ -16,6 +16,7 @@ import {
   usernameField,
 } from '../utils/formSchemas';
 import { getAuthNextPath } from '../utils/authNext';
+import { bindMuiRhfField } from '../utils/muiRhfField.js';
 import {
   Alert,
   Box,
@@ -77,28 +78,22 @@ const Register = () => {
     },
   });
 
+  const usernameValue = watch('username');
+  const emailValue = watch('email');
   const passwordValue = watch('password');
+  const confirmPasswordValue = watch('confirmPassword');
   const passwordOk =
     Boolean(passwordValue) &&
     touchedFields.password &&
     !errors.password &&
     getPasswordRuleErrors(passwordValue).length === 0;
 
-  const usernameRegister = register('username');
-  const emailRegister = register('email');
-  const passwordRegister = register('password');
-  const confirmRegister = register('confirmPassword');
-
-  const bindField = (fieldRegister, name) => {
-    const { ref, ...rest } = fieldRegister;
-    return {
-      ...rest,
-      inputRef: (el) => {
-        ref(el);
+  const bindField = (name, value) =>
+    bindMuiRhfField(register(name), value, {
+      onInputRef: (el) => {
         fieldRefs.current[name] = el;
       },
-    };
-  };
+    });
 
   const scrollToFirstError = (fieldErrors) => {
     const firstKey = Object.keys(fieldErrors)[0];
@@ -172,7 +167,7 @@ const Register = () => {
             <TextField
               id="username"
               label="Nombre de usuario"
-              {...bindField(usernameRegister, 'username')}
+              {...bindField('username', usernameValue)}
               onKeyDown={(e) => {
                 if (e.key === '@') {
                   e.preventDefault();
@@ -188,7 +183,7 @@ const Register = () => {
               id="email"
               label="Correo electrónico"
               type="email"
-              {...bindField(emailRegister, 'email')}
+              {...bindField('email', emailValue)}
               error={Boolean(errors.email)}
               helperText={errors.email?.message || ''}
               fullWidth
@@ -199,7 +194,7 @@ const Register = () => {
               id="password"
               label="Contraseña"
               type={showPassword ? 'text' : 'password'}
-              {...bindField(passwordRegister, 'password')}
+              {...bindField('password', passwordValue)}
               error={Boolean(errors.password)}
               helperText={
                 errors.password?.message ? (
@@ -241,7 +236,7 @@ const Register = () => {
               id="confirmPassword"
               label="Confirmar contraseña"
               type={showConfirmPassword ? 'text' : 'password'}
-              {...bindField(confirmRegister, 'confirmPassword')}
+              {...bindField('confirmPassword', confirmPasswordValue)}
               error={Boolean(errors.confirmPassword)}
               helperText={errors.confirmPassword?.message || ''}
               fullWidth

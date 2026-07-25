@@ -17,6 +17,7 @@ import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import ContentDisplay from './ContentDisplay';
+import ContentTranscriptLink from './ContentTranscriptLink';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import TopicHeader from '../topics/TopicHeader';
 import { AuthContext } from '../context/AuthContext';
@@ -231,6 +232,12 @@ const ContentDetailsTopic = () => {
                 <ContentDisplay 
                     content={content}
                     variant="preview"
+                />
+
+                <ContentTranscriptLink
+                    contentId={contentId}
+                    context="topic"
+                    topicId={topicId}
                 />
             </Paper>
 

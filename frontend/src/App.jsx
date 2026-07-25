@@ -56,6 +56,7 @@ import CollectionEditContent from './content/CollectionEditContent.jsx';
 import ContentDetailsTopic from './content/ContentDetailsTopic';
 import ContentDetailsLibrary from './content/ContentDetailsLibrary';
 import ContentDetailsSearch from './content/ContentDetailsSearch';
+import ContentTranscriptPage from './content/ContentTranscriptPage';
 import TopicCreationForm from './topics/TopicCreationForm';
 import TopicEdit from './topics/TopicEdit';
 import TopicList from './topics/TopicList';
@@ -225,6 +226,7 @@ const AppContent = () => {
               <Route path=":contentId" element={<ContentIdRedirect />} />
               <Route path=":contentId/topic/:topicId" element={<ContentDetailsTopic />} />
               <Route path=":contentId/library" element={<ContentDetailsLibrary />} />
+              <Route path=":contentId/transcript" element={<ContentTranscriptPage />} />
               <Route path="search/:contentId" element={<ContentDetailsSearch />} />
               <Route path=":contentId/edit" element={<ProtectedRoute><ContentProfileEdit /></ProtectedRoute>} />
               <Route path="library_upload_content" element={<LibraryUploadContent />} />

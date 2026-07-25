@@ -21,6 +21,7 @@ import {
 import { confirmPasswordReset } from "../api/profilesApi.js";
 import { applyApiErrorsToForm } from "../utils/apiFormErrors.js";
 import { passwordField } from "../utils/formSchemas.js";
+import { bindMuiRhfField } from "../utils/muiRhfField.js";
 
 const schema = yup.object({
   newPassword: passwordField(),
@@ -43,11 +44,15 @@ const PasswordResetConfirm = () => {
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { newPassword: "", confirmPassword: "" },
   });
+
+  const newPasswordValue = watch("newPassword");
+  const confirmPasswordValue = watch("confirmPassword");
 
   const onSubmit = async ({ newPassword, confirmPassword }) => {
     setGeneralError("");
@@ -121,7 +126,7 @@ const PasswordResetConfirm = () => {
               <TextField
                 label="Nueva contraseña"
                 type={showPassword ? "text" : "password"}
-                {...register("newPassword")}
+                {...bindMuiRhfField(register("newPassword"), newPasswordValue)}
                 error={!!errors.newPassword}
                 helperText={
                   errors.newPassword?.message ||
@@ -151,7 +156,7 @@ const PasswordResetConfirm = () => {
               <TextField
                 label="Confirmar nueva contraseña"
                 type={showConfirm ? "text" : "password"}
-                {...register("confirmPassword")}
+                {...bindMuiRhfField(register("confirmPassword"), confirmPasswordValue)}
                 error={!!errors.confirmPassword}
                 helperText={errors.confirmPassword?.message}
                 fullWidth

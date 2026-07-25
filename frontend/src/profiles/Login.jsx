@@ -17,6 +17,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { parseApiValidationErrors } from "../utils/apiFormErrors.js";
 import { getAuthNextPath } from "../utils/authNext";
+import { bindMuiRhfField } from "../utils/muiRhfField.js";
 import {
   Alert,
   Box,
@@ -64,11 +65,15 @@ const Login = () => {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(loginSchema),
     defaultValues: { username: "", password: "" },
   });
+
+  const usernameValue = watch("username");
+  const passwordValue = watch("password");
 
   useEffect(() => {
     // Select a random login cover image (1-10)
@@ -237,7 +242,7 @@ const Login = () => {
               <Stack spacing={2.5}>
                 <TextField
                   label="Usuario o correo electrónico"
-                  {...register("username")}
+                  {...bindMuiRhfField(register("username"), usernameValue)}
                   error={!!errors.username}
                   helperText={errors.username?.message}
                   fullWidth
@@ -246,7 +251,7 @@ const Login = () => {
                 <TextField
                   label="Contraseña"
                   type={showPassword ? "text" : "password"}
-                  {...register("password")}
+                  {...bindMuiRhfField(register("password"), passwordValue)}
                   error={!!errors.password}
                   helperText={errors.password?.message}
                   fullWidth

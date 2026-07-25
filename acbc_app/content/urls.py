@@ -85,6 +85,7 @@ from .views_youtube_migration import YouTubeMigrationManifestView
 from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
+    ContentTranscriptPublicView,
 )
 
 app_name = "content"
@@ -108,6 +109,11 @@ urlpatterns = [
     path('collections/<int:collection_id>/', CollectionDetailView.as_view(), name='collection-detail'),
     path('collections/<int:collection_id>/content/', CollectionContentView.as_view(), name='collection-content'),
     path('content_details/<int:pk>/', ContentDetailView.as_view(), name='content-detail'),
+    path(
+        'content_details/<int:content_id>/transcript/',
+        ContentTranscriptPublicView.as_view(),
+        name='content-transcript',
+    ),
     path('content_update/<int:pk>/', ContentUpdateView.as_view(), name='content-update'),
     path('content_modification_check/<int:pk>/', ContentModificationCheckView.as_view(), name='content-modification-check'),
     path('content_preview/<int:pk>/', ContentPreviewView.as_view(), name='content-preview'),

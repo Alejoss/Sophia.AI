@@ -7,6 +7,7 @@ import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentReferences from './ContentReferences';
 import ContentDisplay from './ContentDisplay';
+import ContentTranscriptLink from './ContentTranscriptLink';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import FileSuggestionUploadDialog from './FileSuggestionUploadDialog';
 import ContentDetailSkeleton from '../components/ContentDetailSkeleton';
@@ -206,6 +207,8 @@ const ContentDetailsLibrary = () => {
                 >
                     Luego podrás editar la imagen miniatura
                 </Typography>
+
+                <ContentTranscriptLink contentId={contentId} context="library" />
 
                 {/* Content References Section */}
                 {references && (

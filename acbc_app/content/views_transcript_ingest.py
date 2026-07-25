@@ -1,6 +1,6 @@
-"""API endpoints for external async transcript extraction workers.
+"""API endpoints for transcript ingest (workers) and public transcript read.
 
-Contract (machine-to-machine, header ``X-Transcript-Ingest-Key`` or ``Authorization: Bearer``):
+Machine-to-machine ingest (header ``X-Transcript-Ingest-Key`` or ``Authorization: Bearer``):
 
 * ``GET  /api/content/transcript-ingest/``
   Work queue / topic manifest. Default: VIDEO/AUDIO without a transcript.
@@ -21,12 +21,18 @@ Contract (machine-to-machine, header ``X-Transcript-Ingest-Key`` or ``Authorizat
 
 Queue items expose ``file_key`` (S3 object key) for workers with bucket credentials;
 they do not return pre-signed download URLs.
+
+User-facing read (JWT optional, same visibility as content detail GET):
+
+* ``GET /api/content/content_details/<content_id>/transcript/``
+  Full display text + optional timed segments for the content detail UI.
 """
 import logging
 
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,6 +41,7 @@ from content.permissions import TranscriptIngestPermission
 from content.serializers import (
     ContentTranscriptIngestSerializer,
     ContentTranscriptIngestSummarySerializer,
+    ContentTranscriptPublicSerializer,
     ContentTranscriptQueueItemSerializer,
 )
 
@@ -49,6 +56,37 @@ def _parse_bool(value):
     if value is None:
         return False
     return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+class ContentTranscriptPublicView(APIView):
+    """
+    GET /api/content/content_details/<content_id>/transcript/
+
+    Returns the user-facing transcript for a content item, or 404 if none exists.
+
+    Query ``summary=1`` returns metadata only (no text/segments) for detail-page
+    teasers that link to the dedicated transcript page.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, content_id):
+        content = get_object_or_404(Content, pk=content_id)
+        transcript = ContentTranscript.objects.filter(content=content).first()
+        if transcript is None:
+            return Response(
+                {'error': 'Este contenido aún no tiene transcripción.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if _parse_bool(request.query_params.get('summary')):
+            return Response({
+                'has_transcript': True,
+                'language': transcript.language or '',
+                'text_length': transcript.text_length,
+                'segment_count': len(transcript.segments or []),
+                'updated_at': transcript.updated_at,
+            })
+        return Response(ContentTranscriptPublicSerializer(transcript).data)
 
 
 class TranscriptIngestAPIView(APIView):

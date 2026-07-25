@@ -1361,6 +1361,33 @@ class ContentTranscriptIngestSerializer(serializers.Serializer):
         return attrs
 
 
+class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
+    """User-facing transcript payload for content detail pages."""
+
+    text = serializers.SerializerMethodField()
+    segment_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContentTranscript
+        fields = [
+            'language',
+            'format',
+            'text_length',
+            'text',
+            'segments',
+            'segment_count',
+            'updated_at',
+        ]
+
+    def get_text(self, obj):
+        from content.transcript_utils import resolve_hash_source_text
+
+        return resolve_hash_source_text(obj)
+
+    def get_segment_count(self, obj):
+        return len(obj.segments or [])
+
+
 class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
     segment_count = serializers.SerializerMethodField()
     has_parsed_plain = serializers.SerializerMethodField()

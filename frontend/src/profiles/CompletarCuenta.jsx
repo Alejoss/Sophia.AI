@@ -19,6 +19,7 @@ import bookClubsApi from '../api/bookClubsApi';
 import { completeFromInvite } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { passwordField, usernameField } from '../utils/formSchemas';
+import { bindMuiRhfField } from '../utils/muiRhfField.js';
 import { clearGuestSession } from '../bookClubs/guestStorage';
 
 const schema = yup.object({
@@ -46,12 +47,17 @@ const CompletarCuenta = () => {
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     mode: 'onBlur',
     defaultValues: { username: '', password: '', confirmPassword: '' },
   });
+
+  const usernameValue = watch('username');
+  const passwordValue = watch('password');
+  const confirmPasswordValue = watch('confirmPassword');
 
   useEffect(() => {
     let cancelled = false;
@@ -171,11 +177,12 @@ const CompletarCuenta = () => {
             value={preview?.email || ''}
             fullWidth
             InputProps={{ readOnly: true }}
+            InputLabelProps={{ shrink: Boolean(preview?.email) || undefined }}
           />
           <TextField
             label="Nombre de usuario"
             fullWidth
-            {...register('username')}
+            {...bindMuiRhfField(register('username'), usernameValue)}
             error={Boolean(errors.username)}
             helperText={errors.username?.message}
           />
@@ -183,7 +190,7 @@ const CompletarCuenta = () => {
             label="Contraseña"
             type="password"
             fullWidth
-            {...register('password')}
+            {...bindMuiRhfField(register('password'), passwordValue)}
             error={Boolean(errors.password)}
             helperText={errors.password?.message}
           />
@@ -191,7 +198,7 @@ const CompletarCuenta = () => {
             label="Confirmar contraseña"
             type="password"
             fullWidth
-            {...register('confirmPassword')}
+            {...bindMuiRhfField(register('confirmPassword'), confirmPasswordValue)}
             error={Boolean(errors.confirmPassword)}
             helperText={errors.confirmPassword?.message}
           />
