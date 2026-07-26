@@ -343,10 +343,11 @@ class PublicCollectionSummarySerializer(serializers.ModelSerializer):
 
 
 class FeaturedTextThumbnailSerializer(serializers.ModelSerializer):
-    """Compact card for search discovery: visible TEXT profiles with a cover image."""
+    """Compact card for search discovery / staff featured-book curation."""
     content_id = serializers.IntegerField(read_only=True)
     media_type = serializers.CharField(source='content.media_type', read_only=True)
     owner_username = serializers.CharField(source='user.username', read_only=True)
+    collection_name = serializers.CharField(source='collection.name', read_only=True, allow_null=True)
     thumbnail = serializers.ImageField(read_only=True)
     thumbnail_preview = serializers.ImageField(read_only=True)
 
@@ -354,7 +355,8 @@ class FeaturedTextThumbnailSerializer(serializers.ModelSerializer):
         model = ContentProfile
         fields = [
             'id', 'content_id', 'title', 'author', 'thumbnail', 'thumbnail_preview',
-            'media_type', 'owner_username',
+            'media_type', 'owner_username', 'collection_name',
+            'is_featured', 'featured_order',
         ]
 
     def to_representation(self, instance):

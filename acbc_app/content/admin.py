@@ -26,9 +26,10 @@ class ContentAdmin(admin.ModelAdmin):
 
 @admin.register(ContentProfile)
 class ContentProfileAdmin(admin.ModelAdmin):
-    list_display = ['title', 'author', 'user', 'collection']
-    list_filter = ['user', 'collection']
+    list_display = ['title', 'author', 'user', 'collection', 'is_visible', 'is_featured', 'featured_order']
+    list_filter = ['user', 'collection', 'is_visible', 'is_featured']
     search_fields = ['title', 'author']
+    list_editable = ['is_featured', 'featured_order']
 
 
 @admin.register(FileDetails)

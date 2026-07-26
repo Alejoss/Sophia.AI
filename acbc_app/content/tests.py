@@ -1074,7 +1074,7 @@ class PublicCollectionsAPITests(APITestCase):
 
 
 class FeaturedTextWithThumbnailsAPITests(APITestCase):
-    """Search landing: random visible TEXT profiles that have a thumbnail."""
+    """Search landing: staff-curated featured TEXT profiles with thumbnails."""
 
     def setUp(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -1089,6 +1089,23 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
             email='featured_viewer@example.com',
             password='pass12345',
         )
+        self.staff = User.objects.create_user(
+            username='featured_staff',
+            email='featured_staff@example.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        self.library = Library.objects.create(user=self.owner, name='Owner Library')
+        self.public_collection = Collection.objects.create(
+            library=self.library,
+            name='Public Books',
+            is_public=True,
+        )
+        self.private_collection = Collection.objects.create(
+            library=self.library,
+            name='Private Books',
+            is_public=False,
+        )
         tiny_gif = (
             b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00'
             b'!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01'
@@ -1101,9 +1118,25 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
                 original_title='Book With Cover',
             ),
             user=self.owner,
+            collection=self.public_collection,
             title='Book With Cover',
             is_visible=True,
+            is_featured=True,
+            featured_order=1,
             thumbnail=SimpleUploadedFile('cover.gif', tiny_gif, content_type='image/gif'),
+        )
+        self.eligible_not_featured = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Eligible Not Featured',
+            ),
+            user=self.owner,
+            collection=self.public_collection,
+            title='Eligible Not Featured',
+            is_visible=True,
+            is_featured=False,
+            thumbnail=SimpleUploadedFile('cover2.gif', tiny_gif, content_type='image/gif'),
         )
         self.without_thumb = ContentProfile.objects.create(
             content=Content.objects.create(
@@ -1112,8 +1145,10 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
                 original_title='Book Without Cover',
             ),
             user=self.owner,
+            collection=self.public_collection,
             title='Book Without Cover',
             is_visible=True,
+            is_featured=True,
         )
         self.hidden_with_thumb = ContentProfile.objects.create(
             content=Content.objects.create(
@@ -1122,9 +1157,24 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
                 original_title='Hidden Book',
             ),
             user=self.owner,
+            collection=self.public_collection,
             title='Hidden Book',
             is_visible=False,
+            is_featured=True,
             thumbnail=SimpleUploadedFile('hidden.gif', tiny_gif, content_type='image/gif'),
+        )
+        self.private_collection_book = ContentProfile.objects.create(
+            content=Content.objects.create(
+                uploaded_by=self.owner,
+                media_type='TEXT',
+                original_title='Private Collection Book',
+            ),
+            user=self.owner,
+            collection=self.private_collection,
+            title='Private Collection Book',
+            is_visible=True,
+            is_featured=True,
+            thumbnail=SimpleUploadedFile('private.gif', tiny_gif, content_type='image/gif'),
         )
         self.video_with_thumb = ContentProfile.objects.create(
             content=Content.objects.create(
@@ -1133,28 +1183,57 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
                 original_title='Video Cover',
             ),
             user=self.owner,
+            collection=self.public_collection,
             title='Video Cover',
             is_visible=True,
+            is_featured=True,
             thumbnail=SimpleUploadedFile('video.gif', tiny_gif, content_type='image/gif'),
         )
 
-    def test_returns_only_visible_text_with_thumbnail(self):
+    def test_returns_only_curated_eligible_featured_books(self):
         self.client.force_authenticate(user=self.viewer)
         url = reverse('content:featured-text-thumbnails')
         response = self.client.get(url, {'limit': 10})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = {row['id'] for row in response.data['results']}
-        self.assertIn(self.with_thumb.id, ids)
-        self.assertNotIn(self.without_thumb.id, ids)
-        self.assertNotIn(self.hidden_with_thumb.id, ids)
-        self.assertNotIn(self.video_with_thumb.id, ids)
-        row = next(r for r in response.data['results'] if r['id'] == self.with_thumb.id)
+        self.assertEqual(ids, {self.with_thumb.id})
+        row = response.data['results'][0]
         self.assertEqual(row['content_id'], self.with_thumb.content_id)
         self.assertEqual(row['media_type'], 'TEXT')
         self.assertTrue(row['thumbnail'])
+        self.assertTrue(row['is_featured'])
 
     def test_requires_authentication(self):
         url = reverse('content:featured-text-thumbnails')
+        response = self.client.get(url)
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_staff_can_feature_and_unfeature_eligible_book(self):
+        self.client.force_authenticate(user=self.staff)
+        add_url = reverse('content:admin-featured-books')
+        response = self.client.post(add_url, {'profile_id': self.eligible_not_featured.id}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.eligible_not_featured.refresh_from_db()
+        self.assertTrue(self.eligible_not_featured.is_featured)
+
+        remove_url = reverse(
+            'content:admin-featured-book-detail',
+            args=[self.eligible_not_featured.id],
+        )
+        response = self.client.delete(remove_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.eligible_not_featured.refresh_from_db()
+        self.assertFalse(self.eligible_not_featured.is_featured)
+
+    def test_staff_cannot_feature_book_without_thumbnail(self):
+        self.client.force_authenticate(user=self.staff)
+        url = reverse('content:admin-featured-books')
+        response = self.client.post(url, {'profile_id': self.without_thumb.id}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_staff_cannot_manage_featured(self):
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:admin-featured-books')
         response = self.client.get(url)
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 

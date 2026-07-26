@@ -120,7 +120,7 @@ const MainSearch = () => {
             setFeaturedError(
               err.response?.data?.error ||
                 err.message ||
-                'No se pudieron cargar los textos destacados',
+                'No se pudieron cargar los libros destacados',
             );
             setFeaturedTexts([]);
           }
@@ -387,24 +387,21 @@ const MainSearch = () => {
       </Box>
 
       {!hasSearched && (
-        <Box component="section" aria-labelledby="search-featured-texts-heading" sx={{ mb: 3 }}>
-          <Typography id="search-featured-texts-heading" variant="h6">
-            Textos con portada
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Una selección aleatoria de textos visibles con miniatura
+        <Box component="section" aria-labelledby="search-featured-books-heading" sx={{ mb: 3 }}>
+          <Typography id="search-featured-books-heading" variant="h6">
+            Algunos de los libros disponibles son:
           </Typography>
           {!isAuthenticated && (
             <Typography variant="body2" sx={{ mt: 1 }}>
               <MuiLink component={Link} to="/profiles/login" underline="hover">
                 Inicia sesión
               </MuiLink>{' '}
-              para ver textos destacados.
+              para verlos.
             </Typography>
           )}
           {isAuthenticated && featuredLoading && (
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Cargando textos…
+              Cargando libros…
             </Typography>
           )}
           {isAuthenticated && featuredError && !featuredLoading && (
@@ -414,7 +411,7 @@ const MainSearch = () => {
           )}
           {isAuthenticated && !featuredLoading && !featuredError && featuredTexts.length === 0 && (
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Aún no hay textos visibles con miniatura.
+              Pronto habrá libros destacados para explorar aquí.
             </Typography>
           )}
           {isAuthenticated && !featuredLoading && featuredTexts.length > 0 && (

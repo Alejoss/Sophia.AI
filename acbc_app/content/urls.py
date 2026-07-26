@@ -80,6 +80,10 @@ from .views import (
     AdminTopicCreationRequestApproveView,
     AdminTopicCreationRequestFinalizeView,
     AdminTopicCreationRequestRejectView,
+    AdminFeaturedBooksView,
+    AdminFeaturedBookDetailView,
+    AdminFeaturedBookCandidatesView,
+    AdminFeaturedBooksReorderView,
 )
 from .views_youtube_migration import YouTubeMigrationManifestView
 from .views_transcript_ingest import (
@@ -128,6 +132,22 @@ urlpatterns = [
     path('admin/topic-creation-requests/<int:request_id>/approve/', AdminTopicCreationRequestApproveView.as_view(), name='admin-topic-creation-request-approve'),
     path('admin/topic-creation-requests/<int:request_id>/finalize/', AdminTopicCreationRequestFinalizeView.as_view(), name='admin-topic-creation-request-finalize'),
     path('admin/topic-creation-requests/<int:request_id>/reject/', AdminTopicCreationRequestRejectView.as_view(), name='admin-topic-creation-request-reject'),
+    path('admin/featured-books/', AdminFeaturedBooksView.as_view(), name='admin-featured-books'),
+    path(
+        'admin/featured-books/candidates/',
+        AdminFeaturedBookCandidatesView.as_view(),
+        name='admin-featured-book-candidates',
+    ),
+    path(
+        'admin/featured-books/reorder/',
+        AdminFeaturedBooksReorderView.as_view(),
+        name='admin-featured-books-reorder',
+    ),
+    path(
+        'admin/featured-books/<int:profile_id>/',
+        AdminFeaturedBookDetailView.as_view(),
+        name='admin-featured-book-detail',
+    ),
     path('topics/<int:pk>/', TopicDetailView.as_view(), name='topic-detail'),
     path('topics/<int:pk>/content-simple/', TopicContentSimpleView.as_view(), name='topic-content-simple'),
     path('topics/<int:pk>/basic/', TopicBasicView.as_view(), name='topic-basic'),

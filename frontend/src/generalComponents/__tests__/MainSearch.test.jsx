@@ -72,7 +72,7 @@ describe('MainSearch form', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows featured TEXT covers under collections before searching', async () => {
+  it('shows featured book covers under collections before searching', async () => {
     mockGetFeaturedTextThumbnails.mockResolvedValue({
       results: [
         {
@@ -88,7 +88,9 @@ describe('MainSearch form', () => {
 
     renderWithProviders(<MainSearch />);
 
-    expect(await screen.findByText(/textos con portada/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/algunos de los libros disponibles son:/i),
+    ).toBeInTheDocument();
     expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
     expect(mockGetFeaturedTextThumbnails).toHaveBeenCalledWith({ limit: 10 });
   });

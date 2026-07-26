@@ -4,9 +4,11 @@ import { Box, Typography, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import TopicCreationRequestsAdmin from '../topics/TopicCreationRequestsAdmin';
 import BookClubsDashboardAdmin from '../bookClubs/BookClubsDashboardAdmin';
+import FeaturedBooksAdmin from '../content/FeaturedBooksAdmin';
 
 const DashboardHome = () => (
   <>
+    <FeaturedBooksAdmin />
     <BookClubsDashboardAdmin />
     <TopicCreationRequestsAdmin embedded />
   </>

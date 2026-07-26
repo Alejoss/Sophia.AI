@@ -99,12 +99,14 @@ const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null 
               label={`${Number(meta.text_length).toLocaleString()} caracteres`}
             />
           )}
-          {meta.segment_count > 0 && (
+          {meta.segment_count > 0 ? (
             <Chip
               size="small"
               variant="outlined"
-              label={`${meta.segment_count} segmentos`}
+              label={`${meta.segment_count} segmentos · con tiempos`}
             />
+          ) : (
+            <Chip size="small" variant="outlined" label="Texto continuo" />
           )}
         </Box>
       </Box>

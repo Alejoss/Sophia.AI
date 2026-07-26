@@ -161,6 +161,16 @@ class ContentProfile(models.Model):
     personal_note = models.TextField(blank=True, null=True)
     is_visible = models.BooleanField(default=True)  # Controls whether this content appears in search results
     is_producer = models.BooleanField(default=False)  # Indicates whether this user is the producer of the content
+    # Staff-curated shelf for the Search landing page (requires thumbnail + visibility).
+    is_featured = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='When true, eligible to appear in the Search page featured books section.',
+    )
+    featured_order = models.PositiveIntegerField(
+        default=0,
+        help_text='Lower values appear first among featured books.',
+    )
 
     # Editable thumbnail for this user's view of the content.
     # If not set, the app falls back to the content's og_image/favicons.

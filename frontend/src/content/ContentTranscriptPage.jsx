@@ -8,6 +8,8 @@ import {
   Container,
   IconButton,
   Paper,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -18,7 +20,7 @@ import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
 
-const formatMs = (ms) => {
+export const formatMs = (ms) => {
   if (ms == null || Number.isNaN(Number(ms))) return '';
   const totalSec = Math.max(0, Math.floor(Number(ms) / 1000));
   const hours = Math.floor(totalSec / 3600);
@@ -29,6 +31,12 @@ const formatMs = (ms) => {
   }
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 };
+
+export const plainTextFromSegments = (segments) =>
+  (Array.isArray(segments) ? segments : [])
+    .map((segment) => (segment?.text || '').trim())
+    .filter(Boolean)
+    .join(' ');
 
 const ContentTranscriptPage = () => {
   const { contentId } = useParams();
@@ -42,6 +50,8 @@ const ContentTranscriptPage = () => {
   const [transcript, setTranscript] = useState(undefined);
   const [error, setError] = useState(null);
   const [copyLabel, setCopyLabel] = useState('Copiar texto');
+  /** 'timed' | 'plain' — only meaningful when segments exist. */
+  const [viewMode, setViewMode] = useState('timed');
 
   const backPath = useMemo(() => {
     if (context === 'topic' && topicId) {
@@ -66,6 +76,7 @@ const ContentTranscriptPage = () => {
       setError(null);
       setTranscript(undefined);
       setContent(null);
+      setViewMode('timed');
 
       try {
         let detailContext = null;
@@ -115,10 +126,21 @@ const ContentTranscriptPage = () => {
     content?.original_title ||
     `Contenido ${contentId}`;
 
+  const segments = Array.isArray(transcript?.segments) ? transcript.segments : [];
+  const hasSegments = segments.length > 0;
+  const plainText = useMemo(() => {
+    if (transcript?.text) return transcript.text;
+    if (hasSegments) return plainTextFromSegments(segments);
+    return '';
+  }, [transcript?.text, hasSegments, segments]);
+
+  const showTimed = hasSegments && viewMode === 'timed';
+  const charCount = transcript?.text_length ?? plainText.length;
+
   const handleCopy = async () => {
-    if (!transcript?.text) return;
+    if (!plainText) return;
     try {
-      await navigator.clipboard.writeText(transcript.text);
+      await navigator.clipboard.writeText(plainText);
       setCopyLabel('Copiado');
       setTimeout(() => setCopyLabel('Copiar texto'), 1800);
     } catch {
@@ -134,9 +156,6 @@ const ContentTranscriptPage = () => {
       </Container>
     );
   }
-
-  const segments = Array.isArray(transcript?.segments) ? transcript.segments : [];
-  const hasSegments = segments.length > 0;
 
   return (
     <Container maxWidth="md" sx={{ pt: { xs: 8, md: 12 }, pb: 6 }}>
@@ -163,23 +182,28 @@ const ContentTranscriptPage = () => {
               {transcript?.language && (
                 <Chip size="small" label={String(transcript.language).toUpperCase()} />
               )}
-              {transcript?.text_length != null && (
+              {charCount > 0 && (
                 <Chip
                   size="small"
                   variant="outlined"
-                  label={`${Number(transcript.text_length).toLocaleString()} caracteres`}
+                  label={`${Number(charCount).toLocaleString()} caracteres`}
                 />
               )}
-              {hasSegments && (
+              {hasSegments ? (
                 <Chip
                   size="small"
                   variant="outlined"
                   label={`${segments.length} segmentos`}
                 />
+              ) : (
+                !error &&
+                plainText && (
+                  <Chip size="small" variant="outlined" label="Texto continuo" />
+                )
               )}
             </Box>
           </Box>
-          {transcript?.text && (
+          {plainText && (
             <Tooltip title={copyLabel}>
               <IconButton onClick={handleCopy} aria-label="Copiar transcripción">
                 <ContentCopyIcon />
@@ -198,9 +222,36 @@ const ContentTranscriptPage = () => {
           <Box
             sx={{
               display: 'flex',
+              justifyContent: 'flex-end',
+              mb: 1.5,
+            }}
+          >
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={viewMode}
+              onChange={(_, next) => {
+                if (next) setViewMode(next);
+              }}
+              aria-label="Modo de visualización de la transcripción"
+            >
+              <ToggleButton value="timed" sx={{ textTransform: 'none', px: 1.5 }}>
+                Con tiempos
+              </ToggleButton>
+              <ToggleButton value="plain" sx={{ textTransform: 'none', px: 1.5 }}>
+                Texto continuo
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
+
+        {!error && showTimed && (
+          <Box
+            sx={{
+              display: 'flex',
               flexDirection: 'column',
-              gap: 1.5,
-              pt: 1,
+              gap: 0,
+              pt: 0.5,
             }}
           >
             {segments.map((segment, index) => (
@@ -235,12 +286,12 @@ const ContentTranscriptPage = () => {
           </Box>
         )}
 
-        {!error && !hasSegments && transcript?.text && (
+        {!error && !showTimed && plainText && (
           <Typography
             variant="body1"
-            sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, pt: 1 }}
+            sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, pt: 0.5 }}
           >
-            {transcript.text}
+            {plainText}
           </Typography>
         )}
       </Paper>

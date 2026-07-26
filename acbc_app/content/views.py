@@ -1325,10 +1325,25 @@ class PublicCollectionsView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+def _eligible_featured_book_qs():
+    """TEXT profiles that can appear as featured: visible, public collection, with cover."""
+    return (
+        ContentProfile.objects.filter(
+            is_visible=True,
+            content__media_type='TEXT',
+            collection__is_public=True,
+        )
+        .exclude(thumbnail='')
+        .exclude(thumbnail__isnull=True)
+        .select_related('content', 'user', 'collection')
+    )
+
+
 class FeaturedTextWithThumbnailsView(APIView):
     """
-    Random sample of visible TEXT ContentProfiles that have a custom thumbnail.
-    Used on the search landing page under public collections.
+    Staff-curated featured TEXT books for the Search landing page.
+    Only returns profiles marked is_featured that remain eligible (visible,
+    public collection, thumbnail). Ordered by featured_order, then id.
     """
     permission_classes = [IsAuthenticated]
 
@@ -1340,14 +1355,150 @@ class FeaturedTextWithThumbnailsView(APIView):
         limit = max(1, min(limit, 30))
 
         qs = (
-            ContentProfile.objects.filter(
-                is_visible=True,
-                content__media_type='TEXT',
+            _eligible_featured_book_qs()
+            .filter(is_featured=True)
+            .order_by('featured_order', 'id')[:limit]
+        )
+        serializer = FeaturedTextThumbnailSerializer(
+            qs, many=True, context={'request': request}
+        )
+        return Response({'results': serializer.data})
+
+
+class AdminFeaturedBooksView(APIView):
+    """List currently featured books, or add one by profile_id."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        qs = (
+            ContentProfile.objects.filter(is_featured=True)
+            .select_related('content', 'user', 'collection')
+            .order_by('featured_order', 'id')
+        )
+        serializer = FeaturedTextThumbnailSerializer(
+            qs, many=True, context={'request': request}
+        )
+        return Response({'results': serializer.data, 'count': qs.count()})
+
+    def post(self, request):
+        profile_id = request.data.get('profile_id')
+        try:
+            profile_id = int(profile_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'profile_id inválido'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            .exclude(thumbnail='')
-            .exclude(thumbnail__isnull=True)
-            .select_related('content', 'user')
-            .order_by('?')[:limit]
+
+        profile = _eligible_featured_book_qs().filter(pk=profile_id).first()
+        if not profile:
+            return Response(
+                {
+                    'error': (
+                        'El libro no es elegible: debe ser TEXT visible, '
+                        'en una colección pública y con miniatura.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not profile.is_featured:
+            max_order = (
+                ContentProfile.objects.filter(is_featured=True)
+                .aggregate(models.Max('featured_order'))
+                .get('featured_order__max')
+            )
+            profile.is_featured = True
+            profile.featured_order = 0 if max_order is None else max_order + 1
+            profile.save(update_fields=['is_featured', 'featured_order', 'updated_at'])
+
+        serializer = FeaturedTextThumbnailSerializer(
+            profile, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminFeaturedBookDetailView(APIView):
+    """Remove a book from the featured shelf."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, profile_id):
+        profile = get_object_or_404(ContentProfile, pk=profile_id)
+        if profile.is_featured:
+            profile.is_featured = False
+            profile.featured_order = 0
+            profile.save(update_fields=['is_featured', 'featured_order', 'updated_at'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminFeaturedBookCandidatesView(APIView):
+    """Search eligible books (public collection + thumbnail) for featuring."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        qs = _eligible_featured_book_qs().order_by('-updated_at', '-id')
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(author__icontains=search)
+                | Q(content__original_title__icontains=search)
+                | Q(collection__name__icontains=search)
+            )
+        # Prefer showing non-featured candidates first when browsing
+        only_available = (request.query_params.get('available') or '').lower() in (
+            '1', 'true', 'yes',
+        )
+        if only_available:
+            qs = qs.filter(is_featured=False)
+
+        paginator = UserLibraryPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = FeaturedTextThumbnailSerializer(
+            page, many=True, context={'request': request}
+        )
+        return paginator.get_paginated_response(serializer.data)
+
+
+class AdminFeaturedBooksReorderView(APIView):
+    """Set featured_order from an ordered list of profile ids."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def put(self, request):
+        profile_ids = request.data.get('profile_ids')
+        if not isinstance(profile_ids, list) or not profile_ids:
+            return Response(
+                {'error': 'Se requiere profile_ids (lista no vacía)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        normalized = []
+        for raw in profile_ids:
+            try:
+                normalized.append(int(raw))
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'profile_ids contiene un id inválido'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        profiles = {
+            p.id: p
+            for p in ContentProfile.objects.filter(id__in=normalized, is_featured=True)
+        }
+        if len(profiles) != len(set(normalized)):
+            return Response(
+                {'error': 'Todos los ids deben ser libros actualmente destacados'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            for order, pid in enumerate(normalized):
+                ContentProfile.objects.filter(pk=pid).update(featured_order=order)
+
+        qs = (
+            ContentProfile.objects.filter(is_featured=True)
+            .select_related('content', 'user', 'collection')
+            .order_by('featured_order', 'id')
         )
         serializer = FeaturedTextThumbnailSerializer(
             qs, many=True, context={'request': request}

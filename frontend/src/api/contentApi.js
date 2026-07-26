@@ -519,6 +519,36 @@ const contentApi = {
     }
   },
 
+  getAdminFeaturedBooks: async () => {
+    const response = await axiosInstance.get('/content/admin/featured-books/');
+    return response.data;
+  },
+
+  getAdminFeaturedBookCandidates: async (params = {}) => {
+    const response = await axiosInstance.get('/content/admin/featured-books/candidates/', {
+      params,
+    });
+    return response.data;
+  },
+
+  addAdminFeaturedBook: async (profileId) => {
+    const response = await axiosInstance.post('/content/admin/featured-books/', {
+      profile_id: profileId,
+    });
+    return response.data;
+  },
+
+  removeAdminFeaturedBook: async (profileId) => {
+    await axiosInstance.delete(`/content/admin/featured-books/${profileId}/`);
+  },
+
+  reorderAdminFeaturedBooks: async (profileIds) => {
+    const response = await axiosInstance.put('/content/admin/featured-books/reorder/', {
+      profile_ids: profileIds,
+    });
+    return response.data;
+  },
+
   getTopicDetails: async (topicId, params = {}) => {
     try {
       const response = await axiosInstance.get(`/content/topics/${topicId}/`, { params });
