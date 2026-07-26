@@ -15,7 +15,7 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError, transaction
-from django.db.models import Q, OuterRef, Subquery, Count
+from django.db.models import Q, OuterRef, Subquery, Count, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
@@ -1436,7 +1436,13 @@ class AdminFeaturedBookCandidatesView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        qs = _eligible_featured_book_qs().order_by('-updated_at', '-id')
+        qs = (
+            _eligible_featured_book_qs()
+            .annotate(
+                sort_title=Coalesce('title', 'content__original_title', Value(''))
+            )
+            .order_by('sort_title', 'id')
+        )
         search = (request.query_params.get('search') or '').strip()
         if search:
             qs = qs.filter(

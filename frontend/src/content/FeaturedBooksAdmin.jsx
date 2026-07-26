@@ -4,24 +4,106 @@ import {
   Box,
   Button,
   Card,
-  CardContent,
+  CardActionArea,
   CircularProgress,
   IconButton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
 import contentApi from '../api/contentApi';
+
+const CANDIDATES_PAGE_SIZE = 36;
+
+const coverSrc = (item) => item.thumbnail_preview || item.thumbnail;
+const bookTitle = (item) => item.title || 'Sin título';
+
+const CoverImage = ({ item }) => {
+  const title = bookTitle(item);
+  const cover = coverSrc(item);
+  return (
+    <Box
+      sx={{
+        aspectRatio: '2 / 3',
+        bgcolor: 'grey.900',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {cover ? (
+        <Box
+          component="img"
+          src={cover}
+          alt={title}
+          loading="lazy"
+          sx={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      ) : (
+        <Typography variant="caption" color="text.secondary" sx={{ p: 1, textAlign: 'center' }}>
+          Sin portada
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+const CoverCard = ({
+  item,
+  onClick,
+  disabled,
+  overlay,
+  selected = false,
+  clickable = true,
+}) => {
+  const title = bookTitle(item);
+  return (
+    <Tooltip title={title} arrow enterDelay={400}>
+      <Card
+        variant="outlined"
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderColor: selected ? 'primary.main' : 'divider',
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        {clickable ? (
+          <CardActionArea
+            onClick={onClick}
+            disabled={disabled}
+            sx={{ display: 'block' }}
+            aria-label={`Destacar ${title}`}
+          >
+            <CoverImage item={item} />
+          </CardActionArea>
+        ) : (
+          <CoverImage item={item} />
+        )}
+        {overlay}
+      </Card>
+    </Tooltip>
+  );
+};
 
 const FeaturedBooksAdmin = () => {
   const [featured, setFeatured] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [error, setError] = useState(null);
@@ -41,22 +123,27 @@ const FeaturedBooksAdmin = () => {
     }
   }, []);
 
-  const loadCandidates = useCallback(async (query) => {
+  const loadCandidates = useCallback(async (query, pageNum = 1) => {
     setLoadingCandidates(true);
     setError(null);
     try {
       const data = await contentApi.getAdminFeaturedBookCandidates({
         search: query || undefined,
         available: true,
-        page: 1,
-        page_size: 12,
+        page: pageNum,
+        page_size: CANDIDATES_PAGE_SIZE,
       });
       setCandidates(Array.isArray(data?.results) ? data.results : []);
+      setPage(data?.current_page || pageNum);
+      setTotalPages(data?.total_pages || 1);
+      setTotalCount(data?.count || 0);
     } catch (err) {
       setError(
         err.response?.data?.error || err.message || 'No se pudieron buscar candidatos',
       );
       setCandidates([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoadingCandidates(false);
     }
@@ -64,14 +151,21 @@ const FeaturedBooksAdmin = () => {
 
   useEffect(() => {
     loadFeatured();
-    loadCandidates('');
+    loadCandidates('', 1);
   }, [loadFeatured, loadCandidates]);
 
   const handleSearch = async (event) => {
     event.preventDefault();
     const q = searchInput.trim();
     setSearch(q);
-    await loadCandidates(q);
+    setPage(1);
+    await loadCandidates(q, 1);
+  };
+
+  const handlePageChange = async (nextPage) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    setPage(nextPage);
+    await loadCandidates(search, nextPage);
   };
 
   const handleAdd = async (profileId) => {
@@ -79,7 +173,7 @@ const FeaturedBooksAdmin = () => {
     setError(null);
     try {
       await contentApi.addAdminFeaturedBook(profileId);
-      await Promise.all([loadFeatured(), loadCandidates(search)]);
+      await Promise.all([loadFeatured(), loadCandidates(search, page)]);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'No se pudo destacar el libro');
     } finally {
@@ -92,7 +186,7 @@ const FeaturedBooksAdmin = () => {
     setError(null);
     try {
       await contentApi.removeAdminFeaturedBook(profileId);
-      await Promise.all([loadFeatured(), loadCandidates(search)]);
+      await Promise.all([loadFeatured(), loadCandidates(search, page)]);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'No se pudo quitar el destacado');
     } finally {
@@ -120,64 +214,11 @@ const FeaturedBooksAdmin = () => {
     }
   };
 
-  const renderBookRow = (item, { actions }) => {
-    const cover = item.thumbnail_preview || item.thumbnail;
-    const title = item.title || 'Sin título';
-    return (
-      <Card key={item.id} variant="outlined" sx={{ mb: 1.5 }}>
-        <CardContent
-          sx={{
-            display: 'flex',
-            gap: 1.5,
-            alignItems: 'center',
-            py: 1.5,
-            '&:last-child': { pb: 1.5 },
-          }}
-        >
-          <Box
-            sx={{
-              width: 48,
-              height: 72,
-              flexShrink: 0,
-              bgcolor: 'grey.100',
-              borderRadius: 0.5,
-              overflow: 'hidden',
-            }}
-          >
-            {cover ? (
-              <Box
-                component="img"
-                src={cover}
-                alt={title}
-                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : null}
-          </Box>
-          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="subtitle2" noWrap>
-              {title}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block" noWrap>
-              {item.author ? `Por ${item.author}` : 'Sin autor'}
-              {item.collection_name ? ` · ${item.collection_name}` : ''}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            {actions}
-          </Stack>
-        </CardContent>
-      </Card>
-    );
-  };
-
   return (
-    <Box sx={{ mb: 5 }}>
-      <Typography variant="h5" gutterBottom>
-        Libros destacados (Buscar)
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Elige qué libros con portada aparecen en la página Buscar. Solo puedes seleccionar
-        textos visibles en colecciones públicas que tengan miniatura.
+    <Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Elige las portadas que aparecen en Buscar. Solo textos visibles en colecciones
+        públicas con miniatura. Los elegibles están ordenados por título.
       </Typography>
 
       {error && (
@@ -186,7 +227,7 @@ const FeaturedBooksAdmin = () => {
         </Alert>
       )}
 
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>
         Destacados actuales ({featured.length})
       </Typography>
       {loadingFeatured ? (
@@ -194,49 +235,87 @@ const FeaturedBooksAdmin = () => {
           <CircularProgress size={28} />
         </Box>
       ) : featured.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Aún no hay libros destacados. Busca abajo para añadir algunos.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          Aún no hay libros destacados. Elige portadas abajo.
         </Typography>
       ) : (
-        <Box sx={{ mb: 3 }}>
-          {featured.map((item, index) =>
-            renderBookRow(item, {
-              actions: (
-                <>
+        <Box
+          sx={{
+            mb: 4,
+            display: 'grid',
+            gap: 1.5,
+            gridTemplateColumns: {
+              xs: 'repeat(3, minmax(0, 1fr))',
+              sm: 'repeat(4, minmax(0, 1fr))',
+              md: 'repeat(6, minmax(0, 1fr))',
+              lg: 'repeat(8, minmax(0, 1fr))',
+            },
+          }}
+        >
+          {featured.map((item, index) => (
+            <CoverCard
+              key={item.id}
+              item={item}
+              selected
+              clickable={false}
+              disabled={busyId === item.id}
+              overlay={
+                <Stack
+                  direction="row"
+                  spacing={0.25}
+                  sx={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    bgcolor: 'rgba(0,0,0,0.55)',
+                    borderRadius: 1,
+                  }}
+                >
                   <IconButton
                     size="small"
                     aria-label="Subir"
                     disabled={busyId === item.id || index === 0}
-                    onClick={() => handleMove(index, -1)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMove(index, -1);
+                    }}
+                    sx={{ color: 'common.white', p: 0.5 }}
                   >
-                    <ArrowUpwardIcon fontSize="small" />
+                    <ArrowUpwardIcon fontSize="inherit" />
                   </IconButton>
                   <IconButton
                     size="small"
                     aria-label="Bajar"
                     disabled={busyId === item.id || index === featured.length - 1}
-                    onClick={() => handleMove(index, 1)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMove(index, 1);
+                    }}
+                    sx={{ color: 'common.white', p: 0.5 }}
                   >
-                    <ArrowDownwardIcon fontSize="small" />
+                    <ArrowDownwardIcon fontSize="inherit" />
                   </IconButton>
                   <IconButton
                     size="small"
                     aria-label="Quitar de destacados"
-                    color="error"
                     disabled={busyId === item.id}
-                    onClick={() => handleRemove(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(item.id);
+                    }}
+                    sx={{ color: 'error.light', p: 0.5 }}
                   >
-                    <DeleteOutlineIcon fontSize="small" />
+                    <CloseIcon fontSize="inherit" />
                   </IconButton>
-                </>
-              ),
-            }),
-          )}
+                </Stack>
+              }
+            />
+          ))}
         </Box>
       )}
 
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-        Añadir libros elegibles
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        Libros elegibles
       </Typography>
       <Box
         component="form"
@@ -250,13 +329,25 @@ const FeaturedBooksAdmin = () => {
           onChange={(e) => setSearchInput(e.target.value)}
           sx={{ flexGrow: 1, minWidth: 220 }}
         />
-        <Button type="submit" variant="outlined" startIcon={<SearchIcon />} disabled={loadingCandidates}>
+        <Button
+          type="submit"
+          variant="outlined"
+          startIcon={<SearchIcon />}
+          disabled={loadingCandidates}
+        >
           Buscar
         </Button>
       </Box>
 
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        {totalCount > 0
+          ? `${totalCount.toLocaleString()} libros · página ${page} de ${totalPages}`
+          : 'Sin resultados'}
+        {' · clic en una portada para destacar'}
+      </Typography>
+
       {loadingCandidates ? (
-        <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
           <CircularProgress size={28} />
         </Box>
       ) : candidates.length === 0 ? (
@@ -264,21 +355,57 @@ const FeaturedBooksAdmin = () => {
           No hay candidatos disponibles con esos filtros.
         </Typography>
       ) : (
-        candidates.map((item) =>
-          renderBookRow(item, {
-            actions: (
-              <Button
-                size="small"
-                variant="contained"
-                disabled={busyId === item.id}
-                onClick={() => handleAdd(item.id)}
-                sx={{ textTransform: 'none' }}
-              >
-                Destacar
-              </Button>
-            ),
-          }),
-        )
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 1.5,
+            gridTemplateColumns: {
+              xs: 'repeat(3, minmax(0, 1fr))',
+              sm: 'repeat(4, minmax(0, 1fr))',
+              md: 'repeat(6, minmax(0, 1fr))',
+              lg: 'repeat(8, minmax(0, 1fr))',
+            },
+          }}
+        >
+          {candidates.map((item) => (
+            <CoverCard
+              key={item.id}
+              item={item}
+              disabled={busyId === item.id}
+              onClick={() => handleAdd(item.id)}
+            />
+          ))}
+        </Box>
+      )}
+
+      {totalPages > 1 && (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            mt: 3,
+          }}
+        >
+          <Button
+            variant="outlined"
+            disabled={loadingCandidates || page <= 1}
+            onClick={() => handlePageChange(page - 1)}
+          >
+            Anterior
+          </Button>
+          <Typography variant="body2">
+            {page} / {totalPages}
+          </Typography>
+          <Button
+            variant="outlined"
+            disabled={loadingCandidates || page >= totalPages}
+            onClick={() => handlePageChange(page + 1)}
+          >
+            Siguiente
+          </Button>
+        </Box>
       )}
     </Box>
   );

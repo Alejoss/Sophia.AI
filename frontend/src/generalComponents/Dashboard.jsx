@@ -1,23 +1,32 @@
 import React, { useContext } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { Box, Typography, CircularProgress } from '@mui/material';
+import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Box, Tab, Tabs, Typography, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import TopicCreationRequestsAdmin from '../topics/TopicCreationRequestsAdmin';
 import BookClubsDashboardAdmin from '../bookClubs/BookClubsDashboardAdmin';
-import FeaturedBooksAdmin from '../content/FeaturedBooksAdmin';
 
-const DashboardHome = () => (
+export const DashboardHome = () => (
   <>
-    <FeaturedBooksAdmin />
     <BookClubsDashboardAdmin />
     <TopicCreationRequestsAdmin embedded />
   </>
 );
 
+const showDashboardTabs = (pathname) =>
+  pathname === '/dashboard'
+  || pathname === '/dashboard/'
+  || pathname.startsWith('/dashboard/libros-destacados');
+
+const dashboardTabValue = (pathname) => {
+  if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
+  return 'home';
+};
+
 const Dashboard = () => {
   const { authState, authInitialized } = useContext(AuthContext);
   const location = useLocation();
-  const isIndex = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
+  const withTabs = showDashboardTabs(location.pathname);
+  const tabValue = dashboardTabValue(location.pathname);
 
   if (!authInitialized) {
     return (
@@ -37,17 +46,34 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto', pb: 6 }}>
-      {isIndex && (
+      {withTabs && (
         <>
           <Typography variant="h4" gutterBottom>
             Dashboard
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Panel de administración de la plataforma.
           </Typography>
+          <Tabs
+            value={tabValue}
+            sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab
+              label="Inicio"
+              value="home"
+              component={RouterLink}
+              to="/dashboard"
+            />
+            <Tab
+              label="Libros destacados"
+              value="featured-books"
+              component={RouterLink}
+              to="/dashboard/libros-destacados"
+            />
+          </Tabs>
         </>
       )}
-      {isIndex ? <DashboardHome /> : <Outlet />}
+      <Outlet />
     </Box>
   );
 };

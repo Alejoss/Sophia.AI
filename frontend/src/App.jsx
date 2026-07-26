@@ -84,7 +84,8 @@ import PublicationEditForm from './publications/PublicationEditForm';
 import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import CommunityBubble from './generalComponents/CommunityBubble.jsx';
-import Dashboard from './generalComponents/Dashboard.jsx';
+import Dashboard, { DashboardHome } from './generalComponents/Dashboard.jsx';
+import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -254,6 +255,8 @@ const AppContent = () => {
             </Route>
             <Route path="search" element={<MainSearch />} />
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
+              <Route index element={<DashboardHome />} />
+              <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="book-clubs/nuevo" element={<BookClubAdminGeneral mode="create" />} />
               <Route path="book-clubs/:slug" element={<BookClubAdminLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
