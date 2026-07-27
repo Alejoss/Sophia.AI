@@ -337,18 +337,14 @@ const contentApi = {
   },
 
   /**
-   * Random visible TEXT profiles that have a custom thumbnail (search landing).
-   * @param {{ limit?: number }} params
+   * Staff-curated featured TEXT profiles with thumbnails (search landing).
+   * @param {{ page?: number, page_size?: number }} params
    */
   getFeaturedTextThumbnails: async (params = {}) => {
     try {
-      const searchParams = new URLSearchParams();
-      if (params.limit != null) searchParams.set('limit', String(params.limit));
-      const qs = searchParams.toString();
-      const url = qs
-        ? `/content/featured-text-thumbnails/?${qs}`
-        : '/content/featured-text-thumbnails/';
-      const response = await axiosInstance.get(url);
+      const response = await axiosInstance.get('/content/featured-text-thumbnails/', {
+        params,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching featured text thumbnails:', error);

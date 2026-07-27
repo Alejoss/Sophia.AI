@@ -1193,8 +1193,11 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
     def test_returns_only_curated_eligible_featured_books(self):
         self.client.force_authenticate(user=self.viewer)
         url = reverse('content:featured-text-thumbnails')
-        response = self.client.get(url, {'limit': 10})
+        response = self.client.get(url, {'page': 1, 'page_size': 20})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['current_page'], 1)
+        self.assertEqual(response.data['total_pages'], 1)
         ids = {row['id'] for row in response.data['results']}
         self.assertEqual(ids, {self.with_thumb.id})
         row = response.data['results'][0]
@@ -1202,6 +1205,45 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
         self.assertEqual(row['media_type'], 'TEXT')
         self.assertTrue(row['thumbnail'])
         self.assertTrue(row['is_featured'])
+
+    def test_featured_books_default_page_size_is_20(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        tiny_gif = (
+            b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00'
+            b'!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01'
+            b'\x00\x00\x02\x02D\x01\x00;'
+        )
+        for i in range(25):
+            ContentProfile.objects.create(
+                content=Content.objects.create(
+                    uploaded_by=self.owner,
+                    media_type='TEXT',
+                    original_title=f'Extra Featured {i}',
+                ),
+                user=self.owner,
+                collection=self.public_collection,
+                title=f'Extra Featured {i}',
+                is_visible=True,
+                is_featured=True,
+                featured_order=10 + i,
+                thumbnail=SimpleUploadedFile(
+                    f'extra{i}.gif', tiny_gif, content_type='image/gif'
+                ),
+            )
+
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:featured-text-thumbnails')
+        page1 = self.client.get(url)
+        self.assertEqual(page1.status_code, status.HTTP_200_OK)
+        self.assertEqual(page1.data['count'], 26)  # 25 extras + with_thumb
+        self.assertEqual(page1.data['total_pages'], 2)
+        self.assertEqual(len(page1.data['results']), 20)
+
+        page2 = self.client.get(url, {'page': 2})
+        self.assertEqual(page2.status_code, status.HTTP_200_OK)
+        self.assertEqual(page2.data['current_page'], 2)
+        self.assertEqual(len(page2.data['results']), 6)
 
     def test_requires_authentication(self):
         url = reverse('content:featured-text-thumbnails')

@@ -1339,6 +1339,21 @@ def _eligible_featured_book_qs():
     )
 
 
+class FeaturedBooksPagination(PageNumberPagination):
+    """Featured books on Search: 20 per page by default."""
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.page.paginator.count,
+            'current_page': self.page.number,
+            'total_pages': self.page.paginator.num_pages,
+            'results': data,
+        })
+
+
 class FeaturedTextWithThumbnailsView(APIView):
     """
     Staff-curated featured TEXT books for the Search landing page.
@@ -1348,21 +1363,17 @@ class FeaturedTextWithThumbnailsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        try:
-            limit = int(request.query_params.get('limit', 10))
-        except (TypeError, ValueError):
-            limit = 10
-        limit = max(1, min(limit, 30))
-
         qs = (
             _eligible_featured_book_qs()
             .filter(is_featured=True)
-            .order_by('featured_order', 'id')[:limit]
+            .order_by('featured_order', 'id')
         )
+        paginator = FeaturedBooksPagination()
+        page = paginator.paginate_queryset(qs, request)
         serializer = FeaturedTextThumbnailSerializer(
-            qs, many=True, context={'request': request}
+            page, many=True, context={'request': request}
         )
-        return Response({'results': serializer.data})
+        return paginator.get_paginated_response(serializer.data)
 
 
 class AdminFeaturedBooksView(APIView):

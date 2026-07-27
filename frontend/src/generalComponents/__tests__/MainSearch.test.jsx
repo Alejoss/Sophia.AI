@@ -92,6 +92,54 @@ describe('MainSearch form', () => {
       await screen.findByText(/algunos de los libros disponibles son:/i),
     ).toBeInTheDocument();
     expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
-    expect(mockGetFeaturedTextThumbnails).toHaveBeenCalledWith({ limit: 10 });
+    expect(mockGetFeaturedTextThumbnails).toHaveBeenCalledWith({
+      page: 1,
+      page_size: 20,
+    });
+  });
+
+  it('paginates featured books with next page control', async () => {
+    const user = userEvent.setup();
+    mockGetFeaturedTextThumbnails
+      .mockResolvedValueOnce({
+        results: [
+          {
+            id: 7,
+            content_id: 54,
+            title: 'El Secuestro de Bitcoin',
+            thumbnail_preview: 'https://cdn.example.com/cover.webp',
+            thumbnail: 'https://cdn.example.com/cover.jpg',
+            media_type: 'TEXT',
+          },
+        ],
+        current_page: 1,
+        total_pages: 2,
+        count: 25,
+      })
+      .mockResolvedValueOnce({
+        results: [
+          {
+            id: 8,
+            content_id: 55,
+            title: 'Segundo Libro Destacado',
+            thumbnail_preview: 'https://cdn.example.com/cover2.webp',
+            thumbnail: 'https://cdn.example.com/cover2.jpg',
+            media_type: 'TEXT',
+          },
+        ],
+        current_page: 2,
+        total_pages: 2,
+        count: 25,
+      });
+
+    renderWithProviders(<MainSearch />);
+
+    expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /siguientes 20/i }));
+    expect(await screen.findByText(/segundo libro destacado/i)).toBeInTheDocument();
+    expect(mockGetFeaturedTextThumbnails).toHaveBeenLastCalledWith({
+      page: 2,
+      page_size: 20,
+    });
   });
 });

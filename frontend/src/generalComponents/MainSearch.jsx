@@ -57,9 +57,41 @@ const MainSearch = () => {
   const [featuredTexts, setFeaturedTexts] = useState([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [featuredError, setFeaturedError] = useState(null);
+  const [featuredPage, setFeaturedPage] = useState(1);
+  const [featuredTotalPages, setFeaturedTotalPages] = useState(1);
+  const [featuredCount, setFeaturedCount] = useState(0);
+  const FEATURED_PAGE_SIZE = 20;
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const isAuthenticated = authState.isAuthenticated;
+
+  const loadFeaturedTexts = async (page = 1, { cancelled } = {}) => {
+    setFeaturedLoading(true);
+    setFeaturedError(null);
+    try {
+      const data = await contentApi.getFeaturedTextThumbnails({
+        page,
+        page_size: FEATURED_PAGE_SIZE,
+      });
+      if (cancelled?.()) return;
+      setFeaturedTexts(Array.isArray(data?.results) ? data.results : []);
+      setFeaturedPage(data?.current_page || page);
+      setFeaturedTotalPages(data?.total_pages || 1);
+      setFeaturedCount(data?.count || 0);
+    } catch (err) {
+      if (cancelled?.()) return;
+      setFeaturedError(
+        err.response?.data?.error ||
+          err.message ||
+          'No se pudieron cargar los libros destacados',
+      );
+      setFeaturedTexts([]);
+      setFeaturedTotalPages(1);
+      setFeaturedCount(0);
+    } finally {
+      if (!cancelled?.()) setFeaturedLoading(false);
+    }
+  };
 
   const {
     register,
@@ -80,14 +112,16 @@ const MainSearch = () => {
       setFeaturedTexts([]);
       setFeaturedLoading(false);
       setFeaturedError(null);
+      setFeaturedPage(1);
+      setFeaturedTotalPages(1);
+      setFeaturedCount(0);
       return;
     }
     let cancelled = false;
+    const isCancelled = () => cancelled;
     const loadDiscovery = async () => {
       setPublicLoading(true);
       setPublicError(null);
-      setFeaturedLoading(true);
-      setFeaturedError(null);
 
       const collectionsPromise = contentApi
         .getPublicCollections({ page: 1, page_size: 12 })
@@ -108,28 +142,10 @@ const MainSearch = () => {
           if (!cancelled) setPublicLoading(false);
         });
 
-      const featuredPromise = contentApi
-        .getFeaturedTextThumbnails({ limit: 10 })
-        .then((data) => {
-          if (!cancelled) {
-            setFeaturedTexts(Array.isArray(data?.results) ? data.results : []);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setFeaturedError(
-              err.response?.data?.error ||
-                err.message ||
-                'No se pudieron cargar los libros destacados',
-            );
-            setFeaturedTexts([]);
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setFeaturedLoading(false);
-        });
-
-      await Promise.all([collectionsPromise, featuredPromise]);
+      await Promise.all([
+        collectionsPromise,
+        loadFeaturedTexts(1, { cancelled: isCancelled }),
+      ]);
     };
     loadDiscovery();
     return () => {
@@ -415,86 +431,123 @@ const MainSearch = () => {
             </Typography>
           )}
           {isAuthenticated && !featuredLoading && featuredTexts.length > 0 && (
-            <Box
-              sx={{
-                mt: 1.5,
-                display: 'grid',
-                gap: 1.5,
-                gridTemplateColumns: {
-                  xs: 'repeat(2, minmax(0, 1fr))',
-                  sm: 'repeat(3, minmax(0, 1fr))',
-                  md: 'repeat(5, minmax(0, 1fr))',
-                },
-              }}
-            >
-              {featuredTexts.map((item) => {
-                const cover = item.thumbnail_preview || item.thumbnail;
-                const title = item.title || 'Sin título';
-                return (
-                  <Card
-                    key={item.id}
-                    variant="outlined"
-                    sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}
-                  >
-                    <CardActionArea
-                      onClick={() =>
-                        navigate(`/content/search/${item.content_id}?profile=${item.id}`, {
-                          state: { from: '/search' },
-                        })
-                      }
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'stretch',
-                        height: '100%',
-                      }}
+            <>
+              <Box
+                sx={{
+                  mt: 1.5,
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: 'repeat(3, minmax(0, 1fr))',
+                    md: 'repeat(5, minmax(0, 1fr))',
+                  },
+                }}
+              >
+                {featuredTexts.map((item) => {
+                  const cover = item.thumbnail_preview || item.thumbnail;
+                  const title = item.title || 'Sin título';
+                  return (
+                    <Card
+                      key={item.id}
+                      variant="outlined"
+                      sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}
                     >
-                      <Box
+                      <CardActionArea
+                        onClick={() =>
+                          navigate(`/content/search/${item.content_id}?profile=${item.id}`, {
+                            state: { from: '/search' },
+                          })
+                        }
                         sx={{
-                          aspectRatio: '2 / 3',
-                          bgcolor: 'grey.100',
-                          overflow: 'hidden',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          flexDirection: 'column',
+                          alignItems: 'stretch',
+                          height: '100%',
                         }}
                       >
-                        {cover ? (
-                          <Box
-                            component="img"
-                            src={cover}
-                            alt={title}
-                            loading="lazy"
-                            sx={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              display: 'block',
-                            }}
-                          />
-                        ) : null}
-                      </Box>
-                      <CardContent sx={{ py: 1.25, px: 1.25, width: '100%' }}>
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          component="div"
+                        <Box
                           sx={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
+                            aspectRatio: '2 / 3',
+                            bgcolor: 'grey.100',
                             overflow: 'hidden',
-                            minHeight: '2.5em',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}
                         >
-                          {title}
-                        </Typography>
-                      </CardContent>
-                    </CardActionArea>
-                  </Card>
-                );
-              })}
-            </Box>
+                          {cover ? (
+                            <Box
+                              component="img"
+                              src={cover}
+                              alt={title}
+                              loading="lazy"
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                            />
+                          ) : null}
+                        </Box>
+                        <CardContent sx={{ py: 1.25, px: 1.25, width: '100%' }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            component="div"
+                            sx={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              minHeight: '2.5em',
+                            }}
+                          >
+                            {title}
+                          </Typography>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  );
+                })}
+              </Box>
+              {featuredTotalPages > 1 && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 2,
+                    mt: 2,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={featuredLoading || featuredPage <= 1}
+                    onClick={() => loadFeaturedTexts(featuredPage - 1)}
+                  >
+                    Anteriores {FEATURED_PAGE_SIZE}
+                  </Button>
+                  <Typography variant="body2" color="text.secondary">
+                    {featuredPage} / {featuredTotalPages}
+                    {featuredCount > 0
+                      ? ` · ${featuredCount.toLocaleString()} libros`
+                      : ''}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={featuredLoading || featuredPage >= featuredTotalPages}
+                    onClick={() => loadFeaturedTexts(featuredPage + 1)}
+                  >
+                    Siguientes {FEATURED_PAGE_SIZE}
+                  </Button>
+                </Box>
+              )}
+            </>
           )}
         </Box>
       )}
