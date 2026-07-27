@@ -4925,3 +4925,107 @@ class ContentTranscriptPublicAPITests(APITestCase):
         self.assertEqual(response.data['language'], 'es')
         self.assertNotIn('text', response.data)
         self.assertNotIn('segments', response.data)
+
+@override_settings(TRANSCRIPT_INGEST_API_KEY='test-embed-key')
+class ContentEmbeddingIngestAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='embedworker',
+            email='embedworker@example.com',
+            password='testpass123',
+        )
+        self.video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video para embeber',
+        )
+        self.auth_header = {'HTTP_X_TRANSCRIPT_INGEST_KEY': 'test-embed-key'}
+        self.transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Hola, bienvenidos al podcast sobre blockchain.',
+            language='es',
+        )
+
+    def test_queue_lists_pending_transcripts(self):
+        response = self.client.get(
+            '/api/content/embedding-ingest/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in response.data['items']]
+        self.assertIn(self.video.id, ids)
+        item = next(i for i in response.data['items'] if i['id'] == self.video.id)
+        self.assertEqual(item['embedding_status'], 'pending')
+        self.assertEqual(item['text_hash'], self.transcript.text_hash)
+
+    def test_ack_indexed_updates_bookkeeping(self):
+        response = self.client.put(
+            f'/api/content/embedding-ingest/{self.video.id}/',
+            {
+                'status': 'indexed',
+                'embedding_model': 'text-embedding-3-large',
+                'embedding_dims': 3072,
+                'chunk_count': 2,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.transcript.refresh_from_db()
+        self.assertEqual(self.transcript.embedding_status, 'indexed')
+        self.assertEqual(self.transcript.embedded_text_hash, self.transcript.text_hash)
+        self.assertEqual(self.transcript.embedding_model, 'text-embedding-3-large')
+        self.assertEqual(self.transcript.embedding_dims, 3072)
+        self.assertEqual(self.transcript.chunk_count, 2)
+        self.assertIsNotNone(self.transcript.embedded_at)
+
+    def test_ack_indexed_rejects_hash_mismatch(self):
+        response = self.client.put(
+            f'/api/content/embedding-ingest/{self.video.id}/',
+            {
+                'status': 'indexed',
+                'embedding_model': 'text-embedding-3-large',
+                'embedding_dims': 3072,
+                'chunk_count': 1,
+                'embedded_text_hash': '0' * 64,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.transcript.refresh_from_db()
+        self.assertEqual(self.transcript.embedding_status, 'pending')
+
+    def test_ack_failed_sets_error(self):
+        response = self.client.put(
+            f'/api/content/embedding-ingest/{self.video.id}/',
+            {
+                'status': 'failed',
+                'embedding_error': 'Qdrant upsert timeout',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.transcript.refresh_from_db()
+        self.assertEqual(self.transcript.embedding_status, 'failed')
+        self.assertIn('timeout', self.transcript.embedding_error)
+
+    def test_ack_requires_transcript(self):
+        other = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Sin transcript',
+        )
+        response = self.client.put(
+            f'/api/content/embedding-ingest/{other.id}/',
+            {
+                'status': 'indexed',
+                'embedding_model': 'text-embedding-3-large',
+                'embedding_dims': 3072,
+                'chunk_count': 1,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)

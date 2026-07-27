@@ -55,7 +55,11 @@ def is_sql_ascii_database() -> bool:
 
 def warn_if_sql_ascii_database() -> None:
     """Log a warning when the DB cluster is not UTF8 (operational notice, not a crash)."""
-    encodings = get_postgres_encodings()
+    try:
+        encodings = get_postgres_encodings()
+    except Exception as exc:
+        logger.warning('Could not check PostgreSQL encoding: %s', exc)
+        return
     if encodings is None:
         return
     if encodings.get('server') == 'SQL_ASCII':

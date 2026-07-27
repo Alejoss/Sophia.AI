@@ -37,6 +37,7 @@ The API uses JWT (JSON Web Tokens) for authentication. See [Authentication Guide
 - **[Search](endpoints.md#search)** - Search functionality
 - **[Notifications](endpoints.md#notifications)** - In-app notifications (`/api/profiles/notifications/`). See also [backend notifications](../backend/notifications.md).
 - **[Transcript ingest (workers)](transcript-ingest.md)** - Machine-to-machine queue + upsert for external Whisper/captions workers
+- **[Qdrant embeddings](../operations/qdrant-embeddings.md)** - Embedding ack API + Qdrant Cloud config for topic RAG
 
 ## Request/Response Format
 

@@ -1495,6 +1495,120 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             return False
 
 
+class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
+    """Manifest row for an external embed worker (needs existing transcript)."""
+
+    text_hash = serializers.SerializerMethodField()
+    text_length = serializers.SerializerMethodField()
+    language = serializers.SerializerMethodField()
+    embedding_status = serializers.SerializerMethodField()
+    embedding_model = serializers.SerializerMethodField()
+    embedding_dims = serializers.SerializerMethodField()
+    chunk_count = serializers.SerializerMethodField()
+    embedded_text_hash = serializers.SerializerMethodField()
+    embedded_at = serializers.SerializerMethodField()
+
+    class Meta(ContentTranscriptQueueItemSerializer.Meta):
+        fields = ContentTranscriptQueueItemSerializer.Meta.fields + [
+            'text_hash',
+            'text_length',
+            'language',
+            'embedding_status',
+            'embedding_model',
+            'embedding_dims',
+            'chunk_count',
+            'embedded_text_hash',
+            'embedded_at',
+        ]
+
+    def _transcript(self, obj):
+        try:
+            return obj.transcript
+        except ContentTranscript.DoesNotExist:
+            return None
+
+    def get_text_hash(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.text_hash if transcript else None
+
+    def get_text_length(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.text_length if transcript else None
+
+    def get_language(self, obj):
+        transcript = self._transcript(obj)
+        return (transcript.language or '') if transcript else ''
+
+    def get_embedding_status(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.embedding_status if transcript else None
+
+    def get_embedding_model(self, obj):
+        transcript = self._transcript(obj)
+        return (transcript.embedding_model or '') if transcript else ''
+
+    def get_embedding_dims(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.embedding_dims if transcript else None
+
+    def get_chunk_count(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.chunk_count if transcript else None
+
+    def get_embedded_text_hash(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.embedded_text_hash if transcript else None
+
+    def get_embedded_at(self, obj):
+        transcript = self._transcript(obj)
+        return transcript.embedded_at if transcript else None
+
+
+class ContentEmbeddingAckSerializer(serializers.Serializer):
+    """Worker ack after upserting (or failing to upsert) vectors externally."""
+
+    status = serializers.ChoiceField(
+        choices=[
+            ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            ContentTranscript.EMBEDDING_STATUS_FAILED,
+            ContentTranscript.EMBEDDING_STATUS_SKIPPED,
+        ]
+    )
+    embedded_text_hash = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=64,
+        help_text='Must match current transcript.text_hash when status=indexed. '
+                  'Omit to use the current hash.',
+    )
+    embedding_model = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    embedding_dims = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    chunk_count = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    embedded_at = serializers.DateTimeField(required=False, allow_null=True)
+    embedding_error = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_INDEXED:
+            if attrs.get('embedding_dims') is None:
+                raise serializers.ValidationError({
+                    'embedding_dims': 'Requerido cuando status=indexed.',
+                })
+            if attrs.get('chunk_count') is None:
+                raise serializers.ValidationError({
+                    'chunk_count': 'Requerido cuando status=indexed.',
+                })
+            if not (attrs.get('embedding_model') or '').strip():
+                raise serializers.ValidationError({
+                    'embedding_model': 'Requerido cuando status=indexed.',
+                })
+        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_FAILED:
+            if not (attrs.get('embedding_error') or '').strip():
+                raise serializers.ValidationError({
+                    'embedding_error': 'Requerido cuando status=failed.',
+                })
+        return attrs
+
+
 class TopicCreationRequestSerializer(serializers.ModelSerializer):
     requested_by = UserSerializer(read_only=True)
     reviewed_by = UserSerializer(read_only=True)

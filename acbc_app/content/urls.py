@@ -91,6 +91,10 @@ from .views_transcript_ingest import (
     ContentTranscriptIngestDetailView,
     ContentTranscriptPublicView,
 )
+from .views_embedding_ingest import (
+    ContentEmbeddingIngestQueueView,
+    ContentEmbeddingIngestDetailView,
+)
 
 app_name = "content"
 
@@ -217,5 +221,15 @@ urlpatterns = [
         'transcript-ingest/<int:content_id>/',
         ContentTranscriptIngestDetailView.as_view(),
         name='transcript-ingest-detail',
+    ),
+    path(
+        'embedding-ingest/',
+        ContentEmbeddingIngestQueueView.as_view(),
+        name='embedding-ingest-queue',
+    ),
+    path(
+        'embedding-ingest/<int:content_id>/',
+        ContentEmbeddingIngestDetailView.as_view(),
+        name='embedding-ingest-detail',
     ),
 ]

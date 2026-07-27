@@ -118,6 +118,33 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 - **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format`, `language`
 - **Response**: `{ content_id, created, transcript }` (201 create / 200 update)
 
+## Content — Embedding ingest (external workers)
+
+Machine-to-machine API for an external embed worker that upserts vectors to **Qdrant Cloud**. Sophia only stores `ContentTranscript.embedding_*` bookkeeping (no vectors in Postgres).
+
+Full contract: [qdrant-embeddings.md](../operations/qdrant-embeddings.md).
+
+Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
+
+### List embedding queue
+- **GET** `/api/content/embedding-ingest/`
+- **Auth**: Ingest API key
+- **Query**: `topic_id`, `media_type`, `content_id`, `status` (comma-separated), `include_completed`, `limit`, `offset`
+- **Default statuses**: `pending`, `stale`, `failed`
+- **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }`
+
+### Get embedding job detail
+- **GET** `/api/content/embedding-ingest/{content_id}/`
+- **Auth**: Ingest API key
+- **Response**: `{ content, has_transcript, transcript }`
+- **409** if the content has no transcript yet
+
+### Ack embedding result
+- **PUT** `/api/content/embedding-ingest/{content_id}/`
+- **Auth**: Ingest API key
+- **Body**: `status` = `indexed` | `failed` | `skipped`; for `indexed` require `embedding_model`, `embedding_dims`, `chunk_count` (optional `embedded_text_hash`, `embedded_at`); for `failed` require `embedding_error`
+- **409** if `embedded_text_hash` ≠ current `text_hash`
+
 ## Topics — Timeline
 
 Editorial timeline attached to a topic. One timeline per topic; entries are ordered and can link topic content.

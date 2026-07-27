@@ -728,6 +728,12 @@ FRONTEND_PUBLIC_URL = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5173')
 # External async workers that upload parsed subtitles/transcripts (machine-to-machine).
 TRANSCRIPT_INGEST_API_KEY = os.getenv('TRANSCRIPT_INGEST_API_KEY', '')
 
+# Qdrant Cloud — vector search for topic embeddings (written by external embed worker).
+QDRANT_URL = os.getenv('QDRANT_URL', '').rstrip('/')
+QDRANT_API_KEY = os.getenv('QDRANT_API_KEY', '')
+QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'sophia_acbc_topic_chunks')
+QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '3072'))
+
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry
 configure_sentry()

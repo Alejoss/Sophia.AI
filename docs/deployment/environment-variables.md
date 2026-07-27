@@ -115,10 +115,44 @@ Location: `acbc_app/.env`
 ### Transcript ingest (external workers)
 
 #### `TRANSCRIPT_INGEST_API_KEY`
-- **Description**: Shared secret for machine-to-machine access to `/api/content/transcript-ingest/`. External workers authenticate with header `X-Transcript-Ingest-Key: <key>` or `Authorization: Bearer <key>`. If unset/empty, all ingest endpoints return 403.
-- **Required**: No (required to run transcript workers against this API)
+- **Description**: Shared secret for machine-to-machine access to `/api/content/transcript-ingest/` and `/api/content/embedding-ingest/`. External workers authenticate with header `X-Transcript-Ingest-Key: <key>` or `Authorization: Bearer <key>`. If unset/empty, all ingest endpoints return 403.
+- **Required**: No (required to run transcript/embed workers against this API)
 - **Example**: `TRANSCRIPT_INGEST_API_KEY=long-random-secret`
 - **Note**: Workers with AWS credentials use the S3 `file_key` from the queue response to download media; this key only gates the Django ingest API.
+
+### Qdrant Cloud (topic embeddings)
+
+Vectors live in Qdrant; Django only stores `ContentTranscript.embedding_*` metadata and queries Qdrant for RAG.
+
+#### `QDRANT_URL`
+- **Description**: Qdrant Cloud cluster HTTPS endpoint (Overview → Endpoint). No trailing slash.
+- **Required**: No (required for topic vector search / `check_qdrant`)
+- **Example**: `QDRANT_URL=https://9032e54e-….us-west-2-0.aws.cloud.qdrant.io`
+
+#### `QDRANT_API_KEY`
+- **Description**: API key from the cluster **API Keys** tab
+- **Required**: No (required with `QDRANT_URL`)
+- **Example**: `QDRANT_API_KEY=eyJ…`
+
+#### `QDRANT_COLLECTION`
+- **Description**: Collection name for topic chunks
+- **Required**: No
+- **Default**: `sophia_acbc_topic_chunks`
+- **Example**: `QDRANT_COLLECTION=sophia_acbc_topic_chunks`
+
+#### `QDRANT_VECTOR_SIZE`
+- **Description**: Embedding dimensions (must match the embed model)
+- **Required**: No
+- **Default**: `3072` (`text-embedding-3-large`)
+- **Example**: `QDRANT_VECTOR_SIZE=3072`
+
+Verify locally/prod:
+
+```bash
+docker compose exec backend python manage.py check_qdrant
+docker compose exec backend python manage.py check_qdrant --ensure-collection
+docker compose exec backend python manage.py check_qdrant --topic-id 2
+```
 
 ### AWS Configuration (Production)
 
