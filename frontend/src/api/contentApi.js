@@ -338,7 +338,7 @@ const contentApi = {
 
   /**
    * Staff-curated featured TEXT profiles with thumbnails (search landing).
-   * @param {{ page?: number, page_size?: number }} params
+   * @param {{ page?: number, page_size?: number, seed?: string|number }} params
    */
   getFeaturedTextThumbnails: async (params = {}) => {
     try {

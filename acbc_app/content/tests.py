@@ -1245,6 +1245,50 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
         self.assertEqual(page2.data['current_page'], 2)
         self.assertEqual(len(page2.data['results']), 6)
 
+        page1_ids = {row['id'] for row in page1.data['results']}
+        page2_ids = {row['id'] for row in page2.data['results']}
+        self.assertFalse(page1_ids & page2_ids)
+
+    def test_featured_books_seed_keeps_order_stable_across_pages(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        tiny_gif = (
+            b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00'
+            b'!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01'
+            b'\x00\x00\x02\x02D\x01\x00;'
+        )
+        for i in range(25):
+            ContentProfile.objects.create(
+                content=Content.objects.create(
+                    uploaded_by=self.owner,
+                    media_type='TEXT',
+                    original_title=f'Seed Featured {i}',
+                ),
+                user=self.owner,
+                collection=self.public_collection,
+                title=f'Seed Featured {i}',
+                is_visible=True,
+                is_featured=True,
+                featured_order=100 + i,
+                thumbnail=SimpleUploadedFile(
+                    f'seed{i}.gif', tiny_gif, content_type='image/gif'
+                ),
+            )
+
+        self.client.force_authenticate(user=self.viewer)
+        url = reverse('content:featured-text-thumbnails')
+        first = self.client.get(url, {'seed': '42', 'page': 1, 'page_size': 20})
+        second = self.client.get(url, {'seed': '42', 'page': 1, 'page_size': 20})
+        self.assertEqual(
+            [row['id'] for row in first.data['results']],
+            [row['id'] for row in second.data['results']],
+        )
+        other_seed = self.client.get(url, {'seed': '99', 'page': 1, 'page_size': 20})
+        # With enough items, different seeds should usually differ; assert at least
+        # that both responses are valid full pages.
+        self.assertEqual(len(other_seed.data['results']), 20)
+        self.assertEqual(other_seed.data['count'], first.data['count'])
+
     def test_requires_authentication(self):
         url = reverse('content:featured-text-thumbnails')
         response = self.client.get(url)

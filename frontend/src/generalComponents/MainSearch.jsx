@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
@@ -59,8 +59,8 @@ const MainSearch = () => {
   const [featuredError, setFeaturedError] = useState(null);
   const [featuredPage, setFeaturedPage] = useState(1);
   const [featuredTotalPages, setFeaturedTotalPages] = useState(1);
-  const [featuredCount, setFeaturedCount] = useState(0);
   const FEATURED_PAGE_SIZE = 20;
+  const featuredSeedRef = useRef(String(Math.floor(Math.random() * 2_147_483_647)));
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const isAuthenticated = authState.isAuthenticated;
@@ -72,12 +72,12 @@ const MainSearch = () => {
       const data = await contentApi.getFeaturedTextThumbnails({
         page,
         page_size: FEATURED_PAGE_SIZE,
+        seed: featuredSeedRef.current,
       });
       if (cancelled?.()) return;
       setFeaturedTexts(Array.isArray(data?.results) ? data.results : []);
       setFeaturedPage(data?.current_page || page);
       setFeaturedTotalPages(data?.total_pages || 1);
-      setFeaturedCount(data?.count || 0);
     } catch (err) {
       if (cancelled?.()) return;
       setFeaturedError(
@@ -87,7 +87,6 @@ const MainSearch = () => {
       );
       setFeaturedTexts([]);
       setFeaturedTotalPages(1);
-      setFeaturedCount(0);
     } finally {
       if (!cancelled?.()) setFeaturedLoading(false);
     }
@@ -114,7 +113,6 @@ const MainSearch = () => {
       setFeaturedError(null);
       setFeaturedPage(1);
       setFeaturedTotalPages(1);
-      setFeaturedCount(0);
       return;
     }
     let cancelled = false;
@@ -520,7 +518,6 @@ const MainSearch = () => {
                     alignItems: 'center',
                     gap: 2,
                     mt: 2,
-                    flexWrap: 'wrap',
                   }}
                 >
                   <Button
@@ -529,21 +526,15 @@ const MainSearch = () => {
                     disabled={featuredLoading || featuredPage <= 1}
                     onClick={() => loadFeaturedTexts(featuredPage - 1)}
                   >
-                    Anteriores {FEATURED_PAGE_SIZE}
+                    Anteriores
                   </Button>
-                  <Typography variant="body2" color="text.secondary">
-                    {featuredPage} / {featuredTotalPages}
-                    {featuredCount > 0
-                      ? ` · ${featuredCount.toLocaleString()} libros`
-                      : ''}
-                  </Typography>
                   <Button
                     variant="outlined"
                     size="small"
                     disabled={featuredLoading || featuredPage >= featuredTotalPages}
                     onClick={() => loadFeaturedTexts(featuredPage + 1)}
                   >
-                    Siguientes {FEATURED_PAGE_SIZE}
+                    Siguientes
                   </Button>
                 </Box>
               )}

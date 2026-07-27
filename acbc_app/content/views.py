@@ -19,6 +19,8 @@ from django.db.models import Q, OuterRef, Subquery, Count, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
+import random
+import hashlib
 
 from utils.permissions import IsAuthor
 from utils.notification_utils import (
@@ -1358,20 +1360,48 @@ class FeaturedTextWithThumbnailsView(APIView):
     """
     Staff-curated featured TEXT books for the Search landing page.
     Only returns profiles marked is_featured that remain eligible (visible,
-    public collection, thumbnail). Ordered by featured_order, then id.
+    public collection, thumbnail).
+
+    Order is a deterministic shuffle from `seed` (stable across pages for the
+    same visit). Without seed, falls back to the calendar day so order rotates
+    daily.
     """
     permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _shuffle_seed(raw_seed):
+        if raw_seed is None or str(raw_seed).strip() == '':
+            raw_seed = timezone.now().strftime('%Y-%m-%d')
+        raw = str(raw_seed).strip()[:64]
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            digest = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+            return int(digest[:8], 16)
 
     def get(self, request):
         qs = (
             _eligible_featured_book_qs()
             .filter(is_featured=True)
-            .order_by('featured_order', 'id')
+            .order_by('id')
         )
+        ids = list(qs.values_list('id', flat=True))
+        rng = random.Random(self._shuffle_seed(request.query_params.get('seed')))
+        rng.shuffle(ids)
+
         paginator = FeaturedBooksPagination()
-        page = paginator.paginate_queryset(qs, request)
+        page_ids = paginator.paginate_queryset(ids, request)
+        if not page_ids:
+            return paginator.get_paginated_response([])
+
+        id_order = {pk: index for index, pk in enumerate(page_ids)}
+        profiles = list(
+            ContentProfile.objects.filter(pk__in=page_ids)
+            .select_related('content', 'user', 'collection')
+        )
+        profiles.sort(key=lambda profile: id_order[profile.id])
         serializer = FeaturedTextThumbnailSerializer(
-            page, many=True, context={'request': request}
+            profiles, many=True, context={'request': request}
         )
         return paginator.get_paginated_response(serializer.data)
 

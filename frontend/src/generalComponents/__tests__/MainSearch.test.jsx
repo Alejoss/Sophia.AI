@@ -95,6 +95,7 @@ describe('MainSearch form', () => {
     expect(mockGetFeaturedTextThumbnails).toHaveBeenCalledWith({
       page: 1,
       page_size: 20,
+      seed: expect.any(String),
     });
   });
 
@@ -135,11 +136,12 @@ describe('MainSearch form', () => {
     renderWithProviders(<MainSearch />);
 
     expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
-    await user.click(await screen.findByRole('button', { name: /siguientes 20/i }));
+    await user.click(await screen.findByRole('button', { name: /^siguientes$/i }));
     expect(await screen.findByText(/segundo libro destacado/i)).toBeInTheDocument();
     expect(mockGetFeaturedTextThumbnails).toHaveBeenLastCalledWith({
       page: 2,
       page_size: 20,
+      seed: expect.any(String),
     });
   });
 });
