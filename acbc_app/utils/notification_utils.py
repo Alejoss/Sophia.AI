@@ -2,6 +2,7 @@
 Utility functions for handling notifications across the application.
 """
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath
 from content.models import (
@@ -27,6 +28,20 @@ def create_notification(**kwargs):
         if field in kwargs and kwargs[field]:
             kwargs[field] = prepare_text_for_db(kwargs[field])
     return Notification.objects.create(**kwargs)
+
+
+def matching_verb_q(verb):
+    """
+    Build a Q filter that matches a verb whether stored with accents or
+    ASCII-stripped (SQL_ASCII legacy clusters via prepare_text_for_db).
+    """
+    from utils.db_encoding import to_ascii_safe
+
+    accented = verb or ''
+    ascii_verb = to_ascii_safe(accented)
+    if accented == ascii_verb:
+        return Q(verb=accented)
+    return Q(verb=accented) | Q(verb=ascii_verb)
 
 def notify_comment_reply(comment):
     """
@@ -381,13 +396,15 @@ def notify_knowledge_path_completion(user, knowledge_path):
     user_ct = ContentType.objects.get_for_model(user)
     knowledge_path_ct = ContentType.objects.get_for_model(knowledge_path)
     logger.debug(f"Content types - User: {user_ct}, Knowledge Path: {knowledge_path_ct}")
+
+    completion_verb = 'completó tu camino de conocimiento'
     
-    # Check if notification already exists
+    # Check if notification already exists (match accented or ASCII-stripped verb)
     existing_notifications = Notification.objects.filter(
+        matching_verb_q(completion_verb),
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completó tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id
     )
@@ -405,7 +422,7 @@ def notify_knowledge_path_completion(user, knowledge_path):
         recipient=knowledge_path.author,
         actor_content_type=user_ct,
         actor_object_id=user.id,
-        verb='completó tu camino de conocimiento',
+        verb=completion_verb,
         target_content_type=knowledge_path_ct,
         target_object_id=knowledge_path.id,
         description=f'{user.username} completó tu camino de conocimiento "{knowledge_path.title}"'
@@ -471,12 +488,13 @@ def notify_certificate_request(certificate_request):
     from django.utils import timezone
     from datetime import timedelta
     
+    request_verb = 'solicitó un certificado para tu camino de conocimiento'
     recent_cutoff = timezone.now() - timedelta(hours=1)
     existing_notifications = Notification.objects.filter(
+        matching_verb_q(request_verb),
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='solicitó un certificado para tu camino de conocimiento',
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
         timestamp__gte=recent_cutoff
@@ -495,7 +513,7 @@ def notify_certificate_request(certificate_request):
         recipient=certificate_request.knowledge_path.author,
         actor_content_type=requester_ct,
         actor_object_id=certificate_request.requester.id,
-        verb='solicitó un certificado para tu camino de conocimiento',
+        verb=request_verb,
         target_content_type=knowledge_path_ct,
         target_object_id=certificate_request.knowledge_path.id,
         description=f'{certificate_request.requester.username} solicitó un certificado para tu camino de conocimiento "{certificate_request.knowledge_path.title}"'

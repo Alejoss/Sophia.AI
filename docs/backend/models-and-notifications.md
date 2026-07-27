@@ -27,7 +27,8 @@ See **[notifications.md](notifications.md)** for the full API reference, verb ca
 
 Summary:
 
-- **Deduplication**: Helpers check for existing notifications (same `recipient`, `actor`, `verb`, `action_object`, `target`) before creating. Reduces duplicates from repeated triggers.
+- **Deduplication**: Helpers check for existing notifications (same `recipient`, `actor`, `verb`, `action_object`, `target`) before creating. Verb matching is accent-safe (`matching_verb_q`) so SQL_ASCII-stripped verbs still dedupe. Reduces duplicates from repeated triggers.
+- **Path completion**: Notifications fire only on write-side completion transitions (`notify_if_knowledge_path_completed`), not when progress APIs call `is_knowledge_path_completed`.
 - **Cleanup**: `GET /api/profiles/notifications/` deletes read notifications older than 30 days for the current user.
 - **Volume**: High-traffic features (e.g. comments, votes, suggestions) can create many notifications. Monitor DB size and consider limiting or throttling in `notification_utils` for bursty events.
 

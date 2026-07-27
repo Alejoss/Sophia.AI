@@ -77,9 +77,30 @@ All endpoints require authentication (`IsAuthenticated`).
 
 ## Policies
 
+### Path completion notifications
+
+`is_knowledge_path_completed()` is a **pure read** used by progress APIs and badge rules. It does **not** create notifications.
+
+Completion notifications are sent only from write-side transitions via `notify_if_knowledge_path_completed()`:
+
+- When a node is marked completed (`UserNodeCompletion` signal)
+- When a quiz attempt scores 100 and that finishes the path (`UserQuizAttempt` signal)
+
+`notify_knowledge_path_completion` permanently deduplicates per (author, learner, path).
+
+### Certificate requests
+
+Learners may request a certificate for a knowledge path only when:
+
+1. `certificates_enabled` is true on the path
+2. The learner has path access (payment / unlock rules)
+3. The learner has **completed** the path (`is_knowledge_path_completed`)
+
+The frontend hides the request CTA until completion; the backend enforces the same rule.
+
 ### Deduplication
 
-Most helpers in `notification_utils.py` skip creation when an identical notification already exists (same `recipient`, `actor`, `verb`, `action_object`, `target`). Some high-frequency flows also throttle by time window (e.g. certificate requests within the last hour).
+Most helpers in `notification_utils.py` skip creation when an identical notification already exists (same `recipient`, `actor`, `verb`, `action_object`, `target`). Verb matching uses `matching_verb_q()` so accented verbs and ASCII-stripped forms (legacy SQL_ASCII storage via `prepare_text_for_db`) count as the same. Some high-frequency flows also throttle by time window (e.g. certificate requests within the last hour).
 
 ### Performance
 

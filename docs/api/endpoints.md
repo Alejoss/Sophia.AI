@@ -426,9 +426,10 @@ Full product docs: [book-clubs.md](../architecture/book-clubs.md).
 - **Response**: User's certificates
 
 ### Request Certificate
-- **POST** `/api/certificates/request/`
+- **POST** `/api/certificates/request/{path_id}/`
 - **Auth**: Required
-- **Body**: Certificate request data
+- **Body**: Certificate request data (`notes` optional)
+- **Requirements**: Path must have `certificates_enabled`, requester must have path access, and requester must have **completed** the path (all nodes + perfect quiz scores). Otherwise `403` with `code: path_not_completed` (or `path_payment_required` / certificates disabled).
 
 ### Get Certificate Detail
 - **GET** `/api/certificates/{id}/`
