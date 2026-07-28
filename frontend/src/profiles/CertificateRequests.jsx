@@ -217,7 +217,10 @@ const CertificateRequests = () => {
               </Box>
 
               <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-                {request.status === 'PENDING' && request.knowledge_path_author === authState.user?.username &&
+                {request.status === 'PENDING' && (
+                  request.knowledge_path_author === authState.user?.username ||
+                  request.event_owner === authState.user?.username
+                ) &&
                 <>
                     <Button
                     variant="contained"
@@ -235,7 +238,10 @@ const CertificateRequests = () => {
                     </Button>
                   </>
                 }
-                {request.status === 'REJECTED' && request.knowledge_path_author === authState.user?.username &&
+                {request.status === 'REJECTED' && (
+                  request.knowledge_path_author === authState.user?.username ||
+                  request.event_owner === authState.user?.username
+                ) &&
                 <Button
                   variant="contained"
                   color="success"

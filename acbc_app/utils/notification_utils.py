@@ -453,248 +453,256 @@ def notify_knowledge_path_completion(user, knowledge_path):
             'knowledge_path_id': knowledge_path.id,
         })
 
+def _certificate_request_context(certificate_request, actor=None):
+    """
+    Resolve recipient-facing target + deciding user for a certificate request.
+
+    Supports knowledge-path and event requests. Returns None when the request
+    has no usable target/owner (caller should skip notifying).
+    """
+    knowledge_path = certificate_request.knowledge_path
+    event = certificate_request.event
+
+    if knowledge_path is not None:
+        owner = knowledge_path.author
+        if owner is None:
+            logger.warning(
+                "Certificate request knowledge path has no author - skipping notification",
+                extra={'certificate_request_id': certificate_request.id, 'knowledge_path_id': knowledge_path.id},
+            )
+            return None
+        title = knowledge_path.title
+        target = knowledge_path
+        target_kind = 'camino de conocimiento'
+    elif event is not None:
+        owner = event.owner
+        if owner is None:
+            logger.warning(
+                "Certificate request event has no owner - skipping notification",
+                extra={'certificate_request_id': certificate_request.id, 'event_id': event.id},
+            )
+            return None
+        title = event.title
+        target = event
+        target_kind = 'evento'
+    else:
+        logger.warning(
+            "Certificate request has neither knowledge_path nor event - skipping notification",
+            extra={'certificate_request_id': certificate_request.id},
+        )
+        return None
+
+    deciding_user = actor or owner
+    return {
+        'owner': owner,
+        'deciding_user': deciding_user,
+        'title': title,
+        'target': target,
+        'target_kind': target_kind,
+        'target_ct': ContentType.objects.get_for_model(target),
+        'request_ct': ContentType.objects.get_for_model(certificate_request),
+        'requester_ct': ContentType.objects.get_for_model(certificate_request.requester),
+        'decider_ct': ContentType.objects.get_for_model(deciding_user),
+    }
+
+
 def notify_certificate_request(certificate_request):
     """
-    Create a notification when someone requests a certificate for a knowledge path.
-    Notifies the knowledge path author.
-    
-    Args:
-        certificate_request: The CertificateRequest instance that was created
+    Create a notification when someone requests a certificate.
+    Notifies the knowledge path author or event owner.
     """
+    context = _certificate_request_context(certificate_request)
+    if context is None:
+        return
+
+    owner = context['owner']
+    title = context['title']
+    target_kind = context['target_kind']
+    requester = certificate_request.requester
+
     logger.info("Creating certificate request notification", extra={
-        'requester_id': certificate_request.requester.id,
-        'requester_username': certificate_request.requester.username,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'knowledge_path_title': certificate_request.knowledge_path.title,
-        'knowledge_path_author_id': certificate_request.knowledge_path.author.id,
-        'knowledge_path_author_username': certificate_request.knowledge_path.author.username,
+        'requester_id': requester.id,
+        'requester_username': requester.username,
+        'target_id': context['target'].id,
+        'target_title': title,
+        'owner_id': owner.id,
+        'owner_username': owner.username,
+        'target_kind': target_kind,
     })
-    
-    # Don't notify if requester is the author
-    if certificate_request.requester == certificate_request.knowledge_path.author:
-        logger.info("Requester is the author - skipping notification", extra={
-            'requester_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
+
+    if requester == owner:
+        logger.info("Requester is the owner - skipping notification", extra={
+            'requester_id': requester.id,
+            'target_id': context['target'].id,
         })
         return
-        
-    # Get content types
-    requester_ct = ContentType.objects.get_for_model(certificate_request.requester)
-    knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    logger.debug(f"Content types - Requester: {requester_ct}, Knowledge Path: {knowledge_path_ct}")
-    
-    # Check if notification already exists for this specific request
-    # We'll check for recent notifications (within the last hour) to avoid spam
+
     from django.utils import timezone
     from datetime import timedelta
-    
-    request_verb = 'solicitó un certificado para tu camino de conocimiento'
+
+    if target_kind == 'evento':
+        request_verb = 'solicitó un certificado para tu evento'
+    else:
+        request_verb = 'solicitó un certificado para tu camino de conocimiento'
+
     recent_cutoff = timezone.now() - timedelta(hours=1)
     existing_notifications = Notification.objects.filter(
         matching_verb_q(request_verb),
-        recipient=certificate_request.knowledge_path.author,
-        actor_content_type=requester_ct,
-        actor_object_id=certificate_request.requester.id,
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id,
-        timestamp__gte=recent_cutoff
+        recipient=owner,
+        actor_content_type=context['requester_ct'],
+        actor_object_id=requester.id,
+        target_content_type=context['target_ct'],
+        target_object_id=context['target'].id,
+        timestamp__gte=recent_cutoff,
     )
-    logger.debug(f"Recent existing notifications count: {existing_notifications.count()}")
-    
+
     if existing_notifications.exists():
-        logger.info("Recent notification already exists - skipping creation", extra={
-            'requester_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
+        logger.info("Recent certificate request notification already exists - skipping", extra={
+            'requester_id': requester.id,
+            'target_id': context['target'].id,
         })
         return
-    
-    # Create the notification
+
     notification = create_notification(
-        recipient=certificate_request.knowledge_path.author,
-        actor_content_type=requester_ct,
-        actor_object_id=certificate_request.requester.id,
+        recipient=owner,
+        actor_content_type=context['requester_ct'],
+        actor_object_id=requester.id,
         verb=request_verb,
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.requester.username} solicitó un certificado para tu camino de conocimiento "{certificate_request.knowledge_path.title}"'
+        action_object_content_type=context['request_ct'],
+        action_object_object_id=certificate_request.id,
+        target_content_type=context['target_ct'],
+        target_object_id=context['target'].id,
+        description=f'{requester.username} solicitó un certificado para tu {target_kind} "{title}"',
     )
     logger.info("Certificate request notification created successfully", extra={
         'notification_id': notification.id,
-        'requester_id': certificate_request.requester.id,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'recipient_id': notification.recipient.id,
-        'actor_id': notification.actor.id,
+        'requester_id': requester.id,
+        'recipient_id': owner.id,
+        'target_id': context['target'].id,
     })
-    
-    # Verify the notification was created
-    if notification:
-        logger.debug("Notification verification successful", extra={
-            'notification_id': notification.id,
-            'recipient': notification.recipient.username,
-            'actor': notification.actor.username,
-            'verb': notification.verb,
-            'timestamp': notification.timestamp.isoformat(),
-            'unread': notification.unread,
-            'target_content_type': str(notification.target_content_type),
-            'target_object_id': notification.target_object_id,
-        })
-    else:
-        logger.warning("Notification not found in database after creation", extra={
-            'requester_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
-        })
 
-def notify_certificate_approval(certificate_request):
+
+def notify_certificate_approval(certificate_request, actor=None):
     """
     Create a notification when a certificate request is approved.
     Notifies the student who requested the certificate.
-    
-    Args:
-        certificate_request: The CertificateRequest instance that was approved
+
+    Dedup is per CertificateRequest (action_object), not per path/event, so a
+    later re-request after cancel/reject still notifies the student.
     """
+    context = _certificate_request_context(certificate_request, actor=actor)
+    if context is None:
+        return
+
+    deciding_user = context['deciding_user']
+    title = context['title']
+    student = certificate_request.requester
+
     logger.info("Creating certificate approval notification", extra={
-        'student_id': certificate_request.requester.id,
-        'student_username': certificate_request.requester.username,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'knowledge_path_title': certificate_request.knowledge_path.title,
-        'approver_id': certificate_request.knowledge_path.author.id,
-        'approver_username': certificate_request.knowledge_path.author.username,
+        'student_id': student.id,
+        'student_username': student.username,
+        'target_id': context['target'].id,
+        'target_title': title,
+        'approver_id': deciding_user.id,
+        'approver_username': deciding_user.username,
+        'certificate_request_id': certificate_request.id,
+        'target_kind': context['target_kind'],
     })
-    
-    # Get content types
-    approver_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path.author)
-    knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    logger.debug(f"Content types - Approver: {approver_ct}, Knowledge Path: {knowledge_path_ct}")
-    
-    # Check if notification already exists
+
+    approval_verb = 'aprobó tu solicitud de certificado para'
+
     existing_notifications = Notification.objects.filter(
-        recipient=certificate_request.requester,
-        actor_content_type=approver_ct,
-        actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='aprobó tu solicitud de certificado para',
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id
+        matching_verb_q(approval_verb),
+        recipient=student,
+        action_object_content_type=context['request_ct'],
+        action_object_object_id=certificate_request.id,
     )
-    logger.debug(f"Existing notifications count: {existing_notifications.count()}")
-    
+
     if existing_notifications.exists():
-        logger.info("Notification already exists - skipping creation", extra={
-            'student_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
+        logger.info("Approval notification already exists for this request - skipping", extra={
+            'student_id': student.id,
+            'certificate_request_id': certificate_request.id,
         })
         return
-    
-    # Create the notification
+
     notification = create_notification(
-        recipient=certificate_request.requester,
-        actor_content_type=approver_ct,
-        actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='aprobó tu solicitud de certificado para',
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.knowledge_path.author.username} aprobó tu solicitud de certificado para "{certificate_request.knowledge_path.title}"'
+        recipient=student,
+        actor_content_type=context['decider_ct'],
+        actor_object_id=deciding_user.id,
+        verb=approval_verb,
+        action_object_content_type=context['request_ct'],
+        action_object_object_id=certificate_request.id,
+        target_content_type=context['target_ct'],
+        target_object_id=context['target'].id,
+        description=f'{deciding_user.username} aprobó tu solicitud de certificado para "{title}"',
     )
     logger.info("Certificate approval notification created successfully", extra={
         'notification_id': notification.id,
-        'student_id': certificate_request.requester.id,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'recipient_id': notification.recipient.id,
-        'actor_id': notification.actor.id,
+        'student_id': student.id,
+        'certificate_request_id': certificate_request.id,
+        'recipient_id': student.id,
+        'actor_id': deciding_user.id,
     })
-    
-    # Verify the notification was created
-    if notification:
-        logger.debug("Notification verification successful", extra={
-            'notification_id': notification.id,
-            'recipient': notification.recipient.username,
-            'actor': notification.actor.username,
-            'verb': notification.verb,
-            'timestamp': notification.timestamp.isoformat(),
-            'unread': notification.unread,
-            'target_content_type': str(notification.target_content_type),
-            'target_object_id': notification.target_object_id,
-        })
-    else:
-        logger.warning("Notification not found in database after creation", extra={
-            'student_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
-        })
 
-def notify_certificate_rejection(certificate_request):
+
+def notify_certificate_rejection(certificate_request, actor=None):
     """
     Create a notification when a certificate request is rejected.
     Notifies the student who requested the certificate.
-    
-    Args:
-        certificate_request: The CertificateRequest instance that was rejected
     """
+    context = _certificate_request_context(certificate_request, actor=actor)
+    if context is None:
+        return
+
+    deciding_user = context['deciding_user']
+    title = context['title']
+    student = certificate_request.requester
+
     logger.info("Creating certificate rejection notification", extra={
-        'student_id': certificate_request.requester.id,
-        'student_username': certificate_request.requester.username,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'knowledge_path_title': certificate_request.knowledge_path.title,
-        'rejector_id': certificate_request.knowledge_path.author.id,
-        'rejector_username': certificate_request.knowledge_path.author.username,
+        'student_id': student.id,
+        'student_username': student.username,
+        'target_id': context['target'].id,
+        'target_title': title,
+        'rejector_id': deciding_user.id,
+        'rejector_username': deciding_user.username,
+        'certificate_request_id': certificate_request.id,
     })
-    
-    # Get content types
-    rejector_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path.author)
-    knowledge_path_ct = ContentType.objects.get_for_model(certificate_request.knowledge_path)
-    logger.debug(f"Content types - Rejector: {rejector_ct}, Knowledge Path: {knowledge_path_ct}")
-    
-    # Check if notification already exists
+
+    rejection_verb = 'rechazó tu solicitud de certificado para'
+
     existing_notifications = Notification.objects.filter(
-        recipient=certificate_request.requester,
-        actor_content_type=rejector_ct,
-        actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='rechazó tu solicitud de certificado para',
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id
+        matching_verb_q(rejection_verb),
+        recipient=student,
+        action_object_content_type=context['request_ct'],
+        action_object_object_id=certificate_request.id,
     )
-    logger.debug(f"Existing notifications count: {existing_notifications.count()}")
-    
+
     if existing_notifications.exists():
-        logger.info("Notification already exists - skipping creation", extra={
-            'student_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
+        logger.info("Rejection notification already exists for this request - skipping", extra={
+            'student_id': student.id,
+            'certificate_request_id': certificate_request.id,
         })
         return
-    
-    # Create the notification
+
     notification = create_notification(
-        recipient=certificate_request.requester,
-        actor_content_type=rejector_ct,
-        actor_object_id=certificate_request.knowledge_path.author.id,
-        verb='rechazó tu solicitud de certificado para',
-        target_content_type=knowledge_path_ct,
-        target_object_id=certificate_request.knowledge_path.id,
-        description=f'{certificate_request.knowledge_path.author.username} rechazó tu solicitud de certificado para "{certificate_request.knowledge_path.title}"'
+        recipient=student,
+        actor_content_type=context['decider_ct'],
+        actor_object_id=deciding_user.id,
+        verb=rejection_verb,
+        action_object_content_type=context['request_ct'],
+        action_object_object_id=certificate_request.id,
+        target_content_type=context['target_ct'],
+        target_object_id=context['target'].id,
+        description=f'{deciding_user.username} rechazó tu solicitud de certificado para "{title}"',
     )
     logger.info("Certificate rejection notification created successfully", extra={
         'notification_id': notification.id,
-        'student_id': certificate_request.requester.id,
-        'knowledge_path_id': certificate_request.knowledge_path.id,
-        'recipient_id': notification.recipient.id,
-        'actor_id': notification.actor.id,
+        'student_id': student.id,
+        'certificate_request_id': certificate_request.id,
+        'recipient_id': student.id,
+        'actor_id': deciding_user.id,
     })
-    
-    # Verify the notification was created
-    if notification:
-        logger.debug("Notification verification successful", extra={
-            'notification_id': notification.id,
-            'recipient': notification.recipient.username,
-            'actor': notification.actor.username,
-            'verb': notification.verb,
-            'timestamp': notification.timestamp.isoformat(),
-            'unread': notification.unread,
-            'target_content_type': str(notification.target_content_type),
-            'target_object_id': notification.target_object_id,
-        })
-    else:
-        logger.warning("Notification not found in database after creation", extra={
-            'student_id': certificate_request.requester.id,
-            'knowledge_path_id': certificate_request.knowledge_path.id,
-        })
+
 
 def notify_content_upvote(vote):
     """

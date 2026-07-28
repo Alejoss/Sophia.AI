@@ -58,11 +58,17 @@ EVENT_TARGET_VERBS = (
     'se registró en tu evento',
     'aceptó tu pago para',
     'te envió un certificado para',
+    'solicitó un certificado para tu evento',
 )
 
 CERTIFICATE_DECISION_VERBS = (
     'aprobó tu solicitud de certificado para',
     'rechazó tu solicitud de certificado para',
+)
+
+CERTIFICATE_REQUEST_VERBS = (
+    'solicitó un certificado para tu camino de conocimiento',
+    'solicitó un certificado para tu evento',
 )
 
 TOPIC_REQUEST_DECISION_VERBS = (
@@ -77,6 +83,7 @@ KNOWLEDGE_PATH_VERB_KEYS = frozenset(verb_key(v) for v in KNOWLEDGE_PATH_VERBS)
 MODERATOR_ACTION_VERB_KEYS = frozenset(verb_key(v) for v in MODERATOR_ACTION_VERBS)
 EVENT_TARGET_VERB_KEYS = frozenset(verb_key(v) for v in EVENT_TARGET_VERBS)
 CERTIFICATE_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_DECISION_VERBS)
+CERTIFICATE_REQUEST_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_REQUEST_VERBS)
 TOPIC_REQUEST_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_REQUEST_DECISION_VERBS)
 
 # Get logger for profiles serializers
@@ -390,7 +397,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             verb = obj.verb
 
             # Certificate request notifications link to the certificates section
-            if self._verb_is(verb, 'solicitó un certificado para tu camino de conocimiento'):
+            if self._verb_in(verb, CERTIFICATE_REQUEST_VERB_KEYS):
                 request = self.context.get('request')
                 recipient = obj.recipient
                 if request and request.user.is_authenticated and request.user.id == recipient.id:
