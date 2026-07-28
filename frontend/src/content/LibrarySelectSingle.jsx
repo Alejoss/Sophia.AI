@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -24,12 +24,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TablePagination,
+  CircularProgress,
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import contentApi from '../api/contentApi';
+
+const DEFAULT_PAGE_SIZE = 25;
 
 const LibrarySelectSingle = ({
   isOpen,
@@ -38,54 +42,48 @@ const LibrarySelectSingle = ({
   title = 'Seleccionar contenido de tu biblioteca',
   description,
   filterFunction,
+  excludeTopicId = null,
+  excludeCollectionId = null,
   compact = false,
   isLoading = false,
 }) => {
-  const getCollectionId = (item) => {
-    const rawCollection = item?.collection;
-    if (rawCollection && typeof rawCollection === 'object') {
-      return rawCollection.id ?? null;
-    }
-    return rawCollection ?? null;
-  };
-
   const [userContent, setUserContent] = useState([]);
   const [selectedContentProfile, setSelectedContentProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
   const [collections, setCollections] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    const fetchUserContent = async () => {
-      try {
-        const data = await contentApi.getUserContent();
-        if (filterFunction) {
-          setUserContent(data.filter(filterFunction));
-        } else {
-          setUserContent(data);
-        }
-      } catch (err) {
-        console.error('LibrarySelectSingle: Error fetching content:', err);
-        setError('Error al obtener tu contenido');
-      } finally {
-        setLoading(false);
-      }
-    };
+    const t = setTimeout(() => {
+      setSearchDebounced(searchQuery.trim());
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-    if (isOpen) {
-      setSelectedContentProfile(null);
-      setSearchQuery('');
-      setSelectedCollectionId(null);
-      setLoading(true);
-      setError(null);
-      fetchUserContent();
-    }
-  }, [isOpen, filterFunction]);
+  useEffect(() => {
+    setPage(0);
+  }, [searchDebounced, selectedCollectionId, sortField, sortDirection, excludeTopicId, excludeCollectionId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedContentProfile(null);
+    setSearchQuery('');
+    setSearchDebounced('');
+    setSelectedCollectionId(null);
+    setSortField(null);
+    setSortDirection('asc');
+    setPage(0);
+    setError(null);
+  }, [isOpen]);
 
   useEffect(() => {
     const fetchCollections = async () => {
@@ -96,65 +94,59 @@ const LibrarySelectSingle = ({
         console.error('LibrarySelectSingle: Error fetching collections:', err);
       }
     };
-
     if (isOpen) {
       fetchCollections();
     }
   }, [isOpen]);
 
-  const filteredContent = useMemo(() => {
-    let filtered = [...userContent];
+  const ordering = (() => {
+    if (!sortField) return '-created_at';
+    return sortDirection === 'desc' ? `-${sortField}` : sortField;
+  })();
 
-    if (selectedCollectionId !== null) {
-      const collectionIdNum =
-        typeof selectedCollectionId === 'string'
-          ? parseInt(selectedCollectionId, 10)
-          : selectedCollectionId;
-      filtered = filtered.filter(
-        (item) => {
-          const itemCollectionId = getCollectionId(item);
-          return (
-            itemCollectionId === collectionIdNum ||
-            itemCollectionId === selectedCollectionId
-          );
-        }
-      );
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((item) => {
-        const titleText = (item.title || '').toLowerCase();
-        const author = (item.author || '').toLowerCase();
-        const mediaType = (item.content?.media_type || '').toLowerCase();
-        return (
-          titleText.includes(query) ||
-          author.includes(query) ||
-          mediaType.includes(query)
-        );
+  const loadLibraryPage = useCallback(async () => {
+    if (!isOpen) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await contentApi.getUserContentWithDetails({
+        page: page + 1,
+        page_size: rowsPerPage,
+        search: searchDebounced,
+        collection: selectedCollectionId || undefined,
+        exclude_topic: excludeTopicId || undefined,
+        exclude_collection: excludeCollectionId || undefined,
+        ordering,
       });
+      let results = Array.isArray(data?.results) ? data.results : [];
+      if (filterFunction) {
+        results = results.filter(filterFunction);
+      }
+      setUserContent(results);
+      setTotalCount(typeof data?.count === 'number' ? data.count : 0);
+    } catch (err) {
+      console.error('LibrarySelectSingle: Error fetching content:', err);
+      setError('Error al obtener tu contenido');
+      setUserContent([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
     }
+  }, [
+    isOpen,
+    page,
+    rowsPerPage,
+    searchDebounced,
+    selectedCollectionId,
+    excludeTopicId,
+    excludeCollectionId,
+    ordering,
+    filterFunction,
+  ]);
 
-    if (sortField) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue, bValue;
-        if (sortField === 'title') {
-          aValue = (a.title || 'Sin título').toLowerCase();
-          bValue = (b.title || 'Sin título').toLowerCase();
-        } else if (sortField === 'author') {
-          aValue = (a.author || 'Desconocido').toLowerCase();
-          bValue = (b.author || 'Desconocido').toLowerCase();
-        } else {
-          return 0;
-        }
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return filtered;
-  }, [userContent, selectedCollectionId, searchQuery, sortField, sortDirection]);
+  useEffect(() => {
+    loadLibraryPage();
+  }, [loadLibraryPage]);
 
   const handleRowClick = (contentProfile) => {
     setSelectedContentProfile(contentProfile);
@@ -162,6 +154,15 @@ const LibrarySelectSingle = ({
 
   const handleSortDirectionToggle = () => {
     setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  const handleChangePage = (_event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleConfirm = () => {
@@ -188,7 +189,7 @@ const LibrarySelectSingle = ({
       elevation={0}
     >
       <Box sx={{ mb: compact ? 1.5 : 2 }}>
-        <Typography variant={compact ? 'h6' : 'h6'} sx={{ mb: 1 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>
           {title}
         </Typography>
         {description && (
@@ -253,6 +254,7 @@ const LibrarySelectSingle = ({
             </MenuItem>
             <MenuItem value="title">Título</MenuItem>
             <MenuItem value="author">Autor</MenuItem>
+            <MenuItem value="created_at">Fecha de subida</MenuItem>
           </Select>
         </FormControl>
         {sortField && (
@@ -274,8 +276,20 @@ const LibrarySelectSingle = ({
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Contenido disponible ({filteredContent.length})
+        Contenido disponible ({totalCount})
+        {loading && (
+          <CircularProgress size={14} sx={{ ml: 1, verticalAlign: 'middle' }} />
+        )}
       </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+          <Button size="small" onClick={loadLibraryPage} sx={{ ml: 1 }}>
+            Reintentar
+          </Button>
+        </Alert>
+      )}
 
       <TableContainer
         sx={{
@@ -294,92 +308,92 @@ const LibrarySelectSingle = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredContent.map((content) => (
-              <TableRow
-                key={content.id}
-                hover
-                onClick={() => handleRowClick(content)}
-                selected={selectedContentProfile?.id === content.id}
-                sx={{
-                  cursor: 'pointer',
-                  '&.Mui-selected': {
-                    backgroundColor: 'action.selected',
-                  },
-                  '&.Mui-selected:hover': {
-                    backgroundColor: 'action.selected',
-                  },
-                }}
-              >
-                <TableCell>{content.title || 'Sin título'}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={content.content?.media_type || '-'}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                </TableCell>
-                <TableCell>{content.author || 'Desconocido'}</TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <MuiLink
-                    href={`/content/${content.content?.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
-                    Ver
-                    <OpenInNewIcon fontSize="small" />
-                  </MuiLink>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filteredContent.length === 0 && (
+            {loading && userContent.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                  {searchQuery || selectedCollectionId !== null
-                    ? 'No se encontró contenido con los filtros aplicados'
-                    : 'No hay contenido disponible'}
+                  Cargando tu contenido...
                 </TableCell>
               </TableRow>
+            ) : (
+              <>
+                {userContent.map((content) => (
+                  <TableRow
+                    key={content.id}
+                    hover
+                    onClick={() => handleRowClick(content)}
+                    selected={selectedContentProfile?.id === content.id}
+                    sx={{
+                      cursor: 'pointer',
+                      opacity: loading ? 0.6 : 1,
+                      '&.Mui-selected': {
+                        backgroundColor: 'action.selected',
+                      },
+                      '&.Mui-selected:hover': {
+                        backgroundColor: 'action.selected',
+                      },
+                    }}
+                  >
+                    <TableCell>{content.title || 'Sin título'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={content.content?.media_type || '-'}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{content.author || 'Desconocido'}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <MuiLink
+                        href={`/content/${content.content?.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          color: 'primary.main',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                      >
+                        Ver
+                        <OpenInNewIcon fontSize="small" />
+                      </MuiLink>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {userContent.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      {searchDebounced || selectedCollectionId !== null
+                        ? 'No se encontró contenido con los filtros aplicados'
+                        : 'No hay contenido disponible'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
             )}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[12, 25, 50, 100]}
+        labelRowsPerPage="Por página"
+        labelDisplayedRows={({ from, to, count }) =>
+          `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+        }
+        sx={{ flexShrink: 0 }}
+      />
     </Paper>
   );
-
-  if (loading) {
-    return (
-      <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ py: 6, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              Cargando tu contenido...
-            </Typography>
-          </Box>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (error) {
-    return (
-      <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogContent>
-          <Alert severity="error">{error}</Alert>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog
@@ -395,6 +409,7 @@ const LibrarySelectSingle = ({
         },
       }}
     >
+      <DialogTitle sx={{ display: 'none' }}>{title}</DialogTitle>
       <DialogContent
         sx={{
           p: compact ? 2 : 3,

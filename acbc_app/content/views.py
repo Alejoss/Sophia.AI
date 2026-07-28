@@ -1107,13 +1107,22 @@ class UserContentWithDetailsView(APIView):
     """Paginated list of the current user's content profiles with file details for library display."""
     permission_classes = [IsAuthenticated]
 
+    ALLOWED_ORDERINGS = {
+        'title': 'title',
+        '-title': '-title',
+        'author': 'author',
+        '-author': '-author',
+        'created_at': 'created_at',
+        '-created_at': '-created_at',
+    }
+
     def get(self, request):
         user_id = request.user.id
         username = request.user.username
         try:
             queryset = ContentProfile.objects.filter(user=request.user).select_related(
-                'content', 'content__file_details'
-            ).order_by('-created_at')
+                'content', 'content__file_details', 'collection'
+            )
 
             media_type = (request.query_params.get('media_type') or 'ALL').upper()
             if media_type != 'ALL':
@@ -1128,6 +1137,40 @@ class UserContentWithDetailsView(APIView):
                     | Q(content__original_title__icontains=search)
                     | Q(content__media_type__icontains=search)
                 )
+
+            collection = (request.query_params.get('collection') or '').strip()
+            if collection:
+                try:
+                    queryset = queryset.filter(collection_id=int(collection))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro collection inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            exclude_collection = (request.query_params.get('exclude_collection') or '').strip()
+            if exclude_collection:
+                try:
+                    queryset = queryset.exclude(collection_id=int(exclude_collection))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro exclude_collection inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            exclude_topic = (request.query_params.get('exclude_topic') or '').strip()
+            if exclude_topic:
+                try:
+                    queryset = queryset.exclude(content__topics__id=int(exclude_topic))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro exclude_topic inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            ordering_param = (request.query_params.get('ordering') or '-created_at').strip()
+            ordering = self.ALLOWED_ORDERINGS.get(ordering_param, '-created_at')
+            queryset = queryset.order_by(ordering, 'id')
 
             paginator = UserLibraryPagination()
             page = paginator.paginate_queryset(queryset, request)

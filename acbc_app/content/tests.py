@@ -859,6 +859,50 @@ class UserLibraryWithDetailsAPITests(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(r.data['count'], 1)
 
+    def test_collection_filter_and_exclude(self):
+        library = Library.objects.create(user=self.user, name='Lib')
+        collection = Collection.objects.create(library=library, name='Col A')
+        other = Collection.objects.create(library=library, name='Col B')
+
+        c1 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='In A')
+        c2 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='In B')
+        ContentProfile.objects.create(content=c1, user=self.user, title='In A', collection=collection)
+        ContentProfile.objects.create(content=c2, user=self.user, title='In B', collection=other)
+
+        r = self.client.get(self.url, {'collection': collection.id})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+        self.assertEqual(r.data['results'][0]['title'], 'In A')
+
+        r2 = self.client.get(self.url, {'exclude_collection': collection.id})
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.data['count'], 1)
+        self.assertEqual(r2.data['results'][0]['title'], 'In B')
+
+    def test_exclude_topic(self):
+        topic = Topic.objects.create(title='Tema', creator=self.user)
+        c_in = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Already')
+        c_out = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Available')
+        c_in.topics.add(topic)
+        ContentProfile.objects.create(content=c_in, user=self.user, title='Already')
+        ContentProfile.objects.create(content=c_out, user=self.user, title='Available')
+
+        r = self.client.get(self.url, {'exclude_topic': topic.id})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+        self.assertEqual(r.data['results'][0]['title'], 'Available')
+
+    def test_ordering_title(self):
+        c1 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Z')
+        c2 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='A')
+        ContentProfile.objects.create(content=c1, user=self.user, title='Zebra')
+        ContentProfile.objects.create(content=c2, user=self.user, title='Alpha')
+
+        r = self.client.get(self.url, {'ordering': 'title'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in r.data['results']]
+        self.assertEqual(titles, ['Alpha', 'Zebra'])
+
 
 class LibraryAPITests(APITestCase):
     """Test suite for Library API endpoints"""

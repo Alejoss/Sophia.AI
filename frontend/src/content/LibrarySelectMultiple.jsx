@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Box, 
-    Typography, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    Box,
+    Typography,
     Paper,
     Button,
     Alert,
@@ -20,7 +20,9 @@ import {
     MenuItem,
     FormControl,
     InputLabel,
-    IconButton
+    IconButton,
+    TablePagination,
+    CircularProgress,
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
@@ -29,57 +31,49 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import contentApi from '../api/contentApi';
 import { formatDate } from '../utils/dateUtils';
 
-const LibrarySelectMultiple = ({ 
-    onCancel, 
-    onSave, 
+const DEFAULT_PAGE_SIZE = 25;
+
+const LibrarySelectMultiple = ({
+    onCancel,
+    onSave,
     onSelectionChange,
     title = "Seleccionar contenido de la biblioteca",
     description,
     filterFunction,
+    excludeTopicId = null,
+    excludeCollectionId = null,
     maxSelections,
     selectedIds = [],
     contextName = "",
     compact = false
 }) => {
-    const getCollectionId = (item) => {
-        const rawCollection = item?.collection;
-        if (rawCollection && typeof rawCollection === 'object') {
-            return rawCollection.id ?? null;
-        }
-        return rawCollection ?? null;
-    };
-
     const [userContent, setUserContent] = useState([]);
     const [selectedContentProfiles, setSelectedContentProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
-    
-    // New states for search, collection, and sorting
+
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchDebounced, setSearchDebounced] = useState('');
     const [selectedCollectionId, setSelectedCollectionId] = useState(null);
     const [sortField, setSortField] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc');
     const [collections, setCollections] = useState([]);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
-        const fetchUserContent = async () => {
-            try {
-                const data = await contentApi.getUserContent();
-                const filteredData = filterFunction ? data.filter(filterFunction) : data;
-                setUserContent(filteredData);
-                setLoading(false);
-            } catch (err) {
-                console.error('LibrarySelectMultiple: Error fetching content:', err);
-                setError('Error al obtener tu contenido');
-                setLoading(false);
-            }
-        };
+        const t = setTimeout(() => {
+            setSearchDebounced(searchQuery.trim());
+        }, 400);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
 
-        fetchUserContent();
-    }, [filterFunction]);
+    useEffect(() => {
+        setPage(0);
+    }, [searchDebounced, selectedCollectionId, sortField, sortDirection, excludeTopicId, excludeCollectionId]);
 
-    // Fetch user collections
     useEffect(() => {
         const fetchCollections = async () => {
             try {
@@ -87,98 +81,88 @@ const LibrarySelectMultiple = ({
                 setCollections(data || []);
             } catch (err) {
                 console.error('LibrarySelectMultiple: Error fetching collections:', err);
-                // Don't set error state, just log it - collections are optional
             }
         };
-
         fetchCollections();
     }, []);
 
-    // Initialize selectedContentProfiles from selectedIds prop
+    // Seed selection from selectedIds once (IDs only until profiles are loaded from pages)
     useEffect(() => {
-        if (selectedIds && selectedIds.length > 0 && userContent.length > 0) {
-            const initialSelected = userContent.filter(item => 
-                selectedIds.includes(item.id)
-            );
-            if (initialSelected.length > 0) {
-                setSelectedContentProfiles(initialSelected);
+        if (!selectedIds?.length) return;
+        setSelectedContentProfiles((prev) => {
+            if (prev.length > 0) return prev;
+            return selectedIds.map((id) => ({ id }));
+        });
+    }, [selectedIds]);
+
+    const ordering = (() => {
+        if (!sortField) return '-created_at';
+        return sortDirection === 'desc' ? `-${sortField}` : sortField;
+    })();
+
+    const loadLibraryPage = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await contentApi.getUserContentWithDetails({
+                page: page + 1,
+                page_size: rowsPerPage,
+                search: searchDebounced,
+                collection: selectedCollectionId || undefined,
+                exclude_topic: excludeTopicId || undefined,
+                exclude_collection: excludeCollectionId || undefined,
+                ordering,
+            });
+            let results = Array.isArray(data?.results) ? data.results : [];
+            if (filterFunction) {
+                results = results.filter(filterFunction);
             }
-        }
-    }, [selectedIds, userContent]);
+            setUserContent(results);
+            setTotalCount(typeof data?.count === 'number' ? data.count : 0);
 
-    // Filtered and sorted content using useMemo for optimization
-    const filteredContent = useMemo(() => {
-        let filtered = [...userContent];
-
-        // Apply collection filter
-        if (selectedCollectionId !== null) {
-            const collectionIdNum = typeof selectedCollectionId === 'string' 
-                ? parseInt(selectedCollectionId, 10) 
-                : selectedCollectionId;
-            
-            filtered = filtered.filter(item => {
-                const itemCollectionId = getCollectionId(item);
-                return itemCollectionId === collectionIdNum || itemCollectionId === selectedCollectionId;
-            });
-        }
-
-        // Apply search filter
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase().trim();
-            filtered = filtered.filter(item => {
-                const title = (item.title || '').toLowerCase();
-                const author = (item.author || '').toLowerCase();
-                const mediaType = (item.content?.media_type || '').toLowerCase();
-                
-                return title.includes(query) || 
-                       author.includes(query) || 
-                       mediaType.includes(query);
-            });
-        }
-
-        // Apply sorting
-        if (sortField) {
-            filtered = [...filtered].sort((a, b) => {
-                let aValue, bValue;
-                
-                if (sortField === 'title') {
-                    aValue = (a.title || 'Sin título').toLowerCase();
-                    bValue = (b.title || 'Sin título').toLowerCase();
-                } else if (sortField === 'author') {
-                    aValue = (a.author || 'Desconocido').toLowerCase();
-                    bValue = (b.author || 'Desconocido').toLowerCase();
-                } else if (sortField === 'created_at') {
-                    aValue = a.created_at ? new Date(a.created_at).getTime() : 0;
-                    bValue = b.created_at ? new Date(b.created_at).getTime() : 0;
-                    if (aValue < bValue) {
-                        return sortDirection === 'asc' ? -1 : 1;
+            // Enrich stub selections with full profile data when they appear on a page
+            setSelectedContentProfiles((prev) => {
+                if (prev.length === 0) return prev;
+                const byId = new Map(results.map((item) => [item.id, item]));
+                let changed = false;
+                const next = prev.map((item) => {
+                    const full = byId.get(item.id);
+                    if (full && (!item.title || !item.content)) {
+                        changed = true;
+                        return full;
                     }
-                    if (aValue > bValue) {
-                        return sortDirection === 'asc' ? 1 : -1;
-                    }
-                    return 0;
-                } else {
-                    return 0;
-                }
-
-                if (aValue < bValue) {
-                    return sortDirection === 'asc' ? -1 : 1;
-                }
-                if (aValue > bValue) {
-                    return sortDirection === 'asc' ? 1 : -1;
-                }
-                return 0;
+                    return item;
+                });
+                return changed ? next : prev;
             });
+        } catch (err) {
+            console.error('LibrarySelectMultiple: Error fetching content:', err);
+            setError('Error al obtener tu contenido');
+            setUserContent([]);
+            setTotalCount(0);
+        } finally {
+            setLoading(false);
         }
+    }, [
+        page,
+        rowsPerPage,
+        searchDebounced,
+        selectedCollectionId,
+        excludeTopicId,
+        excludeCollectionId,
+        ordering,
+        filterFunction,
+    ]);
 
-        return filtered;
-    }, [userContent, selectedCollectionId, searchQuery, sortField, sortDirection]);
+    useEffect(() => {
+        loadLibraryPage();
+    }, [loadLibraryPage]);
 
     const handleContentToggle = (contentProfile) => {
-        setSelectedContentProfiles(prev => {
+        setSelectedContentProfiles((prev) => {
             let newSelection;
-            if (prev.some(p => p.id === contentProfile.id)) {
-                newSelection = prev.filter(p => p.id !== contentProfile.id);
+            if (prev.some((p) => p.id === contentProfile.id)) {
+                newSelection = prev.filter((p) => p.id !== contentProfile.id);
             } else if (maxSelections === 1) {
                 newSelection = [contentProfile];
             } else if (!maxSelections || prev.length < maxSelections) {
@@ -186,12 +170,11 @@ const LibrarySelectMultiple = ({
             } else {
                 return prev;
             }
-            
-            // Notify parent of selection change
+
             if (onSelectionChange) {
                 onSelectionChange(newSelection);
             }
-            
+
             return newSelection;
         });
     };
@@ -199,40 +182,43 @@ const LibrarySelectMultiple = ({
     const handleSelectAll = (event) => {
         let newSelection;
         if (event.target.checked) {
-            // Get currently selected items that are NOT in filteredContent
-            const selectedNotInFiltered = selectedContentProfiles.filter(
-                selected => !filteredContent.some(filtered => filtered.id === selected.id)
+            const selectedNotInPage = selectedContentProfiles.filter(
+                (selected) => !userContent.some((item) => item.id === selected.id)
             );
-            
-            // Add all filtered items (up to maxSelections if applicable)
-            const itemsToAdd = maxSelections 
-                ? filteredContent.slice(0, maxSelections - selectedNotInFiltered.length)
-                : filteredContent;
-            
-            newSelection = [...selectedNotInFiltered, ...itemsToAdd];
+            const itemsToAdd = maxSelections
+                ? userContent.slice(0, Math.max(0, maxSelections - selectedNotInPage.length))
+                : userContent;
+            newSelection = [...selectedNotInPage, ...itemsToAdd];
         } else {
             newSelection = selectedContentProfiles.filter(
-                selected => !filteredContent.some(filtered => filtered.id === selected.id)
+                (selected) => !userContent.some((item) => item.id === selected.id)
             );
         }
-        
+
         setSelectedContentProfiles(newSelection);
-        
-        // Notify parent of selection change
         if (onSelectionChange) {
             onSelectionChange(newSelection);
         }
     };
 
     const handleSortDirectionToggle = () => {
-        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+
+    const handleChangePage = (_event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
     };
 
     const handleSubmit = async () => {
-        const selectedIds = selectedContentProfiles.map(p => p.id);
+        const ids = selectedContentProfiles.map((p) => p.id);
         setSaving(true);
         try {
-            await onSave(selectedIds);
+            await onSave(ids);
         } catch (err) {
             console.error('LibrarySelectMultiple.handleSubmit - Error:', err);
             setError('Error al guardar las selecciones');
@@ -240,8 +226,14 @@ const LibrarySelectMultiple = ({
         }
     };
 
-    if (loading) return <Typography>Cargando tu contenido...</Typography>;
-    if (error) return <Alert severity="error">{error}</Alert>;
+    if (error && userContent.length === 0 && !loading) {
+        return (
+            <Box sx={{ pt: compact ? 0 : 12, px: compact ? 0 : 3 }}>
+                <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                <Button variant="contained" onClick={loadLibraryPage}>Reintentar</Button>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ pt: compact ? 0 : 12, px: compact ? 0 : 3, maxWidth: compact ? '100%' : 1200, mx: compact ? 0 : 'auto' }}>
@@ -264,9 +256,7 @@ const LibrarySelectMultiple = ({
 
                 <Divider sx={{ my: compact ? 1.5 : 3 }} />
 
-                {/* Toolbar with search, collection selector, and sorting */}
                 <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-                    {/* Search field */}
                     <TextField
                         placeholder="Buscar contenido..."
                         value={searchQuery}
@@ -278,7 +268,6 @@ const LibrarySelectMultiple = ({
                         sx={{ flexGrow: 1, minWidth: 200 }}
                     />
 
-                    {/* Collection selector */}
                     <FormControl size="small" sx={{ minWidth: 200 }}>
                         <InputLabel>Colección</InputLabel>
                         <Select
@@ -297,7 +286,6 @@ const LibrarySelectMultiple = ({
                         </Select>
                     </FormControl>
 
-                    {/* Sort field selector */}
                     <FormControl size="small" sx={{ minWidth: 150 }}>
                         <InputLabel>Ordenar por</InputLabel>
                         <Select
@@ -314,7 +302,6 @@ const LibrarySelectMultiple = ({
                         </Select>
                     </FormControl>
 
-                    {/* Sort direction toggle */}
                     {sortField && (
                         <IconButton
                             onClick={handleSortDirectionToggle}
@@ -327,9 +314,12 @@ const LibrarySelectMultiple = ({
                     )}
                 </Box>
 
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                     <Typography variant="h6">
-                        Contenido disponible ({filteredContent.length})
+                        Contenido disponible ({totalCount})
+                        {loading && (
+                            <CircularProgress size={16} sx={{ ml: 1, verticalAlign: 'middle' }} />
+                        )}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <Button
@@ -350,6 +340,10 @@ const LibrarySelectMultiple = ({
                     </Box>
                 </Box>
 
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                )}
+
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -357,13 +351,13 @@ const LibrarySelectMultiple = ({
                                 <TableCell padding="checkbox">
                                     <Checkbox
                                         indeterminate={
-                                            filteredContent.length > 0 && 
-                                            filteredContent.some(item => selectedContentProfiles.some(p => p.id === item.id)) &&
-                                            !filteredContent.every(item => selectedContentProfiles.some(p => p.id === item.id))
+                                            userContent.length > 0 &&
+                                            userContent.some((item) => selectedContentProfiles.some((p) => p.id === item.id)) &&
+                                            !userContent.every((item) => selectedContentProfiles.some((p) => p.id === item.id))
                                         }
                                         checked={
-                                            filteredContent.length > 0 && 
-                                            filteredContent.every(item => selectedContentProfiles.some(p => p.id === item.id))
+                                            userContent.length > 0 &&
+                                            userContent.every((item) => selectedContentProfiles.some((p) => p.id === item.id))
                                         }
                                         onChange={handleSelectAll}
                                         disabled={maxSelections && selectedContentProfiles.length >= maxSelections}
@@ -377,71 +371,95 @@ const LibrarySelectMultiple = ({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredContent.map((content) => (
-                                <TableRow 
-                                    key={content.id}
-                                    hover
-                                    onClick={() => handleContentToggle(content)}
-                                    sx={{ cursor: 'pointer' }}
-                                >
-                                    <TableCell padding="checkbox">
-                                        <Checkbox
-                                            checked={selectedContentProfiles.some(p => p.id === content.id)}
-                                            disabled={maxSelections && selectedContentProfiles.length >= maxSelections && !selectedContentProfiles.some(p => p.id === content.id)}
-                                        />
-                                    </TableCell>
-                                    <TableCell>{content.title || 'Sin título'}</TableCell>
-                                    <TableCell>
-                                        <Chip 
-                                            label={content.content?.media_type || '-'} 
-                                            size="small"
-                                            color="primary"
-                                            variant="outlined"
-                                        />
-                                    </TableCell>
-                                    <TableCell>{content.author || 'Desconocido'}</TableCell>
-                                    <TableCell>
-                                        {content.created_at ? formatDate(content.created_at) : '—'}
-                                    </TableCell>
-                                    <TableCell 
-                                        onClick={(e) => e.stopPropagation()} // Prevent row click from triggering
-                                    >
-                                        <MuiLink
-                                            href={`/content/${content.content?.id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{ 
-                                                display: 'flex', 
-                                                alignItems: 'center',
-                                                gap: 0.5,
-                                                color: 'primary.main',
-                                                textDecoration: 'none',
-                                                '&:hover': {
-                                                    textDecoration: 'underline'
-                                                }
-                                            }}
-                                        >
-                                            Ver
-                                            <OpenInNewIcon fontSize="small" />
-                                        </MuiLink>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {filteredContent.length === 0 && (
+                            {loading && userContent.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center">
-                                        {searchQuery || selectedCollectionId !== null 
-                                            ? 'No se encontró contenido con los filtros aplicados' 
-                                            : 'No hay contenido disponible'}
+                                        Cargando tu contenido...
                                     </TableCell>
                                 </TableRow>
+                            ) : (
+                                <>
+                                    {userContent.map((content) => (
+                                        <TableRow
+                                            key={content.id}
+                                            hover
+                                            onClick={() => handleContentToggle(content)}
+                                            sx={{ cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
+                                        >
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    checked={selectedContentProfiles.some((p) => p.id === content.id)}
+                                                    disabled={maxSelections && selectedContentProfiles.length >= maxSelections && !selectedContentProfiles.some((p) => p.id === content.id)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>{content.title || 'Sin título'}</TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={content.content?.media_type || '-'}
+                                                    size="small"
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            </TableCell>
+                                            <TableCell>{content.author || 'Desconocido'}</TableCell>
+                                            <TableCell>
+                                                {content.created_at ? formatDate(content.created_at) : '—'}
+                                            </TableCell>
+                                            <TableCell
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MuiLink
+                                                    href={`/content/${content.content?.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        color: 'primary.main',
+                                                        textDecoration: 'none',
+                                                        '&:hover': {
+                                                            textDecoration: 'underline'
+                                                        }
+                                                    }}
+                                                >
+                                                    Ver
+                                                    <OpenInNewIcon fontSize="small" />
+                                                </MuiLink>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {userContent.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={6} align="center">
+                                                {searchDebounced || selectedCollectionId !== null
+                                                    ? 'No se encontró contenido con los filtros aplicados'
+                                                    : 'No hay contenido disponible'}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </>
                             )}
                         </TableBody>
                     </Table>
                 </TableContainer>
+
+                <TablePagination
+                    component="div"
+                    count={totalCount}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    rowsPerPageOptions={[12, 25, 50, 100]}
+                    labelRowsPerPage="Por página"
+                    labelDisplayedRows={({ from, to, count }) =>
+                        `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+                    }
+                />
             </Paper>
         </Box>
     );
 };
 
-export default LibrarySelectMultiple; 
+export default LibrarySelectMultiple;

@@ -250,11 +250,6 @@ const CollectionEditContent = () => {
     }
   };
 
-  const filterContent = (content) => {
-    const isInCollection = content.collection === parseInt(collectionId);
-    return !isInCollection;
-  };
-
   if (loading && collectionData.length === 0 && !error) {
     return <Typography>Cargando contenido de la colección...</Typography>;
   }
@@ -269,7 +264,7 @@ const CollectionEditContent = () => {
         description="Selecciona contenido de tu biblioteca para agregar a esta colección"
         onCancel={handleCancelAdd}
         onSave={handleSaveAdd}
-        filterFunction={filterContent}
+        excludeCollectionId={collectionId}
         contextName={collectionName}
       />
     );

@@ -26,6 +26,18 @@ const contentApi = {
       if (params.search) {
         query.search = params.search;
       }
+      if (params.collection != null && params.collection !== '') {
+        query.collection = params.collection;
+      }
+      if (params.exclude_collection != null && params.exclude_collection !== '') {
+        query.exclude_collection = params.exclude_collection;
+      }
+      if (params.exclude_topic != null && params.exclude_topic !== '') {
+        query.exclude_topic = params.exclude_topic;
+      }
+      if (params.ordering) {
+        query.ordering = params.ordering;
+      }
       const response = await axiosInstance.get('/content/user-content-with-details/', {
         params: query
       });
