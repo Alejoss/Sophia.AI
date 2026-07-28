@@ -53,6 +53,7 @@ All endpoints require authentication (`IsAuthenticated`).
 | `comentó en tu contenido` | Content profile owner | Top-level content comment |
 | `completó tu camino de conocimiento` | Knowledge path author | Path completed |
 | `solicitó un certificado para tu camino de conocimiento` | Knowledge path author | Certificate request |
+| `solicitó un certificado para tu evento` | Event owner | Event certificate request |
 | `aprobó tu solicitud de certificado para` | Student | Certificate approved |
 | `rechazó tu solicitud de certificado para` | Student | Certificate rejected |
 | `votó positivamente tu contenido` | Content uploader | Upvote on content |
@@ -97,6 +98,8 @@ Learners may request a certificate for a knowledge path only when:
 3. The learner has **completed** the path (`is_knowledge_path_completed`)
 
 The frontend hides the request CTA until completion; the backend enforces the same rule.
+
+Approval and rejection notify the **student** (`notify_certificate_approval` / `notify_certificate_rejection`). Dedup is per `CertificateRequest` (via `action_object`), so a new request after cancel/reject still produces a new decision notification. Helpers support both knowledge-path and event requests and use accent-safe verb matching.
 
 ### Deduplication
 

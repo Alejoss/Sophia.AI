@@ -419,7 +419,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 {/* Teacher View */}
                 {requests.filter(
               (req) =>
-              req.knowledge_path_author === authState.user?.username
+              req.knowledge_path_author === authState.user?.username ||
+              req.event_owner === authState.user?.username
             ).length > 0 &&
             <Box>
                     <Typography
@@ -433,7 +434,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     {sortRequests(
                 requests.filter(
                   (req) =>
-                  req.knowledge_path_author === authState.user?.username
+                  req.knowledge_path_author === authState.user?.username ||
+                  req.event_owner === authState.user?.username
                 )
               ).map((request) =>
               <Card key={request.id} sx={{ mb: 2 }}>
