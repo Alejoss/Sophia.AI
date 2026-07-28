@@ -1502,6 +1502,44 @@ class TopicAPITests(APITestCase):
         self.topic.refresh_from_db()
         self.assertFalse(self.topic.is_public)
 
+    def test_cannot_enable_chat_without_indexed_transcripts(self):
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.patch(url, {'chat_enabled': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('chat_enabled', response.data)
+        self.topic.refresh_from_db()
+        self.assertFalse(self.topic.chat_enabled)
+
+    def test_can_enable_chat_with_indexed_transcript(self):
+        video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video indexado',
+        )
+        self.topic.contents.add(video)
+        transcript = ContentTranscript.objects.create(
+            content=video,
+            processed_plain='Texto de prueba para embeddings.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedding_model='text-embedding-3-large',
+            embedding_dims=3072,
+            chunk_count=1,
+            embedded_text_hash=transcript.text_hash or ('a' * 64),
+        )
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        detail = self.client.get(url)
+        self.assertTrue(detail.data['chat_can_enable'])
+        self.assertEqual(detail.data['indexed_transcript_count'], 1)
+
+        response = self.client.patch(url, {'chat_enabled': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['chat_enabled'])
+        self.topic.refresh_from_db()
+        self.assertTrue(self.topic.chat_enabled)
+
     def test_get_topic_basic(self):
         """Test retrieving topic basic info."""
         url = reverse('content:topic-basic', args=[self.topic.id])
@@ -5049,6 +5087,7 @@ class TopicChatAPITests(APITestCase):
             description='Desc',
             creator=self.user,
             is_public=True,
+            chat_enabled=True,
         )
         self.video = Content.objects.create(
             uploaded_by=self.user,
@@ -5074,6 +5113,16 @@ class TopicChatAPITests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_chat_disabled_returns_403(self):
+        self.topic.chat_enabled = False
+        self.topic.save(update_fields=['chat_enabled'])
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Hola'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @override_settings(OPENAI_API_KEY='')
     def test_unavailable_without_openai(self):

@@ -455,6 +455,7 @@ const TopicDetail = () => {
     const canEditTimeline = isCreator || isModerator;
     const canSuggestTimeline = isAuthenticated && !canEditTimeline;
     const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
+    const showChatTab = Boolean(topic?.chat_enabled) && Boolean(topic?.chat_can_enable);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -478,7 +479,9 @@ const TopicDetail = () => {
 
     useEffect(() => {
         if (loading) return;
-        if (activeTab === 'timeline' && !showTimelineTab) {
+        const invalidTimeline = activeTab === 'timeline' && !showTimelineTab;
+        const invalidChat = activeTab === 'chat' && !showChatTab;
+        if (invalidTimeline || invalidChat) {
             setActiveTab('content');
             setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
@@ -486,7 +489,7 @@ const TopicDetail = () => {
                 return next;
             }, { replace: true });
         }
-    }, [activeTab, showTimelineTab, loading, setSearchParams]);
+    }, [activeTab, showTimelineTab, showChatTab, loading, setSearchParams]);
 
     const loadMoreImages = useCallback(async () => {
         if (imagePageInfo.loading || !imagePageInfo.hasNext) {
@@ -833,13 +836,13 @@ const TopicDetail = () => {
                     allowScrollButtonsMobile
                 >
                     <Tab value="content" label="Contenido" />
-                    <Tab value="chat" label="Conversar" />
+                    {showChatTab && <Tab value="chat" label="Conversar" />}
                     {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
                     <Tab value="comments" label="Comentarios" />
                 </Tabs>
             </Box>
 
-            {activeTab === 'chat' && (
+            {activeTab === 'chat' && showChatTab && (
                 <TopicChat topicId={topicId} />
             )}
 

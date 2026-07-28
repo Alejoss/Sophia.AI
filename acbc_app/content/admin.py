@@ -75,15 +75,16 @@ class ContentTranscriptAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'creator', 'is_public', 'created_at', 'updated_at']
-    list_filter = ['is_public', 'creator', 'created_at']
+    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'created_at', 'updated_at']
+    list_filter = ['is_public', 'chat_enabled', 'creator', 'created_at']
+    list_editable = ['chat_enabled']
     search_fields = ['title', 'description', 'creator__username']
     filter_horizontal = ['moderators', 'related_topics']
     raw_id_fields = ['creator']
     readonly_fields = ['topic_image_thumbnail', 'created_at', 'updated_at']
     fieldsets = (
         ('Información básica', {
-            'fields': ('title', 'description', 'creator', 'is_public'),
+            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled'),
         }),
         ('Imagen de portada', {
             'fields': (

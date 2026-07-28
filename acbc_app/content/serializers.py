@@ -388,14 +388,34 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image_focal_y = serializers.FloatField(required=False, min_value=0, max_value=1)
 
     topic_image_thumbnail = serializers.ImageField(read_only=True, required=False)
+    indexed_transcript_count = serializers.SerializerMethodField()
+    chat_can_enable = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
         fields = [
             'id', 'title', 'description', 'creator', 'creator_username', 'is_public',
+            'chat_enabled', 'indexed_transcript_count', 'chat_can_enable',
             'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y',
         ]
-        read_only_fields = ['creator']
+        read_only_fields = ['creator', 'indexed_transcript_count', 'chat_can_enable']
+
+    def get_indexed_transcript_count(self, obj):
+        return obj.indexed_transcript_count()
+
+    def get_chat_can_enable(self, obj):
+        return obj.has_indexed_transcripts()
+
+    def validate_chat_enabled(self, value):
+        if value is True:
+            topic = self.instance
+            if topic is None or not topic.has_indexed_transcripts():
+                raise serializers.ValidationError(
+                    'No se puede activar Conversar: este tema aún no tiene '
+                    'transcripciones indexadas (embeddings). '
+                    'Transcribe e indexa al menos un video/audio del tema primero.'
+                )
+        return value
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)

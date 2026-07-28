@@ -461,6 +461,10 @@ class Topic(models.Model):
         default=True,
         help_text='When false, the topic is hidden from public listings and search.',
     )
+    chat_enabled = models.BooleanField(
+        default=False,
+        help_text='When true, the Conversar (RAG consultation) tab is visible on the topic page.',
+    )
     activity_score = models.IntegerField(
         default=0,
         db_default=0,
@@ -489,6 +493,17 @@ class Topic(models.Model):
             if user.is_staff or self.is_moderator_or_creator(user):
                 return True
         return False
+
+    def indexed_transcript_count(self):
+        """VIDEO/AUDIO in this topic with embedding_status=indexed."""
+        from content.models import ContentTranscript
+        return self.contents.filter(
+            media_type__in=('VIDEO', 'AUDIO'),
+            transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+        ).count()
+
+    def has_indexed_transcripts(self):
+        return self.indexed_transcript_count() > 0
 
 
 class TopicChatQuery(models.Model):

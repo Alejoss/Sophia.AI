@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -13,8 +13,10 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   Paper,
   Snackbar,
+  Switch,
   Tab,
   Tabs,
   TextField,
@@ -47,6 +49,7 @@ const topicSchema = yup.object({
     .trim()
     .required("El título es requerido."),
   description: yup.string().trim().default(""),
+  chat_enabled: yup.boolean().default(false),
 });
 
 const TAB_IDS = {
@@ -87,11 +90,12 @@ const TopicEdit = () => {
     handleSubmit,
     reset,
     watch,
+    control,
     setError,
     formState: { errors, isSubmitting, isDirty },
   } = useForm({
     resolver: yupResolver(topicSchema),
-    defaultValues: { title: "", description: "" },
+    defaultValues: { title: "", description: "", chat_enabled: false },
   });
 
   const titleValue = watch("title");
@@ -133,6 +137,7 @@ const TopicEdit = () => {
         reset({
           title: data.title || "",
           description: data.description || "",
+          chat_enabled: Boolean(data.chat_enabled),
         });
         setPageError(null);
       } catch {
@@ -196,6 +201,7 @@ const TopicEdit = () => {
       reset({
         title: updatedTopic.title || "",
         description: updatedTopic.description || "",
+        chat_enabled: Boolean(updatedTopic.chat_enabled),
       });
       setSaveMessage("Cambios guardados.");
       setPageError(null);
@@ -402,6 +408,43 @@ const TopicEdit = () => {
               maxRows={24}
               placeholder="Describe el tema"
             />
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <Controller
+                name="chat_enabled"
+                control={control}
+                render={({ field }) => {
+                  const chatCanEnable = Boolean(topic?.chat_can_enable);
+                  const canTurnOn = chatCanEnable || Boolean(field.value);
+                  return (
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={Boolean(field.value)}
+                          disabled={!canTurnOn && !field.value}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            if (next && !chatCanEnable) return;
+                            field.onChange(next);
+                          }}
+                          color="primary"
+                        />
+                      }
+                      label="Mostrar pestaña Conversar (consultas con transcripciones)"
+                    />
+                  );
+                }}
+              />
+              {errors.chat_enabled && (
+                <Typography variant="body2" color="error" sx={{ ml: 0.5, mb: 0.5 }}>
+                  {errors.chat_enabled.message}
+                </Typography>
+              )}
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
+                {topic?.chat_can_enable
+                  ? `Listo: ${topic.indexed_transcript_count} transcripción(es) indexada(s). Al activarlo, los usuarios verán Conversar.`
+                  : 'No disponible aún: hace falta al menos un video/audio del tema con transcript embebido (estado indexed).'}
+              </Typography>
+            </Box>
           </Box>
         )}
 

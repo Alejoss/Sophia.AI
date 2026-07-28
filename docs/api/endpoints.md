@@ -152,6 +152,7 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at }`
 - **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
+- **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit / admin.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 ## Topics — Timeline

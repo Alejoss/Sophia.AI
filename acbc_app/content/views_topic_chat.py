@@ -31,6 +31,20 @@ def _get_viewable_topic(request, pk):
     return topic, None
 
 
+def _require_chat_enabled(topic):
+    if not topic.chat_enabled:
+        return Response(
+            {
+                'error': (
+                    'Las consultas de este tema no están activadas. '
+                    'Un moderador puede habilitarlas en la edición del tema.'
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
 class TopicChatView(APIView):
     """
     POST /api/content/topics/<topic_id>/chat/
@@ -45,6 +59,10 @@ class TopicChatView(APIView):
         topic, error_response = _get_viewable_topic(request, pk)
         if error_response:
             return error_response
+
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
 
         ready, reason = topic_chat_ready()
         if not ready:
@@ -108,6 +126,10 @@ class TopicChatQueryListView(APIView):
         if error_response:
             return error_response
 
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
+
         qs = TopicChatQuery.objects.filter(topic=topic, user=request.user)
         try:
             limit = int(request.query_params.get('limit', 50))
@@ -135,6 +157,10 @@ class TopicChatQueryDetailView(APIView):
         topic, error_response = _get_viewable_topic(request, pk)
         if error_response:
             return error_response
+
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
 
         query = TopicChatQuery.objects.filter(
             pk=query_id,
