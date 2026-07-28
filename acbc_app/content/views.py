@@ -1122,7 +1122,7 @@ class UserContentWithDetailsView(APIView):
         try:
             queryset = ContentProfile.objects.filter(user=request.user).select_related(
                 'content', 'content__file_details', 'collection'
-            )
+            ).prefetch_related('content__topics')
 
             media_type = (request.query_params.get('media_type') or 'ALL').upper()
             if media_type != 'ALL':
