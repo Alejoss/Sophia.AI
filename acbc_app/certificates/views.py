@@ -53,6 +53,23 @@ class CertificateRequestView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
+
+            from knowledge_paths.services.node_user_activity_service import (
+                is_knowledge_path_completed,
+            )
+
+            if not is_knowledge_path_completed(request.user, knowledge_path):
+                logger.warning(
+                    f"Certificate request blocked - path not completed by user "
+                    f"{request.user.username} for path {knowledge_path.id}"
+                )
+                return Response(
+                    {
+                        'error': 'Debes completar este camino de conocimiento antes de solicitar un certificado',
+                        'code': 'path_not_completed',
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             
             # Check if user has already requested a certificate for this path
             existing_request = CertificateRequest.objects.filter(

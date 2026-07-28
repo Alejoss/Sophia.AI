@@ -7,6 +7,7 @@ from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, ContactMeth
 from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath, Node
 from certificates.models import CertificateRequest, Certificate, CertificateTemplate
+from certificates.test_helpers import ensure_path_completed
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
@@ -1039,6 +1040,7 @@ class NotificationTests(APITestCase):
             author=teacher,
             certificates_enabled=True,
         )
+        ensure_path_completed(self.user, knowledge_path)
         
         # Student requests a certificate
         url = reverse('certificates:certificate-request', args=[knowledge_path.id])
@@ -1057,12 +1059,16 @@ class NotificationTests(APITestCase):
         self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
         notifications = notifications_response.data['notifications']
         
-        # Should have one notification
-        self.assertEqual(len(notifications), 1)
+        certificate_notifications = [
+            n for n in notifications
+            if to_ascii_safe(n['verb']) == to_ascii_safe(
+                'solicitó un certificado para tu camino de conocimiento'
+            )
+        ]
+        self.assertEqual(len(certificate_notifications), 1)
         
         # Verify notification content (app uses Spanish for notification verbs)
-        notification = notifications[0]
-        self.assertEqual(notification['verb'], 'solicitó un certificado para tu camino de conocimiento')
+        notification = certificate_notifications[0]
         self.assertIn('testuser solicitó un certificado para tu camino de conocimiento', notification['description'])
         self.assertIn('Test Knowledge Path', notification['description'])
         self.assertTrue(notification['unread'])
@@ -1191,6 +1197,7 @@ class NotificationTests(APITestCase):
             author=teacher,
             certificates_enabled=True,
         )
+        ensure_path_completed(self.user, knowledge_path)
         
         # Student requests a certificate
         url = reverse('certificates:certificate-request', args=[knowledge_path.id])
@@ -1222,13 +1229,15 @@ class NotificationTests(APITestCase):
         self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
         notifications = notifications_response.data['notifications']
         
-        # Should have only one notification due to spam protection
-        self.assertEqual(len(notifications), 1)
-        
-        # Verify notification content (app uses Spanish for notification verbs)
-        notification = notifications[0]
-        self.assertEqual(notification['verb'], 'solicitó un certificado para tu camino de conocimiento')
-        self.assertTrue(notification['unread'])
+        certificate_notifications = [
+            n for n in notifications
+            if to_ascii_safe(n['verb']) == to_ascii_safe(
+                'solicitó un certificado para tu camino de conocimiento'
+            )
+        ]
+        # Should have only one certificate notification due to spam protection
+        self.assertEqual(len(certificate_notifications), 1)
+        self.assertTrue(certificate_notifications[0]['unread'])
 
     def test_certificate_notification_no_self_notification(self):
         """Test that users don't get notifications for their own actions"""
@@ -1239,6 +1248,7 @@ class NotificationTests(APITestCase):
             author=self.user,  # Current user is the author
             certificates_enabled=True,
         )
+        ensure_path_completed(self.user, knowledge_path)
         
         # User requests a certificate for their own knowledge path
         url = reverse('certificates:certificate-request', args=[knowledge_path.id])
@@ -1257,9 +1267,93 @@ class NotificationTests(APITestCase):
         notifications = notifications_response.data['notifications']
         
         # Should have no certificate request notifications (no self-notification)
-        # But may have other notifications from setUp
-        certificate_notifications = [n for n in notifications if n['verb'] == 'requested a certificate for your knowledge path']
+        certificate_notifications = [
+            n for n in notifications
+            if to_ascii_safe(n['verb']) == to_ascii_safe(
+                'solicitó un certificado para tu camino de conocimiento'
+            )
+        ]
         self.assertEqual(len(certificate_notifications), 0)
+
+    def test_knowledge_path_completion_notification_once(self):
+        """Completing a path notifies the author once; progress reads do not re-notify."""
+        from knowledge_paths.services.node_user_activity_service import (
+            get_knowledge_path_progress,
+            notify_if_knowledge_path_completed,
+        )
+        from utils.notification_utils import notify_knowledge_path_completion
+
+        teacher = User.objects.create_user(
+            username='kp_teacher',
+            email='kp_teacher@example.com',
+            password='testpass123',
+        )
+        knowledge_path = KnowledgePath.objects.create(
+            title='Completion Path',
+            description='Test',
+            author=teacher,
+        )
+
+        ensure_path_completed(self.user, knowledge_path)
+
+        # Progress / badge re-checks must not create extra notifications
+        get_knowledge_path_progress(self.user, knowledge_path)
+        notify_if_knowledge_path_completed(self.user, knowledge_path)
+        notify_knowledge_path_completion(self.user, knowledge_path)
+
+        completion_verb = to_ascii_safe('completó tu camino de conocimiento')
+        notifications = Notification.objects.filter(
+            recipient=teacher,
+            actor_object_id=self.user.id,
+            target_object_id=knowledge_path.id,
+        )
+        completion_notifications = [
+            n for n in notifications
+            if to_ascii_safe(n.verb) == completion_verb
+        ]
+        self.assertEqual(len(completion_notifications), 1)
+
+    def test_knowledge_path_completion_dedup_with_ascii_verb(self):
+        """Dedup must treat accent-stripped verbs as the same notification."""
+        from utils.notification_utils import notify_knowledge_path_completion
+
+        teacher = User.objects.create_user(
+            username='ascii_teacher',
+            email='ascii_teacher@example.com',
+            password='testpass123',
+        )
+        knowledge_path = KnowledgePath.objects.create(
+            title='ASCII Path',
+            description='Test',
+            author=teacher,
+        )
+        ensure_path_completed(self.user, knowledge_path)
+
+        # Simulate a legacy SQL_ASCII row already stored without accents
+        Notification.objects.filter(
+            recipient=teacher,
+            actor_object_id=self.user.id,
+            target_object_id=knowledge_path.id,
+        ).delete()
+        kp_ct = ContentType.objects.get_for_model(KnowledgePath)
+        user_ct = ContentType.objects.get_for_model(User)
+        Notification.objects.create(
+            recipient=teacher,
+            actor_content_type=user_ct,
+            actor_object_id=self.user.id,
+            verb=to_ascii_safe('completó tu camino de conocimiento'),
+            target_content_type=kp_ct,
+            target_object_id=knowledge_path.id,
+            description=f'{self.user.username} completo tu camino de conocimiento "ASCII Path"',
+        )
+
+        notify_knowledge_path_completion(self.user, knowledge_path)
+
+        completion_notifications = [
+            n for n in Notification.objects.filter(recipient=teacher)
+            if to_ascii_safe(n.verb) == to_ascii_safe('completó tu camino de conocimiento')
+        ]
+        self.assertEqual(len(completion_notifications), 1)
 
     def test_content_upvote_notification(self):
         """Test notification when someone upvotes content"""

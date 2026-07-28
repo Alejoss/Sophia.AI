@@ -149,8 +149,15 @@ image_build_sha_from_tar() {
     local cid=""
     cid="$(docker create "$image" 2>/dev/null)" || return 1
     local sha=""
-    sha="$(docker cp "${cid}:${path}" - 2>/dev/null | tr -d '\r')"
+    # `docker cp … -` writes a tar stream to stdout, not the raw file.
+    # Extract the member with tar -xO, then keep a git SHA if present.
+    sha="$(docker cp "${cid}:${path}" - 2>/dev/null | tar -xO 2>/dev/null | tr -d '\r\n')"
     docker rm "$cid" >/dev/null 2>&1 || true
+    if printf '%s' "$sha" | grep -Eq '^[0-9a-f]{7,40}$'; then
+        printf '%s' "$sha"
+        return 0
+    fi
+    sha="$(printf '%s' "$sha" | grep -oE '[0-9a-f]{40}' | head -n1)"
     if [ -n "$sha" ]; then
         printf '%s' "$sha"
     fi

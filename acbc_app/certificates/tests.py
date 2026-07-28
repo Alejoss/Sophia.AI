@@ -5,6 +5,7 @@ from rest_framework import status
 from django.contrib.auth.models import User
 from knowledge_paths.models import KnowledgePath
 from certificates.models import CertificateRequest, Certificate, CertificateTemplate
+from certificates.test_helpers import ensure_path_completed
 import json
 
 class CertificateRequestFlowTest(TestCase):
@@ -28,6 +29,7 @@ class CertificateRequestFlowTest(TestCase):
             author=self.teacher,
             certificates_enabled=True,
         )
+        ensure_path_completed(self.student, self.knowledge_path)
         
         # Setup API client
         self.client = APIClient()
@@ -200,6 +202,8 @@ class CertificateRequestFlowTest(TestCase):
             author=self.teacher,
             certificates_enabled=True,
         )
+        for path in (path1, path2, path3):
+            ensure_path_completed(self.student, path)
 
         # Create and approve first request
         self.client.force_authenticate(user=self.student)
@@ -272,6 +276,48 @@ class CertificateRequestFlowTest(TestCase):
             ).exists()
         )
 
+    def test_certificate_request_blocked_when_path_not_completed(self):
+        """Requests fail until the learner completes every node (and quizzes)."""
+        incomplete_path = KnowledgePath.objects.create(
+            title='Incomplete Path',
+            description='No nodes completed',
+            author=self.teacher,
+            certificates_enabled=True,
+        )
+        from content.models import Content, ContentProfile
+        from knowledge_paths.models import Node
+
+        content = Content.objects.create(
+            original_title='Incomplete content',
+            media_type='TEXT',
+            uploaded_by=self.teacher,
+        )
+        profile = ContentProfile.objects.create(
+            content=content,
+            title='Incomplete profile',
+            user=self.teacher,
+        )
+        Node.objects.create(
+            knowledge_path=incomplete_path,
+            content_profile=profile,
+            title='Node 1',
+            order=1,
+            media_type='TEXT',
+        )
+
+        self.client.force_authenticate(user=self.student)
+        url = reverse('certificates:certificate-request', args=[incomplete_path.id])
+        response = self.client.post(url, {'notes': 'Too early'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data.get('code'), 'path_not_completed')
+        self.assertFalse(
+            CertificateRequest.objects.filter(
+                requester=self.student,
+                knowledge_path=incomplete_path,
+            ).exists()
+        )
+
 
 class CertificateRequestSerializerNotesTests(TestCase):
     def setUp(self):
@@ -291,6 +337,7 @@ class CertificateRequestSerializerNotesTests(TestCase):
             author=self.teacher,
             certificates_enabled=True,
         )
+        ensure_path_completed(self.student, self.knowledge_path)
         self.client = APIClient()
         self.client.force_authenticate(user=self.student)
         self.request_url = reverse(

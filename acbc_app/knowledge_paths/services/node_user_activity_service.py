@@ -118,7 +118,10 @@ def mark_node_as_completed(user, node):
 def is_knowledge_path_completed(user, knowledge_path):
     """
     Check if a user has completed all nodes and passed all quizzes in a knowledge path.
-    If completed, notify the knowledge path author.
+
+    Pure read: does not send notifications. Call
+    ``notify_if_knowledge_path_completed`` from write-side events
+    (node completion / perfect quiz) when a transition may have occurred.
     
     Args:
         user: The user to check
@@ -149,15 +152,24 @@ def is_knowledge_path_completed(user, knowledge_path):
         if quiz and not has_completed_quiz(user, quiz):
             return False
 
-    # If we get here, the path is completed
-    # Notify the knowledge path author
+    return True
+
+
+def notify_if_knowledge_path_completed(user, knowledge_path):
+    """
+    If the user has fully completed the path, notify the author once.
+
+    Safe to call repeatedly: ``notify_knowledge_path_completion`` deduplicates.
+    """
+    if not is_knowledge_path_completed(user, knowledge_path):
+        return False
+
     logger.info("Knowledge path completed, notifying author", extra={
         'user_id': user.id,
         'knowledge_path_id': knowledge_path.id,
         'knowledge_path_title': knowledge_path.title,
     })
     notify_knowledge_path_completion(user, knowledge_path)
-    
     return True
 
 

@@ -734,6 +734,13 @@ QDRANT_API_KEY = os.getenv('QDRANT_API_KEY', '')
 QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'sophia_acbc_topic_chunks')
 QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '3072'))
 
+# Topic RAG chat (OpenAI embeddings + chat; retrieval via Qdrant).
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_EMBEDDING_MODEL = os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-large')
+OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
+TOPIC_CHAT_TOP_K = int(os.getenv('TOPIC_CHAT_TOP_K', '8'))
+TOPIC_CHAT_MAX_CONTEXT_CHARS = int(os.getenv('TOPIC_CHAT_MAX_CONTEXT_CHARS', '12000'))
+
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry
 configure_sentry()

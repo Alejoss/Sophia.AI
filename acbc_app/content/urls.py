@@ -95,6 +95,7 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestQueueView,
     ContentEmbeddingIngestDetailView,
 )
+from .views_topic_chat import TopicChatView
 
 app_name = "content"
 
@@ -153,6 +154,7 @@ urlpatterns = [
         name='admin-featured-book-detail',
     ),
     path('topics/<int:pk>/', TopicDetailView.as_view(), name='topic-detail'),
+    path('topics/<int:pk>/chat/', TopicChatView.as_view(), name='topic-chat'),
     path('topics/<int:pk>/content-simple/', TopicContentSimpleView.as_view(), name='topic-content-simple'),
     path('topics/<int:pk>/basic/', TopicBasicView.as_view(), name='topic-basic'),
     path('topics/<int:pk>/timeline/', TopicTimelineView.as_view(), name='topic-timeline'),

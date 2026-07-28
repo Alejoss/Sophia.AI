@@ -30,9 +30,12 @@ def check_node_completion_badges(sender, instance, created, **kwargs):
         # Check Knowledge Seeker badge (accumulated)
         rules.check_knowledge_seeker(user)
 
-        # Check if KnowledgePath is completed
-        from knowledge_paths.services.node_user_activity_service import is_knowledge_path_completed
-        if is_knowledge_path_completed(user, knowledge_path):
+        # Check if KnowledgePath is completed (notify only on this write event,
+        # not from progress/read helpers that also call is_knowledge_path_completed)
+        from knowledge_paths.services.node_user_activity_service import (
+            notify_if_knowledge_path_completed,
+        )
+        if notify_if_knowledge_path_completed(user, knowledge_path):
             rules.check_first_knowledge_path_completed(user, knowledge_path)
     except Exception as e:
         log_error(e, f"Error in check_node_completion_badges for user {instance.user.id}", instance.user.id)
@@ -128,16 +131,25 @@ def check_knowledge_path_creation_badge(sender, instance, created, **kwargs):
 @receiver(post_save, sender='quizzes.UserQuizAttempt')
 def check_quiz_badges(sender, instance, created, **kwargs):
     """
-    Check badges when a quiz attempt is completed:
+    Check badges when a quiz attempt scores 100:
     - Quiz Master: 5 quizzes with perfect score
+
+    Also notifies the knowledge-path author when a perfect score is what
+    finishes the path (all nodes were already marked complete).
     """
     try:
-        if not created:
+        if instance.score != 100:
             return
 
-        # Only check if score is perfect (100)
-        if instance.score == 100:
-            user = instance.user
-            rules.check_quiz_master(user)
+        user = instance.user
+        rules.check_quiz_master(user)
+
+        quiz = instance.quiz
+        node = getattr(quiz, 'node', None)
+        if node and node.knowledge_path_id:
+            from knowledge_paths.services.node_user_activity_service import (
+                notify_if_knowledge_path_completed,
+            )
+            notify_if_knowledge_path_completed(user, node.knowledge_path)
     except Exception as e:
         log_error(e, f"Error in check_quiz_badges for user {instance.user.id}", instance.user.id)
