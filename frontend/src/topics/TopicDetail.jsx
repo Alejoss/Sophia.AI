@@ -28,6 +28,7 @@ import ContentDisplay from '../content/ContentDisplay';
 import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
 import TopicTimeline from './timeline/TopicTimeline';
+import TopicChat from './TopicChat';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
 const TOPIC_IMAGE_PAGE_SIZE = 3;
@@ -457,7 +458,7 @@ const TopicDetail = () => {
 
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab === 'timeline' || tab === 'comments' || tab === 'content') {
+        if (tab === 'timeline' || tab === 'comments' || tab === 'content' || tab === 'chat') {
             setActiveTab(tab);
         }
     }, [searchParams]);
@@ -832,10 +833,15 @@ const TopicDetail = () => {
                     allowScrollButtonsMobile
                 >
                     <Tab value="content" label="Contenido" />
+                    <Tab value="chat" label="Conversar" />
                     {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
                     <Tab value="comments" label="Comentarios" />
                 </Tabs>
             </Box>
+
+            {activeTab === 'chat' && (
+                <TopicChat topicId={topicId} />
+            )}
 
             {activeTab === 'content' && (
                 <>

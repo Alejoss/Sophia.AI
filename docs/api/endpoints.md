@@ -145,6 +145,13 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Body**: `status` = `indexed` | `failed` | `skipped`; for `indexed` require `embedding_model`, `embedding_dims`, `chunk_count` (optional `embedded_text_hash`, `embedded_at`); for `failed` require `embedding_error`
 - **409** if `embedded_text_hash` ≠ current `text_hash`
 
+### Topic RAG chat
+- **POST** `/api/content/topics/{topic_id}/chat/`
+- **Auth**: Required (JWT)
+- **Body**: `{ "message": "…", "history": [{ "role": "user"|"assistant", "content": "…" }] }`
+- **Response**: `{ topic_id, answer, sources[] }` with citation excerpts and transcript links
+- Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
+
 ## Topics — Timeline
 
 Editorial timeline attached to a topic. One timeline per topic; entries are ordered and can link topic content.

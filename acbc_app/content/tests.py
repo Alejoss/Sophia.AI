@@ -5029,3 +5029,119 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+
+@override_settings(
+    OPENAI_API_KEY='test-openai-key',
+    QDRANT_URL='https://qdrant.example',
+    QDRANT_API_KEY='test-qdrant-key',
+    TOPIC_CHAT_TOP_K=4,
+)
+class TopicChatAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='chatuser',
+            email='chatuser@example.com',
+            password='testpass123',
+        )
+        self.topic = Topic.objects.create(
+            title='Tema de prueba RAG',
+            description='Desc',
+            creator=self.user,
+            is_public=True,
+        )
+        self.video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video citado',
+        )
+        self.topic.contents.add(self.video)
+        self.client.force_authenticate(user=self.user)
+
+    def test_requires_auth(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Hola'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_rejects_empty_message(self):
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': '   '},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(OPENAI_API_KEY='')
+    def test_unavailable_without_openai(self):
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Que es Bitcoin?'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_chat_returns_answer_and_sources(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Segun el video, el tamano importa [1].',
+            'sources': [
+                {
+                    'index': 1,
+                    'content_id': self.video.id,
+                    'title': 'Video citado',
+                    'chunk_index': 0,
+                    'score': 0.9,
+                    'excerpt': 'El tamano de bloque...',
+                    'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
+                }
+            ],
+        }
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Que dicen del tamano?'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('tamano', response.data['answer'])
+        self.assertEqual(len(response.data['sources']), 1)
+        mock_run.assert_called_once()
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs['topic_id'], self.topic.id)
+        self.assertEqual(kwargs['message'], 'Que dicen del tamano?')
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_builds_sources(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta grounded [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.88,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 2,
+                    'text': 'Los bloques grandes facilitan mas transacciones on-chain.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='bloques?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertEqual(result['answer'], 'Respuesta grounded [1].')
+        self.assertEqual(result['sources'][0]['content_id'], self.video.id)
+        self.assertEqual(result['sources'][0]['title'], 'Video citado')
+        self.assertNotIn('text', result['sources'][0])

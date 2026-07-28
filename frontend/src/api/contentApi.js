@@ -555,6 +555,14 @@ const contentApi = {
     }
   },
 
+  topicChat: async (topicId, { message, history = [] } = {}) => {
+    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, {
+      message,
+      history,
+    });
+    return response.data;
+  },
+
   getTopicDetailsSimple: async (topicId) => {
     try {
       const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);

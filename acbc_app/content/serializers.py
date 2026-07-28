@@ -1564,6 +1564,31 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         return transcript.embedded_at if transcript else None
 
 
+class TopicChatHistoryTurnSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=['user', 'assistant'])
+    content = serializers.CharField(max_length=4000)
+
+
+class TopicChatRequestSerializer(serializers.Serializer):
+    """Body for POST /api/content/topics/{id}/chat/."""
+
+    message = serializers.CharField(min_length=1, max_length=4000)
+    history = TopicChatHistoryTurnSerializer(many=True, required=False)
+
+    def validate_message(self, value):
+        cleaned = (value or '').strip()
+        if not cleaned:
+            raise serializers.ValidationError('El mensaje no puede estar vacío.')
+        return cleaned
+
+    def validate_history(self, value):
+        if value is None:
+            return []
+        if len(value) > 12:
+            raise serializers.ValidationError('Máximo 12 turnos de historial.')
+        return value
+
+
 class ContentEmbeddingAckSerializer(serializers.Serializer):
     """Worker ack after upserting (or failing to upsert) vectors externally."""
 

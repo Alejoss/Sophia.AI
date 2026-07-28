@@ -102,5 +102,6 @@ Filter RAG searches with `topic_id`.
 
 ## Related
 
+- Topic RAG chat UI/API: [topic-rag-chat.md](topic-rag-chat.md)
 - Transcript ingest: [transcript-ingest.md](../api/transcript-ingest.md)
 - Env reference: [environment-variables.md](../deployment/environment-variables.md#qdrant-cloud-topic-embeddings)
