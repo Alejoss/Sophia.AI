@@ -13,6 +13,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
 import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
+import TopicTimelineEntryContentLinkForm from './TopicTimelineEntryContentLinkForm';
 import TopicTimelineEntryForm from './TopicTimelineEntryForm';
 
 const getErrorMessage = (error, fallback) => {
@@ -27,6 +28,14 @@ const getErrorMessage = (error, fallback) => {
   return fallback;
 };
 
+const buildEditPath = (topicId, id, { fromEdit, linkContent }) => {
+  const params = new URLSearchParams();
+  if (fromEdit) params.set('from', 'edit');
+  if (linkContent) params.set('step', 'content');
+  const query = params.toString();
+  return `/content/topics/${topicId}/timeline/${id}/edit${query ? `?${query}` : ''}`;
+};
+
 const TopicTimelineEntryPage = () => {
   const { topicId, entryId } = useParams();
   const navigate = useNavigate();
@@ -34,14 +43,18 @@ const TopicTimelineEntryPage = () => {
   const { user, isAuthenticated } = useAuth();
   const isEdit = Boolean(entryId);
   const fromEdit = searchParams.get('from') === 'edit';
+  const isContentStep = isEdit && searchParams.get('step') === 'content';
 
   const [topicTitle, setTopicTitle] = useState('');
   const [entry, setEntry] = useState(null);
   const [availableContents, setAvailableContents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingContents, setLoadingContents] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingContents, setSavingContents] = useState(false);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
+  const [contentFormError, setContentFormError] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
 
   const timelineUrl = useMemo(
@@ -50,6 +63,16 @@ const TopicTimelineEntryPage = () => {
       : getTopicDetailPath(topicId, TOPIC_TABS.TIMELINE)),
     [fromEdit, topicId],
   );
+
+  const refreshTopicContents = useCallback(async () => {
+    setLoadingContents(true);
+    try {
+      const contentsData = await contentApi.getTopicDetailsSimple(topicId);
+      setAvailableContents(contentsData?.contents || []);
+    } finally {
+      setLoadingContents(false);
+    }
+  }, [topicId]);
 
   const loadPageData = useCallback(async () => {
     setLoading(true);
@@ -110,21 +133,62 @@ const TopicTimelineEntryPage = () => {
     navigate(timelineUrl);
   };
 
-  const handleSubmit = async (payload) => {
+  const handleEntrySubmit = async (payload) => {
     try {
       setSaving(true);
       setFormError(null);
       if (isEdit) {
         await contentApi.updateTopicTimelineEntry(topicId, entryId, payload);
-      } else {
-        await contentApi.createTopicTimelineEntry(topicId, payload);
+        navigate(timelineUrl);
+        return;
       }
-      navigate(timelineUrl);
+
+      const created = await contentApi.createTopicTimelineEntry(topicId, payload);
+      navigate(
+        buildEditPath(topicId, created.id, { fromEdit, linkContent: true }),
+        { replace: true },
+      );
     } catch (err) {
       setFormError(getErrorMessage(err, 'No se pudo guardar la entrada.'));
       throw err;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const linkContentsToEntry = async ({ contents, newProfiles }) => {
+    const targetEntryId = entry?.id || entryId;
+    if (!targetEntryId) {
+      throw new Error('No se encontro la entrada.');
+    }
+
+    const profileIds = (newProfiles || [])
+      .map((profile) => profile?.id)
+      .filter(Boolean);
+
+    if (profileIds.length > 0) {
+      await contentApi.addContentToTopic(topicId, profileIds);
+      await refreshTopicContents();
+    }
+
+    const updated = await contentApi.updateTopicTimelineEntry(topicId, targetEntryId, {
+      contents,
+    });
+    setEntry(updated);
+    return updated;
+  };
+
+  const handleContentSubmit = async ({ contents, newProfiles }) => {
+    try {
+      setSavingContents(true);
+      setContentFormError(null);
+      await linkContentsToEntry({ contents, newProfiles });
+      navigate(timelineUrl);
+    } catch (err) {
+      setContentFormError(getErrorMessage(err, 'No se pudieron vincular los contenidos.'));
+      throw err;
+    } finally {
+      setSavingContents(false);
     }
   };
 
@@ -136,6 +200,18 @@ const TopicTimelineEntryPage = () => {
       </Stack>
     );
   }
+
+  const pageTitle = (() => {
+    if (isContentStep) return 'Vincular contenidos a la entrada';
+    if (isEdit) return 'Editar entrada de la linea de tiempo';
+    return 'Nueva entrada de la linea de tiempo';
+  })();
+
+  const breadcrumbLabel = (() => {
+    if (isContentStep) return 'Vincular contenidos';
+    if (isEdit) return 'Editar entrada';
+    return 'Nueva entrada';
+  })();
 
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto', py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
@@ -150,7 +226,7 @@ const TopicTimelineEntryPage = () => {
           Linea de tiempo
         </MuiLink>
         <Typography color="text.primary">
-          {isEdit ? 'Editar entrada' : 'Nueva entrada'}
+          {breadcrumbLabel}
         </Typography>
       </Breadcrumbs>
 
@@ -168,10 +244,11 @@ const TopicTimelineEntryPage = () => {
       </Stack>
 
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-        {isEdit ? 'Editar entrada de la linea de tiempo' : 'Nueva entrada de la linea de tiempo'}
+        {pageTitle}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         {topicTitle ? `Tema: ${topicTitle}` : ''}
+        {isContentStep && entry?.title ? ` · Entrada: ${entry.title}` : ''}
       </Typography>
 
       {error && (
@@ -180,16 +257,42 @@ const TopicTimelineEntryPage = () => {
         </Alert>
       )}
 
-      {canEdit && !error && (
-        <TopicTimelineEntryForm
+      {canEdit && !error && isContentStep && (
+        <TopicTimelineEntryContentLinkForm
           entry={entry}
           availableContents={availableContents}
-          loadingContents={loading}
-          saving={saving}
-          error={formError}
-          onCancel={handleCancel}
-          onSubmit={handleSubmit}
+          loadingContents={loadingContents}
+          saving={savingContents}
+          error={contentFormError}
+          showSkip
+          onSkip={handleCancel}
+          onSubmit={handleContentSubmit}
         />
+      )}
+
+      {canEdit && !error && !isContentStep && (
+        <Stack spacing={3}>
+          <TopicTimelineEntryForm
+            entry={entry}
+            saving={saving}
+            error={formError}
+            onCancel={handleCancel}
+            onSubmit={handleEntrySubmit}
+            submitLabel={isEdit ? 'Guardar' : 'Crear entrada'}
+          />
+
+          {isEdit && (
+            <TopicTimelineEntryContentLinkForm
+              entry={entry}
+              availableContents={availableContents}
+              loadingContents={loadingContents}
+              saving={savingContents}
+              error={contentFormError}
+              onCancel={handleCancel}
+              onSubmit={handleContentSubmit}
+            />
+          )}
+        </Stack>
       )}
     </Box>
   );

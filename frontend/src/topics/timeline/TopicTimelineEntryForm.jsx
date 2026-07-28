@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import {
@@ -11,21 +11,14 @@ import {
   TextField,
 } from '@mui/material';
 import dayjs from 'dayjs';
-import TopicTimelineContentSelector from './TopicTimelineContentSelector';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
-const buildInitialValues = (entry) => {
-  const links = [...(entry?.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const selectedIds = links.map((link) => String(link.content?.id)).filter(Boolean);
-
-  return {
-    title: entry?.title || '',
-    description: entry?.description || '',
-    start_date: entry?.start_date || '',
-    end_date: entry?.end_date || '',
-    selectedContentIds: selectedIds,
-  };
-};
+const buildInitialValues = (entry) => ({
+  title: entry?.title || '',
+  description: entry?.description || '',
+  start_date: entry?.start_date || '',
+  end_date: entry?.end_date || '',
+});
 
 const schema = yup.object({
   title: yup
@@ -46,22 +39,19 @@ const schema = yup.object({
         return !dayjs(value).isBefore(dayjs(startDate), 'day');
       },
     ),
-  selectedContentIds: yup.array().of(yup.string()).default([]),
 });
 
 const TopicTimelineEntryForm = ({
   entry,
-  availableContents,
-  loadingContents,
   saving,
   error,
   onCancel,
   onSubmit,
+  submitLabel,
 }) => {
   const {
     register,
     handleSubmit,
-    control,
     reset,
     setValue,
     watch,
@@ -80,18 +70,11 @@ const TopicTimelineEntryForm = ({
   }, [entry, reset]);
 
   const handleFormSubmit = async (form) => {
-    const contents = form.selectedContentIds.map((id, index) => ({
-      content_id: Number(id),
-      order: index + 1,
-      caption: '',
-    }));
-
     await onSubmit({
       title: form.title.trim(),
       description: form.description,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      contents,
     });
   };
 
@@ -138,19 +121,6 @@ const TopicTimelineEntryForm = ({
         {errors.end_date && (
           <Alert severity="error">{errors.end_date.message}</Alert>
         )}
-
-        <Controller
-          name="selectedContentIds"
-          control={control}
-          render={({ field }) => (
-            <TopicTimelineContentSelector
-              items={availableContents}
-              selectedIds={field.value}
-              loading={loadingContents}
-              onSelectionChange={field.onChange}
-            />
-          )}
-        />
       </Stack>
 
       <Box
@@ -172,7 +142,9 @@ const TopicTimelineEntryForm = ({
           variant="contained"
           disabled={saving || !isValid}
         >
-          {saving ? 'Guardando...' : 'Guardar'}
+          {saving
+            ? 'Guardando...'
+            : (submitLabel || 'Guardar')}
         </Button>
       </Box>
     </Paper>

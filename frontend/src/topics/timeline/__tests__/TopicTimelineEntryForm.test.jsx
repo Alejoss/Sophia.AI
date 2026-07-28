@@ -5,8 +5,6 @@ import TopicTimelineEntryForm from '../TopicTimelineEntryForm';
 
 const baseProps = {
   entry: null,
-  availableContents: [],
-  loadingContents: false,
   saving: false,
   error: null,
   onCancel: vi.fn(),
@@ -34,16 +32,21 @@ describe('TopicTimelineEntryForm', () => {
     render(<TopicTimelineEntryForm {...baseProps} onSubmit={onSubmit} />);
 
     await user.type(screen.getByLabelText(/^titulo$/i), 'Whitepaper de Bitcoin');
-    await user.click(screen.getByRole('button', { name: /guardar/i }));
+    await user.click(screen.getByRole('button', { name: /guardar|crear entrada/i }));
 
-    await screen.findByRole('button', { name: /guardar/i });
+    await screen.findByRole('button', { name: /guardar|crear entrada/i });
     expect(onSubmit).toHaveBeenCalledWith({
       title: 'Whitepaper de Bitcoin',
       description: '',
       start_date: null,
       end_date: null,
-      contents: [],
     });
+  });
+
+  it('does not render the topic content selector', () => {
+    render(<TopicTimelineEntryForm {...baseProps} />);
+
+    expect(screen.queryByText(/contenidos del tema/i)).not.toBeInTheDocument();
   });
 
   it('shows the Spanish error passed in from the parent', () => {
