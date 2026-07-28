@@ -37,7 +37,6 @@ const TopicTimelineEntryPage = () => {
 
   const [topicTitle, setTopicTitle] = useState('');
   const [entry, setEntry] = useState(null);
-  const [availableContents, setAvailableContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -55,14 +54,12 @@ const TopicTimelineEntryPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [topicData, timelineData, contentsData] = await Promise.all([
+      const [topicData, timelineData] = await Promise.all([
         contentApi.getTopicDetails(topicId, { include_contents: false }),
         contentApi.getTopicTimeline(topicId),
-        contentApi.getTopicDetailsSimple(topicId),
       ]);
 
       setTopicTitle(topicData?.title || '');
-      setAvailableContents(contentsData?.contents || []);
 
       const creatorId = typeof topicData?.creator === 'object'
         ? topicData.creator?.id
@@ -183,8 +180,7 @@ const TopicTimelineEntryPage = () => {
       {canEdit && !error && (
         <TopicTimelineEntryForm
           entry={entry}
-          availableContents={availableContents}
-          loadingContents={loading}
+          topicId={topicId}
           saving={saving}
           error={formError}
           onCancel={handleCancel}

@@ -859,6 +859,50 @@ class UserLibraryWithDetailsAPITests(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(r.data['count'], 1)
 
+    def test_collection_filter_and_exclude(self):
+        library = Library.objects.create(user=self.user, name='Lib')
+        collection = Collection.objects.create(library=library, name='Col A')
+        other = Collection.objects.create(library=library, name='Col B')
+
+        c1 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='In A')
+        c2 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='In B')
+        ContentProfile.objects.create(content=c1, user=self.user, title='In A', collection=collection)
+        ContentProfile.objects.create(content=c2, user=self.user, title='In B', collection=other)
+
+        r = self.client.get(self.url, {'collection': collection.id})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+        self.assertEqual(r.data['results'][0]['title'], 'In A')
+
+        r2 = self.client.get(self.url, {'exclude_collection': collection.id})
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.data['count'], 1)
+        self.assertEqual(r2.data['results'][0]['title'], 'In B')
+
+    def test_exclude_topic(self):
+        topic = Topic.objects.create(title='Tema', creator=self.user)
+        c_in = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Already')
+        c_out = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Available')
+        c_in.topics.add(topic)
+        ContentProfile.objects.create(content=c_in, user=self.user, title='Already')
+        ContentProfile.objects.create(content=c_out, user=self.user, title='Available')
+
+        r = self.client.get(self.url, {'exclude_topic': topic.id})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['count'], 1)
+        self.assertEqual(r.data['results'][0]['title'], 'Available')
+
+    def test_ordering_title(self):
+        c1 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='Z')
+        c2 = Content.objects.create(uploaded_by=self.user, media_type='TEXT', original_title='A')
+        ContentProfile.objects.create(content=c1, user=self.user, title='Zebra')
+        ContentProfile.objects.create(content=c2, user=self.user, title='Alpha')
+
+        r = self.client.get(self.url, {'ordering': 'title'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in r.data['results']]
+        self.assertEqual(titles, ['Alpha', 'Zebra'])
+
 
 class LibraryAPITests(APITestCase):
     """Test suite for Library API endpoints"""
@@ -1566,6 +1610,55 @@ class TopicAPITests(APITestCase):
         self.client.force_authenticate(user=outsider)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_topic_content_simple_paginated_search_and_media_type(self):
+        items = []
+        for i, (title, media) in enumerate([
+            ('Alpha Book', 'TEXT'),
+            ('Beta Video', 'VIDEO'),
+            ('Gamma Book', 'TEXT'),
+        ]):
+            content = Content.objects.create(
+                uploaded_by=self.user,
+                media_type=media,
+                original_title=title,
+                original_author=f'Author {i}',
+            )
+            ContentProfile.objects.create(
+                content=content,
+                user=self.user,
+                title=title,
+                author=f'Author {i}',
+            )
+            items.append(content)
+        self.topic.contents.add(*items)
+
+        url = reverse('content:topic-content-simple', args=[self.topic.id])
+        response = self.client.get(url, {
+            'page': 1,
+            'page_size': 2,
+            'search': 'Book',
+            'ordering': 'title',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(response.data['current_page'], 1)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(len(response.data['contents']), 2)
+        titles = [row['title'] for row in response.data['results']]
+        self.assertEqual(titles, ['Alpha Book', 'Gamma Book'])
+
+        video_response = self.client.get(url, {
+            'page': 1,
+            'page_size': 10,
+            'media_type': 'VIDEO',
+        })
+        self.assertEqual(video_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(video_response.data['count'], 1)
+        self.assertEqual(
+            video_response.data['results'][0]['content']['media_type'],
+            'VIDEO',
+        )
 
     def test_topic_timeline_create_list_and_attach_multiple_contents(self):
         content_video = Content.objects.create(

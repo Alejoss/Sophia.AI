@@ -104,13 +104,6 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
     }
   };
 
-  const filterContent = (content) => {
-    const isInTopic = content?.content?.topics?.some(
-      (id) => id === parseInt(topicId, 10),
-    );
-    return !isInTopic;
-  };
-
   if (loading) {
     return <Typography color="text.secondary">Cargando contenido...</Typography>;
   }
@@ -139,7 +132,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
             description="Selecciona contenido de tu biblioteca para agregar a este tema"
             onCancel={() => setAddSourceMode(null)}
             onSave={handleSaveAdd}
-            filterFunction={filterContent}
+            excludeTopicId={topicId}
             contextName={topicTitle}
           />
         </Box>

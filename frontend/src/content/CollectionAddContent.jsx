@@ -28,25 +28,15 @@ const CollectionAddContent = () => {
     }
   };
 
-  const filterContent = (content) => {
-    // Filter out content that's already in this collection
-    const contentCollectionId =
-    content?.collection && typeof content.collection === 'object' ?
-    content.collection.id :
-    content?.collection;
-    const isInCollection = contentCollectionId === parseInt(collectionId, 10);
-
-
-    return !isInCollection;
-  };
-
   return (
     <LibrarySelectMultiple
       title="Add Content to Collection"
       description="Select content from your library to add to this collection"
       onCancel={handleCancel}
       onSave={handleSave}
-      filterFunction={filterContent} />);
+      excludeCollectionId={collectionId}
+    />
+  );
 
 
 };

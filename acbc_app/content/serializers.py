@@ -246,7 +246,9 @@ class ContentProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'author', 'personal_note', 'thumbnail', 'thumbnail_preview',
             'is_visible', 'is_producer', 'collection', 'collection_name', 'content', 'user',
+            'created_at',
         ]
+        read_only_fields = ['created_at']
 
 
 class ContentWithSelectedProfileSerializer(ContentSerializer):

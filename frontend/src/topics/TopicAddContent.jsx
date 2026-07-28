@@ -86,13 +86,6 @@ const TopicAddContent = () => {
         setSelectedContentProfileIds(selectedContentProfiles.map((p) => p.id));
     };
 
-    const filterContent = (content) => {
-        const isInTopic = content?.content?.topics?.some(
-            (tid) => tid === parseInt(topicId, 10)
-        );
-        return !isInTopic;
-    };
-
     if (loading) {
         return <Typography>Cargando...</Typography>;
     }
@@ -127,7 +120,7 @@ const TopicAddContent = () => {
                     onCancel={handleBackToSourceChoice}
                     onSave={handleSave}
                     onSelectionChange={handleSelectionChange}
-                    filterFunction={filterContent}
+                    excludeTopicId={topicId}
                     contextName={topicTitle || topicId}
                     selectedIds={selectedContentProfileIds}
                 />

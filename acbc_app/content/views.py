@@ -1107,13 +1107,22 @@ class UserContentWithDetailsView(APIView):
     """Paginated list of the current user's content profiles with file details for library display."""
     permission_classes = [IsAuthenticated]
 
+    ALLOWED_ORDERINGS = {
+        'title': 'title',
+        '-title': '-title',
+        'author': 'author',
+        '-author': '-author',
+        'created_at': 'created_at',
+        '-created_at': '-created_at',
+    }
+
     def get(self, request):
         user_id = request.user.id
         username = request.user.username
         try:
             queryset = ContentProfile.objects.filter(user=request.user).select_related(
-                'content', 'content__file_details'
-            ).order_by('-created_at')
+                'content', 'content__file_details', 'collection'
+            ).prefetch_related('content__topics')
 
             media_type = (request.query_params.get('media_type') or 'ALL').upper()
             if media_type != 'ALL':
@@ -1128,6 +1137,40 @@ class UserContentWithDetailsView(APIView):
                     | Q(content__original_title__icontains=search)
                     | Q(content__media_type__icontains=search)
                 )
+
+            collection = (request.query_params.get('collection') or '').strip()
+            if collection:
+                try:
+                    queryset = queryset.filter(collection_id=int(collection))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro collection inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            exclude_collection = (request.query_params.get('exclude_collection') or '').strip()
+            if exclude_collection:
+                try:
+                    queryset = queryset.exclude(collection_id=int(exclude_collection))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro exclude_collection inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            exclude_topic = (request.query_params.get('exclude_topic') or '').strip()
+            if exclude_topic:
+                try:
+                    queryset = queryset.exclude(content__topics__id=int(exclude_topic))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'Parámetro exclude_topic inválido'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            ordering_param = (request.query_params.get('ordering') or '-created_at').strip()
+            ordering = self.ALLOWED_ORDERINGS.get(ordering_param, '-created_at')
+            queryset = queryset.order_by(ordering, 'id')
 
             paginator = UserLibraryPagination()
             page = paginator.paginate_queryset(queryset, request)
@@ -2093,11 +2136,27 @@ class TopicDetailView(APIView):
 
 
 class TopicContentSimpleView(APIView):
-    """Topic content view optimized for content management operations"""
+    """Topic content view optimized for content management operations.
+
+    Without ``page``, returns the full unpaginated list (legacy consumers).
+    With ``page``, returns a paginated payload supporting search / media_type /
+    ordering for pickers (e.g. timeline entry content selector).
+    """
     permission_classes = [IsAuthenticated]
 
+    ALLOWED_ORDERINGS = {
+        'title': 'original_title',
+        '-title': '-original_title',
+        'author': 'original_author',
+        '-author': '-original_author',
+        'created_at': 'created_at',
+        '-created_at': '-created_at',
+        'media_type': 'media_type',
+        '-media_type': '-media_type',
+    }
+
     def get(self, request, pk):
-        topic = get_object_or_404(Topic.objects.prefetch_related("contents"), pk=pk)
+        topic = get_object_or_404(Topic, pk=pk)
 
         if not topic.is_moderator_or_creator(request.user):
             return Response(
@@ -2107,37 +2166,22 @@ class TopicContentSimpleView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Same ordering as the public topic view (vote buckets), then one query
-        # batch for profiles — avoids N+1 selects from per-content profile lookup.
-        ordered_contents = get_topic_contents_ordered_for_public_view(topic)
-        content_ids = [c.id for c in ordered_contents]
-        contents_by_id = (
-            {
-                c.id: c
-                for c in Content.objects.filter(id__in=content_ids).prefetch_related(
-                    "profiles"
-                )
-            }
-            if content_ids
-            else {}
-        )
-        ordered_loaded = [
-            contents_by_id[cid] for cid in content_ids if cid in contents_by_id
-        ]
+        if request.query_params.get('page') is not None:
+            return self._get_paginated(request, topic, pk)
 
-        profiles = []
-        for content in ordered_loaded:
+        return self._get_full_list(request, topic, pk)
+
+    def _serialize_profiles(self, request, topic, pk, contents):
+        response_data = []
+        for content in contents:
             profile = get_topic_content_profile_for_display(
                 content,
                 request,
                 topic,
                 prefetched_profiles=list(content.profiles.all()),
             )
-            if profile is not None:
-                profiles.append(profile)
-
-        response_data = []
-        for profile in profiles:
+            if profile is None:
+                continue
             try:
                 serializer = SimpleContentProfileSerializer(
                     profile,
@@ -2157,7 +2201,27 @@ class TopicContentSimpleView(APIView):
                     exc_info=True,
                 )
                 continue
+        return response_data
 
+    def _get_full_list(self, request, topic, pk):
+        # Same ordering as the public topic view (vote buckets), then one query
+        # batch for profiles — avoids N+1 selects from per-content profile lookup.
+        ordered_contents = get_topic_contents_ordered_for_public_view(topic)
+        content_ids = [c.id for c in ordered_contents]
+        contents_by_id = (
+            {
+                c.id: c
+                for c in Content.objects.filter(id__in=content_ids).prefetch_related(
+                    "profiles"
+                )
+            }
+            if content_ids
+            else {}
+        )
+        ordered_loaded = [
+            contents_by_id[cid] for cid in content_ids if cid in contents_by_id
+        ]
+        response_data = self._serialize_profiles(request, topic, pk, ordered_loaded)
         return Response(
             {
                 "topic": {
@@ -2169,6 +2233,44 @@ class TopicContentSimpleView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    def _get_paginated(self, request, topic, pk):
+        queryset = Content.objects.filter(topics=topic).prefetch_related(
+            'profiles',
+            'profiles__user',
+        )
+
+        media_type = (request.query_params.get('media_type') or '').strip().upper()
+        if media_type and media_type != 'ALL':
+            queryset = queryset.filter(media_type=media_type)
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(original_title__icontains=search)
+                | Q(original_author__icontains=search)
+                | Q(media_type__icontains=search)
+                | Q(profiles__title__icontains=search)
+                | Q(profiles__author__icontains=search)
+            ).distinct()
+
+        ordering_param = (request.query_params.get('ordering') or 'title').strip()
+        ordering = self.ALLOWED_ORDERINGS.get(ordering_param, 'original_title')
+        queryset = queryset.order_by(ordering, 'id')
+
+        paginator = TopicContentMediaTypePagination()
+        page = paginator.paginate_queryset(queryset, request)
+        response_data = self._serialize_profiles(request, topic, pk, page)
+        response = paginator.get_paginated_response(response_data)
+        response.data['topic'] = {
+            'id': topic.id,
+            'title': topic.title,
+            'description': topic.description,
+        }
+        # Alias for consumers that expect `contents` instead of `results`.
+        response.data['contents'] = response.data.get('results', [])
+        return response
+
 
 
 class TopicTimelineView(APIView):
