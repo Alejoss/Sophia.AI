@@ -1,12 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntryForm from '../TopicTimelineEntryForm';
 
+vi.mock('../../../api/contentApi', () => ({
+  default: {
+    getTopicDetailsSimple: vi.fn().mockResolvedValue({
+      count: 0,
+      results: [],
+      contents: [],
+    }),
+  },
+}));
+
 const baseProps = {
   entry: null,
-  availableContents: [],
-  loadingContents: false,
+  topicId: '42',
   saving: false,
   error: null,
   onCancel: vi.fn(),
@@ -14,6 +23,10 @@ const baseProps = {
 };
 
 describe('TopicTimelineEntryForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows a title validation error and disables submit', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Checkbox,
   Chip,
+  CircularProgress,
   FormControl,
   IconButton,
   InputLabel,
@@ -16,6 +17,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -25,7 +27,10 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
+import contentApi from '../../api/contentApi';
 import { formatDate } from '../../utils/dateUtils';
+
+const DEFAULT_PAGE_SIZE = 25;
 
 const MEDIA_TYPE_LABELS = {
   VIDEO: 'Video',
@@ -41,122 +46,163 @@ const getItemId = (item) => {
   return content?.id != null ? String(content.id) : null;
 };
 
-const getItemTitle = (item) => {
+const normalizeItem = (item) => {
   const content = getContentData(item);
-  return (
-    item?.title ||
-    item?.selected_profile?.title ||
-    content?.original_title ||
-    'Contenido sin titulo'
-  );
+  const id = getItemId(item);
+  if (!id) return null;
+  return {
+    id,
+    title:
+      item?.title ||
+      item?.selected_profile?.title ||
+      content?.selected_profile?.title ||
+      content?.original_title ||
+      'Contenido sin titulo',
+    author:
+      item?.author ||
+      item?.selected_profile?.author ||
+      content?.selected_profile?.author ||
+      content?.original_author ||
+      'Desconocido',
+    mediaType: (content?.media_type || item?.media_type || 'TEXT').toUpperCase(),
+    createdAt:
+      item?.created_at ||
+      content?.created_at ||
+      item?.selected_profile?.created_at ||
+      null,
+    contentId: id,
+  };
 };
 
-const getItemAuthor = (item) => {
-  const content = getContentData(item);
-  return item?.author || item?.selected_profile?.author || content?.original_author || 'Desconocido';
+const buildInitialCache = (initialSelectedItems = []) => {
+  const map = {};
+  initialSelectedItems.forEach((raw) => {
+    const item = normalizeItem(raw);
+    if (item) map[item.id] = item;
+  });
+  return map;
 };
-
-const getItemMediaType = (item) => {
-  const content = getContentData(item);
-  return (content?.media_type || item?.media_type || 'TEXT').toUpperCase();
-};
-
-const getItemCreatedAt = (item) => {
-  const content = getContentData(item);
-  return item?.created_at || content?.created_at || item?.selected_profile?.created_at || null;
-};
-
-const normalizeItems = (items = []) => (
-  items
-    .map((item) => ({
-      id: getItemId(item),
-      title: getItemTitle(item),
-      author: getItemAuthor(item),
-      mediaType: getItemMediaType(item),
-      createdAt: getItemCreatedAt(item),
-      contentId: getItemId(item),
-    }))
-    .filter((item) => item.id)
-);
 
 const TopicTimelineContentSelector = ({
-  items = [],
+  topicId,
   selectedIds = [],
-  loading = false,
+  initialSelectedItems = [],
   onSelectionChange,
 }) => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(Boolean(topicId));
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [mediaTypeFilter, setMediaTypeFilter] = useState('');
   const [sortField, setSortField] = useState('title');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const [totalCount, setTotalCount] = useState(0);
+  const [itemCache, setItemCache] = useState(() => buildInitialCache(initialSelectedItems));
 
-  const normalizedItems = useMemo(() => normalizeItems(items), [items]);
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedSet = useMemo(() => new Set(selectedIds.map(String)), [selectedIds]);
 
-  const filteredItems = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    let result = normalizedItems.filter((item) => {
-      const matchesMedia = !mediaTypeFilter || item.mediaType === mediaTypeFilter;
-      const matchesSearch = !query ||
-        item.title.toLowerCase().includes(query) ||
-        item.author.toLowerCase().includes(query) ||
-        (MEDIA_TYPE_LABELS[item.mediaType] || item.mediaType).toLowerCase().includes(query);
-      return matchesMedia && matchesSearch;
-    });
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchDebounced(searchQuery.trim());
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-    result = [...result].sort((a, b) => {
-      let aValue = '';
-      let bValue = '';
-      if (sortField === 'author') {
-        aValue = a.author.toLowerCase();
-        bValue = b.author.toLowerCase();
-      } else if (sortField === 'mediaType') {
-        aValue = MEDIA_TYPE_LABELS[a.mediaType] || a.mediaType;
-        bValue = MEDIA_TYPE_LABELS[b.mediaType] || b.mediaType;
-      } else if (sortField === 'createdAt') {
-        aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      } else {
-        aValue = a.title.toLowerCase();
-        bValue = b.title.toLowerCase();
-      }
+  useEffect(() => {
+    setPage(0);
+  }, [searchDebounced, mediaTypeFilter, sortField, sortDirection, topicId]);
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
+  const ordering = sortDirection === 'desc' ? `-${sortField}` : sortField;
 
-    return result;
-  }, [mediaTypeFilter, normalizedItems, searchQuery, sortDirection, sortField]);
+  const loadPage = useCallback(async () => {
+    if (!topicId) {
+      setItems([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await contentApi.getTopicDetailsSimple(topicId, {
+        page: page + 1,
+        page_size: rowsPerPage,
+        search: searchDebounced,
+        media_type: mediaTypeFilter || undefined,
+        ordering,
+      });
+      const rows = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data?.contents)
+          ? data.contents
+          : [];
+      const normalized = rows.map(normalizeItem).filter(Boolean);
+      setItems(normalized);
+      setTotalCount(typeof data?.count === 'number' ? data.count : normalized.length);
+      setItemCache((prev) => {
+        const next = { ...prev };
+        normalized.forEach((item) => {
+          next[item.id] = item;
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('TopicTimelineContentSelector: Error fetching contents:', err);
+      setError('Error al cargar los contenidos del tema');
+      setItems([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [topicId, page, rowsPerPage, searchDebounced, mediaTypeFilter, ordering]);
+
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
 
   const selectedItems = useMemo(
-    () => normalizedItems.filter((item) => selectedSet.has(item.id)),
-    [normalizedItems, selectedSet],
+    () => selectedIds.map((id) => {
+      const key = String(id);
+      return itemCache[key] || { id: key, title: `Contenido #${key}`, contentId: key };
+    }),
+    [selectedIds, itemCache],
   );
 
   const setSelectedIds = (nextIds) => {
-    onSelectionChange([...new Set(nextIds)]);
+    onSelectionChange([...new Set(nextIds.map(String))]);
   };
 
-  const handleToggle = (itemId) => {
+  const handleToggle = (item) => {
+    const itemId = item.id;
     if (selectedSet.has(itemId)) {
-      setSelectedIds(selectedIds.filter((id) => id !== itemId));
+      setSelectedIds(selectedIds.filter((id) => String(id) !== itemId));
     } else {
+      setItemCache((prev) => ({ ...prev, [itemId]: item }));
       setSelectedIds([...selectedIds, itemId]);
     }
   };
 
   const handleSelectVisible = (event) => {
-    const visibleIds = filteredItems.map((item) => item.id);
+    const visibleIds = items.map((item) => item.id);
     if (event.target.checked) {
+      setItemCache((prev) => {
+        const next = { ...prev };
+        items.forEach((item) => {
+          next[item.id] = item;
+        });
+        return next;
+      });
       setSelectedIds([...selectedIds, ...visibleIds]);
     } else {
-      setSelectedIds(selectedIds.filter((id) => !visibleIds.includes(id)));
+      setSelectedIds(selectedIds.filter((id) => !visibleIds.includes(String(id))));
     }
   };
 
-  const visibleSelectedCount = filteredItems.filter((item) => selectedSet.has(item.id)).length;
-  const allVisibleSelected = filteredItems.length > 0 && visibleSelectedCount === filteredItems.length;
+  const visibleSelectedCount = items.filter((item) => selectedSet.has(item.id)).length;
+  const allVisibleSelected = items.length > 0 && visibleSelectedCount === items.length;
   const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected;
 
   return (
@@ -177,14 +223,14 @@ const TopicTimelineContentSelector = ({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             size="small"
-            disabled={loading}
+            disabled={!topicId}
             InputProps={{
               startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
             }}
             sx={{ flexGrow: 1, minWidth: { md: 240 } }}
           />
 
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={loading}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={!topicId}>
             <InputLabel>Tipo</InputLabel>
             <Select
               value={mediaTypeFilter}
@@ -200,7 +246,7 @@ const TopicTimelineContentSelector = ({
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={loading}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={!topicId}>
             <InputLabel>Ordenar por</InputLabel>
             <Select
               value={sortField}
@@ -209,8 +255,8 @@ const TopicTimelineContentSelector = ({
             >
               <MenuItem value="title">Titulo</MenuItem>
               <MenuItem value="author">Autor</MenuItem>
-              <MenuItem value="mediaType">Tipo</MenuItem>
-              <MenuItem value="createdAt">Fecha de subida</MenuItem>
+              <MenuItem value="media_type">Tipo</MenuItem>
+              <MenuItem value="created_at">Fecha de subida</MenuItem>
             </Select>
           </FormControl>
 
@@ -218,7 +264,7 @@ const TopicTimelineContentSelector = ({
             <IconButton
               onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
               size="small"
-              disabled={loading}
+              disabled={!topicId}
               sx={{ border: 1, borderColor: 'divider', alignSelf: { xs: 'flex-start', md: 'center' } }}
             >
               {sortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
@@ -230,12 +276,15 @@ const TopicTimelineContentSelector = ({
           <Typography variant="body2" color="text.secondary">
             {loading
               ? 'Cargando contenidos...'
-              : `${filteredItems.length} contenido(s) disponible(s) - ${selectedIds.length} seleccionado(s)`}
+              : `${totalCount} contenido(s) disponible(s) - ${selectedIds.length} seleccionado(s)`}
+            {loading && (
+              <CircularProgress size={14} sx={{ ml: 1, verticalAlign: 'middle' }} />
+            )}
           </Typography>
           {selectedItems.length > 0 && (
             <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75 }}>
               {selectedItems.slice(0, 4).map((item) => (
-                <Chip key={item.id} size="small" label={item.title} onDelete={() => handleToggle(item.id)} />
+                <Chip key={item.id} size="small" label={item.title} onDelete={() => handleToggle(item)} />
               ))}
               {selectedItems.length > 4 && (
                 <Chip size="small" label={`+${selectedItems.length - 4} mas`} variant="outlined" />
@@ -243,6 +292,15 @@ const TopicTimelineContentSelector = ({
             </Stack>
           )}
         </Stack>
+
+        {error && (
+          <Typography color="error" variant="body2">
+            {error}{' '}
+            <MuiLink component="button" type="button" onClick={loadPage} underline="hover">
+              Reintentar
+            </MuiLink>
+          </Typography>
+        )}
 
         <TableContainer sx={{ maxHeight: 360, border: 1, borderColor: 'divider' }}>
           <Table stickyHeader size="small">
@@ -253,7 +311,7 @@ const TopicTimelineContentSelector = ({
                     checked={allVisibleSelected}
                     indeterminate={someVisibleSelected}
                     onChange={handleSelectVisible}
-                    disabled={loading || filteredItems.length === 0}
+                    disabled={loading || items.length === 0}
                   />
                 </TableCell>
                 <TableCell>Titulo</TableCell>
@@ -264,60 +322,87 @@ const TopicTimelineContentSelector = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredItems.map((item) => {
-                const selected = selectedSet.has(item.id);
-                return (
-                  <TableRow
-                    key={item.id}
-                    hover
-                    onClick={() => handleToggle(item.id)}
-                    selected={selected}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    <TableCell padding="checkbox">
-                      <Checkbox checked={selected} />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={selected ? 700 : 400}>
-                        {item.title}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        label={MEDIA_TYPE_LABELS[item.mediaType] || item.mediaType}
-                      />
-                    </TableCell>
-                    <TableCell>{item.author}</TableCell>
-                    <TableCell>{item.createdAt ? formatDate(item.createdAt) : '-'}</TableCell>
-                    <TableCell onClick={(event) => event.stopPropagation()}>
-                      <MuiLink
-                        href={`/content/${item.contentId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}
-                      >
-                        Ver
-                        <OpenInNewIcon fontSize="small" />
-                      </MuiLink>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {!loading && filteredItems.length === 0 && (
+              {loading && items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    {normalizedItems.length === 0
-                      ? 'Este tema todavia no tiene contenidos para adjuntar.'
-                      : 'No se encontro contenido con los filtros aplicados.'}
+                    Cargando contenidos...
                   </TableCell>
                 </TableRow>
+              ) : (
+                <>
+                  {items.map((item) => {
+                    const selected = selectedSet.has(item.id);
+                    return (
+                      <TableRow
+                        key={item.id}
+                        hover
+                        onClick={() => handleToggle(item)}
+                        selected={selected}
+                        sx={{ cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
+                      >
+                        <TableCell padding="checkbox">
+                          <Checkbox checked={selected} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={selected ? 700 : 400}>
+                            {item.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            label={MEDIA_TYPE_LABELS[item.mediaType] || item.mediaType}
+                          />
+                        </TableCell>
+                        <TableCell>{item.author}</TableCell>
+                        <TableCell>{item.createdAt ? formatDate(item.createdAt) : '-'}</TableCell>
+                        <TableCell onClick={(event) => event.stopPropagation()}>
+                          <MuiLink
+                            href={`/content/${item.contentId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}
+                          >
+                            Ver
+                            <OpenInNewIcon fontSize="small" />
+                          </MuiLink>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {!loading && items.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                        {searchDebounced || mediaTypeFilter
+                          ? 'No se encontro contenido con los filtros aplicados.'
+                          : 'Este tema todavia no tiene contenidos para adjuntar.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          count={totalCount}
+          page={page}
+          onPageChange={(_event, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[12, 25, 50, 100]}
+          labelRowsPerPage="Por página"
+          labelDisplayedRows={({ from, to, count }) =>
+            `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+          }
+        />
       </Stack>
     </Paper>
   );

@@ -567,9 +567,19 @@ const contentApi = {
     }
   },
 
-  getTopicDetailsSimple: async (topicId) => {
+  getTopicDetailsSimple: async (topicId, params = {}) => {
     try {
-      const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);
+      const query = {};
+      if (params.page != null) query.page = params.page;
+      if (params.page_size != null) query.page_size = params.page_size;
+      if (params.search) query.search = params.search;
+      if (params.media_type && params.media_type !== 'ALL') {
+        query.media_type = params.media_type;
+      }
+      if (params.ordering) query.ordering = params.ordering;
+      const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`, {
+        params: query,
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching topic details (simple):', error);

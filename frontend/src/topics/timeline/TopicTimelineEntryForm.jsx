@@ -51,8 +51,7 @@ const schema = yup.object({
 
 const TopicTimelineEntryForm = ({
   entry,
-  availableContents,
-  loadingContents,
+  topicId,
   saving,
   error,
   onCancel,
@@ -144,9 +143,9 @@ const TopicTimelineEntryForm = ({
           control={control}
           render={({ field }) => (
             <TopicTimelineContentSelector
-              items={availableContents}
+              topicId={topicId}
               selectedIds={field.value}
-              loading={loadingContents}
+              initialSelectedItems={entry?.contents || []}
               onSelectionChange={field.onChange}
             />
           )}
