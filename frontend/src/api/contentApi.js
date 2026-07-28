@@ -288,6 +288,28 @@ const contentApi = {
     }
   },
 
+  getTranscriptAnchor: async (contentId) => {
+    const response = await axiosInstance.get(
+      `/content/content_details/${contentId}/transcript/anchor/`,
+    );
+    return response.data;
+  },
+
+  createTranscriptAnchor: async (contentId, payload = {}) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/anchors/`,
+      payload,
+    );
+    return response.data;
+  },
+
+  listTranscriptAnchors: async (contentId) => {
+    const response = await axiosInstance.get(
+      `/content/content_details/${contentId}/transcript/anchors/`,
+    );
+    return response.data;
+  },
+
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {
       let url = `/content/content_preview/${contentId}/`;

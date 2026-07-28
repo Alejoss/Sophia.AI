@@ -1,6 +1,17 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails, Content, ContentProfile, ContentTranscript, Topic, Publication, TopicCreationRequest
+from content.models import (
+    Library,
+    Collection,
+    FileDetails,
+    Content,
+    ContentProfile,
+    ContentTranscript,
+    TranscriptAnchor,
+    Topic,
+    Publication,
+    TopicCreationRequest,
+)
 
 
 @admin.register(Library)
@@ -71,6 +82,45 @@ class ContentTranscriptAdmin(admin.ModelAdmin):
         'updated_at',
     ]
     date_hierarchy = 'updated_at'
+
+
+@admin.register(TranscriptAnchor)
+class TranscriptAnchorAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'content',
+        'text_hash_short',
+        'status',
+        'btc_network',
+        'btc_txid',
+        'ipfs_cid',
+        'evm_chain_id',
+        'anchored_by',
+        'created_at',
+    ]
+    list_filter = ['status', 'btc_network', 'evm_chain_id', 'created_at']
+    search_fields = [
+        'text_hash',
+        'btc_txid',
+        'evm_tx_hash',
+        'ipfs_cid',
+        'content__original_title',
+    ]
+    raw_id_fields = ['content', 'anchored_by']
+    readonly_fields = [
+        'btc_op_return_hex',
+        'btc_confirmed_at',
+        'evm_recorded_at',
+        'created_at',
+        'updated_at',
+    ]
+    date_hierarchy = 'created_at'
+
+    @admin.display(description='text_hash')
+    def text_hash_short(self, obj):
+        if not obj.text_hash:
+            return ''
+        return f'{obj.text_hash[:12]}…'
 
 
 @admin.register(Topic)
