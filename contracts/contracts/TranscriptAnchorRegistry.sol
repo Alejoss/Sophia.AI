@@ -9,6 +9,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Bitcoin OP_RETURN holds the text hash (existence proof). This contract
  *      stores the same hash plus optional IPFS CID and Bitcoin txid so the app
  *      can discover and display anchors. It does not verify Bitcoin inclusion.
+ *
+ *      All writes are onlyOwner: the Sophia platform wallet records anchors.
+ *      Reads remain public for verification UIs.
  */
 contract TranscriptAnchorRegistry is Ownable {
     struct Anchor {
@@ -45,7 +48,7 @@ contract TranscriptAnchorRegistry is Ownable {
         bytes32 textHash,
         bytes32 btcTxId,
         string calldata ipfsCid
-    ) external {
+    ) external onlyOwner {
         require(textHash != bytes32(0), "Empty text hash");
         require(!anchorsByHash[textHash].exists, "Hash already stored");
         if (btcTxId != bytes32(0)) {
@@ -71,13 +74,9 @@ contract TranscriptAnchorRegistry is Ownable {
     /**
      * @notice Attach or replace the Bitcoin txid once the OP_RETURN tx confirms.
      */
-    function setBtcTxId(bytes32 textHash, bytes32 btcTxId) external {
+    function setBtcTxId(bytes32 textHash, bytes32 btcTxId) external onlyOwner {
         Anchor storage anchor = anchorsByHash[textHash];
         require(anchor.exists, "Hash not stored");
-        require(
-            msg.sender == anchor.recordedBy || msg.sender == owner(),
-            "Not authorized"
-        );
         require(btcTxId != bytes32(0), "Empty BTC tx");
         require(hashByBtcTxId[btcTxId] == bytes32(0), "BTC tx already linked");
 
@@ -99,13 +98,9 @@ contract TranscriptAnchorRegistry is Ownable {
     /**
      * @notice Attach or update the IPFS CID for an existing anchor.
      */
-    function setIpfsCid(bytes32 textHash, string calldata ipfsCid) external {
+    function setIpfsCid(bytes32 textHash, string calldata ipfsCid) external onlyOwner {
         Anchor storage anchor = anchorsByHash[textHash];
         require(anchor.exists, "Hash not stored");
-        require(
-            msg.sender == anchor.recordedBy || msg.sender == owner(),
-            "Not authorized"
-        );
         anchor.ipfsCid = ipfsCid;
         emit IpfsCidUpdated(textHash, ipfsCid);
     }
