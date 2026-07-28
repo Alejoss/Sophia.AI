@@ -145,11 +145,13 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Body**: `status` = `indexed` | `failed` | `skipped`; for `indexed` require `embedding_model`, `embedding_dims`, `chunk_count` (optional `embedded_text_hash`, `embedded_at`); for `failed` require `embedding_error`
 - **409** if `embedded_text_hash` ≠ current `text_hash`
 
-### Topic RAG chat
+### Topic RAG chat (consultations)
 - **POST** `/api/content/topics/{topic_id}/chat/`
 - **Auth**: Required (JWT)
-- **Body**: `{ "message": "…", "history": [{ "role": "user"|"assistant", "content": "…" }] }`
-- **Response**: `{ topic_id, answer, sources[] }` with citation excerpts and transcript links
+- **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
+- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at }`
+- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history
+- **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 ## Topics — Timeline

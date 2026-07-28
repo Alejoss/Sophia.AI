@@ -491,6 +491,47 @@ class Topic(models.Model):
         return False
 
 
+class TopicChatQuery(models.Model):
+    """
+    One independent RAG consultation on a topic (question + answer + sources).
+
+    Not a multi-turn thread: each row is a separate query. Conversation memory /
+    embedding of chat history is out of scope for this model.
+    """
+
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name='chat_queries',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='topic_chat_queries',
+    )
+    question = models.TextField()
+    answer = models.TextField()
+    sources = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['topic', 'user', '-created_at'],
+                name='content_tcq_topic_user_created',
+            ),
+        ]
+
+    def __str__(self):
+        preview = (self.question or '')[:60]
+        return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
+
+
 class TopicCreationRequest(models.Model):
     """User request to create a new topic; admin must approve title and description first."""
     MAX_PENDING_REQUESTS_PER_USER = 3

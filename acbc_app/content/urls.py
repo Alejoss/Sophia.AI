@@ -95,7 +95,11 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestQueueView,
     ContentEmbeddingIngestDetailView,
 )
-from .views_topic_chat import TopicChatView
+from .views_topic_chat import (
+    TopicChatView,
+    TopicChatQueryListView,
+    TopicChatQueryDetailView,
+)
 
 app_name = "content"
 
@@ -155,6 +159,16 @@ urlpatterns = [
     ),
     path('topics/<int:pk>/', TopicDetailView.as_view(), name='topic-detail'),
     path('topics/<int:pk>/chat/', TopicChatView.as_view(), name='topic-chat'),
+    path(
+        'topics/<int:pk>/chat/queries/',
+        TopicChatQueryListView.as_view(),
+        name='topic-chat-queries',
+    ),
+    path(
+        'topics/<int:pk>/chat/queries/<int:query_id>/',
+        TopicChatQueryDetailView.as_view(),
+        name='topic-chat-query-detail',
+    ),
     path('topics/<int:pk>/content-simple/', TopicContentSimpleView.as_view(), name='topic-content-simple'),
     path('topics/<int:pk>/basic/', TopicBasicView.as_view(), name='topic-basic'),
     path('topics/<int:pk>/timeline/', TopicTimelineView.as_view(), name='topic-timeline'),

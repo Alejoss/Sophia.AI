@@ -12,7 +12,7 @@ from content.models import (
     TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
-    TopicCreationRequest,
+    TopicCreationRequest, TopicChatQuery,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -5085,7 +5085,7 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
 
     @patch('content.views_topic_chat.run_topic_chat')
-    def test_chat_returns_answer_and_sources(self, mock_run):
+    def test_chat_persists_query_and_lists_history(self, mock_run):
         mock_run.return_value = {
             'topic_id': self.topic.id,
             'answer': 'Segun el video, el tamano importa [1].',
@@ -5106,13 +5106,42 @@ class TopicChatAPITests(APITestCase):
             {'message': 'Que dicen del tamano?'},
             format='json',
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('tamano', response.data['answer'])
+        self.assertEqual(response.data['question'], 'Que dicen del tamano?')
         self.assertEqual(len(response.data['sources']), 1)
+        query_id = response.data['id']
+        self.assertTrue(TopicChatQuery.objects.filter(pk=query_id, user=self.user).exists())
+
         mock_run.assert_called_once()
         kwargs = mock_run.call_args.kwargs
         self.assertEqual(kwargs['topic_id'], self.topic.id)
         self.assertEqual(kwargs['message'], 'Que dicen del tamano?')
+        self.assertIn(kwargs.get('history'), (None, []))
+
+        list_response = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/queries/',
+        )
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data['count'], 1)
+        self.assertEqual(list_response.data['results'][0]['id'], query_id)
+
+        detail = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data['question'], 'Que dicen del tamano?')
+
+        other = User.objects.create_user(
+            username='otherchat',
+            email='otherchat@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        forbidden = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
+        )
+        self.assertEqual(forbidden.status_code, status.HTTP_404_NOT_FOUND)
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')

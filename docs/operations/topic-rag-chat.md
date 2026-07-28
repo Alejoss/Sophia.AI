@@ -1,18 +1,27 @@
-# Topic RAG chat
+# Topic RAG consultations
 
-Authenticated users can ask questions about a topic. Sophia:
+Authenticated users ask **independent** questions about a topic. Sophia:
 
 1. Embeds the question with OpenAI (`text-embedding-3-large`).
 2. Searches Qdrant filtered by `topic_id`.
 3. Asks an OpenAI chat model to answer **only** from those transcript chunks.
-4. Returns the answer plus citation sources.
+4. Persists the consultation (`TopicChatQuery`: question, answer, sources).
+5. Returns the saved consultation (including `id` for history).
 
-Vectors are **not** stored in Django. They must already be indexed by the
-external embed worker (see [qdrant-embeddings.md](qdrant-embeddings.md)).
+This is **not** multi-turn conversational memory. Each `POST` is a separate
+query; previous answers are not sent back to the LLM. (Embedding past chats
+into Qdrant is a future option.)
+
+Vectors for transcripts are **not** stored in Django. They must already be
+indexed by the external embed worker (see [qdrant-embeddings.md](qdrant-embeddings.md)).
 
 ---
 
-## Endpoint
+## Endpoints
+
+All require JWT. Only the owning user can list/read their consultations.
+
+### Create consultation
 
 ```http
 POST /api/content/topics/{topic_id}/chat/
@@ -20,28 +29,17 @@ Authorization: Bearer <JWT>
 Content-Type: application/json
 ```
 
-### Request
-
 ```json
-{
-  "message": "¿Qué dicen sobre el tamaño de los bloques?",
-  "history": [
-    { "role": "user", "content": "…" },
-    { "role": "assistant", "content": "…" }
-  ]
-}
+{ "message": "¿Qué dicen sobre el tamaño de los bloques?" }
 ```
 
-| Field | Required | Notes |
-|-------|----------|-------|
-| `message` | yes | 1–4000 chars |
-| `history` | no | Max 12 turns; used only for conversational context (retrieval uses `message`) |
-
-### Response `200`
+Response `201`:
 
 ```json
 {
+  "id": 12,
   "topic_id": 2,
+  "question": "¿Qué dicen sobre el tamaño de los bloques?",
   "answer": "Según las transcripciones… [1]",
   "sources": [
     {
@@ -53,17 +51,47 @@ Content-Type: application/json
       "excerpt": "…",
       "transcript_url": "/content/46/transcript?context=topic"
     }
+  ],
+  "created_at": "2026-07-28T18:00:00Z"
+}
+```
+
+### List own consultations
+
+```http
+GET /api/content/topics/{topic_id}/chat/queries/?limit=50
+```
+
+```json
+{
+  "count": 2,
+  "limit": 50,
+  "results": [
+    {
+      "id": 12,
+      "topic_id": 2,
+      "question_preview": "¿Qué dicen sobre el tamaño…",
+      "created_at": "…"
+    }
   ]
 }
 ```
 
-### Errors
+### Get one consultation
+
+```http
+GET /api/content/topics/{topic_id}/chat/queries/{query_id}/
+```
+
+Same shape as the create response. Other users get **404**.
+
+### Errors (create)
 
 | Status | When |
 |--------|------|
 | 401 | Not authenticated |
 | 400 | Empty / invalid body |
-| 404 | Topic missing or not visible to the user |
+| 404 | Topic missing or not visible |
 | 503 | `OPENAI_API_KEY` or Qdrant env missing |
 | 502 | OpenAI / Qdrant upstream failure |
 
@@ -87,8 +115,9 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 
 - Retrieval is scoped to one `topic_id`.
 - At most two chunks per `content_id` in the prompt (dedupe).
-- If no chunks have usable `text` payload, the API returns a fixed “no encontré…” answer without calling the chat model.
-- Prompt instructs the model not to invent facts outside the context.
+- If no chunks have usable `text` payload, the API still persists a fixed
+  “no encontré…” answer (no chat-model call).
+- Per-user / per-topic daily rate limits are **not** implemented yet.
 
 ## Related
 

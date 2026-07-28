@@ -555,11 +555,24 @@ const contentApi = {
     }
   },
 
-  topicChat: async (topicId, { message, history = [] } = {}) => {
+  topicChat: async (topicId, { message } = {}) => {
     const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, {
       message,
-      history,
     });
+    return response.data;
+  },
+
+  listTopicChatQueries: async (topicId, params = {}) => {
+    const response = await axiosInstance.get(`/content/topics/${topicId}/chat/queries/`, {
+      params: { limit: params.limit },
+    });
+    return response.data;
+  },
+
+  getTopicChatQuery: async (topicId, queryId) => {
+    const response = await axiosInstance.get(
+      `/content/topics/${topicId}/chat/queries/${queryId}/`,
+    );
     return response.data;
   },
 

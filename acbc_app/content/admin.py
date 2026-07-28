@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from content.models import Library, Collection, FileDetails, Content, ContentProfile, ContentTranscript, Topic, Publication, TopicCreationRequest
+from content.models import Library, Collection, FileDetails, Content, ContentProfile, ContentTranscript, Topic, Publication, TopicCreationRequest, TopicChatQuery
 
 
 @admin.register(Library)
@@ -101,6 +101,16 @@ class TopicAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+
+@admin.register(TopicChatQuery)
+class TopicChatQueryAdmin(admin.ModelAdmin):
+    list_display = ['id', 'topic', 'user', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['question', 'answer', 'user__username', 'topic__title']
+    raw_id_fields = ['topic', 'user']
+    readonly_fields = ['created_at']
+    date_hierarchy = 'created_at'
 
 
 @admin.register(TopicCreationRequest)

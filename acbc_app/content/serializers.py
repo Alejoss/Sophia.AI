@@ -21,6 +21,7 @@ from content.models import (
     FileSuggestion,
     ContentTranscript,
     TopicCreationRequest,
+    TopicChatQuery,
 )
 from content.utils import build_media_url
 from content.image_utils import (
@@ -1564,16 +1565,10 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         return transcript.embedded_at if transcript else None
 
 
-class TopicChatHistoryTurnSerializer(serializers.Serializer):
-    role = serializers.ChoiceField(choices=['user', 'assistant'])
-    content = serializers.CharField(max_length=4000)
-
-
 class TopicChatRequestSerializer(serializers.Serializer):
-    """Body for POST /api/content/topics/{id}/chat/."""
+    """Body for POST /api/content/topics/{id}/chat/ (one independent consultation)."""
 
     message = serializers.CharField(min_length=1, max_length=4000)
-    history = TopicChatHistoryTurnSerializer(many=True, required=False)
 
     def validate_message(self, value):
         cleaned = (value or '').strip()
@@ -1581,12 +1576,38 @@ class TopicChatRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError('El mensaje no puede estar vacío.')
         return cleaned
 
-    def validate_history(self, value):
-        if value is None:
-            return []
-        if len(value) > 12:
-            raise serializers.ValidationError('Máximo 12 turnos de historial.')
-        return value
+
+class TopicChatQueryListSerializer(serializers.ModelSerializer):
+    question_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TopicChatQuery
+        fields = [
+            'id',
+            'topic_id',
+            'question_preview',
+            'created_at',
+        ]
+
+    def get_question_preview(self, obj):
+        text = (obj.question or '').strip()
+        if len(text) <= 120:
+            return text
+        return text[:117] + '…'
+
+
+class TopicChatQuerySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TopicChatQuery
+        fields = [
+            'id',
+            'topic_id',
+            'question',
+            'answer',
+            'sources',
+            'created_at',
+        ]
+        read_only_fields = fields
 
 
 class ContentEmbeddingAckSerializer(serializers.Serializer):
