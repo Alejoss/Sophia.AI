@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntryContentLinkForm from '../TopicTimelineEntryContentLinkForm';
 
 vi.mock('../../../content/LibrarySelectMultiple', () => ({
   __esModule: true,
-  default: ({ onSelectionChange, onSave }) => (
+  default: ({ onSave }) => (
     <div>
       <button
         type="button"
@@ -13,17 +13,10 @@ vi.mock('../../../content/LibrarySelectMultiple', () => ({
           const profiles = [
             { id: 99, content: { id: 50 }, title: 'Nuevo video' },
           ];
-          onSelectionChange(profiles);
           onSave(profiles.map((profile) => profile.id), profiles);
         }}
       >
         Mock select library content
-      </button>
-      <button
-        type="button"
-        onClick={() => onSave([], [])}
-      >
-        Mock save library
       </button>
     </div>
   ),
@@ -62,7 +55,7 @@ vi.mock('../TopicTimelineContentSelector', () => ({
 }));
 
 const baseProps = {
-  entry: null,
+  entry: { id: 5, contents: [] },
   topicId: '2',
   availableContents: [
     { id: 12, content: { id: 12 }, title: 'Whitepaper' },
@@ -82,39 +75,49 @@ describe('TopicTimelineEntryContentLinkForm', () => {
     expect(screen.getByRole('button', { name: /contenidos del tema/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /elegir de tu biblioteca/i })).toBeInTheDocument();
     expect(screen.queryByText(/contenidos del tema selector/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /guardar contenidos/i })).not.toBeInTheDocument();
   });
 
-  it('opens only one form at a time and submits combined selections', async () => {
+  it('links topic contents immediately on confirm', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue();
     render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
 
     await user.click(screen.getByRole('button', { name: /contenidos del tema/i }));
-    expect(screen.getByText(/contenidos del tema selector/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /elegir de tu biblioteca/i })).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: /mock select topic content/i }));
-    await user.click(screen.getByRole('button', { name: /listo/i }));
+    await user.click(screen.getByRole('button', { name: /vincular seleccionados/i }));
 
-    await user.click(screen.getByRole('button', { name: /elegir de tu biblioteca/i }));
-    expect(screen.getByRole('button', { name: /mock select library content/i })).toBeInTheDocument();
-    expect(screen.queryByText(/contenidos del tema selector/i)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /mock select library content/i }));
-    await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
-
-    expect(onSubmit).toHaveBeenCalledWith({
-      contents: [
-        { content_id: 12, order: 1, caption: '' },
-        { content_id: 50, order: 2, caption: '' },
-      ],
-      newProfiles: [
-        { id: 99, content: { id: 50 }, title: 'Nuevo video' },
-      ],
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        contents: [
+          { content_id: 12, order: 1, caption: '' },
+        ],
+        newProfiles: [],
+      });
     });
   });
 
-  it('resolves content id when upload returns content as a primary key', async () => {
+  it('links library content immediately without a second save', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue();
+    render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole('button', { name: /elegir de tu biblioteca/i }));
+    await user.click(screen.getByRole('button', { name: /mock select library content/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        contents: [
+          { content_id: 50, order: 1, caption: '' },
+        ],
+        newProfiles: [
+          { id: 99, content: { id: 50 }, title: 'Nuevo video' },
+        ],
+      });
+    });
+  });
+
+  it('links uploaded content immediately after upload', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue();
     render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
@@ -122,20 +125,19 @@ describe('TopicTimelineEntryContentLinkForm', () => {
     await user.click(screen.getByRole('button', { name: /desde url/i }));
     await user.click(screen.getByRole('button', { name: /mock upload content/i }));
 
-    expect(screen.getByRole('button', { name: /guardar contenidos/i })).not.toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
-
-    expect(onSubmit).toHaveBeenCalledWith({
-      contents: [
-        { content_id: 88, order: 1, caption: '' },
-      ],
-      newProfiles: [
-        { id: 77, content: 88, title: 'Desde URL' },
-      ],
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        contents: [
+          { content_id: 88, order: 1, caption: '' },
+        ],
+        newProfiles: [
+          { id: 77, content: 88, title: 'Desde URL' },
+        ],
+      });
     });
   });
 
-  it('surfaces API errors from a failed submit', async () => {
+  it('surfaces API errors from a failed link', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockRejectedValue({
       response: { data: { contents: 'Solo se pueden adjuntar contenidos que ya pertenecen al tema.' } },
@@ -144,8 +146,7 @@ describe('TopicTimelineEntryContentLinkForm', () => {
 
     await user.click(screen.getByRole('button', { name: /contenidos del tema/i }));
     await user.click(screen.getByRole('button', { name: /mock select topic content/i }));
-    await user.click(screen.getByRole('button', { name: /listo/i }));
-    await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
+    await user.click(screen.getByRole('button', { name: /vincular seleccionados/i }));
 
     expect(
       await screen.findByText(/solo se pueden adjuntar contenidos que ya pertenecen al tema/i),

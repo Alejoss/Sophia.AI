@@ -30,6 +30,18 @@ const getTopicItemTitle = (item) => {
   );
 };
 
+const uniqueContentIds = (ids) => {
+  const ordered = [];
+  const seen = new Set();
+  ids.forEach((id) => {
+    const key = String(id);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    ordered.push(key);
+  });
+  return ordered;
+};
+
 const TopicTimelineEntryContentLinkForm = ({
   entry,
   topicId,
@@ -40,19 +52,18 @@ const TopicTimelineEntryContentLinkForm = ({
   onSkip,
   onCancel,
   onSubmit,
+  onLinked,
   showSkip = false,
 }) => {
   const [sourceMode, setSourceMode] = useState(null);
   const [uploadMode, setUploadMode] = useState('file');
   const [uploadInProgress, setUploadInProgress] = useState(false);
   const [selectedContentIds, setSelectedContentIds] = useState(() => buildInitialSelectedIds(entry));
-  const [externalProfiles, setExternalProfiles] = useState([]);
   const [generalError, setGeneralError] = useState('');
   const entryId = entry?.id;
 
   useEffect(() => {
     setSelectedContentIds(buildInitialSelectedIds(entry));
-    setExternalProfiles([]);
     setGeneralError('');
     setSourceMode(null);
     setUploadInProgress(false);
@@ -74,44 +85,9 @@ const TopicTimelineEntryContentLinkForm = ({
     [topicContentById],
   );
 
-  const selectedProfileIds = useMemo(
-    () => externalProfiles.map((profile) => profile.id).filter(Boolean),
-    [externalProfiles],
-  );
-
   const backToChoice = () => {
     setUploadInProgress(false);
     setSourceMode(null);
-  };
-
-  const handleLibrarySelectionChange = (profiles) => {
-    const valid = (profiles || []).filter((profile) => profile?.id && getProfileContentId(profile));
-    setExternalProfiles(valid);
-  };
-
-  const handleLibrarySave = (_ids, profiles) => {
-    handleLibrarySelectionChange(profiles);
-    backToChoice();
-  };
-
-  const handleContentUploaded = (contentProfile) => {
-    setUploadInProgress(false);
-    if (contentProfile?.id) {
-      setExternalProfiles((prev) => {
-        const map = new Map(prev.map((profile) => [profile.id, profile]));
-        map.set(contentProfile.id, contentProfile);
-        return [...map.values()];
-      });
-    }
-    setSourceMode(null);
-  };
-
-  const handleRemoveTopicContent = (contentId) => {
-    setSelectedContentIds((prev) => prev.filter((id) => id !== String(contentId)));
-  };
-
-  const handleRemoveProfile = (profileId) => {
-    setExternalProfiles((prev) => prev.filter((profile) => profile.id !== profileId));
   };
 
   const filterLibraryContent = useCallback((contentProfile) => {
@@ -120,42 +96,9 @@ const TopicTimelineEntryContentLinkForm = ({
     return !topics.some((id) => String(id) === String(topicId));
   }, [topicId]);
 
-  const handleSubmit = async () => {
+  const persistLinks = async ({ contentIds, newProfiles = [], finish = false }) => {
     setGeneralError('');
-
-    const orderedIds = [];
-    const seen = new Set();
-
-    selectedContentIds.forEach((id) => {
-      const key = String(id);
-      if (!seen.has(key)) {
-        seen.add(key);
-        orderedIds.push(key);
-      }
-    });
-
-    const newProfiles = [];
-    externalProfiles.forEach((profile) => {
-      const contentId = getProfileContentId(profile);
-      if (!contentId) return;
-      const key = String(contentId);
-      if (seen.has(key)) return;
-      seen.add(key);
-      orderedIds.push(key);
-      if (!topicContentIdSet.has(key) && profile?.id) {
-        newProfiles.push(profile);
-      }
-    });
-
-    if (orderedIds.length === 0) {
-      setGeneralError(
-        externalProfiles.length > 0
-          ? 'No se pudo obtener el contenido seleccionado. Vuelve a elegirlo e inténtalo de nuevo.'
-          : 'Selecciona al menos un contenido para vincular, o usa Omitir.',
-      );
-      return;
-    }
-
+    const orderedIds = uniqueContentIds(contentIds);
     const contents = orderedIds.map((id, index) => ({
       content_id: Number(id),
       order: index + 1,
@@ -164,19 +107,105 @@ const TopicTimelineEntryContentLinkForm = ({
 
     try {
       await onSubmit({ contents, newProfiles });
+      if (finish) {
+        onLinked?.();
+      }
     } catch (err) {
       const { fieldErrors, generalError: parsed } = parseApiValidationErrors(
         err,
         'No se pudieron vincular los contenidos. Inténtalo de nuevo.',
       );
       const contentsError = fieldErrors.contents;
-      setGeneralError(contentsError || parsed || 'No se pudieron vincular los contenidos. Inténtalo de nuevo.');
+      const message = contentsError || parsed || 'No se pudieron vincular los contenidos. Inténtalo de nuevo.';
+      setGeneralError(message);
+      throw err;
+    }
+  };
+
+  const buildNewProfiles = (profiles) => (
+    (profiles || [])
+      .filter((profile) => profile?.id && getProfileContentId(profile))
+      .filter((profile) => !topicContentIdSet.has(String(getProfileContentId(profile))))
+  );
+
+  const handleLibrarySave = async (_ids, profiles) => {
+    const validProfiles = (profiles || []).filter(
+      (profile) => profile?.id && getProfileContentId(profile),
+    );
+    if (validProfiles.length === 0) {
+      setGeneralError('Selecciona al menos un contenido para vincular.');
+      return;
+    }
+
+    const existingIds = buildInitialSelectedIds(entry);
+    const addedIds = validProfiles.map((profile) => String(getProfileContentId(profile)));
+    try {
+      await persistLinks({
+        contentIds: [...existingIds, ...addedIds],
+        newProfiles: buildNewProfiles(validProfiles),
+        finish: true,
+      });
+    } catch {
+      // Error already surfaced via generalError.
+    }
+  };
+
+  const handleContentUploaded = async (contentProfile) => {
+    setUploadInProgress(false);
+    if (!contentProfile?.id || !getProfileContentId(contentProfile)) {
+      setGeneralError('No se pudo obtener el contenido subido. Inténtalo de nuevo.');
+      setSourceMode(null);
+      return;
+    }
+
+    try {
+      const existingIds = buildInitialSelectedIds(entry);
+      const uploadedId = String(getProfileContentId(contentProfile));
+      await persistLinks({
+        contentIds: [...existingIds, uploadedId],
+        newProfiles: buildNewProfiles([contentProfile]),
+        finish: true,
+      });
+    } catch {
+      // Error already surfaced via generalError; return to choice so the user can retry.
+      setSourceMode(null);
+    }
+  };
+
+  const handleTopicConfirm = async () => {
+    if (selectedContentIds.length === 0) {
+      setGeneralError('Selecciona al menos un contenido del tema, o vuelve atrás.');
+      return;
+    }
+    try {
+      await persistLinks({
+        contentIds: selectedContentIds,
+        newProfiles: [],
+        finish: true,
+      });
+    } catch {
+      // Error already surfaced via generalError.
+    }
+  };
+
+  const handleRemoveLinkedContent = async (contentId) => {
+    const nextIds = selectedContentIds.filter((id) => id !== String(contentId));
+    setSelectedContentIds(nextIds);
+    try {
+      await persistLinks({ contentIds: nextIds, newProfiles: [] });
+    } catch {
+      setSelectedContentIds(buildInitialSelectedIds(entry));
     }
   };
 
   const secondaryAction = showSkip ? onSkip : onCancel;
-  const secondaryLabel = showSkip ? 'Omitir' : 'Cancelar';
+  const secondaryLabel = showSkip ? 'Omitir' : 'Volver';
   const busy = saving || uploadInProgress;
+  const errorAlert = (error || generalError) && (
+    <Alert severity="error" sx={{ mb: 2 }}>
+      {error || generalError}
+    </Alert>
+  );
 
   if (sourceMode === 'topic') {
     return (
@@ -190,6 +219,7 @@ const TopicTimelineEntryContentLinkForm = ({
         >
           Volver
         </Button>
+        {errorAlert}
         <TopicTimelineContentSelector
           items={availableContents}
           selectedIds={selectedContentIds}
@@ -199,11 +229,11 @@ const TopicTimelineEntryContentLinkForm = ({
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
           <Button
             variant="contained"
-            onClick={backToChoice}
+            onClick={handleTopicConfirm}
             disabled={busy}
             sx={{ textTransform: 'none' }}
           >
-            Listo
+            {busy ? 'Vinculando...' : 'Vincular seleccionados'}
           </Button>
         </Box>
       </Box>
@@ -222,14 +252,15 @@ const TopicTimelineEntryContentLinkForm = ({
         >
           Volver
         </Button>
+        {errorAlert}
         <LibrarySelectMultiple
           title="Seleccionar contenido"
-          description="Selecciona contenido de tu biblioteca para vincular a esta entrada"
+          description="Al confirmar, el contenido se agregará al tema (si hace falta) y se vincula a esta entrada."
           onCancel={backToChoice}
           onSave={handleLibrarySave}
-          onSelectionChange={handleLibrarySelectionChange}
           filterFunction={filterLibraryContent}
-          selectedIds={selectedProfileIds}
+          confirmLabel="Vincular"
+          confirmingLabel="Vinculando..."
           compact
         />
       </Box>
@@ -248,11 +279,12 @@ const TopicTimelineEntryContentLinkForm = ({
         >
           Volver
         </Button>
+        {errorAlert}
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {uploadMode === 'url'
-              ? 'Indica la URL del contenido que quieres vincular.'
-              : 'Sube el archivo del contenido que quieres vincular.'}
+              ? 'Indica la URL. Al guardar, el contenido se vincula automáticamente a esta entrada.'
+              : 'Sube el archivo. Al guardar, el contenido se vincula automáticamente a esta entrada.'}
           </Typography>
           <UploadContentForm
             onContentUploaded={handleContentUploaded}
@@ -271,52 +303,40 @@ const TopicTimelineEntryContentLinkForm = ({
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
-        {(error || generalError) && (
-          <Alert severity="error">{error || generalError}</Alert>
-        )}
+        {errorAlert}
 
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Vincular contenidos
+            Vincular contenido relacionado a esta entrada en la línea de tiempo
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {showSkip
-              ? 'Este paso es opcional. Elige contenidos del tema o agrega uno nuevo desde tu biblioteca, una URL o un archivo.'
-              : 'Elige contenidos del tema o agrega uno nuevo desde tu biblioteca, una URL o un archivo.'}
+              ? 'Este paso es opcional. Elige una fuente: al confirmar, el contenido queda vinculado a la entrada.'
+              : 'Elige una fuente: al confirmar, el contenido queda vinculado a la entrada.'}
           </Typography>
         </Box>
 
-        {(selectedContentIds.length > 0 || externalProfiles.length > 0) && (
+        {selectedContentIds.length > 0 && (
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             {selectedContentIds.map((id) => {
               const item = topicContentById.get(String(id));
               return (
                 <Chip
-                  key={`topic-${id}`}
+                  key={`linked-${id}`}
                   label={item ? getTopicItemTitle(item) : `Contenido ${id}`}
-                  onDelete={busy ? undefined : () => handleRemoveTopicContent(id)}
+                  onDelete={busy ? undefined : () => handleRemoveLinkedContent(id)}
                   variant="outlined"
                   size="small"
                 />
               );
             })}
-            {externalProfiles.map((profile) => (
-              <Chip
-                key={`profile-${profile.id}`}
-                label={profile.title || profile.content?.original_title || 'Contenido'}
-                onDelete={busy ? undefined : () => handleRemoveProfile(profile.id)}
-                variant="outlined"
-                size="small"
-                color="primary"
-              />
-            ))}
           </Stack>
         )}
 
         <Stack spacing={1.5}>
           <Button
             variant="contained"
-            onClick={() => setSourceMode('topic')}
+            onClick={() => { setGeneralError(''); setSourceMode('topic'); }}
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
@@ -324,7 +344,7 @@ const TopicTimelineEntryContentLinkForm = ({
           </Button>
           <Button
             variant="outlined"
-            onClick={() => setSourceMode('library')}
+            onClick={() => { setGeneralError(''); setSourceMode('library'); }}
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
@@ -332,7 +352,7 @@ const TopicTimelineEntryContentLinkForm = ({
           </Button>
           <Button
             variant="outlined"
-            onClick={() => { setUploadMode('url'); setSourceMode('upload'); }}
+            onClick={() => { setGeneralError(''); setUploadMode('url'); setSourceMode('upload'); }}
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
@@ -340,7 +360,7 @@ const TopicTimelineEntryContentLinkForm = ({
           </Button>
           <Button
             variant="outlined"
-            onClick={() => { setUploadMode('file'); setSourceMode('upload'); }}
+            onClick={() => { setGeneralError(''); setUploadMode('file'); setSourceMode('upload'); }}
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
@@ -365,14 +385,6 @@ const TopicTimelineEntryContentLinkForm = ({
             {secondaryLabel}
           </Button>
         )}
-        <Button
-          type="button"
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={busy}
-        >
-          {saving ? 'Guardando...' : 'Guardar contenidos'}
-        </Button>
       </Box>
     </Paper>
   );

@@ -191,10 +191,13 @@ const TopicTimelineEntryPage = () => {
     setSavingContents(true);
     try {
       await linkContentsToEntry({ contents, newProfiles });
-      navigate(timelineUrl);
     } finally {
       setSavingContents(false);
     }
+  };
+
+  const handleContentsLinked = () => {
+    navigate(timelineUrl);
   };
 
   if (loading) {
@@ -324,6 +327,7 @@ const TopicTimelineEntryPage = () => {
           onSkip={handleCancel}
           onCancel={handleCancel}
           onSubmit={handleContentSubmit}
+          onLinked={handleContentsLinked}
         />
       )}
     </Box>

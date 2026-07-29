@@ -43,6 +43,8 @@ const LibrarySelectMultiple = ({
   selectedIds = [],
   contextName = '',
   compact = false,
+  confirmLabel = 'Elegir',
+  confirmingLabel = 'Guardando...',
 }) => {
   const filterRef = useRef(filterFunction);
   filterRef.current = filterFunction;
@@ -285,7 +287,7 @@ const LibrarySelectMultiple = ({
               onClick={handleSubmit}
               disabled={selectedCount === 0 || saving}
             >
-              {saving ? 'Guardando...' : `Elegir (${selectedCount})`}
+              {saving ? confirmingLabel : `${confirmLabel} (${selectedCount})`}
             </Button>
           </Box>
         </Box>
