@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -19,17 +19,18 @@ import {
   FormControl,
   InputLabel,
   Select,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  TablePagination,
+  CircularProgress,
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import contentApi from '../api/contentApi';
+
+const DEFAULT_PAGE_SIZE = 25;
 
 const LibrarySelectSingle = ({
   isOpen,
@@ -41,13 +42,8 @@ const LibrarySelectSingle = ({
   compact = false,
   isLoading = false,
 }) => {
-  const getCollectionId = (item) => {
-    const rawCollection = item?.collection;
-    if (rawCollection && typeof rawCollection === 'object') {
-      return rawCollection.id ?? null;
-    }
-    return rawCollection ?? null;
-  };
+  const filterRef = useRef(filterFunction);
+  filterRef.current = filterFunction;
 
   const [userContent, setUserContent] = useState([]);
   const [selectedContentProfile, setSelectedContentProfile] = useState(null);
@@ -55,39 +51,26 @@ const LibrarySelectSingle = ({
   const [error, setError] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollectionId, setSelectedCollectionId] = useState(null);
-  const [sortField, setSortField] = useState(null);
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const [selectedCollectionId, setSelectedCollectionId] = useState('');
   const [collections, setCollections] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    const fetchUserContent = async () => {
-      try {
-        const data = await contentApi.getUserContent();
-        if (filterFunction) {
-          setUserContent(data.filter(filterFunction));
-        } else {
-          setUserContent(data);
-        }
-      } catch (err) {
-        console.error('LibrarySelectSingle: Error fetching content:', err);
-        setError('Error al obtener tu contenido');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (isOpen) {
-      setSelectedContentProfile(null);
-      setSearchQuery('');
-      setSelectedCollectionId(null);
-      setLoading(true);
-      setError(null);
-      fetchUserContent();
-    }
-  }, [isOpen, filterFunction]);
+    const timer = setTimeout(() => {
+      setSearchDebounced(searchQuery.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
+    setPage(0);
+  }, [searchDebounced, selectedCollectionId, rowsPerPage]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     const fetchCollections = async () => {
       try {
         const data = await contentApi.getUserCollections();
@@ -96,73 +79,46 @@ const LibrarySelectSingle = ({
         console.error('LibrarySelectSingle: Error fetching collections:', err);
       }
     };
-
-    if (isOpen) {
-      fetchCollections();
-    }
+    fetchCollections();
   }, [isOpen]);
 
-  const filteredContent = useMemo(() => {
-    let filtered = [...userContent];
-
-    if (selectedCollectionId !== null) {
-      const collectionIdNum =
-        typeof selectedCollectionId === 'string'
-          ? parseInt(selectedCollectionId, 10)
-          : selectedCollectionId;
-      filtered = filtered.filter(
-        (item) => {
-          const itemCollectionId = getCollectionId(item);
-          return (
-            itemCollectionId === collectionIdNum ||
-            itemCollectionId === selectedCollectionId
-          );
-        }
-      );
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((item) => {
-        const titleText = (item.title || '').toLowerCase();
-        const author = (item.author || '').toLowerCase();
-        const mediaType = (item.content?.media_type || '').toLowerCase();
-        return (
-          titleText.includes(query) ||
-          author.includes(query) ||
-          mediaType.includes(query)
-        );
+  const loadLibraryPage = useCallback(async () => {
+    if (!isOpen) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await contentApi.getUserContentWithDetails({
+        page: page + 1,
+        page_size: rowsPerPage,
+        search: searchDebounced,
+        collection: selectedCollectionId || undefined,
       });
+      const results = Array.isArray(data?.results)
+        ? data.results.filter((item) => {
+          if (!item?.content) return false;
+          if (filterRef.current && !filterRef.current(item)) return false;
+          return true;
+        })
+        : [];
+      setUserContent(results);
+      setTotalCount(typeof data?.count === 'number' ? data.count : 0);
+    } catch (err) {
+      console.error('LibrarySelectSingle: Error fetching content:', err);
+      setError(err.message || 'Error al obtener tu contenido');
+    } finally {
+      setLoading(false);
     }
+  }, [isOpen, page, rowsPerPage, searchDebounced, selectedCollectionId]);
 
-    if (sortField) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue, bValue;
-        if (sortField === 'title') {
-          aValue = (a.title || 'Sin título').toLowerCase();
-          bValue = (b.title || 'Sin título').toLowerCase();
-        } else if (sortField === 'author') {
-          aValue = (a.author || 'Desconocido').toLowerCase();
-          bValue = (b.author || 'Desconocido').toLowerCase();
-        } else {
-          return 0;
-        }
-        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedContentProfile(null);
+  }, [isOpen]);
 
-    return filtered;
-  }, [userContent, selectedCollectionId, searchQuery, sortField, sortDirection]);
-
-  const handleRowClick = (contentProfile) => {
-    setSelectedContentProfile(contentProfile);
-  };
-
-  const handleSortDirectionToggle = () => {
-    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-  };
+  useEffect(() => {
+    if (!isOpen) return;
+    loadLibraryPage();
+  }, [isOpen, loadLibraryPage]);
 
   const handleConfirm = () => {
     if (selectedContentProfile) {
@@ -188,7 +144,7 @@ const LibrarySelectSingle = ({
       elevation={0}
     >
       <Box sx={{ mb: compact ? 1.5 : 2 }}>
-        <Typography variant={compact ? 'h6' : 'h6'} sx={{ mb: 1 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>
           {title}
         </Typography>
         {description && (
@@ -225,157 +181,136 @@ const LibrarySelectSingle = ({
         <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Colección</InputLabel>
           <Select
-            value={selectedCollectionId || ''}
+            value={selectedCollectionId}
             label="Colección"
-            onChange={(e) =>
-              setSelectedCollectionId(e.target.value || null)
-            }
+            onChange={(e) => setSelectedCollectionId(e.target.value)}
           >
             <MenuItem value="">
               <em>Todas las colecciones</em>
             </MenuItem>
             {collections.map((collection) => (
-              <MenuItem key={collection.id} value={collection.id}>
+              <MenuItem key={collection.id} value={String(collection.id)}>
                 {collection.name}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Ordenar por</InputLabel>
-          <Select
-            value={sortField || ''}
-            label="Ordenar por"
-            onChange={(e) => setSortField(e.target.value || null)}
-          >
-            <MenuItem value="">
-              <em>Sin ordenar</em>
-            </MenuItem>
-            <MenuItem value="title">Título</MenuItem>
-            <MenuItem value="author">Autor</MenuItem>
-          </Select>
-        </FormControl>
-        {sortField && (
-          <IconButton
-            onClick={handleSortDirectionToggle}
-            size="small"
-            sx={{ border: 1, borderColor: 'divider' }}
-            title={
-              sortDirection === 'asc' ? 'Ascendente' : 'Descendente'
-            }
-          >
-            {sortDirection === 'asc' ? (
-              <ArrowUpwardIcon />
-            ) : (
-              <ArrowDownwardIcon />
-            )}
-          </IconButton>
-        )}
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Contenido disponible ({filteredContent.length})
+        Contenido disponible ({totalCount})
       </Typography>
 
-      <TableContainer
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflow: 'auto',
-        }}
-      >
-        <Table size="small" stickyHeader>
-          <TableHead>
-            <TableRow>
-              <TableCell>Título</TableCell>
-              <TableCell>Tipo</TableCell>
-              <TableCell>Autor</TableCell>
-              <TableCell>Ver</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredContent.map((content) => (
-              <TableRow
-                key={content.id}
-                hover
-                onClick={() => handleRowClick(content)}
-                selected={selectedContentProfile?.id === content.id}
-                sx={{
-                  cursor: 'pointer',
-                  '&.Mui-selected': {
-                    backgroundColor: 'action.selected',
-                  },
-                  '&.Mui-selected:hover': {
-                    backgroundColor: 'action.selected',
-                  },
-                }}
-              >
-                <TableCell>{content.title || 'Sin título'}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={content.content?.media_type || '-'}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                </TableCell>
-                <TableCell>{content.author || 'Desconocido'}</TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <MuiLink
-                    href={`/content/${content.content?.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+      {loading && userContent.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : (
+        <>
+          <TableContainer
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflow: 'auto',
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Título</TableCell>
+                  <TableCell>Tipo</TableCell>
+                  <TableCell>Autor</TableCell>
+                  <TableCell>Ver</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {userContent.map((content) => (
+                  <TableRow
+                    key={content.id}
+                    hover
+                    onClick={() => setSelectedContentProfile(content)}
+                    selected={selectedContentProfile?.id === content.id}
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
+                      cursor: 'pointer',
+                      '&.Mui-selected': {
+                        backgroundColor: 'action.selected',
+                      },
+                      '&.Mui-selected:hover': {
+                        backgroundColor: 'action.selected',
+                      },
                     }}
                   >
-                    Ver
-                    <OpenInNewIcon fontSize="small" />
-                  </MuiLink>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filteredContent.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                  {searchQuery || selectedCollectionId !== null
-                    ? 'No se encontró contenido con los filtros aplicados'
-                    : 'No hay contenido disponible'}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                    <TableCell>{content.title || 'Sin título'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={content.content?.media_type || '-'}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{content.author || 'Desconocido'}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <MuiLink
+                        href={`/content/${content.content?.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          color: 'primary.main',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                      >
+                        Ver
+                        <OpenInNewIcon fontSize="small" />
+                      </MuiLink>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {userContent.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      {searchDebounced || selectedCollectionId
+                        ? 'No se encontró contenido con los filtros aplicados'
+                        : 'No hay contenido disponible'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <TablePagination
+            component="div"
+            count={totalCount}
+            page={page}
+            onPageChange={(_event, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50]}
+            labelRowsPerPage="Filas"
+          />
+        </>
+      )}
     </Paper>
   );
 
-  if (loading) {
+  if (error && !loading && userContent.length === 0) {
     return (
       <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>{title}</DialogTitle>
         <DialogContent>
-          <Box sx={{ py: 6, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              Cargando tu contenido...
-            </Typography>
-          </Box>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (error) {
-    return (
-      <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogContent>
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+          <Button variant="contained" onClick={loadLibraryPage}>
+            Reintentar
+          </Button>
         </DialogContent>
       </Dialog>
     );

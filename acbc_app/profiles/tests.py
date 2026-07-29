@@ -1129,6 +1129,94 @@ class NotificationTests(APITestCase):
             '/profiles/my_profile?section=certificates'
         )
 
+    def test_certificate_approval_notifies_after_rerequest(self):
+        """A prior approval notification for the same path must not block a new request."""
+        from utils.db_encoding import to_ascii_safe
+
+        student = User.objects.create_user(
+            username='student_rerequest',
+            email='student_rerequest@example.com',
+            password='testpass123'
+        )
+        knowledge_path = KnowledgePath.objects.create(
+            title='Rerequest Path',
+            description='Test',
+            author=self.user,
+            certificates_enabled=True,
+        )
+        ensure_path_completed(student, knowledge_path)
+
+        # Legacy path-level approval notification (old dedup key) still in DB
+        kp_ct = ContentType.objects.get_for_model(KnowledgePath)
+        user_ct = ContentType.objects.get_for_model(User)
+        Notification.objects.create(
+            recipient=student,
+            actor_content_type=user_ct,
+            actor_object_id=self.user.id,
+            verb=to_ascii_safe('aprobó tu solicitud de certificado para'),
+            target_content_type=kp_ct,
+            target_object_id=knowledge_path.id,
+            description=f'{self.user.username} aprobo tu solicitud de certificado para "Rerequest Path"',
+        )
+
+        self.client.force_authenticate(user=student)
+        request_url = reverse('certificates:certificate-request', args=[knowledge_path.id])
+        response = self.client.post(request_url, {'notes': 'Please review'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        request_id = response.data['id']
+
+        self.client.force_authenticate(user=self.user)
+        approve_url = reverse(
+            'certificates:certificate-request-action',
+            args=[request_id, 'approve'],
+        )
+        response = self.client.post(approve_url, {'note': 'OK'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(user=student)
+        notifications = self.client.get(reverse('profiles:notifications')).data['notifications']
+        approval_notifications = [
+            n for n in notifications
+            if to_ascii_safe(n['verb']) == to_ascii_safe('aprobó tu solicitud de certificado para')
+        ]
+        # Legacy leftover + new approval for this request
+        self.assertGreaterEqual(len(approval_notifications), 1)
+        self.assertTrue(
+            any('Rerequest Path' in (n.get('description') or '') and n['unread']
+                for n in approval_notifications)
+        )
+
+    def test_certificate_approval_notification_once_per_request(self):
+        """Approving the same CertificateRequest twice must not duplicate notifications."""
+        from utils.notification_utils import notify_certificate_approval
+        from utils.db_encoding import to_ascii_safe
+
+        student = User.objects.create_user(
+            username='student_once',
+            email='student_once@example.com',
+            password='testpass123'
+        )
+        knowledge_path = KnowledgePath.objects.create(
+            title='Once Path',
+            description='Test',
+            author=self.user,
+            certificates_enabled=True,
+        )
+        certificate_request = CertificateRequest.objects.create(
+            requester=student,
+            knowledge_path=knowledge_path,
+            status='APPROVED',
+        )
+
+        notify_certificate_approval(certificate_request, actor=self.user)
+        notify_certificate_approval(certificate_request, actor=self.user)
+
+        approval_notifications = [
+            n for n in Notification.objects.filter(recipient=student)
+            if to_ascii_safe(n.verb) == to_ascii_safe('aprobó tu solicitud de certificado para')
+        ]
+        self.assertEqual(len(approval_notifications), 1)
+
     def test_certificate_rejection_notification(self):
         """Test notification when a teacher rejects a certificate request"""
         # Create a student

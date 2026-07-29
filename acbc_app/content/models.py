@@ -605,6 +605,10 @@ class Topic(models.Model):
         default=True,
         help_text='When false, the topic is hidden from public listings and search.',
     )
+    chat_enabled = models.BooleanField(
+        default=False,
+        help_text='When true, the Conversar (RAG consultation) tab is visible on the topic page.',
+    )
     activity_score = models.IntegerField(
         default=0,
         db_default=0,
@@ -633,6 +637,58 @@ class Topic(models.Model):
             if user.is_staff or self.is_moderator_or_creator(user):
                 return True
         return False
+
+    def indexed_transcript_count(self):
+        """VIDEO/AUDIO in this topic with embedding_status=indexed."""
+        from content.models import ContentTranscript
+        return self.contents.filter(
+            media_type__in=('VIDEO', 'AUDIO'),
+            transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+        ).count()
+
+    def has_indexed_transcripts(self):
+        return self.indexed_transcript_count() > 0
+
+
+class TopicChatQuery(models.Model):
+    """
+    One independent RAG consultation on a topic (question + answer + sources).
+
+    Not a multi-turn thread: each row is a separate query. Conversation memory /
+    embedding of chat history is out of scope for this model.
+    """
+
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name='chat_queries',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='topic_chat_queries',
+    )
+    question = models.TextField()
+    answer = models.TextField()
+    sources = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['topic', 'user', '-created_at'],
+                name='content_tcq_topic_user_created',
+            ),
+        ]
+
+    def __str__(self):
+        preview = (self.question or '')[:60]
+        return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
 
 
 class TopicCreationRequest(models.Model):

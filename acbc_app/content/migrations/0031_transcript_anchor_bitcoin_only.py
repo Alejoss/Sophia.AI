@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0028_transcript_anchor'),
+        ('content', '0030_transcript_anchor'),
     ]
 
     operations = [

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0029_transcript_anchor_bitcoin_only'),
+        ('content', '0031_transcript_anchor_bitcoin_only'),
     ]
 
     operations = [

@@ -154,6 +154,31 @@ docker compose exec backend python manage.py check_qdrant --ensure-collection
 docker compose exec backend python manage.py check_qdrant --topic-id 2
 ```
 
+### Topic RAG chat (OpenAI)
+
+#### `OPENAI_API_KEY`
+- **Description**: OpenAI API key for query embeddings + chat completions on topic RAG
+- **Required**: No (required for `POST /api/content/topics/{id}/chat/`)
+- **Example**: `OPENAI_API_KEY=sk-…`
+
+#### `OPENAI_EMBEDDING_MODEL`
+- **Description**: Must match the model used by the embed worker (same dims as Qdrant)
+- **Default**: `text-embedding-3-large`
+
+#### `OPENAI_CHAT_MODEL`
+- **Description**: Chat model for grounded answers
+- **Default**: `gpt-4o-mini`
+
+#### `TOPIC_CHAT_TOP_K`
+- **Description**: Max chunks included after retrieval/dedupe
+- **Default**: `8`
+
+#### `TOPIC_CHAT_MAX_CONTEXT_CHARS`
+- **Description**: Soft cap on context characters sent to the chat model
+- **Default**: `12000`
+
+See [topic-rag-chat.md](../operations/topic-rag-chat.md).
+
 ### Bitcoin OP_RETURN (transcript anchoring)
 
 Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**.

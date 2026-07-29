@@ -62,14 +62,17 @@ class BookClubMemberIntroductionSerializer(serializers.Serializer):
     """
     Club presentation form backed by Profile (source of truth).
 
+    - country → Profile.country
     - intro_description → Profile.profile_description
     - social_url → Profile.external_url
     - additional_url → BookClubMembership.additional_url (extra optional link)
     Membership.intro_updated_at marks that the user presented themselves in this club.
+    All fields are optional.
     """
 
+    country = serializers.CharField(required=False, allow_blank=True, max_length=100)
     intro_description = serializers.CharField(
-        required=True, allow_blank=False, max_length=1000
+        required=False, allow_blank=True, max_length=1000
     )
     social_url = serializers.CharField(
         required=False, allow_blank=True, max_length=500
@@ -90,26 +93,30 @@ class BookClubMemberIntroductionSerializer(serializers.Serializer):
         profile = getattr(membership.user, 'profile', None)
         profile_description = (getattr(profile, 'profile_description', None) or '').strip()
         profile_url = (getattr(profile, 'external_url', None) or '').strip()
+        profile_country = (getattr(profile, 'country', None) or '').strip()
         # Prefer Profile; fall back to legacy membership copies if profile empty.
         intro = profile_description or (membership.intro_description or '').strip()
         social = profile_url or (membership.social_url or '').strip()
         return {
+            'country': profile_country,
             'intro_description': intro,
             'social_url': social,
             'additional_url': membership.additional_url or '',
             'intro_updated_at': membership.intro_updated_at,
-            'sourced_from_profile': bool(profile_description or profile_url),
+            'sourced_from_profile': bool(profile_description or profile_url or profile_country),
         }
 
     def update(self, membership, validated_data):
         profile = _profile_for(membership.user)
-        intro = validated_data['intro_description'].strip()
+        country = (validated_data.get('country') or '').strip()
+        intro = (validated_data.get('intro_description') or '').strip()
         social = validated_data.get('social_url', '') or ''
         additional = validated_data.get('additional_url', '') or ''
 
+        profile.country = country
         profile.profile_description = intro
         profile.external_url = social
-        profile.save(update_fields=['profile_description', 'external_url'])
+        profile.save(update_fields=['country', 'profile_description', 'external_url'])
 
         # Keep membership mirrors for roster fallback / admin, and mark presented.
         membership.intro_description = intro
@@ -132,6 +139,7 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     is_me = serializers.SerializerMethodField()
     has_introduced = serializers.BooleanField(read_only=True)
+    country = serializers.SerializerMethodField()
     intro_description = serializers.SerializerMethodField()
     social_url = serializers.SerializerMethodField()
 
@@ -141,6 +149,7 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
             'id',
             'user_id',
             'username',
+            'country',
             'intro_description',
             'social_url',
             'additional_url',
@@ -153,6 +162,10 @@ class BookClubMemberPublicSerializer(serializers.ModelSerializer):
 
     def _profile(self, obj):
         return getattr(obj.user, 'profile', None)
+
+    def get_country(self, obj):
+        profile = self._profile(obj)
+        return (getattr(profile, 'country', None) or '').strip()
 
     def get_intro_description(self, obj):
         profile = self._profile(obj)

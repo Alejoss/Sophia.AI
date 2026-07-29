@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0027_contentprofile_is_featured'),
+        ('content', '0029_topic_chat_enabled'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

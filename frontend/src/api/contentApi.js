@@ -26,6 +26,9 @@ const contentApi = {
       if (params.search) {
         query.search = params.search;
       }
+      if (params.collection != null && params.collection !== '') {
+        query.collection = params.collection;
+      }
       const response = await axiosInstance.get('/content/user-content-with-details/', {
         params: query
       });
@@ -575,6 +578,27 @@ const contentApi = {
       console.error('Error fetching topic details:', error);
       throw error;
     }
+  },
+
+  topicChat: async (topicId, { message } = {}) => {
+    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, {
+      message,
+    });
+    return response.data;
+  },
+
+  listTopicChatQueries: async (topicId, params = {}) => {
+    const response = await axiosInstance.get(`/content/topics/${topicId}/chat/queries/`, {
+      params: { limit: params.limit },
+    });
+    return response.data;
+  },
+
+  getTopicChatQuery: async (topicId, queryId) => {
+    const response = await axiosInstance.get(
+      `/content/topics/${topicId}/chat/queries/${queryId}/`,
+    );
+    return response.data;
   },
 
   getTopicDetailsSimple: async (topicId) => {

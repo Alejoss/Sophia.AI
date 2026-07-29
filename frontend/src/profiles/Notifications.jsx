@@ -54,7 +54,8 @@ const Notifications = ({
       return notification.description || `${notification.actor} respondió a tu comentario`;
     } else if (verbIs(notification.verb, 'completó tu camino de conocimiento')) {
       return notification.description;
-    } else if (verbIs(notification.verb, 'solicitó un certificado para tu camino de conocimiento')) {
+    } else if (verbIs(notification.verb, 'solicitó un certificado para tu camino de conocimiento') ||
+               verbIs(notification.verb, 'solicitó un certificado para tu evento')) {
       return notification.description;
     } else if (verbIs(notification.verb, 'aprobó tu solicitud de certificado para')) {
       return notification.description;

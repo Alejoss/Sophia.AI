@@ -13,6 +13,7 @@ import {
 import dayjs from 'dayjs';
 import ContentSuggestionPicker, { getProfileContentId } from '../../content/ContentSuggestionPicker';
 import { suggestEntryTitleFromFileName } from '../../content/inferTitleAuthorFromFileName';
+import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
 const schema = yup.object({
@@ -41,19 +42,20 @@ const schema = yup.object({
 });
 
 const TopicTimelineEntrySuggestionForm = ({
-  saving,
-  error,
+  saving = false,
   onCancel,
   onSubmit,
 }) => {
   const [externalProfiles, setExternalProfiles] = useState([]);
+  const [generalError, setGeneralError] = useState('');
 
   const {
     register,
     handleSubmit,
     setValue,
+    setError,
     watch,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
@@ -69,6 +71,7 @@ const TopicTimelineEntrySuggestionForm = ({
   const startDate = watch('start_date');
   const endDate = watch('end_date');
   const messageValue = watch('message');
+  const pending = saving || isSubmitting;
 
   const applyAutoTitleFromFileName = (filename) => {
     const suggested = suggestEntryTitleFromFileName(filename);
@@ -82,6 +85,7 @@ const TopicTimelineEntrySuggestionForm = ({
   };
 
   const handleFormSubmit = async (form) => {
+    setGeneralError('');
     const profile = externalProfiles[0];
     const contents = [];
     if (profile) {
@@ -91,14 +95,23 @@ const TopicTimelineEntrySuggestionForm = ({
       }
     }
 
-    await onSubmit({
-      title: form.title.trim(),
-      description: form.description,
-      start_date: form.start_date || null,
-      end_date: form.end_date || null,
-      message: form.message.trim(),
-      contents,
-    });
+    try {
+      await onSubmit({
+        title: form.title.trim(),
+        description: form.description,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        message: form.message.trim(),
+        contents,
+      });
+    } catch (err) {
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'No se pudo enviar la sugerencia. Inténtalo de nuevo.',
+      );
+      if (parsed) setGeneralError(parsed);
+    }
   };
 
   return (
@@ -110,20 +123,20 @@ const TopicTimelineEntrySuggestionForm = ({
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
-        {error && <Alert severity="error">{error}</Alert>}
+        {generalError && <Alert severity="error">{generalError}</Alert>}
 
         <ContentSuggestionPicker
           selectedProfiles={externalProfiles}
           onSelectionChange={setExternalProfiles}
           onFileSelected={handleFileSelected}
           maxSelections={1}
-          disabled={saving}
+          disabled={pending}
           title="Contenido de tu biblioteca o nuevo"
           description="Opcional: propón un material que aun no esta en el tema. Si se acepta la entrada, tambien se evaluara para el tema."
         />
 
         <TextField
-          label="Titulo de la entrada"
+          label="Título de la entrada"
           {...register('title')}
           error={Boolean(errors.title)}
           helperText={errors.title?.message}
@@ -131,7 +144,7 @@ const TopicTimelineEntrySuggestionForm = ({
           required
         />
         <TextField
-          label="Descripcion narrativa"
+          label="Descripción narrativa"
           placeholder="Descripción narrativa para la línea de tiempo"
           {...register('description')}
           error={Boolean(errors.description)}
@@ -148,11 +161,14 @@ const TopicTimelineEntrySuggestionForm = ({
             setValue('start_date', start_date, { shouldValidate: true });
             setValue('end_date', end_date, { shouldValidate: true });
           }}
-          disabled={saving}
+          disabled={pending}
           isNewEntry
         />
         {errors.end_date && (
           <Alert severity="error">{errors.end_date.message}</Alert>
+        )}
+        {errors.start_date && (
+          <Alert severity="error">{errors.start_date.message}</Alert>
         )}
 
         <TextField
@@ -178,15 +194,15 @@ const TopicTimelineEntrySuggestionForm = ({
           borderColor: 'divider',
         }}
       >
-        <Button type="button" onClick={onCancel} disabled={saving}>
+        <Button type="button" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
         <Button
           type="submit"
           variant="contained"
-          disabled={saving || !isValid}
+          disabled={pending || !isValid}
         >
-          {saving ? 'Enviando...' : 'Enviar sugerencia'}
+          {pending ? 'Enviando...' : 'Enviar sugerencia'}
         </Button>
       </Box>
     </Paper>

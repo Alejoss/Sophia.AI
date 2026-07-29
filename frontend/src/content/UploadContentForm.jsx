@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import axiosInstance from '../api/axiosConfig';
@@ -208,11 +208,17 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
   const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
-  // Notify parent when uploading state changes
+  // Notify parent when uploading state changes; clear on unmount so parents
+  // do not keep a stuck "uploading" / disabled state after this form closes.
   useEffect(() => {
     if (onUploadingChange) {
       onUploadingChange(isUploading);
     }
+    return () => {
+      if (onUploadingChange) {
+        onUploadingChange(false);
+      }
+    };
   }, [isUploading, onUploadingChange]);
   const [isUrlMode, setIsUrlMode] = useState(initialUrlMode !== null ? initialUrlMode : !!initialData?.url);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -228,6 +234,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
     reset,
@@ -844,21 +851,27 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
             {/* Media Type Selector for URL Content */}
             <FormControl fullWidth error={!!errors.media_type} sx={{ mb: 3 }}>
               <InputLabel id="media-type-label">Tipo de contenido</InputLabel>
-              <Select
-              labelId="media-type-label"
-              label="Tipo de contenido"
-              {...register('media_type')}
-              value={watch('media_type')}
-              onChange={(e) => {
-                setValue('media_type', e.target.value);
-                setHasSavedSuccessfully(false);
-              }}>
-              
-                <MenuItem value="VIDEO">Video</MenuItem>
-                <MenuItem value="AUDIO">Audio</MenuItem>
-                <MenuItem value="TEXT">Texto</MenuItem>
-                <MenuItem value="IMAGE">Imagen</MenuItem>
-              </Select>
+              <Controller
+                name="media_type"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    {...field}
+                    labelId="media-type-label"
+                    label="Tipo de contenido"
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      field.onChange(e.target.value);
+                      setHasSavedSuccessfully(false);
+                    }}
+                  >
+                    <MenuItem value="VIDEO">Video</MenuItem>
+                    <MenuItem value="AUDIO">Audio</MenuItem>
+                    <MenuItem value="TEXT">Texto</MenuItem>
+                    <MenuItem value="IMAGE">Imagen</MenuItem>
+                  </Select>
+                )}
+              />
               {errors.media_type &&
             <FormHelperText error>
                   {errors.media_type.message}

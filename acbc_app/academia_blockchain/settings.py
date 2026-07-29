@@ -734,6 +734,13 @@ QDRANT_API_KEY = os.getenv('QDRANT_API_KEY', '')
 QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'sophia_acbc_topic_chunks')
 QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '3072'))
 
+# Topic RAG chat (OpenAI embeddings + chat; retrieval via Qdrant).
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_EMBEDDING_MODEL = os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-large')
+OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
+TOPIC_CHAT_TOP_K = int(os.getenv('TOPIC_CHAT_TOP_K', '8'))
+TOPIC_CHAT_MAX_CONTEXT_CHARS = int(os.getenv('TOPIC_CHAT_MAX_CONTEXT_CHARS', '12000'))
+
 # Bitcoin OP_RETURN anchoring for transcript text_hash (platform wallet).
 # Network: signet (recommended for tests), testnet, or mainnet.
 BTC_NETWORK = os.getenv('BTC_NETWORK', 'signet').strip().lower()

@@ -12,20 +12,9 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
+import { parseApiValidationErrors } from '../../utils/apiFormErrors';
 import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
 import TopicTimelineEntryContentSuggestionForm from './TopicTimelineEntryContentSuggestionForm';
-
-const getErrorMessage = (error, fallback) => {
-  const data = error?.response?.data;
-  if (!data) return fallback;
-  if (typeof data === 'string') return data;
-  if (data.error) return data.error;
-  const firstKey = Object.keys(data)[0];
-  const firstValue = firstKey ? data[firstKey] : null;
-  if (Array.isArray(firstValue)) return firstValue.join(' ');
-  if (typeof firstValue === 'string') return firstValue;
-  return fallback;
-};
 
 const TopicTimelineEntryContentSuggestionPage = () => {
   const { topicId, entryId } = useParams();
@@ -36,8 +25,7 @@ const TopicTimelineEntryContentSuggestionPage = () => {
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [formError, setFormError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [canSuggest, setCanSuggest] = useState(false);
 
   const timelineUrl = useMemo(
@@ -47,7 +35,7 @@ const TopicTimelineEntryContentSuggestionPage = () => {
 
   const loadPageData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const [topicData, timelineData] = await Promise.all([
         contentApi.getTopicDetails(topicId, { include_contents: false }),
@@ -60,7 +48,7 @@ const TopicTimelineEntryContentSuggestionPage = () => {
         (item) => String(item.id) === String(entryId),
       );
       if (!matchedEntry) {
-        setError('No se encontro la entrada de la linea de tiempo.');
+        setLoadError('No se encontro la entrada de la linea de tiempo.');
         return;
       }
       setEntry(matchedEntry);
@@ -80,10 +68,11 @@ const TopicTimelineEntryContentSuggestionPage = () => {
       setCanSuggest(allowed);
 
       if (!allowed) {
-        setError('Solo usuarios que no son moderadores pueden sugerir contenido para entradas.');
+        setLoadError('Solo usuarios que no son moderadores pueden sugerir contenido para entradas.');
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo cargar la informacion.'));
+      const { generalError } = parseApiValidationErrors(err, 'No se pudo cargar la informacion.');
+      setLoadError(generalError);
     } finally {
       setLoading(false);
     }
@@ -98,14 +87,10 @@ const TopicTimelineEntryContentSuggestionPage = () => {
   };
 
   const handleSubmit = async (payload) => {
+    setSaving(true);
     try {
-      setSaving(true);
-      setFormError(null);
       await contentApi.createTopicTimelineEntryContentSuggestion(topicId, entryId, payload);
       navigate(timelineUrl);
-    } catch (err) {
-      setFormError(getErrorMessage(err, 'No se pudo enviar la sugerencia.'));
-      throw err;
     } finally {
       setSaving(false);
     }
@@ -155,17 +140,16 @@ const TopicTimelineEntryContentSuggestionPage = () => {
         {topicTitle ? `Tema: ${topicTitle}` : ''}
       </Typography>
 
-      {error && (
+      {loadError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {loadError}
         </Alert>
       )}
 
-      {canSuggest && entry && !error && (
+      {canSuggest && entry && !loadError && (
         <TopicTimelineEntryContentSuggestionForm
           entry={entry}
           saving={saving}
-          error={formError}
           onCancel={handleCancel}
           onSubmit={handleSubmit}
         />

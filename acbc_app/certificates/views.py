@@ -329,7 +329,7 @@ class CertificateRequestActionView(APIView):
                 
                 # Send notification
                 try:
-                    notify_certificate_approval(certificate_request)
+                    notify_certificate_approval(certificate_request, actor=request.user)
                     logger.debug(f"Approval notification sent for certificate request {request_id}")
                 except Exception as e:
                     logger.error(f"Failed to send approval notification for certificate request {request_id}: {str(e)}", exc_info=True)
@@ -373,7 +373,7 @@ class CertificateRequestActionView(APIView):
                 
                 # Send notification
                 try:
-                    notify_certificate_rejection(certificate_request)
+                    notify_certificate_rejection(certificate_request, actor=request.user)
                     logger.debug(f"Rejection notification sent for certificate request {request_id}")
                 except Exception as e:
                     logger.error(f"Failed to send rejection notification for certificate request {request_id}: {str(e)}", exc_info=True)

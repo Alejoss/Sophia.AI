@@ -1119,6 +1119,16 @@ class UserContentWithDetailsView(APIView):
             if media_type != 'ALL':
                 queryset = queryset.filter(content__media_type=media_type)
 
+            collection = (request.query_params.get('collection') or '').strip()
+            if collection:
+                try:
+                    queryset = queryset.filter(collection_id=int(collection))
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'El parametro collection debe ser un entero.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
             search = (request.query_params.get('search') or '').strip()
             if search:
                 queryset = queryset.filter(

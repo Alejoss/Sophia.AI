@@ -135,6 +135,7 @@ class BookClubAPITestCase(APITestCase):
         update = self.client.patch(
             '/api/book_clubs/cypherpunk/membership/introduction/',
             {
+                'country': 'Ecuador',
                 'intro_description': 'Construyo productos educativos.',
                 'social_url': 'linkedin.com/in/member',
                 'additional_url': 'https://member.example.com',
@@ -144,6 +145,7 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(update.status_code, status.HTTP_200_OK, update.data)
         membership.refresh_from_db()
         profile = Profile.objects.get(user=self.member)
+        self.assertEqual(profile.country, 'Ecuador')
         self.assertEqual(profile.profile_description, 'Construyo productos educativos.')
         self.assertEqual(profile.external_url, 'https://linkedin.com/in/member')
         self.assertEqual(membership.additional_url, 'https://member.example.com')
@@ -155,6 +157,7 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(len(roster.data), 1)
         own = roster.data[0]
         self.assertEqual(own['user_id'], self.member.id)
+        self.assertEqual(own['country'], 'Ecuador')
         self.assertEqual(own['intro_description'], profile.profile_description)
         self.assertEqual(own['social_url'], profile.external_url)
         self.assertTrue(own['has_introduced'])
@@ -162,6 +165,24 @@ class BookClubAPITestCase(APITestCase):
         self.assertFalse(
             any(item['user_id'] == self.admin.id for item in roster.data)
         )
+
+        # All fields optional: blank values still mark as introduced.
+        empty_save = self.client.patch(
+            '/api/book_clubs/cypherpunk/membership/introduction/',
+            {
+                'country': '',
+                'intro_description': '',
+                'social_url': '',
+                'additional_url': '',
+            },
+            format='json',
+        )
+        self.assertEqual(empty_save.status_code, status.HTTP_200_OK, empty_save.data)
+        membership.refresh_from_db()
+        profile.refresh_from_db()
+        self.assertEqual(profile.country, '')
+        self.assertEqual(profile.profile_description, '')
+        self.assertTrue(membership.has_introduced)
 
     def test_non_member_cannot_edit_introduction_or_view_roster(self):
         self.auth(self.outsider)
