@@ -30,8 +30,8 @@ class ContentTranscriptAnchorListView(APIView):
     POST /api/content/content_details/<content_id>/transcript/anchors/
 
     GET is public (directory of Bitcoin proofs). POST creates a pending anchor for
-    the current transcript text_hash (uploader or staff). Does not broadcast to
-    Bitcoin yet — that is a later step.
+    the current transcript text_hash (uploader or staff). Broadcast to Bitcoin is
+    done by ops via ``manage.py broadcast_transcript_anchor`` (not this endpoint).
     """
 
     def get_permissions(self):
@@ -91,7 +91,7 @@ class ContentTranscriptAnchorListView(APIView):
             ),
             btc_network=data.get(
                 'btc_network',
-                TranscriptAnchor.BTC_NETWORK_TESTNET,
+                TranscriptAnchor.BTC_NETWORK_SIGNET,
             ),
             ipfs_cid=data.get('ipfs_cid', ''),
             anchored_by=request.user,

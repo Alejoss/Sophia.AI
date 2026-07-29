@@ -319,10 +319,36 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
   }'
 ```
 
+## Transcript certification (Bitcoin)
+
+Full contract: [transcript-anchor.md](transcript-anchor.md).
+
+### Read current anchor
+
+```bash
+curl -s "http://localhost:8000/api/content/content_details/101/transcript/anchor/"
+```
+
+### Prepare pending OP_RETURN row (uploader / staff JWT)
+
+```bash
+curl -X POST "http://localhost:8000/api/content/content_details/101/transcript/anchors/" \
+  -H "Authorization: Bearer $ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"btc_network": "signet"}'
+```
+
+Broadcast is not an HTTP API — use Docker:
+
+```bash
+docker compose exec backend python manage.py broadcast_transcript_anchor 101 --create
+```
+
 ## Related Documentation
 
 - [API Endpoints](endpoints.md)
 - [Transcript ingest](transcript-ingest.md)
+- [Transcript certification](transcript-anchor.md)
 - [Authentication](authentication.md)
 - [Error Handling](errors.md)
 

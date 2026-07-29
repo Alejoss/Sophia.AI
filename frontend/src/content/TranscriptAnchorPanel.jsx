@@ -71,7 +71,8 @@ const CopyableMono = ({ label, value }) => {
 
 /**
  * Certification panel: prepare and display a Bitcoin OP_RETURN anchor for the transcript hash.
- * Broadcast to Bitcoin is wired in a later step; this UI drives the Django anchor API.
+ * UI creates a pending row via the Django API; ops broadcasts with
+ * `manage.py broadcast_transcript_anchor` (see docs/api/transcript-anchor.md).
  */
 const TranscriptAnchorPanel = ({ contentId, textHash }) => {
   const [loading, setLoading] = useState(true);
@@ -187,8 +188,8 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
           )}
           {anchor.status === 'pending' && (
             <Alert severity="info" sx={{ mt: 1 }}>
-              Anclaje preparado (payload OP_RETURN listo). El envío a la red Bitcoin
-              se completará en un paso posterior.
+              Anclaje preparado (payload OP_RETURN listo). El envío a la red
+              Bitcoin lo completa operaciones con la wallet de la plataforma.
             </Alert>
           )}
           {anchor.status === 'btc_broadcast' && (

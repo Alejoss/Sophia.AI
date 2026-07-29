@@ -88,6 +88,16 @@ Objects must have `author` (FK to User). Used for:
 
 Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcript-ingest.md](../api/transcript-ingest.md).
 
+## Transcript certification (Bitcoin)
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/content/content_details/<content_id>/transcript/anchor/` | `AllowAny` |
+| GET | `/api/content/content_details/<content_id>/transcript/anchors/` | `AllowAny` |
+| POST | `/api/content/content_details/<content_id>/transcript/anchors/` | JWT; uploader of the content **or** staff |
+
+`POST` only creates a `pending` row (no broadcast). Broadcast uses the server WIF via `manage.py broadcast_transcript_anchor` — not an HTTP endpoint. Full contract: [transcript-anchor.md](../api/transcript-anchor.md).
+
 ## OAuth / Google
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_SECRET_KEY`: server-side only.  

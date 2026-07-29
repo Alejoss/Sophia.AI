@@ -1,150 +1,90 @@
 # Blockchain Integration
 
-This document describes the blockchain integration architecture for the Sophia.AI Academia Blockchain platform.
+Blockchain touchpoints for Sophia.AI Academia Blockchain.
 
-## Overview
+## Product path today: Bitcoin transcript certification
 
-The platform integrates with blockchain networks (primarily Polygon) to provide decentralized certification and verification of documents and certificates.
+**Transcript certification anchors the SHA-256 `text_hash` of a content
+transcript in a Bitcoin `OP_RETURN`.** There is no EVM registry for this flow.
 
-## Architecture Components
+| Piece | Role |
+|-------|------|
+| `TranscriptAnchor` | Snapshot of hash + BTC tx metadata (`pending` → `btc_broadcast` → `anchored`) |
+| HTTP API | Prepare / list anchors (does not broadcast) |
+| `content.bitcoin` | Build/sign OP_RETURN tx via platform WIF + Esplora (mempool.space) |
+| `broadcast_transcript_anchor` | Ops command to broadcast and refresh confirmations |
+| UI panel | Shows status; creates pending rows for uploader/staff |
 
-### Smart Contracts
+Full contract (payload format, endpoints, CLI): **[transcript-anchor.md](../api/transcript-anchor.md)**.
 
-Located in `contracts/contracts/`:
+Env: [Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring).
 
-- **SophiaAIParams**: Manages platform parameters, costs, and earnings
-- **HashStore**: Stores document hashes on-chain
-- **ACBCToken**: Token contract (if applicable)
-- **SophiaAIParamsConsumer**: Consumer contract for Chainlink Functions
+```mermaid
+flowchart LR
+  Transcript[ContentTranscript.text_hash] --> Pending[TranscriptAnchor pending]
+  Pending --> Broadcast[OP_RETURN broadcast]
+  Broadcast --> Confirmed[anchored on Bitcoin]
+  Confirmed --> Verify[Anyone recomputes SHA-256]
+```
 
-### Backend Integration
+Recommended test network: **signet**. Production target: Bitcoin **mainnet** when
+the platform wallet and ops runbook are ready.
 
-Web3 integration code in `acbc_app/content/web3/`:
+---
 
-- `web3_utils.py`: Web3 utility functions
-- `contract_abis.py`: Contract ABIs
-- `interact_with_sc.py`: Smart contract interaction
-- `deploy_contract.py`: Contract deployment utilities
+## Secondary / legacy: EVM contracts (Polygon, Hardhat)
 
-### Frontend Integration
+Smart contracts under `contracts/contracts/` support platform parameters, token,
+and experimental/document-hash work — **not** the current transcript
+certification path.
 
-Frontend can interact with contracts via:
-- MetaMask or other Web3 wallets
-- Backend API endpoints that interact with contracts
+### Contracts (examples)
 
-## Blockchain Network
+- **SophiaAIParams**: Platform parameters, costs, earnings
+- **HashStore**: Document hashes on-chain (legacy / experimental)
+- **ACBCToken**: Token contract
+- **SophiaAIParamsConsumer**: Chainlink Functions consumer
 
-### Supported Networks
+Draft / broken Chainlink samples live under `contracts/drafts/` and should not
+be compiled as part of the product path.
 
-- **Polygon Mainnet**: Production network (Chain ID: 137)
-- **Polygon Amoy Testnet**: Test network (Chain ID: 80002)
-- **Hardhat Local**: Local development (Chain ID: 31337)
+### Backend Web3 helpers
 
-### Network Configuration
+Code under `acbc_app/content/web3/` (`web3_utils.py`, `contract_abis.py`,
+`interact_with_sc.py`, …) talks to those EVM contracts when used.
+
+### Networks (Hardhat)
 
 Configured in `contracts/hardhat.config.js`:
 
-```javascript
-networks: {
-  hardhat: {
-    chainId: 31337,
-    // Local development
-  },
-  testnet: {
-    chainId: 80002,
-    url: "https://rpc-amoy.polygon.technology",
-  },
-  mainnet: {
-    chainId: 137,
-    url: "https://polygon-mainnet.infura.io",
-  }
-}
-```
-
-## Certificate Flow
-
-### 1. Certificate Generation
-
-1. User completes a course/knowledge path
-2. Backend generates certificate data
-3. Certificate hash is computed
-
-### 2. On-Chain Storage
-
-1. Backend calls smart contract to store hash
-2. Transaction is sent to blockchain
-3. Transaction hash is stored in database
-
-### 3. Verification
-
-1. User shares certificate
-2. Verifier can check hash on-chain
-3. Verify authenticity of certificate
-
-## Smart Contract Interaction
-
-### Backend Interaction
-
-```python
-from content.web3.interact_with_sc import store_hash
-
-# Store certificate hash on-chain
-tx_hash = store_hash(certificate_hash, user_address)
-```
-
-### Frontend Interaction
-
-Users can interact with contracts via MetaMask:
-
-```javascript
-// Connect to MetaMask
-await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-// Interact with contract
-const contract = new ethers.Contract(contractAddress, abi, signer);
-await contract.someFunction();
-```
-
-## Chainlink Functions
-
-Used for external data fetching and computation:
-
-- Price feeds for cryptocurrency conversion
-- External API calls
-- Off-chain computation
-
-## Security Considerations
-
-1. **Private Key Management**: Never expose private keys
-2. **Transaction Signing**: Use secure signing mechanisms
-3. **Gas Optimization**: Optimize contract calls
-4. **Error Handling**: Handle blockchain errors gracefully
-5. **Network Failures**: Implement retry logic
-
-## Development Setup
-
-### Local Blockchain
+- Hardhat local — chain ID `31337`
+- Polygon Amoy — `80002`
+- Polygon mainnet — `137`
 
 ```bash
 cd contracts
 npx hardhat node
-```
-
-### Deploy Contracts
-
-```bash
 npx hardhat run scripts/ParamsDeploy.js --network localhost
 ```
 
-### Connect MetaMask
+### Chainlink Functions
 
-1. Add local network (Chain ID: 31337)
-2. Import test account
-3. Fund account with test ETH
+Used for external data (e.g. price feeds) in the EVM experiments — not required
+for Bitcoin transcript anchoring.
+
+## Security Considerations
+
+1. **Bitcoin WIF** (`BTC_PRIVATE_KEY_WIF`): platform fee-payer only; never commit
+   or expose to the frontend
+2. **EVM keys**: same rule for any deploy/signing keys
+3. Prefer **signet** until mainnet ops are deliberate
+4. Handle Esplora / network failures with clear `failed` status and retries
 
 ## Related Documentation
 
-- [Contract Development](../development/contracts/contracts.md)
-- [Contract Deployment](../development/contracts/deployment.md)
-- [Backend Web3 Integration](../development/backend/web3-integration.md)
+- [Transcript certification (Bitcoin)](../api/transcript-anchor.md)
+- [Transcript ingest](../api/transcript-ingest.md)
+- [Environment variables](../deployment/environment-variables.md)
+- [Contract Development](../development/contracts/contracts.md) (if present)
+- [Backend Web3 Integration](../development/backend/web3-integration.md) (EVM helpers)
 

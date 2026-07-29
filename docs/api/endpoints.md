@@ -118,6 +118,30 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 - **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format`, `language`
 - **Response**: `{ content_id, created, transcript }` (201 create / 200 update)
 
+## Content — Transcript certification (Bitcoin OP_RETURN)
+
+Anchor `ContentTranscript.text_hash` in a Bitcoin `OP_RETURN`. API prepares/lists
+rows; broadcast is ops-only (`manage.py broadcast_transcript_anchor`).
+
+Full contract: [transcript-anchor.md](transcript-anchor.md). Architecture:
+[blockchain-integration.md](../architecture/blockchain-integration.md).
+
+### Current anchor for transcript hash
+- **GET** `/api/content/content_details/{content_id}/transcript/anchor/`
+- **Auth**: Optional (`AllowAny`)
+- **Response**: `{ content_id, has_transcript, current_text_hash, current_text_length, can_certify, anchor }`
+
+### List anchors
+- **GET** `/api/content/content_details/{content_id}/transcript/anchors/`
+- **Auth**: Optional (`AllowAny`)
+- **Response**: array of `TranscriptAnchorSerializer`
+
+### Prepare pending anchor
+- **POST** `/api/content/content_details/{content_id}/transcript/anchors/`
+- **Auth**: Required (uploader or staff)
+- **Body** (optional): `btc_network` (default `signet`), `op_return_prefix`, `ipfs_cid`
+- **Response**: created anchor (**201**); **409** if current hash already anchored
+
 ## Content — Embedding ingest (external workers)
 
 Machine-to-machine API for an external embed worker that upserts vectors to **Qdrant Cloud**. Sophia only stores `ContentTranscript.embedding_*` bookkeeping (no vectors in Postgres).

@@ -11,7 +11,7 @@ System design, data models, API architecture, and blockchain integration:
 - [API Design](architecture/api-design.md) - API architecture and design principles
 - [Topics & Knowledge Paths](architecture/topics-and-knowledge-paths.md) - Topics, timelines, and learning paths
 - [Club de Lectura](architecture/book-clubs.md) - Book club hub, Foro, Investigación, and staff dashboard
-- [Blockchain Integration](architecture/blockchain-integration.md) - Web3 and smart contract integration
+- [Blockchain Integration](architecture/blockchain-integration.md) - Bitcoin transcript certification + legacy EVM contracts
 
 ### [API Documentation](api/)
 Complete API reference and usage guides:
@@ -19,6 +19,7 @@ Complete API reference and usage guides:
 - [Authentication](api/authentication.md) - Authentication endpoints and flows
 - [Endpoints](api/endpoints.md) - Complete endpoint reference
 - [Transcript ingest](api/transcript-ingest.md) - External worker queue + transcript upsert (S3 / YouTube)
+- [Transcript certification](api/transcript-anchor.md) - Bitcoin OP_RETURN anchors for transcript `text_hash`
 - [Examples](api/examples.md) - API usage examples
 - [Errors](api/errors.md) - Error codes and handling
 

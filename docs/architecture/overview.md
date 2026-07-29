@@ -95,14 +95,13 @@ See also: [Club de Lectura](book-clubs.md), [Topics & Knowledge Paths](topics-an
 
 ### 4. Blockchain Layer
 
-**Technology**: Solidity, Hardhat, Chainlink
+**Technology**: Bitcoin (OP_RETURN) for transcript certification; optional Hardhat/EVM contracts for legacy experiments
 
 - **Purpose**: Decentralized certification and verification
 - **Components**:
-  - Smart contracts for document certification
-  - Chainlink Functions for external data
-  - Polygon network for low-cost transactions
-  - Web3.py for backend integration
+  - Bitcoin `OP_RETURN` anchors for transcript `text_hash` (current product path)
+  - Legacy/experimental EVM contracts (Polygon / Hardhat) for params and other hashes
+  - Chainlink Functions only for those EVM experiments
 
 ## Data Flow
 
@@ -143,22 +142,24 @@ sequenceDiagram
     Backend->>Frontend: Success Response
 ```
 
-### Blockchain Certification Flow
+### Transcript certification flow (Bitcoin)
+
+Product path: anchor `ContentTranscript.text_hash` in a Bitcoin `OP_RETURN`.
+See [blockchain-integration.md](blockchain-integration.md) and
+[transcript-anchor.md](../api/transcript-anchor.md).
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Backend
-    participant SmartContract
-    participant Blockchain
-    
-    User->>Backend: Request Certificate
-    Backend->>Backend: Generate Certificate Hash
-    Backend->>SmartContract: Store Hash on Chain
-    SmartContract->>Blockchain: Transaction
-    Blockchain->>SmartContract: Confirmation
-    SmartContract->>Backend: Transaction Hash
-    Backend->>User: Certificate with Hash
+    participant API as Django API
+    participant Ops as Ops CLI
+    participant BTC as Bitcoin
+
+    User->>API: POST prepare TranscriptAnchor
+    API->>User: pending + OP_RETURN hex
+    Ops->>BTC: Broadcast OP_RETURN tx
+    Ops->>API: Store btc_txid / confirmations
+    User->>BTC: Verify hash in explorer
 ```
 
 ## Technology Stack Summary
@@ -218,7 +219,7 @@ sequenceDiagram
 - **CORS**: Configured for specific origins
 - **CSRF**: Token-based protection
 - **Data Validation**: Serializer validation and model constraints
-- **Blockchain Security**: Smart contract access controls
+- **Blockchain Security**: Platform Bitcoin WIF stays server-side; EVM keys never in frontend
 
 ## Scalability Considerations
 
@@ -226,12 +227,13 @@ sequenceDiagram
 - **Database**: PostgreSQL supports read replicas
 - **Caching**: Can be added with Redis
 - **CDN**: Static files can be served via CDN
-- **Blockchain**: Polygon network handles high transaction volume
+- **Blockchain**: Bitcoin for transcript proofs; Polygon only if using legacy EVM contracts
 
 ## Related Documentation
 
 - [Data Models](data-models.md) - Detailed database schema
 - [API Design](api-design.md) - API architecture details
-- [Blockchain Integration](blockchain-integration.md) - Web3 integration details
+- [Blockchain Integration](blockchain-integration.md) - Bitcoin transcript anchors + legacy EVM
+- [Transcript certification](../api/transcript-anchor.md) - OP_RETURN API and ops CLI
 - [Deployment Guide](../deployment/production.md) - Production deployment
 

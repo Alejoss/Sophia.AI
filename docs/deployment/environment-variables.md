@@ -181,7 +181,7 @@ See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 ### Bitcoin OP_RETURN (transcript anchoring)
 
-Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**.
+Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**. Full product/API/ops guide: [transcript-anchor.md](../api/transcript-anchor.md). Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md).
 
 #### `BTC_NETWORK`
 - **Description**: `signet` (default), `testnet`, `testnet4`, or `mainnet`
@@ -202,14 +202,14 @@ Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Defaul
 - **Defaults**: `1` / `2`
 
 ```bash
-# Show address to fund via signet faucet
-python manage.py broadcast_transcript_anchor --show-address
-# Dry-run for content 123
-python manage.py broadcast_transcript_anchor 123 --create --dry-run
-# Broadcast
-python manage.py broadcast_transcript_anchor 123 --create
-# Poll confirmations
-python manage.py broadcast_transcript_anchor 123 --refresh
+# Local / server Docker (service name: backend)
+docker compose exec backend python manage.py broadcast_transcript_anchor --show-address
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create --dry-run
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --refresh
+
+# Production compose file (if used)
+# docker compose -f docker-compose.prod.yml --env-file .env.compose exec backend python manage.py broadcast_transcript_anchor --show-address
 ```
 
 ### AWS Configuration (Production)

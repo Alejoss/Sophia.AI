@@ -83,6 +83,18 @@ Core content model representing educational materials.
 
 **Location**: `content/models.py`
 
+### ContentTranscript / TranscriptAnchor
+
+Transcript text for VIDEO/AUDIO content, plus optional Bitcoin certification.
+
+**ContentTranscript** (One-to-One with `Content`): plain/processed text, `text_hash` (SHA-256), embedding bookkeeping.
+
+**TranscriptAnchor** (FK to `Content`, unique on `(content, text_hash)`): snapshot of `text_hash` certified via Bitcoin `OP_RETURN` (`pending` → `btc_broadcast` → `anchored`). No EVM fields.
+
+Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md).
+
+**Location**: `content/models.py`
+
 ### Library
 
 User's personal collection of content.

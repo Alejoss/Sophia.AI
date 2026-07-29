@@ -47,6 +47,8 @@ A placeholder value is fine for local dev (real Google login won't work, but use
 
 `npm run lint` (ESLint) and `npm run test` (Vitest) both currently report **pre-existing failures in the repo** (unused-var lint errors; a few Vitest assertions on Spanish UI text). These are code issues, not environment problems — the tooling itself works.
 
-### Contracts (Hardhat) — pre-existing compile error
+### Contracts (Hardhat) — optional / secondary
 
-`npx hardhat compile` **fails on the pre-existing draft file `contracts/CF_contract_borrador.sol`** (uses a deprecated Chainlink Client API — `buildChainlinkRequest`/`sendChainlinkRequestTo`). There are no Hardhat tests (`contracts/test/` is empty). The toolchain installs and runs correctly; the failure is in that one draft contract.
+Transcript certification is **Bitcoin OP_RETURN** (Django `content.bitcoin` + `broadcast_transcript_anchor`), not an EVM registry. See `docs/api/transcript-anchor.md`.
+
+`npx hardhat compile` may still fail if a draft Chainlink file under `contracts/` uses the deprecated Client API (`buildChainlinkRequest`/`sendChainlinkRequestTo`). Prefer drafts in `contracts/drafts/`. `contracts/test/` is empty (`.gitkeep` only).

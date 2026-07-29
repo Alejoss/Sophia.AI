@@ -6,7 +6,13 @@ Smart contracts for the Sophia.AI Academia Blockchain platform.
 
 ## Overview
 
-This directory contains the Solidity smart contracts that handle blockchain functionality for the platform, including document certification and parameter management.
+Solidity / Hardhat experiments for platform parameters, tokens, and legacy
+document-hash contracts.
+
+**Transcript certification is not here.** The product path anchors transcript
+SHA-256 digests on **Bitcoin** via `OP_RETURN` (Django backend). See
+[transcript-anchor.md](../docs/api/transcript-anchor.md) and
+[blockchain-integration.md](../docs/architecture/blockchain-integration.md).
 
 ## Install everything
 

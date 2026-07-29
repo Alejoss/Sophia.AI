@@ -255,3 +255,4 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 - Env: [environment-variables.md](../deployment/environment-variables.md#transcript_ingest_api_key)
 - Model: `ContentTranscript` in `acbc_app/content/models.py`
 - Tests: `ContentTranscriptIngestAPITests` in `acbc_app/content/tests.py`
+- After ingest, certify the hash on Bitcoin: [transcript-anchor.md](transcript-anchor.md)
