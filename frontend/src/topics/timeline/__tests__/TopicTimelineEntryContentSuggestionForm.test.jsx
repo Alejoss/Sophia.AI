@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntryContentSuggestionForm from '../TopicTimelineEntryContentSuggestionForm';
 
@@ -12,7 +12,12 @@ vi.mock('../../../content/ContentSuggestionPicker', () => ({
       Seleccionar contenido mock
     </button>
   ),
-  getProfileContentId: (profile) => profile?.content?.id,
+  getProfileContentId: (profile) => {
+    const content = profile?.content;
+    if (content == null) return null;
+    if (typeof content === 'object') return content.id ?? null;
+    return content;
+  },
 }));
 
 const entry = {
@@ -25,7 +30,6 @@ const entry = {
 const baseProps = {
   entry,
   saving: false,
-  error: null,
   onCancel: vi.fn(),
   onSubmit: vi.fn(),
 };
@@ -56,21 +60,25 @@ describe('TopicTimelineEntryContentSuggestionForm', () => {
     );
     await user.click(screen.getByRole('button', { name: /enviar sugerencia/i }));
 
-    await screen.findByRole('button', { name: /enviar sugerencia/i });
-    expect(onSubmit).toHaveBeenCalledWith({
-      content_id: 55,
-      message: 'Encaja bien con esta entrada',
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        content_id: 55,
+        message: 'Encaja bien con esta entrada',
+      });
     });
   });
 
-  it('shows the Spanish error passed in from the parent', () => {
-    render(
-      <TopicTimelineEntryContentSuggestionForm
-        {...baseProps}
-        error="No se pudo enviar la sugerencia"
-      />,
-    );
+  it('shows a Spanish API error without unmounting the form', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockRejectedValue({
+      response: { data: { error: 'No se pudo enviar la sugerencia' } },
+    });
+    render(<TopicTimelineEntryContentSuggestionForm {...baseProps} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(/no se pudo enviar la sugerencia/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /seleccionar contenido mock/i }));
+    await user.click(screen.getByRole('button', { name: /enviar sugerencia/i }));
+
+    expect(await screen.findByText(/no se pudo enviar la sugerencia/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /enviar sugerencia/i })).toBeInTheDocument();
   });
 });

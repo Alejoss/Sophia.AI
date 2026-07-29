@@ -24,7 +24,19 @@ vi.mock('../../../content/LibrarySelectMultiple', () => ({
 
 vi.mock('../../../content/UploadContentForm', () => ({
   __esModule: true,
-  default: () => <div>Mock upload form</div>,
+  default: ({ onContentUploaded, onUploadingChange }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          onUploadingChange?.(true);
+          onContentUploaded?.({ id: 77, content: 88, title: 'Desde URL' });
+        }}
+      >
+        Mock upload content
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../TopicTimelineContentSelector', () => ({
@@ -94,6 +106,44 @@ describe('TopicTimelineEntryContentLinkForm', () => {
         { id: 99, content: { id: 50 }, title: 'Nuevo video' },
       ],
     });
+  });
+
+  it('resolves content id when upload returns content as a primary key', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue();
+    render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole('button', { name: /desde url/i }));
+    await user.click(screen.getByRole('button', { name: /mock upload content/i }));
+
+    expect(screen.getByRole('button', { name: /guardar contenidos/i })).not.toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      contents: [
+        { content_id: 88, order: 1, caption: '' },
+      ],
+      newProfiles: [
+        { id: 77, content: 88, title: 'Desde URL' },
+      ],
+    });
+  });
+
+  it('surfaces API errors from a failed submit', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockRejectedValue({
+      response: { data: { contents: 'Solo se pueden adjuntar contenidos que ya pertenecen al tema.' } },
+    });
+    render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole('button', { name: /contenidos del tema/i }));
+    await user.click(screen.getByRole('button', { name: /mock select topic content/i }));
+    await user.click(screen.getByRole('button', { name: /listo/i }));
+    await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
+
+    expect(
+      await screen.findByText(/solo se pueden adjuntar contenidos que ya pertenecen al tema/i),
+    ).toBeInTheDocument();
   });
 
   it('shows skip when enabled', async () => {

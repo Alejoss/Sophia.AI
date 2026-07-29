@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ContentSuggestionPicker, { getProfileContentId } from '../../content/ContentSuggestionPicker';
+import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
 
 const formatDate = (value) => {
   if (!value) return null;
@@ -45,12 +46,12 @@ const schema = yup.object({
 
 const TopicTimelineEntryContentSuggestionForm = ({
   entry,
-  saving,
-  error,
+  saving = false,
   onCancel,
   onSubmit,
 }) => {
   const [externalProfiles, setExternalProfiles] = useState([]);
+  const [generalError, setGeneralError] = useState('');
 
   const {
     register,
@@ -58,15 +59,17 @@ const TopicTimelineEntryContentSuggestionForm = ({
     setError,
     clearErrors,
     watch,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { message: '' },
   });
 
   const messageValue = watch('message');
+  const pending = saving || isSubmitting;
 
   const handleFormSubmit = async (form) => {
+    setGeneralError('');
     const profile = externalProfiles[0];
     const contentId = profile ? getProfileContentId(profile) : null;
     if (!contentId) {
@@ -77,10 +80,19 @@ const TopicTimelineEntryContentSuggestionForm = ({
       return;
     }
 
-    await onSubmit({
-      content_id: contentId,
-      message: form.message.trim(),
-    });
+    try {
+      await onSubmit({
+        content_id: contentId,
+        message: form.message.trim(),
+      });
+    } catch (err) {
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'No se pudo enviar la sugerencia. Inténtalo de nuevo.',
+      );
+      if (parsed) setGeneralError(parsed);
+    }
   };
 
   return (
@@ -92,7 +104,7 @@ const TopicTimelineEntryContentSuggestionForm = ({
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
-        {error && <Alert severity="error">{error}</Alert>}
+        {generalError && <Alert severity="error">{generalError}</Alert>}
         {errors.content && <Alert severity="error">{errors.content.message}</Alert>}
 
         <Box
@@ -134,9 +146,9 @@ const TopicTimelineEntryContentSuggestionForm = ({
             }
           }}
           maxSelections={1}
-          disabled={saving}
+          disabled={pending}
           title="Contenido a vincular"
-          description="Elige material de tu biblioteca o sube uno nuevo. Si se acepta, se vinculara a esta entrada y se anadira al tema si aun no forma parte de el."
+          description="Elige material de tu biblioteca o sube uno nuevo. Si se acepta, se vincula a esta entrada y se anade al tema si aun no forma parte de el."
         />
 
         <TextField
@@ -162,15 +174,15 @@ const TopicTimelineEntryContentSuggestionForm = ({
           borderColor: 'divider',
         }}
       >
-        <Button type="button" onClick={onCancel} disabled={saving}>
+        <Button type="button" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
         <Button
           type="submit"
           variant="contained"
-          disabled={saving}
+          disabled={pending}
         >
-          {saving ? 'Enviando...' : 'Enviar sugerencia'}
+          {pending ? 'Enviando...' : 'Enviar sugerencia'}
         </Button>
       </Box>
     </Paper>

@@ -16,6 +16,7 @@ import EventNoteIcon from '@mui/icons-material/EventNote';
 import PermMediaIcon from '@mui/icons-material/PermMedia';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
+import { parseApiValidationErrors } from '../../utils/apiFormErrors';
 import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
 import TopicTimelineEntryContentLinkForm from './TopicTimelineEntryContentLinkForm';
 import TopicTimelineEntryForm from './TopicTimelineEntryForm';
@@ -23,18 +24,6 @@ import TopicTimelineEntryForm from './TopicTimelineEntryForm';
 const EDIT_TABS = {
   details: 'details',
   content: 'content',
-};
-
-const getErrorMessage = (error, fallback) => {
-  const data = error?.response?.data;
-  if (!data) return fallback;
-  if (typeof data === 'string') return data;
-  if (data.error) return data.error;
-  const firstKey = Object.keys(data)[0];
-  const firstValue = firstKey ? data[firstKey] : null;
-  if (Array.isArray(firstValue)) return firstValue.join(' ');
-  if (typeof firstValue === 'string') return firstValue;
-  return fallback;
 };
 
 const TopicTimelineEntryPage = () => {
@@ -57,9 +46,7 @@ const TopicTimelineEntryPage = () => {
   const [loadingContents, setLoadingContents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingContents, setSavingContents] = useState(false);
-  const [error, setError] = useState(null);
-  const [formError, setFormError] = useState(null);
-  const [contentFormError, setContentFormError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
 
   const timelineUrl = useMemo(
@@ -83,7 +70,7 @@ const TopicTimelineEntryPage = () => {
 
   const loadPageData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const [topicData, timelineData, contentsData] = await Promise.all([
         contentApi.getTopicDetails(topicId, { include_contents: false }),
@@ -109,7 +96,7 @@ const TopicTimelineEntryPage = () => {
       setCanEdit(allowed);
 
       if (!allowed) {
-        setError('No tienes permiso para editar la linea de tiempo de este tema.');
+        setLoadError('No tienes permiso para editar la linea de tiempo de este tema.');
         return;
       }
 
@@ -118,7 +105,7 @@ const TopicTimelineEntryPage = () => {
           (item) => String(item.id) === String(entryId),
         );
         if (!found) {
-          setError('No se encontro la entrada de la linea de tiempo.');
+          setLoadError('No se encontro la entrada de la linea de tiempo.');
           return;
         }
         setEntry(found);
@@ -126,7 +113,11 @@ const TopicTimelineEntryPage = () => {
         setEntry(null);
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo cargar la linea de tiempo.'));
+      const { generalError } = parseApiValidationErrors(
+        err,
+        'No se pudo cargar la linea de tiempo.',
+      );
+      setLoadError(generalError);
     } finally {
       setLoading(false);
     }
@@ -149,14 +140,11 @@ const TopicTimelineEntryPage = () => {
       params.delete('created');
     }
     setSearchParams(params, { replace: true });
-    setFormError(null);
-    setContentFormError(null);
   };
 
   const handleEntrySubmit = async (payload) => {
+    setSaving(true);
     try {
-      setSaving(true);
-      setFormError(null);
       if (isEdit) {
         await contentApi.updateTopicTimelineEntry(topicId, entryId, payload);
         navigate(timelineUrl);
@@ -172,9 +160,6 @@ const TopicTimelineEntryPage = () => {
         `/content/topics/${topicId}/timeline/${created.id}/edit?${params.toString()}`,
         { replace: true },
       );
-    } catch (err) {
-      setFormError(getErrorMessage(err, 'No se pudo guardar la entrada.'));
-      throw err;
     } finally {
       setSaving(false);
     }
@@ -203,14 +188,10 @@ const TopicTimelineEntryPage = () => {
   };
 
   const handleContentSubmit = async ({ contents, newProfiles }) => {
+    setSavingContents(true);
     try {
-      setSavingContents(true);
-      setContentFormError(null);
       await linkContentsToEntry({ contents, newProfiles });
       navigate(timelineUrl);
-    } catch (err) {
-      setContentFormError(getErrorMessage(err, 'No se pudieron vincular los contenidos.'));
-      throw err;
     } finally {
       setSavingContents(false);
     }
@@ -275,13 +256,13 @@ const TopicTimelineEntryPage = () => {
         {entry?.title ? ` · ${entry.title}` : ''}
       </Typography>
 
-      {error && (
+      {loadError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {loadError}
         </Alert>
       )}
 
-      {canEdit && !error && isEdit && (
+      {canEdit && !loadError && isEdit && (
         <Tabs
           value={activeEditTab}
           onChange={handleEditTabChange}
@@ -306,42 +287,39 @@ const TopicTimelineEntryPage = () => {
         </Tabs>
       )}
 
-      {canEdit && !error && justCreated && isContentTab && (
+      {canEdit && !loadError && justCreated && isContentTab && (
         <Alert severity="success" sx={{ mb: 2 }}>
           Entrada creada. Ahora puedes vincular contenidos que evidencien ese evento de la línea de tiempo o que aporten un comentario relevante.
         </Alert>
       )}
 
-      {canEdit && !error && !isEdit && (
+      {canEdit && !loadError && !isEdit && (
         <TopicTimelineEntryForm
           entry={null}
           saving={saving}
-          error={formError}
           onCancel={handleCancel}
           onSubmit={handleEntrySubmit}
           submitLabel="Crear entrada"
         />
       )}
 
-      {canEdit && !error && isEdit && activeEditTab === EDIT_TABS.details && (
+      {canEdit && !loadError && isEdit && activeEditTab === EDIT_TABS.details && (
         <TopicTimelineEntryForm
           entry={entry}
           saving={saving}
-          error={formError}
           onCancel={handleCancel}
           onSubmit={handleEntrySubmit}
           submitLabel="Guardar"
         />
       )}
 
-      {canEdit && !error && isEdit && activeEditTab === EDIT_TABS.content && (
+      {canEdit && !loadError && isEdit && activeEditTab === EDIT_TABS.content && (
         <TopicTimelineEntryContentLinkForm
           entry={entry}
           topicId={topicId}
           availableContents={availableContents}
           loadingContents={loadingContents}
           saving={savingContents}
-          error={contentFormError}
           showSkip={justCreated}
           onSkip={handleCancel}
           onCancel={handleCancel}

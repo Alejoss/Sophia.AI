@@ -1,16 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntrySuggestionForm from '../TopicTimelineEntrySuggestionForm';
 
 vi.mock('../../../content/ContentSuggestionPicker', () => ({
   default: () => <div data-testid="content-suggestion-picker" />,
-  getProfileContentId: (profile) => profile?.content?.id,
+  getProfileContentId: (profile) => {
+    const content = profile?.content;
+    if (content == null) return null;
+    if (typeof content === 'object') return content.id ?? null;
+    return content;
+  },
 }));
 
 const baseProps = {
   saving: false,
-  error: null,
   onCancel: vi.fn(),
   onSubmit: vi.fn(),
 };
@@ -21,7 +25,7 @@ describe('TopicTimelineEntrySuggestionForm', () => {
     const onSubmit = vi.fn();
     render(<TopicTimelineEntrySuggestionForm {...baseProps} onSubmit={onSubmit} />);
 
-    const titleField = screen.getByLabelText(/titulo de la entrada/i);
+    const titleField = screen.getByLabelText(/título de la entrada/i);
     await user.type(titleField, 'a');
     await user.clear(titleField);
 
@@ -35,28 +39,32 @@ describe('TopicTimelineEntrySuggestionForm', () => {
     const onSubmit = vi.fn().mockResolvedValue();
     render(<TopicTimelineEntrySuggestionForm {...baseProps} onSubmit={onSubmit} />);
 
-    await user.type(screen.getByLabelText(/titulo de la entrada/i), 'Bull run de 2017');
+    await user.type(screen.getByLabelText(/título de la entrada/i), 'Bull run de 2017');
     await user.click(screen.getByRole('button', { name: /enviar sugerencia/i }));
 
-    await screen.findByRole('button', { name: /enviar sugerencia/i });
-    expect(onSubmit).toHaveBeenCalledWith({
-      title: 'Bull run de 2017',
-      description: '',
-      start_date: null,
-      end_date: null,
-      message: '',
-      contents: [],
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        title: 'Bull run de 2017',
+        description: '',
+        start_date: null,
+        end_date: null,
+        message: '',
+        contents: [],
+      });
     });
   });
 
-  it('shows the Spanish error passed in from the parent', () => {
-    render(
-      <TopicTimelineEntrySuggestionForm
-        {...baseProps}
-        error="No se pudo enviar la sugerencia"
-      />,
-    );
+  it('shows a Spanish API error without unmounting the form', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockRejectedValue({
+      response: { data: { error: 'No se pudo enviar la sugerencia' } },
+    });
+    render(<TopicTimelineEntrySuggestionForm {...baseProps} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(/no se pudo enviar la sugerencia/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/título de la entrada/i), 'Bull run de 2017');
+    await user.click(screen.getByRole('button', { name: /enviar sugerencia/i }));
+
+    expect(await screen.findByText(/no se pudo enviar la sugerencia/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/título de la entrada/i)).toBeInTheDocument();
   });
 });

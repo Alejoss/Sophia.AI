@@ -1,12 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntryForm from '../TopicTimelineEntryForm';
 
 const baseProps = {
   entry: null,
   saving: false,
-  error: null,
   onCancel: vi.fn(),
   onSubmit: vi.fn(),
 };
@@ -17,7 +16,7 @@ describe('TopicTimelineEntryForm', () => {
     const onSubmit = vi.fn();
     render(<TopicTimelineEntryForm {...baseProps} onSubmit={onSubmit} />);
 
-    const titleField = screen.getByLabelText(/^titulo$/i);
+    const titleField = screen.getByLabelText(/^título$/i);
     await user.type(titleField, 'a');
     await user.clear(titleField);
 
@@ -31,15 +30,16 @@ describe('TopicTimelineEntryForm', () => {
     const onSubmit = vi.fn().mockResolvedValue();
     render(<TopicTimelineEntryForm {...baseProps} onSubmit={onSubmit} />);
 
-    await user.type(screen.getByLabelText(/^titulo$/i), 'Whitepaper de Bitcoin');
+    await user.type(screen.getByLabelText(/^título$/i), 'Whitepaper de Bitcoin');
     await user.click(screen.getByRole('button', { name: /guardar|crear entrada/i }));
 
-    await screen.findByRole('button', { name: /guardar|crear entrada/i });
-    expect(onSubmit).toHaveBeenCalledWith({
-      title: 'Whitepaper de Bitcoin',
-      description: '',
-      start_date: null,
-      end_date: null,
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        title: 'Whitepaper de Bitcoin',
+        description: '',
+        start_date: null,
+        end_date: null,
+      });
     });
   });
 
@@ -49,14 +49,17 @@ describe('TopicTimelineEntryForm', () => {
     expect(screen.queryByText(/contenidos del tema/i)).not.toBeInTheDocument();
   });
 
-  it('shows the Spanish error passed in from the parent', () => {
-    render(
-      <TopicTimelineEntryForm
-        {...baseProps}
-        error="No se pudo guardar la entrada"
-      />,
-    );
+  it('shows a Spanish API error without unmounting the form', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockRejectedValue({
+      response: { data: { error: 'No se pudo guardar la entrada' } },
+    });
+    render(<TopicTimelineEntryForm {...baseProps} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(/no se pudo guardar la entrada/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/^título$/i), 'Whitepaper de Bitcoin');
+    await user.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(await screen.findByText(/no se pudo guardar la entrada/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^título$/i)).toBeInTheDocument();
   });
 });

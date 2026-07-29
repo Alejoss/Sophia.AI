@@ -79,4 +79,26 @@ describe('UploadContentForm', () => {
       expect(contentApi.uploadContent).toHaveBeenCalled();
     });
   });
+
+  it('keeps media type after filling other fields in URL mode', async () => {
+    const user = userEvent.setup();
+    contentApi.fetchUrlMetadata.mockResolvedValue({
+      title: '',
+      siteName: 'Example',
+      type: 'article',
+    });
+
+    renderWithProviders(
+      <UploadContentForm initialUrlMode showModeToggle={false} />,
+    );
+
+    await user.type(screen.getByRole('textbox', { name: /^url$/i }), 'https://example.com/article');
+    await user.click(screen.getByLabelText(/tipo de contenido/i));
+    await user.click(await screen.findByRole('option', { name: /texto/i }));
+
+    await user.type(screen.getByRole('textbox', { name: /^autor$/i }), 'Satoshi');
+    await user.type(screen.getByRole('textbox', { name: /^título$/i }), 'Artículo');
+
+    expect(screen.getByLabelText(/tipo de contenido/i)).toHaveTextContent(/texto/i);
+  });
 });

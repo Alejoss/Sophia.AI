@@ -12,7 +12,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 import UploadContentForm from './UploadContentForm';
 
-const getProfileContentId = (profile) => profile?.content?.id;
+const getProfileContentId = (profile) => {
+  const content = profile?.content;
+  if (content == null) return null;
+  if (typeof content === 'object') return content.id ?? null;
+  return content;
+};
 
 const ContentSuggestionPicker = ({
   selectedProfiles = [],

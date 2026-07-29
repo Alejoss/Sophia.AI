@@ -12,6 +12,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LibrarySelectMultiple from '../../content/LibrarySelectMultiple';
 import UploadContentForm from '../../content/UploadContentForm';
 import { getProfileContentId } from '../../content/ContentSuggestionPicker';
+import { parseApiValidationErrors } from '../../utils/apiFormErrors';
 import TopicTimelineContentSelector from './TopicTimelineContentSelector';
 
 const buildInitialSelectedIds = (entry) => {
@@ -46,14 +47,16 @@ const TopicTimelineEntryContentLinkForm = ({
   const [uploadInProgress, setUploadInProgress] = useState(false);
   const [selectedContentIds, setSelectedContentIds] = useState(() => buildInitialSelectedIds(entry));
   const [externalProfiles, setExternalProfiles] = useState([]);
-  const [localError, setLocalError] = useState(null);
+  const [generalError, setGeneralError] = useState('');
+  const entryId = entry?.id;
 
   useEffect(() => {
     setSelectedContentIds(buildInitialSelectedIds(entry));
     setExternalProfiles([]);
-    setLocalError(null);
+    setGeneralError('');
     setSourceMode(null);
-  }, [entry]);
+    setUploadInProgress(false);
+  }, [entryId]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when switching entries
 
   const topicContentById = useMemo(() => {
     const map = new Map();
@@ -76,18 +79,24 @@ const TopicTimelineEntryContentLinkForm = ({
     [externalProfiles],
   );
 
-  const backToChoice = () => setSourceMode(null);
+  const backToChoice = () => {
+    setUploadInProgress(false);
+    setSourceMode(null);
+  };
 
   const handleLibrarySelectionChange = (profiles) => {
     const valid = (profiles || []).filter((profile) => profile?.id);
-    const map = new Map(externalProfiles.map((profile) => [profile.id, profile]));
-    valid.forEach((profile) => map.set(profile.id, profile));
-    setExternalProfiles([...map.values()]);
+    setExternalProfiles(valid);
   };
 
   const handleContentUploaded = (contentProfile) => {
+    setUploadInProgress(false);
     if (contentProfile?.id) {
-      handleLibrarySelectionChange([contentProfile]);
+      setExternalProfiles((prev) => {
+        const map = new Map(prev.map((profile) => [profile.id, profile]));
+        map.set(contentProfile.id, contentProfile);
+        return [...map.values()];
+      });
     }
     setSourceMode(null);
   };
@@ -110,7 +119,7 @@ const TopicTimelineEntryContentLinkForm = ({
   };
 
   const handleSubmit = async () => {
-    setLocalError(null);
+    setGeneralError('');
 
     const orderedIds = [];
     const seen = new Set();
@@ -136,6 +145,11 @@ const TopicTimelineEntryContentLinkForm = ({
       }
     });
 
+    if (orderedIds.length === 0 && externalProfiles.length > 0) {
+      setGeneralError('No se pudo obtener el contenido seleccionado. Vuelve a elegirlo e inténtalo de nuevo.');
+      return;
+    }
+
     const contents = orderedIds.map((id, index) => ({
       content_id: Number(id),
       order: index + 1,
@@ -144,8 +158,13 @@ const TopicTimelineEntryContentLinkForm = ({
 
     try {
       await onSubmit({ contents, newProfiles });
-    } catch {
-      // Parent surfaces API errors via `error`.
+    } catch (err) {
+      const { fieldErrors, generalError: parsed } = parseApiValidationErrors(
+        err,
+        'No se pudieron vincular los contenidos. Inténtalo de nuevo.',
+      );
+      const contentsError = fieldErrors.contents;
+      setGeneralError(contentsError || parsed || 'No se pudieron vincular los contenidos. Inténtalo de nuevo.');
     }
   };
 
@@ -246,8 +265,8 @@ const TopicTimelineEntryContentLinkForm = ({
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
-        {(error || localError) && (
-          <Alert severity="error">{error || localError}</Alert>
+        {(error || generalError) && (
+          <Alert severity="error">{error || generalError}</Alert>
         )}
 
         <Box>

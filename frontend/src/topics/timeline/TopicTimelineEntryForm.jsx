@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -11,6 +11,7 @@ import {
   TextField,
 } from '@mui/material';
 import dayjs from 'dayjs';
+import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
 const buildInitialValues = (entry) => ({
@@ -43,19 +44,20 @@ const schema = yup.object({
 
 const TopicTimelineEntryForm = ({
   entry,
-  saving,
-  error,
+  saving = false,
   onCancel,
   onSubmit,
   submitLabel,
 }) => {
+  const [generalError, setGeneralError] = useState('');
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    setError,
     watch,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: buildInitialValues(entry),
@@ -64,18 +66,30 @@ const TopicTimelineEntryForm = ({
 
   const startDate = watch('start_date');
   const endDate = watch('end_date');
+  const pending = saving || isSubmitting;
 
   useEffect(() => {
     reset(buildInitialValues(entry));
-  }, [entry, reset]);
+    setGeneralError('');
+  }, [entry?.id, reset]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when switching entries
 
   const handleFormSubmit = async (form) => {
-    await onSubmit({
-      title: form.title.trim(),
-      description: form.description,
-      start_date: form.start_date || null,
-      end_date: form.end_date || null,
-    });
+    setGeneralError('');
+    try {
+      await onSubmit({
+        title: form.title.trim(),
+        description: form.description,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+      });
+    } catch (err) {
+      const { generalError: parsed } = applyApiErrorsToForm(
+        err,
+        setError,
+        'No se pudo guardar la entrada. Inténtalo de nuevo.',
+      );
+      if (parsed) setGeneralError(parsed);
+    }
   };
 
   return (
@@ -87,17 +101,17 @@ const TopicTimelineEntryForm = ({
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
-        {error && <Alert severity="error">{error}</Alert>}
+        {generalError && <Alert severity="error">{generalError}</Alert>}
 
         <TextField
-          label="Titulo"
+          label="Título"
           {...register('title')}
           error={Boolean(errors.title)}
           helperText={errors.title?.message}
           fullWidth
         />
         <TextField
-          label="Descripcion narrativa"
+          label="Descripción narrativa"
           placeholder="Descripción narrativa para la línea de tiempo"
           {...register('description')}
           error={Boolean(errors.description)}
@@ -115,11 +129,14 @@ const TopicTimelineEntryForm = ({
             setValue('start_date', start_date, { shouldValidate: true });
             setValue('end_date', end_date, { shouldValidate: true });
           }}
-          disabled={saving}
+          disabled={pending}
           isNewEntry={!entry}
         />
         {errors.end_date && (
           <Alert severity="error">{errors.end_date.message}</Alert>
+        )}
+        {errors.start_date && (
+          <Alert severity="error">{errors.start_date.message}</Alert>
         )}
       </Stack>
 
@@ -134,15 +151,15 @@ const TopicTimelineEntryForm = ({
           borderColor: 'divider',
         }}
       >
-        <Button type="button" onClick={onCancel} disabled={saving}>
+        <Button type="button" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
         <Button
           type="submit"
           variant="contained"
-          disabled={saving || !isValid}
+          disabled={pending || !isValid}
         >
-          {saving
+          {pending
             ? 'Guardando...'
             : (submitLabel || 'Guardar')}
         </Button>
