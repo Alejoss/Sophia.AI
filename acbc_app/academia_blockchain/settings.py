@@ -734,6 +734,26 @@ QDRANT_API_KEY = os.getenv('QDRANT_API_KEY', '')
 QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'sophia_acbc_topic_chunks')
 QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '3072'))
 
+# Bitcoin OP_RETURN anchoring for transcript text_hash (platform wallet).
+# Network: signet (recommended for tests), testnet, or mainnet.
+BTC_NETWORK = os.getenv('BTC_NETWORK', 'signet').strip().lower()
+# WIF private key for the platform address that pays fees and embeds OP_RETURN.
+BTC_PRIVATE_KEY_WIF = os.getenv('BTC_PRIVATE_KEY_WIF', '').strip()
+# Esplora-compatible API base (mempool.space). Override if you self-host.
+_BTC_API_DEFAULTS = {
+    'signet': 'https://mempool.space/signet/api',
+    'testnet': 'https://mempool.space/testnet/api',
+    'testnet4': 'https://mempool.space/testnet4/api',
+    'mainnet': 'https://mempool.space/api',
+}
+BTC_API_BASE = os.getenv(
+    'BTC_API_BASE',
+    _BTC_API_DEFAULTS.get(BTC_NETWORK, _BTC_API_DEFAULTS['signet']),
+).rstrip('/')
+BTC_MIN_CONFIRMATIONS = int(os.getenv('BTC_MIN_CONFIRMATIONS', '1'))
+# Fee rate floor in sat/vB when the API fee endpoint is unavailable.
+BTC_FALLBACK_FEE_SAT_VB = int(os.getenv('BTC_FALLBACK_FEE_SAT_VB', '2'))
+
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry
 configure_sentry()

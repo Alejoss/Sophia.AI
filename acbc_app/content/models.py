@@ -483,7 +483,7 @@ class TranscriptAnchor(models.Model):
     btc_network = models.CharField(
         max_length=16,
         choices=BTC_NETWORK_CHOICES,
-        default=BTC_NETWORK_TESTNET,
+        default=BTC_NETWORK_SIGNET,
     )
     btc_txid = models.CharField(
         max_length=64,

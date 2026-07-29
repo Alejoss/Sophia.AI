@@ -1707,7 +1707,7 @@ class TranscriptAnchorCreateSerializer(serializers.Serializer):
     btc_network = serializers.ChoiceField(
         choices=TranscriptAnchor.BTC_NETWORK_CHOICES,
         required=False,
-        default=TranscriptAnchor.BTC_NETWORK_TESTNET,
+        default=TranscriptAnchor.BTC_NETWORK_SIGNET,
     )
     op_return_prefix = serializers.CharField(
         required=False,

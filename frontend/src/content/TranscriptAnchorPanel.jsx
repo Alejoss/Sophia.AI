@@ -102,7 +102,7 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
     setError(null);
     try {
       await contentApi.createTranscriptAnchor(contentId, {
-        btc_network: 'testnet',
+        btc_network: 'signet',
       });
       await load();
     } catch (err) {
