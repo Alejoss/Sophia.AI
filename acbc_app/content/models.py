@@ -427,26 +427,22 @@ class BlockchainInteraction(models.Model):
 
 class TranscriptAnchor(models.Model):
     """
-    Certification of a content transcript's text_hash.
+    Certification of a content transcript's text_hash on Bitcoin.
 
-    Bitcoin holds the digest directly in an OP_RETURN output (proof of existence).
-    An optional EVM contract indexes the same hash plus IPFS CID and btc_txid for
-    app discovery. Rows snapshot text_hash at certify time so re-ingested
-    transcripts can be re-anchored without rewriting history.
+    The digest is written directly in an OP_RETURN output (proof of existence).
+    Rows snapshot text_hash at certify time so re-ingested transcripts can be
+    re-anchored without rewriting history. Optional ipfs_cid is only a pointer
+    to the text off-chain — not part of the Bitcoin proof.
     """
 
     STATUS_PENDING = 'pending'
     STATUS_BTC_BROADCAST = 'btc_broadcast'
-    STATUS_BTC_CONFIRMED = 'btc_confirmed'
-    STATUS_EVM_BROADCAST = 'evm_broadcast'
     STATUS_ANCHORED = 'anchored'
     STATUS_FAILED = 'failed'
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Pending'),
         (STATUS_BTC_BROADCAST, 'Bitcoin broadcast'),
-        (STATUS_BTC_CONFIRMED, 'Bitcoin confirmed'),
-        (STATUS_EVM_BROADCAST, 'EVM broadcast'),
-        (STATUS_ANCHORED, 'Anchored'),
+        (STATUS_ANCHORED, 'Anchored on Bitcoin'),
         (STATUS_FAILED, 'Failed'),
     ]
 
@@ -484,7 +480,6 @@ class TranscriptAnchor(models.Model):
         help_text='ASCII prefix prepended to text_hash bytes in the Bitcoin OP_RETURN.',
     )
 
-    # --- Bitcoin (source of truth for existence) ---
     btc_network = models.CharField(
         max_length=16,
         choices=BTC_NETWORK_CHOICES,
@@ -505,26 +500,10 @@ class TranscriptAnchor(models.Model):
     btc_confirmations = models.PositiveIntegerField(default=0)
     btc_confirmed_at = models.DateTimeField(blank=True, null=True)
 
-    # --- EVM index (optional; app discovery, not the existence proof) ---
-    evm_chain_id = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-        help_text='EVM chain id (e.g. 80002 Amoy, 137 Polygon).',
-    )
-    evm_contract_address = models.CharField(max_length=42, blank=True)
-    evm_tx_hash = models.CharField(
-        max_length=66,
-        blank=True,
-        help_text='0x-prefixed EVM transaction hash.',
-    )
-    evm_block_number = models.PositiveBigIntegerField(blank=True, null=True)
-    evm_recorded_at = models.DateTimeField(blank=True, null=True)
-
-    # --- Optional content pointer ---
     ipfs_cid = models.CharField(
         max_length=128,
         blank=True,
-        help_text='IPFS CID for the certified plain text, if pinned.',
+        help_text='Optional IPFS CID for the certified plain text (off-chain pointer only).',
     )
 
     status = models.CharField(
@@ -577,11 +556,7 @@ class TranscriptAnchor(models.Model):
 
     @property
     def is_btc_confirmed(self):
-        return self.status in (
-            self.STATUS_BTC_CONFIRMED,
-            self.STATUS_EVM_BROADCAST,
-            self.STATUS_ANCHORED,
-        ) and bool(self.btc_txid)
+        return self.status == self.STATUS_ANCHORED and bool(self.btc_txid)
 
     def build_op_return_payload_hex(self):
         """

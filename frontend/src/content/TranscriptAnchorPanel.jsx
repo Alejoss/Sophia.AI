@@ -7,8 +7,8 @@ import {
   CircularProgress,
   Divider,
   IconButton,
+  Link,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -18,17 +18,15 @@ import contentApi from '../api/contentApi';
 
 const STATUS_LABELS = {
   pending: 'Pendiente (preparado)',
-  btc_broadcast: 'Bitcoin enviado',
-  btc_confirmed: 'Bitcoin confirmado',
-  evm_broadcast: 'EVM enviado',
-  anchored: 'Anclado',
+  btc_broadcast: 'Enviado a Bitcoin',
+  anchored: 'Anclado en Bitcoin',
   failed: 'Fallido',
 };
 
-const shortHash = (value) => {
-  if (!value) return '—';
-  if (value.length <= 18) return value;
-  return `${value.slice(0, 10)}…${value.slice(-8)}`;
+const BTC_EXPLORER = {
+  mainnet: (txid) => `https://mempool.space/tx/${txid}`,
+  testnet: (txid) => `https://mempool.space/testnet/tx/${txid}`,
+  signet: (txid) => `https://mempool.space/signet/tx/${txid}`,
 };
 
 const CopyableMono = ({ label, value }) => {
@@ -72,15 +70,14 @@ const CopyableMono = ({ label, value }) => {
 };
 
 /**
- * Certification panel: prepare Bitcoin OP_RETURN payload + show EVM/IPFS index fields.
- * BTC broadcast and on-chain EVM write are wired later; this UI drives the Django anchor API.
+ * Certification panel: prepare and display a Bitcoin OP_RETURN anchor for the transcript hash.
+ * Broadcast to Bitcoin is wired in a later step; this UI drives the Django anchor API.
  */
 const TranscriptAnchorPanel = ({ contentId, textHash }) => {
   const [loading, setLoading] = useState(true);
   const [certifying, setCertifying] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
-  const [ipfsCid, setIpfsCid] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,9 +85,6 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
     try {
       const data = await contentApi.getTranscriptAnchor(contentId);
       setInfo(data);
-      if (data?.anchor?.ipfs_cid) {
-        setIpfsCid(data.anchor.ipfs_cid);
-      }
     } catch (err) {
       console.error(err);
       setError('No se pudo cargar el estado de certificación.');
@@ -108,7 +102,6 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
     setError(null);
     try {
       await contentApi.createTranscriptAnchor(contentId, {
-        ipfs_cid: ipfsCid.trim(),
         btc_network: 'testnet',
       });
       await load();
@@ -137,6 +130,10 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
   const anchor = info?.anchor;
   const hash = info?.current_text_hash || textHash;
   const statusLabel = anchor ? STATUS_LABELS[anchor.status] || anchor.status : null;
+  const explorerUrl =
+    anchor?.btc_txid && BTC_EXPLORER[anchor.btc_network]
+      ? BTC_EXPLORER[anchor.btc_network](anchor.btc_txid)
+      : null;
 
   return (
     <Box
@@ -150,12 +147,12 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <VerifiedIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" component="h2">
-          Certificación on-chain
+          Certificación en Bitcoin
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        El hash SHA-256 del texto se ancla en Bitcoin (OP_RETURN). Un contrato EVM
-        puede indexar el mismo hash, el CID de IPFS y el txid de Bitcoin.
+        El hash SHA-256 del texto se ancla en Bitcoin con un OP_RETURN. Cualquiera
+        con el transcript puede recalcular el hash y comprobarlo en el explorador.
       </Typography>
 
       {error && (
@@ -181,18 +178,22 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
           </Box>
           <CopyableMono label="OP_RETURN (hex)" value={anchor.btc_op_return_hex} />
           <CopyableMono label="Bitcoin txid" value={anchor.btc_txid || null} />
-          <CopyableMono label="IPFS CID" value={anchor.ipfs_cid || null} />
-          <CopyableMono label="EVM tx" value={anchor.evm_tx_hash || null} />
-          {anchor.evm_contract_address && (
-            <Typography variant="caption" color="text.secondary">
-              Contrato EVM: {shortHash(anchor.evm_contract_address)}
-              {anchor.evm_chain_id ? ` (chain ${anchor.evm_chain_id})` : ''}
+          {explorerUrl && (
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <Link href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                Ver transacción en mempool.space
+              </Link>
             </Typography>
           )}
           {anchor.status === 'pending' && (
             <Alert severity="info" sx={{ mt: 1 }}>
-              Anclaje preparado. El broadcast a Bitcoin y el registro en el contrato EVM
-              se completarán en un paso posterior.
+              Anclaje preparado (payload OP_RETURN listo). El envío a la red Bitcoin
+              se completará en un paso posterior.
+            </Alert>
+          )}
+          {anchor.status === 'btc_broadcast' && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              Transacción enviada; esperando confirmaciones en Bitcoin.
             </Alert>
           )}
         </Stack>
@@ -200,29 +201,19 @@ const TranscriptAnchorPanel = ({ contentId, textHash }) => {
         <>
           <Divider sx={{ my: 1.5 }} />
           {info?.can_certify ? (
-            <Stack spacing={1.5}>
-              <TextField
-                label="IPFS CID (opcional)"
-                size="small"
-                value={ipfsCid}
-                onChange={(e) => setIpfsCid(e.target.value)}
-                placeholder="bafy…"
-                helperText="Puntero al texto; se puede dejar vacío y completar después."
-              />
-              <Button
-                variant="contained"
-                onClick={handleCertify}
-                disabled={certifying || !hash}
-                sx={{ textTransform: 'none', alignSelf: 'flex-start' }}
-              >
-                {certifying ? 'Preparando…' : 'Preparar certificación'}
-              </Button>
-            </Stack>
+            <Button
+              variant="contained"
+              onClick={handleCertify}
+              disabled={certifying || !hash}
+              sx={{ textTransform: 'none' }}
+            >
+              {certifying ? 'Preparando…' : 'Preparar anclaje en Bitcoin'}
+            </Button>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Aún no hay certificación para este transcript.
+              Aún no hay anclaje en Bitcoin para este transcript.
               {hash
-                ? ' Cualquiera puede verificar recalculando el SHA-256 del texto y comparándolo con el OP_RETURN de Bitcoin cuando exista.'
+                ? ' Cuando exista, cualquiera podrá verificar recalculando el SHA-256 y comparándolo con el OP_RETURN.'
                 : ''}
             </Typography>
           )}

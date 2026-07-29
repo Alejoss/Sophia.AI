@@ -5,13 +5,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title TranscriptAnchorRegistry
- * @notice On-chain index for transcript certifications.
- * @dev Bitcoin OP_RETURN holds the text hash (existence proof). This contract
- *      stores the same hash plus optional IPFS CID and Bitcoin txid so the app
- *      can discover and display anchors. It does not verify Bitcoin inclusion.
+ * @notice Optional EVM index for transcript certifications (not used by the
+ *         current product path, which anchors hashes directly on Bitcoin).
+ * @dev Kept for experiments / future discovery UX. Production certification
+ *      uses Bitcoin OP_RETURN only.
  *
- *      All writes are onlyOwner: the Sophia platform wallet records anchors.
- *      Reads remain public for verification UIs.
+ *      All writes are onlyOwner. Reads remain public.
  */
 contract TranscriptAnchorRegistry is Ownable {
     struct Anchor {

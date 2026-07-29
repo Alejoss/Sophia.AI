@@ -1,4 +1,4 @@
-"""API for transcript Bitcoin/EVM certification anchors."""
+"""API for transcript Bitcoin certification anchors (OP_RETURN)."""
 import logging
 
 from django.shortcuts import get_object_or_404
@@ -29,8 +29,9 @@ class ContentTranscriptAnchorListView(APIView):
     GET  /api/content/content_details/<content_id>/transcript/anchors/
     POST /api/content/content_details/<content_id>/transcript/anchors/
 
-    GET is public (directory of proofs). POST creates a pending anchor for the
-    current transcript text_hash (uploader or staff). Does not broadcast BTC/EVM yet.
+    GET is public (directory of Bitcoin proofs). POST creates a pending anchor for
+    the current transcript text_hash (uploader or staff). Does not broadcast to
+    Bitcoin yet — that is a later step.
     """
 
     def get_permissions(self):
@@ -109,8 +110,7 @@ class ContentTranscriptAnchorCurrentView(APIView):
     """
     GET /api/content/content_details/<content_id>/transcript/anchor/
 
-    Returns the anchor matching the current transcript hash, or null.
-    Includes verification helpers (text_hash, op_return payload).
+    Returns the Bitcoin anchor matching the current transcript hash, or null.
     """
 
     permission_classes = [AllowAny]
