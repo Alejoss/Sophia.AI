@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -85,8 +85,13 @@ const TopicTimelineEntryContentLinkForm = ({
   };
 
   const handleLibrarySelectionChange = (profiles) => {
-    const valid = (profiles || []).filter((profile) => profile?.id);
+    const valid = (profiles || []).filter((profile) => profile?.id && getProfileContentId(profile));
     setExternalProfiles(valid);
+  };
+
+  const handleLibrarySave = (_ids, profiles) => {
+    handleLibrarySelectionChange(profiles);
+    backToChoice();
   };
 
   const handleContentUploaded = (contentProfile) => {
@@ -109,14 +114,11 @@ const TopicTimelineEntryContentLinkForm = ({
     setExternalProfiles((prev) => prev.filter((profile) => profile.id !== profileId));
   };
 
-  const filterLibraryContent = (contentProfile) => {
+  const filterLibraryContent = useCallback((contentProfile) => {
     if (!topicId) return true;
     const topics = contentProfile?.content?.topics || [];
-    const alreadyInTopic = topics.some(
-      (id) => String(id) === String(topicId),
-    );
-    return !alreadyInTopic;
-  };
+    return !topics.some((id) => String(id) === String(topicId));
+  }, [topicId]);
 
   const handleSubmit = async () => {
     setGeneralError('');
@@ -145,8 +147,12 @@ const TopicTimelineEntryContentLinkForm = ({
       }
     });
 
-    if (orderedIds.length === 0 && externalProfiles.length > 0) {
-      setGeneralError('No se pudo obtener el contenido seleccionado. Vuelve a elegirlo e inténtalo de nuevo.');
+    if (orderedIds.length === 0) {
+      setGeneralError(
+        externalProfiles.length > 0
+          ? 'No se pudo obtener el contenido seleccionado. Vuelve a elegirlo e inténtalo de nuevo.'
+          : 'Selecciona al menos un contenido para vincular, o usa Omitir.',
+      );
       return;
     }
 
@@ -220,7 +226,7 @@ const TopicTimelineEntryContentLinkForm = ({
           title="Seleccionar contenido"
           description="Selecciona contenido de tu biblioteca para vincular a esta entrada"
           onCancel={backToChoice}
-          onSave={backToChoice}
+          onSave={handleLibrarySave}
           onSelectionChange={handleLibrarySelectionChange}
           filterFunction={filterLibraryContent}
           selectedIds={selectedProfileIds}

@@ -9,13 +9,20 @@ vi.mock('../../../content/LibrarySelectMultiple', () => ({
     <div>
       <button
         type="button"
-        onClick={() => onSelectionChange([
-          { id: 99, content: { id: 50 }, title: 'Nuevo video' },
-        ])}
+        onClick={() => {
+          const profiles = [
+            { id: 99, content: { id: 50 }, title: 'Nuevo video' },
+          ];
+          onSelectionChange(profiles);
+          onSave(profiles.map((profile) => profile.id), profiles);
+        }}
       >
         Mock select library content
       </button>
-      <button type="button" onClick={onSave}>
+      <button
+        type="button"
+        onClick={() => onSave([], [])}
+      >
         Mock save library
       </button>
     </div>
@@ -94,7 +101,6 @@ describe('TopicTimelineEntryContentLinkForm', () => {
     expect(screen.queryByText(/contenidos del tema selector/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /mock select library content/i }));
-    await user.click(screen.getByRole('button', { name: /mock save library/i }));
     await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
 
     expect(onSubmit).toHaveBeenCalledWith({

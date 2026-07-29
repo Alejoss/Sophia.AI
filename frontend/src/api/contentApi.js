@@ -26,6 +26,9 @@ const contentApi = {
       if (params.search) {
         query.search = params.search;
       }
+      if (params.collection != null && params.collection !== '') {
+        query.collection = params.collection;
+      }
       const response = await axiosInstance.get('/content/user-content-with-details/', {
         params: query
       });
