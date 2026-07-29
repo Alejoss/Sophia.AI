@@ -3,30 +3,35 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopicTimelineEntryContentLinkForm from '../TopicTimelineEntryContentLinkForm';
 
-vi.mock('../../../content/ContentSuggestionPicker', () => ({
+vi.mock('../../../content/LibrarySelectMultiple', () => ({
   __esModule: true,
-  getProfileContentId: (profile) => profile?.content?.id,
-  default: ({ title, onSelectionChange, selectedProfiles }) => (
+  default: ({ onSelectionChange, onSave }) => (
     <div>
-      <span>{title}</span>
       <button
         type="button"
         onClick={() => onSelectionChange([
-          ...(selectedProfiles || []),
           { id: 99, content: { id: 50 }, title: 'Nuevo video' },
         ])}
       >
-        Mock add profile
+        Mock select library content
+      </button>
+      <button type="button" onClick={onSave}>
+        Mock save library
       </button>
     </div>
   ),
+}));
+
+vi.mock('../../../content/UploadContentForm', () => ({
+  __esModule: true,
+  default: () => <div>Mock upload form</div>,
 }));
 
 vi.mock('../TopicTimelineContentSelector', () => ({
   __esModule: true,
   default: ({ selectedIds, onSelectionChange }) => (
     <div>
-      <span>Contenidos del tema</span>
+      <span>Contenidos del tema selector</span>
       <button
         type="button"
         onClick={() => onSelectionChange([...(selectedIds || []), '12'])}
@@ -39,7 +44,10 @@ vi.mock('../TopicTimelineContentSelector', () => ({
 
 const baseProps = {
   entry: null,
-  availableContents: [],
+  topicId: '2',
+  availableContents: [
+    { id: 12, content: { id: 12 }, title: 'Whitepaper' },
+  ],
   loadingContents: false,
   saving: false,
   error: null,
@@ -49,13 +57,32 @@ const baseProps = {
 };
 
 describe('TopicTimelineEntryContentLinkForm', () => {
-  it('submits topic content and new profiles together', async () => {
+  it('shows a single choice screen initially', () => {
+    render(<TopicTimelineEntryContentLinkForm {...baseProps} />);
+
+    expect(screen.getByRole('button', { name: /contenidos del tema/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /elegir de tu biblioteca/i })).toBeInTheDocument();
+    expect(screen.queryByText(/contenidos del tema selector/i)).not.toBeInTheDocument();
+  });
+
+  it('opens only one form at a time and submits combined selections', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue();
     render(<TopicTimelineEntryContentLinkForm {...baseProps} onSubmit={onSubmit} />);
 
+    await user.click(screen.getByRole('button', { name: /contenidos del tema/i }));
+    expect(screen.getByText(/contenidos del tema selector/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /elegir de tu biblioteca/i })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: /mock select topic content/i }));
-    await user.click(screen.getByRole('button', { name: /mock add profile/i }));
+    await user.click(screen.getByRole('button', { name: /listo/i }));
+
+    await user.click(screen.getByRole('button', { name: /elegir de tu biblioteca/i }));
+    expect(screen.getByRole('button', { name: /mock select library content/i })).toBeInTheDocument();
+    expect(screen.queryByText(/contenidos del tema selector/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /mock select library content/i }));
+    await user.click(screen.getByRole('button', { name: /mock save library/i }));
     await user.click(screen.getByRole('button', { name: /guardar contenidos/i }));
 
     expect(onSubmit).toHaveBeenCalledWith({

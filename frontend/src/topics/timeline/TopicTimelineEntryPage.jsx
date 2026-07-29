@@ -7,14 +7,23 @@ import {
   CircularProgress,
   Link as MuiLink,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import PermMediaIcon from '@mui/icons-material/PermMedia';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
 import { getTopicDetailPath, TOPIC_TABS } from '../../utils/urlUtils';
 import TopicTimelineEntryContentLinkForm from './TopicTimelineEntryContentLinkForm';
 import TopicTimelineEntryForm from './TopicTimelineEntryForm';
+
+const EDIT_TABS = {
+  details: 'details',
+  content: 'content',
+};
 
 const getErrorMessage = (error, fallback) => {
   const data = error?.response?.data;
@@ -28,22 +37,18 @@ const getErrorMessage = (error, fallback) => {
   return fallback;
 };
 
-const buildEditPath = (topicId, id, { fromEdit, linkContent }) => {
-  const params = new URLSearchParams();
-  if (fromEdit) params.set('from', 'edit');
-  if (linkContent) params.set('step', 'content');
-  const query = params.toString();
-  return `/content/topics/${topicId}/timeline/${id}/edit${query ? `?${query}` : ''}`;
-};
-
 const TopicTimelineEntryPage = () => {
   const { topicId, entryId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
   const isEdit = Boolean(entryId);
   const fromEdit = searchParams.get('from') === 'edit';
-  const isContentStep = isEdit && searchParams.get('step') === 'content';
+  const justCreated = searchParams.get('created') === '1';
+  const activeEditTab = searchParams.get('step') === 'content'
+    ? EDIT_TABS.content
+    : EDIT_TABS.details;
+  const isContentTab = isEdit && activeEditTab === EDIT_TABS.content;
 
   const [topicTitle, setTopicTitle] = useState('');
   const [entry, setEntry] = useState(null);
@@ -63,6 +68,8 @@ const TopicTimelineEntryPage = () => {
       : getTopicDetailPath(topicId, TOPIC_TABS.TIMELINE)),
     [fromEdit, topicId],
   );
+
+  const linkedContentCount = entry?.contents?.length || 0;
 
   const refreshTopicContents = useCallback(async () => {
     setLoadingContents(true);
@@ -133,6 +140,19 @@ const TopicTimelineEntryPage = () => {
     navigate(timelineUrl);
   };
 
+  const handleEditTabChange = (_event, nextTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (nextTab === EDIT_TABS.content) {
+      params.set('step', 'content');
+    } else {
+      params.delete('step');
+      params.delete('created');
+    }
+    setSearchParams(params, { replace: true });
+    setFormError(null);
+    setContentFormError(null);
+  };
+
   const handleEntrySubmit = async (payload) => {
     try {
       setSaving(true);
@@ -144,8 +164,12 @@ const TopicTimelineEntryPage = () => {
       }
 
       const created = await contentApi.createTopicTimelineEntry(topicId, payload);
+      const params = new URLSearchParams();
+      if (fromEdit) params.set('from', 'edit');
+      params.set('step', 'content');
+      params.set('created', '1');
       navigate(
-        buildEditPath(topicId, created.id, { fromEdit, linkContent: true }),
+        `/content/topics/${topicId}/timeline/${created.id}/edit?${params.toString()}`,
         { replace: true },
       );
     } catch (err) {
@@ -202,15 +226,15 @@ const TopicTimelineEntryPage = () => {
   }
 
   const pageTitle = (() => {
-    if (isContentStep) return 'Vincular contenidos a la entrada';
-    if (isEdit) return 'Editar entrada de la linea de tiempo';
-    return 'Nueva entrada de la linea de tiempo';
+    if (!isEdit) return 'Nueva entrada de la linea de tiempo';
+    if (justCreated && isContentTab) return 'Vincular contenidos a la entrada';
+    return 'Editar entrada de la linea de tiempo';
   })();
 
   const breadcrumbLabel = (() => {
-    if (isContentStep) return 'Vincular contenidos';
-    if (isEdit) return 'Editar entrada';
-    return 'Nueva entrada';
+    if (!isEdit) return 'Nueva entrada';
+    if (justCreated && isContentTab) return 'Vincular contenidos';
+    return 'Editar entrada';
   })();
 
   return (
@@ -246,9 +270,9 @@ const TopicTimelineEntryPage = () => {
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
         {pageTitle}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: isEdit ? 2 : 3 }}>
         {topicTitle ? `Tema: ${topicTitle}` : ''}
-        {isContentStep && entry?.title ? ` · Entrada: ${entry.title}` : ''}
+        {entry?.title ? ` · ${entry.title}` : ''}
       </Typography>
 
       {error && (
@@ -257,42 +281,72 @@ const TopicTimelineEntryPage = () => {
         </Alert>
       )}
 
-      {canEdit && !error && isContentStep && (
+      {canEdit && !error && isEdit && (
+        <Tabs
+          value={activeEditTab}
+          onChange={handleEditTabChange}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab
+            value={EDIT_TABS.details}
+            label="Detalles"
+            icon={<EventNoteIcon />}
+            iconPosition="start"
+            sx={{ textTransform: 'none', minHeight: 48 }}
+          />
+          <Tab
+            value={EDIT_TABS.content}
+            label={linkedContentCount > 0 ? `Contenidos (${linkedContentCount})` : 'Contenidos'}
+            icon={<PermMediaIcon />}
+            iconPosition="start"
+            sx={{ textTransform: 'none', minHeight: 48 }}
+          />
+        </Tabs>
+      )}
+
+      {canEdit && !error && justCreated && isContentTab && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Entrada creada. Ahora puedes vincular contenidos que evidencien ese evento de la línea de tiempo o que aporten un comentario relevante.
+        </Alert>
+      )}
+
+      {canEdit && !error && !isEdit && (
+        <TopicTimelineEntryForm
+          entry={null}
+          saving={saving}
+          error={formError}
+          onCancel={handleCancel}
+          onSubmit={handleEntrySubmit}
+          submitLabel="Crear entrada"
+        />
+      )}
+
+      {canEdit && !error && isEdit && activeEditTab === EDIT_TABS.details && (
+        <TopicTimelineEntryForm
+          entry={entry}
+          saving={saving}
+          error={formError}
+          onCancel={handleCancel}
+          onSubmit={handleEntrySubmit}
+          submitLabel="Guardar"
+        />
+      )}
+
+      {canEdit && !error && isEdit && activeEditTab === EDIT_TABS.content && (
         <TopicTimelineEntryContentLinkForm
           entry={entry}
+          topicId={topicId}
           availableContents={availableContents}
           loadingContents={loadingContents}
           saving={savingContents}
           error={contentFormError}
-          showSkip
+          showSkip={justCreated}
           onSkip={handleCancel}
+          onCancel={handleCancel}
           onSubmit={handleContentSubmit}
         />
-      )}
-
-      {canEdit && !error && !isContentStep && (
-        <Stack spacing={3}>
-          <TopicTimelineEntryForm
-            entry={entry}
-            saving={saving}
-            error={formError}
-            onCancel={handleCancel}
-            onSubmit={handleEntrySubmit}
-            submitLabel={isEdit ? 'Guardar' : 'Crear entrada'}
-          />
-
-          {isEdit && (
-            <TopicTimelineEntryContentLinkForm
-              entry={entry}
-              availableContents={availableContents}
-              loadingContents={loadingContents}
-              saving={savingContents}
-              error={contentFormError}
-              onCancel={handleCancel}
-              onSubmit={handleContentSubmit}
-            />
-          )}
-        </Stack>
       )}
     </Box>
   );
