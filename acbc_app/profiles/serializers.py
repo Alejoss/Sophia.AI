@@ -168,7 +168,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
-            'user', 'interests', 'profile_description', 'external_url', 'timezone', 'is_teacher', 
+            'user', 'interests', 'profile_description', 'external_url', 'country', 'timezone', 'is_teacher',
             'profile_picture', 'badges', 'total_points', 'username_change_count', 'featured_badge', 'featured_badge_id'
         ]
 

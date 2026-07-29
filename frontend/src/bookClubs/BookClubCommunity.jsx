@@ -166,15 +166,25 @@ const BookClubCommunity = () => {
                   @{member.username}
                   {member.is_me ? ' · Tú' : ''}
                 </Typography>
-                <Typography
-                  sx={{
-                    color: 'rgba(255,255,255,0.78)',
-                    mt: 1.25,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {member.intro_description}
-                </Typography>
+                {member.country && (
+                  <Typography
+                    variant="body2"
+                    sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.5 }}
+                  >
+                    {member.country}
+                  </Typography>
+                )}
+                {member.intro_description && (
+                  <Typography
+                    sx={{
+                      color: 'rgba(255,255,255,0.78)',
+                      mt: 1.25,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {member.intro_description}
+                  </Typography>
+                )}
                 {(member.social_url || member.additional_url) && (
                   <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
                     {member.social_url && (

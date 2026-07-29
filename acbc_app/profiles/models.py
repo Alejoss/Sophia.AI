@@ -52,6 +52,11 @@ class Profile(models.Model):
     interests = models.CharField(max_length=250, blank=True)
     profile_description = models.TextField(max_length=2500, blank=True)
     external_url = models.URLField(max_length=500, blank=True)
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='País del usuario (presentación / perfil público).',
+    )
     timezone = models.CharField(max_length=30, blank=True)
     is_teacher = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to=upload_profile_picture, null=True, blank=True)

@@ -41,11 +41,8 @@ const optionalLink = yup
   );
 
 const schema = yup.object({
-  intro_description: yup
-    .string()
-    .trim()
-    .required('Cuéntanos qué haces para poder presentarte al club.')
-    .max(1000, 'Máximo 1000 caracteres.'),
+  country: yup.string().trim().max(100, 'Máximo 100 caracteres.'),
+  intro_description: yup.string().trim().max(1000, 'Máximo 1000 caracteres.'),
   social_url: optionalLink,
   additional_url: optionalLink,
 });
@@ -67,6 +64,7 @@ const BookClubIntroduction = () => {
     resolver: yupResolver(schema),
     mode: 'onBlur',
     defaultValues: {
+      country: '',
       intro_description: '',
       social_url: '',
       additional_url: '',
@@ -86,6 +84,7 @@ const BookClubIntroduction = () => {
       .then((data) => {
         if (!cancelled) {
           reset({
+            country: data.country || '',
             intro_description: data.intro_description || '',
             social_url: data.social_url || '',
             additional_url: data.additional_url || '',
@@ -111,9 +110,10 @@ const BookClubIntroduction = () => {
     setGeneralError('');
     try {
       await bookClubsApi.updateMemberIntroduction(slug, {
-        intro_description: data.intro_description.trim(),
-        social_url: data.social_url.trim(),
-        additional_url: data.additional_url.trim(),
+        country: (data.country || '').trim(),
+        intro_description: (data.intro_description || '').trim(),
+        social_url: (data.social_url || '').trim(),
+        additional_url: (data.additional_url || '').trim(),
       });
       navigate(`/club-de-lectura/${slug}/comunidad`, { replace: true });
     } catch (err) {
@@ -175,8 +175,8 @@ const BookClubIntroduction = () => {
         Preséntate al club
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, mb: 3 }}>
-        Esto actualiza tu perfil público (Sobre ti y tu enlace). Si ya los tenías,
-        aparecen aquí listos para confirmar o editar para {club.title}.
+        Todos los campos son opcionales. Si ya tenías datos en tu perfil, aparecen aquí
+        listos para confirmar o editar para {club.title}.
       </Typography>
 
       {generalError && (
@@ -187,17 +187,26 @@ const BookClubIntroduction = () => {
 
       <Stack spacing={2.5}>
         <TextField
-          label="Sobre ti"
-          required
+          label="País"
+          fullWidth
+          placeholder="Ej. Ecuador"
+          InputLabelProps={{ shrink: true }}
+          {...register('country')}
+          error={Boolean(errors.country)}
+          helperText={errors.country?.message || 'Opcional. Se guarda en tu perfil.'}
+          sx={CLUB_TEXT_FIELD_SX}
+        />
+        <TextField
+          label="Dos líneas sobre ti"
           fullWidth
           multiline
-          minRows={4}
+          minRows={3}
           inputProps={{ maxLength: 1000 }}
           {...register('intro_description')}
           error={Boolean(errors.intro_description)}
           helperText={
             errors.intro_description?.message ||
-            `${descriptionLength}/1000 · Se guarda en tu perfil.`
+            `${descriptionLength}/1000 · Opcional. Se guarda en tu perfil.`
           }
           sx={CLUB_TEXT_FIELD_SX}
         />
