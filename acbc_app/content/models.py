@@ -416,13 +416,157 @@ class ContentTranscript(models.Model):
 
 
 class BlockchainInteraction(models.Model):
-    # Records transaction details when content interactions are recorded on a blockchain.
+    # Legacy stub — unused. Prefer TranscriptAnchor for transcript certification.
 
     content = models.OneToOneField(Content, on_delete=models.CASCADE)
     transaction_receipt = models.JSONField(blank=True, null=True)
 
     def __str__(self):
         return f"Blockchain Interaction for {self.content.title}"
+
+
+class TranscriptAnchor(models.Model):
+    """
+    Certification of a content transcript's text_hash on Bitcoin.
+
+    The digest is written directly in an OP_RETURN output (proof of existence).
+    Rows snapshot text_hash at certify time so re-ingested transcripts can be
+    re-anchored without rewriting history. Optional ipfs_cid is only a pointer
+    to the text off-chain — not part of the Bitcoin proof.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_BTC_BROADCAST = 'btc_broadcast'
+    STATUS_ANCHORED = 'anchored'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_BTC_BROADCAST, 'Bitcoin broadcast'),
+        (STATUS_ANCHORED, 'Anchored on Bitcoin'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    BTC_NETWORK_MAINNET = 'mainnet'
+    BTC_NETWORK_TESTNET = 'testnet'
+    BTC_NETWORK_SIGNET = 'signet'
+    BTC_NETWORK_REGTEST = 'regtest'
+    BTC_NETWORK_CHOICES = [
+        (BTC_NETWORK_MAINNET, 'Bitcoin mainnet'),
+        (BTC_NETWORK_TESTNET, 'Bitcoin testnet'),
+        (BTC_NETWORK_SIGNET, 'Bitcoin signet'),
+        (BTC_NETWORK_REGTEST, 'Bitcoin regtest'),
+    ]
+
+    # Magic prefix written before the 32-byte digest in OP_RETURN (ASCII).
+    DEFAULT_OP_RETURN_PREFIX = 'ACBC1'
+
+    content = models.ForeignKey(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='transcript_anchors',
+    )
+    text_hash = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest snapshot (same algorithm as ContentTranscript.text_hash).',
+    )
+    text_length = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text='Length of normalized hash-source text at certify time.',
+    )
+    op_return_prefix = models.CharField(
+        max_length=16,
+        default=DEFAULT_OP_RETURN_PREFIX,
+        help_text='ASCII prefix prepended to text_hash bytes in the Bitcoin OP_RETURN.',
+    )
+
+    btc_network = models.CharField(
+        max_length=16,
+        choices=BTC_NETWORK_CHOICES,
+        default=BTC_NETWORK_SIGNET,
+    )
+    btc_txid = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Bitcoin transaction id (64 hex chars) once broadcast.',
+    )
+    btc_op_return_hex = models.CharField(
+        max_length=256,
+        blank=True,
+        help_text='Hex payload pushed in OP_RETURN (prefix ASCII bytes + 32-byte digest).',
+    )
+    btc_block_height = models.PositiveIntegerField(blank=True, null=True)
+    btc_block_hash = models.CharField(max_length=64, blank=True)
+    btc_confirmations = models.PositiveIntegerField(default=0)
+    btc_confirmed_at = models.DateTimeField(blank=True, null=True)
+
+    ipfs_cid = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text='Optional IPFS CID for the certified plain text (off-chain pointer only).',
+    )
+
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    error_message = models.TextField(blank=True)
+    anchored_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transcript_anchors',
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Flexible extras (explorer URLs, raw receipts, etc.).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['text_hash'], name='transcript_anchor_hash_idx'),
+            models.Index(fields=['btc_txid'], name='transcript_anchor_btc_idx'),
+            models.Index(fields=['status', 'created_at'], name='transcript_anchor_status_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content', 'text_hash'],
+                name='unique_transcript_anchor_content_hash',
+            ),
+        ]
+
+    def __str__(self):
+        short = (self.text_hash or '')[:12]
+        return f"Anchor {self.content_id} {short}… [{self.status}]"
+
+    @property
+    def matches_current_transcript(self):
+        """True if this row's hash equals the content's current transcript hash."""
+        transcript = getattr(self.content, 'transcript', None)
+        if transcript is None or not self.text_hash:
+            return False
+        return (transcript.text_hash or '') == self.text_hash
+
+    @property
+    def is_btc_confirmed(self):
+        return self.status == self.STATUS_ANCHORED and bool(self.btc_txid)
+
+    def build_op_return_payload_hex(self):
+        """
+        prefix (ASCII) + raw 32-byte digest → hex string for OP_RETURN data.
+        """
+        if not self.text_hash or len(self.text_hash) != 64:
+            raise ValueError('text_hash must be a 64-char SHA-256 hex digest')
+        prefix = (self.op_return_prefix or self.DEFAULT_OP_RETURN_PREFIX).encode('ascii')
+        digest = bytes.fromhex(self.text_hash)
+        return (prefix + digest).hex()
 
 
 def topic_image_path(instance, filename):

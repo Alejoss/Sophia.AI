@@ -12,10 +12,11 @@ from content.models import (
     TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
-    TopicCreationRequest, TopicChatQuery,
+    TopicCreationRequest, TopicChatQuery, TranscriptAnchor,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
+from django.db import IntegrityError
 import json
 import os
 from unittest.mock import patch, Mock
@@ -5223,3 +5224,158 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(result['sources'][0]['content_id'], self.video.id)
         self.assertEqual(result['sources'][0]['title'], 'Video citado')
         self.assertNotIn('text', result['sources'][0])
+
+
+class TranscriptAnchorModelTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='anchoruser',
+            email='anchor@example.com',
+            password='testpass123',
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video para anclar',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto certificado de prueba.',
+            language='es',
+        )
+
+    def test_create_pending_anchor_from_transcript_hash(self):
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            anchored_by=self.user,
+        )
+        self.assertEqual(anchor.status, TranscriptAnchor.STATUS_PENDING)
+        self.assertEqual(anchor.op_return_prefix, 'ACBC1')
+        self.assertTrue(anchor.matches_current_transcript)
+        self.assertFalse(anchor.is_btc_confirmed)
+
+    def test_op_return_payload_is_prefix_plus_digest(self):
+        anchor = TranscriptAnchor(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            op_return_prefix='ACBC1',
+        )
+        payload_hex = anchor.build_op_return_payload_hex()
+        prefix_hex = b'ACBC1'.hex()
+        self.assertTrue(payload_hex.startswith(prefix_hex))
+        self.assertEqual(payload_hex[len(prefix_hex):], self.transcript.text_hash)
+        # 5 ASCII bytes + 32 digest bytes = 37 bytes → 74 hex chars
+        self.assertEqual(len(payload_hex), 74)
+
+    def test_unique_content_text_hash(self):
+        TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+        )
+        with self.assertRaises(IntegrityError):
+            TranscriptAnchor.objects.create(
+                content=self.content,
+                text_hash=self.transcript.text_hash,
+            )
+
+    def test_matches_current_transcript_false_after_text_change(self):
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            status=TranscriptAnchor.STATUS_ANCHORED,
+            btc_txid='a' * 64,
+        )
+        self.transcript.processed_plain = 'Texto distinto después del anclaje.'
+        self.transcript.save()
+        anchor.refresh_from_db()
+        self.assertFalse(anchor.matches_current_transcript)
+        self.assertNotEqual(anchor.text_hash, self.transcript.text_hash)
+
+
+class TranscriptAnchorAPITests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='owneranchor',
+            email='owneranchor@example.com',
+            password='testpass123',
+        )
+        self.other = User.objects.create_user(
+            username='otheranchor',
+            email='otheranchor@example.com',
+            password='testpass123',
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.owner,
+            media_type='VIDEO',
+            original_title='Video API anchor',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para API de anclaje.',
+            language='es',
+        )
+
+    def test_get_current_anchor_empty(self):
+        response = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_transcript'])
+        self.assertEqual(response.data['current_text_hash'], self.transcript.text_hash)
+        self.assertIsNone(response.data['anchor'])
+        self.assertFalse(response.data['can_certify'])
+
+    def test_owner_can_create_pending_anchor(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {'ipfs_cid': 'bafytestcid'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+        self.assertEqual(response.data['text_hash'], self.transcript.text_hash)
+        self.assertEqual(response.data['ipfs_cid'], 'bafytestcid')
+        self.assertTrue(response.data['btc_op_return_hex'].startswith(b'ACBC1'.hex()))
+        self.assertTrue(response.data['matches_current_transcript'])
+
+        current = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+        )
+        self.assertEqual(current.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(current.data['anchor'])
+        self.assertTrue(current.data['can_certify'])
+
+    def test_other_user_cannot_certify(self):
+        self.client.force_authenticate(user=self.other)
+        response = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_duplicate_anchor_conflict(self):
+        self.client.force_authenticate(user=self.owner)
+        first = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {},
+            format='json',
+        )
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        second = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {},
+            format='json',
+        )
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('anchor', second.data)
+
+    def test_public_transcript_includes_text_hash(self):
+        response = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text_hash'], self.transcript.text_hash)

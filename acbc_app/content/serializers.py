@@ -21,6 +21,7 @@ from content.models import (
     FileSuggestion,
     ContentTranscript,
     TopicCreationRequest,
+    TranscriptAnchor,
     TopicChatQuery,
 )
 from content.utils import build_media_url
@@ -1396,6 +1397,7 @@ class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
             'language',
             'format',
             'text_length',
+            'text_hash',
             'text',
             'segments',
             'segment_count',
@@ -1725,3 +1727,57 @@ class TopicCreationRequestApproveSerializer(serializers.Serializer):
 
 class TopicCreationRequestRejectSerializer(serializers.Serializer):
     rejection_reason = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class TranscriptAnchorSerializer(serializers.ModelSerializer):
+    matches_current_transcript = serializers.BooleanField(read_only=True)
+    is_btc_confirmed = serializers.BooleanField(read_only=True)
+    anchored_by_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TranscriptAnchor
+        fields = [
+            'id',
+            'content',
+            'text_hash',
+            'text_length',
+            'op_return_prefix',
+            'btc_network',
+            'btc_txid',
+            'btc_op_return_hex',
+            'btc_block_height',
+            'btc_block_hash',
+            'btc_confirmations',
+            'btc_confirmed_at',
+            'ipfs_cid',
+            'status',
+            'error_message',
+            'anchored_by',
+            'anchored_by_username',
+            'matches_current_transcript',
+            'is_btc_confirmed',
+            'metadata',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_anchored_by_username(self, obj):
+        if obj.anchored_by_id and obj.anchored_by:
+            return obj.anchored_by.username
+        return None
+
+
+class TranscriptAnchorCreateSerializer(serializers.Serializer):
+    ipfs_cid = serializers.CharField(required=False, allow_blank=True, default='', max_length=128)
+    btc_network = serializers.ChoiceField(
+        choices=TranscriptAnchor.BTC_NETWORK_CHOICES,
+        required=False,
+        default=TranscriptAnchor.BTC_NETWORK_SIGNET,
+    )
+    op_return_prefix = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        max_length=16,
+        default=TranscriptAnchor.DEFAULT_OP_RETURN_PREFIX,
+    )

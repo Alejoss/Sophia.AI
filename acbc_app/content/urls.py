@@ -91,6 +91,10 @@ from .views_transcript_ingest import (
     ContentTranscriptIngestDetailView,
     ContentTranscriptPublicView,
 )
+from .views_transcript_anchor import (
+    ContentTranscriptAnchorCurrentView,
+    ContentTranscriptAnchorListView,
+)
 from .views_embedding_ingest import (
     ContentEmbeddingIngestQueueView,
     ContentEmbeddingIngestDetailView,
@@ -126,6 +130,16 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/',
         ContentTranscriptPublicView.as_view(),
         name='content-transcript',
+    ),
+    path(
+        'content_details/<int:content_id>/transcript/anchor/',
+        ContentTranscriptAnchorCurrentView.as_view(),
+        name='content-transcript-anchor-current',
+    ),
+    path(
+        'content_details/<int:content_id>/transcript/anchors/',
+        ContentTranscriptAnchorListView.as_view(),
+        name='content-transcript-anchors',
     ),
     path('content_update/<int:pk>/', ContentUpdateView.as_view(), name='content-update'),
     path('content_modification_check/<int:pk>/', ContentModificationCheckView.as_view(), name='content-modification-check'),

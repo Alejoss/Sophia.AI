@@ -179,6 +179,39 @@ docker compose exec backend python manage.py check_qdrant --topic-id 2
 
 See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
+### Bitcoin OP_RETURN (transcript anchoring)
+
+Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**.
+
+#### `BTC_NETWORK`
+- **Description**: `signet` (default), `testnet`, `testnet4`, or `mainnet`
+- **Required**: No
+- **Default**: `signet`
+
+#### `BTC_PRIVATE_KEY_WIF`
+- **Description**: WIF private key for the platform P2WPKH address that pays fees
+- **Required**: Yes to broadcast (not needed for unit tests with mocks)
+- **Example**: `BTC_PRIVATE_KEY_WIF=c...` (signet/testnet WIF)
+
+#### `BTC_API_BASE`
+- **Description**: Esplora REST base URL
+- **Required**: No
+- **Default**: `https://mempool.space/signet/api` when `BTC_NETWORK=signet`
+
+#### `BTC_MIN_CONFIRMATIONS` / `BTC_FALLBACK_FEE_SAT_VB`
+- **Defaults**: `1` / `2`
+
+```bash
+# Show address to fund via signet faucet
+python manage.py broadcast_transcript_anchor --show-address
+# Dry-run for content 123
+python manage.py broadcast_transcript_anchor 123 --create --dry-run
+# Broadcast
+python manage.py broadcast_transcript_anchor 123 --create
+# Poll confirmations
+python manage.py broadcast_transcript_anchor 123 --refresh
+```
+
 ### AWS Configuration (Production)
 
 #### `AWS_ACCESS_KEY_ID`
