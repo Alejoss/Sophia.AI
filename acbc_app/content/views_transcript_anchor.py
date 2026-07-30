@@ -1,6 +1,7 @@
 """API for transcript Bitcoin certification anchors (OP_RETURN)."""
 import logging
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -12,7 +13,13 @@ from content.serializers import (
     TranscriptAnchorCreateSerializer,
     TranscriptAnchorSerializer,
 )
-from content.bitcoin.service import maybe_refresh_broadcast_anchor
+from content.bitcoin.fees import FEE_TOO_HIGH_MESSAGE, FeeBudgetError
+from content.bitcoin.service import (
+    AnchorBroadcastError,
+    broadcast_anchor,
+    ensure_pending_anchor,
+    maybe_refresh_broadcast_anchor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +38,7 @@ class ContentTranscriptAnchorListView(APIView):
     POST /api/content/content_details/<content_id>/transcript/anchors/
 
     GET is public (directory of Bitcoin proofs). POST creates a pending anchor for
-    the current transcript text_hash (uploader or staff). Broadcast to Bitcoin is
-    done by ops via ``manage.py broadcast_transcript_anchor`` (not this endpoint).
+    the current transcript text_hash (uploader or staff).
     """
 
     def get_permissions(self):
@@ -113,14 +119,21 @@ class ContentTranscriptAnchorListView(APIView):
 
 class ContentTranscriptAnchorCurrentView(APIView):
     """
-    GET /api/content/content_details/<content_id>/transcript/anchor/
+    GET  /api/content/content_details/<content_id>/transcript/anchor/
+    POST /api/content/content_details/<content_id>/transcript/anchor/
 
-    Returns the Bitcoin anchor matching the current transcript hash, or null.
+    GET returns the Bitcoin anchor matching the current transcript hash, or null.
     If the matching row is still ``btc_broadcast``, polls Esplora once to update
     confirmations / mark ``anchored`` when ready.
+
+    POST (uploader/staff) ensures a pending row and broadcasts via the platform
+    wallet. Rejects with 503 when estimated fee USD exceeds ``BTC_MAX_FEE_USD``.
     """
 
-    permission_classes = [AllowAny]
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
     def get(self, request, content_id):
         content = get_object_or_404(Content, pk=content_id)
@@ -142,3 +155,62 @@ class ContentTranscriptAnchorCurrentView(APIView):
                 anchor = maybe_refresh_broadcast_anchor(anchor)
                 payload['anchor'] = TranscriptAnchorSerializer(anchor).data
         return Response(payload)
+
+    def post(self, request, content_id):
+        content = get_object_or_404(Content, pk=content_id)
+        if not _user_can_certify(request.user, content):
+            return Response(
+                {'error': 'No tiene permiso para certificar este contenido.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        network = (
+            request.data.get('btc_network')
+            or getattr(settings, 'BTC_NETWORK', TranscriptAnchor.BTC_NETWORK_SIGNET)
+        )
+        try:
+            anchor = ensure_pending_anchor(
+                content,
+                network=network,
+                anchored_by=request.user,
+            )
+            if request.data.get('btc_network'):
+                anchor.btc_network = str(network).lower()
+                anchor.save(update_fields=['btc_network', 'updated_at'])
+            anchor = broadcast_anchor(anchor, dry_run=False)
+        except FeeBudgetError as exc:
+            return Response(
+                {
+                    'error': str(exc) or FEE_TOO_HIGH_MESSAGE,
+                    'code': 'fee_too_high',
+                    'fee_sats': getattr(exc, 'fee_sats', None),
+                    'fee_usd': getattr(exc, 'fee_usd', None),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except AnchorBroadcastError as exc:
+            message = str(exc)
+            cause = exc.__cause__ if isinstance(exc.__cause__, FeeBudgetError) else None
+            if cause is not None or message == FEE_TOO_HIGH_MESSAGE:
+                return Response(
+                    {
+                        'error': FEE_TOO_HIGH_MESSAGE,
+                        'code': 'fee_too_high',
+                        'fee_sats': getattr(cause, 'fee_sats', None),
+                        'fee_usd': getattr(cause, 'fee_usd', None),
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                'content_id': content.id,
+                'has_transcript': True,
+                'current_text_hash': anchor.text_hash,
+                'current_text_length': anchor.text_length,
+                'can_certify': True,
+                'anchor': TranscriptAnchorSerializer(anchor).data,
+            },
+            status=status.HTTP_200_OK,
+        )

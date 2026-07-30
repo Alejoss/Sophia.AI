@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Link,
@@ -12,16 +14,23 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
+const FEE_TOO_HIGH_FALLBACK =
+  'Las comisiones por transacción están muy altas por el momento, por favor vuelve a intentarlo más tarde';
+
 /**
- * Bitcoin OP_RETURN certification block for content detail pages only.
+ * Bitcoin OP_RETURN certification block (content detail + transcript page).
  * Shows hash, txid, and mempool explorer link when an on-chain anchor exists.
+ * Uploaders/staff can trigger broadcast; fee over budget surfaces as an Alert.
  */
 const ContentBitcoinAnchor = ({ contentId }) => {
   const [info, setInfo] = useState(undefined);
+  const [certifying, setCertifying] = useState(false);
+  const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setInfo(undefined);
+    setActionError(null);
 
     if (!contentId) {
       setInfo(null);
@@ -42,6 +51,25 @@ const ContentBitcoinAnchor = ({ contentId }) => {
     };
   }, [contentId]);
 
+  const handleCertify = async () => {
+    if (!contentId || certifying) return;
+    setCertifying(true);
+    setActionError(null);
+    try {
+      const data = await contentApi.broadcastTranscriptAnchor(contentId);
+      setInfo(data);
+    } catch (err) {
+      const payload = err?.response?.data;
+      const message =
+        payload?.error ||
+        (payload?.code === 'fee_too_high' ? FEE_TOO_HIGH_FALLBACK : null) ||
+        'No se pudo anclar la transcripción en Bitcoin.';
+      setActionError(message);
+    } finally {
+      setCertifying(false);
+    }
+  };
+
   if (info === undefined) {
     return (
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -54,8 +82,39 @@ const ContentBitcoinAnchor = ({ contentId }) => {
   }
 
   const anchor = info?.anchor;
-  if (!anchor?.btc_txid) {
+  const canCertify = Boolean(info?.can_certify);
+  const hasTxid = Boolean(anchor?.btc_txid);
+
+  if (!hasTxid && !canCertify && !actionError) {
     return null;
+  }
+
+  if (!hasTxid) {
+    return (
+      <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
+        {actionError && (
+          <Alert severity="warning" sx={{ mb: canCertify ? 1.5 : 0 }}>
+            {actionError}
+          </Alert>
+        )}
+        {canCertify && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+              Puedes anclar el hash de esta transcripción en Bitcoin.
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={certifying}
+              onClick={handleCertify}
+              startIcon={certifying ? <CircularProgress size={14} color="inherit" /> : null}
+            >
+              {certifying ? 'Anclando…' : 'Anclar en Bitcoin'}
+            </Button>
+          </Box>
+        )}
+      </Paper>
+    );
   }
 
   const explorerUrl = getBtcExplorerTxUrl(anchor.btc_txid, anchor.btc_network);
@@ -76,6 +135,11 @@ const ContentBitcoinAnchor = ({ contentId }) => {
         p: 2,
       }}
     >
+      {actionError && (
+        <Alert severity="warning" sx={{ mb: 1.5 }}>
+          {actionError}
+        </Alert>
+      )}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 1 }}>
         <Chip
           size="small"

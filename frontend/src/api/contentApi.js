@@ -298,6 +298,14 @@ const contentApi = {
     return response.data;
   },
 
+  broadcastTranscriptAnchor: async (contentId, payload = {}) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/anchor/`,
+      payload,
+    );
+    return response.data;
+  },
+
   createTranscriptAnchor: async (contentId, payload = {}) => {
     const response = await axiosInstance.post(
       `/content/content_details/${contentId}/transcript/anchors/`,

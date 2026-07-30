@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from content.bitcoin.fees import FEE_TOO_HIGH_MESSAGE, FeeBudgetError, assert_fee_within_usd_budget
 from content.bitcoin.service import (
     AnchorBroadcastError,
     broadcast_anchor,
@@ -66,6 +67,8 @@ class TxBuilderTests(TestCase):
     BTC_NETWORK='signet',
     BTC_API_BASE='https://mempool.space/signet/api',
     BTC_MIN_CONFIRMATIONS=1,
+    BTC_MAX_FEE_USD=1,
+    BTC_USD_PRICE=60000,
 )
 class AnchorBroadcastServiceTests(TestCase):
     def setUp(self):
@@ -139,3 +142,29 @@ class AnchorBroadcastServiceTests(TestCase):
         self.assertEqual(refreshed.status, TranscriptAnchor.STATUS_ANCHORED)
         self.assertEqual(refreshed.btc_confirmations, 1)
         self.assertIsNotNone(refreshed.btc_confirmed_at)
+
+    @override_settings(BTC_PRIVATE_KEY_WIF='ignored', BTC_MAX_FEE_USD=1, BTC_USD_PRICE=60000)
+    def test_broadcast_rejects_fee_over_one_dollar(self):
+        with override_settings(BTC_PRIVATE_KEY_WIF=self.wif):
+            anchor = ensure_pending_anchor(self.content, network='signet')
+            client = MagicMock()
+            client.get_address_utxos.return_value = [
+                {'txid': '33' * 32, 'vout': 0, 'value': 200_000, 'status': {'confirmed': True}},
+            ]
+            # 25 sat/vB * ~160 vB ≈ 4000 sats → ~$2.40 at $60k BTC
+            client.get_recommended_fee_sat_vb.return_value = 25
+
+            with self.assertRaises(AnchorBroadcastError) as ctx:
+                broadcast_anchor(anchor, client=client)
+            self.assertEqual(str(ctx.exception), FEE_TOO_HIGH_MESSAGE)
+            self.assertIsInstance(ctx.exception.__cause__, FeeBudgetError)
+            client.broadcast.assert_not_called()
+            anchor.refresh_from_db()
+            self.assertEqual(anchor.status, TranscriptAnchor.STATUS_PENDING)
+            self.assertFalse(anchor.btc_txid)
+
+    @override_settings(BTC_MAX_FEE_USD=1, BTC_USD_PRICE=60000)
+    def test_assert_fee_within_budget_passes_under_one_dollar(self):
+        # 1600 sats at $60k ≈ $0.96
+        usd = assert_fee_within_usd_budget(1600, btc_usd=60000)
+        self.assertLessEqual(usd, 1.0)

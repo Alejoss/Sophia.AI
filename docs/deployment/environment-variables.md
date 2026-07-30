@@ -199,7 +199,12 @@ Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Defaul
 - **Default**: `https://mempool.space/signet/api` when `BTC_NETWORK=signet`
 
 #### `BTC_MIN_CONFIRMATIONS` / `BTC_FALLBACK_FEE_SAT_VB`
-- **Defaults**: `1` / `2`
+- **Defaults**: `1` / `25` (sat/vB; used only if Esplora fee estimates are unavailable)
+
+#### `BTC_MAX_FEE_USD` / `BTC_USD_PRICE`
+- **`BTC_MAX_FEE_USD`**: reject broadcast when estimated fee exceeds this USD amount (default `1`; `0` disables).
+- **`BTC_USD_PRICE`**: optional fixed USD/BTC for that check; `0` (default) fetches live from `https://mempool.space/api/v1/prices`.
+- On reject, API returns **503** with message: *Las comisiones por transacción están muy altas por el momento, por favor vuelve a intentarlo más tarde* (`code: fee_too_high`). Row stays `pending`.
 
 ```bash
 # Local / server Docker (service name: backend)

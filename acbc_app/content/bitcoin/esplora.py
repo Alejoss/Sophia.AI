@@ -66,7 +66,7 @@ class EsploraClient:
                     return max(1, int(data[key]))
         except BitcoinApiError as exc:
             logger.warning('Fee estimate unavailable (%s); using fallback', exc)
-        return max(1, int(getattr(settings, 'BTC_FALLBACK_FEE_SAT_VB', 2)))
+        return max(1, int(getattr(settings, 'BTC_FALLBACK_FEE_SAT_VB', 25)))
 
     def get_tip_height(self) -> int:
         data = self._get('/blocks/tip/height')

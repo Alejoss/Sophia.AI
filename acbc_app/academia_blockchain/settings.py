@@ -759,7 +759,11 @@ BTC_API_BASE = os.getenv(
 ).rstrip('/')
 BTC_MIN_CONFIRMATIONS = int(os.getenv('BTC_MIN_CONFIRMATIONS', '1'))
 # Fee rate floor in sat/vB when the API fee endpoint is unavailable.
-BTC_FALLBACK_FEE_SAT_VB = int(os.getenv('BTC_FALLBACK_FEE_SAT_VB', '2'))
+BTC_FALLBACK_FEE_SAT_VB = int(os.getenv('BTC_FALLBACK_FEE_SAT_VB', '25'))
+# Reject broadcast when estimated fee USD exceeds this (0 disables the check).
+BTC_MAX_FEE_USD = float(os.getenv('BTC_MAX_FEE_USD', '1'))
+# Optional fixed USD/BTC for fee budgeting; if unset/0, fetch mempool.space /v1/prices.
+BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry

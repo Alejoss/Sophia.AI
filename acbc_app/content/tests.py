@@ -5408,3 +5408,34 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertTrue(response.data['anchor']['is_btc_confirmed'])
         anchor.refresh_from_db()
         self.assertEqual(anchor.status, TranscriptAnchor.STATUS_ANCHORED)
+
+    @patch('content.views_transcript_anchor.broadcast_anchor')
+    @patch('content.views_transcript_anchor.ensure_pending_anchor')
+    def test_broadcast_fee_too_high_returns_503(self, mock_ensure, mock_broadcast):
+        from content.bitcoin.fees import FEE_TOO_HIGH_MESSAGE, FeeBudgetError
+        from content.bitcoin.service import AnchorBroadcastError
+
+        pending = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            status=TranscriptAnchor.STATUS_PENDING,
+            btc_network='signet',
+        )
+        mock_ensure.return_value = pending
+        cause = FeeBudgetError(fee_sats=4000, fee_usd=2.4)
+        err = AnchorBroadcastError(FEE_TOO_HIGH_MESSAGE)
+        err.__cause__ = cause
+        mock_broadcast.side_effect = err
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data['code'], 'fee_too_high')
+        self.assertEqual(response.data['error'], FEE_TOO_HIGH_MESSAGE)
+        pending.refresh_from_db()
+        self.assertEqual(pending.status, TranscriptAnchor.STATUS_PENDING)

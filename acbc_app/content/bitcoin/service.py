@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from content.bitcoin.esplora import BitcoinApiError, EsploraClient
+from content.bitcoin.fees import FeeBudgetError, assert_fee_within_usd_budget
 from content.bitcoin.tx_builder import (
     BitcoinWalletError,
     build_and_sign_op_return_tx,
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 class AnchorBroadcastError(Exception):
     """Business/validation error while broadcasting an anchor."""
+
+
+# Re-export so API/CLI can catch fee budget errors explicitly.
+FeeTooHighError = FeeBudgetError
 
 
 def platform_address(network: Optional[str] = None) -> str:
@@ -116,6 +121,12 @@ def broadcast_anchor(
     if built.from_address != address:
         raise AnchorBroadcastError('Derived address mismatch')
 
+    try:
+        fee_usd = assert_fee_within_usd_budget(built.fee_sats)
+    except FeeBudgetError as exc:
+        # Temporary market condition — keep row pending so the user can retry later.
+        raise AnchorBroadcastError(str(exc)) from exc
+
     metadata = dict(anchor.metadata or {})
     metadata.update({
         'from_address': built.from_address,
@@ -123,6 +134,7 @@ def broadcast_anchor(
         'change_sats': built.change_sats,
         'input_sats': built.input_sats,
         'fee_sat_vb': fee_rate,
+        'fee_usd': round(fee_usd, 6) if fee_usd else None,
         'dry_run': dry_run,
         'raw_tx_hex': built.raw_tx_hex if dry_run else metadata.get('raw_tx_hex'),
     })

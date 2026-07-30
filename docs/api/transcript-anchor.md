@@ -13,7 +13,7 @@ it against the on-chain payload (and explorer).
 | Model | `TranscriptAnchor` in `acbc_app/content/models.py` |
 | API | `acbc_app/content/views_transcript_anchor.py` |
 | Broadcast | `acbc_app/content/bitcoin/` + `manage.py broadcast_transcript_anchor` |
-| UI | `frontend/src/content/TranscriptAnchorPanel.jsx` |
+| UI | `frontend/src/content/ContentBitcoinAnchor.jsx` |
 | Env | [`BTC_*`](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring) |
 
 Prerequisite: a `ContentTranscript` with a non-empty `text_hash` (usually from
@@ -77,11 +77,12 @@ Base path under content details:
 | Method | Path | Auth |
 |--------|------|------|
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchor/` | Public (`AllowAny`). If status is `btc_broadcast`, polls Esplora once and may promote to `anchored`. |
+| `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated; uploader or staff. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated; uploader or staff |
 
-`POST` **only creates a pending row**. It does **not** spend BTC or broadcast.
-Broadcast is ops-only via the management command below.
+`POST .../anchors/` **only creates a pending row**.  
+`POST .../anchor/` **broadcasts** (platform wallet). The same USD fee cap applies to the ops CLI.
 
 ### `GET .../transcript/anchor/` (current)
 
@@ -95,6 +96,22 @@ Returns the anchor matching the **current** transcript hash, or `null`.
   "current_text_length": 4200,
   "can_certify": true,
   "anchor": { "...": "TranscriptAnchorSerializer or null" }
+}
+```
+
+### `POST .../transcript/anchor/` (broadcast)
+
+Creates a pending anchor if needed, builds the OP_RETURN tx, and broadcasts unless
+the estimated fee exceeds `BTC_MAX_FEE_USD` (default `$1`).
+
+**503** when fees are too high (row stays `pending`):
+
+```json
+{
+  "error": "Las comisiones por transacción están muy altas por el momento, por favor vuelve a intentarlo más tarde",
+  "code": "fee_too_high",
+  "fee_sats": 4000,
+  "fee_usd": 2.4
 }
 ```
 

@@ -19,6 +19,8 @@ import SubtitlesIcon from '@mui/icons-material/Subtitles';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
+import ContentBitcoinAnchor from './ContentBitcoinAnchor';
+
 export const formatMs = (ms) => {
   if (ms == null || Number.isNaN(Number(ms))) return '';
   const totalSec = Math.max(0, Math.floor(Number(ms) / 1000));
@@ -295,6 +297,8 @@ const ContentTranscriptPage = () => {
         )}
 
       </Paper>
+
+      {!error && <ContentBitcoinAnchor contentId={contentId} />}
     </Container>
   );
 };

@@ -9,11 +9,13 @@ import { renderWithProviders } from '../../test/formTestUtils';
 
 const mockGetContentDetails = vi.fn();
 const mockGetContentTranscript = vi.fn();
+const mockGetTranscriptAnchor = vi.fn();
 
 vi.mock('../../api/contentApi', () => ({
   default: {
     getContentDetails: (...args) => mockGetContentDetails(...args),
     getContentTranscript: (...args) => mockGetContentTranscript(...args),
+    getTranscriptAnchor: (...args) => mockGetTranscriptAnchor(...args),
   },
 }));
 
@@ -50,6 +52,37 @@ describe('ContentTranscriptPage', () => {
       id: 50,
       original_title: 'Video de prueba',
     });
+    mockGetTranscriptAnchor.mockResolvedValue({
+      content_id: 50,
+      anchor: null,
+    });
+  });
+
+  it('shows Bitcoin hash, txid and explorer link when the transcript is anchored', async () => {
+    mockGetContentTranscript.mockResolvedValue({
+      language: 'es',
+      text: 'texto anclado',
+      text_length: 13,
+      segments: [],
+    });
+    mockGetTranscriptAnchor.mockResolvedValue({
+      content_id: 50,
+      current_text_hash: 'abc123hash',
+      anchor: {
+        status: 'anchored',
+        is_btc_confirmed: true,
+        btc_network: 'signet',
+        text_hash: 'abc123hash',
+        btc_txid: 'deadbeeftxid',
+      },
+    });
+
+    renderWithProviders(<ContentTranscriptPage />);
+
+    expect(await screen.findByText('Anclada en BTC')).toBeInTheDocument();
+    expect(screen.getByText('abc123hash')).toBeInTheDocument();
+    expect(screen.getByText('deadbeeftxid')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ver en mempool\.space/i })).toBeInTheDocument();
   });
 
   it('shows timed segments by default when segments exist, with a view toggle', async () => {
