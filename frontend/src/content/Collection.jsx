@@ -3,17 +3,13 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
     Box,
     Typography,
-    Card,
-    CardContent,
-    Chip,
     IconButton,
     Button,
     TablePagination,
 } from '@mui/material';
-import NoteIcon from '@mui/icons-material/Note';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
-import { resolveMediaUrl } from '../utils/fileUtils';
+import ContentDisplay from './ContentDisplay';
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -163,88 +159,25 @@ const Collection = () => {
                         gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 4' }}
                         key={contentProfile.id}
                     >
-                        <Card
-                            sx={{ cursor: 'pointer' }}
+                        <ContentDisplay
+                            content={contentProfile}
+                            variant="card"
+                            showAuthor={true}
                             onClick={() =>
                                 navigate(
                                     `/content/${contentProfile.content.id}/library?context=library&id=${contentProfile.user}`
                                 )
                             }
-                        >
-                            {contentProfile.content.media_type === 'IMAGE' &&
-                                contentProfile.content.file_details?.file && (
-                                    <Box
-                                        sx={{
-                                            width: '100%',
-                                            height: 200,
-                                            overflow: 'hidden',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                        }}
-                                    >
-                                        <img
-                                            src={resolveMediaUrl(
-                                                contentProfile.content.file_details.url ??
-                                                    contentProfile.content.file_details.file
-                                            )}
-                                            alt={contentProfile.title || 'Content image'}
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                            }}
-                                        />
-                                    </Box>
-                                )}
-                            <CardContent>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <Typography variant="h6">
-                                        {contentProfile.title || 'Sin título'}
-                                    </Typography>
-                                    {contentProfile.personal_note && (
-                                        <IconButton size="small" title={contentProfile.personal_note}>
-                                            <NoteIcon color="primary" />
-                                        </IconButton>
-                                    )}
-                                </Box>
-
-                                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                                    <Chip
-                                        label={contentProfile.content.media_type}
-                                        size="small"
-                                        color="primary"
-                                    />
-                                    {contentProfile.author && (
-                                        <Chip
-                                            label={`Autor: ${contentProfile.author}`}
-                                            size="small"
-                                            variant="outlined"
-                                        />
-                                    )}
-                                </Box>
-
-                                <Typography variant="caption" color="text.secondary">
-                                    Agregado:{' '}
-                                    {contentProfile.content.file_details?.uploaded_at
-                                        ? new Date(
-                                              contentProfile.content.file_details.uploaded_at
-                                          ).toLocaleDateString()
-                                        : 'Fecha no disponible'}
-                                </Typography>
-                            </CardContent>
-                        </Card>
+                        />
                     </Box>
                 ))}
-
-                {content.length === 0 && (
-                    <Box gridColumn="span 12">
-                        <Typography variant="body1" color="text.secondary" align="center">
-                            Aún no hay contenido en esta colección.
-                        </Typography>
-                    </Box>
-                )}
             </Box>
+
+            {content.length === 0 && !loading && (
+                <Typography variant="body1" color="text.secondary" align="center" sx={{ mt: 4 }}>
+                    Esta colección no tiene contenido todavía.
+                </Typography>
+            )}
 
             {totalCount > 0 && (
                 <TablePagination
@@ -255,11 +188,8 @@ const Collection = () => {
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                     rowsPerPageOptions={[12, 24, 48]}
-                    labelRowsPerPage="Por página"
-                    labelDisplayedRows={({ from, to, count }) =>
-                        `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
-                    }
-                    sx={{ mt: 2, borderTop: 1, borderColor: 'divider' }}
+                    labelRowsPerPage="Filas por página"
+                    sx={{ mt: 2 }}
                 />
             )}
         </Box>

@@ -845,15 +845,25 @@ class SimpleContentSerializer(serializers.ModelSerializer):
 
 class SimpleContentProfileSerializer(serializers.ModelSerializer):
     """
-    Simple serializer for ContentProfile when used with ContentDisplay's "simple" mode.
-    Returns minimal data structure that matches what ContentDisplay expects.
+    Lightweight ContentProfile serializer for library/collection cards.
+    Includes thumbnails + nested content (with file_details when collection_detail).
     """
     content = SimpleContentSerializer(read_only=True)
     user = serializers.IntegerField(source='user_id', read_only=True)
 
     class Meta:
         model = ContentProfile
-        fields = ['id', 'title', 'author', 'personal_note', 'content', 'user', 'created_at']
+        fields = [
+            'id',
+            'title',
+            'author',
+            'personal_note',
+            'thumbnail',
+            'thumbnail_preview',
+            'content',
+            'user',
+            'created_at',
+        ]
 
     def to_representation(self, instance):
         try:
@@ -861,6 +871,10 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
             # Ensure title falls back to original_title if not set
             if not data['title'] and data['content'] and data['content']['original_title']:
                 data['title'] = data['content']['original_title']
+            request = self.context.get('request')
+            thumb, preview = _content_profile_thumbnail_urls(instance, request)
+            data['thumbnail'] = thumb
+            data['thumbnail_preview'] = preview
             return data
         except Exception as e:
             print(f"Error in SimpleContentProfileSerializer for profile {instance.id}: {str(e)}")
@@ -870,6 +884,8 @@ class SimpleContentProfileSerializer(serializers.ModelSerializer):
                 'title': getattr(instance, 'title', 'Untitled'),
                 'author': getattr(instance, 'author', ''),
                 'personal_note': getattr(instance, 'personal_note', None),
+                'thumbnail': None,
+                'thumbnail_preview': None,
                 'user': getattr(instance, 'user_id', None),
                 'created_at': (
                     instance.created_at.isoformat()
