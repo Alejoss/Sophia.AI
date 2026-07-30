@@ -139,14 +139,13 @@ class Command(BaseCommand):
                     last_name=fake.last_name()
                 )
                 
-                # Create profile
-                profile = Profile.objects.create(
-                    user=user,
-                    interests=fake.text(max_nb_chars=250),
-                    profile_description=fake.text(max_nb_chars=500),
-                    timezone=fake.timezone(),
-                    is_teacher=random.random() < CONFIG['users']['is_teacher_probability']
-                )
+                # Profile is created by signal; fill seed fields
+                profile = user.profile
+                profile.interests = fake.text(max_nb_chars=250)
+                profile.profile_description = fake.text(max_nb_chars=500)
+                profile.timezone = fake.timezone()
+                profile.is_teacher = random.random() < CONFIG['users']['is_teacher_probability']
+                profile.save()
                 
                 # Create contact methods
                 num_contact_methods = random.randint(*CONFIG['users']['contact_methods_per_user'])

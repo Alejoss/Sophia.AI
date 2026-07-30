@@ -12,6 +12,7 @@ from content.serializers import (
     TranscriptAnchorCreateSerializer,
     TranscriptAnchorSerializer,
 )
+from content.bitcoin.service import maybe_refresh_broadcast_anchor
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ class ContentTranscriptAnchorListView(APIView):
 
     def get(self, request, content_id):
         content = get_object_or_404(Content, pk=content_id)
+        anchors = list(TranscriptAnchor.objects.filter(content=content))
+        for anchor in anchors:
+            if anchor.status == TranscriptAnchor.STATUS_BTC_BROADCAST and anchor.btc_txid:
+                maybe_refresh_broadcast_anchor(anchor)
         anchors = TranscriptAnchor.objects.filter(content=content)
         return Response(TranscriptAnchorSerializer(anchors, many=True).data)
 
@@ -111,6 +116,8 @@ class ContentTranscriptAnchorCurrentView(APIView):
     GET /api/content/content_details/<content_id>/transcript/anchor/
 
     Returns the Bitcoin anchor matching the current transcript hash, or null.
+    If the matching row is still ``btc_broadcast``, polls Esplora once to update
+    confirmations / mark ``anchored`` when ready.
     """
 
     permission_classes = [AllowAny]
@@ -132,5 +139,6 @@ class ContentTranscriptAnchorCurrentView(APIView):
                 text_hash=transcript.text_hash,
             ).first()
             if anchor is not None:
+                anchor = maybe_refresh_broadcast_anchor(anchor)
                 payload['anchor'] = TranscriptAnchorSerializer(anchor).data
         return Response(payload)

@@ -311,11 +311,10 @@ class Command(BaseCommand):
             if created:
                 user.set_password(DEFAULT_PASSWORD)
                 user.save()
-                Profile.objects.create(
-                    user=user,
-                    profile_description='',
-                    external_url='',
-                )
+                profile = user.profile
+                profile.profile_description = ''
+                profile.external_url = ''
+                profile.save()
                 self.stdout.write(f'  Usuario demo: {username}')
             else:
                 Profile.objects.get_or_create(user=user)

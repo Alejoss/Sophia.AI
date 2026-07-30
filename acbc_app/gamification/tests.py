@@ -84,7 +84,6 @@ class UserBadgeModelTests(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=self.user)
         self.badge = Badge.objects.create(
             code='test_badge',
             name='Test Badge',
@@ -140,8 +139,6 @@ class BadgeRulesTests(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=self.user)
-        
         # Create badges
         self.first_comment_badge = Badge.objects.create(
             code='first_comment',
@@ -777,8 +774,6 @@ class BadgeRulesTests(TestCase):
             email='other@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=other_user)
-        
         topic = Topic.objects.create(
             title='Test Topic',
             description='Test Description',
@@ -963,8 +958,6 @@ class BadgeRulesTests(TestCase):
             email='other@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=other_user)
-        
         topic = Topic.objects.create(
             title='Test Topic',
             description='Test Description',
@@ -1017,8 +1010,6 @@ class BadgeSignalsTests(TransactionTestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=self.user)
-        
         # Create badges
         Badge.objects.create(
             code='first_comment',
@@ -1316,7 +1307,6 @@ class BadgeAPITests(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=self.user)
         self.admin_user = User.objects.create_user(
             username='admin',
             email='admin@example.com',
@@ -1414,7 +1404,6 @@ class BadgeSerializerTests(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=self.user)
         self.badge = Badge.objects.create(
             code='test_badge',
             name='Test Badge',

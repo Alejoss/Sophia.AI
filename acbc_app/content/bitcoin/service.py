@@ -223,3 +223,32 @@ def refresh_anchor_confirmations(
 
     anchor.save(update_fields=update_fields)
     return anchor
+
+
+def maybe_refresh_broadcast_anchor(
+    anchor: TranscriptAnchor,
+    *,
+    client: Optional[EsploraClient] = None,
+) -> TranscriptAnchor:
+    """
+    Best-effort confirmation poll for anchors still in ``btc_broadcast``.
+
+    Used by the public GET endpoint so the UI catches up without a manual
+    ``manage.py broadcast_transcript_anchor --refresh``. Failures leave the
+    row unchanged.
+    """
+    if (
+        anchor is None
+        or not anchor.btc_txid
+        or anchor.status != TranscriptAnchor.STATUS_BTC_BROADCAST
+    ):
+        return anchor
+    try:
+        return refresh_anchor_confirmations(anchor, client=client)
+    except Exception as exc:  # noqa: BLE001 — never break public reads
+        logger.warning(
+            'Could not refresh transcript anchor %s confirmations: %s',
+            anchor.pk,
+            exc,
+        )
+        return anchor

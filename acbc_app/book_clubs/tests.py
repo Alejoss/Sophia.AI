@@ -108,18 +108,15 @@ class BookClubAPITestCase(APITestCase):
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
 
     def test_member_can_save_introduction_and_view_roster(self):
-        from profiles.models import Profile
-
         membership = BookClubMembership.objects.create(
             book_club=self.club,
             user=self.member,
                     )
-        # Prefill comes from Profile when present.
-        Profile.objects.create(
-            user=self.member,
-            profile_description='Ya tenía bio en mi perfil.',
-            external_url='https://example.com/me',
-        )
+        # Prefill comes from Profile when present (signal already created it).
+        profile = self.member.profile
+        profile.profile_description = 'Ya tenía bio en mi perfil.'
+        profile.external_url = 'https://example.com/me'
+        profile.save()
         self.auth(self.member)
 
         prefill = self.client.get('/api/book_clubs/cypherpunk/membership/introduction/')
@@ -144,7 +141,7 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(update.status_code, status.HTTP_200_OK, update.data)
         membership.refresh_from_db()
-        profile = Profile.objects.get(user=self.member)
+        profile.refresh_from_db()
         self.assertEqual(profile.country, 'Ecuador')
         self.assertEqual(profile.profile_description, 'Construyo productos educativos.')
         self.assertEqual(profile.external_url, 'https://linkedin.com/in/member')

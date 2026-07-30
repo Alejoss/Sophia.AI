@@ -31,13 +31,12 @@ class ProfileModelTests(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        self.profile = Profile.objects.create(
-            user=self.user,
-            interests='Blockchain, Cryptocurrency',
-            profile_description='Test profile description',
-            timezone='UTC',
-            is_teacher=True
-        )
+        self.profile = self.user.profile
+        self.profile.interests = 'Blockchain, Cryptocurrency'
+        self.profile.profile_description = 'Test profile description'
+        self.profile.timezone = 'UTC'
+        self.profile.is_teacher = True
+        self.profile.save()
 
     def test_profile_creation(self):
         """Test profile creation and string representation"""
@@ -174,13 +173,12 @@ class ProfileAPITests(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
-        self.profile = Profile.objects.create(
-            user=self.user,
-            interests='Blockchain, Cryptocurrency',
-            profile_description='Test profile description',
-            timezone='UTC',
-            is_teacher=True
-        )
+        self.profile = self.user.profile
+        self.profile.interests = 'Blockchain, Cryptocurrency'
+        self.profile.profile_description = 'Test profile description'
+        self.profile.timezone = 'UTC'
+        self.profile.is_teacher = True
+        self.profile.save()
         self.client.force_authenticate(user=self.user)
 
     def test_get_profile(self):
@@ -432,7 +430,21 @@ class AuthenticationTests(APITestCase):
             'password': 'testpass123'
         }
         self.user = User.objects.create_user(**self.user_data)
-        # Profile.objects.create(user=self.user) # Profile is created with user for these tests
+        # Profile is created by the User post_save signal
+
+    def test_user_creation_creates_profile(self):
+        """Creating a User always creates a related Profile."""
+        self.assertTrue(Profile.objects.filter(user=self.user).exists())
+
+    def test_user_profile_heals_missing_profile(self):
+        """GET user_profile recreates a Profile if it was deleted (legacy orphans)."""
+        Profile.objects.filter(user=self.user).delete()
+        self.assertFalse(Profile.objects.filter(user=self.user).exists())
+        self.client.force_authenticate(user=self.user)
+        url = reverse('profiles:user_profile')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Profile.objects.filter(user=self.user).exists())
 
     def test_user_registration(self):
         """Test new user registration, profile creation, and JWT cookie setting."""

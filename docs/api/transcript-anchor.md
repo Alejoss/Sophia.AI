@@ -76,7 +76,7 @@ Base path under content details:
 
 | Method | Path | Auth |
 |--------|------|------|
-| `GET` | `/api/content/content_details/{content_id}/transcript/anchor/` | Public (`AllowAny`) |
+| `GET` | `/api/content/content_details/{content_id}/transcript/anchor/` | Public (`AllowAny`). If status is `btc_broadcast`, polls Esplora once and may promote to `anchored`. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated; uploader or staff |
 

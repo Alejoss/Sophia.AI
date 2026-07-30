@@ -242,11 +242,10 @@ class UserProfileView(APIView):
         logger.info(f"User profile requested - User: {request.user.username}")
         
         try:
-            # Fetch the profile of the authenticated user
-            user_profile = Profile.objects.filter(user=request.user).first()
-            if not user_profile:
-                logger.warning(f"Profile not found for user {request.user.username}")
-                return Response({'error': 'Perfil no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            # Heal legacy users created before the User→Profile signal existed
+            user_profile, created = Profile.objects.get_or_create(user=request.user)
+            if created:
+                logger.info(f"Created missing profile for user {request.user.username}")
 
             serializer = ProfileSerializer(user_profile, context={'request': request})
             logger.debug(f"User profile retrieved successfully for user {request.user.username}")
@@ -263,11 +262,9 @@ class UserProfileView(APIView):
         logger.debug(f"Profile update data: {request.data}")
         
         try:
-            # Get the profile of the authenticated user
-            user_profile = Profile.objects.filter(user=request.user).first()
-            if not user_profile:
-                logger.warning(f"Profile not found for user {request.user.username}")
-                return Response({'error': 'Perfil no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            user_profile, created = Profile.objects.get_or_create(user=request.user)
+            if created:
+                logger.info(f"Created missing profile for user {request.user.username} during update")
 
             # Handle profile picture upload if present
             if 'profile_picture' in request.FILES:
@@ -637,6 +634,7 @@ class LoginView(APIView):
             login(request, user)
             cache.delete(cache_key)  # Reset rate limiting on success
             logger.info(f"[LOGIN RATE LIMIT] SUCCESS - Reset attempt counter for IP {client_ip}, Username/Email: {login_identifier}, Username: {user.username}. Previous attempts: {attempts}")
+            Profile.objects.get_or_create(user=user)
 
             try:
                 # Generate JWT tokens
@@ -761,8 +759,8 @@ class RegisterView(APIView):
     def post(self, request, format=None):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save() # This calls serializer.create()
-            Profile.objects.create(user=user) # Explicitly create profile
+            user = serializer.save() # This calls serializer.create(); signal creates Profile
+            Profile.objects.get_or_create(user=user)
 
             # Log the user in and set JWT token
             try:
@@ -849,7 +847,7 @@ class CompleteFromInviteView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.save()
-        profile = Profile.objects.create(user=user)
+        profile, _ = Profile.objects.get_or_create(user=user)
         if hasattr(profile, 'email_confirmed'):
             profile.email_confirmed = True
             profile.save(update_fields=['email_confirmed'])
@@ -1144,30 +1142,30 @@ class GoogleLoginView(SocialLoginView):
             )
             logger.info(f"Created social account for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
 
-        # Handle profile picture
+        # Always ensure a Profile exists (picture download is optional)
+        profile, created = Profile.objects.get_or_create(user=user)
+        logger.info(
+            f"{'Created' if created else 'Found'} profile for user: {user.username}"
+        )
+
         try:
-            # Get profile picture URL from Google token
             picture_url = decoded_token.get('picture')
-            logger.debug(f"Profile picture URL from token for user {request.user.username if request.user.is_authenticated else 'anonymous'}: {picture_url}")
-            
+            logger.debug(
+                f"Profile picture URL from token for user {user.username}: {picture_url}"
+            )
+
             if picture_url:
-                # Download the image
-                logger.info(f"Downloading profile picture for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                logger.info(f"Downloading profile picture for user {user.username}")
                 picture_response = requests.get(picture_url)
                 if picture_response.status_code == 200:
-                    # Get or create profile
-                    profile, created = Profile.objects.get_or_create(user=user)
-                    logger.info(f"{'Created' if created else 'Found'} profile for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-                    
-                    # Save the profile picture
                     filename = f"{user.username}_{datetime.today().strftime('%h-%d-%y')}.jpeg"
-                    logger.info(f"Saving profile picture as: {filename} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                    logger.info(f"Saving profile picture as: {filename} for user {user.username}")
                     profile.profile_picture.save(
                         filename,
                         ContentFile(picture_response.content),
                         save=True
                     )
-                    logger.info(f"Successfully saved profile picture for user {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+                    logger.info(f"Successfully saved profile picture for user {user.username}")
                 else:
                     logger.warning(
                         "Google login: profile picture download non-200 (optional)",

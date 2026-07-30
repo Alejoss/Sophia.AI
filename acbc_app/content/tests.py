@@ -5379,3 +5379,32 @@ class TranscriptAnchorAPITests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['text_hash'], self.transcript.text_hash)
+
+    @patch('content.views_transcript_anchor.maybe_refresh_broadcast_anchor')
+    def test_get_current_refreshes_broadcast_anchor(self, mock_refresh):
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            status=TranscriptAnchor.STATUS_BTC_BROADCAST,
+            btc_network='signet',
+            btc_txid='e0f0a67142aa325783a85c084864f87e2565fc22dfd0d52024ce2b87caba6103',
+        )
+
+        def _mark_anchored(row, **kwargs):
+            row.status = TranscriptAnchor.STATUS_ANCHORED
+            row.btc_confirmations = 30
+            row.save(update_fields=['status', 'btc_confirmations', 'updated_at'])
+            return row
+
+        mock_refresh.side_effect = _mark_anchored
+
+        response = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_refresh.assert_called_once()
+        self.assertEqual(response.data['anchor']['status'], 'anchored')
+        self.assertTrue(response.data['anchor']['is_btc_confirmed'])
+        anchor.refresh_from_db()
+        self.assertEqual(anchor.status, TranscriptAnchor.STATUS_ANCHORED)
