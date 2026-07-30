@@ -19,8 +19,6 @@ import SubtitlesIcon from '@mui/icons-material/Subtitles';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
-import TranscriptAnchorPanel from './TranscriptAnchorPanel';
-
 export const formatMs = (ms) => {
   if (ms == null || Number.isNaN(Number(ms))) return '';
   const totalSec = Math.max(0, Math.floor(Number(ms) / 1000));
@@ -296,12 +294,6 @@ const ContentTranscriptPage = () => {
           </Typography>
         )}
 
-        {!error && transcript && (
-          <TranscriptAnchorPanel
-            contentId={contentId}
-            textHash={transcript.text_hash}
-          />
-        )}
       </Paper>
     </Container>
   );

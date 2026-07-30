@@ -14,6 +14,7 @@ import contentApi from "../api/contentApi";
 import VoteComponent from "../votes/VoteComponent";
 import ContentDisplay from "./ContentDisplay";
 import ContentTranscriptLink from "./ContentTranscriptLink";
+import ContentBitcoinAnchor from "./ContentBitcoinAnchor";
 import ContentReferences from "./ContentReferences";
 
 // ContentDisplay Mode: "detailed" - Full content detail view from search results
@@ -139,6 +140,7 @@ const ContentDetailsSearch = () => {
         />
 
         <ContentTranscriptLink contentId={contentId} context="search" />
+        <ContentBitcoinAnchor contentId={contentId} />
       </Paper>
 
       {/* Content References Section */}

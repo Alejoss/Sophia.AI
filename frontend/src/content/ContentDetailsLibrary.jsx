@@ -8,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 import ContentReferences from './ContentReferences';
 import ContentDisplay from './ContentDisplay';
 import ContentTranscriptLink from './ContentTranscriptLink';
+import ContentBitcoinAnchor from './ContentBitcoinAnchor';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import FileSuggestionUploadDialog from './FileSuggestionUploadDialog';
 import ContentDetailSkeleton from '../components/ContentDetailSkeleton';
@@ -209,6 +210,7 @@ const ContentDetailsLibrary = () => {
                 </Typography>
 
                 <ContentTranscriptLink contentId={contentId} context="library" />
+                <ContentBitcoinAnchor contentId={contentId} />
 
                 {/* Content References Section */}
                 {references && (

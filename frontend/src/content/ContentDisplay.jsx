@@ -37,6 +37,8 @@ import StorageIcon from "@mui/icons-material/Storage";
 import FolderIcon from "@mui/icons-material/Folder";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import SubtitlesIcon from "@mui/icons-material/Subtitles";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { formatFileSize } from "../utils/fileUtils";
 import VoteComponent from "../votes/VoteComponent";
 import {
@@ -97,6 +99,12 @@ const ContentDisplay = ({
   customThumbnail;
   const hasFileAvailable = Boolean(
     fileDetails?.file || content?.has_file_available || contentData?.has_file_available
+  );
+  const hasTranscript = Boolean(
+    contentData?.has_transcript ?? content?.has_transcript
+  );
+  const transcriptBtcAnchored = Boolean(
+    contentData?.transcript_btc_anchored ?? content?.transcript_btc_anchored
   );
 
   // Debug logging for preview mode (moved after variable declarations)
@@ -1248,6 +1256,26 @@ const ContentDisplay = ({
                     color="info" />
 
                   }
+
+                  {hasTranscript &&
+                  <Chip
+                    icon={<SubtitlesIcon />}
+                    label="Transcripción Disponible"
+                    size="small"
+                    variant="outlined"
+                    color="info" />
+
+                  }
+
+                  {transcriptBtcAnchored &&
+                  <Chip
+                    icon={<VerifiedIcon />}
+                    label="Anclada en BTC"
+                    size="small"
+                    variant="outlined"
+                    color="success" />
+
+                  }
                 </Box>
               </Box>
 
@@ -1460,6 +1488,26 @@ const ContentDisplay = ({
                     label={profile.collection_name}
                     size="small"
                     variant="outlined" />
+
+                  }
+
+                  {hasTranscript &&
+                  <Chip
+                    icon={<SubtitlesIcon />}
+                    label="Transcripción Disponible"
+                    size="small"
+                    variant="outlined"
+                    color="info" />
+
+                  }
+
+                  {transcriptBtcAnchored &&
+                  <Chip
+                    icon={<VerifiedIcon />}
+                    label="Anclada en BTC"
+                    size="small"
+                    variant="outlined"
+                    color="success" />
 
                   }
                 </Box>

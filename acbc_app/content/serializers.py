@@ -35,6 +35,26 @@ from knowledge_paths.models import KnowledgePath, Node
 from profiles.serializers import UserSerializer
 
 
+def _content_has_transcript(obj):
+    """True if Content has a ContentTranscript row (uses annotation when present)."""
+    annotated = getattr(obj, 'has_transcript', None)
+    if isinstance(annotated, bool):
+        return annotated
+    return ContentTranscript.objects.filter(content_id=obj.pk).exists()
+
+
+def _content_transcript_btc_anchored(obj):
+    """True if any TranscriptAnchor for this content has a non-empty btc_txid."""
+    annotated = getattr(obj, 'transcript_btc_anchored', None)
+    if isinstance(annotated, bool):
+        return annotated
+    return (
+        TranscriptAnchor.objects.filter(content_id=obj.pk)
+        .exclude(btc_txid='')
+        .exists()
+    )
+
+
 def _content_profile_thumbnail_urls(profile, request):
     """Absolute URLs for full custom thumbnail and listing-sized preview."""
     thumb = build_media_url(profile.thumbnail, request) if profile.thumbnail else None
@@ -88,6 +108,8 @@ class ContentSerializer(serializers.ModelSerializer):
     has_file_available = serializers.SerializerMethodField()
     is_original_uploader = serializers.SerializerMethodField()
     can_suggest_file = serializers.SerializerMethodField()
+    has_transcript = serializers.SerializerMethodField()
+    transcript_btc_anchored = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -96,7 +118,8 @@ class ContentSerializer(serializers.ModelSerializer):
             'original_title', 'original_author', 'uploaded_by', 'url',
             'has_spanish_subtitles', 'has_spanish_dubbing',
             'vote_count', 'user_vote', 'favicon',
-            'has_file_available', 'is_original_uploader', 'can_suggest_file'
+            'has_file_available', 'is_original_uploader', 'can_suggest_file',
+            'has_transcript', 'transcript_btc_anchored',
         ]
     
     def get_file_details(self, obj):
@@ -171,6 +194,12 @@ class ContentSerializer(serializers.ModelSerializer):
 
     def get_has_file_available(self, obj):
         return self._has_file(obj)
+
+    def get_has_transcript(self, obj):
+        return _content_has_transcript(obj)
+
+    def get_transcript_btc_anchored(self, obj):
+        return _content_transcript_btc_anchored(obj)
 
     def get_is_original_uploader(self, obj):
         request = self.context.get('request')
@@ -777,6 +806,8 @@ class SimpleContentSerializer(serializers.ModelSerializer):
     """
     url = serializers.SerializerMethodField()
     file_details = serializers.SerializerMethodField()
+    has_transcript = serializers.SerializerMethodField()
+    transcript_btc_anchored = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -784,7 +815,14 @@ class SimpleContentSerializer(serializers.ModelSerializer):
             'id', 'media_type', 'original_title', 'url',
             'has_spanish_subtitles', 'has_spanish_dubbing',
             'uploaded_by', 'file_details',
+            'has_transcript', 'transcript_btc_anchored',
         ]
+
+    def get_has_transcript(self, obj):
+        return _content_has_transcript(obj)
+
+    def get_transcript_btc_anchored(self, obj):
+        return _content_transcript_btc_anchored(obj)
 
     def get_file_details(self, obj):
         if not self.context.get('collection_detail'):
@@ -858,6 +896,8 @@ class PreviewContentSerializer(serializers.ModelSerializer):
     has_file_available = serializers.SerializerMethodField()
     is_original_uploader = serializers.SerializerMethodField()
     can_suggest_file = serializers.SerializerMethodField()
+    has_transcript = serializers.SerializerMethodField()
+    transcript_btc_anchored = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -865,8 +905,15 @@ class PreviewContentSerializer(serializers.ModelSerializer):
             'id', 'media_type', 'file_details', 'original_title',
             'original_author', 'uploaded_by', 'url', 'created_at',
             'has_spanish_subtitles', 'has_spanish_dubbing',
-            'favicon', 'has_file_available', 'is_original_uploader', 'can_suggest_file'
+            'favicon', 'has_file_available', 'is_original_uploader', 'can_suggest_file',
+            'has_transcript', 'transcript_btc_anchored',
         ]
+
+    def get_has_transcript(self, obj):
+        return _content_has_transcript(obj)
+
+    def get_transcript_btc_anchored(self, obj):
+        return _content_transcript_btc_anchored(obj)
     
     def get_file_details(self, obj):
         try:
