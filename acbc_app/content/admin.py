@@ -1,5 +1,10 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
+from content.anchor_request_service import (
+    AnchorRequestError,
+    approve_anchor_request,
+    reject_anchor_request,
+)
 from content.models import (
     Library,
     Collection,
@@ -8,6 +13,7 @@ from content.models import (
     ContentProfile,
     ContentTranscript,
     TranscriptAnchor,
+    TranscriptAnchorRequest,
     Topic,
     Publication,
     TopicCreationRequest,
@@ -119,6 +125,62 @@ class TranscriptAnchorAdmin(admin.ModelAdmin):
         if not obj.text_hash:
             return ''
         return f'{obj.text_hash[:12]}…'
+
+
+@admin.register(TranscriptAnchorRequest)
+class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'content',
+        'requester',
+        'text_hash_short',
+        'status',
+        'price_amount',
+        'anchor',
+        'created_at',
+        'reviewed_at',
+    ]
+    list_filter = ['status', 'created_at']
+    search_fields = [
+        'text_hash',
+        'requester__username',
+        'content__original_title',
+        'review_note',
+    ]
+    raw_id_fields = ['content', 'requester', 'anchor', 'reviewed_by']
+    readonly_fields = ['created_at', 'updated_at', 'reviewed_at']
+    actions = ['approve_selected', 'reject_selected']
+    date_hierarchy = 'created_at'
+
+    @admin.display(description='text_hash')
+    def text_hash_short(self, obj):
+        if not obj.text_hash:
+            return ''
+        return f'{obj.text_hash[:12]}…'
+
+    @admin.action(description='Aprobar y emitir anclaje Bitcoin')
+    def approve_selected(self, request, queryset):
+        ok = 0
+        for req in queryset:
+            try:
+                approve_anchor_request(req, admin_user=request.user)
+                ok += 1
+            except AnchorRequestError as exc:
+                self.message_user(request, f'#{req.pk}: {exc}', level=messages.WARNING)
+        if ok:
+            self.message_user(request, f'{ok} solicitud(es) aprobada(s).', level=messages.SUCCESS)
+
+    @admin.action(description='Rechazar (sin reembolso automático)')
+    def reject_selected(self, request, queryset):
+        ok = 0
+        for req in queryset:
+            try:
+                reject_anchor_request(req, admin_user=request.user, note='Rechazado desde admin')
+                ok += 1
+            except AnchorRequestError as exc:
+                self.message_user(request, f'#{req.pk}: {exc}', level=messages.WARNING)
+        if ok:
+            self.message_user(request, f'{ok} solicitud(es) rechazada(s).', level=messages.SUCCESS)
 
 
 @admin.register(Topic)

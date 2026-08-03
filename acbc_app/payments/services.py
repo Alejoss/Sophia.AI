@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.db import transaction
 
+from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
 from payments.models import CryptoPayment
@@ -198,11 +199,37 @@ def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
         )
 
 
+def _mark_anchor_request_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    with transaction.atomic():
+        req = TranscriptAnchorRequest.objects.select_for_update().get(
+            pk=crypto_payment.anchor_request_id
+        )
+        if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
+            return
+        req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+        req.save(update_fields=['status', 'updated_at'])
+
+    req = TranscriptAnchorRequest.objects.select_related(
+        'content', 'requester'
+    ).get(pk=crypto_payment.anchor_request_id)
+    try:
+        on_crypto_payment_completed(crypto_payment, anchor_request=req)
+    except Exception as exc:
+        logger.error(
+            'on_crypto_payment_completed failed for anchor_request %s: %s',
+            req.id,
+            exc,
+            exc_info=True,
+        )
+
+
 def _fulfill_if_needed(crypto_payment: CryptoPayment) -> None:
     if crypto_payment.event_registration_id:
         _mark_event_registration_paid_if_needed(crypto_payment)
     elif crypto_payment.path_purchase_id:
         _mark_path_purchase_paid_if_needed(crypto_payment)
+    elif crypto_payment.anchor_request_id:
+        _mark_anchor_request_paid_if_needed(crypto_payment)
 
 
 def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> CryptoPayment:
@@ -390,6 +417,88 @@ def create_path_purchase_payment(*, path_purchase: KnowledgePathPurchase, user, 
     with transaction.atomic():
         crypto_payment = CryptoPayment.objects.create(
             path_purchase=path_purchase,
+            order_id=order_id,
+            nowpayments_payment_id=payload.get('id'),
+            pay_currency=(pay_currency or '').lower().strip(),
+            price_amount=price_amount,
+            price_currency='usd',
+            payment_status='waiting',
+            invoice_url=invoice_url,
+            provider_payload=stored_payload,
+        )
+    return crypto_payment
+
+
+def create_anchor_request_payment(
+    *,
+    anchor_request: TranscriptAnchorRequest,
+    user,
+    pay_currency=None,
+) -> CryptoPayment:
+    if anchor_request.requester_id != user.id:
+        raise PermissionError('Solo quien solicitó el anclaje puede iniciar el pago.')
+    if anchor_request.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+        raise ValueError('Esta solicitud ya está pagada y en revisión.')
+    if anchor_request.status in (
+        TranscriptAnchorRequest.STATUS_APPROVED,
+        TranscriptAnchorRequest.STATUS_REJECTED,
+    ):
+        raise ValueError('Esta solicitud ya fue resuelta.')
+
+    client = NOWPaymentsClient()
+    if not client.configured:
+        raise NOWPaymentsError('La pasarela de pagos no está configurada en el servidor.')
+
+    reused = _reuse_or_refresh_open_payment(
+        CryptoPayment.objects.filter(anchor_request=anchor_request)
+    )
+    if reused:
+        return reused
+
+    from django.conf import settings
+
+    order_id = f'anchor-req-{anchor_request.id}-{uuid.uuid4().hex[:12]}'
+    ipn_url = f'{_public_base_url()}/api/payments/ipn/'
+    frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
+    content_url = f'{frontend_base}/content/{anchor_request.content_id}/transcript'
+
+    title = (
+        getattr(anchor_request.content, 'original_title', None)
+        or f'Contenido {anchor_request.content_id}'
+    )
+    order_description = f'Anclaje BTC: {prepare_text_for_db(title)[:80]}'
+    price_amount = float(
+        anchor_request.price_amount
+        or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)
+    )
+    payload = client.create_invoice(
+        price_amount=price_amount,
+        price_currency='usd',
+        order_id=order_id,
+        order_description=order_description,
+        ipn_callback_url=ipn_url,
+        success_url=content_url,
+        cancel_url=content_url,
+    )
+
+    invoice_url = payload.get('invoice_url') or ''
+    if not invoice_url:
+        raise NOWPaymentsError('NOWPayments no devolvió invoice_url.')
+
+    logger.info(
+        'NOWPayments invoice created order=%s anchor_request=%s invoice_id=%s',
+        order_id,
+        anchor_request.id,
+        payload.get('id'),
+    )
+
+    stored_payload = prepare_json_for_db(payload)
+    if payload.get('id') is not None and not stored_payload.get('invoice_id'):
+        stored_payload['invoice_id'] = payload.get('id')
+
+    with transaction.atomic():
+        crypto_payment = CryptoPayment.objects.create(
+            anchor_request=anchor_request,
             order_id=order_id,
             nowpayments_payment_id=payload.get('id'),
             pay_currency=(pay_currency or '').lower().strip(),

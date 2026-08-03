@@ -569,6 +569,94 @@ class TranscriptAnchor(models.Model):
         return (prefix + digest).hex()
 
 
+class TranscriptAnchorRequest(models.Model):
+    """
+    Paid request to anchor a transcript hash on Bitcoin.
+
+    Any authenticated user may request; after NOWPayments marks the invoice
+    finished, status becomes paid_pending_review until staff approves (broadcast)
+    or rejects (no automatic refund).
+    """
+
+    STATUS_PENDING_PAYMENT = 'pending_payment'
+    STATUS_PAID_PENDING_REVIEW = 'paid_pending_review'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING_PAYMENT, 'Pending payment'),
+        (STATUS_PAID_PENDING_REVIEW, 'Paid — pending review'),
+        (STATUS_APPROVED, 'Approved (broadcast)'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    ACTIVE_STATUSES = (STATUS_PENDING_PAYMENT, STATUS_PAID_PENDING_REVIEW)
+
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='transcript_anchor_requests',
+    )
+    content = models.ForeignKey(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='transcript_anchor_requests',
+    )
+    text_hash = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest snapshot at request time.',
+    )
+    text_length = models.PositiveIntegerField(blank=True, null=True)
+    price_amount = models.FloatField(default=1.0)
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING_PAYMENT,
+        db_index=True,
+    )
+    anchor = models.ForeignKey(
+        TranscriptAnchor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requests',
+    )
+    review_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_transcript_anchor_requests',
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'created_at'], name='anchor_req_status_idx'),
+            models.Index(fields=['text_hash'], name='anchor_req_hash_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['text_hash'],
+                condition=models.Q(
+                    status__in=['pending_payment', 'paid_pending_review'],
+                ),
+                name='unique_active_anchor_request_per_hash',
+            ),
+        ]
+
+    def __str__(self):
+        short = (self.text_hash or '')[:12]
+        return f'AnchorRequest {self.pk} content={self.content_id} {short}… [{self.status}]'
+
+    @property
+    def is_paid_pending_review(self):
+        return self.status == self.STATUS_PAID_PENDING_REVIEW
+
+
 def topic_image_path(instance, filename):
     # Get the file extension
     ext = filename.split('.')[-1]

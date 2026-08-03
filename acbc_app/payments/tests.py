@@ -8,10 +8,12 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from content.models import Content, ContentTranscript, TranscriptAnchorRequest
 from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase, Node
 from payments.models import CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
+    create_anchor_request_payment,
     create_path_purchase_payment,
     fetch_remote_payment_payload,
     get_or_create_path_purchase,
@@ -367,3 +369,75 @@ class AsciiSafeStorageTests(TestCase):
         self.assertEqual(safe['order_description'], 'Registro: Filosofia')
         raw = json.dumps(safe, ensure_ascii=True)
         self.assertNotIn('í', raw)
+
+
+@override_settings(ANCHOR_REQUEST_PRICE_USD=1)
+class AnchorRequestPaymentFulfillmentTests(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video anclar',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para solicitud de anclaje.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+        self.crypto_payment = CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-req-test-order',
+            pay_currency='bch',
+            price_amount=1.0,
+            pay_amount='0.001',
+            pay_address='bitcoincash:qtest',
+            payment_status='waiting',
+        )
+
+    def test_finished_marks_paid_pending_review(self):
+        sync_payment_from_provider(self.crypto_payment, {
+            'payment_status': 'finished',
+            'actually_paid': '0.001',
+            'pay_amount': '0.001',
+        })
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+
+    def test_confirmed_does_not_advance_request(self):
+        sync_payment_from_provider(self.crypto_payment, {
+            'payment_status': 'confirmed',
+            'actually_paid': '0.001',
+            'pay_amount': '0.001',
+        })
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    @override_settings(NOWPAYMENTS_API_KEY='test-key')
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_create_anchor_request_payment_invoice(self, mock_create_invoice):
+        mock_create_invoice.return_value = {
+            'id': 888,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=888',
+        }
+        # Fresh request without existing crypto payment open
+        req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash='ab' * 32,
+            text_length=10,
+            price_amount=1.0,
+        )
+        payment = create_anchor_request_payment(anchor_request=req, user=self.user)
+        self.assertEqual(payment.anchor_request_id, req.id)
+        self.assertIsNone(payment.path_purchase_id)
+        self.assertTrue(payment.order_id.startswith('anchor-req-'))
+

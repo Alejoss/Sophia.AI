@@ -9,6 +9,7 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'order_id',
         'event_registration',
         'path_purchase',
+        'anchor_request',
         'pay_currency',
         'payment_status',
         'price_amount',
@@ -21,5 +22,6 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'pay_address',
         'event_registration__user__username',
         'path_purchase__user__username',
+        'anchor_request__requester__username',
     )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload')

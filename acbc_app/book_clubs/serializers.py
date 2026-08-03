@@ -371,6 +371,7 @@ class BookClubEventSerializer(serializers.ModelSerializer):
         source='event.schedule_description', read_only=True
     )
     is_visible = serializers.BooleanField(source='event.is_visible', read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = BookClubEvent
@@ -384,9 +385,16 @@ class BookClubEventSerializer(serializers.ModelSerializer):
             'platform',
             'schedule_description',
             'is_visible',
+            'image',
             'created_at',
         ]
         read_only_fields = fields
+
+    def get_image(self, obj):
+        event = getattr(obj, 'event', None)
+        if not event or not getattr(event, 'image', None):
+            return None
+        return build_media_url(event.image, self.context.get('request'))
 
 
 class BookClubEventCreateSerializer(serializers.Serializer):

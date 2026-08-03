@@ -764,6 +764,8 @@ BTC_FALLBACK_FEE_SAT_VB = int(os.getenv('BTC_FALLBACK_FEE_SAT_VB', '25'))
 BTC_MAX_FEE_USD = float(os.getenv('BTC_MAX_FEE_USD', '1'))
 # Optional fixed USD/BTC for fee budgeting; if unset/0, fetch mempool.space /v1/prices.
 BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
+# Fixed USD price charged via NOWPayments for a public transcript-anchor request.
+ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
 
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry

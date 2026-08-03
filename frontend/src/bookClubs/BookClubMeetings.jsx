@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import bookClubsApi from '../api/bookClubsApi';
+import { resolveMediaUrl } from '../utils/fileUtils';
 import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, formatClubDate } from './clubTheme';
 
@@ -63,35 +64,59 @@ const BookClubMeetings = () => {
         </Typography>
       ) : (
         <Stack spacing={2}>
-          {events.map((ev) => (
-            <Box
-              key={ev.id}
-              sx={{
-                p: 2.5,
-                borderRadius: 1,
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              <Typography sx={{ fontWeight: 600 }}>{ev.title}</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
-                {formatClubDate(ev.date_start, { dateStyle: 'full', timeStyle: 'short' }) ||
-                  'Fecha por confirmar'}
-              </Typography>
-              {ev.schedule_description && (
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mt: 1 }}>
-                  {ev.schedule_description}
-                </Typography>
-              )}
-              <Button
-                size="small"
-                component={RouterLink}
-                to={`/events/${ev.event_id}`}
-                sx={{ mt: 1.5, color: CLUB_ACCENT }}
+          {events.map((ev) => {
+            const imageUrl = resolveMediaUrl(ev.image);
+            return (
+              <Box
+                key={ev.id}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 1,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  display: 'flex',
+                  gap: 2,
+                  alignItems: 'stretch',
+                }}
               >
-                Ver evento
-              </Button>
-            </Box>
-          ))}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 600 }}>{ev.title}</Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
+                    {formatClubDate(ev.date_start, { dateStyle: 'full', timeStyle: 'short' }) ||
+                      'Fecha por confirmar'}
+                  </Typography>
+                  {ev.schedule_description && (
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mt: 1 }}>
+                      {ev.schedule_description}
+                    </Typography>
+                  )}
+                  <Button
+                    size="small"
+                    component={RouterLink}
+                    to={`/events/${ev.event_id}`}
+                    sx={{ mt: 1.5, color: CLUB_ACCENT }}
+                  >
+                    Ver evento
+                  </Button>
+                </Box>
+                {imageUrl && (
+                  <Box
+                    component="img"
+                    src={imageUrl}
+                    alt=""
+                    sx={{
+                      width: { xs: 88, sm: 120 },
+                      height: { xs: 88, sm: 120 },
+                      flexShrink: 0,
+                      objectFit: 'cover',
+                      borderRadius: 1,
+                      alignSelf: 'center',
+                      bgcolor: 'rgba(255,255,255,0.06)',
+                    }}
+                  />
+                )}
+              </Box>
+            );
+          })}
         </Stack>
       )}
     </Box>

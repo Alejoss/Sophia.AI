@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 crypto_payment_completed = Signal()
 
 
-def on_crypto_payment_completed(crypto_payment, event_registration=None, path_purchase=None):
+def on_crypto_payment_completed(
+    crypto_payment,
+    event_registration=None,
+    path_purchase=None,
+    anchor_request=None,
+):
     """
     Called once when an entitlement transitions to PAID via the crypto gateway.
     Safe place for certificates, emails, analytics, unlocks, etc.
@@ -33,6 +38,13 @@ def on_crypto_payment_completed(crypto_payment, event_registration=None, path_pu
             path_purchase.id,
             path_purchase.knowledge_path_id,
         )
+    elif anchor_request is not None:
+        logger.info(
+            'Crypto payment completed: order=%s anchor_request=%s content=%s (pending review)',
+            crypto_payment.order_id,
+            anchor_request.id,
+            anchor_request.content_id,
+        )
     else:
         logger.info('Crypto payment completed: order=%s', crypto_payment.order_id)
 
@@ -41,6 +53,7 @@ def on_crypto_payment_completed(crypto_payment, event_registration=None, path_pu
         crypto_payment=crypto_payment,
         event_registration=event_registration,
         path_purchase=path_purchase,
+        anchor_request=anchor_request,
         # Backwards-compatible kwarg for existing listeners
         registration=event_registration,
     )

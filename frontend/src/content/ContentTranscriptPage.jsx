@@ -298,7 +298,9 @@ const ContentTranscriptPage = () => {
 
       </Paper>
 
-      {!error && <ContentBitcoinAnchor contentId={contentId} />}
+      {!error && (
+        <ContentBitcoinAnchor contentId={contentId} contentTitle={title} />
+      )}
     </Container>
   );
 };

@@ -60,3 +60,21 @@ export const listPathPurchasePayments = async (purchaseId) => {
     throwApiError(error, 'No se pudo listar los pagos del camino');
   }
 };
+
+export const createAnchorRequestPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago del anclaje');
+  }
+};
+
+export const listAnchorRequestPayments = async (requestId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/anchor-request/${requestId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo listar los pagos del anclaje');
+  }
+};

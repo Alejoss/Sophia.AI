@@ -36,6 +36,13 @@ class CryptoPayment(models.Model):
         null=True,
         blank=True,
     )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.CASCADE,
+        related_name='crypto_payments',
+        null=True,
+        blank=True,
+    )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     pay_currency = models.CharField(max_length=16, blank=True, default='')
@@ -55,8 +62,21 @@ class CryptoPayment(models.Model):
         constraints = [
             models.CheckConstraint(
                 check=(
-                    Q(event_registration__isnull=False, path_purchase__isnull=True)
-                    | Q(event_registration__isnull=True, path_purchase__isnull=False)
+                    Q(
+                        event_registration__isnull=False,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=False,
+                        anchor_request__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=False,
+                    )
                 ),
                 name='cryptopayment_exactly_one_target',
             ),
@@ -77,4 +97,6 @@ class CryptoPayment(models.Model):
             return self.event_registration.user
         if self.path_purchase_id:
             return self.path_purchase.user
+        if self.anchor_request_id:
+            return self.anchor_request.requester
         return None

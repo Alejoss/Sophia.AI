@@ -22,6 +22,7 @@ from content.models import (
     ContentTranscript,
     TopicCreationRequest,
     TranscriptAnchor,
+    TranscriptAnchorRequest,
     TopicChatQuery,
 )
 from content.utils import build_media_url
@@ -1844,3 +1845,36 @@ class TranscriptAnchorCreateSerializer(serializers.Serializer):
         max_length=16,
         default=TranscriptAnchor.DEFAULT_OP_RETURN_PREFIX,
     )
+
+
+class TranscriptAnchorRequestSerializer(serializers.ModelSerializer):
+    requester_username = serializers.SerializerMethodField()
+    content_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TranscriptAnchorRequest
+        fields = [
+            'id',
+            'content',
+            'content_title',
+            'requester',
+            'requester_username',
+            'text_hash',
+            'text_length',
+            'price_amount',
+            'status',
+            'anchor',
+            'review_note',
+            'reviewed_by',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_requester_username(self, obj):
+        return obj.requester.username if obj.requester_id else None
+
+    def get_content_title(self, obj):
+        return getattr(obj.content, 'original_title', None) or f'Contenido {obj.content_id}'
+

@@ -4,6 +4,7 @@ Academia Blockchain usa [NOWPayments](https://nowpayments.io/) para aceptar pago
 
 1. **Registro a eventos de pago** (`EventRegistration`)
 2. **Compra de Caminos del Conocimiento** (`KnowledgePathPurchase`)
+3. **Solicitud de anclaje Bitcoin de transcripción** (`TranscriptAnchorRequest`, USD fijo `ANCHOR_REQUEST_PRICE_USD`, default `$1`) — el pago deja la solicitud en `paid_pending_review`; un admin aprueba (broadcast) o rechaza en Django admin (sin reembolso automático).
 
 ## Configuración en NOWPayments
 

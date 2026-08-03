@@ -306,6 +306,21 @@ const contentApi = {
     return response.data;
   },
 
+  getTranscriptAnchorRequest: async (contentId) => {
+    const response = await axiosInstance.get(
+      `/content/content_details/${contentId}/transcript/anchor-requests/`,
+    );
+    return response.data;
+  },
+
+  createTranscriptAnchorRequest: async (contentId) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/anchor-requests/`,
+      {},
+    );
+    return response.data;
+  },
+
   createTranscriptAnchor: async (contentId, payload = {}) => {
     const response = await axiosInstance.post(
       `/content/content_details/${contentId}/transcript/anchors/`,

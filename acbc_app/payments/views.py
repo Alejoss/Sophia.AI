@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
 from payments.models import CryptoPayment
@@ -17,6 +18,7 @@ from payments.serializers import CryptoPaymentSerializer
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
+    create_anchor_request_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
     refresh_crypto_payment_from_nowpayments,
@@ -34,6 +36,7 @@ def _find_crypto_payment_for_ipn(body: dict):
             return CryptoPayment.objects.select_related(
                 'event_registration',
                 'path_purchase',
+                'anchor_request',
             ).get(order_id=order_id)
         except CryptoPayment.DoesNotExist:
             pass
@@ -69,6 +72,8 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
     if payment.path_purchase_id:
         purchase = payment.path_purchase
         return user.id in (purchase.user_id, purchase.knowledge_path.author_id)
+    if payment.anchor_request_id:
+        return user.id == payment.anchor_request.requester_id or user.is_staff
     return False
 
 
@@ -201,6 +206,8 @@ class CryptoPaymentDetailView(APIView):
                 'path_purchase',
                 'path_purchase__user',
                 'path_purchase__knowledge_path',
+                'anchor_request',
+                'anchor_request__requester',
             ).get(pk=payment_id)
         except CryptoPayment.DoesNotExist:
             return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
@@ -279,6 +286,82 @@ class PathPurchasePaymentsListView(APIView):
                             'Could not refresh payment %s for path_purchase %s: %s',
                             payment.id,
                             purchase_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
+        return Response(CryptoPaymentSerializer(payments, many=True).data)
+
+
+class AnchorRequestPaymentView(APIView):
+    """Create or refresh a NOWPayments invoice for a transcript anchor request."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.select_related(
+                'content', 'requester'
+            ).get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            payment = create_anchor_request_payment(
+                anchor_request=anchor_request,
+                pay_currency=pay_currency,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except NOWPaymentsError as exc:
+            logger.warning('NOWPayments error for anchor_request=%s: %s', request_id, exc)
+            return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as exc:
+            logger.error(
+                'Unexpected error creating payment for anchor_request=%s: %s',
+                request_id,
+                exc,
+                exc_info=True,
+            )
+            return Response(
+                {'error': 'No se pudo iniciar el pago. Inténtelo de nuevo.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class AnchorRequestPaymentsListView(APIView):
+    """List payments for an anchor request."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if anchor_request.requester_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payments = CryptoPayment.objects.filter(anchor_request=anchor_request).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for anchor_request %s: %s',
+                            payment.id,
+                            request_id,
                             exc,
                         )
                 refreshed.append(payment)

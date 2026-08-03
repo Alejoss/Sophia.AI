@@ -22,9 +22,11 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import {
+  createAnchorRequestPayment,
   createPathPurchasePayment,
   createRegistrationPayment,
   getPaymentStatus,
+  listAnchorRequestPayments,
   listPathPurchasePayments,
   listRegistrationPayments,
 } from '../api/paymentsApi';
@@ -70,6 +72,8 @@ const MSG = {
   confirming: 'Pago detectado en la red. Esperando confirmaci\u00F3n final...',
   paidEvent: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
   paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
+  paidAnchor:
+    '\u00A1Pago completado! Tu solicitud de anclaje Bitcoin est\u00E1 en revisi\u00F3n.',
   polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
   initError: 'No se pudo iniciar el pago',
   copyError: 'No se pudo copiar al portapapeles',
@@ -106,6 +110,7 @@ const CryptoPaymentModal = ({
   onClose,
   registrationId,
   pathPurchaseId,
+  anchorRequestId,
   title,
   eventTitle,
   priceUsd,
@@ -119,7 +124,19 @@ const CryptoPaymentModal = ({
   const [copiedExtra, setCopiedExtra] = useState(false);
   const displayTitle = title || eventTitle;
   const isPathCheckout = Boolean(pathPurchaseId);
-  const entitlementId = pathPurchaseId || registrationId;
+  const isAnchorCheckout = Boolean(anchorRequestId);
+  const entitlementId = anchorRequestId || pathPurchaseId || registrationId;
+
+  const listPayments = isAnchorCheckout
+    ? listAnchorRequestPayments
+    : isPathCheckout
+      ? listPathPurchasePayments
+      : listRegistrationPayments;
+  const createPayment = isAnchorCheckout
+    ? createAnchorRequestPayment
+    : isPathCheckout
+      ? createPathPurchasePayment
+      : createRegistrationPayment;
 
   const refreshPayment = useCallback(async (paymentId) => {
     const data = await getPaymentStatus(paymentId);
@@ -148,9 +165,7 @@ const CryptoPaymentModal = ({
       try {
         setInitializing(true);
         setError(null);
-        const payments = isPathCheckout
-          ? await listPathPurchasePayments(entitlementId)
-          : await listRegistrationPayments(entitlementId);
+        const payments = await listPayments(entitlementId);
         if (cancelled) return;
 
         const openPayment = payments.find((p) => OPEN_PAYMENT_STATUSES.has(p.payment_status));
@@ -160,9 +175,7 @@ const CryptoPaymentModal = ({
           return;
         }
 
-        const data = isPathCheckout
-          ? await createPathPurchasePayment(entitlementId)
-          : await createRegistrationPayment(entitlementId);
+        const data = await createPayment(entitlementId);
         if (!cancelled) setPayment(data);
       } catch (err) {
         if (!cancelled) {
@@ -177,7 +190,7 @@ const CryptoPaymentModal = ({
     return () => {
       cancelled = true;
     };
-  }, [open, entitlementId, isPathCheckout, refreshPayment]);
+  }, [open, entitlementId, isPathCheckout, isAnchorCheckout, refreshPayment]);
 
   useEffect(() => {
     if (!open || !payment?.id || payment.is_paid) return undefined;
@@ -240,7 +253,11 @@ const CryptoPaymentModal = ({
           <PaymentsIcon />
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              {isPathCheckout ? 'Pago del camino' : `Pago del ${productLabel}`}
+              {isAnchorCheckout
+                ? 'Pago del anclaje Bitcoin'
+                : isPathCheckout
+                  ? 'Pago del camino'
+                  : `Pago del ${productLabel}`}
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
               {displayTitle}
@@ -332,7 +349,11 @@ const CryptoPaymentModal = ({
             )}
             {payment.is_paid && (
               <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
-                {isPathCheckout ? MSG.paidPath : MSG.paidEvent}
+                {isAnchorCheckout
+                  ? MSG.paidAnchor
+                  : isPathCheckout
+                    ? MSG.paidPath
+                    : MSG.paidEvent}
               </Alert>
             )}
 

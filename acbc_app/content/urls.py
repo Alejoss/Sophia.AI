@@ -95,6 +95,8 @@ from .views_transcript_anchor import (
     ContentTranscriptAnchorCurrentView,
     ContentTranscriptAnchorListView,
 )
+from .views_anchor_request import ContentTranscriptAnchorRequestView
+
 from .views_embedding_ingest import (
     ContentEmbeddingIngestQueueView,
     ContentEmbeddingIngestDetailView,
@@ -140,6 +142,11 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/anchors/',
         ContentTranscriptAnchorListView.as_view(),
         name='content-transcript-anchors',
+    ),
+    path(
+        'content_details/<int:content_id>/transcript/anchor-requests/',
+        ContentTranscriptAnchorRequestView.as_view(),
+        name='content-transcript-anchor-requests',
     ),
     path('content_update/<int:pk>/', ContentUpdateView.as_view(), name='content-update'),
     path('content_modification_check/<int:pk>/', ContentModificationCheckView.as_view(), name='content-modification-check'),
