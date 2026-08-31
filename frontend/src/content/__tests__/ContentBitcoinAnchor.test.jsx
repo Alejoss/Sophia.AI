@@ -27,7 +27,7 @@ vi.mock('react', async () => {
   };
 });
 
-vi.mock('../../events/CryptoPaymentModal', () => ({
+vi.mock('../AnchorPaymentCheckout', () => ({
   default: () => null,
 }));
 
@@ -44,6 +44,8 @@ describe('ContentBitcoinAnchor', () => {
   it('renders nothing when there is no on-chain txid and user is anonymous', async () => {
     contentApi.getTranscriptAnchor.mockResolvedValue({
       content_id: 3,
+      has_transcript: true,
+      current_text_hash: 'aa'.repeat(32),
       can_certify: false,
       anchor: { status: 'pending', btc_txid: '' },
     });
@@ -54,9 +56,26 @@ describe('ContentBitcoinAnchor', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('renders nothing when the content has no transcript', async () => {
+    contentApi.getTranscriptAnchor.mockResolvedValue({
+      content_id: 3,
+      has_transcript: false,
+      current_text_hash: null,
+      can_certify: true,
+      anchor: null,
+    });
+    const { container } = render(<ContentBitcoinAnchor contentId={3} />);
+    await waitFor(() => {
+      expect(contentApi.getTranscriptAnchor).toHaveBeenCalledWith(3);
+    });
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: /solicitar anclaje a bitcoin/i })).not.toBeInTheDocument();
+  });
+
   it('shows hash, txid and mempool link when anchored', async () => {
     contentApi.getTranscriptAnchor.mockResolvedValue({
       content_id: 3,
+      has_transcript: true,
       current_text_hash: '835afa37dfc4e8b615d8403426779cd03bb030304d77497f50dd4cf1b9c2f824',
       can_certify: false,
       anchor: {
@@ -70,7 +89,7 @@ describe('ContentBitcoinAnchor', () => {
 
     render(<ContentBitcoinAnchor contentId={3} />);
 
-    expect(await screen.findByText('Anclada en BTC')).toBeInTheDocument();
+    expect(await screen.findByText('Anclada a Bitcoin')).toBeInTheDocument();
     expect(screen.getByText('text_hash (SHA-256)')).toBeInTheDocument();
     expect(
       screen.getByText('835afa37dfc4e8b615d8403426779cd03bb030304d77497f50dd4cf1b9c2f824'),

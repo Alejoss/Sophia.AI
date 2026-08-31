@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 
 class CryptoPayment(models.Model):
@@ -100,3 +101,77 @@ class CryptoPayment(models.Model):
         if self.anchor_request_id:
             return self.anchor_request.requester
         return None
+
+
+class BchDirectPayment(models.Model):
+    """
+    Self-custody BCH payment for a TranscriptAnchorRequest.
+
+    Unique exact amount (sats) on a single receive address; user-triggered
+    verification against a public chain API (no webhooks/workers).
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_PAID = 'paid'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_EXPIRED, 'Expired'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    )
+
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+    )
+    address = models.CharField(max_length=128)
+    expected_amount_sats = models.BigIntegerField(
+        help_text='Exact amount in satoshis the payer must send.',
+    )
+    usd_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    usd_bch_rate = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        help_text='USD per 1 BCH at order creation.',
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    expires_at = models.DateTimeField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+    payment_txid = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    provider_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'expires_at'], name='bch_direct_status_exp_idx'),
+            models.Index(fields=['expected_amount_sats'], name='bch_direct_sats_idx'),
+        ]
+
+    def __str__(self):
+        return f'BCH {self.expected_amount_sats} sats → req {self.anchor_request_id} [{self.status}]'
+
+    @property
+    def is_expired(self):
+        if self.status != self.STATUS_PENDING:
+            return self.status == self.STATUS_EXPIRED
+        return timezone.now() >= self.expires_at
+
+    @property
+    def expected_amount_bch(self):
+        return (self.expected_amount_sats or 0) / 100_000_000
+
+    def mark_expired_if_needed(self):
+        if self.status == self.STATUS_PENDING and timezone.now() >= self.expires_at:
+            self.status = self.STATUS_EXPIRED
+            self.save(update_fields=['status', 'updated_at'])
+        return self

@@ -79,7 +79,7 @@ describe('ContentTranscriptPage', () => {
 
     renderWithProviders(<ContentTranscriptPage />);
 
-    expect(await screen.findByText('Anclada en BTC')).toBeInTheDocument();
+    expect(await screen.findByText('Anclada a Bitcoin')).toBeInTheDocument();
     expect(screen.getByText('abc123hash')).toBeInTheDocument();
     expect(screen.getByText('deadbeeftxid')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ver en mempool\.space/i })).toBeInTheDocument();

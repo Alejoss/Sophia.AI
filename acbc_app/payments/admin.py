@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from payments.models import CryptoPayment
+from payments.models import BchDirectPayment, CryptoPayment
 
 
 @admin.register(CryptoPayment)
@@ -25,3 +25,27 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'anchor_request__requester__username',
     )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload')
+
+
+@admin.register(BchDirectPayment)
+class BchDirectPaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'anchor_request',
+        'expected_amount_sats',
+        'usd_amount',
+        'status',
+        'payment_txid',
+        'expires_at',
+        'paid_at',
+        'created_at',
+    )
+    list_filter = ('status', 'created_at')
+    search_fields = (
+        'payment_txid',
+        'address',
+        'anchor_request__requester__username',
+        'anchor_request__text_hash',
+    )
+    raw_id_fields = ('anchor_request',)
+    readonly_fields = ('created_at', 'updated_at', 'provider_payload', 'paid_at')

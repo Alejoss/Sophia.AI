@@ -573,8 +573,8 @@ class TranscriptAnchorRequest(models.Model):
     """
     Paid request to anchor a transcript hash on Bitcoin.
 
-    Any authenticated user may request; after NOWPayments marks the invoice
-    finished, status becomes paid_pending_review until staff approves (broadcast)
+    Any authenticated user may request; after NOWPayments or BCH-direct payment
+    succeeds, status becomes paid_pending_review until staff approves (broadcast)
     or rejects (no automatic refund).
     """
 

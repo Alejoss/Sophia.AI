@@ -767,6 +767,30 @@ BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 # Fixed USD price charged via NOWPayments for a public transcript-anchor request.
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
 
+# Self-custody Bitcoin Cash payments (exact-amount match on a single address).
+# Network mirrors BTC: chipnet in non-PRODUCTION (like signet), mainnet on server.
+_BCH_NETWORK_DEFAULT = 'mainnet' if ENVIRONMENT == 'PRODUCTION' else 'chipnet'
+BCH_NETWORK = os.getenv('BCH_NETWORK', _BCH_NETWORK_DEFAULT).strip().lower()
+# Generic fallback; prefer network-specific addresses when set.
+BCH_RECEIVE_ADDRESS = os.getenv('BCH_RECEIVE_ADDRESS', '').strip()
+BCH_RECEIVE_ADDRESS_CHIPNET = os.getenv('BCH_RECEIVE_ADDRESS_CHIPNET', '').strip()
+BCH_RECEIVE_ADDRESS_MAINNET = os.getenv('BCH_RECEIVE_ADDRESS_MAINNET', '').strip()
+_BCH_API_DEFAULTS = {
+    'mainnet': 'https://api.blockchair.com/bitcoin-cash',
+    # Fulcrum Electrum SSL — community chipnet indexer (bch.ninja).
+    'chipnet': 'ssl://chipnet.bch.ninja:50002',
+    'testnet': 'ssl://chipnet.bch.ninja:50002',
+    'testnet4': 'ssl://chipnet.bch.ninja:50002',
+}
+BCH_API_BASE = os.getenv(
+    'BCH_API_BASE',
+    _BCH_API_DEFAULTS.get(BCH_NETWORK, _BCH_API_DEFAULTS['chipnet']),
+).rstrip('/')
+BCH_PAYMENT_TTL_MINUTES = int(os.getenv('BCH_PAYMENT_TTL_MINUTES', '30'))
+BCH_MIN_CONFIRMATIONS = int(os.getenv('BCH_MIN_CONFIRMATIONS', '0'))
+# Optional fixed USD/BCH; 0 = fetch from Blockchair mainnet /stats (also used on chipnet for sizing).
+BCH_USD_PRICE = float(os.getenv('BCH_USD_PRICE', '0'))
+
 # Sentry: init when SENTRY_DSN is set (production / beta)
 from academia_blockchain.sentry_config import configure_sentry
 configure_sentry()

@@ -5,6 +5,37 @@
     <link rel="icon" type="image/png" href="/images/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Academia Blockchain</title>
+    <!-- Keep URLs in sync with frontend/src/images/homeHeroAssets.js -->
+    <script>
+      (function () {
+        var authed = false;
+        try {
+          authed =
+            localStorage.getItem('is_authenticated') === 'true' &&
+            !!localStorage.getItem('access_token') &&
+            !!localStorage.getItem('user');
+        } catch (e) {}
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.type = 'image/webp';
+        link.setAttribute('imagesizes', '100vw');
+        if (authed) {
+          link.href = '/images/sobre_nosotros_hero-960.webp';
+          link.setAttribute(
+            'imagesrcset',
+            '/images/sobre_nosotros_hero-640.webp 640w, /images/sobre_nosotros_hero-960.webp 960w, /images/sobre_nosotros_hero-1120.webp 1120w'
+          );
+        } else {
+          link.href = '/images/home_hero-960.webp';
+          link.setAttribute(
+            'imagesrcset',
+            '/images/home_hero-640.webp 640w, /images/home_hero-960.webp 960w, /images/home_hero-1120.webp 1120w'
+          );
+        }
+        document.head.appendChild(link);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

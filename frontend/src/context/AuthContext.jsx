@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { getUserFromLocalStorage, isAuthenticated, setUserInLocalStorage, setAuthenticationStatus, 
-  getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus } from './localStorageUtils';
+  getAccessTokenFromLocalStorage, setAccessTokenInLocalStorage, removeAccessTokenFromLocalStorage, removeUserFromLocalStorage, clearAuthenticationStatus, readPersistedSession } from './localStorageUtils';
 import { checkAuth, getUserProfile } from '../api/profilesApi';
 
 export const AuthContext = createContext();
@@ -30,10 +30,10 @@ export const useAuth = () => {
  */
 
 export const AuthProvider = ({ children }) => {
-  const [authState, setAuthState] = useState({
-    isAuthenticated: false,
-    user: null,
-  });
+  // Paint the correct chrome/home on the first frame when localStorage already
+  // has a session. checkAuth still runs; authInitialized stays false until then
+  // so ProtectedRoute does not admit unconfirmed tokens.
+  const [authState, setAuthState] = useState(readPersistedSession);
   const [authInitialized, setAuthInitialized] = useState(false);
 
   const updateAuthState = useCallback((userData, accessToken) => {

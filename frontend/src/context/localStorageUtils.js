@@ -70,3 +70,23 @@ export const removeAccessTokenFromLocalStorage = () => {
     // Failed to remove access token
   }
 };
+
+/**
+ * Synchronous snapshot of a logged-in session for the first React paint.
+ * After logout we keep `{ username }` in localStorage, so token + flag + user
+ * must all be present — otherwise the guest landing flashes then swaps.
+ */
+export const readPersistedSession = () => {
+  try {
+    const hasToken = Boolean(getAccessTokenFromLocalStorage());
+    const flagged = isAuthenticated();
+    const user = getUserFromLocalStorage();
+    const hasUser = Boolean(user && (user.username || user.id != null));
+    if (hasToken && flagged && hasUser) {
+      return { isAuthenticated: true, user };
+    }
+  } catch {
+    // localStorage unavailable (privacy mode, SSR tests, etc.)
+  }
+  return { isAuthenticated: false, user: null };
+};

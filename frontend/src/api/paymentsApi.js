@@ -78,3 +78,30 @@ export const listAnchorRequestPayments = async (requestId) => {
     throwApiError(error, 'No se pudo listar los pagos del anclaje');
   }
 };
+
+export const createAnchorRequestBchPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH');
+  }
+};
+
+export const getAnchorRequestBchPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/anchor-request/${requestId}/bch/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo consultar la orden BCH');
+  }
+};
+
+export const verifyAnchorRequestBchPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/bch/verify/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH');
+  }
+};

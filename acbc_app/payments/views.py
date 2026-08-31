@@ -12,9 +12,15 @@ from rest_framework.views import APIView
 from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
-from payments.models import CryptoPayment
+from payments.bch_client import get_bch_network, is_bch_direct_configured
+from payments.bch_services import (
+    BchPaymentError,
+    create_or_reuse_bch_payment,
+    verify_bch_payment,
+)
+from payments.models import BchDirectPayment, CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
-from payments.serializers import CryptoPaymentSerializer
+from payments.serializers import BchDirectPaymentSerializer, CryptoPaymentSerializer
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
@@ -24,6 +30,7 @@ from payments.services import (
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
+from content.serializers import TranscriptAnchorRequestSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +95,12 @@ class PaymentGatewayStatusView(APIView):
             'enabled': client.configured,
             'currencies': sorted(ALLOWED_PAY_CURRENCIES),
             'provider': 'nowpayments',
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+            'methods': {
+                'nowpayments': client.configured,
+                'bch_direct': is_bch_direct_configured(),
+            },
         })
 
 
@@ -367,6 +380,117 @@ class AnchorRequestPaymentsListView(APIView):
                 refreshed.append(payment)
             payments = refreshed
         return Response(CryptoPaymentSerializer(payments, many=True).data)
+
+
+class AnchorRequestBchPaymentView(APIView):
+    """
+    GET  — current pending/paid BCH direct order for an anchor request.
+    POST — create or reuse a BCH exact-amount order.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if anchor_request.requester_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payment = (
+            BchDirectPayment.objects.filter(anchor_request=anchor_request)
+            .order_by('-created_at')
+            .first()
+        )
+        if payment is None:
+            return Response({
+                'payment': None,
+                'bch_direct_enabled': is_bch_direct_configured(),
+                'bch_network': get_bch_network(),
+            })
+        payment.mark_expired_if_needed()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+            'request': TranscriptAnchorRequestSerializer(anchor_request).data,
+        })
+
+    def post(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.select_related(
+                'content', 'requester'
+            ).get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            payment = create_or_reuse_bch_payment(
+                anchor_request=anchor_request,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.error(
+                'Unexpected error creating BCH payment for anchor_request=%s: %s',
+                request_id,
+                exc,
+                exc_info=True,
+            )
+            return Response(
+                {'error': 'No se pudo crear la orden BCH. Inténtelo de nuevo.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            BchDirectPaymentSerializer(payment).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AnchorRequestBchVerifyView(APIView):
+    """User-triggered on-chain verification for a BCH direct order."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.select_related(
+                'content', 'requester'
+            ).get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            payment = verify_bch_payment(
+                anchor_request=anchor_request,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.error(
+                'Unexpected error verifying BCH payment for anchor_request=%s: %s',
+                request_id,
+                exc,
+                exc_info=True,
+            )
+            return Response(
+                {'error': 'No se pudo verificar el pago BCH. Inténtelo de nuevo.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        anchor_request.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'request': TranscriptAnchorRequestSerializer(anchor_request).data,
+        })
 
 
 @method_decorator(csrf_exempt, name='dispatch')

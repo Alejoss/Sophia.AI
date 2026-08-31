@@ -33,7 +33,7 @@ const GITHUB_URL = "https://github.com/Alejoss/Sophia.AI";
 
 const Home = () => {
   const navigate = useNavigate();
-  const { authState, authInitialized } = React.useContext(AuthContext);
+  const { authState } = React.useContext(AuthContext);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
@@ -42,8 +42,10 @@ const Home = () => {
   const heroBoxBg = isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.77)';
   const isAuthenticated = authState?.isAuthenticated ?? false;
 
-  // Authenticated home: project info, collaborative, open source, blockchain status, GitHub
-  if (authInitialized && isAuthenticated) {
+  // Authenticated home: project info, collaborative, open source, blockchain status, GitHub.
+  // Use persisted auth on the first paint — do not wait for checkAuth or the
+  // guest landing (home_hero.jpg) flashes then swaps, which tanks CLS/LCP.
+  if (isAuthenticated) {
     return (
       <Box sx={{ 
         minHeight: '100vh',
@@ -54,11 +56,7 @@ const Home = () => {
         flexDirection: 'column'
       }}>
         <Box className="home-hero-section">
-          <HomeHeroBackground
-            src="/images/sobre_nosotros_hero_image.jpg"
-            alt=""
-            objectPosition="top center"
-          />
+          <HomeHeroBackground variant="authenticated" objectPosition="top center" />
           <Box className="home-hero-overlay home-hero-overlay-authenticated" />
           <Box sx={{ position: 'absolute', top: { xs: 80, md: 88 }, right: { xs: 24, md: 40 }, zIndex: 3 }}>
             <Button
@@ -288,7 +286,7 @@ const Home = () => {
     );
   }
 
-  // Show home page for non-authenticated users (and while auth is initializing, show landing)
+  // Guest landing. Shown when there is no persisted session (typical first visit).
   return (
     <Box sx={{ 
       minHeight: '100vh',
@@ -300,7 +298,7 @@ const Home = () => {
     }}>
       {/* Hero Section - Full Width */}
       <Box className="home-hero-section">
-        <HomeHeroBackground src="/images/home_hero.jpg" alt="" />
+        <HomeHeroBackground variant="guest" />
         {/* Overlay for better text contrast */}
         <Box className="home-hero-overlay" />
         {/* Content Container - Centered */}

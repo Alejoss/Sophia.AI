@@ -1270,7 +1270,7 @@ const ContentDisplay = ({
                   {transcriptBtcAnchored &&
                   <Chip
                     icon={<VerifiedIcon />}
-                    label="Anclada en BTC"
+                    label="Anclada a Bitcoin"
                     size="small"
                     variant="outlined"
                     color="success" />
@@ -1504,7 +1504,7 @@ const ContentDisplay = ({
                   {transcriptBtcAnchored &&
                   <Chip
                     icon={<VerifiedIcon />}
-                    label="Anclada en BTC"
+                    label="Anclada a Bitcoin"
                     size="small"
                     variant="outlined"
                     color="success" />

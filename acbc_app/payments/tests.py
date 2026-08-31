@@ -1,7 +1,8 @@
 import hashlib
 import hmac
 import json
-from unittest.mock import patch
+from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -10,7 +11,13 @@ from rest_framework.test import APIClient
 
 from content.models import Content, ContentTranscript, TranscriptAnchorRequest
 from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase, Node
-from payments.models import CryptoPayment
+from payments.bch_client import BchTransaction, BchTxOutput
+from payments.bch_services import (
+    BchPaymentError,
+    create_or_reuse_bch_payment,
+    verify_bch_payment,
+)
+from payments.models import BchDirectPayment, CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
     create_anchor_request_payment,
@@ -300,6 +307,7 @@ class PaymentGatewayStatusTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['enabled'])
         self.assertIn('bch', response.data['currencies'])
+        self.assertIn('bch_network', response.data)
 
 
 @override_settings(NOWPAYMENTS_API_KEY='test-key')
@@ -441,3 +449,152 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
         self.assertIsNone(payment.path_purchase_id)
         self.assertTrue(payment.order_id.startswith('anchor-req-'))
 
+
+@override_settings(
+    ANCHOR_REQUEST_PRICE_USD=1,
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class BchDirectPaymentTests(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video BCH',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para BCH directo.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+
+    def test_create_bch_order_unique_sats(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        payment = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(payment.status, BchDirectPayment.STATUS_PENDING)
+        self.assertEqual(payment.expected_amount_sats, 500000)  # 1/200 BCH
+        self.assertTrue(payment.address.startswith('bitcoincash:'))
+        self.assertEqual((payment.provider_payload or {}).get('network'), 'mainnet')
+
+        reused = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(reused.pk, payment.pk)
+
+    def test_verify_marks_request_paid_pending_review(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        client.list_recent_transactions.return_value = [
+            BchTransaction(
+                txid='ab' * 32,
+                timestamp=int(order.created_at.timestamp()) + 10,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(
+                        address=order.address,
+                        amount_sats=order.expected_amount_sats,
+                    ),
+                ],
+            ),
+        ]
+        paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(paid.payment_txid, 'ab' * 32)
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+
+    def test_verify_wrong_amount_fails(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        client.list_recent_transactions.return_value = [
+            BchTransaction(
+                txid='cd' * 32,
+                timestamp=int(order.created_at.timestamp()) + 10,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats + 1),
+                ],
+            ),
+        ]
+        with self.assertRaises(BchPaymentError):
+            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+
+class BchNetworkClientTests(TestCase):
+    def test_cashaddr_scripthash_roundtrip(self):
+        from payments.bch_cashaddr import (
+            address_to_scripthash,
+            decode_cashaddr,
+            encode_cashaddr,
+        )
+        payload = bytes.fromhex('76a04053bda0a88bda5177b86a6c6f1f9abac710')
+        addr = encode_cashaddr('bitcoincash', 0, payload)
+        self.assertTrue(addr.startswith('bitcoincash:'))
+        prefix, version, decoded = decode_cashaddr(addr)
+        self.assertEqual(prefix, 'bitcoincash')
+        self.assertEqual(decoded, payload)
+        scripthash = address_to_scripthash(addr)
+        self.assertEqual(len(scripthash), 64)
+        self.assertTrue(all(c in '0123456789abcdef' for c in scripthash))
+
+    @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
+    def test_build_client_chipnet_is_electrum(self):
+        from payments.bch_client import BchElectrumClient, build_bch_client
+        client = build_bch_client()
+        self.assertIsInstance(client, BchElectrumClient)
+        self.assertEqual(client.host, 'chipnet.bch.ninja')
+        self.assertEqual(client.port, 50002)
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_API_BASE='https://api.blockchair.com/bitcoin-cash',
+    )
+    def test_build_client_mainnet_is_blockchair(self):
+        from payments.bch_client import BchPublicClient, build_bch_client
+        client = build_bch_client()
+        self.assertIsInstance(client, BchPublicClient)
+
+    @override_settings(
+        BCH_NETWORK='chipnet',
+        BCH_RECEIVE_ADDRESS='',
+        BCH_RECEIVE_ADDRESS_CHIPNET='bchtest:qpechipnetplaceholder00000000000000000',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpemainnetplaceholder000000000000000',
+    )
+    def test_receive_address_prefers_chipnet_override(self):
+        from payments.bch_client import get_bch_receive_address
+        self.assertTrue(get_bch_receive_address().startswith('bchtest:'))

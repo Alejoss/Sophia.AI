@@ -82,7 +82,12 @@ Base path under content details:
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated; uploader or staff |
 
-Public paid requests use `TranscriptAnchorRequest` + NOWPayments (`POST /api/payments/anchor-request/<id>/`). After `finished`, status is `paid_pending_review`. Staff approve/reject in Django admin (**Content → Transcript anchor requests**). No automatic refunds.
+Public paid requests use `TranscriptAnchorRequest` and a payment method chooser:
+
+- **NOWPayments** — `POST /api/payments/anchor-request/<id>/`
+- **BCH directo** — `POST /api/payments/anchor-request/<id>/bch/` + `.../bch/verify/` ([docs](../payments/bch-direct.md))
+
+After payment, status is `paid_pending_review`. Staff approve/reject in Django admin (**Content → Transcript anchor requests**). No automatic refunds.
 
 `POST .../anchors/` **only creates a pending row**.  
 `POST .../anchor/` **broadcasts** (platform wallet). The same USD fee cap applies to the ops CLI.

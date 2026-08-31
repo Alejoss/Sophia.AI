@@ -71,6 +71,13 @@ docker-compose exec backend python manage.py populate_users
 # 5. Populate content, topics, libraries, publications, and events
 docker-compose exec backend python manage.py populate_content
 
+# 5b. (Optional) Seed topics with VIDEO+transcript for Bitcoin/BCH anchor QA
+#     Fills existing topics, creates 3 transcript topics, skips duplicates
+docker-compose exec backend python manage.py populate_content --seed-transcripts
+# Equivalent explicit flags:
+# docker-compose exec backend python manage.py populate_content \
+#   --no-base --fill-topics --extra-topics 3 --with-transcripts --skip-existing --no-events
+
 # 6. Populate knowledge paths, nodes, and quizzes
 docker-compose exec backend python manage.py populate_knowledge_paths
 

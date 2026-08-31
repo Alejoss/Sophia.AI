@@ -206,6 +206,25 @@ Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Defaul
 - **`BTC_USD_PRICE`**: optional fixed USD/BTC for that check; `0` (default) fetches live from `https://mempool.space/api/v1/prices`.
 - On reject, API returns **503** with message: *Las comisiones por transacción están muy altas por el momento, por favor vuelve a intentarlo más tarde* (`code: fee_too_high`). Row stays `pending`.
 
+### Bitcoin Cash direct (anchor request payments)
+
+Self-custody exact-amount BCH for `TranscriptAnchorRequest`. See [bch-direct.md](../payments/bch-direct.md).
+
+#### `BCH_NETWORK`
+- **Default**: `chipnet` when `ENVIRONMENT` ≠ `PRODUCTION` (local Docker); `mainnet` in production
+- **Values**: `chipnet` (test net, like BTC signet), `mainnet`
+- Chipnet verification uses Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002` by default)
+- Mainnet verification uses Blockchair
+
+#### `BCH_RECEIVE_ADDRESS` / `BCH_RECEIVE_ADDRESS_CHIPNET` / `BCH_RECEIVE_ADDRESS_MAINNET`
+- **Required** (one of them for the active network) to enable the BCH method in the checkout chooser
+- Chipnet: CashAddr `bchtest:q...`
+- Mainnet: CashAddr `bitcoincash:q...`
+
+#### `BCH_API_BASE` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
+- **Defaults**: follow `BCH_NETWORK` (Electrum SSL on chipnet, Blockchair on mainnet) / `30` / `0` / `0`
+- `BCH_USD_PRICE=0` fetches live USD/BCH from Blockchair mainnet `/stats` (also used to size chipnet orders)
+
 ```bash
 # Local / server Docker (service name: backend)
 docker compose exec backend python manage.py broadcast_transcript_anchor --show-address

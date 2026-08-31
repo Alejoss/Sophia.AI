@@ -199,19 +199,34 @@ def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
         )
 
 
-def _mark_anchor_request_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+def mark_anchor_request_paid(anchor_request: TranscriptAnchorRequest, *, source: str = '') -> TranscriptAnchorRequest:
+    """
+    Transition TranscriptAnchorRequest → paid_pending_review (idempotent).
+
+    Shared by NOWPayments fulfillment and BCH direct verification.
+    """
     with transaction.atomic():
-        req = TranscriptAnchorRequest.objects.select_for_update().get(
-            pk=crypto_payment.anchor_request_id
-        )
+        req = TranscriptAnchorRequest.objects.select_for_update().get(pk=anchor_request.pk)
         if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
-            return
+            return req
         req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
         req.save(update_fields=['status', 'updated_at'])
+    logger.info(
+        'Anchor request %s marked paid_pending_review (source=%s)',
+        req.pk,
+        source or 'unknown',
+    )
+    return req
 
+
+def _mark_anchor_request_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    req = mark_anchor_request_paid(
+        TranscriptAnchorRequest.objects.get(pk=crypto_payment.anchor_request_id),
+        source='nowpayments',
+    )
     req = TranscriptAnchorRequest.objects.select_related(
         'content', 'requester'
-    ).get(pk=crypto_payment.anchor_request_id)
+    ).get(pk=req.pk)
     try:
         on_crypto_payment_completed(crypto_payment, anchor_request=req)
     except Exception as exc:
@@ -444,6 +459,18 @@ def create_anchor_request_payment(
         TranscriptAnchorRequest.STATUS_REJECTED,
     ):
         raise ValueError('Esta solicitud ya fue resuelta.')
+
+    from django.utils import timezone
+    from payments.models import BchDirectPayment
+
+    if BchDirectPayment.objects.filter(
+        anchor_request=anchor_request,
+        status=BchDirectPayment.STATUS_PENDING,
+        expires_at__gt=timezone.now(),
+    ).exists():
+        raise ValueError(
+            'Ya hay un pago BCH directo en curso. Complételo o espere a que expire.'
+        )
 
     client = NOWPaymentsClient()
     if not client.configured:

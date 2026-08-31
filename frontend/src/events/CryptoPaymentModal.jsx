@@ -73,7 +73,7 @@ const MSG = {
   paidEvent: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
   paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
   paidAnchor:
-    '\u00A1Pago completado! Tu solicitud de anclaje Bitcoin est\u00E1 en revisi\u00F3n.',
+    '\u00A1Pago completado! Tu solicitud de anclaje a Bitcoin est\u00E1 en revisi\u00F3n.',
   polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
   initError: 'No se pudo iniciar el pago',
   copyError: 'No se pudo copiar al portapapeles',
@@ -254,7 +254,7 @@ const CryptoPaymentModal = ({
           <Box>
             <Typography variant="h6" fontWeight={700}>
               {isAnchorCheckout
-                ? 'Pago del anclaje Bitcoin'
+                ? 'Anclaje a Bitcoin'
                 : isPathCheckout
                   ? 'Pago del camino'
                   : `Pago del ${productLabel}`}
