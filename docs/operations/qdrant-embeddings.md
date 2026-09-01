@@ -3,7 +3,7 @@
 Sophia does **not** store embedding vectors in Postgres. An external worker
 (Vincent) upserts chunks to **Qdrant Cloud**. Sophia:
 
-1. Exposes a machine-to-machine **embedding-ingest** API (queue + ack).
+1. Exposes a machine-to-machine **embedding-ingest** API (topic queue, content queue, ack).
 2. Updates `ContentTranscript.embedding_*` bookkeeping on ack.
 3. Reads Qdrant later for topic similarity / RAG (`utils.qdrant_client`).
 
@@ -21,17 +21,56 @@ Base: `/api/content/embedding-ingest/`
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/embedding-ingest/` | Queue of VIDEO/AUDIO with transcript needing embed work |
+| `GET` | `/embedding-ingest/topics/` | Topics that have at least one transcript matching the status filter |
 | `GET` | `/embedding-ingest/{content_id}/` | One item + transcript embedding summary |
 | `PUT` | `/embedding-ingest/{content_id}/` | Worker ack (`indexed` / `failed` / `skipped`) |
 
 ### Queue query params
 
-- `topic_id`, `media_type`, `content_id`
+Shared by the content queue and the topic queue:
+
+- `media_type`
 - `status` — comma-separated override (e.g. `pending,stale`)
-- `include_completed` — also list `indexed` / `skipped`
-- `limit` / `offset` (default limit 50, max 200)
+- `include_completed` — also match `indexed` / `skipped`
+- `limit` / `offset` (default limit 100, max 500)
+
+Content queue only (optional filter on the topic queue too):
+
+- `topic_id`, `content_id`
 
 Default queue statuses: `pending`, `stale`, `failed`.
+
+Content not linked to any topic still appears in `GET /embedding-ingest/`
+but **not** in the topic queue (Vincent has no `topic_id` for those points).
+
+### Topic queue (`GET /embedding-ingest/topics/`)
+
+Discover which topics need embed work. Each item:
+
+```json
+{
+  "id": 12,
+  "title": "Bitcoin",
+  "is_public": true,
+  "chat_enabled": false,
+  "matching_count": 3,
+  "status_counts": {
+    "pending": 2,
+    "stale": 1,
+    "failed": 0,
+    "indexed": 5,
+    "skipped": 0
+  }
+}
+```
+
+- `matching_count` — VIDEO/AUDIO transcripts whose `embedding_status` is in the
+  request's status filter (default: pending/stale/failed).
+- `status_counts` — full breakdown for that topic (not limited to the filter).
+- Topics with `matching_count = 0` are omitted. Ordered by `matching_count`
+  descending, then `id`.
+- The same content linked to several topics is counted on **each** topic
+  (Qdrant points are filtered by `topic_id`).
 
 ### List queue — example
 
@@ -75,14 +114,15 @@ Response `200`:
       "chunk_count": null,
       "embedded_text_hash": null,
       "embedded_at": null,
-      "topic_ids": [12]
+      "topic_ids": [12],
+      "topics": [{ "id": 12, "title": "Bitcoin" }]
     }
   ]
 }
 ```
 
 Queue items include manifest fields (same base as transcript-ingest) **plus**
-embedding metadata and **`topic_ids`** (topics linked to the content). They do
+embedding metadata, **`topic_ids`**, and **`topics`** (`{ id, title }`). They do
 **not** include full transcript text bodies — use the detail GET for `index_text`.
 
 ### Get detail — example
@@ -129,6 +169,12 @@ Response `200`:
 
 **409** if the content has no transcript yet (transcribe first via
 [transcript-ingest](../api/transcript-ingest.md)).
+
+Recommended worker discovery flow:
+
+1. `GET /api/content/embedding-ingest/topics/`
+2. For each topic, `GET /api/content/embedding-ingest/?topic_id=<id>`
+3. Embed chunks, upsert to Qdrant with that `topic_id`, then `PUT` ack.
 
 ---
 
@@ -216,29 +262,36 @@ this repository.
    `python manage.py check_qdrant --ensure-collection` or create the collection
    from the worker with the same settings.
 
-3. **Poll the queue**:
+3. **Discover topics** that still need work:
 
    ```bash
-   curl -s "$BASE_URL/api/content/embedding-ingest/?status=pending,stale,failed" \
+   curl -s "$BASE_URL/api/content/embedding-ingest/topics/" \
      -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY"
    ```
 
-   Optionally filter by `topic_id` or `content_id`.
+4. **Poll the content queue** (optionally per topic):
 
-4. **For each item**, load transcript text to chunk:
+   ```bash
+   curl -s "$BASE_URL/api/content/embedding-ingest/?topic_id=12&status=pending,stale,failed" \
+     -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY"
+   ```
+
+   Omit `topic_id` to list all VIDEO/AUDIO with transcripts needing work.
+
+5. **For each item**, load transcript text to chunk:
    - `GET /api/content/embedding-ingest/{content_id}/` → read `transcript.index_text`
-     and `transcript.topic_ids` (also on queue items as `topic_ids`).
+     and `transcript.topic_ids` (also on queue items as `topic_ids` / `topics`).
    - Alternatively, keep `processed_plain` in the worker cache from the transcript
      step if the same process runs both pipelines.
 
-5. **Chunk** `index_text` (or cached equivalent). Chunk size/overlap is
+6. **Chunk** `index_text` (or cached equivalent). Chunk size/overlap is
    worker-defined; keep chunks small enough that citation excerpts fit topic
    chat context (~400 chars shown in UI).
 
-6. **Embed** chunks with OpenAI `text-embedding-3-large` (3072 dimensions).
+7. **Embed** chunks with OpenAI `text-embedding-3-large` (3072 dimensions).
    Must match `OPENAI_EMBEDDING_MODEL` / `QDRANT_VECTOR_SIZE` in Sophia.
 
-7. **Upsert to Qdrant**:
+8. **Upsert to Qdrant**:
    - On **`stale`** or re-index: delete existing points for this `content_id`
      (filter delete) **or** use deterministic point IDs and overwrite in place.
    - Use stable point IDs when possible, e.g. `{content_id}_{chunk_index}` or a
@@ -246,9 +299,9 @@ this repository.
    - Include payload fields listed below (including each `topic_id` from
      `topic_ids`).
 
-8. **Ack success or failure** via `PUT /api/content/embedding-ingest/{content_id}/`.
+9. **Ack success or failure** via `PUT /api/content/embedding-ingest/{content_id}/`.
 
-9. **Verify** (optional):
+10. **Verify** (optional):
 
     ```bash
     python manage.py check_qdrant --topic-id 12

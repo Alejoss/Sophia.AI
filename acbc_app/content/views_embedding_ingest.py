@@ -7,6 +7,10 @@ or ``Authorization: Bearer`` with ``TRANSCRIPT_INGEST_API_KEY``):
   Work queue of VIDEO/AUDIO contents that already have a transcript and whose
   ``embedding_status`` needs work (default: ``pending``, ``stale``, ``failed``).
 
+* ``GET  /api/content/embedding-ingest/topics/``
+  Topics that have at least one VIDEO/AUDIO transcript matching the status
+  filter (same defaults as the content queue).
+
 * ``GET  /api/content/embedding-ingest/<content_id>/``
   One-item manifest + embedding metadata.
 
@@ -19,6 +23,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
@@ -31,6 +36,7 @@ from content.serializers import (
     ContentEmbeddingAckSerializer,
     ContentEmbeddingIngestDetailSerializer,
     ContentEmbeddingQueueItemSerializer,
+    ContentEmbeddingTopicQueueItemSerializer,
     ContentTranscriptIngestSummarySerializer,
 )
 from content.views_transcript_ingest import (
@@ -74,6 +80,98 @@ def _parse_status_filter(raw: str | None) -> list[str] | None:
     return statuses or None
 
 
+def _parse_embedding_queue_params(request):
+    """Parse shared embedding-queue query params.
+
+    Returns ``(error_response, params)``. ``params`` is None when there is an error.
+    """
+    media_type = request.query_params.get('media_type')
+    if media_type and media_type not in TRANSCRIPT_MEDIA_TYPES:
+        return Response(
+            {'error': 'media_type debe ser VIDEO o AUDIO.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        ), None
+
+    topic_id = request.query_params.get('topic_id')
+    if topic_id is not None:
+        try:
+            topic_id = int(topic_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'topic_id debe ser un entero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            ), None
+        if not Topic.objects.filter(pk=topic_id).exists():
+            return Response(
+                {'error': f'No existe el tema {topic_id}.'},
+                status=status.HTTP_404_NOT_FOUND,
+            ), None
+
+    content_id = request.query_params.get('content_id')
+    if content_id is not None:
+        try:
+            content_id = int(content_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'content_id debe ser un entero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            ), None
+
+    try:
+        limit = int(request.query_params.get('limit', DEFAULT_QUEUE_LIMIT))
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'limit debe ser un entero.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        ), None
+    limit = max(1, min(limit, MAX_QUEUE_LIMIT))
+
+    try:
+        offset = int(request.query_params.get('offset', 0))
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'offset debe ser un entero.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        ), None
+    offset = max(0, offset)
+
+    include_completed = _parse_bool(request.query_params.get('include_completed'))
+    status_filter = _parse_status_filter(request.query_params.get('status'))
+    if request.query_params.get('status') is not None and status_filter is None:
+        return Response(
+            {
+                'error': (
+                    'status inválido. Use una lista separada por comas de: '
+                    + ', '.join(sorted(ALL_EMBEDDING_STATUSES))
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        ), None
+
+    if status_filter is not None:
+        statuses = status_filter
+    elif include_completed:
+        statuses = sorted(ALL_EMBEDDING_STATUSES)
+    else:
+        statuses = list(DEFAULT_NEEDING_STATUSES)
+
+    return None, {
+        'media_type': media_type,
+        'topic_id': topic_id,
+        'content_id': content_id,
+        'limit': limit,
+        'offset': offset,
+        'include_completed': include_completed,
+        'statuses': statuses,
+    }
+
+
+def _topic_media_types(media_type):
+    if media_type:
+        return (media_type,)
+    return TRANSCRIPT_MEDIA_TYPES
+
+
 class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
     """
     GET /api/content/embedding-ingest/
@@ -83,75 +181,17 @@ class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
     """
 
     def get(self, request):
-        media_type = request.query_params.get('media_type')
-        if media_type and media_type not in TRANSCRIPT_MEDIA_TYPES:
-            return Response(
-                {'error': 'media_type debe ser VIDEO o AUDIO.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        error, params = _parse_embedding_queue_params(request)
+        if error:
+            return error
 
-        topic_id = request.query_params.get('topic_id')
-        if topic_id is not None:
-            try:
-                topic_id = int(topic_id)
-            except (TypeError, ValueError):
-                return Response(
-                    {'error': 'topic_id debe ser un entero.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if not Topic.objects.filter(pk=topic_id).exists():
-                return Response(
-                    {'error': f'No existe el tema {topic_id}.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-        content_id = request.query_params.get('content_id')
-        if content_id is not None:
-            try:
-                content_id = int(content_id)
-            except (TypeError, ValueError):
-                return Response(
-                    {'error': 'content_id debe ser un entero.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        try:
-            limit = int(request.query_params.get('limit', DEFAULT_QUEUE_LIMIT))
-        except (TypeError, ValueError):
-            return Response(
-                {'error': 'limit debe ser un entero.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        limit = max(1, min(limit, MAX_QUEUE_LIMIT))
-
-        try:
-            offset = int(request.query_params.get('offset', 0))
-        except (TypeError, ValueError):
-            return Response(
-                {'error': 'offset debe ser un entero.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        offset = max(0, offset)
-
-        include_completed = _parse_bool(request.query_params.get('include_completed'))
-        status_filter = _parse_status_filter(request.query_params.get('status'))
-        if request.query_params.get('status') is not None and status_filter is None:
-            return Response(
-                {
-                    'error': (
-                        'status inválido. Use una lista separada por comas de: '
-                        + ', '.join(sorted(ALL_EMBEDDING_STATUSES))
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if status_filter is not None:
-            statuses = status_filter
-        elif include_completed:
-            statuses = sorted(ALL_EMBEDDING_STATUSES)
-        else:
-            statuses = list(DEFAULT_NEEDING_STATUSES)
+        media_type = params['media_type']
+        topic_id = params['topic_id']
+        content_id = params['content_id']
+        limit = params['limit']
+        offset = params['offset']
+        include_completed = params['include_completed']
+        statuses = params['statuses']
 
         queryset = (
             Content.objects.filter(
@@ -173,6 +213,70 @@ class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
         total = queryset.count()
         items = queryset[offset:offset + limit]
         serializer = ContentEmbeddingQueueItemSerializer(items, many=True)
+
+        return Response({
+            'count': total,
+            'limit': limit,
+            'offset': offset,
+            'include_completed': include_completed,
+            'status_filter': statuses,
+            'topic_id': topic_id,
+            'items': serializer.data,
+        })
+
+
+class ContentEmbeddingIngestTopicQueueView(EmbeddingIngestAPIView):
+    """
+    GET /api/content/embedding-ingest/topics/
+
+    List topics that have VIDEO/AUDIO transcripts matching the embedding
+    status filter. Default statuses: pending, stale, failed.
+
+    Use this to discover which topics need embed work, then fetch content with
+    ``GET /embedding-ingest/?topic_id=<id>``.
+    """
+
+    def get(self, request):
+        error, params = _parse_embedding_queue_params(request)
+        if error:
+            return error
+
+        media_type = params['media_type']
+        topic_id = params['topic_id']
+        limit = params['limit']
+        offset = params['offset']
+        include_completed = params['include_completed']
+        statuses = params['statuses']
+        media_types = _topic_media_types(media_type)
+
+        def _count_for(*status_values):
+            return Count(
+                'contents',
+                filter=Q(
+                    contents__media_type__in=media_types,
+                    contents__transcript__embedding_status__in=status_values,
+                ),
+                distinct=True,
+            )
+
+        queryset = (
+            Topic.objects.annotate(
+                matching_count=_count_for(*statuses),
+                pending_count=_count_for(ContentTranscript.EMBEDDING_STATUS_PENDING),
+                stale_count=_count_for(ContentTranscript.EMBEDDING_STATUS_STALE),
+                failed_count=_count_for(ContentTranscript.EMBEDDING_STATUS_FAILED),
+                indexed_count=_count_for(ContentTranscript.EMBEDDING_STATUS_INDEXED),
+                skipped_count=_count_for(ContentTranscript.EMBEDDING_STATUS_SKIPPED),
+            )
+            .filter(matching_count__gt=0)
+            .order_by('-matching_count', 'id')
+        )
+        if topic_id is not None:
+            queryset = queryset.filter(pk=topic_id)
+
+        total = queryset.count()
+        items = queryset[offset:offset + limit]
+        serializer = ContentEmbeddingTopicQueueItemSerializer(items, many=True)
 
         return Response({
             'count': total,

@@ -1582,9 +1582,18 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             return False
 
 
+class ContentEmbeddingTopicRefSerializer(serializers.ModelSerializer):
+    """Minimal topic identity for embed workers writing Qdrant payloads."""
+
+    class Meta:
+        model = Topic
+        fields = ['id', 'title']
+
+
 class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     """Manifest row for an external embed worker (needs existing transcript)."""
 
+    topics = ContentEmbeddingTopicRefSerializer(many=True, read_only=True)
     text_hash = serializers.SerializerMethodField()
     text_length = serializers.SerializerMethodField()
     language = serializers.SerializerMethodField()
@@ -1598,6 +1607,7 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
 
     class Meta(ContentTranscriptQueueItemSerializer.Meta):
         fields = ContentTranscriptQueueItemSerializer.Meta.fields + [
+            'topics',
             'text_hash',
             'text_length',
             'language',
@@ -1682,6 +1692,33 @@ class ContentEmbeddingIngestDetailSerializer(ContentTranscriptIngestSummarySeria
         if hasattr(content, '_prefetched_objects_cache') and 'topics' in content._prefetched_objects_cache:
             return [topic.id for topic in content.topics.all()]
         return list(content.topics.values_list('id', flat=True))
+
+
+class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
+    """Topic with VIDEO/AUDIO transcripts matching the embedding status filter."""
+
+    matching_count = serializers.IntegerField(read_only=True)
+    status_counts = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Topic
+        fields = [
+            'id',
+            'title',
+            'is_public',
+            'chat_enabled',
+            'matching_count',
+            'status_counts',
+        ]
+
+    def get_status_counts(self, obj):
+        return {
+            'pending': getattr(obj, 'pending_count', 0) or 0,
+            'stale': getattr(obj, 'stale_count', 0) or 0,
+            'failed': getattr(obj, 'failed_count', 0) or 0,
+            'indexed': getattr(obj, 'indexed_count', 0) or 0,
+            'skipped': getattr(obj, 'skipped_count', 0) or 0,
+        }
 
 
 class TopicChatRequestSerializer(serializers.Serializer):

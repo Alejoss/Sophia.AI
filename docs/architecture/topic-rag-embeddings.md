@@ -117,10 +117,11 @@ python manage.py check_qdrant --topic-id 2   # optional point count
 Sophia does **not** ship the embed worker. Production setups use an external
 process (internally called **Vincent**) that:
 
-1. Polls `GET /api/content/embedding-ingest/`
-2. Reads `index_text` + `topic_ids` from the detail endpoint
-3. Chunks, embeds with OpenAI, upserts to Qdrant
-4. Acks via `PUT /api/content/embedding-ingest/{content_id}/`
+1. Polls `GET /api/content/embedding-ingest/topics/` to find topics with work
+2. Polls `GET /api/content/embedding-ingest/?topic_id=<id>` for content in each topic
+3. Reads `index_text` + `topic_ids` from the detail endpoint
+4. Chunks, embeds with OpenAI, upserts to Qdrant
+5. Acks via `PUT /api/content/embedding-ingest/{content_id}/`
 
 Worker implementation and runbooks may live in a separate repository; Sophia’s
 contract is defined in [qdrant-embeddings.md](../operations/qdrant-embeddings.md).

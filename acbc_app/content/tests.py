@@ -5069,21 +5069,20 @@ class ContentEmbeddingIngestAPITests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
-    def test_queue_includes_topic_ids(self):
+    def test_queue_includes_topics_on_items(self):
         topic = Topic.objects.create(
-            title='Tema embed',
-            description='Desc',
+            title='Tema embeddings',
+            description='Para Vincent',
             creator=self.user,
-            is_public=True,
         )
         self.video.topics.add(topic)
-
         response = self.client.get(
             '/api/content/embedding-ingest/',
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         item = next(i for i in response.data['items'] if i['id'] == self.video.id)
+        self.assertEqual(item['topics'], [{'id': topic.id, 'title': 'Tema embeddings'}])
         self.assertEqual(item['topic_ids'], [topic.id])
 
     def test_detail_includes_index_text_and_topic_ids(self):
@@ -5106,6 +5105,184 @@ class ContentEmbeddingIngestAPITests(APITestCase):
         )
         self.assertEqual(response.data['transcript']['topic_ids'], [topic.id])
         self.assertEqual(response.data['content']['topic_ids'], [topic.id])
+        self.assertEqual(
+            response.data['content']['topics'],
+            [{'id': topic.id, 'title': 'Tema embed detail'}],
+        )
+
+    def test_topic_queue_requires_api_key(self):
+        response = self.client.get('/api/content/embedding-ingest/topics/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_topic_queue_lists_topics_with_pending_work(self):
+        needing = Topic.objects.create(
+            title='Necesita embeddings',
+            description='Hay trabajo',
+            creator=self.user,
+        )
+        indexed_only = Topic.objects.create(
+            title='Ya indexado',
+            description='Sin trabajo',
+            creator=self.user,
+        )
+        empty = Topic.objects.create(
+            title='Sin transcripts',
+            description='Vacío',
+            creator=self.user,
+        )
+        self.video.topics.add(needing)
+
+        indexed_video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Ya embebido',
+        )
+        indexed_transcript = ContentTranscript.objects.create(
+            content=indexed_video,
+            processed_plain='Texto ya indexado.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=indexed_transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=indexed_transcript.text_hash,
+        )
+        indexed_video.topics.add(indexed_only)
+
+        orphan_video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Sin tema',
+        )
+        ContentTranscript.objects.create(
+            content=orphan_video,
+            processed_plain='Transcript huérfano.',
+            language='es',
+        )
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['topic_id'])
+        self.assertEqual(response.data['status_filter'], ['pending', 'stale', 'failed'])
+        ids = [item['id'] for item in response.data['items']]
+        self.assertEqual(ids, [needing.id])
+        item = response.data['items'][0]
+        self.assertEqual(item['title'], 'Necesita embeddings')
+        self.assertEqual(item['matching_count'], 1)
+        self.assertEqual(item['status_counts']['pending'], 1)
+        self.assertEqual(item['status_counts']['indexed'], 0)
+        self.assertNotIn(indexed_only.id, ids)
+        self.assertNotIn(empty.id, ids)
+
+    def test_topic_queue_counts_shared_content_on_each_topic(self):
+        topic_a = Topic.objects.create(title='A', creator=self.user)
+        topic_b = Topic.objects.create(title='B', creator=self.user)
+        self.video.topics.add(topic_a, topic_b)
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_id = {item['id']: item for item in response.data['items']}
+        self.assertEqual(by_id[topic_a.id]['matching_count'], 1)
+        self.assertEqual(by_id[topic_b.id]['matching_count'], 1)
+
+    def test_topic_queue_include_completed_lists_indexed_only_topics(self):
+        indexed_only = Topic.objects.create(
+            title='Solo indexado',
+            creator=self.user,
+        )
+        indexed_video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Indexado',
+        )
+        indexed_transcript = ContentTranscript.objects.create(
+            content=indexed_video,
+            processed_plain='Indexado.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=indexed_transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=indexed_transcript.text_hash,
+        )
+        indexed_video.topics.add(indexed_only)
+
+        default = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            **self.auth_header,
+        )
+        self.assertNotIn(
+            indexed_only.id,
+            [item['id'] for item in default.data['items']],
+        )
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            {'include_completed': 'true'},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item = next(i for i in response.data['items'] if i['id'] == indexed_only.id)
+        self.assertEqual(item['matching_count'], 1)
+        self.assertEqual(item['status_counts']['indexed'], 1)
+
+    def test_topic_queue_status_filter_failed_only(self):
+        failed_topic = Topic.objects.create(title='Falló', creator=self.user)
+        pending_topic = Topic.objects.create(title='Pendiente', creator=self.user)
+        self.video.topics.add(pending_topic)
+
+        failed_video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Fallido',
+        )
+        failed_transcript = ContentTranscript.objects.create(
+            content=failed_video,
+            processed_plain='Falló el upsert.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=failed_transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_FAILED,
+            embedding_error='timeout',
+        )
+        failed_video.topics.add(failed_topic)
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            {'status': 'failed'},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in response.data['items']]
+        self.assertEqual(ids, [failed_topic.id])
+        self.assertEqual(response.data['items'][0]['status_counts']['failed'], 1)
+        self.assertEqual(response.data['items'][0]['status_counts']['pending'], 0)
+
+    def test_topic_queue_invalid_status(self):
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            {'status': 'unknown'},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_topic_queue_topic_id_filter(self):
+        topic_a = Topic.objects.create(title='Filtrado A', creator=self.user)
+        topic_b = Topic.objects.create(title='Filtrado B', creator=self.user)
+        self.video.topics.add(topic_a, topic_b)
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/topics/',
+            {'topic_id': topic_a.id},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['topic_id'], topic_a.id)
+        self.assertEqual([item['id'] for item in response.data['items']], [topic_a.id])
 
 
 @override_settings(

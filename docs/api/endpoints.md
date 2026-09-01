@@ -155,7 +155,18 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Auth**: Ingest API key
 - **Query**: `topic_id`, `media_type`, `content_id`, `status` (comma-separated), `include_completed`, `limit`, `offset`
 - **Default statuses**: `pending`, `stale`, `failed`
-- **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }` — each item includes `topic_ids`
+- **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }`
+- **Item fields** include `topic_ids` and `topics: [{ id, title }, ...]` (empty if the content is not linked to a topic)
+
+### List topics needing embeddings
+- **GET** `/api/content/embedding-ingest/topics/`
+- **Auth**: Ingest API key
+- **Query**: `topic_id`, `media_type`, `status` (comma-separated), `include_completed`, `limit`, `offset`
+- **Default statuses**: `pending`, `stale`, `failed`
+- **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }`
+- **Item**: `{ id, title, is_public, chat_enabled, matching_count, status_counts }`
+- Topics with no matching VIDEO/AUDIO transcripts are omitted. Ordered by `matching_count` desc, then `id`.
+- Then fetch content with `GET /api/content/embedding-ingest/?topic_id={id}`
 
 ### Get embedding job detail
 - **GET** `/api/content/embedding-ingest/{content_id}/`
