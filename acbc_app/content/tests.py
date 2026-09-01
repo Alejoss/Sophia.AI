@@ -5548,6 +5548,27 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(result['sources'][0]['title'], 'Video citado')
         self.assertNotIn('text', result['sources'][0])
 
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_qdrant_connection_reset_returns_502(self, mock_qdrant_cls, mock_openai_cls):
+        from requests.exceptions import ConnectionError as RequestsConnectionError
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.side_effect = RequestsConnectionError(
+            ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+        )
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Qué hizo el Digital Currency Group?'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn('archivos indexados', response.data['error'])
+        self.assertFalse(TopicChatQuery.objects.filter(topic=self.topic).exists())
+
 
 class TranscriptAnchorModelTests(TestCase):
     def setUp(self):

@@ -122,6 +122,9 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
   Enabling the flag via topic edit / PATCH fails with **400** if nothing is
   indexed yet. Chat API still returns **403** when the flag is off.
+- If Qdrant drops the TLS connection (`Connection reset by peer`), the client
+  retries a few times, then the API returns **502** with a Spanish error instead
+  of an unhandled **500**.
 
 ## Related
 

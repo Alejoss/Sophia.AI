@@ -227,12 +227,17 @@ function TopicChat({ topicId }) {
         return [row, ...prev.filter((item) => item.id !== data.id)];
       });
     } catch (err) {
-      const detail =
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        err?.message ||
-        'No se pudo obtener una respuesta.';
-      setError(typeof detail === 'string' ? detail : 'No se pudo obtener una respuesta.');
+      const apiError = err?.response?.data?.error || err?.response?.data?.detail;
+      const status = err?.response?.status;
+      let detail = apiError;
+      if (typeof detail !== 'string' || !detail.trim()) {
+        if (status >= 500) {
+          detail = 'No se pudo completar la consulta. Inténtalo de nuevo en unos segundos.';
+        } else {
+          detail = err?.message || 'No se pudo obtener una respuesta.';
+        }
+      }
+      setError(detail);
     } finally {
       setLoading(false);
     }

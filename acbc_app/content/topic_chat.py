@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+import requests
 from django.conf import settings
 
 from content.models import Content
@@ -178,10 +179,11 @@ def run_topic_chat(
 
     try:
         hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
-    except QdrantClientError as exc:
+    except (QdrantClientError, requests.RequestException) as exc:
         logger.exception('Topic chat Qdrant search failed topic_id=%s', topic_id)
         raise TopicChatError(
-            f'No se pudo buscar en Qdrant: {exc}',
+            'No se pudo consultar los archivos indexados. '
+            'Inténtalo de nuevo en unos segundos.',
             status_code=502,
         ) from exc
 
