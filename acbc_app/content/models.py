@@ -778,6 +778,17 @@ class TopicChatQuery(models.Model):
         preview = (self.question or '')[:60]
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
 
+    def save(self, *args, **kwargs):
+        # Reuse utils.db_encoding (same helpers as ContentTranscript / payments).
+        from utils.db_encoding import prepare_model_fields
+
+        prepare_model_fields(
+            self,
+            text_fields=('question', 'answer'),
+            json_fields=('sources',),
+        )
+        super().save(*args, **kwargs)
+
 
 class TopicCreationRequest(models.Model):
     """User request to create a new topic; admin must approve title and description first."""
