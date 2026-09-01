@@ -429,7 +429,7 @@ const TopicEdit = () => {
                           color="primary"
                         />
                       }
-                      label="Mostrar pestaña Conversar (consultas con transcripciones)"
+                      label="Mostrar pestaña Conversación (consultas con transcripciones)"
                     />
                   );
                 }}
@@ -441,7 +441,7 @@ const TopicEdit = () => {
               )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
                 {topic?.chat_can_enable
-                  ? `Listo: ${topic.indexed_transcript_count} transcripción(es) indexada(s). Al activarlo, los usuarios verán Conversar.`
+                  ? `Listo: ${topic.indexed_transcript_count} transcripción(es) indexada(s). Al activarlo, los usuarios verán Conversación.`
                   : 'No disponible aún: hace falta al menos un video/audio del tema con transcript embebido (estado indexed).'}
               </Typography>
             </Box>

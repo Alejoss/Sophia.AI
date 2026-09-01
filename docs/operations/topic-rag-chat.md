@@ -118,7 +118,7 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 - If no chunks have usable `text` payload, the API still persists a fixed
   “no encontré…” answer (no chat-model call).
 - Per-user / per-topic daily rate limits are **not** implemented yet.
-- The Conversar tab is only shown when `Topic.chat_enabled` is true **and**
+- The Conversación tab is only shown when `Topic.chat_enabled` is true **and**
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
   Enabling the flag via topic edit / PATCH fails with **400** if nothing is
   indexed yet. Chat API still returns **403** when the flag is off.

@@ -1541,6 +1541,35 @@ class TopicAPITests(APITestCase):
         self.topic.refresh_from_db()
         self.assertTrue(self.topic.chat_enabled)
 
+    def test_staff_can_enable_chat_on_topic_they_do_not_own(self):
+        staff = User.objects.create_user(
+            username='dashboardstaff',
+            email='dashboardstaff@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video staff',
+        )
+        self.topic.contents.add(video)
+        transcript = ContentTranscript.objects.create(
+            content=video,
+            processed_plain='Texto indexado staff.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=transcript.text_hash,
+        )
+        self.client.force_authenticate(user=staff)
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.patch(url, {'chat_enabled': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.topic.refresh_from_db()
+        self.assertTrue(self.topic.chat_enabled)
+
     def test_get_topic_basic(self):
         """Test retrieving topic basic info."""
         url = reverse('content:topic-basic', args=[self.topic.id])
@@ -1724,6 +1753,85 @@ class TopicAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AdminTopicsConversationAPITests(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='conversationadmin',
+            email='conversationadmin@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.regular = User.objects.create_user(
+            username='normaluser',
+            email='normal@example.com',
+            password='testpass123',
+        )
+        self.visible = Topic.objects.create(
+            title='Visible',
+            creator=self.regular,
+            chat_enabled=True,
+        )
+        self.ready = Topic.objects.create(
+            title='Ready',
+            creator=self.regular,
+            chat_enabled=False,
+        )
+        self.empty = Topic.objects.create(
+            title='Empty',
+            creator=self.regular,
+            is_public=False,
+            chat_enabled=False,
+        )
+        video = Content.objects.create(
+            uploaded_by=self.regular,
+            media_type='VIDEO',
+            original_title='Indexed video',
+        )
+        self.visible.contents.add(video)
+        self.ready.contents.add(video)
+        transcript = ContentTranscript.objects.create(
+            content=video,
+            processed_plain='Indexado.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=transcript.text_hash,
+        )
+
+    def test_requires_staff(self):
+        self.client.force_authenticate(user=self.regular)
+        response = self.client.get('/api/content/admin/topics/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_lists_all_topics_including_private(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {item['title'] for item in response.data['results']}
+        self.assertEqual(titles, {'Visible', 'Ready', 'Empty'})
+        by_title = {item['title']: item for item in response.data['results']}
+        self.assertTrue(by_title['Visible']['chat_enabled'])
+        self.assertTrue(by_title['Visible']['chat_can_enable'])
+        self.assertGreaterEqual(by_title['Visible']['indexed_transcript_count'], 1)
+        self.assertFalse(by_title['Empty']['is_public'])
+        self.assertFalse(by_title['Empty']['chat_can_enable'])
+
+    def test_filter_visible(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'visible'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in response.data['results']]
+        self.assertEqual(titles, ['Visible'])
+
+    def test_filter_ready(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'ready'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in response.data['results']]
+        self.assertEqual(titles, ['Ready'])
 
 
 class TopicActivityScoreTests(TestCase):
