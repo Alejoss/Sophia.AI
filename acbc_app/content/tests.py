@@ -1726,6 +1726,99 @@ class TopicAPITests(APITestCase):
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class TopicAdminConversarTests(TestCase):
+    """Django admin changelist shows which topics have Conversar available."""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username='adminstaff',
+            email='adminstaff@example.com',
+            password='adminpass123',
+        )
+        self.client.force_login(self.admin_user)
+        self.creator = User.objects.create_user(
+            username='topiccreator',
+            email='creator@example.com',
+            password='testpass123',
+        )
+        self.visible_topic = Topic.objects.create(
+            title='Conversar visible',
+            creator=self.creator,
+            chat_enabled=True,
+        )
+        self.ready_topic = Topic.objects.create(
+            title='Tema embeddings listos',
+            creator=self.creator,
+            chat_enabled=False,
+        )
+        self.empty_topic = Topic.objects.create(
+            title='Tema vacio sin embeddings',
+            creator=self.creator,
+            chat_enabled=False,
+        )
+        video_visible = Content.objects.create(
+            uploaded_by=self.creator,
+            media_type='VIDEO',
+            original_title='Video visible',
+        )
+        video_ready = Content.objects.create(
+            uploaded_by=self.creator,
+            media_type='VIDEO',
+            original_title='Video listo',
+        )
+        self.visible_topic.contents.add(video_visible)
+        self.ready_topic.contents.add(video_ready)
+        for content in (video_visible, video_ready):
+            transcript = ContentTranscript.objects.create(
+                content=content,
+                processed_plain='Texto indexado para Conversar.',
+                language='es',
+            )
+            ContentTranscript.objects.filter(pk=transcript.pk).update(
+                embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+                embedded_text_hash=transcript.text_hash,
+            )
+
+    def test_changelist_shows_conversar_columns_and_status(self):
+        response = self.client.get('/admin/content/topic/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Visible para usuarios')
+        self.assertContains(response, 'Embeddings indexados')
+        self.assertContains(response, 'Conversar visible')
+        self.assertContains(response, 'Tema embeddings listos')
+        self.assertContains(response, 'Tema vacio sin embeddings')
+        self.assertContains(response, 'Listo para activar')
+
+    def test_filter_visible_topics(self):
+        response = self.client.get('/admin/content/topic/', {'conversar': 'visible'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Conversar visible')
+        self.assertNotContains(response, 'Tema embeddings listos')
+        self.assertNotContains(response, 'Tema vacio sin embeddings')
+
+    def test_filter_ready_topics(self):
+        response = self.client.get('/admin/content/topic/', {'conversar': 'ready'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Tema embeddings listos')
+        self.assertNotContains(response, 'Conversar visible')
+        self.assertNotContains(response, 'Tema vacio sin embeddings')
+
+    def test_admin_cannot_enable_conversar_without_embeddings(self):
+        from django.contrib.admin.sites import site
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        request = RequestFactory().post('/admin/content/topic/')
+        request.user = self.admin_user
+        request.session = {}
+        request._messages = FallbackStorage(request)
+        admin_instance = site._registry[Topic]
+        self.empty_topic.chat_enabled = True
+        admin_instance.save_model(request, self.empty_topic, form=None, change=True)
+        self.empty_topic.refresh_from_db()
+        self.assertFalse(self.empty_topic.chat_enabled)
+
+
 class TopicActivityScoreTests(TestCase):
     """Incremental activity_score updates and list ordering."""
 

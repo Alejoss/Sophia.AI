@@ -695,7 +695,11 @@ class Topic(models.Model):
     )
     chat_enabled = models.BooleanField(
         default=False,
-        help_text='When true, the Conversar (RAG consultation) tab is visible on the topic page.',
+        verbose_name='Conversar',
+        help_text=(
+            'Si está activo y el tema tiene transcripciones indexadas, '
+            'los usuarios ven la pestaña Conversar.'
+        ),
     )
     activity_score = models.IntegerField(
         default=0,

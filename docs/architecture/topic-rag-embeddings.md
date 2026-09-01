@@ -77,6 +77,12 @@ Topic RAG (“Conversar”) is available when **all** of the following hold:
 
 The frontend shows the Conversar tab only when `chat_enabled && chat_can_enable`.
 
+Staff can see which topics have Conversar in **Django admin** → Topics: columns
+**Conversar**, **Embeddings indexados**, and **Visible para usuarios**, plus a
+**Conversar** sidebar filter (`Visible para usuarios` / `Listo para activar` /
+`Sin embeddings`). Admin will not turn Conversar on unless the topic already has
+indexed transcripts.
+
 Each chat POST is an **independent** consultation (`TopicChatQuery`). Previous
 answers are not sent to the LLM. See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 

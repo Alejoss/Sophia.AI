@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.db.models import Count, Q
 
 from content.anchor_request_service import (
     AnchorRequestError,
@@ -183,18 +184,72 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
             self.message_user(request, f'{ok} solicitud(es) rechazada(s).', level=messages.SUCCESS)
 
 
+class ConversarStatusFilter(admin.SimpleListFilter):
+    """Filter topics by whether Conversar is visible, ready, or missing embeddings."""
+
+    title = 'Conversar'
+    parameter_name = 'conversar'
+
+    INDEXED_Q = Q(
+        contents__media_type__in=('VIDEO', 'AUDIO'),
+        contents__transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+    )
+
+    def lookups(self, request, model_admin):
+        return (
+            ('visible', 'Visible para usuarios'),
+            ('on', 'Activado'),
+            ('ready', 'Listo para activar'),
+            ('no_embeddings', 'Sin embeddings'),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == 'visible':
+            return queryset.filter(chat_enabled=True).filter(self.INDEXED_Q).distinct()
+        if value == 'on':
+            return queryset.filter(chat_enabled=True)
+        if value == 'ready':
+            return queryset.filter(chat_enabled=False).filter(self.INDEXED_Q).distinct()
+        if value == 'no_embeddings':
+            return queryset.exclude(self.INDEXED_Q).distinct()
+        return queryset
+
+
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'created_at', 'updated_at']
-    list_filter = ['is_public', 'chat_enabled', 'creator', 'created_at']
+    list_display = [
+        'id',
+        'title',
+        'creator',
+        'is_public',
+        'chat_enabled',
+        'indexed_transcripts',
+        'conversar_status',
+        'created_at',
+    ]
+    list_filter = ['is_public', ConversarStatusFilter, 'chat_enabled', 'creator', 'created_at']
     list_editable = ['chat_enabled']
     search_fields = ['title', 'description', 'creator__username']
     filter_horizontal = ['moderators', 'related_topics']
     raw_id_fields = ['creator']
-    readonly_fields = ['topic_image_thumbnail', 'created_at', 'updated_at']
+    readonly_fields = [
+        'indexed_transcripts',
+        'conversar_status',
+        'topic_image_thumbnail',
+        'created_at',
+        'updated_at',
+    ]
     fieldsets = (
         ('Información básica', {
-            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled'),
+            'fields': ('title', 'description', 'creator', 'is_public'),
+        }),
+        ('Conversar', {
+            'fields': ('chat_enabled', 'indexed_transcripts', 'conversar_status'),
+            'description': (
+                'Conversar solo es visible para usuarios si está activado y el tema '
+                'tiene al menos un video/audio con embeddings indexados.'
+            ),
         }),
         ('Imagen de portada', {
             'fields': (
@@ -212,6 +267,55 @@ class TopicAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            _indexed_transcript_count=Count(
+                'contents',
+                filter=Q(
+                    contents__media_type__in=('VIDEO', 'AUDIO'),
+                    contents__transcript__embedding_status=(
+                        ContentTranscript.EMBEDDING_STATUS_INDEXED
+                    ),
+                ),
+                distinct=True,
+            ),
+        )
+
+    def _indexed_count(self, obj):
+        annotated = getattr(obj, '_indexed_transcript_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.indexed_transcript_count()
+
+    @admin.display(description='Embeddings indexados', ordering='_indexed_transcript_count')
+    def indexed_transcripts(self, obj):
+        return self._indexed_count(obj)
+
+    @admin.display(description='Visible para usuarios')
+    def conversar_status(self, obj):
+        indexed = self._indexed_count(obj)
+        if obj.chat_enabled and indexed:
+            return 'Visible'
+        if obj.chat_enabled:
+            return 'Activado (sin embeddings)'
+        if indexed:
+            return 'Listo para activar'
+        return 'Sin embeddings'
+
+    def save_model(self, request, obj, form, change):
+        if obj.chat_enabled and not obj.has_indexed_transcripts():
+            obj.chat_enabled = False
+            self.message_user(
+                request,
+                (
+                    f'No se puede activar Conversar en «{obj.title}»: '
+                    'no hay transcripciones indexadas.'
+                ),
+                level=messages.ERROR,
+            )
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(TopicChatQuery)
