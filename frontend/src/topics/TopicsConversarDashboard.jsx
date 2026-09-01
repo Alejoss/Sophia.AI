@@ -142,8 +142,8 @@ const TopicsConversarDashboard = () => {
             Conversar
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Temas donde los usuarios pueden consultar transcripciones indexadas en Qdrant.
-            Actívalo cuando el tema ya tenga embeddings.
+            Conversar es la consulta de usuarios sobre un tema: usa los chunks y embeddings
+            guardados en Qdrant. Actívalo cuando el tema ya tenga transcripciones indexadas.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

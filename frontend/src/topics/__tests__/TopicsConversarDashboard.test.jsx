@@ -63,6 +63,9 @@ describe('TopicsConversarDashboard', () => {
     renderWithProviders(<TopicsConversarDashboard />, { auth: staffAuth });
 
     expect(await screen.findByText('Bitcoin')).toBeInTheDocument();
+    expect(
+      screen.getByText(/consulta de usuarios.*chunks y embeddings.*Qdrant/i),
+    ).toBeInTheDocument();
     expect(screen.getByText('Lightning')).toBeInTheDocument();
     expect(screen.getByText('Tema vacio')).toBeInTheDocument();
     expect(screen.getByText('Visible')).toBeInTheDocument();
