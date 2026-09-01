@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from content.s3_key_utils import sanitize_filename_for_s3_key
 from content.transcript_utils import sync_transcript_derived_fields
+from utils.db_encoding import TextJSONField
 
 
 class Library(models.Model):
@@ -758,7 +759,7 @@ class TopicChatQuery(models.Model):
     )
     question = models.TextField()
     answer = models.TextField()
-    sources = models.JSONField(
+    sources = TextJSONField(
         default=list,
         blank=True,
         help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',
@@ -777,17 +778,6 @@ class TopicChatQuery(models.Model):
     def __str__(self):
         preview = (self.question or '')[:60]
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
-
-    def save(self, *args, **kwargs):
-        # Reuse utils.db_encoding (same helpers as ContentTranscript / payments).
-        from utils.db_encoding import prepare_model_fields
-
-        prepare_model_fields(
-            self,
-            text_fields=('question', 'answer'),
-            json_fields=('sources',),
-        )
-        super().save(*args, **kwargs)
 
 
 class TopicCreationRequest(models.Model):
