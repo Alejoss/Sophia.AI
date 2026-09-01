@@ -1417,8 +1417,8 @@ class FeaturedTextWithThumbnailsView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-class AdminTopicsConversarView(APIView):
-    """Staff dashboard: list topics and Conversar (Qdrant RAG) readiness."""
+class AdminTopicsConversationView(APIView):
+    """Staff dashboard: list topics and conversation (Qdrant RAG) readiness."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -1436,20 +1436,20 @@ class AdminTopicsConversarView(APIView):
             ),
         ).order_by('-_indexed_transcript_count', 'title')
 
-        conversar = (request.query_params.get('conversar') or '').strip().lower()
-        if conversar == 'visible':
+        conversation = (request.query_params.get('conversation') or '').strip().lower()
+        if conversation == 'visible':
             queryset = queryset.filter(chat_enabled=True, _indexed_transcript_count__gt=0)
-        elif conversar == 'ready':
+        elif conversation == 'ready':
             queryset = queryset.filter(chat_enabled=False, _indexed_transcript_count__gt=0)
-        elif conversar == 'on':
+        elif conversation == 'on':
             queryset = queryset.filter(chat_enabled=True)
-        elif conversar == 'no_embeddings':
+        elif conversation == 'no_embeddings':
             queryset = queryset.filter(_indexed_transcript_count=0)
-        elif conversar:
+        elif conversation:
             return Response(
                 {
                     'error': (
-                        'conversar inválido. Use visible, ready, on o no_embeddings.'
+                        'Invalid conversation filter. Use visible, ready, on, or no_embeddings.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1461,7 +1461,7 @@ class AdminTopicsConversarView(APIView):
         results = serializer.data
         return Response({
             'count': len(results),
-            'conversar': conversar or None,
+            'conversation': conversation or None,
             'results': results,
         })
 

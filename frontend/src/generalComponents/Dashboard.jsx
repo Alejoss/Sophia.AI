@@ -4,12 +4,12 @@ import { Box, Tab, Tabs, Typography, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import TopicCreationRequestsAdmin from '../topics/TopicCreationRequestsAdmin';
 import BookClubsDashboardAdmin from '../bookClubs/BookClubsDashboardAdmin';
-import TopicsConversarDashboard from '../topics/TopicsConversarDashboard';
+import TopicsConversationDashboard from '../topics/TopicsConversationDashboard';
 
 export const DashboardHome = () => (
   <>
     <BookClubsDashboardAdmin />
-    <TopicsConversarDashboard />
+    <TopicsConversationDashboard />
     <TopicCreationRequestsAdmin embedded />
   </>
 );

@@ -445,7 +445,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
             topic = self.instance
             if topic is None or not topic.has_indexed_transcripts():
                 raise serializers.ValidationError(
-                    'No se puede activar Conversar: este tema aún no tiene '
+                    'No se puede activar la conversación: este tema aún no tiene '
                     'transcripciones indexadas (embeddings). '
                     'Transcribe e indexa al menos un video/audio del tema primero.'
                 )

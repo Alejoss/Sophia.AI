@@ -1755,11 +1755,11 @@ class TopicAPITests(APITestCase):
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
-class AdminTopicsConversarAPITests(APITestCase):
+class AdminTopicsConversationAPITests(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            username='conversaradmin',
-            email='conversaradmin@example.com',
+            username='conversationadmin',
+            email='conversationadmin@example.com',
             password='testpass123',
             is_staff=True,
         )
@@ -1821,14 +1821,14 @@ class AdminTopicsConversarAPITests(APITestCase):
 
     def test_filter_visible(self):
         self.client.force_authenticate(user=self.staff)
-        response = self.client.get('/api/content/admin/topics/', {'conversar': 'visible'})
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'visible'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Visible'])
 
     def test_filter_ready(self):
         self.client.force_authenticate(user=self.staff)
-        response = self.client.get('/api/content/admin/topics/', {'conversar': 'ready'})
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'ready'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Ready'])
