@@ -122,9 +122,16 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
       - Lista de contenidos asociados ordenados por votos y media type (IMAGE, TEXT, AUDIO, VIDEO).
       - Perfiles de contenido (`ContentProfile`) seleccionados preferentemente del creador del tema y, si no existen, del usuario actual.
   - `PATCH /topics/<pk>/` → `TopicDetailView.patch`
-    - Actualiza el título, descripción o imagen del tema.
+    - Actualiza el título, descripción, imagen o **`chat_enabled`** del tema.
+    - **`chat_enabled`**: activa la pestaña **Conversar** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
     - **Permiso**: solo `creator` o moderadores (`topic.is_moderator_or_creator(request.user)`).
     - Si se actualiza `topic_image`, elimina el fichero anterior en disco/S3 antes de guardar el nuevo.
+
+- **Consultas RAG (Conversar)**
+  - `POST /topics/<pk>/chat/` → consulta independiente (pregunta + respuesta + fuentes).
+  - `GET /topics/<pk>/chat/queries/` → historial del usuario autenticado.
+  - Requiere `chat_enabled=true`, OpenAI + Qdrant configurados, y vectores indexados en Qdrant.
+  - Documentación: [topic-rag-chat.md](../operations/topic-rag-chat.md), [topic-rag-embeddings.md](topic-rag-embeddings.md).
 
 - **Vista simple para gestión de contenido**
   - `GET /topics/<pk>/content-simple/` → `TopicContentSimpleView.get`

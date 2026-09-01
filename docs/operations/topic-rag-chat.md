@@ -125,5 +125,6 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 
 ## Related
 
+- Architecture: [topic-rag-embeddings.md](../architecture/topic-rag-embeddings.md)
 - [qdrant-embeddings.md](qdrant-embeddings.md)
 - [environment-variables.md](../deployment/environment-variables.md)

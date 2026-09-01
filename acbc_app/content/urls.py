@@ -99,6 +99,7 @@ from .views_anchor_request import ContentTranscriptAnchorRequestView
 
 from .views_embedding_ingest import (
     ContentEmbeddingIngestQueueView,
+    ContentEmbeddingIngestTopicQueueView,
     ContentEmbeddingIngestDetailView,
 )
 from .views_topic_chat import (
@@ -263,6 +264,11 @@ urlpatterns = [
         'embedding-ingest/',
         ContentEmbeddingIngestQueueView.as_view(),
         name='embedding-ingest-queue',
+    ),
+    path(
+        'embedding-ingest/topics/',
+        ContentEmbeddingIngestTopicQueueView.as_view(),
+        name='embedding-ingest-topics',
     ),
     path(
         'embedding-ingest/<int:content_id>/',

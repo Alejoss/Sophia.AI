@@ -87,11 +87,20 @@ Core content model representing educational materials.
 
 Transcript text for VIDEO/AUDIO content, plus optional Bitcoin certification.
 
-**ContentTranscript** (One-to-One with `Content`): plain/processed text, `text_hash` (SHA-256), embedding bookkeeping.
+**ContentTranscript** (One-to-One with `Content`): plain/processed text, `text_hash` (SHA-256), and embedding **bookkeeping** (vectors live in Qdrant, not Postgres).
+
+| Field | Purpose |
+|-------|---------|
+| `parsed_plain` / `processed_plain` / `obsidian_markdown` | Worker artifacts; hash derived from processed text |
+| `text_hash` | SHA-256 of normalized transcript text |
+| `embedding_status` | `pending` \| `indexed` \| `stale` \| `failed` \| `skipped` |
+| `embedded_text_hash` | Last successfully indexed hash |
+| `embedding_model`, `embedding_dims`, `chunk_count`, `embedded_at` | Last successful embed-worker ack |
+| `embedding_error` | Last failure message |
 
 **TranscriptAnchor** (FK to `Content`, unique on `(content, text_hash)`): snapshot of `text_hash` certified via Bitcoin `OP_RETURN` (`pending` → `btc_broadcast` → `anchored`). No EVM fields.
 
-Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md).
+Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md). Embeddings + topic RAG: [topic-rag-embeddings.md](topic-rag-embeddings.md).
 
 **Location**: `content/models.py`
 

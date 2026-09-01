@@ -1582,9 +1582,18 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             return False
 
 
+class ContentEmbeddingTopicRefSerializer(serializers.ModelSerializer):
+    """Minimal topic identity for embed workers writing Qdrant payloads."""
+
+    class Meta:
+        model = Topic
+        fields = ['id', 'title']
+
+
 class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     """Manifest row for an external embed worker (needs existing transcript)."""
 
+    topics = ContentEmbeddingTopicRefSerializer(many=True, read_only=True)
     text_hash = serializers.SerializerMethodField()
     text_length = serializers.SerializerMethodField()
     language = serializers.SerializerMethodField()
@@ -1594,9 +1603,11 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     chunk_count = serializers.SerializerMethodField()
     embedded_text_hash = serializers.SerializerMethodField()
     embedded_at = serializers.SerializerMethodField()
+    topic_ids = serializers.SerializerMethodField()
 
     class Meta(ContentTranscriptQueueItemSerializer.Meta):
         fields = ContentTranscriptQueueItemSerializer.Meta.fields + [
+            'topics',
             'text_hash',
             'text_length',
             'language',
@@ -1606,6 +1617,7 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
             'chunk_count',
             'embedded_text_hash',
             'embedded_at',
+            'topic_ids',
         ]
 
     def _transcript(self, obj):
@@ -1649,6 +1661,64 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     def get_embedded_at(self, obj):
         transcript = self._transcript(obj)
         return transcript.embedded_at if transcript else None
+
+    def get_topic_ids(self, obj):
+        if hasattr(obj, '_prefetched_objects_cache') and 'topics' in obj._prefetched_objects_cache:
+            return [topic.id for topic in obj.topics.all()]
+        return list(obj.topics.values_list('id', flat=True))
+
+
+class ContentEmbeddingIngestDetailSerializer(ContentTranscriptIngestSummarySerializer):
+    """Transcript summary + index text for embed workers (detail GET only)."""
+
+    index_text = serializers.SerializerMethodField()
+    topic_ids = serializers.SerializerMethodField()
+
+    class Meta(ContentTranscriptIngestSummarySerializer.Meta):
+        fields = ContentTranscriptIngestSummarySerializer.Meta.fields + [
+            'index_text',
+            'topic_ids',
+        ]
+
+    def get_index_text(self, obj):
+        from content.transcript_utils import resolve_hash_source_text
+
+        return resolve_hash_source_text(obj)
+
+    def get_topic_ids(self, obj):
+        content = getattr(obj, 'content', None)
+        if content is None:
+            return []
+        if hasattr(content, '_prefetched_objects_cache') and 'topics' in content._prefetched_objects_cache:
+            return [topic.id for topic in content.topics.all()]
+        return list(content.topics.values_list('id', flat=True))
+
+
+class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
+    """Topic with VIDEO/AUDIO transcripts matching the embedding status filter."""
+
+    matching_count = serializers.IntegerField(read_only=True)
+    status_counts = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Topic
+        fields = [
+            'id',
+            'title',
+            'is_public',
+            'chat_enabled',
+            'matching_count',
+            'status_counts',
+        ]
+
+    def get_status_counts(self, obj):
+        return {
+            'pending': getattr(obj, 'pending_count', 0) or 0,
+            'stale': getattr(obj, 'stale_count', 0) or 0,
+            'failed': getattr(obj, 'failed_count', 0) or 0,
+            'indexed': getattr(obj, 'indexed_count', 0) or 0,
+            'skipped': getattr(obj, 'skipped_count', 0) or 0,
+        }
 
 
 class TopicChatRequestSerializer(serializers.Serializer):
