@@ -5,7 +5,7 @@
 | App | Has tests | Priority | Notes |
 |-----|-----------|----------|-------|
 | events | Yes (dedicated suite) | High | `tests/test_events_*`, factories, EVENTS_TEST_COVERAGE.md |
-| content | Yes | High | Many views; N+1 and permissions important |
+| content | Yes | High | Many views; N+1 and permissions important; embedding ingest + topic chat in `content/tests.py` (`ContentEmbeddingIngestAPITests`, `TopicChatAPITests`) |
 | profiles | Yes | High | Auth, JWT, OAuth |
 | comments | Yes | High | IsAuthor, notifications |
 | votes | Yes | High | Vote logic, notifications |

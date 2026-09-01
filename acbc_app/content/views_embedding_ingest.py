@@ -29,6 +29,7 @@ from content.models import Content, ContentTranscript, Topic
 from content.permissions import TranscriptIngestPermission
 from content.serializers import (
     ContentEmbeddingAckSerializer,
+    ContentEmbeddingIngestDetailSerializer,
     ContentEmbeddingQueueItemSerializer,
     ContentTranscriptIngestSummarySerializer,
 )
@@ -159,6 +160,7 @@ class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
                 transcript__embedding_status__in=statuses,
             )
             .select_related('file_details', 'transcript')
+            .prefetch_related('topics')
             .order_by('id')
         )
         if media_type:
@@ -194,7 +196,8 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
 
     def _get_content(self, content_id):
         content = get_object_or_404(
-            Content.objects.select_related('file_details', 'transcript'),
+            Content.objects.select_related('file_details', 'transcript')
+            .prefetch_related('topics'),
             pk=content_id,
         )
         if content.media_type not in TRANSCRIPT_MEDIA_TYPES:
@@ -231,7 +234,7 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
         return Response({
             'content': ContentEmbeddingQueueItemSerializer(content).data,
             'has_transcript': True,
-            'transcript': ContentTranscriptIngestSummarySerializer(content.transcript).data,
+            'transcript': ContentEmbeddingIngestDetailSerializer(content.transcript).data,
         })
 
     def put(self, request, content_id):

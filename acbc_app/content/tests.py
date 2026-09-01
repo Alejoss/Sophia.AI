@@ -5069,6 +5069,44 @@ class ContentEmbeddingIngestAPITests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
+    def test_queue_includes_topic_ids(self):
+        topic = Topic.objects.create(
+            title='Tema embed',
+            description='Desc',
+            creator=self.user,
+            is_public=True,
+        )
+        self.video.topics.add(topic)
+
+        response = self.client.get(
+            '/api/content/embedding-ingest/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item = next(i for i in response.data['items'] if i['id'] == self.video.id)
+        self.assertEqual(item['topic_ids'], [topic.id])
+
+    def test_detail_includes_index_text_and_topic_ids(self):
+        topic = Topic.objects.create(
+            title='Tema embed detail',
+            description='Desc',
+            creator=self.user,
+            is_public=True,
+        )
+        self.video.topics.add(topic)
+
+        response = self.client.get(
+            f'/api/content/embedding-ingest/{self.video.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data['transcript']['index_text'],
+            self.transcript.processed_plain,
+        )
+        self.assertEqual(response.data['transcript']['topic_ids'], [topic.id])
+        self.assertEqual(response.data['content']['topic_ids'], [topic.id])
+
 
 @override_settings(
     OPENAI_API_KEY='test-openai-key',
