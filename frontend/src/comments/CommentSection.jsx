@@ -205,6 +205,15 @@ const CommentSection = ({
                         error={!!errors.body}
                         helperText={errors.body?.message}
                         disabled={isSubmitting}
+                        sx={{
+                            '& .MuiOutlinedInput-root.MuiInputBase-multiline': {
+                                padding: '12px 14px',
+                            },
+                            '& textarea': {
+                                padding: 0,
+                                backgroundColor: 'transparent !important',
+                            },
+                        }}
                         {...register('body')}
                     />
                     <Button

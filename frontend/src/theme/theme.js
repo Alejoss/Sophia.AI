@@ -138,6 +138,26 @@ const createThemeConfig = (mode) => ({
                 },
               }),
         },
+        input: {
+          // Beat index.css `textarea { background: var(--input-bg) !important }`,
+          // which paints a flush inner box because MUI puts padding on the root
+          // and padding: 0 on the textarea.
+          backgroundColor: 'transparent !important',
+        },
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          // InputBase's multiline variant uses padding: 4px 0 5px, which can
+          // override OutlinedInput's default and leave placeholders flush left.
+          '&.MuiInputBase-multiline': {
+            padding: '16.5px 14px',
+          },
+          '&.MuiInputBase-sizeSmall.MuiInputBase-multiline': {
+            padding: '8.5px 14px',
+          },
+        },
       },
     },
     MuiTextField: {
