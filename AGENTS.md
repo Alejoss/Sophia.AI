@@ -52,3 +52,22 @@ A placeholder value is fine for local dev (real Google login won't work, but use
 Transcript certification is **Bitcoin OP_RETURN** (Django `content.bitcoin` + `broadcast_transcript_anchor`), not an EVM registry. See `docs/api/transcript-anchor.md`.
 
 `npx hardhat compile` may still fail if a draft Chainlink file under `contracts/` uses the deprecated Client API (`buildChainlinkRequest`/`sendChainlinkRequestTo`). Prefer drafts in `contracts/drafts/`. `contracts/test/` is empty (`.gitkeep` only).
+
+### Topic RAG / embeddings (optional)
+
+Topic “Conversar” chat uses **Qdrant** (transcript chunk vectors) and **OpenAI** (query embedding + grounded answers). Vectors are **not** in Postgres; an external embed worker acks via `/api/content/embedding-ingest/`.
+
+- Docs: [topic-rag-embeddings.md](docs/architecture/topic-rag-embeddings.md), [qdrant-embeddings.md](docs/operations/qdrant-embeddings.md)
+- Backend env (export in shell for native runs, or `acbc_app/.env` for Docker):
+
+```bash
+export OPENAI_API_KEY=sk-…
+export QDRANT_URL=https://….cloud.qdrant.io
+export QDRANT_API_KEY=…
+export QDRANT_COLLECTION=sophia_acbc_topic_chunks
+export TRANSCRIPT_INGEST_API_KEY=dev-ingest-secret   # for embed-worker API in dev
+```
+
+- Verify Qdrant: `cd acbc_app && . .venv/bin/activate && python manage.py check_qdrant --ensure-collection`
+- **Seed data** (`populate_content`) sets `embedding_status=skipped`, so Conversar will not appear until transcripts are acked as `indexed` (manually in dev or via the embed worker).
+- Topic chat tests mock OpenAI/Qdrant; no live keys required for `python manage.py test content.tests.TopicChatAPITests`.
