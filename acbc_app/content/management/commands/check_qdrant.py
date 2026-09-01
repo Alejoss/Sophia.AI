@@ -59,16 +59,17 @@ class Command(BaseCommand):
         self.stdout.write(f"  Collection exists: {health['collection_exists']}")
         self.stdout.write(f"  All collections: {health['collections']}")
 
+        dims = getattr(settings, 'QDRANT_VECTOR_SIZE', DEFAULT_VECTOR_SIZE)
         if options['ensure_collection']:
             try:
-                created = client.ensure_collection(vector_size=DEFAULT_VECTOR_SIZE)
+                created = client.ensure_collection(vector_size=int(dims))
             except QdrantClientError as exc:
                 self.stderr.write(self.style.ERROR(f'ensure_collection failed: {exc}'))
                 raise SystemExit(1)
             if created:
                 self.stdout.write(self.style.SUCCESS(
                     f"Created collection '{client.collection}' "
-                    f"(size={DEFAULT_VECTOR_SIZE}, Cosine)"
+                    f"(size={dims}, Cosine)"
                 ))
             else:
                 self.stdout.write(f"Collection '{client.collection}' already exists")
@@ -87,5 +88,4 @@ class Command(BaseCommand):
                 raise SystemExit(1)
             self.stdout.write(f'  Points for topic_id={topic_id}: {count}')
 
-        dims = getattr(settings, 'QDRANT_VECTOR_SIZE', DEFAULT_VECTOR_SIZE)
         self.stdout.write(f'  Expected vector size: {dims}')

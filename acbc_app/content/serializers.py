@@ -1594,6 +1594,7 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     chunk_count = serializers.SerializerMethodField()
     embedded_text_hash = serializers.SerializerMethodField()
     embedded_at = serializers.SerializerMethodField()
+    topic_ids = serializers.SerializerMethodField()
 
     class Meta(ContentTranscriptQueueItemSerializer.Meta):
         fields = ContentTranscriptQueueItemSerializer.Meta.fields + [
@@ -1606,6 +1607,7 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
             'chunk_count',
             'embedded_text_hash',
             'embedded_at',
+            'topic_ids',
         ]
 
     def _transcript(self, obj):
@@ -1649,6 +1651,37 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
     def get_embedded_at(self, obj):
         transcript = self._transcript(obj)
         return transcript.embedded_at if transcript else None
+
+    def get_topic_ids(self, obj):
+        if hasattr(obj, '_prefetched_objects_cache') and 'topics' in obj._prefetched_objects_cache:
+            return [topic.id for topic in obj.topics.all()]
+        return list(obj.topics.values_list('id', flat=True))
+
+
+class ContentEmbeddingIngestDetailSerializer(ContentTranscriptIngestSummarySerializer):
+    """Transcript summary + index text for embed workers (detail GET only)."""
+
+    index_text = serializers.SerializerMethodField()
+    topic_ids = serializers.SerializerMethodField()
+
+    class Meta(ContentTranscriptIngestSummarySerializer.Meta):
+        fields = ContentTranscriptIngestSummarySerializer.Meta.fields + [
+            'index_text',
+            'topic_ids',
+        ]
+
+    def get_index_text(self, obj):
+        from content.transcript_utils import resolve_hash_source_text
+
+        return resolve_hash_source_text(obj)
+
+    def get_topic_ids(self, obj):
+        content = getattr(obj, 'content', None)
+        if content is None:
+            return []
+        if hasattr(content, '_prefetched_objects_cache') and 'topics' in content._prefetched_objects_cache:
+            return [topic.id for topic in content.topics.all()]
+        return list(content.topics.values_list('id', flat=True))
 
 
 class TopicChatRequestSerializer(serializers.Serializer):

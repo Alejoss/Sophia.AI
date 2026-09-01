@@ -74,14 +74,16 @@ Response `200`:
       "embedding_dims": null,
       "chunk_count": null,
       "embedded_text_hash": null,
-      "embedded_at": null
+      "embedded_at": null,
+      "topic_ids": [12]
     }
   ]
 }
 ```
 
 Queue items include manifest fields (same base as transcript-ingest) **plus**
-embedding metadata. They do **not** include full transcript text bodies.
+embedding metadata and **`topic_ids`** (topics linked to the content). They do
+**not** include full transcript text bodies — use the detail GET for `index_text`.
 
 ### Get detail — example
 
@@ -113,10 +115,17 @@ Response `200`:
     "embedded_text_hash": null,
     "embedded_at": null,
     "created_at": "…",
-    "updated_at": "…"
+    "updated_at": "…",
+    "index_text": "Hola, bienvenidos al podcast sobre blockchain.",
+    "topic_ids": [12]
   }
 }
 ```
+
+- **`index_text`**: normalized text the worker should chunk (same source as
+  `text_hash`: `processed_plain` → `parsed_plain` → Obsidian body).
+- **`topic_ids`**: upsert one Qdrant point set per topic id (filter RAG by
+  `topic_id`).
 
 **409** if the content has no transcript yet (transcribe first via
 [transcript-ingest](../api/transcript-ingest.md)).
@@ -216,38 +225,30 @@ this repository.
 
    Optionally filter by `topic_id` or `content_id`.
 
-4. **For each item**, obtain transcript text to chunk:
-   - **Preferred**: keep `processed_plain` (or equivalent) in the worker’s local
-     cache from the transcript step (same `content_id` + `text_hash`).
-   - The embedding-ingest and transcript-ingest GET endpoints return **metadata
-     only** — not full text bodies. If the worker did not cache text, it must
-     re-derive it from its transcript pipeline or read from a trusted internal
-     source; do not guess from hashes alone.
+4. **For each item**, load transcript text to chunk:
+   - `GET /api/content/embedding-ingest/{content_id}/` → read `transcript.index_text`
+     and `transcript.topic_ids` (also on queue items as `topic_ids`).
+   - Alternatively, keep `processed_plain` in the worker cache from the transcript
+     step if the same process runs both pipelines.
 
-5. **Resolve `topic_id`(s)** for the content (worker-side: content–topic M2M
-   from Django ORM, admin export, or a future API). Each Qdrant point must
-   carry every `topic_id` the content belongs to, or run one index pass per
-   topic if your worker duplicates points.
+5. **Chunk** `index_text` (or cached equivalent). Chunk size/overlap is
+   worker-defined; keep chunks small enough that citation excerpts fit topic
+   chat context (~400 chars shown in UI).
 
-6. **Chunk** `processed_plain` (primary source; fall back to parsed plain /
-   Obsidian body using the same rules as `resolve_hash_source_text()` in
-   `transcript_utils.py`). Chunk size/overlap is worker-defined; keep chunks
-   small enough that citation excerpts fit topic chat context (~400 chars shown
-   in UI).
-
-7. **Embed** chunks with OpenAI `text-embedding-3-large` (3072 dimensions).
+6. **Embed** chunks with OpenAI `text-embedding-3-large` (3072 dimensions).
    Must match `OPENAI_EMBEDDING_MODEL` / `QDRANT_VECTOR_SIZE` in Sophia.
 
-8. **Upsert to Qdrant**:
+7. **Upsert to Qdrant**:
    - On **`stale`** or re-index: delete existing points for this `content_id`
      (filter delete) **or** use deterministic point IDs and overwrite in place.
-   - Include payload fields listed below.
    - Use stable point IDs when possible, e.g. `{content_id}_{chunk_index}` or a
      UUID derived from `doc_key`, so retries are idempotent.
+   - Include payload fields listed below (including each `topic_id` from
+     `topic_ids`).
 
-9. **Ack success or failure** via `PUT /api/content/embedding-ingest/{content_id}/`.
+8. **Ack success or failure** via `PUT /api/content/embedding-ingest/{content_id}/`.
 
-10. **Verify** (optional):
+9. **Verify** (optional):
 
     ```bash
     python manage.py check_qdrant --topic-id 12
