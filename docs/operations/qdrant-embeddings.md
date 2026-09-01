@@ -3,7 +3,7 @@
 Sophia does **not** store embedding vectors in Postgres. An external worker
 (Vincent) upserts chunks to **Qdrant Cloud**. Sophia:
 
-1. Exposes a machine-to-machine **embedding-ingest** API (queue + ack).
+1. Exposes a machine-to-machine **embedding-ingest** API (topic queue, content queue, ack).
 2. Updates `ContentTranscript.embedding_*` bookkeeping on ack.
 3. Reads Qdrant later for topic similarity / RAG (`utils.qdrant_client`).
 
@@ -19,17 +19,65 @@ Base: `/api/content/embedding-ingest/`
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/embedding-ingest/` | Queue of VIDEO/AUDIO with transcript needing embed work |
+| `GET` | `/embedding-ingest/topics/` | Topics that have at least one transcript matching the status filter |
 | `GET` | `/embedding-ingest/{content_id}/` | One item + transcript embedding summary |
 | `PUT` | `/embedding-ingest/{content_id}/` | Worker ack (`indexed` / `failed` / `skipped`) |
 
 ### Queue query params
 
-- `topic_id`, `media_type`, `content_id`
+Shared by the content queue and the topic queue:
+
+- `media_type`
 - `status` — comma-separated override (e.g. `pending,stale`)
-- `include_completed` — also list `indexed` / `skipped`
+- `include_completed` — also match `indexed` / `skipped`
 - `limit` / `offset`
 
+Content queue only (optional filter on the topic queue too):
+
+- `topic_id`, `content_id`
+
 Default queue statuses: `pending`, `stale`, `failed`.
+
+Content not linked to any topic still appears in `GET /embedding-ingest/`
+but **not** in the topic queue (Vincent has no `topic_id` for those points).
+
+### Topic queue (`GET /embedding-ingest/topics/`)
+
+Discover which topics need embed work. Each item:
+
+```json
+{
+  "id": 12,
+  "title": "Bitcoin",
+  "is_public": true,
+  "chat_enabled": false,
+  "matching_count": 3,
+  "status_counts": {
+    "pending": 2,
+    "stale": 1,
+    "failed": 0,
+    "indexed": 5,
+    "skipped": 0
+  }
+}
+```
+
+- `matching_count` — VIDEO/AUDIO transcripts whose `embedding_status` is in the
+  request's status filter (default: pending/stale/failed).
+- `status_counts` — full breakdown for that topic (not limited to the filter).
+- Topics with `matching_count = 0` are omitted. Ordered by `matching_count`
+  descending, then `id`.
+- The same content linked to several topics is counted on **each** topic
+  (Qdrant points are filtered by `topic_id`).
+
+Recommended worker flow:
+
+1. `GET /api/content/embedding-ingest/topics/`
+2. For each topic, `GET /api/content/embedding-ingest/?topic_id=<id>`
+3. Embed chunks, upsert to Qdrant with that `topic_id`, then `PUT` ack.
+
+Content-queue items include `topics: [{ "id", "title" }, ...]` so a payload can
+carry every topic the content belongs to.
 
 ### Ack body (`status=indexed`)
 
