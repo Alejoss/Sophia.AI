@@ -135,6 +135,25 @@ def prepare_json_for_db(obj: Any) -> Any:
     return obj
 
 
+def prepare_model_fields(instance, *, text_fields=(), json_fields=()) -> None:
+    """
+    Apply prepare_text_for_db / prepare_json_for_db in place.
+
+    Shared by models that persist user Spanish text on a legacy SQL_ASCII
+    cluster (ContentTranscript, TopicChatQuery, …). No-op on UTF8.
+    """
+    for name in text_fields:
+        setattr(instance, name, prepare_text_for_db(getattr(instance, name)))
+    for name in json_fields:
+        setattr(instance, name, prepare_json_for_db(getattr(instance, name)))
+
+
+def is_sql_ascii_error(exc: BaseException) -> bool:
+    """True when Postgres rejected UTF-8 because SERVER_ENCODING is SQL_ASCII."""
+    message = str(exc)
+    return 'SQL_ASCII' in message or 'conversion between UTF8' in message
+
+
 def normalize_notes_value(notes: Any) -> str:
     """Normalize certificate request notes from API input to plain text."""
     if notes is None or notes == '':

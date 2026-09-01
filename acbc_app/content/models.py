@@ -779,13 +779,14 @@ class TopicChatQuery(models.Model):
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
 
     def save(self, *args, **kwargs):
-        # Production Postgres is still SQL_ASCII; Spanish answers/excerpts 500
-        # without this. No-op on UTF8. Same pattern as ContentTranscript.save.
-        from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
+        # Reuse utils.db_encoding (same helpers as ContentTranscript / payments).
+        from utils.db_encoding import prepare_model_fields
 
-        self.question = prepare_text_for_db(self.question)
-        self.answer = prepare_text_for_db(self.answer)
-        self.sources = prepare_json_for_db(self.sources or [])
+        prepare_model_fields(
+            self,
+            text_fields=('question', 'answer'),
+            json_fields=('sources',),
+        )
         super().save(*args, **kwargs)
 
 
