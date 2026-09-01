@@ -124,8 +124,13 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
   - `PATCH /topics/<pk>/` → `TopicDetailView.patch`
     - Actualiza el título, descripción, imagen o **`chat_enabled`** del tema.
     - **`chat_enabled`**: activa la pestaña **Conversar** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
-    - **Permiso**: solo `creator` o moderadores (`topic.is_moderator_or_creator(request.user)`).
+    - **Permiso**: `creator`, moderadores, o staff (`is_staff`).
     - Si se actualiza `topic_image`, elimina el fichero anterior en disco/S3 antes de guardar el nuevo.
+
+- **Dashboard staff (Conversar)**
+  - `GET /admin/topics/` → lista todos los temas (incluidos privados) con `chat_enabled`, `chat_can_enable` e `indexed_transcript_count`.
+  - Query `conversar=visible|ready|on|no_embeddings`.
+  - UI: `/dashboard` sección **Conversar**. Staff puede activar/desactivar Conversar (consultas RAG sobre chunks en Qdrant).
 
 - **Consultas RAG (Conversar)**
   - `POST /topics/<pk>/chat/` → consulta independiente (pregunta + respuesta + fuentes).

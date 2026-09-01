@@ -432,6 +432,9 @@ class TopicBasicSerializer(serializers.ModelSerializer):
         read_only_fields = ['creator', 'indexed_transcript_count', 'chat_can_enable']
 
     def get_indexed_transcript_count(self, obj):
+        annotated = getattr(obj, '_indexed_transcript_count', None)
+        if annotated is not None:
+            return annotated
         return obj.indexed_transcript_count()
 
     def get_chat_can_enable(self, obj):

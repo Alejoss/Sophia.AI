@@ -77,6 +77,10 @@ Topic RAG (“Conversar”) is available when **all** of the following hold:
 
 The frontend shows the Conversar tab only when `chat_enabled && chat_can_enable`.
 
+Staff see which topics have Conversar on `/dashboard` (section **Conversar**):
+status, indexed-embedding count, and a switch to turn it on once Qdrant has
+vectors for that topic.
+
 Each chat POST is an **independent** consultation (`TopicChatQuery`). Previous
 answers are not sent to the LLM. See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 

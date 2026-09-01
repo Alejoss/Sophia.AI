@@ -525,6 +525,16 @@ const contentApi = {
     }
   },
 
+  getAdminTopics: async (filters = {}) => {
+    try {
+      const response = await axiosInstance.get('/content/admin/topics/', { params: filters });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching admin topics:', error);
+      throw error;
+    }
+  },
+
   approveTopicCreationRequest: async (requestId, data) => {
     try {
       const response = await axiosInstance.post(
