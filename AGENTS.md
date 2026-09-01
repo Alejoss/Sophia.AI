@@ -8,7 +8,9 @@ This repo is a monorepo with three components:
 - **Frontend** (`frontend/`): React 18 + Vite. Dev server on `http://localhost:5173` (`npm run dev`). Vite proxies `/api`, `/admin`, `/media` to `:8000` (see `vite.config.js`).
 - **Contracts** (`contracts/`): Solidity + Hardhat. Secondary/optional component.
 
-The dependency-refresh update script (Python venv + `pip install`, `npm install` for `frontend` and `contracts`) runs automatically on VM startup. The notes below are the non-obvious things it does NOT handle.
+The Cloud Agent **install** script installs `python3.12-venv` and PostgreSQL, then creates `acbc_app/.venv`, `pip install -r acbc_app/requirements.txt`, and `npm install` for `frontend` and `contracts`. The **start** script starts PostgreSQL (`sudo pg_ctlcluster 16 main start`), creates `acbc_db`, runs migrations, and seeds `admin` / `admin`. The notes below are the non-obvious things still worth knowing when you run commands yourself.
+
+The previous install script (`python3 -m venv` + pip + npm only) failed on Cloud Agent VMs because `python3.12-venv` / `ensurepip` is not on the base image. `set -e` is required so a failed `venv` does not look like a successful setup.
 
 ### Backend (Django) — how to run
 
