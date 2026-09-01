@@ -193,14 +193,16 @@ Invalid optional subtitles → **400**. Missing all three text artifacts → **4
 
 ### Embedding status (Postgres only)
 
-Each transcript tracks whether its current `text_hash` still needs vector indexing later.
-Vectors themselves are **not** stored in Django; these fields prepare an embed worker:
+Each transcript tracks whether its current `text_hash` still needs vector indexing.
+Vectors themselves are **not** stored in Django; these fields are updated by the
+[embedding-ingest API](../operations/qdrant-embeddings.md) after an external worker
+upserts chunks to Qdrant.
 
 | Field | Meaning |
 |-------|---------|
 | `embedding_status` | `pending` \| `indexed` \| `stale` \| `failed` \| `skipped` |
 | `embedded_text_hash` | Hash that was last indexed (compare to `text_hash`) |
-| `embedding_model` / `embedding_dims` / `chunk_count` / `embedded_at` | Filled by a future embed-worker ack |
+| `embedding_model` / `embedding_dims` / `chunk_count` / `embedded_at` | Set by embed-worker ack (`PUT /api/content/embedding-ingest/{content_id}/`) |
 
 On every successful PUT/save:
 
@@ -208,7 +210,9 @@ On every successful PUT/save:
 - text changes while previously indexed → `stale` (keeps prior `embedding_model` / `chunk_count` until re-acked)
 - same `text_hash` as `embedded_text_hash` and already `indexed` → stays `indexed`
 
-The ingest summary returns these fields. Embed-queue / chat endpoints are out of scope for this API.
+The ingest summary returns these fields. For embedding queue/ack see
+[qdrant-embeddings.md](../operations/qdrant-embeddings.md). For topic chat that
+consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 ---
 
@@ -238,6 +242,11 @@ The ingest summary returns these fields. Embed-queue / chat endpoints are out of
 
 Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-download from S3.
 
+6. **After transcripts exist**, run the embed worker against
+   [embedding-ingest](../operations/qdrant-embeddings.md) so Qdrant receives
+   chunk vectors and Django marks `embedding_status=indexed`. Topic “Conversar”
+   chat requires at least one indexed transcript per topic.
+
 ---
 
 ## Errors
@@ -255,4 +264,5 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 - Env: [environment-variables.md](../deployment/environment-variables.md#transcript_ingest_api_key)
 - Model: `ContentTranscript` in `acbc_app/content/models.py`
 - Tests: `ContentTranscriptIngestAPITests` in `acbc_app/content/tests.py`
+- After ingest, index for RAG: [qdrant-embeddings.md](../operations/qdrant-embeddings.md)
 - After ingest, certify the hash on Bitcoin: [transcript-anchor.md](transcript-anchor.md)
