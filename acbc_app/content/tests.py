@@ -1755,11 +1755,11 @@ class TopicAPITests(APITestCase):
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
 
 
-class AdminTopicsConversationAPITests(APITestCase):
+class AdminTopicsConsultationsAPITests(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            username='conversationadmin',
-            email='conversationadmin@example.com',
+            username='consultationsadmin',
+            email='consultationsadmin@example.com',
             password='testpass123',
             is_staff=True,
         )
@@ -1821,17 +1821,26 @@ class AdminTopicsConversationAPITests(APITestCase):
 
     def test_filter_visible(self):
         self.client.force_authenticate(user=self.staff)
-        response = self.client.get('/api/content/admin/topics/', {'conversation': 'visible'})
+        response = self.client.get('/api/content/admin/topics/', {'consultation': 'visible'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['consultation'], 'visible')
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Visible'])
 
     def test_filter_ready(self):
         self.client.force_authenticate(user=self.staff)
-        response = self.client.get('/api/content/admin/topics/', {'conversation': 'ready'})
+        response = self.client.get('/api/content/admin/topics/', {'consultation': 'ready'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Ready'])
+
+    def test_legacy_conversation_query_alias(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'visible'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['consultation'], 'visible')
+        titles = [item['title'] for item in response.data['results']]
+        self.assertEqual(titles, ['Visible'])
 
 
 class TopicActivityScoreTests(TestCase):
