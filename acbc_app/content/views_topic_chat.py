@@ -156,6 +156,16 @@ class TopicChatView(APIView):
         if disabled:
             return disabled
 
+        serializer = TopicChatRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        message = serializer.validated_data['message']
+        content_ids = serializer.validated_data.get('content_ids')
+        selected_ids, selection_error = _resolve_selected_content_ids(topic, content_ids)
+        if selection_error:
+            return selection_error
+
         ready, reason = topic_chat_ready()
         if not ready:
             return Response(
@@ -167,16 +177,6 @@ class TopicChatView(APIView):
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-
-        serializer = TopicChatRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        message = serializer.validated_data['message']
-        content_ids = serializer.validated_data.get('content_ids')
-        selected_ids, selection_error = _resolve_selected_content_ids(topic, content_ids)
-        if selection_error:
-            return selection_error
 
         try:
             result = run_topic_chat(
