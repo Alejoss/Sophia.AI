@@ -764,6 +764,14 @@ class TopicChatQuery(models.Model):
         blank=True,
         help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',
     )
+    retrieved_chunk_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Chunks after score filter / dedupe / keyword fallback, before context budget.',
+    )
+    used_chunk_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Chunks that fit wholly in the prompt context budget.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

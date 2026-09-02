@@ -5407,6 +5407,7 @@ class ContentEmbeddingIngestAPITests(APITestCase):
     QDRANT_URL='https://qdrant.example',
     QDRANT_API_KEY='test-qdrant-key',
     TOPIC_CHAT_TOP_K=4,
+    TOPIC_CHAT_MIN_SCORE=0.30,
 )
 class TopicChatAPITests(APITestCase):
     def setUp(self):
@@ -5482,6 +5483,8 @@ class TopicChatAPITests(APITestCase):
                     'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
                 }
             ],
+            'retrieved_chunk_count': 1,
+            'used_chunk_count': 1,
         }
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
@@ -5524,6 +5527,101 @@ class TopicChatAPITests(APITestCase):
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
         )
         self.assertEqual(forbidden.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_low_score_hits_skip_chat_model(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import LOW_SCORE_ANSWER, run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.12,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Texto poco relacionado con la pregunta.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='qué opinan del tamaño de bloque?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertEqual(result['answer'], LOW_SCORE_ANSWER)
+        self.assertEqual(result['sources'], [])
+        self.assertEqual(result['used_chunk_count'], 0)
+        openai.chat.assert_not_called()
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_format_context_keeps_whole_chunks_only(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import format_context
+
+        long_a = 'A' * 8000
+        long_b = 'B' * 8000
+        sources = [
+            {
+                'index': 1,
+                'content_id': 1,
+                'title': 'Uno',
+                'chunk_index': 0,
+                'text': long_a,
+                'excerpt': long_a[:400],
+            },
+            {
+                'index': 2,
+                'content_id': 2,
+                'title': 'Dos',
+                'chunk_index': 1,
+                'text': long_b,
+                'excerpt': long_b[:400],
+            },
+        ]
+        with self.settings(TOPIC_CHAT_MAX_CONTEXT_CHARS=9000):
+            context, used = format_context(sources)
+        self.assertEqual(len(used), 1)
+        self.assertIn(long_a, context)
+        self.assertNotIn(long_b, context)
+        self.assertNotIn(long_b[:100], context)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_entity_missing_from_context_skips_llm(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        qdrant = mock_qdrant_cls.return_value
+        # High score but no Adam Back in text, and no Postgres mention either.
+        qdrant.search.return_value = [
+            {
+                'score': 0.71,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Solo hablamos de fees y del tamaño de los bloques en 2017.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='¿quién es Adam Back?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        openai.chat.assert_not_called()
+        self.assertNotEqual(result['answer'], '')
+        self.assertEqual(result['used_chunk_count'], 1)
+        self.assertEqual(result['retrieved_chunk_count'], 1)
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')

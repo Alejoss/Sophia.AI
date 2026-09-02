@@ -204,7 +204,12 @@ def diagnose_live_retrieval(
     """
     Run embed + Qdrant search (no chat completion) and classify against Postgres.
     """
-    from content.topic_chat import merge_keyword_fallback
+    from content.topic_chat import (
+        _filter_hits_by_score,
+        context_mentions_entities,
+        empty_retrieval_answer,
+        merge_keyword_fallback,
+    )
 
     topic = Topic.objects.get(pk=topic_id)
     keywords = extract_debug_keywords(message, explicit=keyword)
@@ -223,6 +228,8 @@ def diagnose_live_retrieval(
         'runtime_reason': reason,
         'hits': [],
         'sources': [],
+        'retrieved_chunk_count': 0,
+        'used_chunk_count': 0,
         'classification': None,
     }
 
@@ -258,10 +265,11 @@ def diagnose_live_retrieval(
         }
         return report
 
-    hits = _dedupe_hits(raw_hits, max_per_content=2)[: _top_k()]
+    scored_hits = _filter_hits_by_score(raw_hits)
+    hits = _dedupe_hits(scored_hits, max_per_content=2)[: _top_k()]
     hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
     sources = build_sources_from_hits(hits, topic_id=topic_id)
-    context = format_context(sources)
+    context, used_sources = format_context(sources)
     report['hits'] = [
         {
             'score': round(float(h.get('score') or 0), 4),
@@ -273,20 +281,26 @@ def diagnose_live_retrieval(
         }
         for h in hits
     ]
-    report['sources'] = [{k: v for k, v in s.items() if k != 'text'} for s in sources]
+    report['sources'] = [{k: v for k, v in s.items() if k != 'text'} for s in used_sources]
+    report['retrieved_chunk_count'] = len(sources)
+    report['used_chunk_count'] = len(used_sources)
     report['context_chars'] = len(context)
+    report['entity_in_context'] = context_mentions_entities(context, keywords) if keywords else None
     report['qdrant_point_count'] = None
     try:
         report['qdrant_point_count'] = qdrant.count_topic(topic_id)
     except Exception:
         pass
 
-    from content.topic_chat import empty_retrieval_answer
-
-    fake_answer = empty_retrieval_answer(topic_id=topic_id, message=message) if not context.strip() else ''
+    if not context.strip():
+        fake_answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+    elif keywords and not context_mentions_entities(context, keywords):
+        fake_answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+    else:
+        fake_answer = ''
     report['classification'] = classify_failure(
         answer=fake_answer,
-        sources=sources,
+        sources=used_sources,
         keywords=keywords,
         postgres_matches=pg_matches,
     )

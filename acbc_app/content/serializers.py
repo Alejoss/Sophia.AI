@@ -1764,6 +1764,8 @@ class TopicChatQuerySerializer(serializers.ModelSerializer):
             'question',
             'answer',
             'sources',
+            'retrieved_chunk_count',
+            'used_chunk_count',
             'created_at',
         ]
         read_only_fields = fields

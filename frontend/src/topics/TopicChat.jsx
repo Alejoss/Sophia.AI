@@ -148,6 +148,19 @@ function ConsultationView({ query, topicId }) {
         </Typography>
       </Box>
       <SourcesList sources={query.sources} topicId={topicId} />
+      {(typeof query.used_chunk_count === 'number' ||
+        typeof query.retrieved_chunk_count === 'number') && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', mt: 1.5, px: 0.5 }}
+        >
+          Fragmentos usados: {query.used_chunk_count ?? 0}
+          {typeof query.retrieved_chunk_count === 'number'
+            ? ` / recuperados: ${query.retrieved_chunk_count}`
+            : ''}
+        </Typography>
+      )}
     </Box>
   );
 }

@@ -26,8 +26,12 @@ SYSTEM_PROMPT = (
     '- Solo si el contexto realmente no habla del tema de la pregunta, di que no '
     'lo encuentras en los fragmentos recuperados (no afirmes que no existe en el '
     'tema completo).\n'
-    '- Cita fuentes con [n] donde n es el número del fragmento.\n'
-    '- Responde en español, de forma clara y educativa.\n'
+    '- Cita cada afirmación con [n] donde n es el número del fragmento.\n'
+    '- Para cada afirmación, incluye una cita breve entre comillas tomada '
+    'literalmente del fragmento [n], o di explícitamente que ese detalle no está '
+    'en el contexto.\n'
+    '- Responde en español, de forma clara y concisa. Sin tono de tutor ni '
+    'relleno educativo fuera de los fragmentos.\n'
     '- No inventes citas, títulos ni hechos fuera del contexto.'
 )
 
@@ -50,6 +54,18 @@ INDEX_GAP_ANSWER = (
     'Un moderador debe reindexar esos archivos antes de poder consultarlos aquí.'
 )
 
+LOW_SCORE_ANSWER = (
+    'Encontré archivos indexados para este tema, pero ninguno fue lo bastante '
+    'similar a tu pregunta (por debajo del umbral de relevancia). Prueba a '
+    'reformularla con más detalle o con el nombre exacto que buscas.'
+)
+
+ENTITY_NOT_IN_CONTEXT_ANSWER = (
+    'Recuperé fragmentos del tema, pero ninguno menciona el nombre o dato '
+    'principal de tu pregunta, así que no generé una respuesta para no inventar. '
+    'Prueba a reformular o a preguntar de otra forma.'
+)
+
 
 class TopicChatError(RuntimeError):
     """Raised for configuration / upstream failures in topic chat."""
@@ -69,9 +85,9 @@ def topic_chat_ready() -> tuple[bool, str]:
 
 def _top_k() -> int:
     try:
-        return max(1, min(int(getattr(settings, 'TOPIC_CHAT_TOP_K', 8)), 32))
+        return max(1, min(int(getattr(settings, 'TOPIC_CHAT_TOP_K', 4)), 32))
     except (TypeError, ValueError):
-        return 8
+        return 4
 
 
 def _max_context_chars() -> int:
@@ -81,11 +97,32 @@ def _max_context_chars() -> int:
         return 12000
 
 
+def _min_score() -> float:
+    try:
+        return float(getattr(settings, 'TOPIC_CHAT_MIN_SCORE', 0.30))
+    except (TypeError, ValueError):
+        return 0.30
+
+
 def _score_of(hit: dict[str, Any]) -> float:
     try:
         return float(hit.get('score') or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _filter_hits_by_score(hits: list[dict[str, Any]], *, min_score: Optional[float] = None) -> list[dict[str, Any]]:
+    """Keep dense hits at/above the cosine floor; always keep keyword_fallback hits."""
+    threshold = _min_score() if min_score is None else min_score
+    kept: list[dict[str, Any]] = []
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        if payload.get('retrieval') == 'keyword_fallback':
+            kept.append(hit)
+            continue
+        if _score_of(hit) >= threshold:
+            kept.append(hit)
+    return kept
 
 
 def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> list[dict[str, Any]]:
@@ -410,24 +447,69 @@ def build_sources_from_hits(
     return sources
 
 
-def format_context(sources: list[dict[str, Any]]) -> str:
-    blocks = []
+def format_context(sources: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """
+    Build prompt context from whole chunks only (no partial truncation).
+
+    Returns (context_text, used_sources_with_renumbered_indexes).
+    """
     budget = _max_context_chars()
-    used = 0
+    used_chars = 0
+    kept: list[dict[str, Any]] = []
     for src in sources:
         text = (src.get('text') or src.get('excerpt') or '').strip()
         if not text:
             continue
         title = src.get('title') or f"contenido {src.get('content_id') or '?'}"
-        header = f"[{src['index']}] {title}"
+        # Provisional header length uses upcoming index.
+        next_index = len(kept) + 1
+        header = f"[{next_index}] {title}"
         if src.get('chunk_index') is not None:
             header += f" (chunk {src['chunk_index']})"
         block = f"{header}\n{text}"
-        if used + len(block) > budget and blocks:
+        # Skip any chunk that does not fit in full (including the first).
+        if used_chars + len(block) > budget:
             break
-        blocks.append(block)
-        used += len(block) + 2
-    return '\n\n'.join(blocks)
+        kept.append({**src, 'index': next_index})
+        used_chars += len(block) + 2
+
+    blocks = []
+    for src in kept:
+        text = (src.get('text') or src.get('excerpt') or '').strip()
+        title = src.get('title') or f"contenido {src.get('content_id') or '?'}"
+        header = f"[{src['index']}] {title}"
+        if src.get('chunk_index') is not None:
+            header += f" (chunk {src['chunk_index']})"
+        blocks.append(f"{header}\n{text}")
+    return '\n\n'.join(blocks), kept
+
+
+def context_mentions_entities(context: str, keywords: list[str]) -> bool:
+    if not keywords:
+        return True
+    blob = (context or '').casefold()
+    return any(kw.casefold() in blob for kw in keywords)
+
+
+def _public_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{k: v for k, v in src.items() if k != 'text'} for src in sources]
+
+
+def _result_payload(
+    *,
+    topic_id: int,
+    answer: str,
+    sources: list[dict[str, Any]],
+    retrieved_chunk_count: int,
+    used_chunk_count: int,
+) -> dict[str, Any]:
+    return {
+        'answer': answer,
+        'sources': _public_sources(sources),
+        'topic_id': topic_id,
+        'retrieved_chunk_count': retrieved_chunk_count,
+        'used_chunk_count': used_chunk_count,
+    }
 
 
 def run_topic_chat(
@@ -439,6 +521,10 @@ def run_topic_chat(
     openai_client: Optional[OpenAIClient] = None,
     qdrant_client: Optional[QdrantClient] = None,
 ) -> dict[str, Any]:
+    # history is accepted for API compatibility but never sent to the LLM
+    # (one-shot consultations only).
+    del history
+
     ready, reason = topic_chat_ready()
     if not ready and openai_client is None and qdrant_client is None:
         raise TopicChatError(reason, status_code=503)
@@ -456,7 +542,7 @@ def run_topic_chat(
         ) from exc
 
     try:
-        hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
+        raw_hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
     except (QdrantClientError, requests.RequestException) as exc:
         logger.exception('Topic chat Qdrant search failed topic_id=%s', topic_id)
         raise TopicChatError(
@@ -465,17 +551,52 @@ def run_topic_chat(
             status_code=502,
         ) from exc
 
-    hits = _dedupe_hits(hits, max_per_content=2)[: _top_k()]
+    scored_hits = _filter_hits_by_score(raw_hits)
+    hits = _dedupe_hits(scored_hits, max_per_content=2)[: _top_k()]
     hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
-    sources = build_sources_from_hits(hits, topic_id=topic_id)
-    context = format_context(sources)
+
+    all_sources = build_sources_from_hits(hits, topic_id=topic_id)
+    retrieved_chunk_count = len(all_sources)
+    context, used_sources = format_context(all_sources)
+    used_chunk_count = len(used_sources)
 
     if not context.strip():
-        return {
-            'answer': empty_retrieval_answer(topic_id=topic_id, message=message),
-            'sources': [],
-            'topic_id': topic_id,
-        }
+        # Distinguish: had raw hits but all below score floor vs true empty.
+        if raw_hits and not scored_hits and not hits:
+            answer = LOW_SCORE_ANSWER
+        else:
+            answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+        return _result_payload(
+            topic_id=topic_id,
+            answer=answer,
+            sources=[],
+            retrieved_chunk_count=retrieved_chunk_count,
+            used_chunk_count=0,
+        )
+
+    # Pre-LLM entity check: if the question names an entity, it must appear in
+    # the prompt context (after keyword fallback). Otherwise skip the chat model.
+    keywords = extract_entity_keywords(message)
+    if keywords and not context_mentions_entities(context, keywords):
+        logger.info(
+            'Topic chat entity not in context topic_id=%s keywords=%s '
+            'retrieved=%s used=%s',
+            topic_id,
+            keywords,
+            retrieved_chunk_count,
+            used_chunk_count,
+        )
+        # Prefer corpus-aware miss copy when Postgres still has the name.
+        answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+        if answer == EMPTY_RETRIEVAL_ANSWER:
+            answer = ENTITY_NOT_IN_CONTEXT_ANSWER
+        return _result_payload(
+            topic_id=topic_id,
+            answer=answer,
+            sources=used_sources,
+            retrieved_chunk_count=retrieved_chunk_count,
+            used_chunk_count=used_chunk_count,
+        )
 
     user_prompt = (
         f'Tema: {topic_title}\n\n'
@@ -483,16 +604,13 @@ def run_topic_chat(
         f'Pregunta del usuario:\n{message}'
     )
 
-    messages: list[dict[str, str]] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
-    for turn in (history or [])[-6:]:
-        role = (turn.get('role') or '').strip()
-        content = (turn.get('content') or '').strip()
-        if role in ('user', 'assistant') and content:
-            messages.append({'role': role, 'content': content[:4000]})
-    messages.append({'role': 'user', 'content': user_prompt})
+    messages: list[dict[str, str]] = [
+        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'user', 'content': user_prompt},
+    ]
 
     try:
-        answer = openai.chat(messages)
+        answer = openai.chat(messages, temperature=0.2)
     except OpenAIClientError as exc:
         logger.exception('Topic chat completion failed topic_id=%s', topic_id)
         raise TopicChatError(
@@ -500,13 +618,10 @@ def run_topic_chat(
             status_code=502,
         ) from exc
 
-    # Strip full chunk text from API response (keep excerpt only).
-    public_sources = [
-        {k: v for k, v in src.items() if k != 'text'}
-        for src in sources
-    ]
-    return {
-        'answer': answer,
-        'sources': public_sources,
-        'topic_id': topic_id,
-    }
+    return _result_payload(
+        topic_id=topic_id,
+        answer=answer,
+        sources=used_sources,
+        retrieved_chunk_count=retrieved_chunk_count,
+        used_chunk_count=used_chunk_count,
+    )

@@ -52,6 +52,8 @@ Response `201`:
       "transcript_url": "/content/46/transcript?context=topic"
     }
   ],
+  "retrieved_chunk_count": 4,
+  "used_chunk_count": 3,
   "created_at": "2026-07-28T18:00:00Z"
 }
 ```
@@ -103,7 +105,8 @@ Same shape as the create response. Other users get **404**.
 OPENAI_API_KEY=sk-…
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 OPENAI_CHAT_MODEL=gpt-4o-mini
-TOPIC_CHAT_TOP_K=8
+TOPIC_CHAT_TOP_K=4
+TOPIC_CHAT_MIN_SCORE=0.30
 TOPIC_CHAT_MAX_CONTEXT_CHARS=12000
 ```
 
@@ -114,12 +117,23 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 ## Behaviour notes
 
 - Retrieval is scoped to one `topic_id`.
-- At most two chunks per `content_id` in the prompt (dedupe).
-- Entity keywords (e.g. `Adam Back`) missing from dense hits are backfilled
-  from indexed Postgres transcript windows when present.
+- Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
+- Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
+  remain and keyword fallback cannot help, the API returns a fixed message and
+  **does not** call the chat model.
+- Context includes **whole chunks only** under `TOPIC_CHAT_MAX_CONTEXT_CHARS`
+  (default 12000). Partial tail truncation is not allowed.
+- Responses expose `retrieved_chunk_count` / `used_chunk_count`.
+- Entity keywords from the question must appear in the assembled prompt after
+  keyword fallback; otherwise the chat model is skipped.
+- System prompt requires `[n]` citations plus a short verbatim quote from
+  fragment `[n]` (or an explicit “not in context”).
+- Previous consultations are never sent back to the LLM (one-shot only).
+- Entity keywords missing from dense hits are backfilled from indexed Postgres
+  transcript windows when present.
 - If no usable context remains, the API persists an honest fixed Spanish
-  answer (retrieval miss / index gap / empty) — **no** chat-model call, and it
-  does **not** claim the entity is absent from the whole topic when Postgres
+  answer (retrieval miss / index gap / empty / low score) — **no** chat-model call,
+  and it does **not** claim the entity is absent from the whole topic when Postgres
   still has matches.
 - Per-user / per-topic daily rate limits are **not** implemented yet.
 - The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
