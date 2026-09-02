@@ -5527,6 +5527,101 @@ class TopicChatAPITests(APITestCase):
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')
+    def test_keyword_fallback_injects_adam_back_when_dense_misses(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=(
+                'Hoy hablamos con Adam Back, cofundador de Blockstream, '
+                'sobre Hashcash y la prueba de trabajo.'
+            ),
+            language='es',
+        )
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
+        transcript.chunk_count = 2
+        transcript.save(update_fields=['embedded_text_hash', 'embedding_status', 'chunk_count'])
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Adam Back es cofundador de Blockstream [1].'
+        qdrant = mock_qdrant_cls.return_value
+        # Dense hits talk about something else — classic name miss.
+        qdrant.search.return_value = [
+            {
+                'score': 0.55,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Hablamos de fees y el tamaño de los bloques en 2017.',
+                },
+            }
+        ]
+
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='¿quién es Adam Back?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertIn('Adam Back', result['answer'])
+        self.assertTrue(
+            any('Adam Back' in (src.get('excerpt') or '') for src in result['sources']),
+            msg=f"expected keyword snippet in sources, got {result['sources']!r}",
+        )
+        prompt = openai.chat.call_args.args[0]
+        user_content = prompt[-1]['content']
+        self.assertIn('Adam Back', user_content)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_empty_retrieval_explains_miss_when_postgres_has_entity(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import RETRIEVAL_MISS_ANSWER, run_topic_chat
+
+        transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Mención a Adam Back en el documental.',
+            language='es',
+        )
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
+        transcript.save(update_fields=['embedded_text_hash', 'embedding_status'])
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.1,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': '',  # unusable dense hit
+                },
+            }
+        ]
+
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='¿quién es Adam Back?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        # Keyword fallback should still inject from Postgres when dense text is empty.
+        if result['sources']:
+            self.assertTrue(any('Adam Back' in (s.get('excerpt') or '') for s in result['sources']))
+            openai.chat.assert_called()
+        else:
+            self.assertEqual(result['answer'], RETRIEVAL_MISS_ANSWER)
+            openai.chat.assert_not_called()
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
     def test_run_topic_chat_builds_sources(self, mock_qdrant_cls, mock_openai_cls):
         from content.topic_chat import run_topic_chat
 
@@ -5795,8 +5890,15 @@ class TopicChatDebugTests(TestCase):
             openai_client=openai,
             qdrant_client=qdrant,
         )
-        self.assertEqual(report['classification']['mode'], 'retrieval_miss')
-        self.assertEqual(len(report['sources']), 1)
+        # Keyword fallback injects Postgres windows, so diagnosis becomes ok.
+        self.assertEqual(report['classification']['mode'], 'ok')
+        self.assertTrue(
+            any(
+                (h.get('retrieval') == 'keyword_fallback')
+                or ('Adam Back' in (h.get('excerpt') or ''))
+                for h in report['hits']
+            )
+        )
         self.assertEqual(report['qdrant_point_count'], 12)
 
     def test_management_command_query_id(self):

@@ -115,8 +115,12 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 
 - Retrieval is scoped to one `topic_id`.
 - At most two chunks per `content_id` in the prompt (dedupe).
-- If no chunks have usable `text` payload, the API still persists a fixed
-  “no encontré…” answer (no chat-model call).
+- Entity keywords (e.g. `Adam Back`) missing from dense hits are backfilled
+  from indexed Postgres transcript windows when present.
+- If no usable context remains, the API persists an honest fixed Spanish
+  answer (retrieval miss / index gap / empty) — **no** chat-model call, and it
+  does **not** claim the entity is absent from the whole topic when Postgres
+  still has matches.
 - Per-user / per-topic daily rate limits are **not** implemented yet.
 - The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
@@ -201,11 +205,20 @@ Add `--json` for machine-readable output. Logic lives in
 
 ### 5. Likely root cause for entity questions
 
-Sophia’s consult path is **dense-only** (`text-embedding-3-large` → Qdrant
-filter by `topic_id` → top-k with max 2 chunks per content). Short questions
-about people (“Adam Back”) often fail to rank name-mention chunks even when the
-name appears across the topic. Hybrid keyword fallback is a follow-up fix once
-`debug_topic_chat` confirms `retrieval_miss`.
+Sophia’s consult path is primarily **dense** retrieval (`text-embedding-3-large`
+→ Qdrant filter by `topic_id` → top-k). Short questions about people
+(“¿quién es Adam Back?”) can rank the wrong chunks after tiny wording/accent
+changes, and the model then says “no encuentro…” even though the name is in
+the corpus.
+
+**Mitigation (in `topic_chat.py`):** if extracted entity keywords are missing
+from dense hits but present in indexed Postgres transcripts, inject keyword
+windows into the prompt (`keyword_fallback`). Empty retrieval also returns an
+honest message (`RETRIEVAL_MISS_ANSWER` / `INDEX_GAP_ANSWER`) instead of
+claiming the material does not exist.
+
+SQL_ASCII on Postgres is a separate ops issue (accents may degrade on save);
+migrate with `./scripts/migrate-db-to-utf8.sh` when possible.
 
 ## Related
 

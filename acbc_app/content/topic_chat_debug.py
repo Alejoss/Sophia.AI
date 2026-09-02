@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any, Optional
 
-from content.models import ContentTranscript, Topic, TopicChatQuery
+from content.models import Topic, TopicChatQuery
 from content.topic_chat import (
+    EMPTY_RETRIEVAL_ANSWER,
+    INDEX_GAP_ANSWER,
+    RETRIEVAL_MISS_ANSWER,
     _dedupe_hits,
     _top_k,
     build_sources_from_hits,
+    extract_entity_keywords,
     format_context,
+    postgres_keyword_matches,
     topic_chat_ready,
 )
-from content.transcript_utils import resolve_hash_source_text
 
-# Fixed empty-context answer from run_topic_chat (no LLM call).
-EMPTY_RETRIEVAL_ANSWER_PREFIX = 'No encontré fragmentos indexados'
+# Fixed empty-context answers from run_topic_chat (no LLM call).
+EMPTY_RETRIEVAL_ANSWER_PREFIX = EMPTY_RETRIEVAL_ANSWER[:32]
+_FIXED_ANSWER_PREFIXES = (
+    EMPTY_RETRIEVAL_ANSWER[:40],
+    RETRIEVAL_MISS_ANSWER[:40],
+    INDEX_GAP_ANSWER[:40],
+)
 
 _REFUSAL_MARKERS = (
     'no la encuentro',
@@ -26,6 +34,8 @@ _REFUSAL_MARKERS = (
     'no aparece',
     'no se menciona',
     'no hay información',
+    'no pude recuperar',
+    'no recuperó bien',
 )
 
 
@@ -35,99 +45,7 @@ def _looks_like_refusal(answer: str) -> bool:
 
 
 def extract_debug_keywords(message: str, *, explicit: Optional[str] = None) -> list[str]:
-    """
-    Keywords to probe Postgres / retrieved excerpts.
-
-    Prefer an explicit --keyword. Otherwise keep capitalized multi-word names
-    (e.g. "Adam Back") and longer tokens from the question.
-    """
-    if explicit and explicit.strip():
-        return [explicit.strip()]
-
-    text = (message or '').strip()
-    if not text:
-        return []
-
-    keywords: list[str] = []
-    for match in re.finditer(r'\b([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+)+)\b', text):
-        keywords.append(match.group(1))
-
-    stop = {
-        'que', 'qué', 'quien', 'quién', 'como', 'cómo', 'donde', 'dónde',
-        'cual', 'cuál', 'sobre', 'dice', 'dicen', 'habla', 'hablan', 'tema',
-        'the', 'who', 'what', 'where', 'about', 'from', 'with', 'this', 'that',
-    }
-    for token in re.findall(r'[\wÁÉÍÓÚÑáéíóúñ]{4,}', text, flags=re.UNICODE):
-        if token.lower() in stop:
-            continue
-        if token[0].isupper() and token not in keywords:
-            keywords.append(token)
-
-    # Dedupe preserving order.
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for kw in keywords:
-        key = kw.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        ordered.append(kw)
-    return ordered
-
-
-def _snippet_around(text: str, keyword: str, *, radius: int = 180) -> str:
-    lower = text.casefold()
-    needle = keyword.casefold()
-    pos = lower.find(needle)
-    if pos < 0:
-        return (text[: radius * 2] + ('…' if len(text) > radius * 2 else ''))
-    start = max(0, pos - radius)
-    end = min(len(text), pos + len(keyword) + radius)
-    snippet = text[start:end].strip()
-    if start > 0:
-        snippet = '…' + snippet
-    if end < len(text):
-        snippet = snippet + '…'
-    return snippet
-
-
-def postgres_keyword_matches(
-    topic_id: int,
-    keywords: list[str],
-    *,
-    limit: int = 20,
-) -> list[dict[str, Any]]:
-    """Find topic transcripts (any embedding status) whose index text mentions keywords."""
-    if not keywords:
-        return []
-
-    qs = ContentTranscript.objects.filter(
-        content__topics__id=topic_id,
-        content__media_type__in=('VIDEO', 'AUDIO'),
-    ).select_related('content').distinct()
-
-    matches: list[dict[str, Any]] = []
-    for transcript in qs:
-        body = resolve_hash_source_text(transcript) or ''
-        if not body:
-            continue
-        hit_keywords = [kw for kw in keywords if kw.casefold() in body.casefold()]
-        if not hit_keywords:
-            continue
-        primary = hit_keywords[0]
-        matches.append({
-            'content_id': transcript.content_id,
-            'title': transcript.content.original_title or '',
-            'embedding_status': transcript.embedding_status,
-            'chunk_count': transcript.chunk_count,
-            'text_hash': transcript.text_hash,
-            'embedded_text_hash': transcript.embedded_text_hash,
-            'matched_keywords': hit_keywords,
-            'snippet': _snippet_around(body, primary),
-        })
-        if len(matches) >= limit:
-            break
-    return matches
+    return extract_entity_keywords(message, explicit=explicit)
 
 
 def sources_mention_keywords(sources: list[dict[str, Any]], keywords: list[str]) -> list[int]:
@@ -166,7 +84,7 @@ def classify_failure(
     answer = answer or ''
     sources = sources or []
     empty_sources = len(sources) == 0
-    fixed_empty = answer.startswith(EMPTY_RETRIEVAL_ANSWER_PREFIX)
+    fixed_empty = any(answer.startswith(prefix) for prefix in _FIXED_ANSWER_PREFIXES)
     source_hit_indexes = sources_mention_keywords(sources, keywords)
 
     indexed_pg = [m for m in postgres_matches if m.get('embedding_status') == 'indexed']
@@ -205,7 +123,7 @@ def classify_failure(
         detail = (
             f'Top-{len(sources)} retrieved chunks do not mention {keywords!r}, '
             f'but {len(indexed_pg)} indexed Postgres transcript(s) do. '
-            'Classic dense-retrieval miss — consider hybrid / keyword fallback.'
+            'Classic dense-retrieval miss — keyword fallback should inject snippets.'
         )
     elif keywords and postgres_matches and not source_hit_indexes:
         mode = 'index_gap'
@@ -220,7 +138,6 @@ def classify_failure(
             'The model refusal may be correct for this corpus.'
         )
     else:
-        # Has sources, no keyword probe — check if answer looks like a refusal.
         if _looks_like_refusal(answer):
             mode = 'grounding_refuse'
             detail = (
@@ -231,7 +148,6 @@ def classify_failure(
             mode = 'ok'
             detail = 'Consultation returned sources and a non-refusal answer.'
 
-    # Refine: sources have keyword but answer refuses → grounding_refuse
     if keywords and source_hit_indexes and _looks_like_refusal(answer):
         mode = 'grounding_refuse'
         detail = (
@@ -288,6 +204,8 @@ def diagnose_live_retrieval(
     """
     Run embed + Qdrant search (no chat completion) and classify against Postgres.
     """
+    from content.topic_chat import merge_keyword_fallback
+
     topic = Topic.objects.get(pk=topic_id)
     keywords = extract_debug_keywords(message, explicit=keyword)
     pg_matches = postgres_keyword_matches(topic_id, keywords)
@@ -341,6 +259,7 @@ def diagnose_live_retrieval(
         return report
 
     hits = _dedupe_hits(raw_hits, max_per_content=2)[: _top_k()]
+    hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
     sources = build_sources_from_hits(hits, topic_id=topic_id)
     context = format_context(sources)
     report['hits'] = [
@@ -349,6 +268,7 @@ def diagnose_live_retrieval(
             'content_id': (h.get('payload') or {}).get('content_id'),
             'chunk_index': (h.get('payload') or {}).get('chunk_index'),
             'has_text': bool(((h.get('payload') or {}).get('text') or '').strip()),
+            'retrieval': (h.get('payload') or {}).get('retrieval') or 'dense',
             'excerpt': ((h.get('payload') or {}).get('text') or '')[:240],
         }
         for h in hits
@@ -361,11 +281,9 @@ def diagnose_live_retrieval(
     except Exception:
         pass
 
-    fake_answer = (
-        EMPTY_RETRIEVAL_ANSWER_PREFIX + '…'
-        if not context.strip()
-        else ''
-    )
+    from content.topic_chat import empty_retrieval_answer
+
+    fake_answer = empty_retrieval_answer(topic_id=topic_id, message=message) if not context.strip() else ''
     report['classification'] = classify_failure(
         answer=fake_answer,
         sources=sources,

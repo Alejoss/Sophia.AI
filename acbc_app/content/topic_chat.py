@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 
 import requests
 from django.conf import settings
 
-from content.models import Content
+from content.models import Content, ContentTranscript
+from content.transcript_utils import resolve_hash_source_text
 from utils.openai_client import OpenAIClient, OpenAIClientError, openai_configured
 from utils.qdrant_client import QdrantClient, QdrantClientError, qdrant_configured
 
@@ -18,11 +20,34 @@ SYSTEM_PROMPT = (
     'Eres un asistente de Academia Blockchain. Respondes preguntas sobre un tema '
     'usando ÚNICAMENTE los fragmentos de transcripciones proporcionados como contexto.\n'
     'Reglas:\n'
-    '- Si el contexto no contiene la información, di claramente que no la encuentras '
-    'en las transcripciones del tema. No inventes.\n'
+    '- Si el contexto menciona a la persona o concepto preguntado, resume lo que '
+    'dicen esos fragmentos (aunque sea parcial). No digas que no aparece si el '
+    'nombre sí está en el contexto.\n'
+    '- Solo si el contexto realmente no habla del tema de la pregunta, di que no '
+    'lo encuentras en los fragmentos recuperados (no afirmes que no existe en el '
+    'tema completo).\n'
     '- Cita fuentes con [n] donde n es el número del fragmento.\n'
     '- Responde en español, de forma clara y educativa.\n'
     '- No inventes citas, títulos ni hechos fuera del contexto.'
+)
+
+EMPTY_RETRIEVAL_ANSWER = (
+    'No pude recuperar fragmentos útiles de las transcripciones indexadas para '
+    'responder a tu pregunta. Puede que la búsqueda semántica no haya coincidido '
+    'con el material, o que aún falten embeddings.'
+)
+
+RETRIEVAL_MISS_ANSWER = (
+    'La búsqueda semántica no recuperó bien los pasajes, aunque el nombre o '
+    'concepto sí aparece en transcripciones indexadas de este tema. Prueba a '
+    'reformular la pregunta (por ejemplo sin acentos o con más contexto), o '
+    'vuelve a intentarlo en unos segundos.'
+)
+
+INDEX_GAP_ANSWER = (
+    'Encontré menciones en el texto de las transcripciones, pero todavía no '
+    'están indexadas para consultas (embeddings pendientes, obsoletos o con error). '
+    'Un moderador debe reindexar esos archivos antes de poder consultarlos aquí.'
 )
 
 
@@ -78,6 +103,235 @@ def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> lis
         per_content[key] = count + 1
         selected.append(hit)
     return selected
+
+
+def extract_entity_keywords(message: str, *, explicit: Optional[str] = None) -> list[str]:
+    """
+    Proper nouns / distinctive tokens from a consultation question.
+
+    Used for Postgres keyword fallback when dense retrieval misses names
+    (e.g. "Adam Back") after small wording/accent changes.
+    """
+    if explicit and explicit.strip():
+        return [explicit.strip()]
+
+    text = (message or '').strip()
+    if not text:
+        return []
+
+    keywords: list[str] = []
+    for match in re.finditer(
+        r'\b([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+)+)\b',
+        text,
+    ):
+        keywords.append(match.group(1))
+
+    multi_parts = {
+        part.casefold()
+        for kw in keywords
+        for part in kw.split()
+    }
+
+    stop = {
+        'que', 'qué', 'quien', 'quién', 'como', 'cómo', 'donde', 'dónde',
+        'cual', 'cuál', 'sobre', 'dice', 'dicen', 'habla', 'hablan', 'tema',
+        'the', 'who', 'what', 'where', 'about', 'from', 'with', 'this', 'that',
+    }
+    for token in re.findall(r'[\wÁÉÍÓÚÑáéíóúñ]{4,}', text, flags=re.UNICODE):
+        if token.casefold() in stop or token.casefold() in multi_parts:
+            continue
+        if token[0].isupper() and token not in keywords:
+            keywords.append(token)
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for kw in keywords:
+        key = kw.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(kw)
+    return ordered
+
+
+def snippet_around(text: str, keyword: str, *, radius: int = 220) -> str:
+    lower = text.casefold()
+    needle = keyword.casefold()
+    pos = lower.find(needle)
+    if pos < 0:
+        return (text[: radius * 2] + ('…' if len(text) > radius * 2 else ''))
+    start = max(0, pos - radius)
+    end = min(len(text), pos + len(keyword) + radius)
+    snippet = text[start:end].strip()
+    if start > 0:
+        snippet = '…' + snippet
+    if end < len(text):
+        snippet = snippet + '…'
+    return snippet
+
+
+def postgres_keyword_matches(
+    topic_id: int,
+    keywords: list[str],
+    *,
+    limit: int = 20,
+    indexed_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Find topic transcripts whose index text mentions keywords."""
+    if not keywords:
+        return []
+
+    qs = ContentTranscript.objects.filter(
+        content__topics__id=topic_id,
+        content__media_type__in=('VIDEO', 'AUDIO', 'TEXT'),
+    ).select_related('content').distinct()
+    if indexed_only:
+        qs = qs.filter(embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED)
+
+    matches: list[dict[str, Any]] = []
+    for transcript in qs:
+        body = resolve_hash_source_text(transcript) or ''
+        if not body:
+            continue
+        hit_keywords = [kw for kw in keywords if kw.casefold() in body.casefold()]
+        if not hit_keywords:
+            continue
+        primary = hit_keywords[0]
+        matches.append({
+            'content_id': transcript.content_id,
+            'title': transcript.content.original_title or '',
+            'media_type': transcript.content.media_type or '',
+            'embedding_status': transcript.embedding_status,
+            'chunk_count': transcript.chunk_count,
+            'text_hash': transcript.text_hash,
+            'embedded_text_hash': transcript.embedded_text_hash,
+            'matched_keywords': hit_keywords,
+            'snippet': snippet_around(body, primary),
+        })
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def sources_mention_keywords(sources: list[dict[str, Any]], keywords: list[str]) -> bool:
+    if not keywords:
+        return False
+    for src in sources or []:
+        blob = f"{src.get('excerpt') or ''} {src.get('text') or ''} {src.get('title') or ''}"
+        if any(kw.casefold() in blob.casefold() for kw in keywords):
+            return True
+    return False
+
+
+def keyword_fallback_hits(
+    topic_id: int,
+    keywords: list[str],
+    *,
+    limit: int = 4,
+    exclude_content_ids: Optional[set[int]] = None,
+) -> list[dict[str, Any]]:
+    """Build synthetic Qdrant-like hits from indexed Postgres snippets."""
+    exclude = exclude_content_ids or set()
+    matches = postgres_keyword_matches(
+        topic_id,
+        keywords,
+        limit=limit + len(exclude) + 4,
+        indexed_only=True,
+    )
+    hits: list[dict[str, Any]] = []
+    for match in matches:
+        content_id = match.get('content_id')
+        if content_id in exclude:
+            continue
+        text = (match.get('snippet') or '').strip()
+        if not text:
+            continue
+        hits.append({
+            'score': 0.99,
+            'payload': {
+                'topic_id': topic_id,
+                'content_id': content_id,
+                'chunk_index': None,
+                'text': text,
+                'retrieval': 'keyword_fallback',
+            },
+        })
+        if len(hits) >= limit:
+            break
+    return hits
+
+
+def merge_keyword_fallback(
+    hits: list[dict[str, Any]],
+    *,
+    topic_id: int,
+    message: str,
+) -> list[dict[str, Any]]:
+    """
+    If dense hits omit entity keywords that exist in indexed transcripts,
+    prepend Postgres keyword windows so the LLM sees the name.
+    """
+    keywords = extract_entity_keywords(message)
+    if not keywords:
+        return hits
+
+    # Peek whether current hit texts already mention the entity.
+    provisional = []
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        provisional.append({
+            'excerpt': (payload.get('text') or '')[:400],
+            'text': payload.get('text') or '',
+            'title': '',
+        })
+    if sources_mention_keywords(provisional, keywords):
+        return hits
+
+    # Only skip contents whose dense hit already mentions the keyword.
+    already: set[int] = set()
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        text = payload.get('text') or ''
+        if not any(kw.casefold() in text.casefold() for kw in keywords):
+            continue
+        cid = payload.get('content_id')
+        try:
+            already.add(int(cid))
+        except (TypeError, ValueError):
+            pass
+
+    fallback = keyword_fallback_hits(
+        topic_id,
+        keywords,
+        limit=min(4, _top_k()),
+        exclude_content_ids=already,
+    )
+    if not fallback:
+        return hits
+
+    logger.info(
+        'Topic chat keyword fallback topic_id=%s keywords=%s injected=%s',
+        topic_id,
+        keywords,
+        len(fallback),
+    )
+    # Prefer keyword windows, then dense hits; dedupe caps per content.
+    return _dedupe_hits(fallback + hits, max_per_content=2)[: _top_k()]
+
+
+def empty_retrieval_answer(*, topic_id: int, message: str) -> str:
+    """Honest fixed answer when no usable context could be built."""
+    keywords = extract_entity_keywords(message)
+    if not keywords:
+        return EMPTY_RETRIEVAL_ANSWER
+
+    matches = postgres_keyword_matches(topic_id, keywords, limit=8)
+    indexed = [m for m in matches if m.get('embedding_status') == 'indexed']
+    if indexed:
+        return RETRIEVAL_MISS_ANSWER
+    if matches:
+        return INDEX_GAP_ANSWER
+    return EMPTY_RETRIEVAL_ANSWER
 
 
 def _load_content_metadata(content_ids: list[int]) -> dict[int, dict[str, str]]:
@@ -212,16 +466,13 @@ def run_topic_chat(
         ) from exc
 
     hits = _dedupe_hits(hits, max_per_content=2)[: _top_k()]
+    hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
     sources = build_sources_from_hits(hits, topic_id=topic_id)
     context = format_context(sources)
 
     if not context.strip():
         return {
-            'answer': (
-                'No encontré fragmentos indexados de transcripciones para este tema '
-                'que respondan a tu pregunta. Puede que aún no haya embeddings o que '
-                'la pregunta no coincida con el material disponible.'
-            ),
+            'answer': empty_retrieval_answer(topic_id=topic_id, message=message),
             'sources': [],
             'topic_id': topic_id,
         }
