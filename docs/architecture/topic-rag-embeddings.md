@@ -95,6 +95,7 @@ answers are not sent to the LLM. See [topic-rag-chat.md](../operations/topic-rag
 | Staleness sync | `acbc_app/content/transcript_utils.py` |
 | Embedding-ingest API | `acbc_app/content/views_embedding_ingest.py` |
 | RAG orchestration | `acbc_app/content/topic_chat.py` |
+| Consultation debug CLI | `acbc_app/content/topic_chat_debug.py` + `manage.py debug_topic_chat` |
 | OpenAI client | `acbc_app/utils/openai_client.py` |
 | Qdrant search client | `acbc_app/utils/qdrant_client.py` |
 | Qdrant connectivity CLI | `acbc_app/content/management/commands/check_qdrant.py` |
@@ -152,6 +153,7 @@ Topic chat also requires valid Qdrant and OpenAI credentials in the backend env.
 | `ContentEmbeddingIngestAPITests` | `acbc_app/content/tests.py` |
 | `ContentTranscriptIngestAPITests` (stale on text change) | `acbc_app/content/tests.py` |
 | `TopicChatAPITests` | `acbc_app/content/tests.py` |
+| `TopicChatDebugTests` | `acbc_app/content/tests.py` |
 
 ---
 
