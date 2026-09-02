@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0033_transcript_anchor_request'),
+        ('content', '0034_topicchatquery_sources_text_json'),
     ]
 
     operations = [
