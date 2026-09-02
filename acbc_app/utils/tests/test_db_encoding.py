@@ -54,6 +54,14 @@ class DbEncodingUtilsTests(SimpleTestCase):
         self.assertEqual(obj.question, 'Que paso?')
         self.assertEqual(obj.sources[0]['excerpt'], 'diseno')
 
+    def test_text_json_field_dumps_unicode_as_text(self):
+        from utils.db_encoding import TextJSONField
+
+        field = TextJSONField()
+        dumped = field.get_db_prep_value({'excerpt': 'diseño'}, connection=None)
+        self.assertIsInstance(dumped, str)
+        self.assertIn('diseño', dumped)
+
     def test_normalize_notes_string(self):
         self.assertEqual(normalize_notes_value('  Hola  '), 'Hola')
 

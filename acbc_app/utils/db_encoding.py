@@ -13,6 +13,8 @@ import logging
 import unicodedata
 from typing import Any
 
+from django.db.models import JSONField as DjangoJSONField
+
 logger = logging.getLogger(__name__)
 
 _encoding_cache: dict[str, str] | None = None
@@ -139,8 +141,9 @@ def prepare_model_fields(instance, *, text_fields=(), json_fields=()) -> None:
     """
     Apply prepare_text_for_db / prepare_json_for_db in place.
 
-    Shared by models that persist user Spanish text on a legacy SQL_ASCII
-    cluster (ContentTranscript, TopicChatQuery, …). No-op on UTF8.
+    Used by ContentTranscript (and similar) on a legacy SQL_ASCII cluster.
+    Prefer TextJSONField for new JSON that must keep Spanish accents.
+    No-op on UTF8.
     """
     for name in text_fields:
         setattr(instance, name, prepare_text_for_db(getattr(instance, name)))
@@ -168,3 +171,34 @@ def normalize_notes_value(notes: Any) -> str:
             return ''
         return json.dumps(notes, ensure_ascii=False)
     return str(notes).strip()
+
+
+class TextJSONField(DjangoJSONField):
+    """
+    JSON stored as TEXT instead of jsonb.
+
+    Production Postgres is SQL_ASCII. jsonb cannot hold Unicode there
+    (`unsupported Unicode escape sequence` / UTF8↔SQL_ASCII). TEXT columns
+    already store Spanish UTF-8 bytes, which is why topic titles and
+    transcripts still show accents.
+
+    Do not run this through prepare_json_for_db — that strips accents.
+    """
+
+    def db_type(self, connection):
+        if connection.vendor == 'postgresql':
+            return 'text'
+        return super().db_type(connection)
+
+    def get_db_prep_value(self, value, connection, prepared=False):
+        if value is None:
+            return value
+        if hasattr(value, 'as_sql'):
+            return value
+        if isinstance(value, str):
+            return value
+        dumps_kwargs = {'ensure_ascii': False}
+        if self.encoder is not None:
+            dumps_kwargs['cls'] = self.encoder
+        return json.dumps(value, **dumps_kwargs)
+

@@ -5569,33 +5569,28 @@ class TopicChatAPITests(APITestCase):
         self.assertIn('archivos indexados', response.data['error'])
         self.assertFalse(TopicChatQuery.objects.filter(topic=self.topic).exists())
 
-    def test_save_degrades_unicode_on_sql_ascii_database(self):
-        from unittest.mock import patch
-
-        with patch('utils.db_encoding.is_sql_ascii_database', return_value=True):
-            query = TopicChatQuery.objects.create(
-                topic=self.topic,
-                user=self.user,
-                question='Qué hizo el Digital Currency Group?',
-                answer='Nació de su diseño original [1].',
-                sources=[{
-                    'index': 1,
-                    'content_id': self.video.id,
-                    'title': 'Video citado',
-                    'excerpt': 'los tres líderes del proyecto…',
-                    'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
-                }],
-            )
+    def test_save_keeps_spanish_accents(self):
+        query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.user,
+            question='Qué hizo el Digital Currency Group?',
+            answer='Nació de su diseño original [1].',
+            sources=[{
+                'index': 1,
+                'content_id': self.video.id,
+                'title': 'Video citado',
+                'excerpt': 'los tres líderes del proyecto…',
+                'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
+            }],
+        )
 
         query.refresh_from_db()
-        self.assertEqual(query.question, 'Que hizo el Digital Currency Group?')
-        self.assertEqual(query.answer, 'Nacio de su diseno original [1].')
-        self.assertEqual(query.sources[0]['excerpt'], 'los tres lideres del proyecto...')
+        self.assertEqual(query.question, 'Qué hizo el Digital Currency Group?')
+        self.assertEqual(query.answer, 'Nació de su diseño original [1].')
+        self.assertEqual(query.sources[0]['excerpt'], 'los tres líderes del proyecto…')
 
     @patch('content.views_topic_chat.run_topic_chat')
-    def test_chat_persists_spanish_answer_on_sql_ascii(self, mock_run):
-        from unittest.mock import patch
-
+    def test_chat_api_returns_spanish_accents(self, mock_run):
         mock_run.return_value = {
             'topic_id': self.topic.id,
             'answer': 'Nació de su diseño original [1].',
@@ -5607,16 +5602,17 @@ class TopicChatAPITests(APITestCase):
                 'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
             }],
         }
-        with patch('utils.db_encoding.is_sql_ascii_database', return_value=True):
-            response = self.client.post(
-                f'/api/content/topics/{self.topic.id}/chat/',
-                {'message': 'Qué hizo el Digital Currency Group?'},
-                format='json',
-            )
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Qué hizo el Digital Currency Group?'},
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['answer'], 'Nació de su diseño original [1].')
+        self.assertEqual(response.data['question'], 'Qué hizo el Digital Currency Group?')
+        self.assertEqual(response.data['sources'][0]['excerpt'], 'los tres líderes del proyecto…')
         query = TopicChatQuery.objects.get(pk=response.data['id'])
-        self.assertEqual(query.answer, 'Nacio de su diseno original [1].')
-        self.assertEqual(query.sources[0]['excerpt'], 'los tres lideres del proyecto...')
+        self.assertEqual(query.answer, 'Nació de su diseño original [1].')
 
 
 
