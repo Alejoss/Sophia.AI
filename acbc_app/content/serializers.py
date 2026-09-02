@@ -20,6 +20,7 @@ from content.models import (
     ContentSuggestion,
     FileSuggestion,
     ContentTranscript,
+    ContentEmbedding,
     TopicCreationRequest,
     TranscriptAnchor,
     TranscriptAnchorRequest,
@@ -446,8 +447,8 @@ class TopicBasicSerializer(serializers.ModelSerializer):
             if topic is None or not topic.has_indexed_transcripts():
                 raise serializers.ValidationError(
                     'No se pueden activar las consultas: este tema aún no tiene '
-                    'transcripciones indexadas (embeddings). '
-                    'Transcribe e indexa al menos un video/audio del tema primero.'
+                    'contenidos indexados (embeddings). '
+                    'Transcribe e indexa al menos un contenido del tema primero.'
                 )
         return value
 
@@ -1498,12 +1499,6 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
             'has_processed_plain',
             'has_obsidian_markdown',
             'obsidian_frontmatter',
-            'embedding_status',
-            'embedding_model',
-            'embedding_dims',
-            'chunk_count',
-            'embedded_text_hash',
-            'embedded_at',
             'created_at',
             'updated_at',
         ]
@@ -1594,7 +1589,7 @@ class ContentEmbeddingTopicRefSerializer(serializers.ModelSerializer):
 
 
 class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
-    """Manifest row for an external embed worker (needs existing transcript)."""
+    """Manifest row for an external embed worker."""
 
     topics = ContentEmbeddingTopicRefSerializer(many=True, read_only=True)
     text_hash = serializers.SerializerMethodField()
@@ -1629,6 +1624,12 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         except ContentTranscript.DoesNotExist:
             return None
 
+    def _embedding(self, obj):
+        try:
+            return obj.embedding
+        except ContentEmbedding.DoesNotExist:
+            return None
+
     def get_text_hash(self, obj):
         transcript = self._transcript(obj)
         return transcript.text_hash if transcript else None
@@ -1642,28 +1643,28 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         return (transcript.language or '') if transcript else ''
 
     def get_embedding_status(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedding_status if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.status if embedding else None
 
     def get_embedding_model(self, obj):
-        transcript = self._transcript(obj)
-        return (transcript.embedding_model or '') if transcript else ''
+        embedding = self._embedding(obj)
+        return (embedding.model or '') if embedding else ''
 
     def get_embedding_dims(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedding_dims if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.dims if embedding else None
 
     def get_chunk_count(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.chunk_count if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.chunk_count if embedding else None
 
     def get_embedded_text_hash(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedded_text_hash if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.source_hash if embedding else None
 
     def get_embedded_at(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedded_at if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.embedded_at if embedding else None
 
     def get_topic_ids(self, obj):
         if hasattr(obj, '_prefetched_objects_cache') and 'topics' in obj._prefetched_objects_cache:
@@ -1698,7 +1699,7 @@ class ContentEmbeddingIngestDetailSerializer(ContentTranscriptIngestSummarySeria
 
 
 class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
-    """Topic with VIDEO/AUDIO transcripts matching the embedding status filter."""
+    """Topic with contents matching the embedding status filter."""
 
     matching_count = serializers.IntegerField(read_only=True)
     status_counts = serializers.SerializerMethodField()
@@ -1735,8 +1736,8 @@ class TopicChatRequestSerializer(serializers.Serializer):
         max_length=100,
         help_text=(
             'Optional. Restrict retrieval to these topic content IDs '
-            '(must be VIDEO/AUDIO with embedding_status=indexed). '
-            'Omit to use all indexed transcripts in the topic.'
+            '(must be indexed contenidos in the topic). '
+            'Omit to use all indexed contents in the topic.'
         ),
     )
 
@@ -1759,7 +1760,7 @@ class TopicChatRequestSerializer(serializers.Serializer):
 
 
 class TopicChatSourceSerializer(serializers.Serializer):
-    """One indexed transcript available for Consultas selection."""
+    """One indexed content available for Consultas selection."""
 
     content_id = serializers.IntegerField()
     title = serializers.CharField()
@@ -1811,17 +1812,24 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(
         choices=[
-            ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            ContentTranscript.EMBEDDING_STATUS_FAILED,
-            ContentTranscript.EMBEDDING_STATUS_SKIPPED,
+            ContentEmbedding.EMBEDDING_STATUS_INDEXED,
+            ContentEmbedding.EMBEDDING_STATUS_FAILED,
+            ContentEmbedding.EMBEDDING_STATUS_SKIPPED,
         ]
     )
     embedded_text_hash = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=64,
-        help_text='Must match current transcript.text_hash when status=indexed. '
-                  'Omit to use the current hash.',
+        help_text='For A/V indexed ack: must match current transcript.text_hash '
+                  '(omit to use the current hash). For TEXT indexed ack: same as source_hash.',
+    )
+    source_hash = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=64,
+        help_text='Hash of the indexed source (alias: embedded_text_hash). '
+                  'Required for TEXT when status=indexed.',
     )
     embedding_model = serializers.CharField(required=False, allow_blank=True, max_length=64)
     embedding_dims = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -1830,7 +1838,7 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
     embedding_error = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
-        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_INDEXED:
+        if attrs.get('status') == ContentEmbedding.EMBEDDING_STATUS_INDEXED:
             if attrs.get('embedding_dims') is None:
                 raise serializers.ValidationError({
                     'embedding_dims': 'Requerido cuando status=indexed.',
@@ -1843,7 +1851,7 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
                 raise serializers.ValidationError({
                     'embedding_model': 'Requerido cuando status=indexed.',
                 })
-        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_FAILED:
+        if attrs.get('status') == ContentEmbedding.EMBEDDING_STATUS_FAILED:
             if not (attrs.get('embedding_error') or '').strip():
                 raise serializers.ValidationError({
                     'embedding_error': 'Requerido cuando status=failed.',

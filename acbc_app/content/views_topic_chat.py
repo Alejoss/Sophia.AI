@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import ContentTranscript, Topic, TopicChatQuery
+from content.models import ContentEmbedding, Topic, TopicChatQuery
 from content.serializers import (
     TopicChatQueryListSerializer,
     TopicChatQuerySerializer,
@@ -47,13 +47,13 @@ def _require_chat_enabled(topic):
 
 
 def _indexed_contents_qs(topic):
-    """VIDEO/AUDIO in the topic with embedding_status=indexed."""
+    """VIDEO/AUDIO/TEXT in the topic with ContentEmbedding.status=indexed."""
     return (
         topic.contents.filter(
-            media_type__in=('VIDEO', 'AUDIO'),
-            transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            media_type__in=('VIDEO', 'AUDIO', 'TEXT'),
+            embedding__status=ContentEmbedding.STATUS_INDEXED,
         )
-        .select_related('transcript')
+        .select_related('embedding')
         .order_by('original_title', 'id')
     )
 
@@ -61,21 +61,21 @@ def _indexed_contents_qs(topic):
 def _serialize_chat_sources(queryset):
     rows = []
     for content in queryset:
-        transcript = getattr(content, 'transcript', None)
+        embedding = getattr(content, 'embedding', None)
         rows.append({
             'content_id': content.id,
             'title': content.original_title or f'Contenido {content.id}',
             'media_type': content.media_type or '',
             'original_author': content.original_author or '',
-            'chunk_count': getattr(transcript, 'chunk_count', None),
-            'embedded_at': getattr(transcript, 'embedded_at', None),
+            'chunk_count': getattr(embedding, 'chunk_count', None),
+            'embedded_at': getattr(embedding, 'embedded_at', None),
         })
     return TopicChatSourceSerializer(rows, many=True).data
 
 
 def _resolve_selected_content_ids(topic, content_ids):
     """
-    Validate optional content_ids against indexed transcripts in the topic.
+    Validate optional content_ids against indexed contents in the topic.
 
     Returns (ordered_ids_or_None, error_response).
     None means "all indexed" (client omitted the field).
@@ -88,7 +88,7 @@ def _resolve_selected_content_ids(topic, content_ids):
         return None, Response(
             {
                 'error': (
-                    'Este tema aún no tiene transcripciones indexadas '
+                    'Este tema aún no tiene contenidos indexados '
                     'para consultas.'
                 ),
             },
@@ -115,7 +115,7 @@ class TopicChatSourcesView(APIView):
     """
     GET /api/content/topics/<topic_id>/chat/sources/
 
-    Indexed VIDEO/AUDIO transcripts the user may select for a consultation.
+    Indexed contenidos the user may select for a consultation.
     """
 
     permission_classes = [IsAuthenticated]

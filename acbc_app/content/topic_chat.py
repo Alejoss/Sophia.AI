@@ -9,7 +9,7 @@ from typing import Any, Optional
 import requests
 from django.conf import settings
 
-from content.models import Content, ContentTranscript
+from content.models import Content, ContentEmbedding, ContentTranscript
 from content.transcript_utils import resolve_hash_source_text
 from utils.openai_client import OpenAIClient, OpenAIClientError, openai_configured
 from utils.qdrant_client import QdrantClient, QdrantClientError, qdrant_configured
@@ -222,11 +222,11 @@ def postgres_keyword_matches(
     qs = ContentTranscript.objects.filter(
         content__topics__id=topic_id,
         content__media_type__in=('VIDEO', 'AUDIO', 'TEXT'),
-    ).select_related('content').distinct()
+    ).select_related('content', 'content__embedding').distinct()
     if content_ids is not None:
         qs = qs.filter(content_id__in=[int(cid) for cid in content_ids])
     if indexed_only:
-        qs = qs.filter(embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED)
+        qs = qs.filter(content__embedding__status=ContentEmbedding.STATUS_INDEXED)
 
     matches: list[dict[str, Any]] = []
     for transcript in qs:
@@ -237,14 +237,19 @@ def postgres_keyword_matches(
         if not hit_keywords:
             continue
         primary = hit_keywords[0]
+        embedding = None
+        try:
+            embedding = transcript.content.embedding
+        except ContentEmbedding.DoesNotExist:
+            pass
         matches.append({
             'content_id': transcript.content_id,
             'title': transcript.content.original_title or '',
             'media_type': transcript.content.media_type or '',
-            'embedding_status': transcript.embedding_status,
-            'chunk_count': transcript.chunk_count,
+            'embedding_status': embedding.status if embedding else None,
+            'chunk_count': embedding.chunk_count if embedding else None,
             'text_hash': transcript.text_hash,
-            'embedded_text_hash': transcript.embedded_text_hash,
+            'embedded_text_hash': embedding.source_hash if embedding else None,
             'matched_keywords': hit_keywords,
             'snippet': snippet_around(body, primary),
         })
