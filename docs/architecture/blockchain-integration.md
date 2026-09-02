@@ -17,6 +17,8 @@ transcript in a Bitcoin `OP_RETURN`.** There is no EVM registry for this flow.
 
 Full contract (payload format, endpoints, CLI): **[transcript-anchor.md](../api/transcript-anchor.md)**.
 
+Public paid requests (`TranscriptAnchorRequest`) use a checkout chooser: hosted [NOWPayments](../payments/nowpayments-setup.md) or self-custody [BCH directo](../payments/bch-direct.md). After payment the request is `paid_pending_review` until staff approve the Bitcoin broadcast.
+
 Env: [Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring).
 
 ```mermaid
@@ -83,6 +85,7 @@ for Bitcoin transcript anchoring.
 ## Related Documentation
 
 - [Transcript certification (Bitcoin)](../api/transcript-anchor.md)
+- [Payments](../payments/README.md) (NOWPayments + BCH direct for paid requests)
 - [Transcript ingest](../api/transcript-ingest.md)
 - [Environment variables](../deployment/environment-variables.md)
 - [Contract Development](../development/contracts/contracts.md) (if present)

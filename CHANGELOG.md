@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation hub in `docs/` directory
 
 ### Changed
+- Documentation: Bitcoin Cash direct payments — expanded [bch-direct.md](docs/payments/bch-direct.md), added [payments index](docs/payments/README.md), and linked from API, permissions, data models, and env-var docs
 - Removed `role` from topic timeline entry content links (model, API, migration `0018`)
 - Removed optional temporal label (`display_date`) from topic timeline entries; use `start_date` / `end_date` or numbered stages instead
 - Improved project structure documentation

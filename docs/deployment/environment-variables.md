@@ -210,9 +210,25 @@ Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Defaul
 - **`BTC_USD_PRICE`**: optional fixed USD/BTC for that check; `0` (default) fetches live from `https://mempool.space/api/v1/prices`.
 - On reject, API returns **503** with message: *Las comisiones por transacción están muy altas por el momento, por favor vuelve a intentarlo más tarde* (`code: fee_too_high`). Row stays `pending`.
 
+```bash
+# Local / server Docker (service name: backend)
+docker compose exec backend python manage.py broadcast_transcript_anchor --show-address
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create --dry-run
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create
+docker compose exec backend python manage.py broadcast_transcript_anchor 123 --refresh
+
+# Production compose file (if used)
+# docker compose -f docker-compose.prod.yml --env-file .env.compose exec backend python manage.py broadcast_transcript_anchor --show-address
+```
+
 ### Bitcoin Cash direct (anchor request payments)
 
-Self-custody exact-amount BCH for `TranscriptAnchorRequest`. See [bch-direct.md](../payments/bch-direct.md).
+Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and knowledge paths stay on NOWPayments). See [bch-direct.md](../payments/bch-direct.md).
+
+#### `ANCHOR_REQUEST_PRICE_USD`
+- **Description**: Default USD price for a public transcript-anchor request (also used by NOWPayments)
+- **Required**: No
+- **Default**: `1`
 
 #### `BCH_NETWORK`
 - **Default**: `chipnet` when `ENVIRONMENT` ≠ `PRODUCTION` (local Docker); `mainnet` in production
@@ -227,18 +243,8 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest`. See [bch-direct.md]
 
 #### `BCH_API_BASE` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
 - **Defaults**: follow `BCH_NETWORK` (Electrum SSL on chipnet, Blockchair on mainnet) / `30` / `0` / `0`
+- `BCH_PAYMENT_TTL_MINUTES` is clamped to a **minimum of 5** minutes in code
 - `BCH_USD_PRICE=0` fetches live USD/BCH from Blockchair mainnet `/stats` (also used to size chipnet orders)
-
-```bash
-# Local / server Docker (service name: backend)
-docker compose exec backend python manage.py broadcast_transcript_anchor --show-address
-docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create --dry-run
-docker compose exec backend python manage.py broadcast_transcript_anchor 123 --create
-docker compose exec backend python manage.py broadcast_transcript_anchor 123 --refresh
-
-# Production compose file (if used)
-# docker compose -f docker-compose.prod.yml --env-file .env.compose exec backend python manage.py broadcast_transcript_anchor --show-address
-```
 
 ### AWS Configuration (Production)
 
