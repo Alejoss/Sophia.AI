@@ -5503,6 +5503,8 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(kwargs['topic_id'], self.topic.id)
         self.assertEqual(kwargs['message'], 'Que dicen del tamano?')
         self.assertIn(kwargs.get('history'), (None, []))
+        self.assertIsNone(kwargs.get('content_ids'))
+        self.assertEqual(response.data.get('selected_content_ids'), [])
 
         list_response = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/',
@@ -5527,6 +5529,139 @@ class TopicChatAPITests(APITestCase):
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
         )
         self.assertEqual(forbidden.status_code, status.HTTP_404_NOT_FOUND)
+
+    def _index_transcript(self, content, text='Texto indexado de prueba.'):
+        transcript = ContentTranscript.objects.create(
+            content=content,
+            processed_plain=text,
+            language='es',
+        )
+        transcript.embedded_text_hash = transcript.text_hash
+        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
+        transcript.chunk_count = 2
+        transcript.save(update_fields=['embedded_text_hash', 'embedding_status', 'chunk_count'])
+        return transcript
+
+    def test_list_chat_sources_returns_indexed_only(self):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Otro video',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video, 'Video A indexado')
+        ContentTranscript.objects.create(
+            content=video_b,
+            processed_plain='Pendiente de indexar',
+            language='es',
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_PENDING,
+        )
+
+        response = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/sources/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['content_id'], self.video.id)
+        self.assertEqual(response.data['results'][0]['title'], 'Video citado')
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_chat_accepts_content_ids_filter(self, mock_run):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='AUDIO',
+            original_title='Audio citado',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video)
+        self._index_transcript(video_b)
+
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Respuesta filtrada [1].',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {
+                'message': 'Solo con el video',
+                'content_ids': [self.video.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['selected_content_ids'], [self.video.id])
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs['content_ids'], [self.video.id])
+
+    def test_chat_rejects_non_indexed_content_ids(self):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Sin indexar',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video)
+        ContentTranscript.objects.create(
+            content=video_b,
+            processed_plain='Aun no',
+            language='es',
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_PENDING,
+        )
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {
+                'message': 'Hola',
+                'content_ids': [self.video.id, video_b.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(video_b.id, response.data.get('invalid_content_ids', []))
+
+    def test_chat_rejects_empty_content_ids(self):
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Hola', 'content_ids': []},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_passes_content_ids_to_qdrant(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.8,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Fragmento sobre bloques.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='¿qué dicen de los bloques?',
+            content_ids=[self.video.id],
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertIn('Respuesta', result['answer'])
+        search_kwargs = qdrant.search.call_args.kwargs
+        self.assertEqual(search_kwargs['content_ids'], [self.video.id])
+        self.assertEqual(search_kwargs['topic_id'], self.topic.id)
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')

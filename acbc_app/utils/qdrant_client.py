@@ -225,6 +225,7 @@ class QdrantClient:
         vector: list[float],
         *,
         topic_id: Optional[int] = None,
+        content_ids: Optional[list[int]] = None,
         limit: int = 8,
         with_payload: bool = True,
     ) -> list[dict[str, Any]]:
@@ -233,10 +234,16 @@ class QdrantClient:
             'limit': max(1, min(int(limit), 64)),
             'with_payload': with_payload,
         }
+        must: list[dict[str, Any]] = []
         if topic_id is not None:
-            body['filter'] = {
-                'must': [{'key': 'topic_id', 'match': {'value': int(topic_id)}}]
-            }
+            must.append({'key': 'topic_id', 'match': {'value': int(topic_id)}})
+        if content_ids is not None:
+            ids = [int(cid) for cid in content_ids]
+            if not ids:
+                return []
+            must.append({'key': 'content_id', 'match': {'any': ids}})
+        if must:
+            body['filter'] = {'must': must}
         data = self._request(
             'POST',
             f'/collections/{self.collection}/points/search',

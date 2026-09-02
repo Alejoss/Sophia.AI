@@ -613,10 +613,17 @@ const contentApi = {
     }
   },
 
-  topicChat: async (topicId, { message } = {}) => {
-    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, {
-      message,
-    });
+  topicChat: async (topicId, { message, contentIds } = {}) => {
+    const body = { message };
+    if (Array.isArray(contentIds)) {
+      body.content_ids = contentIds;
+    }
+    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, body);
+    return response.data;
+  },
+
+  listTopicChatSources: async (topicId) => {
+    const response = await axiosInstance.get(`/content/topics/${topicId}/chat/sources/`);
     return response.data;
   },
 

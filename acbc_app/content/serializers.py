@@ -1728,12 +1728,45 @@ class TopicChatRequestSerializer(serializers.Serializer):
     """Body for POST /api/content/topics/{id}/chat/ (one independent consultation)."""
 
     message = serializers.CharField(min_length=1, max_length=4000)
+    content_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+        max_length=100,
+        help_text=(
+            'Optional. Restrict retrieval to these topic content IDs '
+            '(must be VIDEO/AUDIO with embedding_status=indexed). '
+            'Omit to use all indexed transcripts in the topic.'
+        ),
+    )
 
     def validate_message(self, value):
         cleaned = (value or '').strip()
         if not cleaned:
             raise serializers.ValidationError('El mensaje no puede estar vacío.')
         return cleaned
+
+    def validate_content_ids(self, value):
+        # Deduplicate while preserving order.
+        seen = set()
+        ordered = []
+        for cid in value:
+            if cid in seen:
+                continue
+            seen.add(cid)
+            ordered.append(cid)
+        return ordered
+
+
+class TopicChatSourceSerializer(serializers.Serializer):
+    """One indexed transcript available for Consultas selection."""
+
+    content_id = serializers.IntegerField()
+    title = serializers.CharField()
+    media_type = serializers.CharField()
+    original_author = serializers.CharField(allow_blank=True)
+    chunk_count = serializers.IntegerField(allow_null=True)
+    embedded_at = serializers.DateTimeField(allow_null=True)
 
 
 class TopicChatQueryListSerializer(serializers.ModelSerializer):
@@ -1745,6 +1778,7 @@ class TopicChatQueryListSerializer(serializers.ModelSerializer):
             'id',
             'topic_id',
             'question_preview',
+            'selected_content_ids',
             'created_at',
         ]
 
@@ -1766,6 +1800,7 @@ class TopicChatQuerySerializer(serializers.ModelSerializer):
             'sources',
             'retrieved_chunk_count',
             'used_chunk_count',
+            'selected_content_ids',
             'created_at',
         ]
         read_only_fields = fields

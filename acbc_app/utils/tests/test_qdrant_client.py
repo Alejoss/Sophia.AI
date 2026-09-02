@@ -49,3 +49,21 @@ class QdrantClientRetryTests(SimpleTestCase):
         self.assertIsInstance(ctx.exception.__cause__, requests.ConnectionError)
         self.assertIn('No se pudo conectar a Qdrant', str(ctx.exception))
         self.assertEqual(session.request.call_count, 3)
+
+    def test_search_filters_by_content_ids(self):
+        session = MagicMock()
+        session.request.return_value = _ok_response({'result': []})
+        client = QdrantClient(session=session)
+
+        client.search([0.1, 0.2], topic_id=2, content_ids=[46, 88], limit=4)
+
+        body = session.request.call_args.kwargs['json']
+        must = body['filter']['must']
+        self.assertEqual(must[0], {'key': 'topic_id', 'match': {'value': 2}})
+        self.assertEqual(must[1], {'key': 'content_id', 'match': {'any': [46, 88]}})
+
+    def test_search_with_empty_content_ids_skips_request(self):
+        session = MagicMock()
+        client = QdrantClient(session=session)
+        self.assertEqual(client.search([0.1], topic_id=2, content_ids=[]), [])
+        session.request.assert_not_called()

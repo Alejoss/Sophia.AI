@@ -213,6 +213,7 @@ def postgres_keyword_matches(
     *,
     limit: int = 20,
     indexed_only: bool = False,
+    content_ids: Optional[list[int]] = None,
 ) -> list[dict[str, Any]]:
     """Find topic transcripts whose index text mentions keywords."""
     if not keywords:
@@ -222,6 +223,8 @@ def postgres_keyword_matches(
         content__topics__id=topic_id,
         content__media_type__in=('VIDEO', 'AUDIO', 'TEXT'),
     ).select_related('content').distinct()
+    if content_ids is not None:
+        qs = qs.filter(content_id__in=[int(cid) for cid in content_ids])
     if indexed_only:
         qs = qs.filter(embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED)
 
@@ -266,6 +269,7 @@ def keyword_fallback_hits(
     *,
     limit: int = 4,
     exclude_content_ids: Optional[set[int]] = None,
+    content_ids: Optional[list[int]] = None,
 ) -> list[dict[str, Any]]:
     """Build synthetic Qdrant-like hits from indexed Postgres snippets."""
     exclude = exclude_content_ids or set()
@@ -274,6 +278,7 @@ def keyword_fallback_hits(
         keywords,
         limit=limit + len(exclude) + 4,
         indexed_only=True,
+        content_ids=content_ids,
     )
     hits: list[dict[str, Any]] = []
     for match in matches:
@@ -303,6 +308,7 @@ def merge_keyword_fallback(
     *,
     topic_id: int,
     message: str,
+    content_ids: Optional[list[int]] = None,
 ) -> list[dict[str, Any]]:
     """
     If dense hits omit entity keywords that exist in indexed transcripts,
@@ -342,6 +348,7 @@ def merge_keyword_fallback(
         keywords,
         limit=min(4, _top_k()),
         exclude_content_ids=already,
+        content_ids=content_ids,
     )
     if not fallback:
         return hits
@@ -356,13 +363,23 @@ def merge_keyword_fallback(
     return _dedupe_hits(fallback + hits, max_per_content=2)[: _top_k()]
 
 
-def empty_retrieval_answer(*, topic_id: int, message: str) -> str:
+def empty_retrieval_answer(
+    *,
+    topic_id: int,
+    message: str,
+    content_ids: Optional[list[int]] = None,
+) -> str:
     """Honest fixed answer when no usable context could be built."""
     keywords = extract_entity_keywords(message)
     if not keywords:
         return EMPTY_RETRIEVAL_ANSWER
 
-    matches = postgres_keyword_matches(topic_id, keywords, limit=8)
+    matches = postgres_keyword_matches(
+        topic_id,
+        keywords,
+        limit=8,
+        content_ids=content_ids,
+    )
     indexed = [m for m in matches if m.get('embedding_status') == 'indexed']
     if indexed:
         return RETRIEVAL_MISS_ANSWER
@@ -518,6 +535,7 @@ def run_topic_chat(
     topic_title: str,
     message: str,
     history: Optional[list[dict[str, str]]] = None,
+    content_ids: Optional[list[int]] = None,
     openai_client: Optional[OpenAIClient] = None,
     qdrant_client: Optional[QdrantClient] = None,
 ) -> dict[str, Any]:
@@ -531,6 +549,7 @@ def run_topic_chat(
 
     openai = openai_client or OpenAIClient()
     qdrant = qdrant_client or QdrantClient()
+    selected_ids = [int(cid) for cid in content_ids] if content_ids is not None else None
 
     try:
         query_vector = openai.embed(message)
@@ -542,7 +561,12 @@ def run_topic_chat(
         ) from exc
 
     try:
-        raw_hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
+        raw_hits = qdrant.search(
+            query_vector,
+            topic_id=topic_id,
+            content_ids=selected_ids,
+            limit=_top_k() * 2,
+        )
     except (QdrantClientError, requests.RequestException) as exc:
         logger.exception('Topic chat Qdrant search failed topic_id=%s', topic_id)
         raise TopicChatError(
@@ -553,7 +577,12 @@ def run_topic_chat(
 
     scored_hits = _filter_hits_by_score(raw_hits)
     hits = _dedupe_hits(scored_hits, max_per_content=2)[: _top_k()]
-    hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
+    hits = merge_keyword_fallback(
+        hits,
+        topic_id=topic_id,
+        message=message,
+        content_ids=selected_ids,
+    )
 
     all_sources = build_sources_from_hits(hits, topic_id=topic_id)
     retrieved_chunk_count = len(all_sources)
@@ -565,7 +594,11 @@ def run_topic_chat(
         if raw_hits and not scored_hits and not hits:
             answer = LOW_SCORE_ANSWER
         else:
-            answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+            answer = empty_retrieval_answer(
+                topic_id=topic_id,
+                message=message,
+                content_ids=selected_ids,
+            )
         return _result_payload(
             topic_id=topic_id,
             answer=answer,
@@ -587,7 +620,11 @@ def run_topic_chat(
             used_chunk_count,
         )
         # Prefer corpus-aware miss copy when Postgres still has the name.
-        answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+        answer = empty_retrieval_answer(
+            topic_id=topic_id,
+            message=message,
+            content_ids=selected_ids,
+        )
         if answer == EMPTY_RETRIEVAL_ANSWER:
             answer = ENTITY_NOT_IN_CONTEXT_ANSWER
         return _result_payload(

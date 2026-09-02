@@ -772,6 +772,14 @@ class TopicChatQuery(models.Model):
         default=0,
         help_text='Chunks that fit wholly in the prompt context budget.',
     )
+    selected_content_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            'Content IDs the user chose for this consultation. Empty means '
+            'all indexed transcripts in the topic were eligible.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
