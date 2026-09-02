@@ -5546,7 +5546,60 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(result['answer'], 'Respuesta grounded [1].')
         self.assertEqual(result['sources'][0]['content_id'], self.video.id)
         self.assertEqual(result['sources'][0]['title'], 'Video citado')
+        self.assertEqual(result['sources'][0]['media_type'], 'VIDEO')
+        self.assertEqual(
+            result['sources'][0]['transcript_url'],
+            f'/content/{self.video.id}/transcript?context=topic&topicId={self.topic.id}',
+        )
         self.assertNotIn('text', result['sources'][0])
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_text_file_source_points_to_topic_content(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        text_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Libro Blanco Bitcoin',
+        )
+        self.topic.contents.add(text_content)
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta basada en el libro blanco [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.95,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': text_content.id,
+                    'chunk_index': 0,
+                    'text': 'A purely peer-to-peer version of electronic cash...',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='que es dinero electronico peer-to-peer?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertEqual(result['answer'], 'Respuesta basada en el libro blanco [1].')
+        source = result['sources'][0]
+        self.assertEqual(source['content_id'], text_content.id)
+        self.assertEqual(source['title'], 'Libro Blanco Bitcoin')
+        self.assertEqual(source['media_type'], 'TEXT')
+        self.assertEqual(
+            source['transcript_url'],
+            f'/content/{text_content.id}/topic/{self.topic.id}',
+        )
+        self.assertEqual(
+            source['url'],
+            f'/content/{text_content.id}/topic/{self.topic.id}',
+        )
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')
