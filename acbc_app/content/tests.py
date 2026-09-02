@@ -5677,6 +5677,152 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(query.answer, 'Nació de su diseño original [1].')
 
 
+class TopicChatDebugTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='debugchat',
+            email='debugchat@example.com',
+            password='testpass123',
+        )
+        self.topic = Topic.objects.create(
+            title='Tema debug Adam Back',
+            description='Desc',
+            creator=self.user,
+            is_public=True,
+            chat_enabled=True,
+        )
+        self.video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Entrevista Blockstream',
+        )
+        self.topic.contents.add(self.video)
+        self.transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=(
+                'Hoy hablamos con Adam Back sobre Hashcash y la prueba de trabajo. '
+                'Adam Back explica el origen de Bitcoin.'
+            ),
+            language='es',
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            chunk_count=3,
+        )
+        # Keep status indexed after save hook computes text_hash.
+        self.transcript.embedded_text_hash = self.transcript.text_hash
+        self.transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
+        self.transcript.save(update_fields=['embedded_text_hash', 'embedding_status'])
+
+    def test_extract_debug_keywords_prefers_explicit_and_names(self):
+        from content.topic_chat_debug import extract_debug_keywords
+
+        self.assertEqual(
+            extract_debug_keywords('ignored', explicit='Adam Back'),
+            ['Adam Back'],
+        )
+        guessed = extract_debug_keywords('¿Quién es Adam Back en este tema?')
+        self.assertIn('Adam Back', guessed)
+
+    def test_classify_retrieval_miss_when_postgres_has_indexed_entity(self):
+        from content.topic_chat_debug import classify_failure, postgres_keyword_matches
+
+        matches = postgres_keyword_matches(self.topic.id, ['Adam Back'])
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]['embedding_status'], 'indexed')
+        self.assertIn('Adam Back', matches[0]['snippet'])
+
+        result = classify_failure(
+            answer='No encontré fragmentos indexados de transcripciones…',
+            sources=[],
+            keywords=['Adam Back'],
+            postgres_matches=matches,
+        )
+        self.assertEqual(result['mode'], 'retrieval_miss')
+
+    def test_classify_index_gap_when_only_skipped(self):
+        from content.topic_chat_debug import classify_failure, postgres_keyword_matches
+
+        self.transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_SKIPPED
+        self.transcript.save(update_fields=['embedding_status'])
+        matches = postgres_keyword_matches(self.topic.id, ['Adam Back'])
+        result = classify_failure(
+            answer='No encontré fragmentos indexados…',
+            sources=[],
+            keywords=['Adam Back'],
+            postgres_matches=matches,
+        )
+        self.assertEqual(result['mode'], 'index_gap')
+
+    def test_diagnose_saved_query_retrieval_miss(self):
+        from content.topic_chat_debug import diagnose_saved_query
+
+        query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.user,
+            question='¿Quién es Adam Back?',
+            answer=(
+                'No encontré fragmentos indexados de transcripciones para este tema '
+                'que respondan a tu pregunta.'
+            ),
+            sources=[],
+        )
+        report = diagnose_saved_query(query.id, keyword='Adam Back')
+        self.assertEqual(report['classification']['mode'], 'retrieval_miss')
+        self.assertEqual(report['postgres_matches'][0]['content_id'], self.video.id)
+
+    def test_diagnose_live_retrieval_miss_with_mocks(self):
+        from content.topic_chat_debug import diagnose_live_retrieval
+
+        openai = Mock()
+        openai.embed.return_value = [0.1] * 8
+        qdrant = Mock()
+        qdrant.search.return_value = [
+            {
+                'score': 0.55,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Hablamos de bloques y fees, sin mencionar al personaje.',
+                },
+            }
+        ]
+        qdrant.count_topic.return_value = 12
+
+        report = diagnose_live_retrieval(
+            topic_id=self.topic.id,
+            message='¿Quién es Adam Back?',
+            keyword='Adam Back',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertEqual(report['classification']['mode'], 'retrieval_miss')
+        self.assertEqual(len(report['sources']), 1)
+        self.assertEqual(report['qdrant_point_count'], 12)
+
+    def test_management_command_query_id(self):
+        from django.core.management import call_command
+        from io import StringIO
+
+        query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.user,
+            question='¿Quién es Adam Back?',
+            answer='No encontré fragmentos indexados de transcripciones para este tema.',
+            sources=[],
+        )
+        out = StringIO()
+        call_command(
+            'debug_topic_chat',
+            '--query-id',
+            str(query.id),
+            '--keyword',
+            'Adam Back',
+            stdout=out,
+        )
+        text = out.getvalue()
+        self.assertIn('Classification: retrieval_miss', text)
+        self.assertIn('Adam Back', text)
+
 
 class TranscriptAnchorModelTests(TestCase):
     def setUp(self):

@@ -126,6 +126,87 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
   retries a few times, then the API returns **502** with a Spanish error instead
   of an unhandled **500**.
 
+---
+
+## Debugging “not found” answers (e.g. Adam Back)
+
+A consultation can say the entity is missing for **different** reasons. Distinguish
+them before changing retrieval or the prompt.
+
+### 1. Look at `sources` on the saved consultation
+
+In the UI, open the consultation and check **Fuentes**:
+
+| What you see | Meaning |
+|--------------|---------|
+| No Fuentes / empty `sources` | Dense search returned nothing usable (or payloads lack `text`). Fixed Spanish “No encontré fragmentos…” may appear — **no LLM call**. |
+| Fuentes present, but excerpts never mention the entity | Retrieval ranked the wrong chunks. The model correctly refuses (grounding). Common for **proper nouns** with dense-only search. |
+| Fuentes mention the entity, answer still refuses | Prompt / truncation / over-refusal — inspect context length and system prompt. |
+
+API: `GET /api/content/topics/{topic_id}/chat/queries/{query_id}/` (own queries only).
+
+### 2. Confirm the text exists in Postgres for that topic
+
+```bash
+cd acbc_app && . .venv/bin/activate
+# native runs: export ENVIRONMENT=DEVELOPMENT DB_* … as in AGENTS.md
+python manage.py shell -c "
+from content.models import ContentTranscript
+from content.transcript_utils import resolve_hash_source_text
+kw='Adam Back'
+for t in ContentTranscript.objects.filter(content__topics__id=TOPIC_ID).select_related('content'):
+    body = resolve_hash_source_text(t) or ''
+    if kw.casefold() in body.casefold():
+        print(t.content_id, t.embedding_status, t.chunk_count, t.content.original_title)
+"
+```
+
+If matches are `pending` / `stale` / `failed` / `skipped`, fix indexing first
+(embed worker + `PUT /api/content/embedding-ingest/{content_id}/`).
+
+### 3. Confirm Qdrant has points for the topic
+
+```bash
+python manage.py check_qdrant --topic-id TOPIC_ID
+```
+
+`0` points with `chat_enabled` and Postgres `indexed` rows → embed-worker / ack gap
+(or wrong `topic_id` on Qdrant payloads).
+
+### 4. One-shot classifier: `debug_topic_chat`
+
+```bash
+# Saved consultation (no OpenAI/Qdrant required)
+python manage.py debug_topic_chat --query-id QUERY_ID --keyword "Adam Back"
+
+# Live embed + Qdrant search (needs OPENAI_* + QDRANT_*)
+python manage.py debug_topic_chat \
+  --topic-id TOPIC_ID \
+  --message "¿Quién es Adam Back?" \
+  --keyword "Adam Back"
+```
+
+Classification modes:
+
+| Mode | Likely cause |
+|------|----------------|
+| `retrieval_miss` | Indexed Postgres text has the keyword; top Qdrant chunks do not → dense ranking miss (typical for names). |
+| `index_gap` | Keyword only on non-`indexed` transcripts → re-embed / ack. |
+| `empty_retrieval` | No Qdrant context and no Postgres hits → wrong topic / spelling / empty corpus. |
+| `grounding_refuse` | Keyword in sources (or refusal without keyword probe) → inspect LLM grounding. |
+| `ok` | Sources mention the keyword; focus on answer quality / UI. |
+
+Add `--json` for machine-readable output. Logic lives in
+`acbc_app/content/topic_chat_debug.py`.
+
+### 5. Likely root cause for entity questions
+
+Sophia’s consult path is **dense-only** (`text-embedding-3-large` → Qdrant
+filter by `topic_id` → top-k with max 2 chunks per content). Short questions
+about people (“Adam Back”) often fail to rank name-mention chunks even when the
+name appears across the topic. Hybrid keyword fallback is a follow-up fix once
+`debug_topic_chat` confirms `retrieval_miss`.
+
 ## Related
 
 - Architecture: [topic-rag-embeddings.md](../architecture/topic-rag-embeddings.md)
