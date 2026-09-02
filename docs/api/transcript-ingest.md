@@ -244,8 +244,8 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 
 6. **After transcripts exist**, run the embed worker against
    [embedding-ingest](../operations/qdrant-embeddings.md) so Qdrant receives
-   chunk vectors and Django marks `embedding_status=indexed`. Topic conversation
-   chat requires at least one indexed transcript per topic.
+   chunk vectors and Django marks `embedding_status=indexed`. Topic consultations
+   require at least one indexed transcript per topic.
 
 ---
 

@@ -695,7 +695,7 @@ class Topic(models.Model):
     )
     chat_enabled = models.BooleanField(
         default=False,
-        help_text='When true, the conversation (RAG consultation) tab is visible on the topic page.',
+        help_text='When true, the Consultas (RAG consultations) tab is visible on the topic page.',
     )
     activity_score = models.IntegerField(
         default=0,

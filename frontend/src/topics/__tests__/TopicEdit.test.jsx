@@ -68,6 +68,9 @@ describe('TopicEdit general tab', () => {
       description: 'Descripción original',
       creator: mockAuthValue.user.id,
       moderators: [],
+      chat_enabled: false,
+      chat_can_enable: true,
+      indexed_transcript_count: 2,
     });
     mockGetTopicContentSuggestions.mockResolvedValue([]);
     mockGetTopicTimelineEntrySuggestions.mockResolvedValue([]);
@@ -110,9 +113,18 @@ describe('TopicEdit general tab', () => {
       expect(mockUpdateTopic).toHaveBeenCalledWith('9', {
         title: 'Tema actualizado',
         description: 'Descripción original',
+        chat_enabled: false,
       });
     });
     expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument();
+  });
+
+  it('labels the transcript Q&A toggle as Consultas', async () => {
+    renderWithProviders(<TopicEdit />, { route: '/content/topics/9/edit' });
+
+    expect(await screen.findByText('Mostrar pestaña Consultas')).toBeInTheDocument();
+    expect(screen.getByText(/los usuarios verán la pestaña Consultas/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Conversación/i)).not.toBeInTheDocument();
   });
 
   it('shows a Spanish alert when the API call fails', async () => {

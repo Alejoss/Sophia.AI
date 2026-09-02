@@ -66,19 +66,19 @@ Embed-worker acks (`PUT /api/content/embedding-ingest/{content_id}/`) set
 
 ---
 
-## Topic chat gating
+## Topic consultations gating
 
-Topic RAG conversation is available when **all** of the following hold:
+Topic RAG consultations are available when **all** of the following hold:
 
 1. `Topic.chat_enabled` is `true` (moderator toggle; PATCH returns **400** if nothing is indexed yet).
 2. At least one VIDEO/AUDIO in the topic has `embedding_status=indexed`
    (`Topic.indexed_transcript_count()`, exposed as `chat_can_enable` in API).
 3. Runtime env: `OPENAI_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY`.
 
-The frontend shows the Conversación tab only when `chat_enabled && chat_can_enable`.
+The frontend shows the Consultas tab only when `chat_enabled && chat_can_enable`.
 
-Staff see which topics have conversation enabled on `/dashboard`
-(section **Conversación con los archivos**):
+Staff see which topics have consultations enabled on `/dashboard`
+(section **Consultas con los archivos**):
 status, indexed-embedding count, and a switch to turn it on once Qdrant has
 vectors for that topic.
 
@@ -136,7 +136,7 @@ contract is defined in [qdrant-embeddings.md](../operations/qdrant-embeddings.md
 ## Local dev caveat
 
 Seed command `populate_content` sets `embedding_status=skipped` on demo
-transcripts, so **Conversación will not appear** after seeding unless you either:
+transcripts, so **Consultas will not appear** after seeding unless you either:
 
 - Run the embed worker and ack items as `indexed`, or
 - Manually ack a transcript via `PUT /api/content/embedding-ingest/{content_id}/` in dev.
