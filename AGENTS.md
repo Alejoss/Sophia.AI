@@ -8,7 +8,9 @@ This repo is a monorepo with three components:
 - **Frontend** (`frontend/`): React 18 + Vite. Dev server on `http://localhost:5173` (`npm run dev`). Vite proxies `/api`, `/admin`, `/media` to `:8000` (see `vite.config.js`).
 - **Contracts** (`contracts/`): Solidity + Hardhat. Secondary/optional component.
 
-The dependency-refresh update script (Python venv + `pip install`, `npm install` for `frontend` and `contracts`) runs automatically on VM startup. The notes below are the non-obvious things it does NOT handle.
+The Cloud Agent **install** script installs `python3.12-venv` and PostgreSQL, then creates `acbc_app/.venv`, `pip install -r acbc_app/requirements.txt`, and `npm install` for `frontend` and `contracts`. The **start** script starts PostgreSQL (`sudo pg_ctlcluster 16 main start`), creates `acbc_db`, runs migrations, and seeds `admin` / `admin`. The notes below are the non-obvious things still worth knowing when you run commands yourself.
+
+The previous install script (`python3 -m venv` + pip + npm only) failed on Cloud Agent VMs because `python3.12-venv` / `ensurepip` is not on the base image. `set -e` is required so a failed `venv` does not look like a successful setup.
 
 ### Backend (Django) — how to run
 
@@ -55,7 +57,7 @@ Transcript certification is **Bitcoin OP_RETURN** (Django `content.bitcoin` + `b
 
 ### Topic RAG / embeddings (optional)
 
-Topic “Conversar” chat uses **Qdrant** (transcript chunk vectors) and **OpenAI** (query embedding + grounded answers). Vectors are **not** in Postgres; an external embed worker acks via `/api/content/embedding-ingest/`.
+Topic conversation chat uses **Qdrant** (transcript chunk vectors) and **OpenAI** (query embedding + grounded answers). Vectors are **not** in Postgres; an external embed worker acks via `/api/content/embedding-ingest/`.
 
 - Docs: [topic-rag-embeddings.md](docs/architecture/topic-rag-embeddings.md), [qdrant-embeddings.md](docs/operations/qdrant-embeddings.md)
 - Backend env (export in shell for native runs, or `acbc_app/.env` for Docker):
@@ -69,5 +71,5 @@ export TRANSCRIPT_INGEST_API_KEY=dev-ingest-secret   # for embed-worker API in d
 ```
 
 - Verify Qdrant: `cd acbc_app && . .venv/bin/activate && python manage.py check_qdrant --ensure-collection`
-- **Seed data** (`populate_content`) sets `embedding_status=skipped`, so Conversar will not appear until transcripts are acked as `indexed` (manually in dev or via the embed worker).
+- **Seed data** (`populate_content`) sets `embedding_status=skipped`, so Conversación will not appear until transcripts are acked as `indexed` (manually in dev or via the embed worker).
 - Topic chat tests mock OpenAI/Qdrant; no live keys required for `python manage.py test content.tests.TopicChatAPITests`.

@@ -35,6 +35,33 @@ class DbEncodingUtilsTests(SimpleTestCase):
             safe = prepare_json_for_db(notes)
         self.assertEqual(safe['message'], 'Muchas gracias por Ucronia')
 
+    def test_prepare_model_fields_uses_existing_helpers(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from utils.db_encoding import prepare_model_fields
+
+        obj = SimpleNamespace(
+            question='Qué pasó?',
+            sources=[{'excerpt': 'diseño'}],
+        )
+        with patch('utils.db_encoding.is_sql_ascii_database', return_value=True):
+            prepare_model_fields(
+                obj,
+                text_fields=('question',),
+                json_fields=('sources',),
+            )
+        self.assertEqual(obj.question, 'Que paso?')
+        self.assertEqual(obj.sources[0]['excerpt'], 'diseno')
+
+    def test_text_json_field_dumps_unicode_as_text(self):
+        from utils.db_encoding import TextJSONField
+
+        field = TextJSONField()
+        dumped = field.get_db_prep_value({'excerpt': 'diseño'}, connection=None)
+        self.assertIsInstance(dumped, str)
+        self.assertIn('diseño', dumped)
+
     def test_normalize_notes_string(self):
         self.assertEqual(normalize_notes_value('  Hola  '), 'Hola')
 

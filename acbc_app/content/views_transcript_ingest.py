@@ -44,6 +44,7 @@ from content.serializers import (
     ContentTranscriptPublicSerializer,
     ContentTranscriptQueueItemSerializer,
 )
+from utils.db_encoding import is_sql_ascii_error
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +260,7 @@ class ContentTranscriptIngestDetailView(TranscriptIngestAPIView):
             # Prefer UTF8 migration; ContentTranscript.save degrades on SQL_ASCII.
             # If something still slips through, return a clear machine-readable error.
             message = str(exc)
-            if 'SQL_ASCII' in message or 'conversion between UTF8' in message:
+            if is_sql_ascii_error(exc):
                 logger.exception(
                     'Transcript ingest blocked by PostgreSQL encoding content_id=%s',
                     content_id,

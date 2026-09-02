@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from content.s3_key_utils import sanitize_filename_for_s3_key
 from content.transcript_utils import sync_transcript_derived_fields
+from utils.db_encoding import TextJSONField
 
 
 class Library(models.Model):
@@ -695,7 +696,7 @@ class Topic(models.Model):
     )
     chat_enabled = models.BooleanField(
         default=False,
-        help_text='When true, the Conversar (RAG consultation) tab is visible on the topic page.',
+        help_text='When true, the conversation (RAG consultation) tab is visible on the topic page.',
     )
     activity_score = models.IntegerField(
         default=0,
@@ -758,7 +759,7 @@ class TopicChatQuery(models.Model):
     )
     question = models.TextField()
     answer = models.TextField()
-    sources = models.JSONField(
+    sources = TextJSONField(
         default=list,
         blank=True,
         help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',

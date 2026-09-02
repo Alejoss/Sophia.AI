@@ -1541,6 +1541,35 @@ class TopicAPITests(APITestCase):
         self.topic.refresh_from_db()
         self.assertTrue(self.topic.chat_enabled)
 
+    def test_staff_can_enable_chat_on_topic_they_do_not_own(self):
+        staff = User.objects.create_user(
+            username='dashboardstaff',
+            email='dashboardstaff@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        video = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video staff',
+        )
+        self.topic.contents.add(video)
+        transcript = ContentTranscript.objects.create(
+            content=video,
+            processed_plain='Texto indexado staff.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=transcript.text_hash,
+        )
+        self.client.force_authenticate(user=staff)
+        url = reverse('content:topic-detail', args=[self.topic.id])
+        response = self.client.patch(url, {'chat_enabled': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.topic.refresh_from_db()
+        self.assertTrue(self.topic.chat_enabled)
+
     def test_get_topic_basic(self):
         """Test retrieving topic basic info."""
         url = reverse('content:topic-basic', args=[self.topic.id])
@@ -1724,6 +1753,85 @@ class TopicAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AdminTopicsConversationAPITests(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='conversationadmin',
+            email='conversationadmin@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.regular = User.objects.create_user(
+            username='normaluser',
+            email='normal@example.com',
+            password='testpass123',
+        )
+        self.visible = Topic.objects.create(
+            title='Visible',
+            creator=self.regular,
+            chat_enabled=True,
+        )
+        self.ready = Topic.objects.create(
+            title='Ready',
+            creator=self.regular,
+            chat_enabled=False,
+        )
+        self.empty = Topic.objects.create(
+            title='Empty',
+            creator=self.regular,
+            is_public=False,
+            chat_enabled=False,
+        )
+        video = Content.objects.create(
+            uploaded_by=self.regular,
+            media_type='VIDEO',
+            original_title='Indexed video',
+        )
+        self.visible.contents.add(video)
+        self.ready.contents.add(video)
+        transcript = ContentTranscript.objects.create(
+            content=video,
+            processed_plain='Indexado.',
+            language='es',
+        )
+        ContentTranscript.objects.filter(pk=transcript.pk).update(
+            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedded_text_hash=transcript.text_hash,
+        )
+
+    def test_requires_staff(self):
+        self.client.force_authenticate(user=self.regular)
+        response = self.client.get('/api/content/admin/topics/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_lists_all_topics_including_private(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {item['title'] for item in response.data['results']}
+        self.assertEqual(titles, {'Visible', 'Ready', 'Empty'})
+        by_title = {item['title']: item for item in response.data['results']}
+        self.assertTrue(by_title['Visible']['chat_enabled'])
+        self.assertTrue(by_title['Visible']['chat_can_enable'])
+        self.assertGreaterEqual(by_title['Visible']['indexed_transcript_count'], 1)
+        self.assertFalse(by_title['Empty']['is_public'])
+        self.assertFalse(by_title['Empty']['chat_can_enable'])
+
+    def test_filter_visible(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'visible'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in response.data['results']]
+        self.assertEqual(titles, ['Visible'])
+
+    def test_filter_ready(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/content/admin/topics/', {'conversation': 'ready'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = [item['title'] for item in response.data['results']]
+        self.assertEqual(titles, ['Ready'])
 
 
 class TopicActivityScoreTests(TestCase):
@@ -5438,7 +5546,127 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(result['answer'], 'Respuesta grounded [1].')
         self.assertEqual(result['sources'][0]['content_id'], self.video.id)
         self.assertEqual(result['sources'][0]['title'], 'Video citado')
+        self.assertEqual(result['sources'][0]['media_type'], 'VIDEO')
+        self.assertEqual(
+            result['sources'][0]['transcript_url'],
+            f'/content/{self.video.id}/transcript?context=topic&topicId={self.topic.id}',
+        )
         self.assertNotIn('text', result['sources'][0])
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_text_file_source_points_to_topic_content(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        text_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Libro Blanco Bitcoin',
+        )
+        self.topic.contents.add(text_content)
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta basada en el libro blanco [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.95,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': text_content.id,
+                    'chunk_index': 0,
+                    'text': 'A purely peer-to-peer version of electronic cash...',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='que es dinero electronico peer-to-peer?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertEqual(result['answer'], 'Respuesta basada en el libro blanco [1].')
+        source = result['sources'][0]
+        self.assertEqual(source['content_id'], text_content.id)
+        self.assertEqual(source['title'], 'Libro Blanco Bitcoin')
+        self.assertEqual(source['media_type'], 'TEXT')
+        self.assertEqual(
+            source['transcript_url'],
+            f'/content/{text_content.id}/topic/{self.topic.id}',
+        )
+        self.assertEqual(
+            source['url'],
+            f'/content/{text_content.id}/topic/{self.topic.id}',
+        )
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_qdrant_connection_reset_returns_502(self, mock_qdrant_cls, mock_openai_cls):
+        from requests.exceptions import ConnectionError as RequestsConnectionError
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.side_effect = RequestsConnectionError(
+            ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+        )
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Qué hizo el Digital Currency Group?'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn('archivos indexados', response.data['error'])
+        self.assertFalse(TopicChatQuery.objects.filter(topic=self.topic).exists())
+
+    def test_save_keeps_spanish_accents(self):
+        query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.user,
+            question='Qué hizo el Digital Currency Group?',
+            answer='Nació de su diseño original [1].',
+            sources=[{
+                'index': 1,
+                'content_id': self.video.id,
+                'title': 'Video citado',
+                'excerpt': 'los tres líderes del proyecto…',
+                'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
+            }],
+        )
+
+        query.refresh_from_db()
+        self.assertEqual(query.question, 'Qué hizo el Digital Currency Group?')
+        self.assertEqual(query.answer, 'Nació de su diseño original [1].')
+        self.assertEqual(query.sources[0]['excerpt'], 'los tres líderes del proyecto…')
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_chat_api_returns_spanish_accents(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Nació de su diseño original [1].',
+            'sources': [{
+                'index': 1,
+                'content_id': self.video.id,
+                'title': 'Video citado',
+                'excerpt': 'los tres líderes del proyecto…',
+                'transcript_url': f'/content/{self.video.id}/transcript?context=topic',
+            }],
+        }
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Qué hizo el Digital Currency Group?'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['answer'], 'Nació de su diseño original [1].')
+        self.assertEqual(response.data['question'], 'Qué hizo el Digital Currency Group?')
+        self.assertEqual(response.data['sources'][0]['excerpt'], 'los tres líderes del proyecto…')
+        query = TopicChatQuery.objects.get(pk=response.data['id'])
+        self.assertEqual(query.answer, 'Nació de su diseño original [1].')
+
 
 
 class TranscriptAnchorModelTests(TestCase):

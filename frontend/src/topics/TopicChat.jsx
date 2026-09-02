@@ -14,6 +14,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
+import { getTopicContentPath } from '../utils/urlUtils';
 
 function formatQueryDate(iso) {
   if (!iso) return '';
@@ -49,9 +50,20 @@ function SourcesList({ sources, topicId }) {
         }}
       >
         {sources.map((src) => {
-          const transcriptTo = src.content_id
-            ? `/content/${src.content_id}/transcript?context=topic&topicId=${topicId}`
-            : src.transcript_url;
+          let sourceTo = null;
+          if (src.content_id) {
+            if (src.media_type === 'TEXT') {
+              sourceTo = topicId
+                ? getTopicContentPath(src.content_id, topicId)
+                : `/content/${src.content_id}/library`;
+            } else {
+              sourceTo = `/content/${src.content_id}/transcript?context=topic${
+                topicId ? `&topicId=${topicId}` : ''
+              }`;
+            }
+          } else {
+            sourceTo = src.url || src.transcript_url;
+          }
           return (
             <Box
               component="li"
@@ -59,8 +71,8 @@ function SourcesList({ sources, topicId }) {
             >
               <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
                 [{src.index}]{' '}
-                {transcriptTo ? (
-                  <Link component={RouterLink} to={transcriptTo} underline="hover">
+                {sourceTo ? (
+                  <Link component={RouterLink} to={sourceTo} underline="hover">
                     {src.title || `Contenido ${src.content_id}`}
                   </Link>
                 ) : (
@@ -227,12 +239,17 @@ function TopicChat({ topicId }) {
         return [row, ...prev.filter((item) => item.id !== data.id)];
       });
     } catch (err) {
-      const detail =
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        err?.message ||
-        'No se pudo obtener una respuesta.';
-      setError(typeof detail === 'string' ? detail : 'No se pudo obtener una respuesta.');
+      const apiError = err?.response?.data?.error || err?.response?.data?.detail;
+      const status = err?.response?.status;
+      let detail = apiError;
+      if (typeof detail !== 'string' || !detail.trim()) {
+        if (status >= 500) {
+          detail = 'No se pudo completar la consulta. Inténtalo de nuevo en unos segundos.';
+        } else {
+          detail = err?.message || 'No se pudo obtener una respuesta.';
+        }
+      }
+      setError(detail);
     } finally {
       setLoading(false);
     }

@@ -13,6 +13,8 @@ import logging
 import unicodedata
 from typing import Any
 
+from django.db.models import JSONField as DjangoJSONField
+
 logger = logging.getLogger(__name__)
 
 _encoding_cache: dict[str, str] | None = None
@@ -135,6 +137,26 @@ def prepare_json_for_db(obj: Any) -> Any:
     return obj
 
 
+def prepare_model_fields(instance, *, text_fields=(), json_fields=()) -> None:
+    """
+    Apply prepare_text_for_db / prepare_json_for_db in place.
+
+    Used by ContentTranscript (and similar) on a legacy SQL_ASCII cluster.
+    Prefer TextJSONField for new JSON that must keep Spanish accents.
+    No-op on UTF8.
+    """
+    for name in text_fields:
+        setattr(instance, name, prepare_text_for_db(getattr(instance, name)))
+    for name in json_fields:
+        setattr(instance, name, prepare_json_for_db(getattr(instance, name)))
+
+
+def is_sql_ascii_error(exc: BaseException) -> bool:
+    """True when Postgres rejected UTF-8 because SERVER_ENCODING is SQL_ASCII."""
+    message = str(exc)
+    return 'SQL_ASCII' in message or 'conversion between UTF8' in message
+
+
 def normalize_notes_value(notes: Any) -> str:
     """Normalize certificate request notes from API input to plain text."""
     if notes is None or notes == '':
@@ -149,3 +171,34 @@ def normalize_notes_value(notes: Any) -> str:
             return ''
         return json.dumps(notes, ensure_ascii=False)
     return str(notes).strip()
+
+
+class TextJSONField(DjangoJSONField):
+    """
+    JSON stored as TEXT instead of jsonb.
+
+    Production Postgres is SQL_ASCII. jsonb cannot hold Unicode there
+    (`unsupported Unicode escape sequence` / UTF8↔SQL_ASCII). TEXT columns
+    already store Spanish UTF-8 bytes, which is why topic titles and
+    transcripts still show accents.
+
+    Do not run this through prepare_json_for_db — that strips accents.
+    """
+
+    def db_type(self, connection):
+        if connection.vendor == 'postgresql':
+            return 'text'
+        return super().db_type(connection)
+
+    def get_db_prep_value(self, value, connection, prepared=False):
+        if value is None:
+            return value
+        if hasattr(value, 'as_sql'):
+            return value
+        if isinstance(value, str):
+            return value
+        dumps_kwargs = {'ensure_ascii': False}
+        if self.encoder is not None:
+            dumps_kwargs['cls'] = self.encoder
+        return json.dumps(value, **dumps_kwargs)
+

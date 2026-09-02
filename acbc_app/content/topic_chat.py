@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+import requests
 from django.conf import settings
 
 from content.models import Content
@@ -79,14 +80,24 @@ def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> lis
     return selected
 
 
-def _load_titles(content_ids: list[int]) -> dict[int, str]:
+def _load_content_metadata(content_ids: list[int]) -> dict[int, dict[str, str]]:
     if not content_ids:
         return {}
-    rows = Content.objects.filter(pk__in=content_ids).values_list('id', 'original_title')
-    return {pk: (title or '') for pk, title in rows}
+    rows = Content.objects.filter(pk__in=content_ids).values('id', 'original_title', 'media_type')
+    return {
+        row['id']: {
+            'title': row['original_title'] or '',
+            'media_type': row['media_type'] or '',
+        }
+        for row in rows
+    }
 
 
-def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_sources_from_hits(
+    hits: list[dict[str, Any]],
+    *,
+    topic_id: Optional[int] = None,
+) -> list[dict[str, Any]]:
     content_ids = []
     for hit in hits:
         payload = hit.get('payload') or {}
@@ -96,7 +107,7 @@ def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 content_ids.append(int(cid))
             except (TypeError, ValueError):
                 pass
-    titles = _load_titles(list(dict.fromkeys(content_ids)))
+    metadata_by_id = _load_content_metadata(list(dict.fromkeys(content_ids)))
 
     sources: list[dict[str, Any]] = []
     for index, hit in enumerate(hits, start=1):
@@ -114,18 +125,32 @@ def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         except (TypeError, ValueError):
             chunk_index = None
 
+        meta = metadata_by_id.get(content_id_int, {}) if content_id_int else {}
+        title = meta.get('title', '')
+        media_type = meta.get('media_type', '')
+
         transcript_url = None
         if content_id_int is not None:
-            transcript_url = f'/content/{content_id_int}/transcript?context=topic'
+            if media_type == 'TEXT':
+                if topic_id:
+                    transcript_url = f'/content/{content_id_int}/topic/{topic_id}'
+                else:
+                    transcript_url = f'/content/{content_id_int}/library'
+            else:
+                transcript_url = f'/content/{content_id_int}/transcript?context=topic'
+                if topic_id:
+                    transcript_url += f'&topicId={topic_id}'
 
         sources.append({
             'index': index,
             'content_id': content_id_int,
-            'title': titles.get(content_id_int, '') if content_id_int else '',
+            'title': title,
+            'media_type': media_type,
             'chunk_index': chunk_index,
             'score': round(_score_of(hit), 4),
             'excerpt': excerpt,
             'transcript_url': transcript_url,
+            'url': transcript_url,
             'text': text,
         })
     return sources
@@ -178,15 +203,16 @@ def run_topic_chat(
 
     try:
         hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
-    except QdrantClientError as exc:
+    except (QdrantClientError, requests.RequestException) as exc:
         logger.exception('Topic chat Qdrant search failed topic_id=%s', topic_id)
         raise TopicChatError(
-            f'No se pudo buscar en Qdrant: {exc}',
+            'No se pudo consultar los archivos indexados. '
+            'Inténtalo de nuevo en unos segundos.',
             status_code=502,
         ) from exc
 
     hits = _dedupe_hits(hits, max_per_content=2)[: _top_k()]
-    sources = build_sources_from_hits(hits)
+    sources = build_sources_from_hits(hits, topic_id=topic_id)
     context = format_context(sources)
 
     if not context.strip():

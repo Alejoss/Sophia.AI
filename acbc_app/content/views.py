@@ -47,6 +47,7 @@ from content.models import (
     ContentSuggestion,
     FileSuggestion,
     TopicCreationRequest,
+    ContentTranscript,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
@@ -1416,6 +1417,55 @@ class FeaturedTextWithThumbnailsView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+class AdminTopicsConversationView(APIView):
+    """Staff dashboard: list topics and conversation (Qdrant RAG) readiness."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    INDEXED_Q = Q(
+        contents__media_type__in=('VIDEO', 'AUDIO'),
+        contents__transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+    )
+
+    def get(self, request):
+        queryset = Topic.objects.annotate(
+            _indexed_transcript_count=Count(
+                'contents',
+                filter=self.INDEXED_Q,
+                distinct=True,
+            ),
+        ).order_by('-_indexed_transcript_count', 'title')
+
+        conversation = (request.query_params.get('conversation') or '').strip().lower()
+        if conversation == 'visible':
+            queryset = queryset.filter(chat_enabled=True, _indexed_transcript_count__gt=0)
+        elif conversation == 'ready':
+            queryset = queryset.filter(chat_enabled=False, _indexed_transcript_count__gt=0)
+        elif conversation == 'on':
+            queryset = queryset.filter(chat_enabled=True)
+        elif conversation == 'no_embeddings':
+            queryset = queryset.filter(_indexed_transcript_count=0)
+        elif conversation:
+            return Response(
+                {
+                    'error': (
+                        'Invalid conversation filter. Use visible, ready, on, or no_embeddings.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TopicBasicSerializer(
+            queryset, many=True, context={'request': request}
+        )
+        results = serializer.data
+        return Response({
+            'count': len(results),
+            'conversation': conversation or None,
+            'results': results,
+        })
+
+
 class AdminFeaturedBooksView(APIView):
     """List currently featured books, or add one by profile_id."""
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -2034,7 +2084,11 @@ class TopicDetailView(APIView):
         logger.info("Topic PATCH topic_id=%s", pk)
         topic = get_object_or_404(Topic, pk=pk)
 
-        if not topic.is_moderator_or_creator(request.user):
+        if not (
+            topic.is_moderator_or_creator(request.user)
+            or request.user.is_staff
+            or request.user.is_superuser
+        ):
             logger.warning("Topic PATCH forbidden topic_id=%s", pk)
             return Response(
                 {"error": "No tiene permiso para actualizar este tema."},

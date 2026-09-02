@@ -836,7 +836,7 @@ const TopicDetail = () => {
                     allowScrollButtonsMobile
                 >
                     <Tab value="content" label="Contenido" />
-                    {showChatTab && <Tab value="chat" label="Conversar" />}
+                    {showChatTab && <Tab value="chat" label="Conversación" />}
                     {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
                     <Tab value="comments" label="Comentarios" />
                 </Tabs>
