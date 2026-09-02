@@ -8,16 +8,20 @@ Vectors are written by an external embed worker. Django only:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Optional
 
 import requests
 from django.conf import settings
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_VECTOR_SIZE = 3072  # text-embedding-3-large full dims
 DEFAULT_DISTANCE = 'Cosine'
+MAX_REQUEST_ATTEMPTS = 3
 
 
 class QdrantClientError(RuntimeError):
@@ -54,11 +58,39 @@ class QdrantClient:
             or 'sophia_acbc_topic_chunks'
         ).strip()
         self.timeout = timeout
-        self.session = session or requests.Session()
+        self._owns_session = session is None
+        self.session = session or self._build_session()
         if not self.base_url or not self.api_key:
             raise QdrantClientError(
                 'Qdrant no configurado. Define QDRANT_URL y QDRANT_API_KEY en acbc_app/.env'
             )
+
+    @staticmethod
+    def _build_session() -> requests.Session:
+        session = requests.Session()
+        retry = Retry(
+            total=2,
+            connect=2,
+            read=1,
+            backoff_factor=0.3,
+            status_forcelist=(429, 502, 503, 504),
+            allowed_methods=frozenset(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('https://', adapter)
+        session.mount('http://', adapter)
+        return session
+
+    def _reset_session(self) -> None:
+        """Drop pooled sockets after a RST so the next attempt opens a new TLS session."""
+        if not self._owns_session:
+            return
+        try:
+            self.session.close()
+        except Exception:
+            logger.debug('Could not close Qdrant session after connection error', exc_info=True)
+        self.session = self._build_session()
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -75,27 +107,52 @@ class QdrantClient:
         json_body: Optional[dict[str, Any]] = None,
     ) -> Any:
         url = f'{self.base_url}{path}'
-        response = self.session.request(
-            method,
-            url,
-            headers=self._headers(),
-            json=json_body,
-            timeout=self.timeout,
-        )
-        if response.status_code >= 400:
-            detail: Any
+        last_error: Optional[BaseException] = None
+        for attempt in range(1, MAX_REQUEST_ATTEMPTS + 1):
             try:
-                detail = response.json()
-            except Exception:
-                detail = (response.text or '').strip()[:800]
-            raise QdrantClientError(
-                f'{method} {path} → {response.status_code}: {detail}',
-                status_code=response.status_code,
-                body=detail,
-            )
-        if response.status_code == 204 or not (response.content or b'').strip():
-            return None
-        return response.json()
+                response = self.session.request(
+                    method,
+                    url,
+                    headers=self._headers(),
+                    json=json_body,
+                    timeout=self.timeout,
+                )
+            except requests.RequestException as exc:
+                last_error = exc
+                logger.warning(
+                    'Qdrant %s %s connection error attempt=%s/%s: %s',
+                    method,
+                    path,
+                    attempt,
+                    MAX_REQUEST_ATTEMPTS,
+                    exc,
+                )
+                self._reset_session()
+                if attempt >= MAX_REQUEST_ATTEMPTS:
+                    raise QdrantClientError(
+                        f'No se pudo conectar a Qdrant ({method} {path}).',
+                    ) from exc
+                time.sleep(0.25 * attempt)
+                continue
+
+            if response.status_code >= 400:
+                detail: Any
+                try:
+                    detail = response.json()
+                except Exception:
+                    detail = (response.text or '').strip()[:800]
+                raise QdrantClientError(
+                    f'{method} {path} → {response.status_code}: {detail}',
+                    status_code=response.status_code,
+                    body=detail,
+                )
+            if response.status_code == 204 or not (response.content or b'').strip():
+                return None
+            return response.json()
+
+        raise QdrantClientError(
+            f'No se pudo conectar a Qdrant ({method} {path}).',
+        ) from last_error
 
     def health(self) -> dict[str, Any]:
         """GET / — cluster root / readiness style check via collections list."""
@@ -111,25 +168,13 @@ class QdrantClient:
         }
 
     def collection_exists(self) -> bool:
-        response = self.session.get(
-            f'{self.base_url}/collections/{self.collection}',
-            headers=self._headers(),
-            timeout=self.timeout,
-        )
-        if response.status_code == 200:
-            return True
-        if response.status_code == 404:
-            return False
-        detail: Any
         try:
-            detail = response.json()
-        except Exception:
-            detail = (response.text or '').strip()[:800]
-        raise QdrantClientError(
-            f'GET /collections/{self.collection} → {response.status_code}: {detail}',
-            status_code=response.status_code,
-            body=detail,
-        )
+            self._request('GET', f'/collections/{self.collection}')
+            return True
+        except QdrantClientError as exc:
+            if exc.status_code == 404:
+                return False
+            raise
 
     def ensure_collection(
         self,
