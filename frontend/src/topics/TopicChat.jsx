@@ -14,6 +14,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AddIcon from '@mui/icons-material/Add';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
+import { getTopicChatSourcePath } from '../utils/urlUtils';
 
 function formatQueryDate(iso) {
   if (!iso) return '';
@@ -49,9 +50,7 @@ function SourcesList({ sources, topicId }) {
         }}
       >
         {sources.map((src) => {
-          const transcriptTo = src.content_id
-            ? `/content/${src.content_id}/transcript?context=topic&topicId=${topicId}`
-            : src.transcript_url;
+          const sourceTo = getTopicChatSourcePath(src, topicId);
           return (
             <Box
               component="li"
@@ -59,8 +58,8 @@ function SourcesList({ sources, topicId }) {
             >
               <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
                 [{src.index}]{' '}
-                {transcriptTo ? (
-                  <Link component={RouterLink} to={transcriptTo} underline="hover">
+                {sourceTo ? (
+                  <Link component={RouterLink} to={sourceTo} underline="hover">
                     {src.title || `Contenido ${src.content_id}`}
                   </Link>
                 ) : (

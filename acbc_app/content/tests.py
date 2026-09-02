@@ -5546,7 +5546,97 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(result['answer'], 'Respuesta grounded [1].')
         self.assertEqual(result['sources'][0]['content_id'], self.video.id)
         self.assertEqual(result['sources'][0]['title'], 'Video citado')
+        self.assertEqual(result['sources'][0]['media_type'], 'VIDEO')
+        self.assertFalse(result['sources'][0]['has_transcript'])
+        self.assertEqual(
+            result['sources'][0]['source_url'],
+            f'/content/{self.video.id}/topic/{self.topic.id}',
+        )
+        self.assertIsNone(result['sources'][0]['transcript_url'])
         self.assertNotIn('text', result['sources'][0])
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_links_text_to_topic_content(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        text_file = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='El Secuestro de Bitcoin',
+        )
+        self.topic.contents.add(text_file)
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Cita el PDF [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.64,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': text_file.id,
+                    'chunk_index': 0,
+                    'text': 'El secuestro de Bitcoin es una historia de captura regulatoria.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='secuestro?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        source = result['sources'][0]
+        self.assertEqual(source['media_type'], 'TEXT')
+        self.assertFalse(source['has_transcript'])
+        self.assertEqual(source['source_url'], f'/content/{text_file.id}/topic/{self.topic.id}')
+        self.assertIsNone(source['transcript_url'])
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_links_video_transcript_when_present(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Los bloques grandes facilitan mas transacciones on-chain.',
+        )
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta grounded [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.88,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 2,
+                    'text': 'Los bloques grandes facilitan mas transacciones on-chain.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='bloques?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        source = result['sources'][0]
+        self.assertTrue(source['has_transcript'])
+        self.assertEqual(
+            source['source_url'],
+            f'/content/{self.video.id}/transcript?context=topic&topicId={self.topic.id}',
+        )
+        self.assertEqual(
+            source['transcript_url'],
+            f'/content/{self.video.id}/transcript?context=topic',
+        )
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')

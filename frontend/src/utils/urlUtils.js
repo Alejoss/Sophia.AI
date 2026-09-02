@@ -58,3 +58,23 @@ export const getTopicContentPath = (contentId, topicId, tab = TOPIC_TABS.CONTENT
   if (normalized === TOPIC_TABS.CONTENT) return base;
   return `${base}?tab=${normalized}`;
 };
+
+/**
+ * Citation link for a topic-chat source.
+ * Transcript page only when a transcript exists; text/PDF and other
+ * files go to the content object in the topic view.
+ */
+export const getTopicChatSourcePath = (src, topicId) => {
+  if (!src) return '';
+  if (src.source_url) return src.source_url;
+  if (!src.content_id) return src.transcript_url || '';
+
+  const useTranscript = src.has_transcript === true;
+
+  if (useTranscript) {
+    const base = `/content/${src.content_id}/transcript?context=topic`;
+    return topicId ? `${base}&topicId=${topicId}` : base;
+  }
+  if (topicId) return getTopicContentPath(src.content_id, topicId);
+  return src.transcript_url || `/content/${src.content_id}/library`;
+};

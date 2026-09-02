@@ -8,7 +8,9 @@ from typing import Any, Optional
 import requests
 from django.conf import settings
 
-from content.models import Content
+from django.db.models import Exists, OuterRef
+
+from content.models import Content, ContentTranscript
 from utils.openai_client import OpenAIClient, OpenAIClientError, openai_configured
 from utils.qdrant_client import QdrantClient, QdrantClientError, qdrant_configured
 
@@ -80,14 +82,54 @@ def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> lis
     return selected
 
 
-def _load_titles(content_ids: list[int]) -> dict[int, str]:
+def _load_content_meta(content_ids: list[int]) -> dict[int, dict[str, Any]]:
     if not content_ids:
         return {}
-    rows = Content.objects.filter(pk__in=content_ids).values_list('id', 'original_title')
-    return {pk: (title or '') for pk, title in rows}
+    transcript_exists = ContentTranscript.objects.filter(content_id=OuterRef('pk'))
+    rows = (
+        Content.objects.filter(pk__in=content_ids)
+        .annotate(has_transcript=Exists(transcript_exists))
+        .values_list('id', 'original_title', 'media_type', 'has_transcript')
+    )
+    return {
+        pk: {
+            'title': title or '',
+            'media_type': media_type or '',
+            'has_transcript': bool(has_transcript),
+        }
+        for pk, title, media_type, has_transcript in rows
+    }
 
 
-def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _source_urls(
+    *,
+    content_id: int,
+    topic_id: Optional[int],
+    has_transcript: bool,
+) -> tuple[Optional[str], Optional[str]]:
+    """Return (source_url, transcript_url) for a citation.
+
+    Video/audio with a stored transcript keep the transcript page.
+    Text/PDF (and anything without a transcript) go to the topic content view.
+    """
+    if has_transcript:
+        transcript_url = f'/content/{content_id}/transcript?context=topic'
+        source_url = (
+            f'{transcript_url}&topicId={topic_id}'
+            if topic_id is not None
+            else transcript_url
+        )
+        return source_url, transcript_url
+    if topic_id is not None:
+        return f'/content/{content_id}/topic/{topic_id}', None
+    return f'/content/{content_id}/library', None
+
+
+def build_sources_from_hits(
+    hits: list[dict[str, Any]],
+    *,
+    topic_id: Optional[int] = None,
+) -> list[dict[str, Any]]:
     content_ids = []
     for hit in hits:
         payload = hit.get('payload') or {}
@@ -97,7 +139,7 @@ def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 content_ids.append(int(cid))
             except (TypeError, ValueError):
                 pass
-    titles = _load_titles(list(dict.fromkeys(content_ids)))
+    meta = _load_content_meta(list(dict.fromkeys(content_ids)))
 
     sources: list[dict[str, Any]] = []
     for index, hit in enumerate(hits, start=1):
@@ -115,17 +157,28 @@ def build_sources_from_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         except (TypeError, ValueError):
             chunk_index = None
 
+        info = meta.get(content_id_int, {}) if content_id_int is not None else {}
+        has_transcript = bool(info.get('has_transcript'))
+        media_type = info.get('media_type') or ''
+        source_url = None
         transcript_url = None
         if content_id_int is not None:
-            transcript_url = f'/content/{content_id_int}/transcript?context=topic'
+            source_url, transcript_url = _source_urls(
+                content_id=content_id_int,
+                topic_id=topic_id,
+                has_transcript=has_transcript,
+            )
 
         sources.append({
             'index': index,
             'content_id': content_id_int,
-            'title': titles.get(content_id_int, '') if content_id_int else '',
+            'title': info.get('title', '') if content_id_int else '',
+            'media_type': media_type,
+            'has_transcript': has_transcript,
             'chunk_index': chunk_index,
             'score': round(_score_of(hit), 4),
             'excerpt': excerpt,
+            'source_url': source_url,
             'transcript_url': transcript_url,
             'text': text,
         })
@@ -188,7 +241,7 @@ def run_topic_chat(
         ) from exc
 
     hits = _dedupe_hits(hits, max_per_content=2)[: _top_k()]
-    sources = build_sources_from_hits(hits)
+    sources = build_sources_from_hits(hits, topic_id=topic_id)
     context = format_context(sources)
 
     if not context.strip():

@@ -49,6 +49,9 @@ Response `201`:
       "chunk_index": 3,
       "score": 0.81,
       "excerpt": "…",
+      "media_type": "VIDEO",
+      "has_transcript": true,
+      "source_url": "/content/46/transcript?context=topic&topicId=2",
       "transcript_url": "/content/46/transcript?context=topic"
     }
   ],
@@ -125,6 +128,10 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 - If Qdrant drops the TLS connection (`Connection reset by peer`), the client
   retries a few times, then the API returns **502** with a Spanish error instead
   of an unhandled **500**.
+- Citation `source_url` points to the transcript page only when a
+  `ContentTranscript` exists (typical VIDEO/AUDIO). TEXT/PDF and other files
+  without a transcript link to `/content/{id}/topic/{topic_id}` so the UI
+  opens the file in the topic view instead of an empty transcript page.
 
 ## Related
 
