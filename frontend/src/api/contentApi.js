@@ -434,7 +434,7 @@ const contentApi = {
     try {
       const query = {
         page: params.page ?? 1,
-        page_size: params.page_size ?? 12,
+        page_size: params.page_size ?? 24,
       };
       const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`, {
         params: query,

@@ -11,7 +11,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
 
-const DEFAULT_PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 24;
 
 const Collection = () => {
     const { collectionId } = useParams();
@@ -187,7 +187,7 @@ const Collection = () => {
                     onPageChange={handleChangePage}
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
-                    rowsPerPageOptions={[12, 24, 48]}
+                    rowsPerPageOptions={[24, 48, 96]}
                     labelRowsPerPage="Filas por página"
                     sx={{ mt: 2 }}
                 />
