@@ -32,6 +32,8 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'anchor_request',
+        'path_purchase',
+        'topic_purchase',
         'expected_amount_sats',
         'usd_amount',
         'status',
@@ -47,5 +49,5 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'anchor_request__requester__username',
         'anchor_request__text_hash',
     )
-    raw_id_fields = ('anchor_request',)
+    raw_id_fields = ('anchor_request', 'path_purchase', 'topic_purchase')
     readonly_fields = ('created_at', 'updated_at', 'provider_payload', 'paid_at')

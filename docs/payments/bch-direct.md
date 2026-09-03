@@ -4,9 +4,15 @@ Además de [NOWPayments](nowpayments-setup.md), Academia Blockchain puede cobrar
 precio fijo de una `TranscriptAnchorRequest` (`price_amount`, default
 `ANCHOR_REQUEST_PRICE_USD`) en **Bitcoin Cash** hacia una wallet propia.
 
-Este flujo **solo** cubre solicitudes de anclaje. Eventos y Caminos del
-Conocimiento siguen usando NOWPayments (que puede cobrar BCH, pero de forma
-hospedada, no autocustodia).
+Cubre tres productos cuando el staff los activa en el dashboard
+(`/dashboard/pagos-bch`):
+
+- Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
+- Caminos de conocimiento con `reference_price > 0` y `bch_direct_enabled`
+- Consultas de un tema con `reference_price > 0` y `bch_direct_enabled`
+
+Eventos siguen en NOWPayments. Un camino de pago también puede seguir cobrando
+por NOWPayments; no puede haber ambos métodos **pendientes** a la vez.
 
 Índice de pagos: [README.md](README.md).
 
@@ -132,9 +138,16 @@ verificar**, no crear la orden.
 | Método | Ruta | Auth | Respuesta |
 |--------|------|------|-----------|
 | GET | `/api/payments/status/` | Público | `bch_direct_enabled`, `bch_network`, `methods.bch_direct` |
+| GET | `/api/payments/admin/bch-catalog/` | Staff | Caminos y temas + flags BCH |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ bch_direct_enabled }` |
+| PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ bch_direct_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
 | POST | `/api/payments/anchor-request/<id>/bch/verify/` | Requester o staff | `{ payment, request }` |
+| GET/POST | `/api/payments/path-purchase/<id>/bch/` | Comprador (POST) | Orden BCH del camino |
+| POST | `/api/payments/path-purchase/<id>/bch/verify/` | Comprador o autor | `{ payment, purchase }` |
+| GET/POST | `/api/payments/topic-purchase/<id>/bch/` | Comprador (POST) | Orden BCH de Consultas |
+| POST | `/api/payments/topic-purchase/<id>/bch/verify/` | Comprador o moderador | `{ payment, purchase }` |
 
 ### Serializer (`BchDirectPayment`)
 

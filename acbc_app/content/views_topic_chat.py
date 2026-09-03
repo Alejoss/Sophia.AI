@@ -16,6 +16,7 @@ from content.serializers import (
     TopicChatQuerySerializer,
     TopicChatRequestSerializer,
 )
+from content.topic_access import user_has_topic_consultas_access
 from content.topic_chat import TopicChatError, run_topic_chat, topic_chat_ready
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,18 @@ def _require_chat_enabled(topic):
     return None
 
 
+def _require_consultas_access(user, topic):
+    if user_has_topic_consultas_access(user, topic):
+        return None
+    return Response(
+        {
+            'error': 'Debes pagar para usar las consultas de este tema.',
+            'code': 'topic_payment_required',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 class TopicChatView(APIView):
     """
     POST /api/content/topics/<topic_id>/chat/
@@ -63,6 +76,9 @@ class TopicChatView(APIView):
         disabled = _require_chat_enabled(topic)
         if disabled:
             return disabled
+        unpaid = _require_consultas_access(request.user, topic)
+        if unpaid:
+            return unpaid
 
         ready, reason = topic_chat_ready()
         if not ready:
@@ -134,6 +150,9 @@ class TopicChatQueryListView(APIView):
         disabled = _require_chat_enabled(topic)
         if disabled:
             return disabled
+        unpaid = _require_consultas_access(request.user, topic)
+        if unpaid:
+            return unpaid
 
         qs = TopicChatQuery.objects.filter(topic=topic, user=request.user)
         try:
@@ -166,6 +185,9 @@ class TopicChatQueryDetailView(APIView):
         disabled = _require_chat_enabled(topic)
         if disabled:
             return disabled
+        unpaid = _require_consultas_access(request.user, topic)
+        if unpaid:
+            return unpaid
 
         query = TopicChatQuery.objects.filter(
             pk=query_id,

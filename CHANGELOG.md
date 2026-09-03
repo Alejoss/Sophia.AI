@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Staff dashboard tab to activate Bitcoin Cash payments on knowledge paths and topic Consultas (`/dashboard/pagos-bch`)
 - Topic timeline entry content suggestions: link library/topic content to an existing timeline entry (API, UI, moderation, notifications)
 - Documentation: [topic-timeline-entry-content-suggestions.md](docs/architecture/topic-timeline-entry-content-suggestions.md)
 - Backend tests: `TopicTimelineEntryContentSuggestionsAPITests` (19 cases)

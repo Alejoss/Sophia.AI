@@ -11,6 +11,8 @@ import {
     useMediaQuery,
     Tabs,
     Tab,
+    Alert,
+    Stack,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -29,6 +31,12 @@ import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
 import TopicTimeline from './timeline/TopicTimeline';
 import TopicChat from './TopicChat';
+import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
+import {
+  createTopicPurchaseBchPayment,
+  verifyTopicPurchaseBchPayment,
+} from '../api/paymentsApi';
+import Payments from '@mui/icons-material/Payments';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
 const TOPIC_IMAGE_PAGE_SIZE = 3;
@@ -357,6 +365,10 @@ const TopicDetail = () => {
         hasNext: false,
         loading: false,
     });
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [topicPurchaseId, setTopicPurchaseId] = useState(null);
+    const [purchaseLoading, setPurchaseLoading] = useState(false);
+    const [purchaseError, setPurchaseError] = useState(null);
 
     const fetchContentByTypePage = useCallback(async (mediaType, page, pageSize) => {
         return contentApi.getTopicContentByType(topicId, mediaType, {
@@ -463,6 +475,44 @@ const TopicDetail = () => {
     const canSuggestTimeline = isAuthenticated && !canEditTimeline;
     const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
     const showConsultationsTab = Boolean(topic?.chat_enabled) && Boolean(topic?.chat_can_enable);
+    const needsConsultasPurchase = Boolean(topic?.is_paid_topic)
+        && !topic?.user_has_consultas_access
+        && !canEditTimeline;
+
+    const handleStartTopicPurchase = async () => {
+        if (!isAuthenticated) {
+            navigate('/login');
+            return;
+        }
+        try {
+            setPurchaseLoading(true);
+            setPurchaseError(null);
+            const purchase = await contentApi.createOrGetTopicPurchase(topicId);
+            setTopicPurchaseId(purchase.id);
+            if (purchase.is_paid || purchase.payment_status === 'PAID') {
+                const data = await contentApi.getTopicDetails(topicId, { include_contents: false });
+                setTopic(data);
+                return;
+            }
+            setShowPaymentModal(true);
+        } catch (err) {
+            setPurchaseError(
+                err?.response?.data?.error || err?.error || 'No se pudo iniciar el pago',
+            );
+        } finally {
+            setPurchaseLoading(false);
+        }
+    };
+
+    const handleTopicPaymentComplete = async () => {
+        try {
+            const data = await contentApi.getTopicDetails(topicId, { include_contents: false });
+            setTopic(data);
+        } catch {
+            // ignore refresh errors; user can reload
+        }
+        setShowPaymentModal(false);
+    };
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -863,7 +913,37 @@ const TopicDetail = () => {
             </Box>
 
             {activeTab === TOPIC_TAB_CONSULTATIONS && showConsultationsTab && (
-                <TopicChat topicId={topicId} />
+                needsConsultasPurchase ? (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        <Stack spacing={1.5}>
+                            <Typography variant="subtitle1" fontWeight={600}>
+                                Consultas de pago
+                            </Typography>
+                            <Typography variant="body2">
+                                Desbloquea las consultas de este tema por{' '}
+                                <strong>${Number(topic.reference_price).toFixed(2)} USD</strong>{' '}
+                                pagando con Bitcoin Cash.
+                            </Typography>
+                            {purchaseError && <Typography color="error">{purchaseError}</Typography>}
+                            <Button
+                                variant="contained"
+                                startIcon={<Payments />}
+                                onClick={handleStartTopicPurchase}
+                                disabled={purchaseLoading || !topic.bch_direct_available}
+                                sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
+                            >
+                                {purchaseLoading ? 'Preparando...' : 'Pagar con BCH'}
+                            </Button>
+                            {!topic.bch_direct_available && (
+                                <Typography variant="caption" color="text.secondary">
+                                    El pago BCH aún no está activado para este tema.
+                                </Typography>
+                            )}
+                        </Stack>
+                    </Alert>
+                ) : (
+                    <TopicChat topicId={topicId} />
+                )
             )}
 
             {activeTab === 'content' && (
@@ -927,6 +1007,19 @@ const TopicDetail = () => {
                 onClose={() => setSuggestionModalOpen(false)}
                 topicId={topicId}
                 onSuccess={handleSuggestionSuccess}
+            />
+
+            <ProductPaymentCheckout
+                open={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                title={topic?.title}
+                priceUsd={topic?.reference_price}
+                productLabel="consultas del tema"
+                offerNowpayments={false}
+                offerBch
+                createBchPayment={() => createTopicPurchaseBchPayment(topicPurchaseId)}
+                verifyBchPayment={() => verifyTopicPurchaseBchPayment(topicPurchaseId)}
+                onPaid={handleTopicPaymentComplete}
             />
         </Box>
     );

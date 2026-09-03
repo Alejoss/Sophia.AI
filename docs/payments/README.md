@@ -5,7 +5,7 @@ Crypto checkout for Academia Blockchain. Two complementary paths:
 | Path | Use | Docs |
 |------|-----|------|
 | **NOWPayments** (hosted) | Event registrations, knowledge-path purchases, and transcript-anchor requests. User pays BCH or Monero on NOWPayments. | [nowpayments-setup.md](nowpayments-setup.md) |
-| **BCH directo** (self-custody) | Transcript-anchor requests only. Exact-amount Bitcoin Cash to a platform wallet; user taps **Ya realicé el pago**. | [bch-direct.md](bch-direct.md) |
+| **BCH directo** (self-custody) | Transcript-anchor requests, plus staff-activated knowledge paths and topic Consultas. Exact-amount Bitcoin Cash to a platform wallet; user taps **Ya realicé el pago**. | [bch-direct.md](bch-direct.md) |
 
 Public paid Bitcoin anchors (`TranscriptAnchorRequest`) show a method chooser when both are configured. The two methods cannot both be **pending** on the same request.
 

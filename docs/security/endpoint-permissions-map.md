@@ -117,6 +117,19 @@ Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcri
 
 BCH direct is self-custody exact-amount match (no IPN). Docs: [bch-direct.md](../payments/bch-direct.md).
 
+Staff dashboard (`IsAdminUser`):
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/payments/admin/bch-catalog/` | JWT staff |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | JWT staff (`bch_direct_enabled`) |
+| PATCH | `/api/payments/admin/topics/<id>/` | JWT staff (`bch_direct_enabled`, `reference_price`) |
+| POST | `/api/content/topics/<id>/purchase/` | JWT; buyer for paid Consultas |
+| GET/POST | `/api/payments/path-purchase/<id>/bch/` | JWT; buyer (POST), buyer/author/staff (GET) |
+| POST | `/api/payments/path-purchase/<id>/bch/verify/` | JWT; buyer, author, or staff |
+| GET/POST | `/api/payments/topic-purchase/<id>/bch/` | JWT; buyer (POST), buyer/moderator/staff (GET) |
+| POST | `/api/payments/topic-purchase/<id>/bch/verify/` | JWT; buyer, moderator, or staff |
+
 ## OAuth / Google
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_SECRET_KEY`: server-side only.  

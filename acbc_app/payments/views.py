@@ -5,13 +5,13 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import TranscriptAnchorRequest
+from content.models import Topic, TopicPurchase, TranscriptAnchorRequest
 from events.models import EventRegistration
-from knowledge_paths.models import KnowledgePathPurchase
+from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase
 from payments.bch_client import get_bch_network, is_bch_direct_configured
 from payments.bch_services import (
     BchPaymentError,
@@ -540,3 +540,282 @@ class NOWPaymentsIPNView(APIView):
             body.get('payment_status'),
         )
         return Response({'status': 'ok'})
+
+
+def _latest_bch_for(**filters):
+    payment = (
+        BchDirectPayment.objects.filter(**filters)
+        .order_by('-created_at')
+        .first()
+    )
+    if payment:
+        payment.mark_expired_if_needed()
+    return payment
+
+
+class AdminBchCatalogView(APIView):
+    """Staff dashboard: knowledge paths and topics that can accept BCH."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        paths = KnowledgePath.objects.select_related('author').order_by('title')
+        topics = Topic.objects.select_related('creator').order_by('title')
+        configured = is_bch_direct_configured()
+        return Response({
+            'bch_direct_configured': configured,
+            'bch_direct_enabled': configured,
+            'bch_network': get_bch_network(),
+            'knowledge_paths': [
+                {
+                    'id': path.id,
+                    'title': path.title,
+                    'author': path.author.username if path.author_id else None,
+                    'is_visible': path.is_visible,
+                    'reference_price': path.reference_price or 0,
+                    'is_paid_path': path.is_paid_path,
+                    'bch_direct_enabled': path.bch_direct_enabled,
+                    'bch_direct_available': bool(
+                        configured and path.bch_direct_enabled and path.is_paid_path
+                    ),
+                }
+                for path in paths
+            ],
+            'topics': [
+                {
+                    'id': topic.id,
+                    'title': topic.title,
+                    'creator': topic.creator.username if topic.creator_id else None,
+                    'is_public': topic.is_public,
+                    'chat_enabled': topic.chat_enabled,
+                    'reference_price': topic.reference_price or 0,
+                    'is_paid_topic': topic.is_paid_topic,
+                    'bch_direct_enabled': topic.bch_direct_enabled,
+                    'bch_direct_available': bool(
+                        configured and topic.bch_direct_enabled and topic.is_paid_topic
+                    ),
+                }
+                for topic in topics
+            ],
+        })
+
+
+class AdminKnowledgePathBchView(APIView):
+    """Staff: activate/deactivate BCH checkout on a knowledge path."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, pk):
+        path = KnowledgePath.objects.select_related('author').filter(pk=pk).first()
+        if path is None:
+            return Response({'error': 'Camino no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if 'bch_direct_enabled' not in request.data:
+            return Response(
+                {'error': 'Falta bch_direct_enabled.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        enabled = bool(request.data.get('bch_direct_enabled'))
+        if enabled and not path.is_paid_path:
+            return Response(
+                {'error': 'Define un precio mayor a 0 en el camino antes de activar BCH.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        path.bch_direct_enabled = enabled
+        path.save(update_fields=['bch_direct_enabled', 'updated_at'])
+        return Response({
+            'id': path.id,
+            'title': path.title,
+            'reference_price': path.reference_price or 0,
+            'is_paid_path': path.is_paid_path,
+            'bch_direct_enabled': path.bch_direct_enabled,
+            'bch_direct_available': bool(
+                is_bch_direct_configured() and path.bch_direct_enabled and path.is_paid_path
+            ),
+        })
+
+
+class AdminTopicBchView(APIView):
+    """Staff: set Consultas price and activate BCH on a topic."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, pk):
+        topic = Topic.objects.select_related('creator').filter(pk=pk).first()
+        if topic is None:
+            return Response({'error': 'Tema no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        update_fields = ['updated_at']
+        if 'reference_price' in request.data:
+            try:
+                price = float(request.data.get('reference_price') or 0)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'El precio debe ser un número.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if price < 0:
+                return Response(
+                    {'error': 'El precio no puede ser negativo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            topic.reference_price = price
+            update_fields.append('reference_price')
+            if price <= 0:
+                topic.bch_direct_enabled = False
+                update_fields.append('bch_direct_enabled')
+
+        if 'bch_direct_enabled' in request.data:
+            enabled = bool(request.data.get('bch_direct_enabled'))
+            if enabled and not topic.is_paid_topic:
+                return Response(
+                    {'error': 'Define un precio mayor a 0 antes de activar BCH.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            topic.bch_direct_enabled = enabled
+            update_fields.append('bch_direct_enabled')
+
+        topic.save(update_fields=list(dict.fromkeys(update_fields)))
+        return Response({
+            'id': topic.id,
+            'title': topic.title,
+            'reference_price': topic.reference_price or 0,
+            'is_paid_topic': topic.is_paid_topic,
+            'bch_direct_enabled': topic.bch_direct_enabled,
+            'bch_direct_available': bool(
+                is_bch_direct_configured() and topic.bch_direct_enabled and topic.is_paid_topic
+            ),
+        })
+
+
+class PathPurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_purchase(self, request, purchase_id):
+        try:
+            return KnowledgePathPurchase.objects.select_related(
+                'knowledge_path', 'user'
+            ).get(pk=purchase_id)
+        except KnowledgePathPurchase.DoesNotExist:
+            return None
+
+    def get(self, request, purchase_id):
+        purchase = self._get_purchase(request, purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        path = purchase.knowledge_path
+        if (
+            purchase.user_id != request.user.id
+            and path.author_id != request.user.id
+            and not request.user.is_staff
+        ):
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(path_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured() and path.bch_direct_enabled,
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = self._get_purchase(request, purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, path_purchase=purchase)
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class PathPurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        try:
+            purchase = KnowledgePathPurchase.objects.select_related(
+                'knowledge_path', 'user'
+            ).get(pk=purchase_id)
+        except KnowledgePathPurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(user=request.user, path_purchase=purchase)
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+            },
+        })
+
+
+class TopicPurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_purchase(self, purchase_id):
+        try:
+            return TopicPurchase.objects.select_related('topic', 'user').get(pk=purchase_id)
+        except TopicPurchase.DoesNotExist:
+            return None
+
+    def get(self, request, purchase_id):
+        purchase = self._get_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        topic = purchase.topic
+        if (
+            purchase.user_id != request.user.id
+            and not topic.is_moderator_or_creator(request.user)
+            and not request.user.is_staff
+        ):
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(topic_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured() and topic.bch_direct_enabled,
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = self._get_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, topic_purchase=purchase)
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class TopicPurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        try:
+            purchase = TopicPurchase.objects.select_related('topic', 'user').get(pk=purchase_id)
+        except TopicPurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(user=request.user, topic_purchase=purchase)
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except BchPaymentError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+            },
+        })
