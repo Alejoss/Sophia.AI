@@ -271,24 +271,13 @@ class ContentTranscript(models.Model):
     parsed_plain → processed_plain → obsidian_markdown.
     Optional source_subtitles (SRT/VTT) enables timed segments for the player.
 
-    Embedding vectors live in an external vector DB; this model only tracks
-    whether the current text_hash still needs indexing (see embedding_status).
+    Embedding bookkeeping lives on ContentEmbedding (not here): A/V transcripts
+    remain the hash source for staleness, but vectors and index status are
+    content-level so TEXT files can be indexed without a transcript body.
     """
     FORMAT_CHOICES = [
         ('SRT', 'SubRip (.srt)'),
         ('VTT', 'WebVTT (.vtt)'),
-    ]
-    EMBEDDING_STATUS_PENDING = 'pending'
-    EMBEDDING_STATUS_INDEXED = 'indexed'
-    EMBEDDING_STATUS_STALE = 'stale'
-    EMBEDDING_STATUS_FAILED = 'failed'
-    EMBEDDING_STATUS_SKIPPED = 'skipped'
-    EMBEDDING_STATUS_CHOICES = [
-        (EMBEDDING_STATUS_PENDING, 'Pending'),
-        (EMBEDDING_STATUS_INDEXED, 'Indexed'),
-        (EMBEDDING_STATUS_STALE, 'Stale'),
-        (EMBEDDING_STATUS_FAILED, 'Failed'),
-        (EMBEDDING_STATUS_SKIPPED, 'Skipped'),
     ]
 
     content = models.OneToOneField(
@@ -339,43 +328,6 @@ class ContentTranscript(models.Model):
         blank=True,
         help_text='ISO 639-1 language code, e.g. es or en.',
     )
-    embedding_status = models.CharField(
-        max_length=16,
-        choices=EMBEDDING_STATUS_CHOICES,
-        default=EMBEDDING_STATUS_PENDING,
-        db_index=True,
-        help_text='Whether current text_hash is indexed in the external vector DB.',
-    )
-    embedding_model = models.CharField(
-        max_length=64,
-        blank=True,
-        help_text='Embedding model last used when status=indexed (set by embed worker ack).',
-    )
-    embedding_dims = models.PositiveSmallIntegerField(
-        blank=True,
-        null=True,
-        help_text='Vector dimensions for embedding_model.',
-    )
-    chunk_count = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-        help_text='Number of chunks upserted to the vector DB on last successful index.',
-    )
-    embedded_text_hash = models.CharField(
-        max_length=64,
-        blank=True,
-        null=True,
-        help_text='text_hash that was indexed; compared to text_hash to detect stale.',
-    )
-    embedded_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        help_text='When the vector DB was last successfully updated for this transcript.',
-    )
-    embedding_error = models.TextField(
-        blank=True,
-        help_text='Last embed-worker error message when status=failed.',
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -383,10 +335,6 @@ class ContentTranscript(models.Model):
         indexes = [
             models.Index(fields=['text_hash'], name='content_transcript_hash_idx'),
             models.Index(fields=['language'], name='content_transcript_lang_idx'),
-            models.Index(
-                fields=['embedded_text_hash'],
-                name='content_tr_emb_hash_idx',
-            ),
         ]
 
     def __str__(self):
@@ -404,8 +352,6 @@ class ContentTranscript(models.Model):
         self.obsidian_markdown = prepare_text_for_db(self.obsidian_markdown)
         self.source_subtitles = prepare_text_for_db(self.source_subtitles)
         self.language = prepare_text_for_db(self.language)
-        self.embedding_model = prepare_text_for_db(self.embedding_model)
-        self.embedding_error = prepare_text_for_db(self.embedding_error)
         self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
         self.segments = prepare_json_for_db(self.segments or [])
 
@@ -413,6 +359,104 @@ class ContentTranscript(models.Model):
 
         self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
         self.segments = prepare_json_for_db(self.segments or [])
+        super().save(*args, **kwargs)
+
+
+class ContentEmbedding(models.Model):
+    """
+    Vector-index bookkeeping for any Content (VIDEO, AUDIO, TEXT, …).
+
+    Vectors live in Qdrant; this row only tracks whether the current source
+    hash is indexed. TEXT files do not need a ContentTranscript — the worker
+    hashes/chunks the file and acks here. For A/V, transcript.text_hash is the
+    usual source_hash input for staleness.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_INDEXED = 'indexed'
+    STATUS_STALE = 'stale'
+    STATUS_FAILED = 'failed'
+    STATUS_SKIPPED = 'skipped'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_INDEXED, 'Indexed'),
+        (STATUS_STALE, 'Stale'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_SKIPPED, 'Skipped'),
+    ]
+
+    # Back-compat aliases used across ingest/chat code and tests.
+    EMBEDDING_STATUS_PENDING = STATUS_PENDING
+    EMBEDDING_STATUS_INDEXED = STATUS_INDEXED
+    EMBEDDING_STATUS_STALE = STATUS_STALE
+    EMBEDDING_STATUS_FAILED = STATUS_FAILED
+    EMBEDDING_STATUS_SKIPPED = STATUS_SKIPPED
+    EMBEDDING_STATUS_CHOICES = STATUS_CHOICES
+
+    content = models.OneToOneField(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='embedding',
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+        help_text='Whether current source_hash is indexed in the external vector DB.',
+    )
+    model = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Embedding model last used when status=indexed (set by embed worker ack).',
+    )
+    dims = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text='Vector dimensions for model.',
+    )
+    chunk_count = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text='Number of chunks upserted to the vector DB on last successful index.',
+    )
+    source_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text=(
+            'Hash of the source that was indexed (transcript text_hash for A/V, '
+            'or worker-supplied file/content hash for TEXT).'
+        ),
+    )
+    embedded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text='When the vector DB was last successfully updated for this content.',
+    )
+    error = models.TextField(
+        blank=True,
+        help_text='Last embed-worker error message when status=failed.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['source_hash'], name='content_emb_source_hash_idx'),
+            models.Index(fields=['status'], name='content_emb_status_idx'),
+        ]
+
+    def __str__(self):
+        title = self.content.original_title or self.content_id
+        return f"Embedding({self.status}) for {title}"
+
+    def save(self, *args, **kwargs):
+        from utils.db_encoding import prepare_text_for_db
+
+        self.model = prepare_text_for_db(self.model)
+        self.error = prepare_text_for_db(self.error)
+        self.source_hash = prepare_text_for_db(self.source_hash) if self.source_hash else self.source_hash
         super().save(*args, **kwargs)
 
 
@@ -728,11 +772,10 @@ class Topic(models.Model):
         return False
 
     def indexed_transcript_count(self):
-        """VIDEO/AUDIO in this topic with embedding_status=indexed."""
-        from content.models import ContentTranscript
+        """Contents in this topic with ContentEmbedding.status=indexed (any media type)."""
+        from content.models import ContentEmbedding
         return self.contents.filter(
-            media_type__in=('VIDEO', 'AUDIO'),
-            transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+            embedding__status=ContentEmbedding.STATUS_INDEXED,
         ).count()
 
     def has_indexed_transcripts(self):
