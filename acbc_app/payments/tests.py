@@ -598,3 +598,185 @@ class BchNetworkClientTests(TestCase):
     def test_receive_address_prefers_chipnet_override(self):
         from payments.bch_client import get_bch_receive_address
         self.assertTrue(get_bch_receive_address().startswith('bchtest:'))
+
+
+@override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class AdminBchCatalogTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = UserFactory(is_staff=True)
+        self.author = UserFactory()
+        self.path = KnowledgePath.objects.create(
+            title='Paid Path',
+            author=self.author,
+            reference_price=10,
+            is_visible=True,
+        )
+        from content.models import Topic
+        self.topic = Topic.objects.create(
+            title='Paid Topic',
+            creator=self.author,
+            reference_price=0,
+            chat_enabled=True,
+        )
+
+    def test_catalog_requires_staff(self):
+        self.client.force_authenticate(user=self.author)
+        response = self.client.get('/api/payments/admin/bch-catalog/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_lists_paths_and_topics(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get('/api/payments/admin/bch-catalog/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {item['title'] for item in response.data['knowledge_paths']}
+        self.assertIn('Paid Path', titles)
+        topic_titles = {item['title'] for item in response.data['topics']}
+        self.assertIn('Paid Topic', topic_titles)
+        self.assertTrue(response.data['bch_direct_configured'])
+
+    def test_cannot_enable_bch_on_free_path(self):
+        self.path.reference_price = 0
+        self.path.save(update_fields=['reference_price'])
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.patch(
+            f'/api/payments/admin/knowledge-paths/{self.path.id}/',
+            {'bch_direct_enabled': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_enable_bch_on_paid_path(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.patch(
+            f'/api/payments/admin/knowledge-paths/{self.path.id}/',
+            {'bch_direct_enabled': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.path.refresh_from_db()
+        self.assertTrue(self.path.bch_direct_enabled)
+
+    def test_set_topic_price_and_enable_bch(self):
+        self.client.force_authenticate(user=self.staff)
+        price = self.client.patch(
+            f'/api/payments/admin/topics/{self.topic.id}/',
+            {'reference_price': 3.5},
+            format='json',
+        )
+        self.assertEqual(price.status_code, status.HTTP_200_OK)
+        enabled = self.client.patch(
+            f'/api/payments/admin/topics/{self.topic.id}/',
+            {'bch_direct_enabled': True},
+            format='json',
+        )
+        self.assertEqual(enabled.status_code, status.HTTP_200_OK)
+        self.topic.refresh_from_db()
+        self.assertEqual(self.topic.reference_price, 3.5)
+        self.assertTrue(self.topic.bch_direct_enabled)
+
+
+@override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class PathAndTopicBchPaymentTests(TestCase):
+    def setUp(self):
+        self.author = UserFactory()
+        self.buyer = UserFactory()
+        self.path = KnowledgePath.objects.create(
+            title='BCH Path',
+            author=self.author,
+            reference_price=2,
+            bch_direct_enabled=True,
+            is_visible=True,
+        )
+        self.purchase = KnowledgePathPurchase.objects.create(
+            user=self.buyer,
+            knowledge_path=self.path,
+            payment_status='PENDING',
+            price_amount=2,
+        )
+        from content.models import Topic, TopicPurchase
+        self.topic = Topic.objects.create(
+            title='BCH Topic',
+            creator=self.author,
+            reference_price=4,
+            bch_direct_enabled=True,
+            chat_enabled=True,
+        )
+        self.topic_purchase = TopicPurchase.objects.create(
+            user=self.buyer,
+            topic=self.topic,
+            payment_status='PENDING',
+            price_amount=4,
+        )
+
+    def _paid_tx(self, order):
+        return [
+            BchTransaction(
+                txid='ef' * 32,
+                timestamp=int(order.created_at.timestamp()) + 10,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+                ],
+            ),
+        ]
+
+    def test_path_bch_requires_flag(self):
+        self.path.bch_direct_enabled = False
+        self.path.save(update_fields=['bch_direct_enabled'])
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError):
+            create_or_reuse_bch_payment(
+                path_purchase=self.purchase,
+                user=self.buyer,
+                client=client,
+            )
+
+    def test_path_bch_verify_unlocks(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=self.purchase,
+            user=self.buyer,
+            client=client,
+        )
+        client.list_recent_transactions.return_value = self._paid_tx(order)
+        paid = verify_bch_payment(
+            path_purchase=self.purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_topic_bch_verify_unlocks(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            topic_purchase=self.topic_purchase,
+            user=self.buyer,
+            client=client,
+        )
+        client.list_recent_transactions.return_value = self._paid_tx(order)
+        paid = verify_bch_payment(
+            topic_purchase=self.topic_purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.topic_purchase.refresh_from_db()
+        self.assertEqual(self.topic_purchase.payment_status, 'PAID')

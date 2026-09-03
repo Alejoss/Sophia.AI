@@ -105,3 +105,66 @@ export const verifyAnchorRequestBchPayment = async (requestId) => {
     throwApiError(error, 'No se pudo verificar el pago BCH');
   }
 };
+
+export const getAdminBchCatalog = async () => {
+  try {
+    const response = await axiosInstance.get('/payments/admin/bch-catalog/');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el catálogo BCH');
+  }
+};
+
+export const updateKnowledgePathBch = async (pathId, payload) => {
+  try {
+    const response = await axiosInstance.patch(`/payments/admin/knowledge-paths/${pathId}/`, payload);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el camino');
+  }
+};
+
+export const updateTopicBch = async (topicId, payload) => {
+  try {
+    const response = await axiosInstance.patch(`/payments/admin/topics/${topicId}/`, payload);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo actualizar el tema');
+  }
+};
+
+export const createPathPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH');
+  }
+};
+
+export const verifyPathPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/bch/verify/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH');
+  }
+};
+
+export const createTopicPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/topic-purchase/${purchaseId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH');
+  }
+};
+
+export const verifyTopicPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/topic-purchase/${purchaseId}/bch/verify/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH');
+  }
+};

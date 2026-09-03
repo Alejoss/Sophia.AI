@@ -175,19 +175,48 @@ def _mark_event_registration_paid_if_needed(crypto_payment: CryptoPayment) -> No
         )
 
 
-def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+def mark_path_purchase_paid(path_purchase: KnowledgePathPurchase, *, source: str = '') -> KnowledgePathPurchase:
+    """Mark a knowledge-path purchase PAID (idempotent). Shared by NOWPayments and BCH."""
     with transaction.atomic():
-        purchase = KnowledgePathPurchase.objects.select_for_update().get(
-            pk=crypto_payment.path_purchase_id
-        )
+        purchase = KnowledgePathPurchase.objects.select_for_update().get(pk=path_purchase.pk)
         if purchase.payment_status == 'PAID':
-            return
+            return purchase
         purchase.payment_status = 'PAID'
         purchase.save(update_fields=['payment_status', 'updated_at'])
+    logger.info(
+        'Path purchase %s marked PAID (source=%s)',
+        purchase.pk,
+        source or 'unknown',
+    )
+    return purchase
 
+
+def mark_topic_purchase_paid(topic_purchase, *, source: str = ''):
+    """Mark a topic Consultas purchase PAID (idempotent)."""
+    from content.models import TopicPurchase
+
+    with transaction.atomic():
+        purchase = TopicPurchase.objects.select_for_update().get(pk=topic_purchase.pk)
+        if purchase.payment_status == 'PAID':
+            return purchase
+        purchase.payment_status = 'PAID'
+        purchase.save(update_fields=['payment_status', 'updated_at'])
+    logger.info(
+        'Topic purchase %s marked PAID (source=%s)',
+        purchase.pk,
+        source or 'unknown',
+    )
+    return purchase
+
+
+def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    purchase = mark_path_purchase_paid(
+        KnowledgePathPurchase.objects.get(pk=crypto_payment.path_purchase_id),
+        source='nowpayments',
+    )
     purchase = KnowledgePathPurchase.objects.select_related(
         'knowledge_path', 'knowledge_path__author', 'user'
-    ).get(pk=crypto_payment.path_purchase_id)
+    ).get(pk=purchase.pk)
     try:
         on_crypto_payment_completed(crypto_payment, path_purchase=purchase)
     except Exception as exc:
