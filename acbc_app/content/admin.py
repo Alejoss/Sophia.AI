@@ -12,6 +12,7 @@ from content.models import (
     Content,
     ContentProfile,
     ContentTranscript,
+    ContentEmbedding,
     TranscriptAnchor,
     TranscriptAnchorRequest,
     Topic,
@@ -68,27 +69,46 @@ class ContentTranscriptAdmin(admin.ModelAdmin):
         'language',
         'text_length',
         'text_hash',
-        'embedding_status',
-        'chunk_count',
         'updated_at',
     ]
-    list_filter = ['format', 'language', 'embedding_status', 'updated_at']
+    list_filter = ['format', 'language', 'updated_at']
     search_fields = [
         'content__original_title',
         'processed_plain',
         'text_hash',
-        'embedded_text_hash',
     ]
     readonly_fields = [
         'segments',
         'obsidian_frontmatter',
         'text_length',
         'text_hash',
-        'embedded_text_hash',
-        'embedded_at',
         'created_at',
         'updated_at',
     ]
+    date_hierarchy = 'updated_at'
+
+
+@admin.register(ContentEmbedding)
+class ContentEmbeddingAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'content',
+        'status',
+        'model',
+        'dims',
+        'chunk_count',
+        'source_hash',
+        'embedded_at',
+        'updated_at',
+    ]
+    list_filter = ['status', 'model', 'updated_at']
+    search_fields = [
+        'content__original_title',
+        'source_hash',
+        'model',
+        'error',
+    ]
+    readonly_fields = ['created_at', 'updated_at']
     date_hierarchy = 'updated_at'
 
 
@@ -248,5 +268,3 @@ class TopicPurchaseAdmin(admin.ModelAdmin):
     list_filter = ('payment_status', 'created_at')
     search_fields = ('user__username', 'topic__title')
     raw_id_fields = ('user', 'topic')
-
-

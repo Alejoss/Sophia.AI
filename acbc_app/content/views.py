@@ -48,6 +48,7 @@ from content.models import (
     FileSuggestion,
     TopicCreationRequest,
     ContentTranscript,
+    ContentEmbedding,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
@@ -1423,8 +1424,7 @@ class AdminTopicsConsultationsView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     INDEXED_Q = Q(
-        contents__media_type__in=('VIDEO', 'AUDIO'),
-        contents__transcript__embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
+        contents__embedding__status=ContentEmbedding.STATUS_INDEXED,
     )
 
     def get(self, request):

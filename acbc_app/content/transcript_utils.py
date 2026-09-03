@@ -196,31 +196,37 @@ def resolve_hash_source_text(transcript):
 
 def sync_embedding_status_for_text_hash(transcript):
     """
-    Keep embedding_status aligned with text_hash vs embedded_text_hash.
+    Keep ContentEmbedding.status aligned with transcript.text_hash vs source_hash.
 
     Called on transcript save (including transcript-ingest PUT). Does not write
     vectors; only marks pending/stale so a later embed worker can pick work up.
     """
-    status = (transcript.embedding_status or '').strip() or 'pending'
-    if status == 'skipped':
+    from content.models import ContentEmbedding
+
+    embedding, _ = ContentEmbedding.objects.get_or_create(
+        content=transcript.content,
+        defaults={'status': ContentEmbedding.STATUS_PENDING},
+    )
+    status = (embedding.status or '').strip() or ContentEmbedding.STATUS_PENDING
+    if status == ContentEmbedding.STATUS_SKIPPED:
         return
 
     current_hash = (transcript.text_hash or '').strip()
-    embedded_hash = (transcript.embedded_text_hash or '').strip()
+    embedded_hash = (embedding.source_hash or '').strip()
 
     if not current_hash:
-        transcript.embedding_status = 'pending'
-        return
-
-    if embedded_hash and embedded_hash == current_hash:
+        new_status = ContentEmbedding.STATUS_PENDING
+    elif embedded_hash and embedded_hash == current_hash:
         # Corpus unchanged since last successful index (or same hash after failed retry).
         return
+    elif embedded_hash and embedded_hash != current_hash:
+        new_status = ContentEmbedding.STATUS_STALE
+    else:
+        new_status = ContentEmbedding.STATUS_PENDING
 
-    if embedded_hash and embedded_hash != current_hash:
-        transcript.embedding_status = 'stale'
-        return
-
-    transcript.embedding_status = 'pending'
+    if embedding.status != new_status:
+        embedding.status = new_status
+        embedding.save(update_fields=['status', 'updated_at'])
 
 
 def sync_transcript_derived_fields(transcript):

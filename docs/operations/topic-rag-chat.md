@@ -21,6 +21,32 @@ indexed by the external embed worker (see [qdrant-embeddings.md](qdrant-embeddin
 
 All require JWT. Only the owning user can list/read their consultations.
 
+### List selectable transcripts
+
+```http
+GET /api/content/topics/{topic_id}/chat/sources/
+Authorization: Bearer <JWT>
+```
+
+Returns VIDEO/AUDIO in the topic with `embedding_status=indexed` (what the
+Consultas checklist shows).
+
+```json
+{
+  "count": 2,
+  "results": [
+    {
+      "content_id": 46,
+      "title": "Introducción a Bitcoin",
+      "media_type": "VIDEO",
+      "original_author": "Autor",
+      "chunk_count": 7,
+      "embedded_at": "2026-07-28T18:00:00Z"
+    }
+  ]
+}
+```
+
 ### Create consultation
 
 ```http
@@ -30,8 +56,16 @@ Content-Type: application/json
 ```
 
 ```json
-{ "message": "¿Qué dicen sobre el tamaño de los bloques?" }
+{
+  "message": "¿Qué dicen sobre el tamaño de los bloques?",
+  "content_ids": [46, 88]
+}
 ```
+
+- `content_ids` (optional): restrict retrieval to these indexed files.
+  Omit to search all indexed transcripts in the topic. Empty list → **400**.
+- IDs must belong to the topic and be `embedding_status=indexed`; otherwise
+  **400** with `invalid_content_ids`.
 
 Response `201`:
 
@@ -54,9 +88,13 @@ Response `201`:
   ],
   "retrieved_chunk_count": 4,
   "used_chunk_count": 3,
+  "selected_content_ids": [46, 88],
   "created_at": "2026-07-28T18:00:00Z"
 }
 ```
+
+`selected_content_ids` is empty when the client omitted `content_ids` (all
+indexed files were eligible).
 
 ### List own consultations
 
@@ -116,7 +154,8 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 
 ## Behaviour notes
 
-- Retrieval is scoped to one `topic_id`.
+- Retrieval is scoped to one `topic_id`, and optionally to a subset of
+  `content_ids` chosen by the user for that consultation.
 - Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
 - Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
   remain and keyword fallback cannot help, the API returns a fixed message and
