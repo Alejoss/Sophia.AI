@@ -554,6 +554,61 @@ class BchDirectPaymentTests(TestCase):
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
 
+    def test_waiting_nowpayments_is_abandoned_when_starting_bch(self):
+        CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-waiting-switch',
+            payment_status='waiting',
+            price_amount=1.0,
+            invoice_url='https://nowpayments.io/payment/?iid=switch',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+        abandoned = CryptoPayment.objects.get(order_id='anchor-waiting-switch')
+        self.assertEqual(abandoned.payment_status, 'expired')
+
+    def test_confirming_nowpayments_still_blocks_bch(self):
+        CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-confirming-switch',
+            payment_status='confirming',
+            price_amount=1.0,
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError) as ctx:
+            create_or_reuse_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
+        self.assertIn('confirmación', str(ctx.exception))
+
+    @override_settings(NOWPAYMENTS_API_KEY='test-key')
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_pending_bch_does_not_block_nowpayments(self, mock_create_invoice):
+        mock_create_invoice.return_value = {
+            'id': 889,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=889',
+        }
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        bch_order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        payment = create_anchor_request_payment(anchor_request=self.req, user=self.user)
+        self.assertEqual(payment.invoice_url, 'https://nowpayments.io/payment/?iid=889')
+        bch_order.refresh_from_db()
+        self.assertEqual(bch_order.status, BchDirectPayment.STATUS_PENDING)
+
 
 class BchNetworkClientTests(TestCase):
     def test_cashaddr_scripthash_roundtrip(self):
@@ -780,3 +835,39 @@ class PathAndTopicBchPaymentTests(TestCase):
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
         self.topic_purchase.refresh_from_db()
         self.assertEqual(self.topic_purchase.payment_status, 'PAID')
+
+    def test_waiting_nowpayments_is_abandoned_when_starting_path_bch(self):
+        CryptoPayment.objects.create(
+            path_purchase=self.purchase,
+            order_id='kp-waiting-switch',
+            payment_status='waiting',
+            price_amount=2,
+            invoice_url='https://nowpayments.io/payment/?iid=path',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=self.purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+        abandoned = CryptoPayment.objects.get(order_id='kp-waiting-switch')
+        self.assertEqual(abandoned.payment_status, 'expired')
+
+    def test_confirming_nowpayments_still_blocks_path_bch(self):
+        CryptoPayment.objects.create(
+            path_purchase=self.purchase,
+            order_id='kp-confirming-switch',
+            payment_status='confirming',
+            price_amount=2,
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError) as ctx:
+            create_or_reuse_bch_payment(
+                path_purchase=self.purchase,
+                user=self.buyer,
+                client=client,
+            )
+        self.assertIn('confirmación', str(ctx.exception))

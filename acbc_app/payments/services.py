@@ -20,6 +20,10 @@ ALLOWED_PAY_CURRENCIES = {'bch', 'xmr'}
 # "confirmed" is on-chain only — proceed only if you validate actually_paid vs pay_amount.
 FULFILLMENT_STATUS = 'finished'
 OPEN_PAYMENT_STATUSES = ('waiting', 'confirming', 'confirmed', 'sending', 'partially_paid')
+# Invoice created, no coins yet — safe to abandon if the user switches to BCH.
+SWITCHABLE_NOWPAYMENTS_STATUSES = ('waiting',)
+# Coins are already moving; do not start a second checkout method.
+IN_FLIGHT_NOWPAYMENTS_STATUSES = ('confirming', 'confirmed', 'sending', 'partially_paid')
 # Backwards-compatible alias
 REGISTRATION_PAID_STATUS = FULFILLMENT_STATUS
 
@@ -312,6 +316,31 @@ def _reuse_or_refresh_open_payment(queryset):
     return None
 
 
+def nowpayments_queryset(*, anchor_request=None, path_purchase=None):
+    if anchor_request is not None:
+        return CryptoPayment.objects.filter(anchor_request=anchor_request)
+    if path_purchase is not None:
+        return CryptoPayment.objects.filter(path_purchase=path_purchase)
+    return CryptoPayment.objects.none()
+
+
+def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None) -> bool:
+    return nowpayments_queryset(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+    ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
+
+
+def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None) -> int:
+    """Mark unused hosted invoices expired so the user can switch to BCH."""
+    return nowpayments_queryset(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+    ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
+        payment_status='expired',
+    )
+
+
 def create_event_registration_payment(*, event_registration: EventRegistration, user, pay_currency=None) -> CryptoPayment:
     if event_registration.user_id != user.id:
         raise PermissionError('Solo el participante puede iniciar el pago.')
@@ -488,18 +517,6 @@ def create_anchor_request_payment(
         TranscriptAnchorRequest.STATUS_REJECTED,
     ):
         raise ValueError('Esta solicitud ya fue resuelta.')
-
-    from django.utils import timezone
-    from payments.models import BchDirectPayment
-
-    if BchDirectPayment.objects.filter(
-        anchor_request=anchor_request,
-        status=BchDirectPayment.STATUS_PENDING,
-        expires_at__gt=timezone.now(),
-    ).exists():
-        raise ValueError(
-            'Ya hay un pago BCH directo en curso. Complételo o espere a que expire.'
-        )
 
     client = NOWPaymentsClient()
     if not client.configured:

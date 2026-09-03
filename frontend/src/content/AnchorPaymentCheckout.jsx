@@ -196,10 +196,8 @@ const AnchorPaymentCheckout = ({
 
       <CryptoPaymentModal
         open={showNowpayments}
-        onClose={() => {
-          setMethod(null);
-          onClose();
-        }}
+        onClose={onClose}
+        onBackToMethods={() => setMethod(null)}
         anchorRequestId={anchorRequestId}
         title={title}
         priceUsd={priceUsd}

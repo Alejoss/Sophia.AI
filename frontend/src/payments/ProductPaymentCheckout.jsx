@@ -205,10 +205,8 @@ const ProductPaymentCheckout = ({
 
       <CryptoPaymentModal
         open={showNowpayments}
-        onClose={() => {
-          setMethod(null);
-          onClose();
-        }}
+        onClose={onClose}
+        onBackToMethods={() => setMethod(null)}
         title={title}
         priceUsd={priceUsd}
         productLabel={productLabel}
@@ -328,6 +326,18 @@ const ProductPaymentCheckout = ({
           <Button onClick={onClose} fullWidth>
             {paid ? 'Listo' : 'Cerrar'}
           </Button>
+          {!paid && (
+            <Button
+              size="small"
+              onClick={() => {
+                setMethod(null);
+                setBchOrder(null);
+                setBchError(null);
+              }}
+            >
+              Volver a métodos de pago
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </>

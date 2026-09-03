@@ -22,9 +22,10 @@ from payments.bch_client import (
     get_bch_receive_address,
     is_bch_direct_configured,
 )
-from payments.models import BchDirectPayment, CryptoPayment
+from payments.models import BchDirectPayment
 from payments.services import (
-    OPEN_PAYMENT_STATUSES,
+    abandon_waiting_nowpayments,
+    has_in_flight_nowpayments,
     mark_anchor_request_paid,
     mark_path_purchase_paid,
     mark_topic_purchase_paid,
@@ -87,14 +88,13 @@ def _target_filter(
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _has_open_nowpayments(*, anchor_request=None, path_purchase=None) -> bool:
-    if anchor_request is not None:
-        qs = CryptoPayment.objects.filter(anchor_request=anchor_request)
-    elif path_purchase is not None:
-        qs = CryptoPayment.objects.filter(path_purchase=path_purchase)
-    else:
-        return False
-    return qs.filter(payment_status__in=OPEN_PAYMENT_STATUSES).exists()
+def _release_waiting_nowpayments(*, anchor_request=None, path_purchase=None) -> None:
+    """Allow switching from an unused NOWPayments invoice to BCH."""
+    if has_in_flight_nowpayments(anchor_request=anchor_request, path_purchase=path_purchase):
+        raise BchPaymentError(
+            'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+        )
+    abandon_waiting_nowpayments(anchor_request=anchor_request, path_purchase=path_purchase)
 
 
 def _expire_stale_pending() -> None:
@@ -131,10 +131,7 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise PermissionError('Solo quien solicitó el anclaje puede iniciar el pago BCH.')
         if anchor_request.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
             raise BchPaymentError('Esta solicitud no admite un nuevo pago BCH.')
-        if _has_open_nowpayments(anchor_request=anchor_request):
-            raise BchPaymentError(
-                'Ya hay un pago NOWPayments en curso. Complételo o espere a que expire.'
-            )
+        _release_waiting_nowpayments(anchor_request=anchor_request)
         return
 
     if path_purchase is not None:
@@ -147,10 +144,7 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Este camino de conocimiento es gratuito.')
         if not path.bch_direct_enabled:
             raise BchPaymentError('El pago BCH no está activado para este camino.')
-        if _has_open_nowpayments(path_purchase=path_purchase):
-            raise BchPaymentError(
-                'Ya hay un pago NOWPayments en curso. Complételo o espere a que expire.'
-            )
+        _release_waiting_nowpayments(path_purchase=path_purchase)
         return
 
     if topic_purchase is not None:
