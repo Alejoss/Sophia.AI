@@ -12,7 +12,8 @@ Cubre tres productos cuando el staff los activa en el dashboard
 - Consultas de un tema con `reference_price > 0` y `bch_direct_enabled`
 
 Eventos siguen en NOWPayments. Un camino de pago también puede seguir cobrando
-por NOWPayments; no puede haber ambos métodos **pendientes** a la vez.
+por NOWPayments. El usuario puede cambiar de método mientras el invoice
+NOWPayments sigue en `waiting` (aún no hay fondos en camino).
 
 Índice de pagos: [README.md](README.md).
 
@@ -63,7 +64,8 @@ sequenceDiagram
 ```
 
 1. Usuario crea solicitud de anclaje (`pending_payment`).
-2. Elige método: NOWPayments **o** BCH directo (no ambos pendientes a la vez).
+2. Elige método: NOWPayments o BCH directo. Puede volver atrás y cambiar
+   mientras el invoice NOWPayments esté en `waiting`.
 3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats, desambiguación +1 sat).
 4. Usuario paga el monto **exacto** a la dirección de la red activa.
 5. `POST .../bch/verify/` consulta Blockchair o Fulcrum; si hay match → orden `paid` + solicitud `paid_pending_review`.
@@ -98,7 +100,11 @@ Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
 - Filas `pending` con `expires_at` vencido pasan a `expired` (lazy, al crear/verificar).
 - Otras `pending` viejas de la misma solicitud se marcan `cancelled` al crear una nueva.
 - TTL: `max(5, BCH_PAYMENT_TTL_MINUTES)` minutos (default 30).
-- Si hay un `CryptoPayment` NOWPayments en estado abierto, no se puede crear BCH (y al revés: un BCH `pending` no expirado bloquea NOWPayments).
+- Cambiar a BCH **abandona** invoices NOWPayments en `waiting` (marcados `expired`).
+  Si el NOWPayments ya está en confirmación (`confirming` / `confirmed` / `sending` /
+  `partially_paid`), BCH se bloquea hasta que ese pago termine o expire.
+- Un BCH `pending` no bloquea abrir NOWPayments; el primer método que cumpla
+  desbloquea el entitlement.
 
 Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 
@@ -180,7 +186,7 @@ verificar**, no crear la orden.
 |------|--------|
 | 403 | No es el requester (POST crear) o no es requester/staff (GET/verify) |
 | 404 | Solicitud inexistente |
-| 400 | BCH no configurado; solicitud no `pending_payment`; NOWPayments abierto; orden expirada; sin match on-chain; tasa/monto inválido |
+| 400 | BCH no configurado; solicitud no `pending_payment`; NOWPayments en confirmación; orden expirada; sin match on-chain; tasa/monto inválido |
 | 500 | Error inesperado al crear o verificar |
 
 ## Código

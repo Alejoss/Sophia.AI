@@ -45,7 +45,7 @@ FRONTEND_PUBLIC_URL=http://localhost:5173
 
 No hay FK directa a `Event` ni a `KnowledgePath`. El producto tiene `reference_price`; el entitlement guarda el estado `PENDING`/`PAID` y el snapshot del precio.
 
-Para anclajes, NOWPayments y [BCH directo](bch-direct.md) son mutuamente excluyentes mientras haya un pago **pendiente**.
+Para anclajes y caminos, el usuario puede cambiar de NOWPayments a [BCH directo](bch-direct.md) mientras el invoice sigue en `waiting`. Un pago NOWPayments ya en confirmación bloquea BCH hasta que termine o expire.
 
 ## Flujo (según [API NOWPayments](https://documenter.getpostman.com/view/7907941/2s93JusNJt))
 
