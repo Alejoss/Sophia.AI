@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MainSearch from '../MainSearch';
-import { renderWithProviders } from '../../test/formTestUtils';
+import { renderWithProviders, unauthenticatedAuth } from '../../test/formTestUtils';
 
 const mockSearch = vi.fn();
 const mockGetPublicCollections = vi.fn();
@@ -143,5 +143,39 @@ describe('MainSearch form', () => {
       page_size: 20,
       seed: expect.any(String),
     });
+  });
+
+  it('loads public collections and featured books without requiring login', async () => {
+    mockGetPublicCollections.mockResolvedValue({
+      results: [
+        {
+          id: 3,
+          name: 'Biblioteca Abierta',
+          description: 'Libros para todos',
+          owner_username: 'alice',
+          visible_item_count: 4,
+        },
+      ],
+    });
+    mockGetFeaturedTextThumbnails.mockResolvedValue({
+      results: [
+        {
+          id: 7,
+          content_id: 54,
+          title: 'El Secuestro de Bitcoin',
+          thumbnail_preview: 'https://cdn.example.com/cover.webp',
+          thumbnail: 'https://cdn.example.com/cover.jpg',
+          media_type: 'TEXT',
+        },
+      ],
+    });
+
+    renderWithProviders(<MainSearch />, { auth: unauthenticatedAuth() });
+
+    expect(await screen.findByText(/biblioteca abierta/i)).toBeInTheDocument();
+    expect(await screen.findByText(/el secuestro de bitcoin/i)).toBeInTheDocument();
+    expect(screen.queryByText(/inicia sesión/i)).not.toBeInTheDocument();
+    expect(mockGetPublicCollections).toHaveBeenCalled();
+    expect(mockGetFeaturedTextThumbnails).toHaveBeenCalled();
   });
 });

@@ -58,6 +58,22 @@ def _content_transcript_btc_anchored(obj):
     )
 
 
+def _request_is_authenticated(context):
+    """True when the serializer context has a logged-in user."""
+    request = (context or {}).get('request')
+    user = getattr(request, 'user', None)
+    return bool(user and getattr(user, 'is_authenticated', False))
+
+
+def _content_file_url(file_field, context):
+    """Storage URL for the content file. Guests never receive a downloadable URL."""
+    if not file_field:
+        return None
+    if not _request_is_authenticated(context):
+        return None
+    return build_media_url(file_field, (context or {}).get('request'))
+
+
 def _content_profile_thumbnail_urls(profile, request):
     """Absolute URLs for full custom thumbnail and listing-sized preview."""
     thumb = build_media_url(profile.thumbnail, request) if profile.thumbnail else None
@@ -90,10 +106,8 @@ class FileDetailsSerializer(serializers.ModelSerializer):
         ]
 
     def _get_file_url(self, obj):
-        """Return absolute media URL. Build S3 URL explicitly to avoid build_absolute_uri mangling."""
-        if not obj.file:
-            return None
-        return build_media_url(obj.file, self.context.get('request'))
+        """Return absolute media URL. Guests get metadata only, not the file URL."""
+        return _content_file_url(obj.file, self.context)
 
     def get_file(self, obj):
         return self._get_file_url(obj)
@@ -969,7 +983,7 @@ class PreviewContentSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, 'file_details') and obj.file_details:
                 fd = obj.file_details
-                url = build_media_url(fd.file, self.context.get('request')) if fd.file else None
+                url = _content_file_url(fd.file, self.context)
                 return {
                     'file': url,
                     'url': url,

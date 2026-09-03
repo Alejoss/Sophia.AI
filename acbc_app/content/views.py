@@ -157,14 +157,36 @@ class ContentDetailView(APIView):
                 return ContentProfile.objects.get(content=content, user=topic.creator)
             
             elif context == 'library':
-                # Prevent profile data leaks across users in library context.
-                if (
-                    not request.user.is_authenticated
-                    or (context_id_int != request.user.id and not request.user.is_staff)
-                ):
-                    return None
                 library_owner = User.objects.get(id=context_id_int)
-                return ContentProfile.objects.get(content=content, user=library_owner)
+                profile = ContentProfile.objects.select_related('collection').get(
+                    content=content, user=library_owner
+                )
+                is_self_or_staff = (
+                    request.user.is_authenticated
+                    and (context_id_int == request.user.id or request.user.is_staff)
+                )
+                collection = profile.collection
+                is_public_item = (
+                    profile.is_visible
+                    and collection is not None
+                    and collection.is_public
+                )
+                if is_self_or_staff or is_public_item:
+                    return profile
+                return None
+
+            elif context == 'search':
+                profile = ContentProfile.objects.select_related('collection').get(
+                    pk=context_id_int,
+                    content=content,
+                )
+                if profile.is_visible:
+                    return profile
+                if request.user.is_authenticated and (
+                    profile.user_id == request.user.id or request.user.is_staff
+                ):
+                    return profile
+                return None
             
             elif context == 'publication':
                 publication = Publication.objects.get(id=context_id_int)
@@ -1294,12 +1316,13 @@ class PublicCollectionsView(APIView):
     """
     Paginated list of collections marked public by any user.
     Only includes collections with at least one visible content profile.
+    Public: guests can discover collections; file downloads stay auth-gated.
 
     Query params:
     - search: filter by collection name or description (icontains)
     - owner: user id of the library owner (only their public collections with visible items)
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         qs = (
@@ -1376,9 +1399,9 @@ class FeaturedTextWithThumbnailsView(APIView):
 
     Order is a deterministic shuffle from `seed` (stable across pages for the
     same visit). Without seed, falls back to the calendar day so order rotates
-    daily.
+    daily. Public: covers and titles are visible without login.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @staticmethod
     def _shuffle_seed(raw_seed):
@@ -1618,15 +1641,23 @@ class AdminFeaturedBooksReorderView(APIView):
 
 
 class CollectionDetailView(APIView):
-    """Get or update a specific collection"""
+    """Get or update a specific collection. GET of public collections is unauthenticated."""
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get(self, request, collection_id):
         collection = get_object_or_404(
             Collection.objects.select_related('library__user'),
             id=collection_id,
         )
-        is_owner = collection.library.user_id == request.user.id
+        is_owner = (
+            request.user.is_authenticated
+            and collection.library.user_id == request.user.id
+        )
         if not is_owner and not collection.is_public:
             return Response(
                 {'error': 'Colección no encontrada'},
@@ -1668,15 +1699,23 @@ class CollectionDetailView(APIView):
 
 
 class CollectionContentView(APIView):
-    """Paginated content profiles for a specific collection."""
+    """Paginated content profiles for a specific collection. GET of public items is unauthenticated."""
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
 
     def get(self, request, collection_id):
         collection = get_object_or_404(
             Collection.objects.select_related('library__user'),
             id=collection_id,
         )
-        is_owner = collection.library.user_id == request.user.id
+        is_owner = (
+            request.user.is_authenticated
+            and collection.library.user_id == request.user.id
+        )
         if not is_owner and not collection.is_public:
             return Response(
                 {'error': 'Colección no encontrada'},
@@ -3202,7 +3241,7 @@ class PublicationDetailView(APIView):
 
 
 class ContentReferencesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, pk):
         try:
