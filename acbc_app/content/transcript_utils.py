@@ -194,6 +194,13 @@ def resolve_hash_source_text(transcript):
     return extract_obsidian_body(transcript.obsidian_markdown)
 
 
+def _bind_embedding_on_content(content, embedding):
+    """Keep content.embedding from returning a stale in-memory reverse OneToOne."""
+    cache = getattr(content._state, 'fields_cache', None)
+    if isinstance(cache, dict):
+        cache['embedding'] = embedding
+
+
 def sync_embedding_status_for_text_hash(transcript):
     """
     Keep ContentEmbedding.status aligned with transcript.text_hash vs source_hash.
@@ -209,6 +216,7 @@ def sync_embedding_status_for_text_hash(transcript):
     )
     status = (embedding.status or '').strip() or ContentEmbedding.STATUS_PENDING
     if status == ContentEmbedding.STATUS_SKIPPED:
+        _bind_embedding_on_content(transcript.content, embedding)
         return
 
     current_hash = (transcript.text_hash or '').strip()
@@ -218,6 +226,7 @@ def sync_embedding_status_for_text_hash(transcript):
         new_status = ContentEmbedding.STATUS_PENDING
     elif embedded_hash and embedded_hash == current_hash:
         # Corpus unchanged since last successful index (or same hash after failed retry).
+        _bind_embedding_on_content(transcript.content, embedding)
         return
     elif embedded_hash and embedded_hash != current_hash:
         new_status = ContentEmbedding.STATUS_STALE
@@ -227,6 +236,7 @@ def sync_embedding_status_for_text_hash(transcript):
     if embedding.status != new_status:
         embedding.status = new_status
         embedding.save(update_fields=['status', 'updated_at'])
+    _bind_embedding_on_content(transcript.content, embedding)
 
 
 def sync_transcript_derived_fields(transcript):

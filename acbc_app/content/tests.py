@@ -4790,6 +4790,7 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         transcript.save()
 
         embedding = self.content.embedding
+        embedding.refresh_from_db()
         self.assertEqual(embedding.status, 'stale')
         self.assertNotEqual(transcript.text_hash, embedding.source_hash)
         self.assertEqual(embedding.model, 'text-embedding-3-large')
