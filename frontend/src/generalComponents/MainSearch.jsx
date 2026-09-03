@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -18,12 +18,10 @@ import {
   CircularProgress,
   Alert,
   Stack,
-  Link as MuiLink,
   Paper,
 } from '@mui/material';
 import generalApi from '../api/generalApi';
 import contentApi from '../api/contentApi';
-import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from '../content/ContentDisplay';
 
 import TopicIcon from '@mui/icons-material/Label';
@@ -62,8 +60,6 @@ const MainSearch = () => {
   const FEATURED_PAGE_SIZE = 20;
   const featuredSeedRef = useRef(String(Math.floor(Math.random() * 2_147_483_647)));
   const navigate = useNavigate();
-  const { authState } = useContext(AuthContext);
-  const isAuthenticated = authState.isAuthenticated;
 
   const loadFeaturedTexts = async (page = 1, { cancelled } = {}) => {
     setFeaturedLoading(true);
@@ -104,17 +100,6 @@ const MainSearch = () => {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setPublicCollections([]);
-      setPublicLoading(false);
-      setPublicError(null);
-      setFeaturedTexts([]);
-      setFeaturedLoading(false);
-      setFeaturedError(null);
-      setFeaturedPage(1);
-      setFeaturedTotalPages(1);
-      return;
-    }
     let cancelled = false;
     const isCancelled = () => cancelled;
     const loadDiscovery = async () => {
@@ -149,7 +134,7 @@ const MainSearch = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, []);
 
   const runSearch = async (query, searchType, page = 1) => {
     setIsLoading(true);
@@ -320,30 +305,22 @@ const MainSearch = () => {
         <Typography variant="body2" color="text.secondary">
           Colecciones públicas de la comunidad
         </Typography>
-        {!isAuthenticated && (
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            <MuiLink component={Link} to="/profiles/login" underline="hover">
-              Inicia sesión
-            </MuiLink>{' '}
-            para ver colecciones públicas.
-          </Typography>
-        )}
-        {isAuthenticated && publicLoading && (
+        {publicLoading && (
           <Typography variant="body2" sx={{ mt: 1 }}>
             Cargando colecciones…
           </Typography>
         )}
-        {isAuthenticated && publicError && !publicLoading && (
+        {publicError && !publicLoading && (
           <Alert severity="error" sx={{ mt: 1 }}>
             {publicError}
           </Alert>
         )}
-        {isAuthenticated && !publicLoading && !publicError && publicCollections.length === 0 && (
+        {!publicLoading && !publicError && publicCollections.length === 0 && (
           <Typography variant="body2" sx={{ mt: 1 }}>
             Aún no hay colecciones públicas con contenido visible.
           </Typography>
         )}
-        {isAuthenticated && !publicLoading && publicCollections.length > 0 && (
+        {!publicLoading && publicCollections.length > 0 && (
           <Box
             sx={{
               mt: 1.5,
@@ -405,30 +382,22 @@ const MainSearch = () => {
           <Typography id="search-featured-books-heading" variant="h6">
             Algunos de los libros disponibles son:
           </Typography>
-          {!isAuthenticated && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              <MuiLink component={Link} to="/profiles/login" underline="hover">
-                Inicia sesión
-              </MuiLink>{' '}
-              para verlos.
-            </Typography>
-          )}
-          {isAuthenticated && featuredLoading && (
+          {featuredLoading && (
             <Typography variant="body2" sx={{ mt: 1 }}>
               Cargando libros…
             </Typography>
           )}
-          {isAuthenticated && featuredError && !featuredLoading && (
+          {featuredError && !featuredLoading && (
             <Alert severity="error" sx={{ mt: 1 }}>
               {featuredError}
             </Alert>
           )}
-          {isAuthenticated && !featuredLoading && !featuredError && featuredTexts.length === 0 && (
+          {!featuredLoading && !featuredError && featuredTexts.length === 0 && (
             <Typography variant="body2" sx={{ mt: 1 }}>
               Pronto habrá libros destacados para explorar aquí.
             </Typography>
           )}
-          {isAuthenticated && !featuredLoading && featuredTexts.length > 0 && (
+          {!featuredLoading && featuredTexts.length > 0 && (
             <>
               <Box
                 sx={{

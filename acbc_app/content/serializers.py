@@ -20,10 +20,12 @@ from content.models import (
     ContentSuggestion,
     FileSuggestion,
     ContentTranscript,
+    ContentEmbedding,
     TopicCreationRequest,
     TranscriptAnchor,
     TranscriptAnchorRequest,
     TopicChatQuery,
+    TopicPurchase,
 )
 from content.utils import build_media_url
 from content.image_utils import (
@@ -54,6 +56,22 @@ def _content_transcript_btc_anchored(obj):
         .exclude(btc_txid='')
         .exists()
     )
+
+
+def _request_is_authenticated(context):
+    """True when the serializer context has a logged-in user."""
+    request = (context or {}).get('request')
+    user = getattr(request, 'user', None)
+    return bool(user and getattr(user, 'is_authenticated', False))
+
+
+def _content_file_url(file_field, context):
+    """Storage URL for the content file. Guests never receive a downloadable URL."""
+    if not file_field:
+        return None
+    if not _request_is_authenticated(context):
+        return None
+    return build_media_url(file_field, (context or {}).get('request'))
 
 
 def _content_profile_thumbnail_urls(profile, request):
@@ -88,10 +106,8 @@ class FileDetailsSerializer(serializers.ModelSerializer):
         ]
 
     def _get_file_url(self, obj):
-        """Return absolute media URL. Build S3 URL explicitly to avoid build_absolute_uri mangling."""
-        if not obj.file:
-            return None
-        return build_media_url(obj.file, self.context.get('request'))
+        """Return absolute media URL. Guests get metadata only, not the file URL."""
+        return _content_file_url(obj.file, self.context)
 
     def get_file(self, obj):
         return self._get_file_url(obj)
@@ -421,15 +437,25 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image_thumbnail = serializers.ImageField(read_only=True, required=False)
     indexed_transcript_count = serializers.SerializerMethodField()
     chat_can_enable = serializers.SerializerMethodField()
+    is_paid_topic = serializers.BooleanField(read_only=True)
+    bch_direct_available = serializers.SerializerMethodField()
+    user_has_consultas_access = serializers.SerializerMethodField()
+    user_purchase_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
         fields = [
             'id', 'title', 'description', 'creator', 'creator_username', 'is_public',
             'chat_enabled', 'indexed_transcript_count', 'chat_can_enable',
+            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
             'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y',
         ]
-        read_only_fields = ['creator', 'indexed_transcript_count', 'chat_can_enable']
+        read_only_fields = [
+            'creator', 'indexed_transcript_count', 'chat_can_enable',
+            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
+        ]
 
     def get_indexed_transcript_count(self, obj):
         annotated = getattr(obj, '_indexed_transcript_count', None)
@@ -440,14 +466,32 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     def get_chat_can_enable(self, obj):
         return obj.has_indexed_transcripts()
 
+    def get_bch_direct_available(self, obj):
+        from payments.bch_client import is_bch_direct_configured
+        return bool(is_bch_direct_configured() and obj.bch_direct_enabled and obj.is_paid_topic)
+
+    def get_user_has_consultas_access(self, obj):
+        from content.topic_access import user_has_topic_consultas_access
+        request = self.context.get('request')
+        user = request.user if request else None
+        return user_has_topic_consultas_access(user, obj)
+
+    def get_user_purchase_id(self, obj):
+        from content.topic_access import get_user_topic_purchase
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_authenticated', False):
+            return None
+        purchase = get_user_topic_purchase(request.user, obj)
+        return purchase.id if purchase else None
+
     def validate_chat_enabled(self, value):
         if value is True:
             topic = self.instance
             if topic is None or not topic.has_indexed_transcripts():
                 raise serializers.ValidationError(
                     'No se pueden activar las consultas: este tema aún no tiene '
-                    'transcripciones indexadas (embeddings). '
-                    'Transcribe e indexa al menos un video/audio del tema primero.'
+                    'contenidos indexados (embeddings). '
+                    'Transcribe e indexa al menos un contenido del tema primero.'
                 )
         return value
 
@@ -939,7 +983,7 @@ class PreviewContentSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, 'file_details') and obj.file_details:
                 fd = obj.file_details
-                url = build_media_url(fd.file, self.context.get('request')) if fd.file else None
+                url = _content_file_url(fd.file, self.context)
                 return {
                     'file': url,
                     'url': url,
@@ -1498,12 +1542,6 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
             'has_processed_plain',
             'has_obsidian_markdown',
             'obsidian_frontmatter',
-            'embedding_status',
-            'embedding_model',
-            'embedding_dims',
-            'chunk_count',
-            'embedded_text_hash',
-            'embedded_at',
             'created_at',
             'updated_at',
         ]
@@ -1594,7 +1632,7 @@ class ContentEmbeddingTopicRefSerializer(serializers.ModelSerializer):
 
 
 class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
-    """Manifest row for an external embed worker (needs existing transcript)."""
+    """Manifest row for an external embed worker."""
 
     topics = ContentEmbeddingTopicRefSerializer(many=True, read_only=True)
     text_hash = serializers.SerializerMethodField()
@@ -1629,6 +1667,12 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         except ContentTranscript.DoesNotExist:
             return None
 
+    def _embedding(self, obj):
+        try:
+            return obj.embedding
+        except ContentEmbedding.DoesNotExist:
+            return None
+
     def get_text_hash(self, obj):
         transcript = self._transcript(obj)
         return transcript.text_hash if transcript else None
@@ -1642,28 +1686,28 @@ class ContentEmbeddingQueueItemSerializer(ContentTranscriptQueueItemSerializer):
         return (transcript.language or '') if transcript else ''
 
     def get_embedding_status(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedding_status if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.status if embedding else None
 
     def get_embedding_model(self, obj):
-        transcript = self._transcript(obj)
-        return (transcript.embedding_model or '') if transcript else ''
+        embedding = self._embedding(obj)
+        return (embedding.model or '') if embedding else ''
 
     def get_embedding_dims(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedding_dims if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.dims if embedding else None
 
     def get_chunk_count(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.chunk_count if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.chunk_count if embedding else None
 
     def get_embedded_text_hash(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedded_text_hash if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.source_hash if embedding else None
 
     def get_embedded_at(self, obj):
-        transcript = self._transcript(obj)
-        return transcript.embedded_at if transcript else None
+        embedding = self._embedding(obj)
+        return embedding.embedded_at if embedding else None
 
     def get_topic_ids(self, obj):
         if hasattr(obj, '_prefetched_objects_cache') and 'topics' in obj._prefetched_objects_cache:
@@ -1698,7 +1742,7 @@ class ContentEmbeddingIngestDetailSerializer(ContentTranscriptIngestSummarySeria
 
 
 class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
-    """Topic with VIDEO/AUDIO transcripts matching the embedding status filter."""
+    """Topic with contents matching the embedding status filter."""
 
     matching_count = serializers.IntegerField(read_only=True)
     status_counts = serializers.SerializerMethodField()
@@ -1728,12 +1772,45 @@ class TopicChatRequestSerializer(serializers.Serializer):
     """Body for POST /api/content/topics/{id}/chat/ (one independent consultation)."""
 
     message = serializers.CharField(min_length=1, max_length=4000)
+    content_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+        max_length=100,
+        help_text=(
+            'Optional. Restrict retrieval to these topic content IDs '
+            '(must be indexed contenidos in the topic). '
+            'Omit to use all indexed contents in the topic.'
+        ),
+    )
 
     def validate_message(self, value):
         cleaned = (value or '').strip()
         if not cleaned:
             raise serializers.ValidationError('El mensaje no puede estar vacío.')
         return cleaned
+
+    def validate_content_ids(self, value):
+        # Deduplicate while preserving order.
+        seen = set()
+        ordered = []
+        for cid in value:
+            if cid in seen:
+                continue
+            seen.add(cid)
+            ordered.append(cid)
+        return ordered
+
+
+class TopicChatSourceSerializer(serializers.Serializer):
+    """One indexed content available for Consultas selection."""
+
+    content_id = serializers.IntegerField()
+    title = serializers.CharField()
+    media_type = serializers.CharField()
+    original_author = serializers.CharField(allow_blank=True)
+    chunk_count = serializers.IntegerField(allow_null=True)
+    embedded_at = serializers.DateTimeField(allow_null=True)
 
 
 class TopicChatQueryListSerializer(serializers.ModelSerializer):
@@ -1745,6 +1822,7 @@ class TopicChatQueryListSerializer(serializers.ModelSerializer):
             'id',
             'topic_id',
             'question_preview',
+            'selected_content_ids',
             'created_at',
         ]
 
@@ -1766,6 +1844,7 @@ class TopicChatQuerySerializer(serializers.ModelSerializer):
             'sources',
             'retrieved_chunk_count',
             'used_chunk_count',
+            'selected_content_ids',
             'created_at',
         ]
         read_only_fields = fields
@@ -1776,17 +1855,24 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(
         choices=[
-            ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            ContentTranscript.EMBEDDING_STATUS_FAILED,
-            ContentTranscript.EMBEDDING_STATUS_SKIPPED,
+            ContentEmbedding.EMBEDDING_STATUS_INDEXED,
+            ContentEmbedding.EMBEDDING_STATUS_FAILED,
+            ContentEmbedding.EMBEDDING_STATUS_SKIPPED,
         ]
     )
     embedded_text_hash = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=64,
-        help_text='Must match current transcript.text_hash when status=indexed. '
-                  'Omit to use the current hash.',
+        help_text='For A/V indexed ack: must match current transcript.text_hash '
+                  '(omit to use the current hash). For TEXT indexed ack: same as source_hash.',
+    )
+    source_hash = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=64,
+        help_text='Hash of the indexed source (alias: embedded_text_hash). '
+                  'Required for TEXT when status=indexed.',
     )
     embedding_model = serializers.CharField(required=False, allow_blank=True, max_length=64)
     embedding_dims = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -1795,7 +1881,7 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
     embedding_error = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
-        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_INDEXED:
+        if attrs.get('status') == ContentEmbedding.EMBEDDING_STATUS_INDEXED:
             if attrs.get('embedding_dims') is None:
                 raise serializers.ValidationError({
                     'embedding_dims': 'Requerido cuando status=indexed.',
@@ -1808,7 +1894,7 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
                 raise serializers.ValidationError({
                     'embedding_model': 'Requerido cuando status=indexed.',
                 })
-        if attrs.get('status') == ContentTranscript.EMBEDDING_STATUS_FAILED:
+        if attrs.get('status') == ContentEmbedding.EMBEDDING_STATUS_FAILED:
             if not (attrs.get('embedding_error') or '').strip():
                 raise serializers.ValidationError({
                     'embedding_error': 'Requerido cuando status=failed.',
@@ -1952,4 +2038,24 @@ class TranscriptAnchorRequestSerializer(serializers.ModelSerializer):
 
     def get_content_title(self, obj):
         return getattr(obj.content, 'original_title', None) or f'Contenido {obj.content_id}'
+
+
+class TopicPurchaseSerializer(serializers.ModelSerializer):
+    topic_id = serializers.IntegerField(source='topic.id', read_only=True)
+    topic_title = serializers.CharField(source='topic.title', read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = TopicPurchase
+        fields = [
+            'id',
+            'topic_id',
+            'topic_title',
+            'payment_status',
+            'price_amount',
+            'is_paid',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
 

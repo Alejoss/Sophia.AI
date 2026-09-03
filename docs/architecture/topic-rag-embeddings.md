@@ -37,18 +37,18 @@ query time; citations use chunk `text` stored in Qdrant payloads (see
 
 ---
 
-## ContentTranscript embedding fields
+## ContentEmbedding (not ContentTranscript)
 
-| Field | Purpose |
-|-------|---------|
-| `text_hash` | SHA-256 of normalized transcript text (source of truth for staleness) |
-| `embedding_status` | `pending` \| `indexed` \| `stale` \| `failed` \| `skipped` |
-| `embedded_text_hash` | `text_hash` that was last successfully indexed |
-| `embedding_model` | Model used on last successful index (e.g. `text-embedding-3-large`) |
-| `embedding_dims` | Vector size (must match Qdrant collection, default **3072**) |
-| `chunk_count` | Chunks upserted on last successful index |
-| `embedded_at` | Timestamp of last successful ack |
-| `embedding_error` | Last failure message when `status=failed` |
+Django stores **embedding bookkeeping** on `ContentEmbedding` (1:1 with
+`Content`): `status`, `source_hash`, `model`, `dims`, `chunk_count`,
+`embedded_at`, `error`. Vectors stay in Qdrant only.
+
+`ContentTranscript` holds A/V transcript text only. TEXT/PDF files are indexed
+**without** a transcript row — the embed worker hashes/chunks the file and acks
+`ContentEmbedding` directly.
+
+For A/V, staleness compares `ContentTranscript.text_hash` →
+`ContentEmbedding.source_hash` on transcript save.
 
 ### Status lifecycle
 
@@ -83,7 +83,9 @@ status, indexed-embedding count, and a switch to turn it on once Qdrant has
 vectors for that topic.
 
 Each chat POST is an **independent** consultation (`TopicChatQuery`). Previous
-answers are not sent to the LLM. See [topic-rag-chat.md](../operations/topic-rag-chat.md).
+answers are not sent to the LLM. The client may pass optional `content_ids` to
+restrict retrieval to a subset of indexed transcripts for that consultation.
+See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 ---
 

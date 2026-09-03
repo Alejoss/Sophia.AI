@@ -24,6 +24,12 @@ Complete API reference and usage guides:
 - [Examples](api/examples.md) - API usage examples
 - [Errors](api/errors.md) - Error codes and handling
 
+### [Payments](payments/)
+Crypto checkout (NOWPayments + self-custody Bitcoin Cash):
+- [Payments index](payments/README.md) - Which product uses which path
+- [NOWPayments setup](payments/nowpayments-setup.md) - Hosted BCH/XMR for events, paths, and anchor requests
+- [BCH directo](payments/bch-direct.md) - Self-custody exact-amount BCH for transcript-anchor requests
+
 ### [Deployment](deployment/)
 Deployment guides for different environments:
 - [Deployment Index](deployment/README.md) - Deployment guide overview

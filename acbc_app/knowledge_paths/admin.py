@@ -8,6 +8,7 @@ class KnowledgePathAdmin(admin.ModelAdmin):
         'title',
         'author',
         'reference_price',
+        'bch_direct_enabled',
         'is_visible',
         'certificates_enabled',
         'created_at',
@@ -15,7 +16,8 @@ class KnowledgePathAdmin(admin.ModelAdmin):
         'vote_count',
     )
     search_fields = ('title', 'description', 'author__username')
-    list_filter = ('is_visible', 'certificates_enabled', 'created_at', 'updated_at')
+    list_filter = ('is_visible', 'certificates_enabled', 'bch_direct_enabled', 'created_at', 'updated_at')
+    list_editable = ('bch_direct_enabled',)
     readonly_fields = ('vote_count',)
 
     def vote_count(self, obj):

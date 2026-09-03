@@ -11,6 +11,7 @@ from content.models import (
     Content,
     ContentProfile,
     ContentTranscript,
+    ContentEmbedding,
     Library,
     Collection,
     Publication,
@@ -517,8 +518,11 @@ class Command(BaseCommand):
                 ),
                 'language': language,
                 'format': 'SRT',
-                'embedding_status': ContentTranscript.EMBEDDING_STATUS_SKIPPED,
             },
+        )
+        ContentEmbedding.objects.get_or_create(
+            content=content,
+            defaults={'status': ContentEmbedding.STATUS_SKIPPED},
         )
         if not created:
             transcript.parsed_plain = processed_plain

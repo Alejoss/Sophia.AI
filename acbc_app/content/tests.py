@@ -12,7 +12,7 @@ from content.models import (
     TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
-    TopicCreationRequest, TopicChatQuery, TranscriptAnchor,
+    TopicCreationRequest, TopicChatQuery, TranscriptAnchor, ContentEmbedding,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -581,6 +581,93 @@ class ContentAPITests(APITestCase):
         # Should not return the requested other user's profile.
         self.assertNotEqual(response.data['selected_profile'].get('id'), other_profile.id)
 
+    def test_library_context_allows_visible_profile_in_public_collection(self):
+        """Guests can load another user's profile when it is visible in a public collection."""
+        other_user = User.objects.create_user(
+            username='publiclibraryuser',
+            email='publiclibrary@example.com',
+            password='testpass123',
+        )
+        library = Library.objects.create(user=other_user, name='Public Library')
+        public_collection = Collection.objects.create(
+            library=library,
+            name='Public Shelf',
+            is_public=True,
+        )
+        public_profile = ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            collection=public_collection,
+            title='Public Collection Title',
+            is_visible=True,
+        )
+        self.client.force_authenticate(user=None)
+        detail_url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=library&id={other_user.id}'
+        )
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['selected_profile']['id'], public_profile.id)
+        self.assertEqual(
+            response.data['selected_profile']['title'],
+            'Public Collection Title',
+        )
+
+    def test_search_context_returns_visible_profile_for_anonymous(self):
+        self.client.force_authenticate(user=None)
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=search&id={self.content_profile.id}'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['selected_profile']['id'], self.content_profile.id)
+
+    def test_search_context_hides_invisible_profile_from_anonymous(self):
+        self.content_profile.is_visible = False
+        self.content_profile.save(update_fields=['is_visible'])
+        self.client.force_authenticate(user=None)
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=search&id={self.content_profile.id}'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(
+            response.data['selected_profile'].get('id'),
+            self.content_profile.id,
+        )
+
+    def test_anonymous_content_detail_omits_file_url(self):
+        """Guests can see that a file exists, but not the download URL."""
+        self.file_details.file.save(
+            'book.pdf',
+            SimpleUploadedFile('book.pdf', b'%PDF-1.4 test', content_type='application/pdf'),
+            save=True,
+        )
+        self.client.force_authenticate(user=None)
+        url = reverse('content:content-detail', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_file_available'])
+        file_details = response.data.get('file_details') or {}
+        self.assertIsNone(file_details.get('file'))
+        self.assertIsNone(file_details.get('url'))
+
+    def test_authenticated_content_detail_includes_file_url(self):
+        self.file_details.file.save(
+            'book.pdf',
+            SimpleUploadedFile('book.pdf', b'%PDF-1.4 test', content_type='application/pdf'),
+            save=True,
+        )
+        url = reverse('content:content-detail', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_file_available'])
+        file_details = response.data.get('file_details') or {}
+        self.assertTrue(file_details.get('file'))
+
     def test_upload_url_content_basic(self):
         """Test basic URL content upload with minimal data."""
         url = 'https://example.com/article'
@@ -1073,6 +1160,58 @@ class PublicCollectionsAPITests(APITestCase):
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.description, 'Una colección corta de prueba')
 
+    def test_anonymous_can_list_public_collections(self):
+        url = reverse('content:public-collections')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], self.collection.id)
+
+    def test_anonymous_gets_public_collection_detail_and_visible_content(self):
+        detail = self.client.get(
+            reverse('content:collection-detail', args=[self.collection.id])
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data['name'], 'Public Shelf')
+        self.assertFalse(detail.data['is_owner'])
+
+        content = self.client.get(
+            reverse('content:collection-content', args=[self.collection.id])
+        )
+        self.assertEqual(content.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in content.data['results']}
+        self.assertIn(self.profile_visible.id, ids)
+        self.assertNotIn(self.profile_hidden.id, ids)
+
+    def test_anonymous_collection_content_omits_file_url(self):
+        FileDetails.objects.create(
+            content=self.content,
+            file=SimpleUploadedFile(
+                'doc.pdf', b'%PDF-1.4 test', content_type='application/pdf'
+            ),
+        )
+        response = self.client.get(
+            reverse('content:collection-content', args=[self.collection.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(r for r in response.data['results'] if r['id'] == self.profile_visible.id)
+        file_details = (row.get('content') or {}).get('file_details') or {}
+        self.assertIsNone(file_details.get('file'))
+        self.assertIsNone(file_details.get('url'))
+
+    def test_anonymous_cannot_see_private_collection(self):
+        self.collection.is_public = False
+        self.collection.save(update_fields=['is_public'])
+        response = self.client.get(
+            reverse('content:collection-detail', args=[self.collection.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_cannot_patch_collection(self):
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.patch(url, {'name': 'Hacked'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
 
 class FeaturedTextWithThumbnailsAPITests(APITestCase):
     """Search landing: staff-curated featured TEXT profiles with thumbnails."""
@@ -1191,6 +1330,13 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
             thumbnail=SimpleUploadedFile('video.gif', tiny_gif, content_type='image/gif'),
         )
 
+    def test_anonymous_can_list_featured_books(self):
+        url = reverse('content:featured-text-thumbnails')
+        response = self.client.get(url, {'page': 1, 'page_size': 20})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], self.with_thumb.id)
+
     def test_returns_only_curated_eligible_featured_books(self):
         self.client.force_authenticate(user=self.viewer)
         url = reverse('content:featured-text-thumbnails')
@@ -1289,11 +1435,6 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
         # that both responses are valid full pages.
         self.assertEqual(len(other_seed.data['results']), 20)
         self.assertEqual(other_seed.data['count'], first.data['count'])
-
-    def test_requires_authentication(self):
-        url = reverse('content:featured-text-thumbnails')
-        response = self.client.get(url)
-        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
     def test_staff_can_feature_and_unfeature_eligible_book(self):
         self.client.force_authenticate(user=self.staff)
@@ -1523,12 +1664,15 @@ class TopicAPITests(APITestCase):
             processed_plain='Texto de prueba para embeddings.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            embedding_model='text-embedding-3-large',
-            embedding_dims=3072,
-            chunk_count=1,
-            embedded_text_hash=transcript.text_hash or ('a' * 64),
+        ContentEmbedding.objects.update_or_create(
+            content=video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'model': 'text-embedding-3-large',
+                'dims': 3072,
+                'chunk_count': 1,
+                'source_hash': transcript.text_hash or ('a' * 64),
+            },
         )
         url = reverse('content:topic-detail', args=[self.topic.id])
         detail = self.client.get(url)
@@ -1559,9 +1703,12 @@ class TopicAPITests(APITestCase):
             processed_plain='Texto indexado staff.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            embedded_text_hash=transcript.text_hash,
+        ContentEmbedding.objects.update_or_create(
+            content=video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+            },
         )
         self.client.force_authenticate(user=staff)
         url = reverse('content:topic-detail', args=[self.topic.id])
@@ -1796,9 +1943,12 @@ class AdminTopicsConsultationsAPITests(APITestCase):
             processed_plain='Indexado.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            embedded_text_hash=transcript.text_hash,
+        ContentEmbedding.objects.update_or_create(
+            content=video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+            },
         )
 
     def test_requires_staff(self):
@@ -3226,11 +3376,12 @@ class AuxiliaryEndpointsAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('Contenido no encontrado', response.data['error'])
 
-    def test_content_references_requires_authentication(self):
+    def test_content_references_visible_to_anonymous(self):
         self.client.force_authenticate(user=None)
         url = reverse('content:content-references', args=[self.content.id])
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('topics', response.data)
 
     def test_preview_url_requires_url_field(self):
         url = reverse('content:preview-url')
@@ -4614,7 +4765,8 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         self.assertEqual(transcript.language, 'es')
         self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
         self.assertIn('blockchain', transcript.processed_plain)
-        self.assertEqual(transcript.embedding_status, 'pending')
+        embedding = self.content.embedding
+        self.assertEqual(embedding.status, 'pending')
 
     def test_save_marks_stale_when_indexed_hash_drifts(self):
         from content.models import ContentTranscript
@@ -4624,18 +4776,24 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             processed_plain='Texto original indexado.',
             language='es',
         )
-        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
-        transcript.embedded_text_hash = transcript.text_hash
-        transcript.embedding_model = 'text-embedding-3-large'
-        transcript.chunk_count = 1
-        transcript.save()
+        ContentEmbedding.objects.update_or_create(
+            content=self.content,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+                'model': 'text-embedding-3-large',
+                'chunk_count': 1,
+            },
+        )
 
         transcript.processed_plain = 'Texto original indexado. Más contenido.'
         transcript.save()
 
-        self.assertEqual(transcript.embedding_status, 'stale')
-        self.assertNotEqual(transcript.text_hash, transcript.embedded_text_hash)
-        self.assertEqual(transcript.embedding_model, 'text-embedding-3-large')
+        embedding = self.content.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'stale')
+        self.assertNotEqual(transcript.text_hash, embedding.source_hash)
+        self.assertEqual(embedding.model, 'text-embedding-3-large')
 
     def test_save_parses_vtt_segments_when_optional_source_provided(self):
         from content.models import ContentTranscript
@@ -4868,9 +5026,9 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         transcript = ContentTranscript.objects.get(content=self.video)
         self.assertEqual(transcript.language, 'es')
         self.assertEqual(transcript.obsidian_frontmatter.get('title'), 'Demo')
-        self.assertEqual(transcript.embedding_status, 'pending')
-        self.assertIsNone(transcript.embedded_text_hash)
-        self.assertEqual(response.data['transcript']['embedding_status'], 'pending')
+        embedding = self.video.embedding
+        self.assertEqual(embedding.status, 'pending')
+        self.assertIsNone(embedding.source_hash)
 
     def test_put_marks_stale_when_indexed_text_changes(self):
         ContentTranscript.objects.create(
@@ -4880,12 +5038,16 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             language='es',
         )
         transcript = ContentTranscript.objects.get(content=self.video)
-        transcript.embedding_status = 'indexed'
-        transcript.embedded_text_hash = transcript.text_hash
-        transcript.embedding_model = 'text-embedding-3-large'
-        transcript.embedding_dims = 3072
-        transcript.chunk_count = 3
-        transcript.save()
+        ContentEmbedding.objects.update_or_create(
+            content=self.video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+                'model': 'text-embedding-3-large',
+                'dims': 3072,
+                'chunk_count': 3,
+            },
+        )
 
         updated_processed = self.PROCESSED_PLAIN + ' Cierre del episodio.'
         response = self.client.put(
@@ -4900,12 +5062,13 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         transcript.refresh_from_db()
-        self.assertEqual(transcript.embedding_status, 'stale')
-        self.assertNotEqual(transcript.text_hash, transcript.embedded_text_hash)
-        self.assertEqual(response.data['transcript']['embedding_status'], 'stale')
+        embedding = self.video.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'stale')
+        self.assertNotEqual(transcript.text_hash, embedding.source_hash)
         # Prior index metadata retained until embed worker acks again.
-        self.assertEqual(transcript.embedding_model, 'text-embedding-3-large')
-        self.assertEqual(transcript.chunk_count, 3)
+        self.assertEqual(embedding.model, 'text-embedding-3-large')
+        self.assertEqual(embedding.chunk_count, 3)
 
     def test_put_keeps_indexed_when_text_hash_unchanged(self):
         ContentTranscript.objects.create(
@@ -4914,10 +5077,14 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             language='es',
         )
         transcript = ContentTranscript.objects.get(content=self.video)
-        transcript.embedding_status = 'indexed'
-        transcript.embedded_text_hash = transcript.text_hash
-        transcript.chunk_count = 2
-        transcript.save()
+        ContentEmbedding.objects.update_or_create(
+            content=self.video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+                'chunk_count': 2,
+            },
+        )
 
         response = self.client.put(
             f'/api/content/transcript-ingest/{self.video.id}/',
@@ -4930,9 +5097,10 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         transcript.refresh_from_db()
-        self.assertEqual(transcript.embedding_status, 'indexed')
-        self.assertEqual(transcript.text_hash, transcript.embedded_text_hash)
-        self.assertEqual(response.data['transcript']['embedding_status'], 'indexed')
+        embedding = self.video.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'indexed')
+        self.assertEqual(transcript.text_hash, embedding.source_hash)
 
     def test_put_accepts_optional_source_subtitles_for_segments(self):
         response = self.client.put(
@@ -5127,13 +5295,19 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.transcript.refresh_from_db()
-        self.assertEqual(self.transcript.embedding_status, 'indexed')
-        self.assertEqual(self.transcript.embedded_text_hash, self.transcript.text_hash)
-        self.assertEqual(self.transcript.embedding_model, 'text-embedding-3-large')
-        self.assertEqual(self.transcript.embedding_dims, 3072)
-        self.assertEqual(self.transcript.chunk_count, 2)
-        self.assertIsNotNone(self.transcript.embedded_at)
+        embedding = self.video.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'indexed')
+        self.assertEqual(embedding.source_hash, self.transcript.text_hash)
+        self.assertEqual(embedding.model, 'text-embedding-3-large')
+        self.assertEqual(embedding.dims, 3072)
+        self.assertEqual(embedding.chunk_count, 2)
+        self.assertIsNotNone(embedding.embedded_at)
+        self.assertEqual(response.data['embedding']['embedding_status'], 'indexed')
+        self.assertEqual(
+            response.data['embedding']['embedded_text_hash'],
+            self.transcript.text_hash,
+        )
 
     def test_ack_indexed_rejects_hash_mismatch(self):
         response = self.client.put(
@@ -5149,8 +5323,9 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
-        self.transcript.refresh_from_db()
-        self.assertEqual(self.transcript.embedding_status, 'pending')
+        embedding = self.video.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'pending')
 
     def test_ack_failed_sets_error(self):
         response = self.client.put(
@@ -5163,9 +5338,10 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.transcript.refresh_from_db()
-        self.assertEqual(self.transcript.embedding_status, 'failed')
-        self.assertIn('timeout', self.transcript.embedding_error)
+        embedding = self.video.embedding
+        embedding.refresh_from_db()
+        self.assertEqual(embedding.status, 'failed')
+        self.assertIn('timeout', embedding.error)
 
     def test_ack_requires_transcript(self):
         other = Content.objects.create(
@@ -5259,9 +5435,12 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             processed_plain='Texto ya indexado.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=indexed_transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            embedded_text_hash=indexed_transcript.text_hash,
+        ContentEmbedding.objects.update_or_create(
+            content=indexed_video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': indexed_transcript.text_hash,
+            },
         )
         indexed_video.topics.add(indexed_only)
 
@@ -5322,9 +5501,12 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             processed_plain='Indexado.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=indexed_transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            embedded_text_hash=indexed_transcript.text_hash,
+        ContentEmbedding.objects.update_or_create(
+            content=indexed_video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': indexed_transcript.text_hash,
+            },
         )
         indexed_video.topics.add(indexed_only)
 
@@ -5362,9 +5544,12 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             processed_plain='Falló el upsert.',
             language='es',
         )
-        ContentTranscript.objects.filter(pk=failed_transcript.pk).update(
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_FAILED,
-            embedding_error='timeout',
+        ContentEmbedding.objects.update_or_create(
+            content=failed_video,
+            defaults={
+                'status': ContentEmbedding.STATUS_FAILED,
+                'error': 'timeout',
+            },
         )
         failed_video.topics.add(failed_topic)
 
@@ -5503,6 +5688,8 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(kwargs['topic_id'], self.topic.id)
         self.assertEqual(kwargs['message'], 'Que dicen del tamano?')
         self.assertIn(kwargs.get('history'), (None, []))
+        self.assertIsNone(kwargs.get('content_ids'))
+        self.assertEqual(response.data.get('selected_content_ids'), [])
 
         list_response = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/',
@@ -5527,6 +5714,141 @@ class TopicChatAPITests(APITestCase):
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
         )
         self.assertEqual(forbidden.status_code, status.HTTP_404_NOT_FOUND)
+
+    def _index_transcript(self, content, text='Texto indexado de prueba.'):
+        transcript = ContentTranscript.objects.create(
+            content=content,
+            processed_plain=text,
+            language='es',
+        )
+        ContentEmbedding.objects.update_or_create(
+            content=content,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+                'chunk_count': 2,
+            },
+        )
+        return transcript
+
+    def test_list_chat_sources_returns_indexed_only(self):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Otro video',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video, 'Video A indexado')
+        ContentTranscript.objects.create(
+            content=video_b,
+            processed_plain='Pendiente de indexar',
+            language='es',
+        )
+
+        response = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/sources/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['content_id'], self.video.id)
+        self.assertEqual(response.data['results'][0]['title'], 'Video citado')
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_chat_accepts_content_ids_filter(self, mock_run):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='AUDIO',
+            original_title='Audio citado',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video)
+        self._index_transcript(video_b)
+
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Respuesta filtrada [1].',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {
+                'message': 'Solo con el video',
+                'content_ids': [self.video.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['selected_content_ids'], [self.video.id])
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs['content_ids'], [self.video.id])
+
+    def test_chat_rejects_non_indexed_content_ids(self):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Sin indexar',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(self.video)
+        ContentTranscript.objects.create(
+            content=video_b,
+            processed_plain='Aun no',
+            language='es',
+        )
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {
+                'message': 'Hola',
+                'content_ids': [self.video.id, video_b.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(video_b.id, response.data.get('invalid_content_ids', []))
+
+    def test_chat_rejects_empty_content_ids(self):
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Hola', 'content_ids': []},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_passes_content_ids_to_qdrant(self, mock_qdrant_cls, mock_openai_cls):
+        from content.topic_chat import run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = 'Respuesta [1].'
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.8,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Fragmento sobre bloques.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='¿qué dicen de los bloques?',
+            content_ids=[self.video.id],
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        self.assertIn('Respuesta', result['answer'])
+        search_kwargs = qdrant.search.call_args.kwargs
+        self.assertEqual(search_kwargs['content_ids'], [self.video.id])
+        self.assertEqual(search_kwargs['topic_id'], self.topic.id)
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')
@@ -5636,10 +5958,14 @@ class TopicChatAPITests(APITestCase):
             ),
             language='es',
         )
-        transcript.embedded_text_hash = transcript.text_hash
-        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
-        transcript.chunk_count = 2
-        transcript.save(update_fields=['embedded_text_hash', 'embedding_status', 'chunk_count'])
+        ContentEmbedding.objects.update_or_create(
+            content=self.video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+                'chunk_count': 2,
+            },
+        )
 
         openai = mock_openai_cls.return_value
         openai.embed.return_value = [0.1] * 8
@@ -5684,9 +6010,13 @@ class TopicChatAPITests(APITestCase):
             processed_plain='Mención a Adam Back en el documental.',
             language='es',
         )
-        transcript.embedded_text_hash = transcript.text_hash
-        transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
-        transcript.save(update_fields=['embedded_text_hash', 'embedding_status'])
+        ContentEmbedding.objects.update_or_create(
+            content=self.video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': transcript.text_hash,
+            },
+        )
 
         openai = mock_openai_cls.return_value
         openai.embed.return_value = [0.1] * 8
@@ -5897,13 +6227,15 @@ class TopicChatDebugTests(TestCase):
                 'Adam Back explica el origen de Bitcoin.'
             ),
             language='es',
-            embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED,
-            chunk_count=3,
         )
-        # Keep status indexed after save hook computes text_hash.
-        self.transcript.embedded_text_hash = self.transcript.text_hash
-        self.transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
-        self.transcript.save(update_fields=['embedded_text_hash', 'embedding_status'])
+        ContentEmbedding.objects.update_or_create(
+            content=self.video,
+            defaults={
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': self.transcript.text_hash,
+                'chunk_count': 3,
+            },
+        )
 
     def test_extract_debug_keywords_prefers_explicit_and_names(self):
         from content.topic_chat_debug import extract_debug_keywords
@@ -5934,8 +6266,9 @@ class TopicChatDebugTests(TestCase):
     def test_classify_index_gap_when_only_skipped(self):
         from content.topic_chat_debug import classify_failure, postgres_keyword_matches
 
-        self.transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_SKIPPED
-        self.transcript.save(update_fields=['embedding_status'])
+        embedding = self.video.embedding
+        embedding.status = ContentEmbedding.STATUS_SKIPPED
+        embedding.save(update_fields=['status'])
         matches = postgres_keyword_matches(self.topic.id, ['Adam Back'])
         result = classify_failure(
             answer='No encontré fragmentos indexados…',

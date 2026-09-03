@@ -116,6 +116,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
     is_paid_path = serializers.BooleanField(read_only=True)
+    bch_direct_available = serializers.SerializerMethodField()
     user_has_access = serializers.SerializerMethodField()
     user_purchase_status = serializers.SerializerMethodField()
     user_purchase_id = serializers.SerializerMethodField()
@@ -127,8 +128,13 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image',
             'image_preview', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
             'certificates_enabled', 'reference_price', 'is_paid_path',
+            'bch_direct_enabled', 'bch_direct_available',
             'user_has_access', 'user_purchase_status', 'user_purchase_id',
         ]
+
+    def get_bch_direct_available(self, obj):
+        from payments.bch_client import is_bch_direct_configured
+        return bool(is_bch_direct_configured() and obj.bch_direct_enabled and obj.is_paid_path)
 
     def get_user_has_access(self, obj):
         request = self.context.get('request')

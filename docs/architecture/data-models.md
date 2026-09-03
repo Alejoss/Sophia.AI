@@ -100,7 +100,9 @@ Transcript text for VIDEO/AUDIO content, plus optional Bitcoin certification.
 
 **TranscriptAnchor** (FK to `Content`, unique on `(content, text_hash)`): snapshot of `text_hash` certified via Bitcoin `OP_RETURN` (`pending` → `btc_broadcast` → `anchored`). No EVM fields.
 
-Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md). Embeddings + topic RAG: [topic-rag-embeddings.md](topic-rag-embeddings.md).
+**TranscriptAnchorRequest** (FK to requester + `Content`): paid public request to certify the current hash (`pending_payment` → `paid_pending_review` → `approved` \| `rejected`). At most one active request per `text_hash`. Paid via NOWPayments (`CryptoPayment`) or self-custody BCH (`BchDirectPayment`).
+
+Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Payments: [payments/](../payments/README.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md). Embeddings + topic RAG: [topic-rag-embeddings.md](topic-rag-embeddings.md).
 
 **Location**: `content/models.py`
 
@@ -359,6 +361,26 @@ User-to-user messages.
 
 **Location**: `user_messages/models.py`
 
+## Payment Models
+
+### CryptoPayment
+
+NOWPayments invoice/payment linked to **exactly one** entitlement (`cryptopayment_exactly_one_target`):
+
+- `event_registration` → `EventRegistration`
+- `path_purchase` → `KnowledgePathPurchase`
+- `anchor_request` → `TranscriptAnchorRequest`
+
+**Location**: `payments/models.py`. Setup: [nowpayments-setup.md](../payments/nowpayments-setup.md).
+
+### BchDirectPayment
+
+Self-custody exact-amount Bitcoin Cash for a `TranscriptAnchorRequest`. Unique `expected_amount_sats` on a single receive address; user-triggered verification (no IPN).
+
+Statuses: `pending` → `paid` \| `expired` \| `cancelled`.
+
+**Location**: `payments/models.py`. Docs: [bch-direct.md](../payments/bch-direct.md).
+
 ## Cryptocurrency Models
 
 ### CryptoCurrency
@@ -397,6 +419,9 @@ User's accepted cryptocurrency addresses.
 | Node | N:1 KnowledgePath, 1:1 Quiz (optional) |
 | Comment | N:1 User/Content, N:1 Comment (parent) |
 | Vote | N:1 User, Generic (ContentType), N:1 Topic (optional) |
+| TranscriptAnchorRequest | N:1 User (requester), N:1 Content, optional N:1 TranscriptAnchor |
+| CryptoPayment | XOR FK to EventRegistration / KnowledgePathPurchase / TranscriptAnchorRequest |
+| BchDirectPayment | N:1 TranscriptAnchorRequest |
 
 ## Database Indexes
 

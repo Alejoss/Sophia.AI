@@ -30,7 +30,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 
-const DEFAULT_PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 24;
 
 const CollectionEditContent = () => {
   const { collectionId } = useParams();
@@ -488,7 +488,7 @@ const CollectionEditContent = () => {
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[12, 24, 48]}
+            rowsPerPageOptions={[24, 48, 96]}
             labelRowsPerPage="Por página"
             labelDisplayedRows={({ from, to, count }) =>
               `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`

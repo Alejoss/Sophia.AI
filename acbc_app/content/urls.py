@@ -103,8 +103,10 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestTopicQueueView,
     ContentEmbeddingIngestDetailView,
 )
+from .views_topic_purchase import TopicPurchaseView
 from .views_topic_chat import (
     TopicChatView,
+    TopicChatSourcesView,
     TopicChatQueryListView,
     TopicChatQueryDetailView,
 )
@@ -182,7 +184,13 @@ urlpatterns = [
         name='admin-featured-book-detail',
     ),
     path('topics/<int:pk>/', TopicDetailView.as_view(), name='topic-detail'),
+    path('topics/<int:pk>/purchase/', TopicPurchaseView.as_view(), name='topic-purchase'),
     path('topics/<int:pk>/chat/', TopicChatView.as_view(), name='topic-chat'),
+    path(
+        'topics/<int:pk>/chat/sources/',
+        TopicChatSourcesView.as_view(),
+        name='topic-chat-sources',
+    ),
     path(
         'topics/<int:pk>/chat/queries/',
         TopicChatQueryListView.as_view(),

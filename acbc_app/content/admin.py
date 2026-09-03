@@ -12,12 +12,14 @@ from content.models import (
     Content,
     ContentProfile,
     ContentTranscript,
+    ContentEmbedding,
     TranscriptAnchor,
     TranscriptAnchorRequest,
     Topic,
     Publication,
     TopicCreationRequest,
     TopicChatQuery,
+    TopicPurchase,
 )
 
 
@@ -67,27 +69,46 @@ class ContentTranscriptAdmin(admin.ModelAdmin):
         'language',
         'text_length',
         'text_hash',
-        'embedding_status',
-        'chunk_count',
         'updated_at',
     ]
-    list_filter = ['format', 'language', 'embedding_status', 'updated_at']
+    list_filter = ['format', 'language', 'updated_at']
     search_fields = [
         'content__original_title',
         'processed_plain',
         'text_hash',
-        'embedded_text_hash',
     ]
     readonly_fields = [
         'segments',
         'obsidian_frontmatter',
         'text_length',
         'text_hash',
-        'embedded_text_hash',
-        'embedded_at',
         'created_at',
         'updated_at',
     ]
+    date_hierarchy = 'updated_at'
+
+
+@admin.register(ContentEmbedding)
+class ContentEmbeddingAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'content',
+        'status',
+        'model',
+        'dims',
+        'chunk_count',
+        'source_hash',
+        'embedded_at',
+        'updated_at',
+    ]
+    list_filter = ['status', 'model', 'updated_at']
+    search_fields = [
+        'content__original_title',
+        'source_hash',
+        'model',
+        'error',
+    ]
+    readonly_fields = ['created_at', 'updated_at']
     date_hierarchy = 'updated_at'
 
 
@@ -185,16 +206,16 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'created_at', 'updated_at']
-    list_filter = ['is_public', 'chat_enabled', 'creator', 'created_at']
-    list_editable = ['chat_enabled']
+    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'reference_price', 'bch_direct_enabled', 'created_at', 'updated_at']
+    list_filter = ['is_public', 'chat_enabled', 'bch_direct_enabled', 'creator', 'created_at']
+    list_editable = ['chat_enabled', 'bch_direct_enabled']
     search_fields = ['title', 'description', 'creator__username']
     filter_horizontal = ['moderators', 'related_topics']
     raw_id_fields = ['creator']
     readonly_fields = ['topic_image_thumbnail', 'created_at', 'updated_at']
     fieldsets = (
         ('Información básica', {
-            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled'),
+            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled', 'reference_price', 'bch_direct_enabled'),
         }),
         ('Imagen de portada', {
             'fields': (
@@ -241,3 +262,9 @@ class PublicationAdmin(admin.ModelAdmin):
     readonly_fields = ['published_at', 'updated_at']
 
 
+@admin.register(TopicPurchase)
+class TopicPurchaseAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'topic', 'payment_status', 'price_amount', 'created_at')
+    list_filter = ('payment_status', 'created_at')
+    search_fields = ('user__username', 'topic__title')
+    raw_id_fields = ('user', 'topic')

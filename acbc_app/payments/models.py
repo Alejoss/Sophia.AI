@@ -126,6 +126,22 @@ class BchDirectPayment(models.Model):
         'content.TranscriptAnchorRequest',
         on_delete=models.CASCADE,
         related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
+    path_purchase = models.ForeignKey(
+        'knowledge_paths.KnowledgePathPurchase',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
+    topic_purchase = models.ForeignKey(
+        'content.TopicPurchase',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
     )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
@@ -155,6 +171,28 @@ class BchDirectPayment(models.Model):
         indexes = [
             models.Index(fields=['status', 'expires_at'], name='bch_direct_status_exp_idx'),
             models.Index(fields=['expected_amount_sats'], name='bch_direct_sats_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        anchor_request__isnull=False,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=False,
+                        topic_purchase__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=False,
+                    )
+                ),
+                name='bchdirectpayment_exactly_one_target',
+            ),
         ]
 
     def __str__(self):

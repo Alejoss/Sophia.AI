@@ -434,7 +434,7 @@ const contentApi = {
     try {
       const query = {
         page: params.page ?? 1,
-        page_size: params.page_size ?? 12,
+        page_size: params.page_size ?? 24,
       };
       const response = await axiosInstance.get(`/content/collections/${collectionId}/content/`, {
         params: query,
@@ -613,10 +613,17 @@ const contentApi = {
     }
   },
 
-  topicChat: async (topicId, { message } = {}) => {
-    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, {
-      message,
-    });
+  topicChat: async (topicId, { message, contentIds } = {}) => {
+    const body = { message };
+    if (Array.isArray(contentIds)) {
+      body.content_ids = contentIds;
+    }
+    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, body);
+    return response.data;
+  },
+
+  listTopicChatSources: async (topicId) => {
+    const response = await axiosInstance.get(`/content/topics/${topicId}/chat/sources/`);
     return response.data;
   },
 
@@ -910,6 +917,16 @@ const contentApi = {
       return response.data;
     } catch (error) {
       console.error('Error fetching content references:', error);
+      throw error;
+    }
+  },
+
+  createOrGetTopicPurchase: async (topicId) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/purchase/`, {});
+      return response.data;
+    } catch (error) {
+      console.error('Error creating topic purchase:', error);
       throw error;
     }
   },

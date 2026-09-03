@@ -65,6 +65,10 @@ class KnowledgePath(models.Model):
         null=True,
         help_text="Price in USD. 0 or null means the path is free.",
     )
+    bch_direct_enabled = models.BooleanField(
+        default=False,
+        help_text="Staff: offer self-custody Bitcoin Cash checkout for this paid path.",
+    )
 
     class Meta:
         app_label = 'knowledge_paths'

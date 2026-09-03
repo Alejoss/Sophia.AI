@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   Box,
   Typography,
@@ -17,7 +17,7 @@ import {
   Snackbar,
   Alert } from
 "@mui/material";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { resolveMediaUrl } from "../utils/fileUtils";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
@@ -40,6 +40,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import SubtitlesIcon from "@mui/icons-material/Subtitles";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import { formatFileSize } from "../utils/fileUtils";
+import { LOGIN_PATH } from "../utils/authErrorHandler";
+import { AuthContext } from "../context/AuthContext";
 import VoteComponent from "../votes/VoteComponent";
 import {
   SequentialThumbnail,
@@ -69,6 +71,12 @@ const ContentDisplay = ({
     severity: "success"
   });
   const navigate = useNavigate();
+  const location = useLocation();
+  const { authState } = useContext(AuthContext) || {};
+  const isAuthenticated = Boolean(authState?.isAuthenticated);
+  const loginHref = `${LOGIN_PATH}?next=${encodeURIComponent(
+    `${location.pathname}${location.search || ""}`
+  )}`;
 
   if (!content) {
     return null;
@@ -174,7 +182,7 @@ const ContentDisplay = ({
   const getCopyUrlTarget = () => {
     const external = contentExternalUrl && String(contentExternalUrl).trim();
     if (external) return resolveMediaUrl(external);
-    if (fileDetails?.file) {
+    if (isAuthenticated && fileDetails?.file) {
       return resolveMediaUrl(fileDetails.file);
     }
     return null;
@@ -221,7 +229,7 @@ const ContentDisplay = ({
 
   const getFileUrlFromContent = () => {
     try {
-      if (fileDetails?.file) {
+      if (isAuthenticated && fileDetails?.file) {
         return resolveMediaUrl(fileDetails.url ?? fileDetails.file);
       }
       const external = contentExternalUrl && String(contentExternalUrl).trim();
@@ -291,6 +299,30 @@ const ContentDisplay = ({
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
+  const renderLoginToAccessFile = (message) => (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 1,
+        width: "100%",
+        py: 3,
+        px: 2,
+        bgcolor: "grey.100",
+        borderRadius: 0.5,
+      }}
+    >
+      <Typography color="text.secondary" align="center">
+        {message}
+      </Typography>
+      <Button component={Link} to={loginHref} size="small" variant="outlined">
+        Inicia sesión
+      </Button>
+    </Box>
+  );
+
   const renderContentByType = () => {
     const mediaTypeUpper = contentData.media_type?.toUpperCase();
     const fileUrl = getFileUrlFromContent();
@@ -311,6 +343,9 @@ const ContentDisplay = ({
           const thumbUrl = customThumbnailForDisplay || fileUrl;
           if (!thumbUrl) {
             console.warn("No file URL found for image content:", contentData);
+            if (!isAuthenticated && hasFileAvailable) {
+              return renderLoginToAccessFile("Inicia sesión para ver esta imagen.");
+            }
             return (
               <Box
                 sx={{
@@ -424,6 +459,9 @@ const ContentDisplay = ({
               </Box>);
 
           }
+          if (!isAuthenticated && hasFileAvailable) {
+            return renderLoginToAccessFile("Inicia sesión para reproducir este video.");
+          }
           return (
             <Box
               sx={{
@@ -491,6 +529,9 @@ const ContentDisplay = ({
                 
               </Box>);
 
+          }
+          if (!isAuthenticated && hasFileAvailable) {
+            return renderLoginToAccessFile("Inicia sesión para reproducir este audio.");
           }
           return (
             <Box
@@ -690,7 +731,7 @@ const ContentDisplay = ({
                   </Typography>
                 }
 
-                {fileDetails?.file &&
+                {isAuthenticated && fileDetails?.file &&
                 <Box
                   sx={{
                     display: "flex",
@@ -711,6 +752,27 @@ const ContentDisplay = ({
                     }>
                     
                       Descargar archivo
+                    </Button>
+                  </Box>
+                }
+
+                {!isAuthenticated && hasFileAvailable &&
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 1
+                  }}>
+                  
+                    <StorageIcon fontSize="small" color="action" />
+                    <Button
+                      component={Link}
+                      to={loginHref}
+                      size="small"
+                      variant="outlined">
+                      
+                      Inicia sesión para descargar
                     </Button>
                   </Box>
                 }
@@ -997,7 +1059,7 @@ const ContentDisplay = ({
                 // Prefer canonical content URL; otherwise open stored file
                 if (contentExternalUrl && String(contentExternalUrl).trim()) {
                   window.open(resolveMediaUrl(contentExternalUrl), "_blank");
-                } else if (fileDetails?.file) {
+                } else if (isAuthenticated && fileDetails?.file) {
                   const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
                   if (fileUrl) {
                     window.open(fileUrl, "_blank");
@@ -1078,6 +1140,7 @@ const ContentDisplay = ({
                   sources={buildListingThumbnailSources({
                     customThumbnailForDisplay,
                     hasImageFile:
+                    isAuthenticated &&
                     contentData.media_type?.toUpperCase() === "IMAGE" &&
                     fileDetails?.file,
                     fileDetails,
@@ -1351,7 +1414,7 @@ const ContentDisplay = ({
             // Prefer canonical content URL; otherwise open stored file
             if (contentExternalUrl && String(contentExternalUrl).trim()) {
               window.open(resolveMediaUrl(contentExternalUrl), "_blank");
-            } else if (fileDetails?.file || fileDetails?.url) {
+            } else if (isAuthenticated && (fileDetails?.file || fileDetails?.url)) {
               const fileUrl = resolveMediaUrl(fileDetails.url ?? fileDetails.file);
               if (fileUrl) {
                 window.open(fileUrl, "_blank");
@@ -1399,6 +1462,7 @@ const ContentDisplay = ({
                   sources={buildListingThumbnailSources({
                     customThumbnailForDisplay,
                     hasImageFile:
+                    isAuthenticated &&
                     contentData.media_type?.toUpperCase() === "IMAGE" &&
                     fileDetails?.file,
                     fileDetails,

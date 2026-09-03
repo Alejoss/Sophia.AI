@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,9 @@ import {
   CircularProgress,
   Alert,
   Divider,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import SendIcon from '@mui/icons-material/Send';
@@ -26,6 +29,13 @@ function formatQueryDate(iso) {
   } catch {
     return iso;
   }
+}
+
+function mediaTypeLabel(mediaType) {
+  if (mediaType === 'AUDIO') return 'Audio';
+  if (mediaType === 'VIDEO') return 'Video';
+  if (mediaType === 'TEXT') return 'Texto';
+  return mediaType || 'Archivo';
 }
 
 function SourcesList({ sources, topicId }) {
@@ -96,7 +106,57 @@ function SourcesList({ sources, topicId }) {
   );
 }
 
-function ConsultationView({ query, topicId }) {
+function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId }) {
+  if (!selectedContentIds?.length) {
+    return (
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, px: 0.5 }}>
+        Archivos consultados: todos los indexados del tema
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ mt: 1.5, px: 0.5 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+        Archivos seleccionados ({selectedContentIds.length})
+      </Typography>
+      <Box
+        component="ul"
+        sx={{
+          m: 0,
+          pl: 2.25,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+        }}
+      >
+        {selectedContentIds.map((id) => {
+          const src = sourceById?.[id];
+          const title = src?.title || `Contenido ${id}`;
+          const href = `/content/${id}/transcript?context=topic${
+            topicId ? `&topicId=${topicId}` : ''
+          }`;
+          return (
+            <Box component="li" key={id}>
+              <Typography variant="body2">
+                <Link component={RouterLink} to={href} underline="hover">
+                  {title}
+                </Link>
+                {src?.media_type ? (
+                  <Typography component="span" variant="caption" color="text.secondary">
+                    {` · ${mediaTypeLabel(src.media_type)}`}
+                  </Typography>
+                ) : null}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+function ConsultationView({ query, topicId, sourceById }) {
   if (!query) return null;
   return (
     <Box
@@ -148,6 +208,11 @@ function ConsultationView({ query, topicId }) {
         </Typography>
       </Box>
       <SourcesList sources={query.sources} topicId={topicId} />
+      <SelectedTranscriptsSummary
+        selectedContentIds={query.selected_content_ids}
+        sourceById={sourceById}
+        topicId={topicId}
+      />
       {(typeof query.used_chunk_count === 'number' ||
         typeof query.retrieved_chunk_count === 'number') && (
         <Typography
@@ -165,6 +230,108 @@ function ConsultationView({ query, topicId }) {
   );
 }
 
+function TranscriptChecklist({
+  sources,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+  onClear,
+  disabled,
+  loading,
+}) {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <CircularProgress size={16} />
+        <Typography variant="body2" color="text.secondary">
+          Cargando contenidos indexados…
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (!sources.length) {
+    return (
+      <Alert severity="warning" sx={{ borderRadius: 0 }}>
+        No hay contenidos indexados en este tema todavía.
+      </Alert>
+    );
+  }
+
+  const allSelected = selectedIds.length === sources.length;
+
+  return (
+    <Box>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          flexWrap: 'wrap',
+          mb: 1,
+        }}
+      >
+        <Typography variant="subtitle2">
+          Contenidos a consultar ({selectedIds.length}/{sources.length})
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button size="small" onClick={onSelectAll} disabled={disabled || allSelected}>
+            Todas
+          </Button>
+          <Button size="small" onClick={onClear} disabled={disabled || selectedIds.length === 0}>
+            Ninguna
+          </Button>
+        </Box>
+      </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Marca los archivos cuyos contenidos quieres usar en esta consulta.
+      </Typography>
+      <FormGroup
+        sx={{
+          maxHeight: 220,
+          overflowY: 'auto',
+          border: '1px solid',
+          borderColor: 'divider',
+          px: 1.5,
+          py: 0.5,
+        }}
+      >
+        {sources.map((src) => {
+          const checked = selectedIds.includes(src.content_id);
+          const label = (
+            <Box sx={{ py: 0.25 }}>
+              <Typography variant="body2" sx={{ fontWeight: checked ? 600 : 400 }}>
+                {src.title}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {mediaTypeLabel(src.media_type)}
+                {src.original_author ? ` · ${src.original_author}` : ''}
+                {typeof src.chunk_count === 'number' ? ` · ${src.chunk_count} fragmentos` : ''}
+              </Typography>
+            </Box>
+          );
+          return (
+            <FormControlLabel
+              key={src.content_id}
+              control={
+                <Checkbox
+                  checked={checked}
+                  onChange={() => onToggle(src.content_id)}
+                  disabled={disabled}
+                  size="small"
+                />
+              }
+              label={label}
+              sx={{ alignItems: 'flex-start', mr: 0, py: 0.25 }}
+            />
+          );
+        })}
+      </FormGroup>
+    </Box>
+  );
+}
+
 /**
  * Independent topic consultations (one question → one answer), with history.
  */
@@ -173,10 +340,21 @@ function TopicChat({ topicId }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const [activeQuery, setActiveQuery] = useState(null);
   const [composing, setComposing] = useState(true);
+  const [sources, setSources] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const sourceById = useMemo(() => {
+    const map = {};
+    sources.forEach((src) => {
+      map[src.content_id] = src;
+    });
+    return map;
+  }, [sources]);
 
   const loadHistory = useCallback(async () => {
     if (!isAuthenticated || !topicId) return;
@@ -191,14 +369,31 @@ function TopicChat({ topicId }) {
     }
   }, [isAuthenticated, topicId]);
 
+  const loadSources = useCallback(async () => {
+    if (!isAuthenticated || !topicId) return;
+    setSourcesLoading(true);
+    try {
+      const data = await contentApi.listTopicChatSources(topicId);
+      const rows = data.results || [];
+      setSources(rows);
+      setSelectedIds(rows.map((row) => row.content_id));
+    } catch {
+      setSources([]);
+      setSelectedIds([]);
+    } finally {
+      setSourcesLoading(false);
+    }
+  }, [isAuthenticated, topicId]);
+
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    loadSources();
+  }, [loadHistory, loadSources]);
 
   if (!isAuthenticated) {
     return (
       <Alert severity="info" sx={{ borderRadius: 0, mb: 4 }}>
-        Inicia sesión para consultar las transcripciones de este tema.
+        Inicia sesión para consultar los contenidos de este tema.
       </Alert>
     );
   }
@@ -208,6 +403,15 @@ function TopicChat({ topicId }) {
     setComposing(true);
     setError(null);
     setInput('');
+    setSelectedIds(sources.map((row) => row.content_id));
+  };
+
+  const toggleSource = (contentId) => {
+    setSelectedIds((prev) =>
+      prev.includes(contentId)
+        ? prev.filter((id) => id !== contentId)
+        : [...prev, contentId]
+    );
   };
 
   const openConsultation = async (id) => {
@@ -232,11 +436,18 @@ function TopicChat({ topicId }) {
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
+    if (selectedIds.length === 0) {
+      setError('Selecciona al menos un contenido para consultar.');
+      return;
+    }
 
     setError(null);
     setLoading(true);
     try {
-      const data = await contentApi.topicChat(topicId, { message: text });
+      const data = await contentApi.topicChat(topicId, {
+        message: text,
+        contentIds: selectedIds,
+      });
       setActiveQuery(data);
       setComposing(false);
       setInput('');
@@ -247,6 +458,7 @@ function TopicChat({ topicId }) {
           id: data.id,
           topic_id: data.topic_id,
           question_preview: preview,
+          selected_content_ids: data.selected_content_ids || selectedIds,
           created_at: data.created_at,
         };
         return [row, ...prev.filter((item) => item.id !== data.id)];
@@ -286,8 +498,8 @@ function TopicChat({ topicId }) {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Cada consulta es independiente: se responde solo con las transcripciones
-        indexadas de este tema y se guarda en tu historial.
+        Cada consulta es independiente: eliges qué contenidos indexados
+        usar, se responde solo con esos archivos y se guarda en tu historial.
       </Typography>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -322,6 +534,15 @@ function TopicChat({ topicId }) {
           }}
         >
           <Typography variant="subtitle2">Nueva consulta</Typography>
+          <TranscriptChecklist
+            sources={sources}
+            selectedIds={selectedIds}
+            onToggle={toggleSource}
+            onSelectAll={() => setSelectedIds(sources.map((row) => row.content_id))}
+            onClear={() => setSelectedIds([])}
+            disabled={loading}
+            loading={sourcesLoading}
+          />
           <TextField
             fullWidth
             multiline
@@ -337,7 +558,7 @@ function TopicChat({ topicId }) {
             <Button
               variant="contained"
               onClick={send}
-              disabled={loading || !input.trim()}
+              disabled={loading || !input.trim() || selectedIds.length === 0}
               endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             >
               Consultar
@@ -345,7 +566,11 @@ function TopicChat({ topicId }) {
           </Box>
         </Box>
       ) : (
-        <ConsultationView query={activeQuery} topicId={topicId} />
+        <ConsultationView
+          query={activeQuery}
+          topicId={topicId}
+          sourceById={sourceById}
+        />
       )}
 
       <Divider />
@@ -375,6 +600,9 @@ function TopicChat({ topicId }) {
           >
             {history.map((item) => {
               const selected = activeQuery?.id === item.id && !composing;
+              const selectedCount = Array.isArray(item.selected_content_ids)
+                ? item.selected_content_ids.length
+                : 0;
               return (
                 <Box
                   key={item.id}
@@ -402,6 +630,9 @@ function TopicChat({ topicId }) {
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {formatQueryDate(item.created_at)}
+                    {selectedCount > 0
+                      ? ` · ${selectedCount} archivo${selectedCount === 1 ? '' : 's'}`
+                      : ' · todos los archivos'}
                   </Typography>
                 </Box>
               );

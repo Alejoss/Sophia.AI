@@ -519,6 +519,41 @@ Custom in-app notification API under profiles. See [Notifications (backend)](../
 - **POST** `/api/profiles/notifications/mark-all-as-read/`
 - **Auth**: Required
 
+## Payments
+
+Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custody: [bch-direct.md](../payments/bch-direct.md). NOWPayments: [nowpayments-setup.md](../payments/nowpayments-setup.md).
+
+### Gateway status
+- **GET** `/api/payments/status/`
+- **Auth**: Public
+- **Response**: `enabled`, `currencies`, `provider`, `bch_direct_enabled`, `bch_network`, `methods.nowpayments`, `methods.bch_direct`
+
+### Event registration invoice (NOWPayments)
+- **POST** `/api/payments/registration/{id}/` — registrant only
+- **GET** `/api/payments/registration/{id}/list/` — registrant or event owner
+- **Auth**: Required
+
+### Knowledge-path purchase invoice (NOWPayments)
+- **POST** `/api/payments/path-purchase/{id}/` — buyer only
+- **GET** `/api/payments/path-purchase/{id}/list/` — buyer or path author
+- **Auth**: Required
+
+### Transcript-anchor request (NOWPayments)
+- **POST** `/api/payments/anchor-request/{id}/` — requester only
+- **GET** `/api/payments/anchor-request/{id}/list/` — requester or staff
+- **Auth**: Required
+- **Note**: Blocked while a non-expired BCH-direct order is `pending`.
+
+### Transcript-anchor request (BCH directo)
+- **GET** `/api/payments/anchor-request/{id}/bch/` — current order (`payment` may be `null`)
+- **POST** `/api/payments/anchor-request/{id}/bch/` — create or reuse exact-amount order (requester only)
+- **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match
+- **Auth**: Required (requester; staff may GET/verify)
+
+### Payment detail / IPN
+- **GET** `/api/payments/{id}/` — NOWPayments row; syncs with the provider
+- **POST** `/api/payments/ipn/` — NOWPayments webhook (no JWT; HMAC `x-nowpayments-sig`)
+
 ## Interactive Documentation
 
 For detailed request/response schemas and to test endpoints:
@@ -531,4 +566,5 @@ For detailed request/response schemas and to test endpoints:
 - [Authentication](authentication.md)
 - [API Examples](examples.md)
 - [Error Handling](errors.md)
+- [Payments](../payments/README.md)
 

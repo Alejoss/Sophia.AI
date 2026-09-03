@@ -20,6 +20,10 @@ ALLOWED_PAY_CURRENCIES = {'bch', 'xmr'}
 # "confirmed" is on-chain only — proceed only if you validate actually_paid vs pay_amount.
 FULFILLMENT_STATUS = 'finished'
 OPEN_PAYMENT_STATUSES = ('waiting', 'confirming', 'confirmed', 'sending', 'partially_paid')
+# Invoice created, no coins yet — safe to abandon if the user switches to BCH.
+SWITCHABLE_NOWPAYMENTS_STATUSES = ('waiting',)
+# Coins are already moving; do not start a second checkout method.
+IN_FLIGHT_NOWPAYMENTS_STATUSES = ('confirming', 'confirmed', 'sending', 'partially_paid')
 # Backwards-compatible alias
 REGISTRATION_PAID_STATUS = FULFILLMENT_STATUS
 
@@ -175,19 +179,48 @@ def _mark_event_registration_paid_if_needed(crypto_payment: CryptoPayment) -> No
         )
 
 
-def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+def mark_path_purchase_paid(path_purchase: KnowledgePathPurchase, *, source: str = '') -> KnowledgePathPurchase:
+    """Mark a knowledge-path purchase PAID (idempotent). Shared by NOWPayments and BCH."""
     with transaction.atomic():
-        purchase = KnowledgePathPurchase.objects.select_for_update().get(
-            pk=crypto_payment.path_purchase_id
-        )
+        purchase = KnowledgePathPurchase.objects.select_for_update().get(pk=path_purchase.pk)
         if purchase.payment_status == 'PAID':
-            return
+            return purchase
         purchase.payment_status = 'PAID'
         purchase.save(update_fields=['payment_status', 'updated_at'])
+    logger.info(
+        'Path purchase %s marked PAID (source=%s)',
+        purchase.pk,
+        source or 'unknown',
+    )
+    return purchase
 
+
+def mark_topic_purchase_paid(topic_purchase, *, source: str = ''):
+    """Mark a topic Consultas purchase PAID (idempotent)."""
+    from content.models import TopicPurchase
+
+    with transaction.atomic():
+        purchase = TopicPurchase.objects.select_for_update().get(pk=topic_purchase.pk)
+        if purchase.payment_status == 'PAID':
+            return purchase
+        purchase.payment_status = 'PAID'
+        purchase.save(update_fields=['payment_status', 'updated_at'])
+    logger.info(
+        'Topic purchase %s marked PAID (source=%s)',
+        purchase.pk,
+        source or 'unknown',
+    )
+    return purchase
+
+
+def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    purchase = mark_path_purchase_paid(
+        KnowledgePathPurchase.objects.get(pk=crypto_payment.path_purchase_id),
+        source='nowpayments',
+    )
     purchase = KnowledgePathPurchase.objects.select_related(
         'knowledge_path', 'knowledge_path__author', 'user'
-    ).get(pk=crypto_payment.path_purchase_id)
+    ).get(pk=purchase.pk)
     try:
         on_crypto_payment_completed(crypto_payment, path_purchase=purchase)
     except Exception as exc:
@@ -281,6 +314,31 @@ def _reuse_or_refresh_open_payment(queryset):
         if existing.invoice_url:
             return existing
     return None
+
+
+def nowpayments_queryset(*, anchor_request=None, path_purchase=None):
+    if anchor_request is not None:
+        return CryptoPayment.objects.filter(anchor_request=anchor_request)
+    if path_purchase is not None:
+        return CryptoPayment.objects.filter(path_purchase=path_purchase)
+    return CryptoPayment.objects.none()
+
+
+def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None) -> bool:
+    return nowpayments_queryset(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+    ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
+
+
+def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None) -> int:
+    """Mark unused hosted invoices expired so the user can switch to BCH."""
+    return nowpayments_queryset(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+    ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
+        payment_status='expired',
+    )
 
 
 def create_event_registration_payment(*, event_registration: EventRegistration, user, pay_currency=None) -> CryptoPayment:
@@ -459,18 +517,6 @@ def create_anchor_request_payment(
         TranscriptAnchorRequest.STATUS_REJECTED,
     ):
         raise ValueError('Esta solicitud ya fue resuelta.')
-
-    from django.utils import timezone
-    from payments.models import BchDirectPayment
-
-    if BchDirectPayment.objects.filter(
-        anchor_request=anchor_request,
-        status=BchDirectPayment.STATUS_PENDING,
-        expires_at__gt=timezone.now(),
-    ).exists():
-        raise ValueError(
-            'Ya hay un pago BCH directo en curso. Complételo o espere a que expire.'
-        )
 
     client = NOWPaymentsClient()
     if not client.configured:

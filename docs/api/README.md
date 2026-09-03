@@ -38,6 +38,7 @@ The API uses JWT (JSON Web Tokens) for authentication. See [Authentication Guide
 - **[Notifications](endpoints.md#notifications)** - In-app notifications (`/api/profiles/notifications/`). See also [backend notifications](../backend/notifications.md).
 - **[Transcript ingest (workers)](transcript-ingest.md)** - Machine-to-machine queue + upsert for external Whisper/captions workers
 - **[Transcript certification (Bitcoin)](transcript-anchor.md)** - Prepare/list OP_RETURN anchors; ops broadcast via management command
+- **[Payments](endpoints.md#payments)** - NOWPayments + self-custody BCH. See [payments/](../payments/README.md)
 - **[Topic RAG & embeddings](../architecture/topic-rag-embeddings.md)** - Pipeline overview (Qdrant + OpenAI)
 - **[Qdrant embeddings](../operations/qdrant-embeddings.md)** - Embedding ack API + Qdrant Cloud config for topic RAG
 - **[Topic RAG chat](../operations/topic-rag-chat.md)** - Authenticated chat over topic transcript chunks
@@ -105,6 +106,7 @@ See [API Examples](examples.md) for code examples and common use cases.
 - [Endpoints](endpoints.md) - Complete endpoint reference
 - [Transcript ingest](transcript-ingest.md) - External worker contract (S3 + YouTube)
 - [Transcript certification](transcript-anchor.md) - Bitcoin OP_RETURN anchors
+- [Payments](../payments/README.md) - NOWPayments and BCH direct
 - [Examples](examples.md) - Usage examples
 - [Errors](errors.md) - Error codes and handling
 - [Blockchain integration](../architecture/blockchain-integration.md) - Product path vs legacy EVM

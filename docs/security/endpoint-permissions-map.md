@@ -98,6 +98,38 @@ Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcri
 
 `POST` only creates a `pending` row (no broadcast). Broadcast uses the server WIF via `manage.py broadcast_transcript_anchor` — not an HTTP endpoint. Full contract: [transcript-anchor.md](../api/transcript-anchor.md).
 
+## Payments
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/payments/status/` | `AllowAny` |
+| POST | `/api/payments/ipn/` | `AllowAny` (HMAC `x-nowpayments-sig`; no JWT) |
+| GET | `/api/payments/<id>/` | JWT; registrant/event owner, buyer/path author, or anchor requester/staff |
+| POST | `/api/payments/registration/<id>/` | JWT; **registrant only** |
+| GET | `/api/payments/registration/<id>/list/` | JWT; registrant or event owner |
+| POST | `/api/payments/path-purchase/<id>/` | JWT; **buyer only** |
+| GET | `/api/payments/path-purchase/<id>/list/` | JWT; buyer or path author |
+| POST | `/api/payments/anchor-request/<id>/` | JWT; **requester only** |
+| GET | `/api/payments/anchor-request/<id>/list/` | JWT; requester or staff |
+| GET | `/api/payments/anchor-request/<id>/bch/` | JWT; requester or staff |
+| POST | `/api/payments/anchor-request/<id>/bch/` | JWT; **requester only** |
+| POST | `/api/payments/anchor-request/<id>/bch/verify/` | JWT; requester or staff |
+
+BCH direct is self-custody exact-amount match (no IPN). Docs: [bch-direct.md](../payments/bch-direct.md).
+
+Staff dashboard (`IsAdminUser`):
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/payments/admin/bch-catalog/` | JWT staff |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | JWT staff (`bch_direct_enabled`) |
+| PATCH | `/api/payments/admin/topics/<id>/` | JWT staff (`bch_direct_enabled`, `reference_price`) |
+| POST | `/api/content/topics/<id>/purchase/` | JWT; buyer for paid Consultas |
+| GET/POST | `/api/payments/path-purchase/<id>/bch/` | JWT; buyer (POST), buyer/author/staff (GET) |
+| POST | `/api/payments/path-purchase/<id>/bch/verify/` | JWT; buyer, author, or staff |
+| GET/POST | `/api/payments/topic-purchase/<id>/bch/` | JWT; buyer (POST), buyer/moderator/staff (GET) |
+| POST | `/api/payments/topic-purchase/<id>/bch/verify/` | JWT; buyer, moderator, or staff |
+
 ## OAuth / Google
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_SECRET_KEY`: server-side only.  

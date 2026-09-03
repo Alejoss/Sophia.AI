@@ -16,11 +16,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import {
-  createAnchorRequestBchPayment,
-  getPaymentGatewayStatus,
-  verifyAnchorRequestBchPayment,
-} from '../api/paymentsApi';
+import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 
 const formatApiError = (err, fallback) => {
@@ -31,32 +27,40 @@ const formatApiError = (err, fallback) => {
 };
 
 /**
- * Checkout chooser: NOWPayments (hosted) vs self-custody BCH direct.
+ * Checkout chooser: NOWPayments (optional) vs self-custody BCH.
  */
-const AnchorPaymentCheckout = ({
+const ProductPaymentCheckout = ({
   open,
   onClose,
-  anchorRequestId,
   title,
   priceUsd = 1,
+  productLabel = 'producto',
+  offerNowpayments = true,
+  offerBch = false,
+  createBchPayment,
+  verifyBchPayment,
+  nowpaymentsProps = {},
   onPaid,
 }) => {
-  const [methods, setMethods] = useState({ nowpayments: false, bch_direct: false });
+  const [methods, setMethods] = useState({
+    nowpayments: offerNowpayments,
+    bch_direct: offerBch,
+  });
   const [bchNetwork, setBchNetwork] = useState(null);
   const [loadingMethods, setLoadingMethods] = useState(false);
-  const [method, setMethod] = useState(null); // 'nowpayments' | 'bch' | null
+  const [method, setMethod] = useState(null);
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState(null);
   const [copied, setCopied] = useState('');
-  const [paidReview, setPaidReview] = useState(false);
+  const [paid, setPaid] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setMethod(null);
       setBchOrder(null);
       setBchError(null);
-      setPaidReview(false);
+      setPaid(false);
       setCopied('');
       return undefined;
     }
@@ -66,13 +70,15 @@ const AnchorPaymentCheckout = ({
       .then((data) => {
         if (cancelled) return;
         setMethods({
-          nowpayments: Boolean(data?.methods?.nowpayments ?? data?.enabled),
-          bch_direct: Boolean(data?.methods?.bch_direct ?? data?.bch_direct_enabled),
+          nowpayments: offerNowpayments && Boolean(data?.methods?.nowpayments ?? data?.enabled),
+          bch_direct: offerBch && Boolean(data?.methods?.bch_direct ?? data?.bch_direct_enabled),
         });
         setBchNetwork(data?.bch_network || null);
       })
       .catch(() => {
-        if (!cancelled) setMethods({ nowpayments: true, bch_direct: false });
+        if (!cancelled) {
+          setMethods({ nowpayments: offerNowpayments, bch_direct: offerBch });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingMethods(false);
@@ -80,15 +86,22 @@ const AnchorPaymentCheckout = ({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, offerNowpayments, offerBch]);
+
+  useEffect(() => {
+    if (!open || loadingMethods || method !== null || paid) return;
+    if (!methods.nowpayments && methods.bch_direct) {
+      startBch();
+    }
+  }, [open, loadingMethods, methods, method, paid]);
 
   const startBch = async () => {
-    if (!anchorRequestId) return;
+    if (!createBchPayment) return;
     setMethod('bch');
     setBchBusy(true);
     setBchError(null);
     try {
-      const order = await createAnchorRequestBchPayment(anchorRequestId);
+      const order = await createBchPayment();
       setBchOrder(order);
     } catch (err) {
       setBchError(formatApiError(err, 'No se pudo crear la orden BCH'));
@@ -98,14 +111,14 @@ const AnchorPaymentCheckout = ({
   };
 
   const verifyBch = async () => {
-    if (!anchorRequestId) return;
+    if (!verifyBchPayment) return;
     setBchBusy(true);
     setBchError(null);
     try {
-      const data = await verifyAnchorRequestBchPayment(anchorRequestId);
+      const data = await verifyBchPayment();
       setBchOrder(data.payment);
-      if (data.request?.status === 'paid_pending_review' || data.payment?.status === 'paid') {
-        setPaidReview(true);
+      if (data.purchase?.is_paid || data.purchase?.payment_status === 'PAID' || data.payment?.status === 'paid') {
+        setPaid(true);
         onPaid?.(data);
       }
     } catch (err) {
@@ -125,7 +138,7 @@ const AnchorPaymentCheckout = ({
     }
   };
 
-  const showChooser = open && method === null && !paidReview;
+  const showChooser = open && method === null && !paid;
   const showNowpayments = open && method === 'nowpayments';
   const showBch = open && method === 'bch';
 
@@ -133,7 +146,7 @@ const AnchorPaymentCheckout = ({
     <>
       <Dialog open={showChooser} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Anclaje a Bitcoin
+          Pagar {productLabel}
           <IconButton
             aria-label="Cerrar"
             onClick={onClose}
@@ -147,7 +160,7 @@ const AnchorPaymentCheckout = ({
             {title}
           </Typography>
           <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
-            ${priceUsd} USD
+            ${Number(priceUsd || 0).toFixed(2)} USD
           </Typography>
           {loadingMethods ? (
             <Stack alignItems="center" sx={{ py: 3 }}>
@@ -155,15 +168,11 @@ const AnchorPaymentCheckout = ({
             </Stack>
           ) : (
             <Stack spacing={1.5}>
-              <Typography variant="body2" color="text.secondary">
-                Elige cómo pagar. Tras el pago, un administrador revisará el anclaje a Bitcoin.
-                {bchNetwork && bchNetwork !== 'mainnet' && (
-                  <>
-                    {' '}
-                    BCH directo usa la red de pruebas <strong>{bchNetwork}</strong>.
-                  </>
-                )}
-              </Typography>
+              {bchNetwork && bchNetwork !== 'mainnet' && methods.bch_direct && (
+                <Typography variant="body2" color="text.secondary">
+                  BCH directo usa la red de pruebas <strong>{bchNetwork}</strong>.
+                </Typography>
+              )}
               <Button
                 variant="contained"
                 size="large"
@@ -198,14 +207,14 @@ const AnchorPaymentCheckout = ({
         open={showNowpayments}
         onClose={onClose}
         onBackToMethods={() => setMethod(null)}
-        anchorRequestId={anchorRequestId}
         title={title}
         priceUsd={priceUsd}
-        productLabel="anclaje a Bitcoin"
+        productLabel={productLabel}
         onPaymentComplete={(data) => {
-          setPaidReview(true);
+          setPaid(true);
           onPaid?.(data);
         }}
+        {...nowpaymentsProps}
       />
 
       <Dialog open={showBch} onClose={onClose} maxWidth="sm" fullWidth>
@@ -228,9 +237,9 @@ const AnchorPaymentCheckout = ({
               {bchError}
             </Alert>
           )}
-          {paidReview && (
+          {paid && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              ¡Pago recibido! Tu solicitud de anclaje a Bitcoin está en revisión.
+              ¡Pago recibido! Ya puedes usar este {productLabel}.
             </Alert>
           )}
           {bchBusy && !bchOrder && (
@@ -244,11 +253,7 @@ const AnchorPaymentCheckout = ({
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía <strong>exactamente</strong> este monto a la dirección
-                {(bchOrder.network || bchNetwork) && (bchOrder.network || bchNetwork) !== 'mainnet'
-                  ? ` en ${bchOrder.network || bchNetwork}`
-                  : ''}
-                . La orden expira en unos minutos.
+                Envía <strong>exactamente</strong> este monto a la dirección.
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
@@ -293,15 +298,11 @@ const AnchorPaymentCheckout = ({
                 </Typography>
               )}
               <Divider />
-              <Typography variant="caption" color="text.secondary">
-                Cuando hayas enviado el pago, pulsa verificar. No cierres esta ventana
-                hasta confirmar.
-              </Typography>
             </Stack>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, flexDirection: 'column', gap: 1 }}>
-          {!paidReview && bchOrder?.status === 'pending' && (
+          {!paid && bchOrder?.status === 'pending' && (
             <Button
               variant="contained"
               fullWidth
@@ -312,33 +313,35 @@ const AnchorPaymentCheckout = ({
               Ya realicé el pago
             </Button>
           )}
-          {(paidReview || bchOrder?.status === 'expired') && (
+          {(paid || bchOrder?.status === 'expired') && (
             <Button
               variant="outlined"
               fullWidth
-              disabled={bchBusy || paidReview}
+              disabled={bchBusy || paid}
               onClick={startBch}
             >
               Generar nueva orden BCH
             </Button>
           )}
           <Button onClick={onClose} fullWidth>
-            {paidReview ? 'Listo' : 'Cerrar'}
+            {paid ? 'Listo' : 'Cerrar'}
           </Button>
-          <Button
-            size="small"
-            onClick={() => {
-              setMethod(null);
-              setBchOrder(null);
-              setBchError(null);
-            }}
-          >
-            Volver a métodos de pago
-          </Button>
+          {!paid && (
+            <Button
+              size="small"
+              onClick={() => {
+                setMethod(null);
+                setBchOrder(null);
+                setBchError(null);
+              }}
+            >
+              Volver a métodos de pago
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </>
   );
 };
 
-export default AnchorPaymentCheckout;
+export default ProductPaymentCheckout;

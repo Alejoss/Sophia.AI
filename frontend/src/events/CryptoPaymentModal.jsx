@@ -116,6 +116,7 @@ const CryptoPaymentModal = ({
   priceUsd,
   productLabel = 'evento',
   onPaymentComplete,
+  onBackToMethods,
 }) => {
   const [payment, setPayment] = useState(null);
   const [initializing, setInitializing] = useState(false);
@@ -221,9 +222,16 @@ const CryptoPaymentModal = ({
   const busy = initializing;
   const hasInvoice = Boolean(payment?.invoice_url);
   const hasOnChainDetails = Boolean(payment?.pay_address);
+  const handleDismiss = () => {
+    if (onBackToMethods && !payment?.is_paid) {
+      onBackToMethods();
+      return;
+    }
+    onClose();
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleDismiss} maxWidth="sm" fullWidth>
       <Box
         sx={{
           px: 3,
@@ -235,7 +243,7 @@ const CryptoPaymentModal = ({
         }}
       >
         <IconButton
-          onClick={onClose}
+          onClick={handleDismiss}
           aria-label="Cerrar"
           size="small"
           sx={{
@@ -381,6 +389,11 @@ const CryptoPaymentModal = ({
         {payment?.is_paid && (
           <Button onClick={onClose} variant="contained" fullWidth>
             Listo
+          </Button>
+        )}
+        {onBackToMethods && !payment?.is_paid && (
+          <Button onClick={onBackToMethods} fullWidth>
+            Elegir otro método
           </Button>
         )}
       </DialogActions>

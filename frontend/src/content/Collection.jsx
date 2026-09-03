@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
     Box,
@@ -10,13 +10,16 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
+import { AuthContext } from '../context/AuthContext';
 
-const DEFAULT_PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 24;
 
 const Collection = () => {
     const { collectionId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { authState } = useContext(AuthContext) || {};
+    const isAuthenticated = Boolean(authState?.isAuthenticated);
     const [content, setContent] = useState([]);
     const [collectionName, setCollectionName] = useState('');
     const [collectionDescription, setCollectionDescription] = useState('');
@@ -142,7 +145,7 @@ const Collection = () => {
                     >
                         Editar Colección
                     </Button>
-                ) : (
+                ) : isAuthenticated ? (
                     <Button
                         variant="contained"
                         color="primary"
@@ -150,7 +153,7 @@ const Collection = () => {
                     >
                         Mis colecciones
                     </Button>
-                )}
+                ) : null}
             </Box>
 
             <Box display="grid" gridTemplateColumns="repeat(12, 1fr)" gap={3}>
@@ -187,7 +190,7 @@ const Collection = () => {
                     onPageChange={handleChangePage}
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
-                    rowsPerPageOptions={[12, 24, 48]}
+                    rowsPerPageOptions={[24, 48, 96]}
                     labelRowsPerPage="Filas por página"
                     sx={{ mt: 2 }}
                 />

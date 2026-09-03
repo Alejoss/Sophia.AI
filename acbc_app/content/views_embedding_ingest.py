@@ -4,19 +4,20 @@ Machine-to-machine (same auth as transcript-ingest: ``X-Transcript-Ingest-Key``
 or ``Authorization: Bearer`` with ``TRANSCRIPT_INGEST_API_KEY``):
 
 * ``GET  /api/content/embedding-ingest/``
-  Work queue of VIDEO/AUDIO contents that already have a transcript and whose
-  ``embedding_status`` needs work (default: ``pending``, ``stale``, ``failed``).
+  Work queue of VIDEO/AUDIO/TEXT contents whose ``ContentEmbedding.status``
+  needs work (default: ``pending``, ``stale``, ``failed``). VIDEO/AUDIO require
+  a transcript; TEXT is queued by embedding status alone (worker reads the file).
 
 * ``GET  /api/content/embedding-ingest/topics/``
-  Topics that have at least one VIDEO/AUDIO transcript matching the status
-  filter (same defaults as the content queue).
+  Topics that have at least one content matching the embedding status filter
+  (same defaults as the content queue).
 
 * ``GET  /api/content/embedding-ingest/<content_id>/``
   One-item manifest + embedding metadata.
 
 * ``PUT  /api/content/embedding-ingest/<content_id>/``
   Ack from the embed worker after indexing (or failure/skip). Does **not**
-  store vectors in Django -- only updates ``ContentTranscript`` bookkeeping.
+  store vectors in Django -- only updates ``ContentEmbedding`` bookkeeping.
 """
 
 from __future__ import annotations
@@ -30,14 +31,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import Content, ContentTranscript, Topic
+from content.models import Content, ContentEmbedding, ContentTranscript, Topic
 from content.permissions import TranscriptIngestPermission
 from content.serializers import (
     ContentEmbeddingAckSerializer,
     ContentEmbeddingIngestDetailSerializer,
     ContentEmbeddingQueueItemSerializer,
     ContentEmbeddingTopicQueueItemSerializer,
-    ContentTranscriptIngestSummarySerializer,
 )
 from content.views_transcript_ingest import (
     DEFAULT_QUEUE_LIMIT,
@@ -48,13 +48,15 @@ from content.views_transcript_ingest import (
 
 logger = logging.getLogger(__name__)
 
+EMBEDDING_MEDIA_TYPES = TRANSCRIPT_MEDIA_TYPES + ('TEXT',)
+
 DEFAULT_NEEDING_STATUSES = (
-    ContentTranscript.EMBEDDING_STATUS_PENDING,
-    ContentTranscript.EMBEDDING_STATUS_STALE,
-    ContentTranscript.EMBEDDING_STATUS_FAILED,
+    ContentEmbedding.EMBEDDING_STATUS_PENDING,
+    ContentEmbedding.EMBEDDING_STATUS_STALE,
+    ContentEmbedding.EMBEDDING_STATUS_FAILED,
 )
 ALL_EMBEDDING_STATUSES = {
-    choice[0] for choice in ContentTranscript.EMBEDDING_STATUS_CHOICES
+    choice[0] for choice in ContentEmbedding.EMBEDDING_STATUS_CHOICES
 }
 
 
@@ -86,9 +88,9 @@ def _parse_embedding_queue_params(request):
     Returns ``(error_response, params)``. ``params`` is None when there is an error.
     """
     media_type = request.query_params.get('media_type')
-    if media_type and media_type not in TRANSCRIPT_MEDIA_TYPES:
+    if media_type and media_type not in EMBEDDING_MEDIA_TYPES:
         return Response(
-            {'error': 'media_type debe ser VIDEO o AUDIO.'},
+            {'error': 'media_type debe ser VIDEO, AUDIO o TEXT.'},
             status=status.HTTP_400_BAD_REQUEST,
         ), None
 
@@ -169,15 +171,39 @@ def _parse_embedding_queue_params(request):
 def _topic_media_types(media_type):
     if media_type:
         return (media_type,)
-    return TRANSCRIPT_MEDIA_TYPES
+    return EMBEDDING_MEDIA_TYPES
+
+
+def _embedding_queue_filter(*, statuses):
+    """VIDEO/AUDIO need a transcript; TEXT is queued by embedding status only."""
+    return Q(
+        media_type__in=EMBEDDING_MEDIA_TYPES,
+        embedding__status__in=statuses,
+    ) & (
+        Q(media_type='TEXT')
+        | Q(transcript__isnull=False)
+    )
+
+
+def _embedding_ack_response(embedding):
+    """Map ContentEmbedding fields to legacy API names for worker back-compat."""
+    return {
+        'embedding_status': embedding.status,
+        'embedding_model': embedding.model or '',
+        'embedding_dims': embedding.dims,
+        'chunk_count': embedding.chunk_count,
+        'embedded_text_hash': embedding.source_hash,
+        'embedded_at': embedding.embedded_at,
+        'embedding_error': embedding.error or '',
+    }
 
 
 class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
     """
     GET /api/content/embedding-ingest/
 
-    List VIDEO/AUDIO contents with a transcript that need (or already have)
-    vector indexing metadata updated.
+    List VIDEO/AUDIO/TEXT contents that need (or already have) vector indexing
+    metadata updated on ContentEmbedding.
     """
 
     def get(self, request):
@@ -194,12 +220,8 @@ class ContentEmbeddingIngestQueueView(EmbeddingIngestAPIView):
         statuses = params['statuses']
 
         queryset = (
-            Content.objects.filter(
-                media_type__in=TRANSCRIPT_MEDIA_TYPES,
-                transcript__isnull=False,
-                transcript__embedding_status__in=statuses,
-            )
-            .select_related('file_details', 'transcript')
+            Content.objects.filter(_embedding_queue_filter(statuses=statuses))
+            .select_related('file_details', 'transcript', 'embedding')
             .prefetch_related('topics')
             .order_by('id')
         )
@@ -229,8 +251,8 @@ class ContentEmbeddingIngestTopicQueueView(EmbeddingIngestAPIView):
     """
     GET /api/content/embedding-ingest/topics/
 
-    List topics that have VIDEO/AUDIO transcripts matching the embedding
-    status filter. Default statuses: pending, stale, failed.
+    List topics that have contents matching the embedding status filter.
+    Default statuses: pending, stale, failed.
 
     Use this to discover which topics need embed work, then fetch content with
     ``GET /embedding-ingest/?topic_id=<id>``.
@@ -249,24 +271,28 @@ class ContentEmbeddingIngestTopicQueueView(EmbeddingIngestAPIView):
         statuses = params['statuses']
         media_types = _topic_media_types(media_type)
 
+        av_transcript_ok = Q(contents__media_type='TEXT') | Q(
+            contents__transcript__isnull=False,
+        )
+
         def _count_for(*status_values):
             return Count(
                 'contents',
                 filter=Q(
                     contents__media_type__in=media_types,
-                    contents__transcript__embedding_status__in=status_values,
-                ),
+                    contents__embedding__status__in=status_values,
+                ) & av_transcript_ok,
                 distinct=True,
             )
 
         queryset = (
             Topic.objects.annotate(
                 matching_count=_count_for(*statuses),
-                pending_count=_count_for(ContentTranscript.EMBEDDING_STATUS_PENDING),
-                stale_count=_count_for(ContentTranscript.EMBEDDING_STATUS_STALE),
-                failed_count=_count_for(ContentTranscript.EMBEDDING_STATUS_FAILED),
-                indexed_count=_count_for(ContentTranscript.EMBEDDING_STATUS_INDEXED),
-                skipped_count=_count_for(ContentTranscript.EMBEDDING_STATUS_SKIPPED),
+                pending_count=_count_for(ContentEmbedding.EMBEDDING_STATUS_PENDING),
+                stale_count=_count_for(ContentEmbedding.EMBEDDING_STATUS_STALE),
+                failed_count=_count_for(ContentEmbedding.EMBEDDING_STATUS_FAILED),
+                indexed_count=_count_for(ContentEmbedding.EMBEDDING_STATUS_INDEXED),
+                skipped_count=_count_for(ContentEmbedding.EMBEDDING_STATUS_SKIPPED),
             )
             .filter(matching_count__gt=0)
             .order_by('-matching_count', 'id')
@@ -300,34 +326,36 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
 
     def _get_content(self, content_id):
         content = get_object_or_404(
-            Content.objects.select_related('file_details', 'transcript')
+            Content.objects.select_related('file_details', 'transcript', 'embedding')
             .prefetch_related('topics'),
             pk=content_id,
         )
-        if content.media_type not in TRANSCRIPT_MEDIA_TYPES:
+        if content.media_type not in EMBEDDING_MEDIA_TYPES:
             return None, Response(
                 {
                     'error': (
                         f'El contenido {content_id} tiene media_type={content.media_type}. '
-                        'Solo se admiten VIDEO y AUDIO.'
+                        'Solo se admiten VIDEO, AUDIO y TEXT.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        try:
-            transcript = content.transcript
-        except ContentTranscript.DoesNotExist:
-            transcript = None
-        if transcript is None:
-            return None, Response(
-                {
-                    'error': (
-                        f'El contenido {content_id} no tiene transcript. '
-                        'Transcribe primero vía /api/content/transcript-ingest/.'
-                    ),
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
+
+        if content.media_type in TRANSCRIPT_MEDIA_TYPES:
+            try:
+                transcript = content.transcript
+            except ContentTranscript.DoesNotExist:
+                transcript = None
+            if transcript is None:
+                return None, Response(
+                    {
+                        'error': (
+                            f'El contenido {content_id} no tiene transcript. '
+                            'Transcribe primero vía /api/content/transcript-ingest/.'
+                        ),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
         return content, None
 
     def get(self, request, content_id):
@@ -335,10 +363,19 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
         if error_response:
             return error_response
 
+        has_transcript = False
+        transcript_data = None
+        try:
+            transcript = content.transcript
+            has_transcript = True
+            transcript_data = ContentEmbeddingIngestDetailSerializer(transcript).data
+        except ContentTranscript.DoesNotExist:
+            pass
+
         return Response({
             'content': ContentEmbeddingQueueItemSerializer(content).data,
-            'has_transcript': True,
-            'transcript': ContentEmbeddingIngestDetailSerializer(content.transcript).data,
+            'has_transcript': has_transcript,
+            'transcript': transcript_data,
         })
 
     def put(self, request, content_id):
@@ -351,88 +388,113 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         payload = serializer.validated_data
-        transcript = content.transcript
+        embedding, _ = ContentEmbedding.objects.get_or_create(
+            content=content,
+            defaults={'status': ContentEmbedding.STATUS_PENDING},
+        )
         ack_status = payload['status']
+        now = datetime.now(timezone.utc)
 
-        if ack_status == ContentTranscript.EMBEDDING_STATUS_INDEXED:
-            current_hash = (transcript.text_hash or '').strip()
-            if not current_hash:
-                return Response(
-                    {
-                        'error': (
-                            'El transcript no tiene text_hash; no se puede marcar indexed.'
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            ack_hash = (payload.get('embedded_text_hash') or '').strip() or current_hash
-            if ack_hash != current_hash:
-                return Response(
-                    {
-                        'error': (
-                            'embedded_text_hash no coincide con text_hash actual del transcript. '
-                            'Re-embebe el texto vigente o omite el campo para usar el hash actual.'
-                        ),
-                        'text_hash': current_hash,
-                        'embedded_text_hash': ack_hash,
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
+        if ack_status == ContentEmbedding.EMBEDDING_STATUS_INDEXED:
+            if content.media_type in TRANSCRIPT_MEDIA_TYPES:
+                transcript = content.transcript
+                current_hash = (transcript.text_hash or '').strip()
+                if not current_hash:
+                    return Response(
+                        {
+                            'error': (
+                                'El transcript no tiene text_hash; no se puede marcar indexed.'
+                            ),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                ack_hash = (
+                    payload.get('source_hash')
+                    or payload.get('embedded_text_hash')
+                    or ''
+                ).strip() or current_hash
+                if ack_hash != current_hash:
+                    return Response(
+                        {
+                            'error': (
+                                'embedded_text_hash no coincide con text_hash actual del '
+                                'transcript. Re-embebe el texto vigente o omite el campo '
+                                'para usar el hash actual.'
+                            ),
+                            'text_hash': current_hash,
+                            'embedded_text_hash': ack_hash,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                source_hash = current_hash
+            else:
+                source_hash = (
+                    payload.get('source_hash')
+                    or payload.get('embedded_text_hash')
+                    or ''
+                ).strip()
+                if not source_hash:
+                    return Response(
+                        {
+                            'error': (
+                                'source_hash (o embedded_text_hash) es requerido cuando '
+                                'status=indexed para contenido TEXT.'
+                            ),
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-            transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_INDEXED
-            transcript.embedded_text_hash = current_hash
-            transcript.embedding_model = payload.get('embedding_model') or ''
-            transcript.embedding_dims = payload.get('embedding_dims')
-            transcript.chunk_count = payload.get('chunk_count')
-            transcript.embedding_error = ''
             embedded_at = payload.get('embedded_at')
             if embedded_at:
                 if isinstance(embedded_at, str):
                     parsed = parse_datetime(embedded_at)
-                    transcript.embedded_at = parsed or datetime.now(timezone.utc)
-                else:
-                    transcript.embedded_at = embedded_at
+                    embedded_at = parsed or now
             else:
-                transcript.embedded_at = datetime.now(timezone.utc)
+                embedded_at = now
 
-        elif ack_status == ContentTranscript.EMBEDDING_STATUS_FAILED:
-            transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_FAILED
-            transcript.embedding_error = (payload.get('embedding_error') or '').strip()
+            update_fields = {
+                'status': ContentEmbedding.STATUS_INDEXED,
+                'source_hash': source_hash,
+                'model': payload.get('embedding_model') or '',
+                'dims': payload.get('embedding_dims'),
+                'chunk_count': payload.get('chunk_count'),
+                'error': '',
+                'embedded_at': embedded_at,
+                'updated_at': now,
+            }
+
+        elif ack_status == ContentEmbedding.EMBEDDING_STATUS_FAILED:
+            update_fields = {
+                'status': ContentEmbedding.STATUS_FAILED,
+                'error': (payload.get('embedding_error') or '').strip(),
+                'updated_at': now,
+            }
             if payload.get('embedding_model'):
-                transcript.embedding_model = payload['embedding_model']
+                update_fields['model'] = payload['embedding_model']
             if payload.get('embedding_dims') is not None:
-                transcript.embedding_dims = payload['embedding_dims']
+                update_fields['dims'] = payload['embedding_dims']
 
         else:  # skipped
-            transcript.embedding_status = ContentTranscript.EMBEDDING_STATUS_SKIPPED
-            transcript.embedding_error = (payload.get('embedding_error') or '').strip()
+            update_fields = {
+                'status': ContentEmbedding.STATUS_SKIPPED,
+                'error': (payload.get('embedding_error') or '').strip(),
+                'updated_at': now,
+            }
             if payload.get('embedding_model'):
-                transcript.embedding_model = payload['embedding_model']
+                update_fields['model'] = payload['embedding_model']
 
-        # Persist via QuerySet.update to avoid ContentTranscript.save() re-running
-        # sync_embedding_status_for_text_hash, which would overwrite an explicit ack.
-        update_fields = {
-            'embedding_status': transcript.embedding_status,
-            'embedded_text_hash': transcript.embedded_text_hash,
-            'embedding_model': transcript.embedding_model,
-            'embedding_dims': transcript.embedding_dims,
-            'chunk_count': transcript.chunk_count,
-            'embedded_at': transcript.embedded_at,
-            'embedding_error': transcript.embedding_error,
-            'updated_at': datetime.now(timezone.utc),
-        }
-        ContentTranscript.objects.filter(pk=transcript.pk).update(**update_fields)
-        transcript.refresh_from_db()
+        ContentEmbedding.objects.filter(pk=embedding.pk).update(**update_fields)
+        embedding.refresh_from_db()
 
         logger.info(
             'Embedding ingest ack status=%s content_id=%s model=%s chunks=%s',
             ack_status,
             content_id,
-            transcript.embedding_model or '-',
-            transcript.chunk_count,
+            embedding.model or '-',
+            embedding.chunk_count,
         )
 
         return Response({
             'content_id': content.id,
-            'transcript': ContentTranscriptIngestSummarySerializer(transcript).data,
+            'embedding': _embedding_ack_response(embedding),
         })
