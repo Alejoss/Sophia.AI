@@ -2,12 +2,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ContentDisplay from '../ContentDisplay';
+import { AuthContext } from '../../context/AuthContext';
+import { mockAuthValue, unauthenticatedAuth } from '../../test/formTestUtils';
 
-const renderContentDisplay = (content) =>
+const renderContentDisplay = (content, { auth = mockAuthValue } = {}) =>
   render(
-    <MemoryRouter>
-      <ContentDisplay content={content} variant="detailed" showAuthor={false} />
-    </MemoryRouter>,
+    <AuthContext.Provider value={auth}>
+      <MemoryRouter>
+        <ContentDisplay content={content} variant="detailed" showAuthor={false} />
+      </MemoryRouter>
+    </AuthContext.Provider>,
   );
 
 describe('ContentDisplay', () => {
@@ -126,5 +130,29 @@ describe('ContentDisplay', () => {
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', 'https://cdn.example.com/cover-preview.webp');
     expect(screen.queryByText(/no hay contenido de texto disponible/i)).not.toBeInTheDocument();
+  });
+
+  it('asks guests to log in instead of downloading the file', () => {
+    const content = {
+      id: 14,
+      media_type: 'TEXT',
+      original_title: 'Documento protegido',
+      has_file_available: true,
+      file_details: {
+        file: '/media/docs/secreto.pdf',
+        url: '/media/docs/secreto.pdf',
+        file_size: 2048,
+      },
+    };
+
+    renderContentDisplay(content, { auth: unauthenticatedAuth() });
+
+    expect(
+      screen.getByRole('link', { name: /inicia sesión para descargar/i }),
+    ).toHaveAttribute('href', '/profiles/login?next=%2F');
+    expect(screen.queryByRole('button', { name: /descargar archivo/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/documento protegido/i));
+    expect(openSpy).not.toHaveBeenCalled();
   });
 });

@@ -33,11 +33,8 @@ const ContentDetailsSearch = () => {
   useEffect(() => {
     const fetchContent = async () => {
       try {
-        // Get profile ID from URL if present
         const searchParams = new URLSearchParams(location.search);
         const profileId = searchParams.get("profile");
-
-        // Fetch content details
         const contentData = await contentApi.getContentDetails(
           contentId,
           "search",
@@ -45,9 +42,12 @@ const ContentDetailsSearch = () => {
         );
         setContent(contentData);
 
-        // Fetch content references
-        const referencesData = await contentApi.getContentReferences(contentId);
-        setReferences(referencesData);
+        try {
+          const referencesData = await contentApi.getContentReferences(contentId);
+          setReferences(referencesData);
+        } catch (refErr) {
+          console.warn("Error loading content references:", refErr);
+        }
       } catch (err) {
         console.error("Error fetching content details:", err);
         setError("Error al cargar el contenido");

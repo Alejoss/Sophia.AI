@@ -581,6 +581,93 @@ class ContentAPITests(APITestCase):
         # Should not return the requested other user's profile.
         self.assertNotEqual(response.data['selected_profile'].get('id'), other_profile.id)
 
+    def test_library_context_allows_visible_profile_in_public_collection(self):
+        """Guests can load another user's profile when it is visible in a public collection."""
+        other_user = User.objects.create_user(
+            username='publiclibraryuser',
+            email='publiclibrary@example.com',
+            password='testpass123',
+        )
+        library = Library.objects.create(user=other_user, name='Public Library')
+        public_collection = Collection.objects.create(
+            library=library,
+            name='Public Shelf',
+            is_public=True,
+        )
+        public_profile = ContentProfile.objects.create(
+            content=self.content,
+            user=other_user,
+            collection=public_collection,
+            title='Public Collection Title',
+            is_visible=True,
+        )
+        self.client.force_authenticate(user=None)
+        detail_url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=library&id={other_user.id}'
+        )
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['selected_profile']['id'], public_profile.id)
+        self.assertEqual(
+            response.data['selected_profile']['title'],
+            'Public Collection Title',
+        )
+
+    def test_search_context_returns_visible_profile_for_anonymous(self):
+        self.client.force_authenticate(user=None)
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=search&id={self.content_profile.id}'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['selected_profile']['id'], self.content_profile.id)
+
+    def test_search_context_hides_invisible_profile_from_anonymous(self):
+        self.content_profile.is_visible = False
+        self.content_profile.save(update_fields=['is_visible'])
+        self.client.force_authenticate(user=None)
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'?context=search&id={self.content_profile.id}'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(
+            response.data['selected_profile'].get('id'),
+            self.content_profile.id,
+        )
+
+    def test_anonymous_content_detail_omits_file_url(self):
+        """Guests can see that a file exists, but not the download URL."""
+        self.file_details.file.save(
+            'book.pdf',
+            SimpleUploadedFile('book.pdf', b'%PDF-1.4 test', content_type='application/pdf'),
+            save=True,
+        )
+        self.client.force_authenticate(user=None)
+        url = reverse('content:content-detail', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_file_available'])
+        file_details = response.data.get('file_details') or {}
+        self.assertIsNone(file_details.get('file'))
+        self.assertIsNone(file_details.get('url'))
+
+    def test_authenticated_content_detail_includes_file_url(self):
+        self.file_details.file.save(
+            'book.pdf',
+            SimpleUploadedFile('book.pdf', b'%PDF-1.4 test', content_type='application/pdf'),
+            save=True,
+        )
+        url = reverse('content:content-detail', args=[self.content.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_file_available'])
+        file_details = response.data.get('file_details') or {}
+        self.assertTrue(file_details.get('file'))
+
     def test_upload_url_content_basic(self):
         """Test basic URL content upload with minimal data."""
         url = 'https://example.com/article'
@@ -1073,6 +1160,58 @@ class PublicCollectionsAPITests(APITestCase):
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.description, 'Una colección corta de prueba')
 
+    def test_anonymous_can_list_public_collections(self):
+        url = reverse('content:public-collections')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], self.collection.id)
+
+    def test_anonymous_gets_public_collection_detail_and_visible_content(self):
+        detail = self.client.get(
+            reverse('content:collection-detail', args=[self.collection.id])
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data['name'], 'Public Shelf')
+        self.assertFalse(detail.data['is_owner'])
+
+        content = self.client.get(
+            reverse('content:collection-content', args=[self.collection.id])
+        )
+        self.assertEqual(content.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in content.data['results']}
+        self.assertIn(self.profile_visible.id, ids)
+        self.assertNotIn(self.profile_hidden.id, ids)
+
+    def test_anonymous_collection_content_omits_file_url(self):
+        FileDetails.objects.create(
+            content=self.content,
+            file=SimpleUploadedFile(
+                'doc.pdf', b'%PDF-1.4 test', content_type='application/pdf'
+            ),
+        )
+        response = self.client.get(
+            reverse('content:collection-content', args=[self.collection.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(r for r in response.data['results'] if r['id'] == self.profile_visible.id)
+        file_details = (row.get('content') or {}).get('file_details') or {}
+        self.assertIsNone(file_details.get('file'))
+        self.assertIsNone(file_details.get('url'))
+
+    def test_anonymous_cannot_see_private_collection(self):
+        self.collection.is_public = False
+        self.collection.save(update_fields=['is_public'])
+        response = self.client.get(
+            reverse('content:collection-detail', args=[self.collection.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_cannot_patch_collection(self):
+        url = reverse('content:collection-detail', args=[self.collection.id])
+        response = self.client.patch(url, {'name': 'Hacked'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
 
 class FeaturedTextWithThumbnailsAPITests(APITestCase):
     """Search landing: staff-curated featured TEXT profiles with thumbnails."""
@@ -1190,6 +1329,13 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
             is_featured=True,
             thumbnail=SimpleUploadedFile('video.gif', tiny_gif, content_type='image/gif'),
         )
+
+    def test_anonymous_can_list_featured_books(self):
+        url = reverse('content:featured-text-thumbnails')
+        response = self.client.get(url, {'page': 1, 'page_size': 20})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], self.with_thumb.id)
 
     def test_returns_only_curated_eligible_featured_books(self):
         self.client.force_authenticate(user=self.viewer)
@@ -3226,11 +3372,12 @@ class AuxiliaryEndpointsAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('Contenido no encontrado', response.data['error'])
 
-    def test_content_references_requires_authentication(self):
+    def test_content_references_visible_to_anonymous(self):
         self.client.force_authenticate(user=None)
         url = reverse('content:content-references', args=[self.content.id])
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('topics', response.data)
 
     def test_preview_url_requires_url_field(self):
         url = reverse('content:preview-url')
