@@ -160,7 +160,7 @@ const HeaderComp = () => {
     </IconButton>
   );
   const navLinks = [
-    { to: '/search', label: 'Buscar' },
+    { to: '/search', label: 'Biblioteca' },
     { to: '/knowledge_path', label: 'Caminos de conocimiento' },
     { to: '/content/topics', label: 'Temas' },
     { to: '/events', label: 'Eventos' },
