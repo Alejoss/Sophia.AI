@@ -18,6 +18,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
+import MoneroPaymentModal from './MoneroPaymentModal';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -27,7 +28,7 @@ const formatApiError = (err, fallback) => {
 };
 
 /**
- * Checkout chooser: NOWPayments (optional) vs self-custody BCH.
+ * Checkout chooser: NOWPayments, self-custody BCH, or Monero via message.
  */
 const ProductPaymentCheckout = ({
   open,
@@ -37,6 +38,7 @@ const ProductPaymentCheckout = ({
   productLabel = 'producto',
   offerNowpayments = true,
   offerBch = false,
+  offerMonero = true,
   createBchPayment,
   verifyBchPayment,
   nowpaymentsProps = {},
@@ -89,11 +91,11 @@ const ProductPaymentCheckout = ({
   }, [open, offerNowpayments, offerBch]);
 
   useEffect(() => {
-    if (!open || loadingMethods || method !== null || paid) return;
+    if (!open || loadingMethods || method !== null || paid || offerMonero) return;
     if (!methods.nowpayments && methods.bch_direct) {
       startBch();
     }
-  }, [open, loadingMethods, methods, method, paid]);
+  }, [open, loadingMethods, methods, method, paid, offerMonero]);
 
   const startBch = async () => {
     if (!createBchPayment) return;
@@ -141,6 +143,7 @@ const ProductPaymentCheckout = ({
   const showChooser = open && method === null && !paid;
   const showNowpayments = open && method === 'nowpayments';
   const showBch = open && method === 'bch';
+  const showMonero = open && method === 'monero';
 
   return (
     <>
@@ -190,7 +193,16 @@ const ProductPaymentCheckout = ({
                 Bitcoin Cash directo (BCH)
                 {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
               </Button>
-              {!methods.nowpayments && !methods.bch_direct && (
+              {offerMonero && (
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => setMethod('monero')}
+                >
+                  Pagar con Monero
+                </Button>
+              )}
+              {!methods.nowpayments && !methods.bch_direct && !offerMonero && (
                 <Alert severity="warning">
                   No hay métodos de pago configurados en el servidor.
                 </Alert>
@@ -202,6 +214,15 @@ const ProductPaymentCheckout = ({
           <Button onClick={onClose}>Cancelar</Button>
         </DialogActions>
       </Dialog>
+
+      <MoneroPaymentModal
+        open={showMonero}
+        onClose={onClose}
+        onBackToMethods={() => setMethod(null)}
+        title={title}
+        priceUsd={priceUsd}
+        productLabel={productLabel}
+      />
 
       <CryptoPaymentModal
         open={showNowpayments}
