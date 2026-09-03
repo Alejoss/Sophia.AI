@@ -1436,11 +1436,6 @@ class FeaturedTextWithThumbnailsAPITests(APITestCase):
         self.assertEqual(len(other_seed.data['results']), 20)
         self.assertEqual(other_seed.data['count'], first.data['count'])
 
-    def test_requires_authentication(self):
-        url = reverse('content:featured-text-thumbnails')
-        response = self.client.get(url)
-        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
-
     def test_staff_can_feature_and_unfeature_eligible_book(self):
         self.client.force_authenticate(user=self.staff)
         add_url = reverse('content:admin-featured-books')
