@@ -244,7 +244,7 @@ function TranscriptChecklist({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
         <Typography variant="body2" color="text.secondary">
-          Cargando transcripciones indexadas…
+          Cargando contenidos indexados…
         </Typography>
       </Box>
     );
@@ -253,7 +253,7 @@ function TranscriptChecklist({
   if (!sources.length) {
     return (
       <Alert severity="warning" sx={{ borderRadius: 0 }}>
-        No hay transcripciones indexadas en este tema todavía.
+        No hay contenidos indexados en este tema todavía.
       </Alert>
     );
   }
@@ -273,7 +273,7 @@ function TranscriptChecklist({
         }}
       >
         <Typography variant="subtitle2">
-          Transcripciones a consultar ({selectedIds.length}/{sources.length})
+          Contenidos a consultar ({selectedIds.length}/{sources.length})
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button size="small" onClick={onSelectAll} disabled={disabled || allSelected}>
@@ -285,7 +285,7 @@ function TranscriptChecklist({
         </Box>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-        Marca los archivos cuyas transcripciones quieres usar en esta consulta.
+        Marca los archivos cuyos contenidos quieres usar en esta consulta.
       </Typography>
       <FormGroup
         sx={{
@@ -393,7 +393,7 @@ function TopicChat({ topicId }) {
   if (!isAuthenticated) {
     return (
       <Alert severity="info" sx={{ borderRadius: 0, mb: 4 }}>
-        Inicia sesión para consultar las transcripciones de este tema.
+        Inicia sesión para consultar los contenidos de este tema.
       </Alert>
     );
   }
@@ -437,7 +437,7 @@ function TopicChat({ topicId }) {
     const text = input.trim();
     if (!text || loading) return;
     if (selectedIds.length === 0) {
-      setError('Selecciona al menos una transcripción para consultar.');
+      setError('Selecciona al menos un contenido para consultar.');
       return;
     }
 
@@ -498,7 +498,7 @@ function TopicChat({ topicId }) {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Cada consulta es independiente: eliges qué transcripciones indexadas
+        Cada consulta es independiente: eliges qué contenidos indexados
         usar, se responde solo con esos archivos y se guarda en tu historial.
       </Typography>
 

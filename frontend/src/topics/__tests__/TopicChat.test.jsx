@@ -55,7 +55,7 @@ describe('TopicChat component', () => {
     });
 
     expect(
-      screen.getByText(/inicia sesión para consultar las transcripciones de este tema/i)
+      screen.getByText(/inicia sesión para consultar los contenidos de este tema/i)
     ).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe('TopicChat component', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/transcripciones a consultar/i)).toBeInTheDocument();
+      expect(screen.getByText(/contenidos a consultar/i)).toBeInTheDocument();
     });
 
     const firstCheckbox = screen.getByRole('checkbox', { name: /libro blanco bitcoin/i });
