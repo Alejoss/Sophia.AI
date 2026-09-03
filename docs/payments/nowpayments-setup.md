@@ -37,12 +37,15 @@ FRONTEND_PUBLIC_URL=http://localhost:5173
 
 ## Modelo de datos
 
-`CryptoPayment` apunta a **exactamente uno** de estos entitlements (constraint XOR):
+`CryptoPayment` apunta a **exactamente uno** de estos entitlements (constraint XOR `cryptopayment_exactly_one_target`):
 
 - `event_registration` → `events.EventRegistration`
 - `path_purchase` → `knowledge_paths.KnowledgePathPurchase`
+- `anchor_request` → `content.TranscriptAnchorRequest`
 
 No hay FK directa a `Event` ni a `KnowledgePath`. El producto tiene `reference_price`; el entitlement guarda el estado `PENDING`/`PAID` y el snapshot del precio.
+
+Para anclajes, NOWPayments y [BCH directo](bch-direct.md) son mutuamente excluyentes mientras haya un pago **pendiente**.
 
 ## Flujo (según [API NOWPayments](https://documenter.getpostman.com/view/7907941/2s93JusNJt))
 
@@ -97,11 +100,15 @@ También se llama `on_crypto_payment_completed()` desde `sync_payment_from_provi
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/payments/status/` | ¿Pasarela activa? Monedas soportadas |
+| GET | `/api/payments/status/` | ¿Pasarela activa? Monedas + `methods.nowpayments` / `methods.bch_direct` |
 | POST | `/api/payments/registration/{id}/` | Crear invoice para registro de evento |
 | GET | `/api/payments/registration/{id}/list/` | Listar pagos de un registro |
 | POST | `/api/payments/path-purchase/{id}/` | Crear invoice para compra de camino |
 | GET | `/api/payments/path-purchase/{id}/list/` | Listar pagos de una compra |
+| POST | `/api/payments/anchor-request/{id}/` | Crear invoice para solicitud de anclaje |
+| GET | `/api/payments/anchor-request/{id}/list/` | Listar pagos NOWPayments de un anclaje |
+| GET/POST | `/api/payments/anchor-request/{id}/bch/` | Orden BCH directa (autocustodia) — [bch-direct.md](bch-direct.md) |
+| POST | `/api/payments/anchor-request/{id}/bch/verify/` | Verificar pago BCH on-chain |
 | GET | `/api/payments/{id}/` | Estado del pago (sincroniza con NOWPayments) |
 | POST | `/api/payments/ipn/` | Webhook NOWPayments (sin auth) |
 | POST | `/api/knowledge_paths/{id}/purchase/` | Crear/obtener `KnowledgePathPurchase` |

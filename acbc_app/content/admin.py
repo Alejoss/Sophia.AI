@@ -19,6 +19,7 @@ from content.models import (
     Publication,
     TopicCreationRequest,
     TopicChatQuery,
+    TopicPurchase,
 )
 
 
@@ -205,16 +206,16 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'created_at', 'updated_at']
-    list_filter = ['is_public', 'chat_enabled', 'creator', 'created_at']
-    list_editable = ['chat_enabled']
+    list_display = ['id', 'title', 'creator', 'is_public', 'chat_enabled', 'reference_price', 'bch_direct_enabled', 'created_at', 'updated_at']
+    list_filter = ['is_public', 'chat_enabled', 'bch_direct_enabled', 'creator', 'created_at']
+    list_editable = ['chat_enabled', 'bch_direct_enabled']
     search_fields = ['title', 'description', 'creator__username']
     filter_horizontal = ['moderators', 'related_topics']
     raw_id_fields = ['creator']
     readonly_fields = ['topic_image_thumbnail', 'created_at', 'updated_at']
     fieldsets = (
         ('Información básica', {
-            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled'),
+            'fields': ('title', 'description', 'creator', 'is_public', 'chat_enabled', 'reference_price', 'bch_direct_enabled'),
         }),
         ('Imagen de portada', {
             'fields': (
@@ -259,3 +260,11 @@ class PublicationAdmin(admin.ModelAdmin):
     search_fields = ['text_content']
     date_hierarchy = 'published_at'
     readonly_fields = ['published_at', 'updated_at']
+
+
+@admin.register(TopicPurchase)
+class TopicPurchaseAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'topic', 'payment_status', 'price_amount', 'created_at')
+    list_filter = ('payment_status', 'created_at')
+    search_fields = ('user__username', 'topic__title')
+    raw_id_fields = ('user', 'topic')

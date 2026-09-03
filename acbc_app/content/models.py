@@ -742,6 +742,16 @@ class Topic(models.Model):
         default=False,
         help_text='When true, the Consultas (RAG consultations) tab is visible on the topic page.',
     )
+    reference_price = models.FloatField(
+        default=0,
+        blank=True,
+        null=True,
+        help_text='USD price for Consultas. 0 or null means consultations are free.',
+    )
+    bch_direct_enabled = models.BooleanField(
+        default=False,
+        help_text='Staff: offer self-custody Bitcoin Cash checkout for paid Consultas.',
+    )
     activity_score = models.IntegerField(
         default=0,
         db_default=0,
@@ -780,6 +790,42 @@ class Topic(models.Model):
 
     def has_indexed_transcripts(self):
         return self.indexed_transcript_count() > 0
+
+    @property
+    def is_paid_topic(self):
+        return bool(self.reference_price and self.reference_price > 0)
+
+
+class TopicPurchase(models.Model):
+    """Entitlement for a user who pays for topic Consultas."""
+
+    PAYMENT_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('REFUNDED', 'Refunded'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='topic_purchases')
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='purchases')
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='PENDING',
+    )
+    price_amount = models.FloatField(help_text='USD price snapshot at purchase time')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['user', 'topic']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → topic {self.topic_id} ({self.payment_status})'
+
+    @property
+    def is_paid(self):
+        return self.payment_status == 'PAID'
 
 
 class TopicChatQuery(models.Model):

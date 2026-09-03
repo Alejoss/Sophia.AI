@@ -189,7 +189,8 @@ before running these commands.
 ## Related
 
 - Env: [environment-variables.md — Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring)
+- Payments: [BCH directo](../payments/bch-direct.md) · [NOWPayments](../payments/nowpayments-setup.md) · [payments index](../payments/README.md)
 - Transcript ingest: [transcript-ingest.md](transcript-ingest.md)
 - Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md)
 - Permissions: [endpoint-permissions-map.md](../security/endpoint-permissions-map.md)
-- Endpoints index: [endpoints.md](endpoints.md)
+- Endpoints index: [endpoints.md](endpoints.md#payments)

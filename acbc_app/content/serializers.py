@@ -25,6 +25,7 @@ from content.models import (
     TranscriptAnchor,
     TranscriptAnchorRequest,
     TopicChatQuery,
+    TopicPurchase,
 )
 from content.utils import build_media_url
 from content.image_utils import (
@@ -422,15 +423,25 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     topic_image_thumbnail = serializers.ImageField(read_only=True, required=False)
     indexed_transcript_count = serializers.SerializerMethodField()
     chat_can_enable = serializers.SerializerMethodField()
+    is_paid_topic = serializers.BooleanField(read_only=True)
+    bch_direct_available = serializers.SerializerMethodField()
+    user_has_consultas_access = serializers.SerializerMethodField()
+    user_purchase_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
         fields = [
             'id', 'title', 'description', 'creator', 'creator_username', 'is_public',
             'chat_enabled', 'indexed_transcript_count', 'chat_can_enable',
+            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
             'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y',
         ]
-        read_only_fields = ['creator', 'indexed_transcript_count', 'chat_can_enable']
+        read_only_fields = [
+            'creator', 'indexed_transcript_count', 'chat_can_enable',
+            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
+        ]
 
     def get_indexed_transcript_count(self, obj):
         annotated = getattr(obj, '_indexed_transcript_count', None)
@@ -440,6 +451,24 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     def get_chat_can_enable(self, obj):
         return obj.has_indexed_transcripts()
+
+    def get_bch_direct_available(self, obj):
+        from payments.bch_client import is_bch_direct_configured
+        return bool(is_bch_direct_configured() and obj.bch_direct_enabled and obj.is_paid_topic)
+
+    def get_user_has_consultas_access(self, obj):
+        from content.topic_access import user_has_topic_consultas_access
+        request = self.context.get('request')
+        user = request.user if request else None
+        return user_has_topic_consultas_access(user, obj)
+
+    def get_user_purchase_id(self, obj):
+        from content.topic_access import get_user_topic_purchase
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_authenticated', False):
+            return None
+        purchase = get_user_topic_purchase(request.user, obj)
+        return purchase.id if purchase else None
 
     def validate_chat_enabled(self, value):
         if value is True:
@@ -1995,4 +2024,24 @@ class TranscriptAnchorRequestSerializer(serializers.ModelSerializer):
 
     def get_content_title(self, obj):
         return getattr(obj.content, 'original_title', None) or f'Contenido {obj.content_id}'
+
+
+class TopicPurchaseSerializer(serializers.ModelSerializer):
+    topic_id = serializers.IntegerField(source='topic.id', read_only=True)
+    topic_title = serializers.CharField(source='topic.title', read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = TopicPurchase
+        fields = [
+            'id',
+            'topic_id',
+            'topic_title',
+            'payment_status',
+            'price_amount',
+            'is_paid',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
 

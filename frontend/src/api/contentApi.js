@@ -921,6 +921,16 @@ const contentApi = {
     }
   },
 
+  createOrGetTopicPurchase: async (topicId) => {
+    try {
+      const response = await axiosInstance.post(`/content/topics/${topicId}/purchase/`, {});
+      return response.data;
+    } catch (error) {
+      console.error('Error creating topic purchase:', error);
+      throw error;
+    }
+  },
+
   updateTopic: async (topicId, topicData) => {
     try {
       const response = await axiosInstance.patch(`/content/topics/${topicId}/`, topicData);
