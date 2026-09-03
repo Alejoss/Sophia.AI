@@ -948,7 +948,14 @@ const TopicDetail = () => {
 
             {activeTab === 'content' && (
                 <>
-                    {/* Content sections: imágenes en galería; video/audio en tarjetas; textos en lista */}
+                    {renderContentSection('video', contentByType.video)}
+                    {renderContentSection('audio', contentByType.audio)}
+                    {renderContentSection('text', contentByType.text, {
+                        sectionTitle: 'Textos',
+                        itemsWord: 'textos',
+                        layout: 'textList',
+                    })}
+
                     {renderContentSection('image', contentByType.image, {
                         sectionTitle: 'Imágenes',
                         itemsWord: 'imágenes',
@@ -973,13 +980,6 @@ const TopicDetail = () => {
                         onRequestNextPage={loadMoreImages}
                         isLoadingNextPage={imagePageInfo.loading}
                     />
-                    {renderContentSection('video', contentByType.video)}
-                    {renderContentSection('audio', contentByType.audio)}
-                    {renderContentSection('text', contentByType.text, {
-                        sectionTitle: 'Textos',
-                        itemsWord: 'textos',
-                        layout: 'textList',
-                    })}
 
                     {(Object.values(contentCounts).reduce((acc, n) => acc + (n || 0), 0) === 0) && (
                         <Typography variant="body1" color="text.secondary" align="center">
