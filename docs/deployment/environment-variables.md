@@ -170,11 +170,15 @@ docker compose exec backend python manage.py check_qdrant --topic-id 2
 - **Default**: `gpt-4o-mini`
 
 #### `TOPIC_CHAT_TOP_K`
-- **Description**: Max chunks included after retrieval/dedupe
-- **Default**: `8`
+- **Description**: Max chunks kept after retrieval/dedupe (fetch is `2 × TOP_K`, max 2 per content)
+- **Default**: `4`
+
+#### `TOPIC_CHAT_MIN_SCORE`
+- **Description**: Minimum Qdrant cosine score for dense hits; keyword-fallback windows bypass this floor. If nothing passes, the chat model is not called.
+- **Default**: `0.30`
 
 #### `TOPIC_CHAT_MAX_CONTEXT_CHARS`
-- **Description**: Soft cap on context characters sent to the chat model
+- **Description**: Hard cap on context characters; only whole chunks are included (no partial truncation)
 - **Default**: `12000`
 
 See [topic-rag-chat.md](../operations/topic-rag-chat.md).

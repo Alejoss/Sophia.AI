@@ -445,7 +445,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
             topic = self.instance
             if topic is None or not topic.has_indexed_transcripts():
                 raise serializers.ValidationError(
-                    'No se puede activar la conversación: este tema aún no tiene '
+                    'No se pueden activar las consultas: este tema aún no tiene '
                     'transcripciones indexadas (embeddings). '
                     'Transcribe e indexa al menos un video/audio del tema primero.'
                 )
@@ -1764,6 +1764,8 @@ class TopicChatQuerySerializer(serializers.ModelSerializer):
             'question',
             'answer',
             'sources',
+            'retrieved_chunk_count',
+            'used_chunk_count',
             'created_at',
         ]
         read_only_fields = fields

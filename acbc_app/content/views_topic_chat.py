@@ -101,14 +101,19 @@ class TopicChatView(APIView):
             question=message,
             answer=result.get('answer') or '',
             sources=result.get('sources') or [],
+            retrieved_chunk_count=int(result.get('retrieved_chunk_count') or 0),
+            used_chunk_count=int(result.get('used_chunk_count') or 0),
         )
 
         logger.info(
-            'Topic chat query saved id=%s topic_id=%s user_id=%s sources=%s',
+            'Topic chat query saved id=%s topic_id=%s user_id=%s sources=%s '
+            'retrieved=%s used=%s',
             query.id,
             topic.id,
             request.user.id,
             len(query.sources or []),
+            query.retrieved_chunk_count,
+            query.used_chunk_count,
         )
         return Response(
             TopicChatQuerySerializer(query).data,

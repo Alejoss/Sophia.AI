@@ -10,7 +10,7 @@ System design, data models, API architecture, and blockchain integration:
 - [Data Models](architecture/data-models.md) - Database schema and entity relationships
 - [API Design](architecture/api-design.md) - API architecture and design principles
 - [Topics & Knowledge Paths](architecture/topics-and-knowledge-paths.md) - Topics, timelines, and learning paths
-- [Topic RAG & embeddings](architecture/topic-rag-embeddings.md) - Qdrant vectors, embed worker, topic conversation
+- [Topic RAG & embeddings](architecture/topic-rag-embeddings.md) - Qdrant vectors, embed worker, topic consultations
 - [Club de Lectura](architecture/book-clubs.md) - Book club hub, Foro, Investigación, and staff dashboard
 - [Blockchain Integration](architecture/blockchain-integration.md) - Bitcoin transcript certification + legacy EVM contracts
 
@@ -35,7 +35,7 @@ Deployment guides for different environments:
 ### [Operations](operations/)
 Runbooks for external workers and platform features:
 - [Qdrant embeddings](operations/qdrant-embeddings.md) - Embed worker queue/ack + Qdrant Cloud
-- [Topic RAG chat](operations/topic-rag-chat.md) - Authenticated topic conversation consultations
+- [Topic RAG chat](operations/topic-rag-chat.md) - Authenticated topic consultations
 
 ### [Development](development/)
 Development guides for different parts of the system:

@@ -738,8 +738,9 @@ QDRANT_VECTOR_SIZE = int(os.getenv('QDRANT_VECTOR_SIZE', '3072'))
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_EMBEDDING_MODEL = os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-large')
 OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
-TOPIC_CHAT_TOP_K = int(os.getenv('TOPIC_CHAT_TOP_K', '8'))
+TOPIC_CHAT_TOP_K = int(os.getenv('TOPIC_CHAT_TOP_K', '4'))
 TOPIC_CHAT_MAX_CONTEXT_CHARS = int(os.getenv('TOPIC_CHAT_MAX_CONTEXT_CHARS', '12000'))
+TOPIC_CHAT_MIN_SCORE = float(os.getenv('TOPIC_CHAT_MIN_SCORE', '0.30'))
 
 # Bitcoin OP_RETURN anchoring for transcript text_hash (platform wallet).
 # Network: signet (recommended for tests), testnet, or mainnet.

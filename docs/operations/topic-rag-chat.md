@@ -52,6 +52,8 @@ Response `201`:
       "transcript_url": "/content/46/transcript?context=topic"
     }
   ],
+  "retrieved_chunk_count": 4,
+  "used_chunk_count": 3,
   "created_at": "2026-07-28T18:00:00Z"
 }
 ```
@@ -103,7 +105,8 @@ Same shape as the create response. Other users get **404**.
 OPENAI_API_KEY=sk-…
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 OPENAI_CHAT_MODEL=gpt-4o-mini
-TOPIC_CHAT_TOP_K=8
+TOPIC_CHAT_TOP_K=4
+TOPIC_CHAT_MIN_SCORE=0.30
 TOPIC_CHAT_MAX_CONTEXT_CHARS=12000
 ```
 
@@ -114,17 +117,122 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 ## Behaviour notes
 
 - Retrieval is scoped to one `topic_id`.
-- At most two chunks per `content_id` in the prompt (dedupe).
-- If no chunks have usable `text` payload, the API still persists a fixed
-  “no encontré…” answer (no chat-model call).
+- Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
+- Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
+  remain and keyword fallback cannot help, the API returns a fixed message and
+  **does not** call the chat model.
+- Context includes **whole chunks only** under `TOPIC_CHAT_MAX_CONTEXT_CHARS`
+  (default 12000). Partial tail truncation is not allowed.
+- Responses expose `retrieved_chunk_count` / `used_chunk_count`.
+- Entity keywords from the question must appear in the assembled prompt after
+  keyword fallback; otherwise the chat model is skipped.
+- System prompt requires `[n]` citations plus a short verbatim quote from
+  fragment `[n]` (or an explicit “not in context”).
+- Previous consultations are never sent back to the LLM (one-shot only).
+- Entity keywords missing from dense hits are backfilled from indexed Postgres
+  transcript windows when present.
+- If no usable context remains, the API persists an honest fixed Spanish
+  answer (retrieval miss / index gap / empty / low score) — **no** chat-model call,
+  and it does **not** claim the entity is absent from the whole topic when Postgres
+  still has matches.
 - Per-user / per-topic daily rate limits are **not** implemented yet.
-- The Conversación tab is only shown when `Topic.chat_enabled` is true **and**
+- The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
   Enabling the flag via topic edit / PATCH fails with **400** if nothing is
   indexed yet. Chat API still returns **403** when the flag is off.
 - If Qdrant drops the TLS connection (`Connection reset by peer`), the client
   retries a few times, then the API returns **502** with a Spanish error instead
   of an unhandled **500**.
+
+---
+
+## Debugging “not found” answers (e.g. Adam Back)
+
+A consultation can say the entity is missing for **different** reasons. Distinguish
+them before changing retrieval or the prompt.
+
+### 1. Look at `sources` on the saved consultation
+
+In the UI, open the consultation and check **Fuentes**:
+
+| What you see | Meaning |
+|--------------|---------|
+| No Fuentes / empty `sources` | Dense search returned nothing usable (or payloads lack `text`). Fixed Spanish “No encontré fragmentos…” may appear — **no LLM call**. |
+| Fuentes present, but excerpts never mention the entity | Retrieval ranked the wrong chunks. The model correctly refuses (grounding). Common for **proper nouns** with dense-only search. |
+| Fuentes mention the entity, answer still refuses | Prompt / truncation / over-refusal — inspect context length and system prompt. |
+
+API: `GET /api/content/topics/{topic_id}/chat/queries/{query_id}/` (own queries only).
+
+### 2. Confirm the text exists in Postgres for that topic
+
+```bash
+cd acbc_app && . .venv/bin/activate
+# native runs: export ENVIRONMENT=DEVELOPMENT DB_* … as in AGENTS.md
+python manage.py shell -c "
+from content.models import ContentTranscript
+from content.transcript_utils import resolve_hash_source_text
+kw='Adam Back'
+for t in ContentTranscript.objects.filter(content__topics__id=TOPIC_ID).select_related('content'):
+    body = resolve_hash_source_text(t) or ''
+    if kw.casefold() in body.casefold():
+        print(t.content_id, t.embedding_status, t.chunk_count, t.content.original_title)
+"
+```
+
+If matches are `pending` / `stale` / `failed` / `skipped`, fix indexing first
+(embed worker + `PUT /api/content/embedding-ingest/{content_id}/`).
+
+### 3. Confirm Qdrant has points for the topic
+
+```bash
+python manage.py check_qdrant --topic-id TOPIC_ID
+```
+
+`0` points with `chat_enabled` and Postgres `indexed` rows → embed-worker / ack gap
+(or wrong `topic_id` on Qdrant payloads).
+
+### 4. One-shot classifier: `debug_topic_chat`
+
+```bash
+# Saved consultation (no OpenAI/Qdrant required)
+python manage.py debug_topic_chat --query-id QUERY_ID --keyword "Adam Back"
+
+# Live embed + Qdrant search (needs OPENAI_* + QDRANT_*)
+python manage.py debug_topic_chat \
+  --topic-id TOPIC_ID \
+  --message "¿Quién es Adam Back?" \
+  --keyword "Adam Back"
+```
+
+Classification modes:
+
+| Mode | Likely cause |
+|------|----------------|
+| `retrieval_miss` | Indexed Postgres text has the keyword; top Qdrant chunks do not → dense ranking miss (typical for names). |
+| `index_gap` | Keyword only on non-`indexed` transcripts → re-embed / ack. |
+| `empty_retrieval` | No Qdrant context and no Postgres hits → wrong topic / spelling / empty corpus. |
+| `grounding_refuse` | Keyword in sources (or refusal without keyword probe) → inspect LLM grounding. |
+| `ok` | Sources mention the keyword; focus on answer quality / UI. |
+
+Add `--json` for machine-readable output. Logic lives in
+`acbc_app/content/topic_chat_debug.py`.
+
+### 5. Likely root cause for entity questions
+
+Sophia’s consult path is primarily **dense** retrieval (`text-embedding-3-large`
+→ Qdrant filter by `topic_id` → top-k). Short questions about people
+(“¿quién es Adam Back?”) can rank the wrong chunks after tiny wording/accent
+changes, and the model then says “no encuentro…” even though the name is in
+the corpus.
+
+**Mitigation (in `topic_chat.py`):** if extracted entity keywords are missing
+from dense hits but present in indexed Postgres transcripts, inject keyword
+windows into the prompt (`keyword_fallback`). Empty retrieval also returns an
+honest message (`RETRIEVAL_MISS_ANSWER` / `INDEX_GAP_ANSWER`) instead of
+claiming the material does not exist.
+
+SQL_ASCII on Postgres is a separate ops issue (accents may degrade on save);
+migrate with `./scripts/migrate-db-to-utf8.sh` when possible.
 
 ## Related
 

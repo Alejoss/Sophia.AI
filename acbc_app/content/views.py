@@ -1417,8 +1417,8 @@ class FeaturedTextWithThumbnailsView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-class AdminTopicsConversationView(APIView):
-    """Staff dashboard: list topics and conversation (Qdrant RAG) readiness."""
+class AdminTopicsConsultationsView(APIView):
+    """Staff dashboard: list topics and consultations (Qdrant RAG) readiness."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -1436,20 +1436,24 @@ class AdminTopicsConversationView(APIView):
             ),
         ).order_by('-_indexed_transcript_count', 'title')
 
-        conversation = (request.query_params.get('conversation') or '').strip().lower()
-        if conversation == 'visible':
+        consultation = (
+            request.query_params.get('consultation')
+            or request.query_params.get('conversation')
+            or ''
+        ).strip().lower()
+        if consultation == 'visible':
             queryset = queryset.filter(chat_enabled=True, _indexed_transcript_count__gt=0)
-        elif conversation == 'ready':
+        elif consultation == 'ready':
             queryset = queryset.filter(chat_enabled=False, _indexed_transcript_count__gt=0)
-        elif conversation == 'on':
+        elif consultation == 'on':
             queryset = queryset.filter(chat_enabled=True)
-        elif conversation == 'no_embeddings':
+        elif consultation == 'no_embeddings':
             queryset = queryset.filter(_indexed_transcript_count=0)
-        elif conversation:
+        elif consultation:
             return Response(
                 {
                     'error': (
-                        'Invalid conversation filter. Use visible, ready, on, or no_embeddings.'
+                        'Invalid consultation filter. Use visible, ready, on, or no_embeddings.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1461,7 +1465,7 @@ class AdminTopicsConversationView(APIView):
         results = serializer.data
         return Response({
             'count': len(results),
-            'conversation': conversation or None,
+            'consultation': consultation or None,
             'results': results,
         })
 

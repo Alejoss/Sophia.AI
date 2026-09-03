@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 
 import requests
 from django.conf import settings
 
-from content.models import Content
+from content.models import Content, ContentTranscript
+from content.transcript_utils import resolve_hash_source_text
 from utils.openai_client import OpenAIClient, OpenAIClientError, openai_configured
 from utils.qdrant_client import QdrantClient, QdrantClientError, qdrant_configured
 
@@ -18,11 +20,50 @@ SYSTEM_PROMPT = (
     'Eres un asistente de Academia Blockchain. Respondes preguntas sobre un tema '
     'usando ÚNICAMENTE los fragmentos de transcripciones proporcionados como contexto.\n'
     'Reglas:\n'
-    '- Si el contexto no contiene la información, di claramente que no la encuentras '
-    'en las transcripciones del tema. No inventes.\n'
-    '- Cita fuentes con [n] donde n es el número del fragmento.\n'
-    '- Responde en español, de forma clara y educativa.\n'
+    '- Si el contexto menciona a la persona o concepto preguntado, resume lo que '
+    'dicen esos fragmentos (aunque sea parcial). No digas que no aparece si el '
+    'nombre sí está en el contexto.\n'
+    '- Solo si el contexto realmente no habla del tema de la pregunta, di que no '
+    'lo encuentras en los fragmentos recuperados (no afirmes que no existe en el '
+    'tema completo).\n'
+    '- Cita cada afirmación con [n] donde n es el número del fragmento.\n'
+    '- Para cada afirmación, incluye una cita breve entre comillas tomada '
+    'literalmente del fragmento [n], o di explícitamente que ese detalle no está '
+    'en el contexto.\n'
+    '- Responde en español, de forma clara y concisa. Sin tono de tutor ni '
+    'relleno educativo fuera de los fragmentos.\n'
     '- No inventes citas, títulos ni hechos fuera del contexto.'
+)
+
+EMPTY_RETRIEVAL_ANSWER = (
+    'No pude recuperar fragmentos útiles de las transcripciones indexadas para '
+    'responder a tu pregunta. Puede que la búsqueda semántica no haya coincidido '
+    'con el material, o que aún falten embeddings.'
+)
+
+RETRIEVAL_MISS_ANSWER = (
+    'La búsqueda semántica no recuperó bien los pasajes, aunque el nombre o '
+    'concepto sí aparece en transcripciones indexadas de este tema. Prueba a '
+    'reformular la pregunta (por ejemplo sin acentos o con más contexto), o '
+    'vuelve a intentarlo en unos segundos.'
+)
+
+INDEX_GAP_ANSWER = (
+    'Encontré menciones en el texto de las transcripciones, pero todavía no '
+    'están indexadas para consultas (embeddings pendientes, obsoletos o con error). '
+    'Un moderador debe reindexar esos archivos antes de poder consultarlos aquí.'
+)
+
+LOW_SCORE_ANSWER = (
+    'Encontré archivos indexados para este tema, pero ninguno fue lo bastante '
+    'similar a tu pregunta (por debajo del umbral de relevancia). Prueba a '
+    'reformularla con más detalle o con el nombre exacto que buscas.'
+)
+
+ENTITY_NOT_IN_CONTEXT_ANSWER = (
+    'Recuperé fragmentos del tema, pero ninguno menciona el nombre o dato '
+    'principal de tu pregunta, así que no generé una respuesta para no inventar. '
+    'Prueba a reformular o a preguntar de otra forma.'
 )
 
 
@@ -44,9 +85,9 @@ def topic_chat_ready() -> tuple[bool, str]:
 
 def _top_k() -> int:
     try:
-        return max(1, min(int(getattr(settings, 'TOPIC_CHAT_TOP_K', 8)), 32))
+        return max(1, min(int(getattr(settings, 'TOPIC_CHAT_TOP_K', 4)), 32))
     except (TypeError, ValueError):
-        return 8
+        return 4
 
 
 def _max_context_chars() -> int:
@@ -56,11 +97,32 @@ def _max_context_chars() -> int:
         return 12000
 
 
+def _min_score() -> float:
+    try:
+        return float(getattr(settings, 'TOPIC_CHAT_MIN_SCORE', 0.30))
+    except (TypeError, ValueError):
+        return 0.30
+
+
 def _score_of(hit: dict[str, Any]) -> float:
     try:
         return float(hit.get('score') or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _filter_hits_by_score(hits: list[dict[str, Any]], *, min_score: Optional[float] = None) -> list[dict[str, Any]]:
+    """Keep dense hits at/above the cosine floor; always keep keyword_fallback hits."""
+    threshold = _min_score() if min_score is None else min_score
+    kept: list[dict[str, Any]] = []
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        if payload.get('retrieval') == 'keyword_fallback':
+            kept.append(hit)
+            continue
+        if _score_of(hit) >= threshold:
+            kept.append(hit)
+    return kept
 
 
 def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> list[dict[str, Any]]:
@@ -78,6 +140,235 @@ def _dedupe_hits(hits: list[dict[str, Any]], *, max_per_content: int = 2) -> lis
         per_content[key] = count + 1
         selected.append(hit)
     return selected
+
+
+def extract_entity_keywords(message: str, *, explicit: Optional[str] = None) -> list[str]:
+    """
+    Proper nouns / distinctive tokens from a consultation question.
+
+    Used for Postgres keyword fallback when dense retrieval misses names
+    (e.g. "Adam Back") after small wording/accent changes.
+    """
+    if explicit and explicit.strip():
+        return [explicit.strip()]
+
+    text = (message or '').strip()
+    if not text:
+        return []
+
+    keywords: list[str] = []
+    for match in re.finditer(
+        r'\b([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]+)+)\b',
+        text,
+    ):
+        keywords.append(match.group(1))
+
+    multi_parts = {
+        part.casefold()
+        for kw in keywords
+        for part in kw.split()
+    }
+
+    stop = {
+        'que', 'qué', 'quien', 'quién', 'como', 'cómo', 'donde', 'dónde',
+        'cual', 'cuál', 'sobre', 'dice', 'dicen', 'habla', 'hablan', 'tema',
+        'the', 'who', 'what', 'where', 'about', 'from', 'with', 'this', 'that',
+    }
+    for token in re.findall(r'[\wÁÉÍÓÚÑáéíóúñ]{4,}', text, flags=re.UNICODE):
+        if token.casefold() in stop or token.casefold() in multi_parts:
+            continue
+        if token[0].isupper() and token not in keywords:
+            keywords.append(token)
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for kw in keywords:
+        key = kw.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(kw)
+    return ordered
+
+
+def snippet_around(text: str, keyword: str, *, radius: int = 220) -> str:
+    lower = text.casefold()
+    needle = keyword.casefold()
+    pos = lower.find(needle)
+    if pos < 0:
+        return (text[: radius * 2] + ('…' if len(text) > radius * 2 else ''))
+    start = max(0, pos - radius)
+    end = min(len(text), pos + len(keyword) + radius)
+    snippet = text[start:end].strip()
+    if start > 0:
+        snippet = '…' + snippet
+    if end < len(text):
+        snippet = snippet + '…'
+    return snippet
+
+
+def postgres_keyword_matches(
+    topic_id: int,
+    keywords: list[str],
+    *,
+    limit: int = 20,
+    indexed_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Find topic transcripts whose index text mentions keywords."""
+    if not keywords:
+        return []
+
+    qs = ContentTranscript.objects.filter(
+        content__topics__id=topic_id,
+        content__media_type__in=('VIDEO', 'AUDIO', 'TEXT'),
+    ).select_related('content').distinct()
+    if indexed_only:
+        qs = qs.filter(embedding_status=ContentTranscript.EMBEDDING_STATUS_INDEXED)
+
+    matches: list[dict[str, Any]] = []
+    for transcript in qs:
+        body = resolve_hash_source_text(transcript) or ''
+        if not body:
+            continue
+        hit_keywords = [kw for kw in keywords if kw.casefold() in body.casefold()]
+        if not hit_keywords:
+            continue
+        primary = hit_keywords[0]
+        matches.append({
+            'content_id': transcript.content_id,
+            'title': transcript.content.original_title or '',
+            'media_type': transcript.content.media_type or '',
+            'embedding_status': transcript.embedding_status,
+            'chunk_count': transcript.chunk_count,
+            'text_hash': transcript.text_hash,
+            'embedded_text_hash': transcript.embedded_text_hash,
+            'matched_keywords': hit_keywords,
+            'snippet': snippet_around(body, primary),
+        })
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def sources_mention_keywords(sources: list[dict[str, Any]], keywords: list[str]) -> bool:
+    if not keywords:
+        return False
+    for src in sources or []:
+        blob = f"{src.get('excerpt') or ''} {src.get('text') or ''} {src.get('title') or ''}"
+        if any(kw.casefold() in blob.casefold() for kw in keywords):
+            return True
+    return False
+
+
+def keyword_fallback_hits(
+    topic_id: int,
+    keywords: list[str],
+    *,
+    limit: int = 4,
+    exclude_content_ids: Optional[set[int]] = None,
+) -> list[dict[str, Any]]:
+    """Build synthetic Qdrant-like hits from indexed Postgres snippets."""
+    exclude = exclude_content_ids or set()
+    matches = postgres_keyword_matches(
+        topic_id,
+        keywords,
+        limit=limit + len(exclude) + 4,
+        indexed_only=True,
+    )
+    hits: list[dict[str, Any]] = []
+    for match in matches:
+        content_id = match.get('content_id')
+        if content_id in exclude:
+            continue
+        text = (match.get('snippet') or '').strip()
+        if not text:
+            continue
+        hits.append({
+            'score': 0.99,
+            'payload': {
+                'topic_id': topic_id,
+                'content_id': content_id,
+                'chunk_index': None,
+                'text': text,
+                'retrieval': 'keyword_fallback',
+            },
+        })
+        if len(hits) >= limit:
+            break
+    return hits
+
+
+def merge_keyword_fallback(
+    hits: list[dict[str, Any]],
+    *,
+    topic_id: int,
+    message: str,
+) -> list[dict[str, Any]]:
+    """
+    If dense hits omit entity keywords that exist in indexed transcripts,
+    prepend Postgres keyword windows so the LLM sees the name.
+    """
+    keywords = extract_entity_keywords(message)
+    if not keywords:
+        return hits
+
+    # Peek whether current hit texts already mention the entity.
+    provisional = []
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        provisional.append({
+            'excerpt': (payload.get('text') or '')[:400],
+            'text': payload.get('text') or '',
+            'title': '',
+        })
+    if sources_mention_keywords(provisional, keywords):
+        return hits
+
+    # Only skip contents whose dense hit already mentions the keyword.
+    already: set[int] = set()
+    for hit in hits:
+        payload = hit.get('payload') or {}
+        text = payload.get('text') or ''
+        if not any(kw.casefold() in text.casefold() for kw in keywords):
+            continue
+        cid = payload.get('content_id')
+        try:
+            already.add(int(cid))
+        except (TypeError, ValueError):
+            pass
+
+    fallback = keyword_fallback_hits(
+        topic_id,
+        keywords,
+        limit=min(4, _top_k()),
+        exclude_content_ids=already,
+    )
+    if not fallback:
+        return hits
+
+    logger.info(
+        'Topic chat keyword fallback topic_id=%s keywords=%s injected=%s',
+        topic_id,
+        keywords,
+        len(fallback),
+    )
+    # Prefer keyword windows, then dense hits; dedupe caps per content.
+    return _dedupe_hits(fallback + hits, max_per_content=2)[: _top_k()]
+
+
+def empty_retrieval_answer(*, topic_id: int, message: str) -> str:
+    """Honest fixed answer when no usable context could be built."""
+    keywords = extract_entity_keywords(message)
+    if not keywords:
+        return EMPTY_RETRIEVAL_ANSWER
+
+    matches = postgres_keyword_matches(topic_id, keywords, limit=8)
+    indexed = [m for m in matches if m.get('embedding_status') == 'indexed']
+    if indexed:
+        return RETRIEVAL_MISS_ANSWER
+    if matches:
+        return INDEX_GAP_ANSWER
+    return EMPTY_RETRIEVAL_ANSWER
 
 
 def _load_content_metadata(content_ids: list[int]) -> dict[int, dict[str, str]]:
@@ -156,24 +447,69 @@ def build_sources_from_hits(
     return sources
 
 
-def format_context(sources: list[dict[str, Any]]) -> str:
-    blocks = []
+def format_context(sources: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """
+    Build prompt context from whole chunks only (no partial truncation).
+
+    Returns (context_text, used_sources_with_renumbered_indexes).
+    """
     budget = _max_context_chars()
-    used = 0
+    used_chars = 0
+    kept: list[dict[str, Any]] = []
     for src in sources:
         text = (src.get('text') or src.get('excerpt') or '').strip()
         if not text:
             continue
         title = src.get('title') or f"contenido {src.get('content_id') or '?'}"
-        header = f"[{src['index']}] {title}"
+        # Provisional header length uses upcoming index.
+        next_index = len(kept) + 1
+        header = f"[{next_index}] {title}"
         if src.get('chunk_index') is not None:
             header += f" (chunk {src['chunk_index']})"
         block = f"{header}\n{text}"
-        if used + len(block) > budget and blocks:
+        # Skip any chunk that does not fit in full (including the first).
+        if used_chars + len(block) > budget:
             break
-        blocks.append(block)
-        used += len(block) + 2
-    return '\n\n'.join(blocks)
+        kept.append({**src, 'index': next_index})
+        used_chars += len(block) + 2
+
+    blocks = []
+    for src in kept:
+        text = (src.get('text') or src.get('excerpt') or '').strip()
+        title = src.get('title') or f"contenido {src.get('content_id') or '?'}"
+        header = f"[{src['index']}] {title}"
+        if src.get('chunk_index') is not None:
+            header += f" (chunk {src['chunk_index']})"
+        blocks.append(f"{header}\n{text}")
+    return '\n\n'.join(blocks), kept
+
+
+def context_mentions_entities(context: str, keywords: list[str]) -> bool:
+    if not keywords:
+        return True
+    blob = (context or '').casefold()
+    return any(kw.casefold() in blob for kw in keywords)
+
+
+def _public_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{k: v for k, v in src.items() if k != 'text'} for src in sources]
+
+
+def _result_payload(
+    *,
+    topic_id: int,
+    answer: str,
+    sources: list[dict[str, Any]],
+    retrieved_chunk_count: int,
+    used_chunk_count: int,
+) -> dict[str, Any]:
+    return {
+        'answer': answer,
+        'sources': _public_sources(sources),
+        'topic_id': topic_id,
+        'retrieved_chunk_count': retrieved_chunk_count,
+        'used_chunk_count': used_chunk_count,
+    }
 
 
 def run_topic_chat(
@@ -185,6 +521,10 @@ def run_topic_chat(
     openai_client: Optional[OpenAIClient] = None,
     qdrant_client: Optional[QdrantClient] = None,
 ) -> dict[str, Any]:
+    # history is accepted for API compatibility but never sent to the LLM
+    # (one-shot consultations only).
+    del history
+
     ready, reason = topic_chat_ready()
     if not ready and openai_client is None and qdrant_client is None:
         raise TopicChatError(reason, status_code=503)
@@ -202,7 +542,7 @@ def run_topic_chat(
         ) from exc
 
     try:
-        hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
+        raw_hits = qdrant.search(query_vector, topic_id=topic_id, limit=_top_k() * 2)
     except (QdrantClientError, requests.RequestException) as exc:
         logger.exception('Topic chat Qdrant search failed topic_id=%s', topic_id)
         raise TopicChatError(
@@ -211,20 +551,52 @@ def run_topic_chat(
             status_code=502,
         ) from exc
 
-    hits = _dedupe_hits(hits, max_per_content=2)[: _top_k()]
-    sources = build_sources_from_hits(hits, topic_id=topic_id)
-    context = format_context(sources)
+    scored_hits = _filter_hits_by_score(raw_hits)
+    hits = _dedupe_hits(scored_hits, max_per_content=2)[: _top_k()]
+    hits = merge_keyword_fallback(hits, topic_id=topic_id, message=message)
+
+    all_sources = build_sources_from_hits(hits, topic_id=topic_id)
+    retrieved_chunk_count = len(all_sources)
+    context, used_sources = format_context(all_sources)
+    used_chunk_count = len(used_sources)
 
     if not context.strip():
-        return {
-            'answer': (
-                'No encontré fragmentos indexados de transcripciones para este tema '
-                'que respondan a tu pregunta. Puede que aún no haya embeddings o que '
-                'la pregunta no coincida con el material disponible.'
-            ),
-            'sources': [],
-            'topic_id': topic_id,
-        }
+        # Distinguish: had raw hits but all below score floor vs true empty.
+        if raw_hits and not scored_hits and not hits:
+            answer = LOW_SCORE_ANSWER
+        else:
+            answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+        return _result_payload(
+            topic_id=topic_id,
+            answer=answer,
+            sources=[],
+            retrieved_chunk_count=retrieved_chunk_count,
+            used_chunk_count=0,
+        )
+
+    # Pre-LLM entity check: if the question names an entity, it must appear in
+    # the prompt context (after keyword fallback). Otherwise skip the chat model.
+    keywords = extract_entity_keywords(message)
+    if keywords and not context_mentions_entities(context, keywords):
+        logger.info(
+            'Topic chat entity not in context topic_id=%s keywords=%s '
+            'retrieved=%s used=%s',
+            topic_id,
+            keywords,
+            retrieved_chunk_count,
+            used_chunk_count,
+        )
+        # Prefer corpus-aware miss copy when Postgres still has the name.
+        answer = empty_retrieval_answer(topic_id=topic_id, message=message)
+        if answer == EMPTY_RETRIEVAL_ANSWER:
+            answer = ENTITY_NOT_IN_CONTEXT_ANSWER
+        return _result_payload(
+            topic_id=topic_id,
+            answer=answer,
+            sources=used_sources,
+            retrieved_chunk_count=retrieved_chunk_count,
+            used_chunk_count=used_chunk_count,
+        )
 
     user_prompt = (
         f'Tema: {topic_title}\n\n'
@@ -232,16 +604,13 @@ def run_topic_chat(
         f'Pregunta del usuario:\n{message}'
     )
 
-    messages: list[dict[str, str]] = [{'role': 'system', 'content': SYSTEM_PROMPT}]
-    for turn in (history or [])[-6:]:
-        role = (turn.get('role') or '').strip()
-        content = (turn.get('content') or '').strip()
-        if role in ('user', 'assistant') and content:
-            messages.append({'role': role, 'content': content[:4000]})
-    messages.append({'role': 'user', 'content': user_prompt})
+    messages: list[dict[str, str]] = [
+        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'user', 'content': user_prompt},
+    ]
 
     try:
-        answer = openai.chat(messages)
+        answer = openai.chat(messages, temperature=0.2)
     except OpenAIClientError as exc:
         logger.exception('Topic chat completion failed topic_id=%s', topic_id)
         raise TopicChatError(
@@ -249,13 +618,10 @@ def run_topic_chat(
             status_code=502,
         ) from exc
 
-    # Strip full chunk text from API response (keep excerpt only).
-    public_sources = [
-        {k: v for k, v in src.items() if k != 'text'}
-        for src in sources
-    ]
-    return {
-        'answer': answer,
-        'sources': public_sources,
-        'topic_id': topic_id,
-    }
+    return _result_payload(
+        topic_id=topic_id,
+        answer=answer,
+        sources=used_sources,
+        retrieved_chunk_count=retrieved_chunk_count,
+        used_chunk_count=used_chunk_count,
+    )

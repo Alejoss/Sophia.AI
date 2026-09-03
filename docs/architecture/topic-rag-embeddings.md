@@ -66,19 +66,19 @@ Embed-worker acks (`PUT /api/content/embedding-ingest/{content_id}/`) set
 
 ---
 
-## Topic chat gating
+## Topic consultations gating
 
-Topic RAG conversation is available when **all** of the following hold:
+Topic RAG consultations are available when **all** of the following hold:
 
 1. `Topic.chat_enabled` is `true` (moderator toggle; PATCH returns **400** if nothing is indexed yet).
 2. At least one VIDEO/AUDIO in the topic has `embedding_status=indexed`
    (`Topic.indexed_transcript_count()`, exposed as `chat_can_enable` in API).
 3. Runtime env: `OPENAI_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY`.
 
-The frontend shows the Conversación tab only when `chat_enabled && chat_can_enable`.
+The frontend shows the Consultas tab only when `chat_enabled && chat_can_enable`.
 
-Staff see which topics have conversation enabled on `/dashboard`
-(section **Conversación con los archivos**):
+Staff see which topics have consultations enabled on `/dashboard`
+(section **Consultas con los archivos**):
 status, indexed-embedding count, and a switch to turn it on once Qdrant has
 vectors for that topic.
 
@@ -95,6 +95,7 @@ answers are not sent to the LLM. See [topic-rag-chat.md](../operations/topic-rag
 | Staleness sync | `acbc_app/content/transcript_utils.py` |
 | Embedding-ingest API | `acbc_app/content/views_embedding_ingest.py` |
 | RAG orchestration | `acbc_app/content/topic_chat.py` |
+| Consultation debug CLI | `acbc_app/content/topic_chat_debug.py` + `manage.py debug_topic_chat` |
 | OpenAI client | `acbc_app/utils/openai_client.py` |
 | Qdrant search client | `acbc_app/utils/qdrant_client.py` |
 | Qdrant connectivity CLI | `acbc_app/content/management/commands/check_qdrant.py` |
@@ -136,7 +137,7 @@ contract is defined in [qdrant-embeddings.md](../operations/qdrant-embeddings.md
 ## Local dev caveat
 
 Seed command `populate_content` sets `embedding_status=skipped` on demo
-transcripts, so **Conversación will not appear** after seeding unless you either:
+transcripts, so **Consultas will not appear** after seeding unless you either:
 
 - Run the embed worker and ack items as `indexed`, or
 - Manually ack a transcript via `PUT /api/content/embedding-ingest/{content_id}/` in dev.
@@ -152,6 +153,7 @@ Topic chat also requires valid Qdrant and OpenAI credentials in the backend env.
 | `ContentEmbeddingIngestAPITests` | `acbc_app/content/tests.py` |
 | `ContentTranscriptIngestAPITests` (stale on text change) | `acbc_app/content/tests.py` |
 | `TopicChatAPITests` | `acbc_app/content/tests.py` |
+| `TopicChatDebugTests` | `acbc_app/content/tests.py` |
 
 ---
 

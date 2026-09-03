@@ -32,6 +32,13 @@ import TopicChat from './TopicChat';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
 const TOPIC_IMAGE_PAGE_SIZE = 3;
+const TOPIC_TAB_CONSULTATIONS = 'consultations';
+const LEGACY_TOPIC_TAB_CHAT = 'chat';
+
+function normalizeTopicTab(tab) {
+    if (tab === LEGACY_TOPIC_TAB_CHAT) return TOPIC_TAB_CONSULTATIONS;
+    return tab;
+}
 
 function getGalleryImageSrc(content) {
     const contentData = content.content || content;
@@ -342,7 +349,7 @@ const TopicDetail = () => {
     const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
     const [imageLightboxIndex, setImageLightboxIndex] = useState(0);
     const [contentCounts, setContentCounts] = useState({});
-    const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'content');
+    const [activeTab, setActiveTab] = useState(() => normalizeTopicTab(searchParams.get('tab')) || 'content');
     const [timelineEntryCount, setTimelineEntryCount] = useState(0);
     const [imagePageInfo, setImagePageInfo] = useState({
         currentPage: 0,
@@ -455,14 +462,27 @@ const TopicDetail = () => {
     const canEditTimeline = isCreator || isModerator;
     const canSuggestTimeline = isAuthenticated && !canEditTimeline;
     const showTimelineTab = canEditTimeline || timelineEntryCount > 0;
-    const showChatTab = Boolean(topic?.chat_enabled) && Boolean(topic?.chat_can_enable);
+    const showConsultationsTab = Boolean(topic?.chat_enabled) && Boolean(topic?.chat_can_enable);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab === 'timeline' || tab === 'comments' || tab === 'content' || tab === 'chat') {
-            setActiveTab(tab);
+        const normalized = normalizeTopicTab(tab);
+        if (
+            normalized === 'timeline'
+            || normalized === 'comments'
+            || normalized === 'content'
+            || normalized === TOPIC_TAB_CONSULTATIONS
+        ) {
+            setActiveTab(normalized);
         }
-    }, [searchParams]);
+        if (tab === LEGACY_TOPIC_TAB_CHAT) {
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set('tab', TOPIC_TAB_CONSULTATIONS);
+                return next;
+            }, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     const handleTabChange = (_, value) => {
         setActiveTab(value);
@@ -480,8 +500,8 @@ const TopicDetail = () => {
     useEffect(() => {
         if (loading) return;
         const invalidTimeline = activeTab === 'timeline' && !showTimelineTab;
-        const invalidChat = activeTab === 'chat' && !showChatTab;
-        if (invalidTimeline || invalidChat) {
+        const invalidConsultations = activeTab === TOPIC_TAB_CONSULTATIONS && !showConsultationsTab;
+        if (invalidTimeline || invalidConsultations) {
             setActiveTab('content');
             setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
@@ -489,7 +509,7 @@ const TopicDetail = () => {
                 return next;
             }, { replace: true });
         }
-    }, [activeTab, showTimelineTab, showChatTab, loading, setSearchParams]);
+    }, [activeTab, showTimelineTab, showConsultationsTab, loading, setSearchParams]);
 
     const loadMoreImages = useCallback(async () => {
         if (imagePageInfo.loading || !imagePageInfo.hasNext) {
@@ -836,13 +856,13 @@ const TopicDetail = () => {
                     allowScrollButtonsMobile
                 >
                     <Tab value="content" label="Contenido" />
-                    {showChatTab && <Tab value="chat" label="Conversación" />}
+                    {showConsultationsTab && <Tab value={TOPIC_TAB_CONSULTATIONS} label="Consultas" />}
                     {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
                     <Tab value="comments" label="Comentarios" />
                 </Tabs>
             </Box>
 
-            {activeTab === 'chat' && showChatTab && (
+            {activeTab === TOPIC_TAB_CONSULTATIONS && showConsultationsTab && (
                 <TopicChat topicId={topicId} />
             )}
 

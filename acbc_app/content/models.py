@@ -696,7 +696,7 @@ class Topic(models.Model):
     )
     chat_enabled = models.BooleanField(
         default=False,
-        help_text='When true, the conversation (RAG consultation) tab is visible on the topic page.',
+        help_text='When true, the Consultas (RAG consultations) tab is visible on the topic page.',
     )
     activity_score = models.IntegerField(
         default=0,
@@ -763,6 +763,14 @@ class TopicChatQuery(models.Model):
         default=list,
         blank=True,
         help_text='Citation payloads returned with the answer (index, content_id, excerpt, …).',
+    )
+    retrieved_chunk_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Chunks after score filter / dedupe / keyword fallback, before context budget.',
+    )
+    used_chunk_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Chunks that fit wholly in the prompt context budget.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

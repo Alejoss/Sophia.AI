@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import TopicsConversationDashboard, { conversationStatus } from '../TopicsConversationDashboard';
+import TopicsConsultationsDashboard, { consultationStatus } from '../TopicsConsultationsDashboard';
 import { renderWithProviders, mockAuthValue } from '../../test/formTestUtils';
 
 const mockGetAdminTopics = vi.fn();
@@ -53,16 +53,16 @@ const topicsPayload = {
   ],
 };
 
-describe('TopicsConversationDashboard', () => {
+describe('TopicsConsultationsDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAdminTopics.mockResolvedValue(topicsPayload);
   });
 
-  it('lists topics with conversation status from Qdrant embeddings', async () => {
-    renderWithProviders(<TopicsConversationDashboard />, { auth: staffAuth });
+  it('lists topics with consultation status from Qdrant embeddings', async () => {
+    renderWithProviders(<TopicsConsultationsDashboard />, { auth: staffAuth });
 
-    expect(await screen.findByText('Conversación con los archivos')).toBeInTheDocument();
+    expect(await screen.findByText('Consultas con los archivos')).toBeInTheDocument();
     expect(screen.getByText('Bitcoin')).toBeInTheDocument();
     expect(
       screen.getByText(/consultas de usuarios.*chunks y embeddings.*Qdrant/i),
@@ -72,11 +72,12 @@ describe('TopicsConversationDashboard', () => {
     expect(screen.getByText('Visible')).toBeInTheDocument();
     expect(screen.getByText('Listo para activar')).toBeInTheDocument();
     expect(screen.getByText('1 visibles')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Consultas' })).toBeInTheDocument();
   });
 
-  it('filters to topics ready to enable conversation', async () => {
+  it('filters to topics ready to enable consultations', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<TopicsConversationDashboard />, { auth: staffAuth });
+    renderWithProviders(<TopicsConsultationsDashboard />, { auth: staffAuth });
     await screen.findByText('Bitcoin');
 
     await user.click(screen.getByRole('button', { name: /^listos$/i }));
@@ -86,13 +87,13 @@ describe('TopicsConversationDashboard', () => {
     expect(screen.queryByText('Tema vacio')).not.toBeInTheDocument();
   });
 
-  it('enables conversation on a topic that already has embeddings', async () => {
+  it('enables consultations on a topic that already has embeddings', async () => {
     const user = userEvent.setup();
     mockUpdateTopic.mockResolvedValue({
       ...topicsPayload.results[1],
       chat_enabled: true,
     });
-    renderWithProviders(<TopicsConversationDashboard />, { auth: staffAuth });
+    renderWithProviders(<TopicsConsultationsDashboard />, { auth: staffAuth });
     await screen.findByText('Lightning');
 
     const switches = screen.getAllByRole('checkbox');
@@ -104,12 +105,12 @@ describe('TopicsConversationDashboard', () => {
   });
 });
 
-describe('conversationStatus', () => {
+describe('consultationStatus', () => {
   it('marks indexed+enabled topics as visible', () => {
-    expect(conversationStatus({ chat_enabled: true, chat_can_enable: true })).toBe('visible');
+    expect(consultationStatus({ chat_enabled: true, chat_can_enable: true })).toBe('visible');
   });
 
   it('marks indexed but off topics as ready', () => {
-    expect(conversationStatus({ chat_enabled: false, indexed_transcript_count: 1 })).toBe('ready');
+    expect(consultationStatus({ chat_enabled: false, indexed_transcript_count: 1 })).toBe('ready');
   });
 });

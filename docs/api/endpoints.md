@@ -190,12 +190,12 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
-### Staff — topic conversation
+### Staff — topic consultations
 - **GET** `/api/content/admin/topics/`
 - **Auth**: Staff (`IsAdminUser`)
-- **Query**: `conversation` = `visible` | `ready` | `on` | `no_embeddings`
-- **Response**: `{ count, conversation, results[] }` with `chat_enabled`, `chat_can_enable`, `indexed_transcript_count`
-- UI: `/dashboard` section **Conversación con los archivos**
+- **Query**: `consultation` = `visible` | `ready` | `on` | `no_embeddings` (legacy alias: `conversation`)
+- **Response**: `{ count, consultation, results[] }` with `chat_enabled`, `chat_can_enable`, `indexed_transcript_count`
+- UI: `/dashboard` section **Consultas con los archivos**
 
 ## Topics — Timeline
 

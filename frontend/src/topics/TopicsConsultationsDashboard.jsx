@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import contentApi from '../api/contentApi';
 
-export const conversationStatus = (topic) => {
+export const consultationStatus = (topic) => {
   const indexed = Boolean(topic?.chat_can_enable) || Number(topic?.indexed_transcript_count) > 0;
   if (topic?.chat_enabled && indexed) return 'visible';
   if (topic?.chat_enabled) return 'on_no_index';
@@ -43,7 +43,7 @@ const FILTERS = [
   { value: 'none', label: 'Sin embeddings' },
 ];
 
-const TopicsConversationDashboard = () => {
+const TopicsConsultationsDashboard = () => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,7 +58,7 @@ const TopicsConversationDashboard = () => {
       setTopics(results);
       setError(null);
     } catch (err) {
-      setError('No se pudieron cargar los temas de conversación.');
+      setError('No se pudieron cargar los temas.');
     } finally {
       setLoading(false);
     }
@@ -72,17 +72,17 @@ const TopicsConversationDashboard = () => {
     if (filter === 'all') return topics;
     if (filter === 'none') {
       return topics.filter((topic) => {
-        const status = conversationStatus(topic);
+        const status = consultationStatus(topic);
         return status === 'none' || status === 'on_no_index';
       });
     }
-    return topics.filter((topic) => conversationStatus(topic) === filter);
+    return topics.filter((topic) => consultationStatus(topic) === filter);
   }, [topics, filter]);
 
   const summary = useMemo(() => {
     const counts = { visible: 0, ready: 0, none: 0 };
     topics.forEach((topic) => {
-      const status = conversationStatus(topic);
+      const status = consultationStatus(topic);
       if (status === 'visible') counts.visible += 1;
       else if (status === 'ready') counts.ready += 1;
       else counts.none += 1;
@@ -113,7 +113,7 @@ const TopicsConversationDashboard = () => {
       const apiError =
         err?.response?.data?.chat_enabled?.[0]
         || err?.response?.data?.error
-        || 'No se pudo actualizar la conversación.';
+        || 'No se pudieron actualizar las consultas.';
       setError(apiError);
     } finally {
       setSavingId(null);
@@ -139,11 +139,11 @@ const TopicsConversationDashboard = () => {
       >
         <Box>
           <Typography variant="h5" gutterBottom>
-            Conversación con los archivos
+            Consultas con los archivos
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Consultas de usuarios sobre un tema usando los chunks y embeddings
-            guardados en Qdrant. Actívala cuando el tema ya tenga transcripciones indexadas.
+            guardados en Qdrant. Actívalas cuando el tema ya tenga transcripciones indexadas.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -187,13 +187,13 @@ const TopicsConversationDashboard = () => {
                 <TableCell>Tema</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell>Embeddings</TableCell>
-                <TableCell>Conversación</TableCell>
+                <TableCell>Consultas</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredTopics.map((topic) => {
-                const status = conversationStatus(topic);
+                const status = consultationStatus(topic);
                 const meta = STATUS_META[status];
                 const canTurnOn = Boolean(topic.chat_can_enable) || Boolean(topic.chat_enabled);
                 return (
@@ -254,4 +254,4 @@ const TopicsConversationDashboard = () => {
   );
 };
 
-export default TopicsConversationDashboard;
+export default TopicsConsultationsDashboard;

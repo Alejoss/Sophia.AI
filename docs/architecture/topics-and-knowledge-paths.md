@@ -123,16 +123,16 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
       - Perfiles de contenido (`ContentProfile`) seleccionados preferentemente del creador del tema y, si no existen, del usuario actual.
   - `PATCH /topics/<pk>/` → `TopicDetailView.patch`
     - Actualiza el título, descripción, imagen o **`chat_enabled`** del tema.
-    - **`chat_enabled`**: activa la pestaña **Conversación** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
+    - **`chat_enabled`**: activa la pestaña **Consultas** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
     - **Permiso**: `creator`, moderadores, o staff (`is_staff`).
     - Si se actualiza `topic_image`, elimina el fichero anterior en disco/S3 antes de guardar el nuevo.
 
-- **Dashboard staff (Conversación con los archivos)**
+- **Dashboard staff (Consultas con los archivos)**
   - `GET /admin/topics/` → lista todos los temas (incluidos privados) con `chat_enabled`, `chat_can_enable` e `indexed_transcript_count`.
-  - Query `conversation=visible|ready|on|no_embeddings`.
-  - UI: `/dashboard` sección **Conversación con los archivos**. Staff puede activar/desactivar la conversación (consultas RAG sobre chunks en Qdrant).
+  - Query `consultation=visible|ready|on|no_embeddings` (alias legado: `conversation`).
+  - UI: `/dashboard` sección **Consultas con los archivos**. Staff puede activar/desactivar las consultas RAG sobre chunks en Qdrant.
 
-- **Consultas RAG (Conversación)**
+- **Consultas RAG**
   - `POST /topics/<pk>/chat/` → consulta independiente (pregunta + respuesta + fuentes).
   - `GET /topics/<pk>/chat/queries/` → historial del usuario autenticado.
   - Requiere `chat_enabled=true`, OpenAI + Qdrant configurados, y vectores indexados en Qdrant.
