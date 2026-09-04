@@ -3,15 +3,18 @@
  * Mirrors legacy UploadContentForm behavior.
  */
 export function getMediaType(file) {
-  if (!file || !file.type) return null;
+  if (!file) return null;
 
-  if (file.type.startsWith('image/')) return 'IMAGE';
-  if (file.type.startsWith('video/')) return 'VIDEO';
-  if (file.type.startsWith('audio/')) return 'AUDIO';
+  const type = file.type || '';
+
+  if (type.startsWith('image/')) return 'IMAGE';
+  if (type.startsWith('video/')) return 'VIDEO';
+  if (type.startsWith('audio/')) return 'AUDIO';
   if (
-    file.type === 'application/pdf' ||
-    file.type === 'application/msword' ||
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    type === 'application/pdf' ||
+    type === 'application/msword' ||
+    type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    type === 'application/epub+zip'
   ) {
     return 'TEXT';
   }
@@ -20,7 +23,7 @@ export function getMediaType(file) {
   const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
   const videoExts = ['mp4', 'webm', 'avi', 'mov'];
   const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
-  const textExts = ['txt', 'pdf', 'doc', 'docx', 'rtf'];
+  const textExts = ['txt', 'pdf', 'doc', 'docx', 'rtf', 'epub'];
 
   if (imageExts.includes(extension)) return 'IMAGE';
   if (videoExts.includes(extension)) return 'VIDEO';

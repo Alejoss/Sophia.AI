@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/formTestUtils';
 vi.mock('../../api/contentApi', () => ({
   default: {
     uploadContent: vi.fn(),
+    uploadContentViaS3: vi.fn(),
     createContentProfile: vi.fn(),
     fetchUrlMetadata: vi.fn(),
   },
@@ -78,6 +79,55 @@ describe('UploadContentForm', () => {
     await waitFor(() => {
       expect(contentApi.uploadContent).toHaveBeenCalled();
     });
+  });
+
+  it('accepts EPUB files as TEXT and uploads via S3', async () => {
+    const user = userEvent.setup();
+    const onContentUploaded = vi.fn();
+    contentApi.uploadContentViaS3.mockResolvedValue({
+      content_id: 42,
+      content_profile: { id: 7, title: 'Libro Prueba' },
+    });
+
+    renderWithProviders(
+      <UploadContentForm
+        initialUrlMode={false}
+        showModeToggle={false}
+        onContentUploaded={onContentUploaded}
+      />,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]');
+    const epub = new File(['epub-bytes'], 'Libro_Prueba.epub', {
+      type: 'application/epub+zip',
+    });
+    await user.upload(fileInput, epub);
+
+    await user.click(screen.getByRole('button', { name: /guardar contenido/i }));
+
+    await waitFor(() => {
+      expect(contentApi.uploadContentViaS3).toHaveBeenCalled();
+    });
+
+    const [uploadedFile, payload] = contentApi.uploadContentViaS3.mock.calls[0];
+    expect(uploadedFile.name).toBe('Libro_Prueba.epub');
+    expect(payload.media_type).toBe('TEXT');
+    expect(screen.queryByText(/tipo de archivo no soportado/i)).not.toBeInTheDocument();
+  });
+
+  it('rejects unsupported archives instead of treating them as TEXT', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <UploadContentForm initialUrlMode={false} showModeToggle={false} />,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]');
+    const zip = new File(['zip'], 'archive.zip', { type: 'application/zip' });
+    await user.upload(fileInput, zip);
+    await user.click(screen.getByRole('button', { name: /guardar contenido/i }));
+
+    expect(await screen.findByText(/tipo de archivo no soportado/i)).toBeInTheDocument();
+    expect(contentApi.uploadContentViaS3).not.toHaveBeenCalled();
   });
 
   it('keeps media type after filling other fields in URL mode', async () => {

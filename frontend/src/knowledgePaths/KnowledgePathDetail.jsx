@@ -45,7 +45,6 @@ import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
-import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
 import {
   createPathPurchaseBchPayment,
@@ -931,31 +930,19 @@ const KnowledgePathDetail = () => {
         </Paper>
       )}
 
-      {knowledgePath?.bch_direct_available ? (
-        <ProductPaymentCheckout
-          open={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          title={knowledgePath?.title}
-          priceUsd={knowledgePath?.reference_price}
-          productLabel="camino"
-          offerNowpayments
-          offerBch
-          createBchPayment={() => createPathPurchaseBchPayment(pathPurchaseId)}
-          verifyBchPayment={() => verifyPathPurchaseBchPayment(pathPurchaseId)}
-          nowpaymentsProps={{ pathPurchaseId }}
-          onPaid={handlePaymentComplete}
-        />
-      ) : (
-        <CryptoPaymentModal
-          open={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          pathPurchaseId={pathPurchaseId}
-          title={knowledgePath?.title}
-          priceUsd={knowledgePath?.reference_price}
-          productLabel="camino"
-          onPaymentComplete={handlePaymentComplete}
-        />
-      )}
+      <ProductPaymentCheckout
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        title={knowledgePath?.title}
+        priceUsd={knowledgePath?.reference_price}
+        productLabel="camino"
+        offerNowpayments
+        offerBch={Boolean(knowledgePath?.bch_direct_available)}
+        createBchPayment={() => createPathPurchaseBchPayment(pathPurchaseId)}
+        verifyBchPayment={() => verifyPathPurchaseBchPayment(pathPurchaseId)}
+        nowpaymentsProps={{ pathPurchaseId }}
+        onPaid={handlePaymentComplete}
+      />
     </Container>
   );
 };

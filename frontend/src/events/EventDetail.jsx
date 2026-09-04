@@ -16,6 +16,7 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/authErrorHandler';
 import CryptoPaymentModal from './CryptoPaymentModal';
+import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
 import { getPaymentStatus, listRegistrationPayments } from '../api/paymentsApi';
@@ -79,6 +80,7 @@ const EventDetail = () => {
   const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showMoneroModal, setShowMoneroModal] = useState(false);
   const [imageError, setImageError] = useState(false);
   const userId = authState.user?.id;
   const isAuthenticated = authState.isAuthenticated;
@@ -551,14 +553,24 @@ const EventDetail = () => {
                     ) : (
                       <>
                         {needsPayment && (
-                          <Button
-                            variant="contained"
-                            size="large"
-                            startIcon={<PaymentsIcon />}
-                            onClick={() => setShowPaymentModal(true)}
-                          >
-                            Completar pago
-                          </Button>
+                          <>
+                            <Button
+                              variant="contained"
+                              size="large"
+                              startIcon={<PaymentsIcon />}
+                              onClick={() => setShowPaymentModal(true)}
+                            >
+                              Completar pago
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="large"
+                              startIcon={<PaymentsIcon />}
+                              onClick={() => setShowMoneroModal(true)}
+                            >
+                              Pagar con Monero
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="outlined"
@@ -631,6 +643,13 @@ const EventDetail = () => {
         eventTitle={event?.title}
         priceUsd={event?.reference_price}
         onPaymentComplete={handlePaymentComplete}
+      />
+      <MoneroPaymentModal
+        open={showMoneroModal}
+        onClose={() => setShowMoneroModal(false)}
+        title={event?.title}
+        priceUsd={event?.reference_price}
+        productLabel="evento"
       />
     </Container>
   );

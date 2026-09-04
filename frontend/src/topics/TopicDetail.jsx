@@ -32,6 +32,7 @@ import ContentSuggestionModal from './ContentSuggestionModal';
 import TopicTimeline from './timeline/TopicTimeline';
 import TopicChat from './TopicChat';
 import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
+import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import {
   createTopicPurchaseBchPayment,
   verifyTopicPurchaseBchPayment,
@@ -366,6 +367,7 @@ const TopicDetail = () => {
         loading: false,
     });
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showMoneroModal, setShowMoneroModal] = useState(false);
     const [topicPurchaseId, setTopicPurchaseId] = useState(null);
     const [purchaseLoading, setPurchaseLoading] = useState(false);
     const [purchaseError, setPurchaseError] = useState(null);
@@ -502,6 +504,14 @@ const TopicDetail = () => {
         } finally {
             setPurchaseLoading(false);
         }
+    };
+
+    const handleStartMoneroPayment = () => {
+        if (!isAuthenticated) {
+            navigate('/login');
+            return;
+        }
+        setShowMoneroModal(true);
     };
 
     const handleTopicPaymentComplete = async () => {
@@ -921,19 +931,28 @@ const TopicDetail = () => {
                             </Typography>
                             <Typography variant="body2">
                                 Desbloquea las consultas de este tema por{' '}
-                                <strong>${Number(topic.reference_price).toFixed(2)} USD</strong>{' '}
-                                pagando con Bitcoin Cash.
+                                <strong>${Number(topic.reference_price).toFixed(2)} USD</strong>.
                             </Typography>
                             {purchaseError && <Typography color="error">{purchaseError}</Typography>}
-                            <Button
-                                variant="contained"
-                                startIcon={<Payments />}
-                                onClick={handleStartTopicPurchase}
-                                disabled={purchaseLoading || !topic.bch_direct_available}
-                                sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
-                            >
-                                {purchaseLoading ? 'Preparando...' : 'Pagar con BCH'}
-                            </Button>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Payments />}
+                                    onClick={handleStartTopicPurchase}
+                                    disabled={purchaseLoading || !topic.bch_direct_available}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    {purchaseLoading ? 'Preparando...' : 'Pagar con BCH'}
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Payments />}
+                                    onClick={handleStartMoneroPayment}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    Pagar con Monero
+                                </Button>
+                            </Stack>
                             {!topic.bch_direct_available && (
                                 <Typography variant="caption" color="text.secondary">
                                     El pago BCH aún no está activado para este tema.
@@ -1017,9 +1036,17 @@ const TopicDetail = () => {
                 productLabel="consultas del tema"
                 offerNowpayments={false}
                 offerBch
+                offerMonero={false}
                 createBchPayment={() => createTopicPurchaseBchPayment(topicPurchaseId)}
                 verifyBchPayment={() => verifyTopicPurchaseBchPayment(topicPurchaseId)}
                 onPaid={handleTopicPaymentComplete}
+            />
+            <MoneroPaymentModal
+                open={showMoneroModal}
+                onClose={() => setShowMoneroModal(false)}
+                title={topic?.title}
+                priceUsd={topic?.reference_price}
+                productLabel="consultas del tema"
             />
         </Box>
     );
