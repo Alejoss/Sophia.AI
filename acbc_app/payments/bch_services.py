@@ -408,6 +408,13 @@ def verify_bch_payment(
                 'amount_sats': out.amount_sats,
             })
 
+    logger.info(
+        'BCH verify no exact-amount match yet payment_id=%s address=%s sats=%s txs_scanned=%s',
+        payment.pk,
+        payment.address,
+        payment.expected_amount_sats,
+        len(txs),
+    )
     raise BchPaymentError(
         'No encontramos un pago BCH con el monto exacto aún. '
         'Espere unos segundos y vuelva a intentarlo.'

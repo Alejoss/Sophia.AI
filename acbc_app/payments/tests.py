@@ -901,3 +901,24 @@ class PathAndTopicBchPaymentTests(TestCase):
                 client=client,
             )
         self.assertIn('confirmación', str(ctx.exception))
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+        BCH_USD_PRICE=200,
+    )
+    @patch('payments.views.verify_bch_payment')
+    def test_path_bch_verify_view_logs_payment_errors(self, mock_verify):
+        mock_verify.side_effect = BchPaymentError(
+            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.'
+        )
+        api = APIClient()
+        api.force_authenticate(user=self.buyer)
+        with self.assertLogs('payments.views', level='WARNING') as logs:
+            response = api.post(f'/api/payments/path-purchase/{self.purchase.id}/bch/verify/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(
+            any('verify_path_bch failed' in line for line in logs.output),
+            logs.output,
+        )
+        self.assertIn('blockchain', response.data['error'].lower())

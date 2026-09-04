@@ -308,8 +308,10 @@ def _fetch_coingecko_bch_usd_rate() -> Decimal:
         payload = response.json()
         price = ((payload.get('bitcoin-cash') or {}).get('usd'))
     except (ValueError, AttributeError, TypeError) as exc:
+        logger.error('Invalid CoinGecko price JSON: %s', exc, exc_info=True)
         raise BchApiError('Invalid CoinGecko price JSON') from exc
     if price is None or Decimal(str(price)) <= 0:
+        logger.error('CoinGecko returned empty/invalid BCH price: %r', payload)
         raise BchApiError('No se pudo obtener el precio de BCH en USD.')
     return Decimal(str(price))
 
@@ -385,8 +387,16 @@ class BchElectrumClient:
         try:
             data = json.loads(raw.decode('utf-8'))
         except (UnicodeDecodeError, ValueError) as exc:
+            logger.error(
+                'Invalid Electrum JSON from %s:%s: %s',
+                self.host,
+                self.port,
+                exc,
+                exc_info=True,
+            )
             raise BchApiError('Invalid Electrum JSON response') from exc
         if data.get('error'):
+            logger.error('Electrum error from %s:%s: %s', self.host, self.port, data['error'])
             raise BchApiError(f'Electrum error: {data["error"]}')
         return data.get('result')
 
@@ -423,6 +433,12 @@ class BchElectrumClient:
         except BchApiError:
             raise
         except Exception as exc:
+            logger.error(
+                'Unexpected Electrum history error for %s: %s',
+                addr,
+                exc,
+                exc_info=True,
+            )
             raise BchApiError(f'No se pudo leer historial Electrum: {exc}') from exc
 
         # Newest last in Electrum; reverse for recent-first.
