@@ -234,17 +234,18 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Default**: `chipnet` when `ENVIRONMENT` ≠ `PRODUCTION` (local Docker); `mainnet` in production
 - **Values**: `chipnet` (test net, like BTC signet), `mainnet`
 - Chipnet verification uses Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002` by default)
-- Mainnet verification uses Blockchair
+- Mainnet verification uses Fulcrum/Electrum (`ssl://bch.imaginary.cash:50002` by default)
 
 #### `BCH_RECEIVE_ADDRESS` / `BCH_RECEIVE_ADDRESS_CHIPNET` / `BCH_RECEIVE_ADDRESS_MAINNET`
 - **Required** (one of them for the active network) to enable the BCH method in the checkout chooser
 - Chipnet: CashAddr `bchtest:q...`
 - Mainnet: CashAddr `bitcoincash:q...`
 
-#### `BCH_API_BASE` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
-- **Defaults**: follow `BCH_NETWORK` (Electrum SSL on chipnet, Blockchair on mainnet) / `30` / `0` / `0`
+#### `BCH_API_BASE` / `BCH_BLOCKCHAIR_API_KEY` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
+- **Defaults**: Fulcrum Electrum SSL for mainnet + chipnet / empty / `30` / `0` / `0`
+- Set `BCH_API_BASE=https://api.blockchair.com/bitcoin-cash` to force Blockchair; use `BCH_BLOCKCHAIR_API_KEY` in production
 - `BCH_PAYMENT_TTL_MINUTES` is clamped to a **minimum of 5** minutes in code
-- `BCH_USD_PRICE=0` fetches live USD/BCH from Blockchair mainnet `/stats` (also used to size chipnet orders)
+- `BCH_USD_PRICE=0` fetches live USD/BCH from Blockchair, then CoinGecko
 
 ### AWS Configuration (Production)
 

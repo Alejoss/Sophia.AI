@@ -21,7 +21,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 30
 SATS_PER_BCH = 100_000_000
 BLOCKCHAIR_MAINNET = 'https://api.blockchair.com/bitcoin-cash'
+DEFAULT_MAINNET_ELECTRUM = 'ssl://bch.imaginary.cash:50002'
 DEFAULT_CHIPNET_ELECTRUM = 'ssl://chipnet.bch.ninja:50002'
+COINGECKO_BCH_PRICE_URL = (
+    'https://api.coingecko.com/api/v3/simple/price'
+    '?ids=bitcoin-cash&vs_currencies=usd'
+)
 
 
 class BchApiError(Exception):
@@ -85,16 +90,18 @@ def is_bch_direct_configured() -> bool:
 
 def build_bch_client(session: requests.Session | None = None) -> 'BchPublicClient | BchElectrumClient':
     """
-    Mainnet → Blockchair HTTP.
-    Chipnet/testnet → Fulcrum/Electrum SSL (default chipnet.bch.ninja).
+    Default: Fulcrum/Electrum SSL (mainnet + chipnet).
+    Explicit ``https://…blockchair.com…`` → Blockchair HTTP (optional API key).
     """
     network = get_bch_network()
     api_base = (getattr(settings, 'BCH_API_BASE', '') or '').strip()
-    if network == 'mainnet' and not api_base.startswith('ssl://'):
-        return BchPublicClient(api_base=api_base or BLOCKCHAIR_MAINNET, session=session)
     if api_base.startswith('https://') and 'blockchair.com' in api_base:
-        # Explicit Blockchair override (rarely useful on chipnet).
         return BchPublicClient(api_base=api_base, session=session)
+    if api_base.startswith('https://') and not api_base.startswith('ssl://'):
+        # Legacy/custom HTTP explorer still using the Blockchair-shaped client.
+        return BchPublicClient(api_base=api_base, session=session)
+    if network == 'mainnet':
+        return BchElectrumClient.from_api_base(api_base or DEFAULT_MAINNET_ELECTRUM)
     return BchElectrumClient.from_api_base(api_base or DEFAULT_CHIPNET_ELECTRUM)
 
 
@@ -115,31 +122,54 @@ class BchPublicClient:
 
     def _get(self, path: str, params: dict | None = None) -> Any:
         url = f'{self.api_base}{path}'
+        query = dict(params or {})
+        api_key = (getattr(settings, 'BCH_BLOCKCHAIR_API_KEY', '') or '').strip()
+        if api_key and 'key' not in query:
+            query['key'] = api_key
         try:
-            response = self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
+            response = self.session.get(url, params=query or None, timeout=DEFAULT_TIMEOUT)
         except requests.RequestException as exc:
+            logger.error('BCH HTTP GET %s failed: %s', url, exc, exc_info=True)
             raise BchApiError(f'GET {url} failed: {exc}') from exc
         if response.status_code >= 400:
+            body = (response.text or '')[:500]
+            logger.error(
+                'BCH HTTP GET %s → %s body=%s',
+                response.url,
+                response.status_code,
+                body,
+            )
             raise BchApiError(
-                f'GET {url} → {response.status_code}: {response.text[:300]}'
+                f'GET {url} → {response.status_code}: {body[:300]}'
             )
         try:
-            return response.json()
+            payload = response.json()
         except ValueError as exc:
+            logger.error('BCH HTTP GET %s returned invalid JSON', response.url)
             raise BchApiError(f'Invalid JSON from {url}') from exc
+        context = payload.get('context') if isinstance(payload, dict) else None
+        if isinstance(context, dict) and context.get('error'):
+            code = context.get('code')
+            err = context.get('error')
+            logger.error('BCH HTTP GET %s context error code=%s: %s', response.url, code, err)
+            raise BchApiError(f'Blockchair error {code}: {err}')
+        return payload
 
     def get_bch_usd_rate(self) -> Decimal:
         """USD price for 1 BCH."""
         configured = Decimal(str(getattr(settings, 'BCH_USD_PRICE', 0) or 0))
         if configured > 0:
             return configured
-        data = self._get('/stats')
-        price = (data.get('data') or {}).get('market_price_usd')
-        if price is None:
-            price = (data.get('context') or {}).get('market_price_usd')
-        if price is None or Decimal(str(price)) <= 0:
-            raise BchApiError('No se pudo obtener el precio de BCH en USD.')
-        return Decimal(str(price))
+        try:
+            data = self._get('/stats')
+            price = (data.get('data') or {}).get('market_price_usd')
+            if price is None:
+                price = (data.get('context') or {}).get('market_price_usd')
+            if price is not None and Decimal(str(price)) > 0:
+                return Decimal(str(price))
+        except BchApiError as exc:
+            logger.warning('Blockchair BCH/USD rate failed, trying CoinGecko: %s', exc)
+        return _fetch_coingecko_bch_usd_rate()
 
     def list_recent_transactions(
         self,
@@ -150,7 +180,8 @@ class BchPublicClient:
         """
         Fetch recent txs that touch ``address`` with output details.
 
-        Uses Blockchair address dashboard + per-tx lookup.
+        Prefers a single Blockchair address dashboard call with
+        ``transaction_details=true``; falls back to per-tx lookups.
         """
         addr = (address or '').strip()
         if not addr:
@@ -158,25 +189,53 @@ class BchPublicClient:
 
         dashboard = self._get(
             f'/dashboards/address/{addr}',
-            params={'limit': str(limit)},
+            params={'limit': str(min(limit, 10)), 'transaction_details': 'true'},
         )
         addr_data = (dashboard.get('data') or {}).get(addr) or {}
         # Blockchair sometimes keys without prefix
         if not addr_data and ':' in addr:
             bare = addr.split(':', 1)[1]
             addr_data = (dashboard.get('data') or {}).get(bare) or {}
-        txids = addr_data.get('transactions') or []
-        if not txids:
+        tip = (dashboard.get('context') or {}).get('state')
+        txs_raw = addr_data.get('transactions') or []
+        if not txs_raw:
             return []
 
-        tip = (dashboard.get('context') or {}).get('state')
         results: list[BchTransaction] = []
-        for txid in txids[:limit]:
+        pending_txids: list[str] = []
+        for item in txs_raw[:limit]:
+            if isinstance(item, dict):
+                try:
+                    results.append(self._transaction_from_blockchair_detail(item, tip_height=tip))
+                except BchApiError as exc:
+                    logger.warning('Skip BCH dashboard tx detail: %s', exc)
+                continue
+            pending_txids.append(str(item))
+
+        for txid in pending_txids[:limit]:
             try:
-                results.append(self.get_transaction(str(txid), tip_height=tip))
+                results.append(self.get_transaction(txid, tip_height=tip))
             except BchApiError as exc:
                 logger.warning('Skip BCH tx %s: %s', txid, exc)
         return results
+
+    def _transaction_from_blockchair_detail(
+        self,
+        detail: dict,
+        *,
+        tip_height: int | None = None,
+    ) -> BchTransaction:
+        tx = detail.get('transaction') or detail
+        txid = tx.get('hash') or detail.get('hash') or detail.get('txid')
+        if not txid:
+            raise BchApiError('Blockchair transaction detail missing hash')
+        outputs_raw = detail.get('outputs') or []
+        return self._parse_blockchair_tx(
+            str(txid),
+            tx,
+            outputs_raw,
+            tip_height=tip_height,
+        )
 
     def get_transaction(
         self,
@@ -188,7 +247,16 @@ class BchPublicClient:
         tx_wrap = (data.get('data') or {}).get(txid) or {}
         tx = tx_wrap.get('transaction') or {}
         outputs_raw = tx_wrap.get('outputs') or []
+        return self._parse_blockchair_tx(str(txid), tx, outputs_raw, tip_height=tip_height)
 
+    def _parse_blockchair_tx(
+        self,
+        txid: str,
+        tx: dict,
+        outputs_raw: list,
+        *,
+        tip_height: int | None = None,
+    ) -> BchTransaction:
         block_id = tx.get('block_id')
         confirmations = 0
         if block_id is not None and int(block_id) >= 0 and tip_height is not None:
@@ -225,6 +293,25 @@ class BchPublicClient:
             confirmations=confirmations,
             outputs=outputs,
         )
+
+
+def _fetch_coingecko_bch_usd_rate() -> Decimal:
+    try:
+        response = requests.get(COINGECKO_BCH_PRICE_URL, timeout=DEFAULT_TIMEOUT)
+    except requests.RequestException as exc:
+        logger.error('CoinGecko BCH/USD request failed: %s', exc, exc_info=True)
+        raise BchApiError(f'CoinGecko price failed: {exc}') from exc
+    if response.status_code >= 400:
+        logger.error('CoinGecko BCH/USD → %s: %s', response.status_code, response.text[:300])
+        raise BchApiError(f'CoinGecko price → {response.status_code}')
+    try:
+        payload = response.json()
+        price = ((payload.get('bitcoin-cash') or {}).get('usd'))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise BchApiError('Invalid CoinGecko price JSON') from exc
+    if price is None or Decimal(str(price)) <= 0:
+        raise BchApiError('No se pudo obtener el precio de BCH en USD.')
+    return Decimal(str(price))
 
 
 class BchElectrumClient:
@@ -283,6 +370,14 @@ class BchElectrumClient:
                     if self.use_ssl:
                         ssock.close()
         except (OSError, ssl.SSLError) as exc:
+            logger.error(
+                'Electrum %s:%s %s failed: %s',
+                self.host,
+                self.port,
+                method,
+                exc,
+                exc_info=True,
+            )
             raise BchApiError(
                 f'Electrum {self.host}:{self.port} {method} failed: {exc}'
             ) from exc
@@ -297,13 +392,17 @@ class BchElectrumClient:
 
     def get_bch_usd_rate(self) -> Decimal:
         """
-        Chipnet has no market price. Use ``BCH_USD_PRICE`` or mainnet Blockchair
-        so the UX still targets ~ANCHOR_REQUEST_PRICE_USD in sats.
+        Chipnet has no market price. Use ``BCH_USD_PRICE``, then Blockchair,
+        then CoinGecko so order sizing still works when Blockchair is banned.
         """
         configured = Decimal(str(getattr(settings, 'BCH_USD_PRICE', 0) or 0))
         if configured > 0:
             return configured
-        return BchPublicClient(api_base=BLOCKCHAIR_MAINNET).get_bch_usd_rate()
+        try:
+            return BchPublicClient(api_base=BLOCKCHAIR_MAINNET).get_bch_usd_rate()
+        except BchApiError as exc:
+            logger.warning('USD rate via Blockchair failed (%s); CoinGecko fallback', exc)
+            return _fetch_coingecko_bch_usd_rate()
 
     def list_recent_transactions(
         self,

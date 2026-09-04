@@ -247,6 +247,12 @@ def create_or_reuse_bch_payment(
     try:
         rate = client.get_bch_usd_rate()
     except BchApiError as exc:
+        logger.exception(
+            'BCH USD rate failed network=%s user=%s: %s',
+            get_bch_network(),
+            getattr(user, 'id', None),
+            exc,
+        )
         raise BchPaymentError(str(exc)) from exc
 
     usd = _usd_for_target(
@@ -364,10 +370,19 @@ def verify_bch_payment(
 
     client = client or build_bch_client()
     try:
-        txs = client.list_recent_transactions(payment.address, limit=30)
+        txs = client.list_recent_transactions(payment.address, limit=15)
     except BchApiError as exc:
+        logger.exception(
+            'BCH chain lookup failed network=%s payment_id=%s address=%s sats=%s: %s',
+            get_bch_network(),
+            payment.pk,
+            payment.address,
+            payment.expected_amount_sats,
+            exc,
+        )
         raise BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.'
+            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde '
+            'o avise por mensaje con el monto y la dirección de la orden.'
         ) from exc
 
     min_ts = int((payment.created_at - timedelta(seconds=60)).timestamp())

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -21,8 +22,13 @@ import {
   getPaymentGatewayStatus,
   verifyAnchorRequestBchPayment,
 } from '../api/paymentsApi';
+import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from '../payments/MoneroPaymentModal';
+import {
+  PAYMENT_SUPPORT_USER_ID,
+  buildBchVerifyHelpMessage,
+} from '../payments/bchPaymentSupport';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -42,6 +48,7 @@ const AnchorPaymentCheckout = ({
   priceUsd = 1,
   onPaid,
 }) => {
+  const navigate = useNavigate();
   const [methods, setMethods] = useState({ nowpayments: false, bch_direct: false });
   const [bchNetwork, setBchNetwork] = useState(null);
   const [loadingMethods, setLoadingMethods] = useState(false);
@@ -49,6 +56,7 @@ const AnchorPaymentCheckout = ({
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState(null);
+  const [supportBusy, setSupportBusy] = useState(false);
   const [copied, setCopied] = useState('');
   const [paidReview, setPaidReview] = useState(false);
 
@@ -123,6 +131,34 @@ const AnchorPaymentCheckout = ({
       setTimeout(() => setCopied(''), 1800);
     } catch {
       setBchError('No se pudo copiar al portapapeles');
+    }
+  };
+
+  const contactSupportAboutBch = async () => {
+    if (supportBusy) return;
+    setSupportBusy(true);
+    try {
+      const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
+      const thread = threadRes?.data;
+      if (!thread?.id) {
+        throw new Error('No se pudo abrir la conversación');
+      }
+      await sendMessage(
+        thread.id,
+        buildBchVerifyHelpMessage({
+          title,
+          priceUsd,
+          productLabel: 'anclaje a Bitcoin',
+          bchOrder,
+          error: bchError,
+        }),
+      );
+      onClose?.();
+      navigate(`/messages/thread/${PAYMENT_SUPPORT_USER_ID}`);
+    } catch (err) {
+      setBchError(formatApiError(err, 'No se pudo enviar el mensaje de soporte'));
+    } finally {
+      setSupportBusy(false);
     }
   };
 
@@ -239,6 +275,20 @@ const AnchorPaymentCheckout = ({
           {bchError && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {bchError}
+              {!paidReview && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    disabled={supportBusy}
+                    onClick={contactSupportAboutBch}
+                    startIcon={supportBusy ? <CircularProgress size={14} color="inherit" /> : null}
+                  >
+                    Avisar por mensaje
+                  </Button>
+                </Box>
+              )}
             </Alert>
           )}
           {paidReview && (

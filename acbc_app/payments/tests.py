@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 
 from content.models import Content, ContentTranscript, TranscriptAnchorRequest
 from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase, Node
-from payments.bch_client import BchTransaction, BchTxOutput
+from payments.bch_client import BchApiError, BchTransaction, BchTxOutput
 from payments.bch_services import (
     BchPaymentError,
     create_or_reuse_bch_payment,
@@ -609,6 +609,25 @@ class BchDirectPaymentTests(TestCase):
         bch_order.refresh_from_db()
         self.assertEqual(bch_order.status, BchDirectPayment.STATUS_PENDING)
 
+    def test_verify_logs_chain_lookup_failure(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        client.list_recent_transactions.side_effect = BchApiError(
+            'Blockchair error 430: blacklisted'
+        )
+        with self.assertLogs('payments.bch_services', level='ERROR') as logs:
+            with self.assertRaises(BchPaymentError) as ctx:
+                verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+        self.assertIn('blockchain', str(ctx.exception).lower())
+        self.assertTrue(any('chain lookup failed' in line.lower() for line in logs.output))
+        order.refresh_from_db()
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+
 
 class BchNetworkClientTests(TestCase):
     def test_cashaddr_scripthash_roundtrip(self):
@@ -643,6 +662,17 @@ class BchNetworkClientTests(TestCase):
         from payments.bch_client import BchPublicClient, build_bch_client
         client = build_bch_client()
         self.assertIsInstance(client, BchPublicClient)
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_API_BASE='ssl://bch.imaginary.cash:50002',
+    )
+    def test_build_client_mainnet_default_is_electrum(self):
+        from payments.bch_client import BchElectrumClient, build_bch_client
+        client = build_bch_client()
+        self.assertIsInstance(client, BchElectrumClient)
+        self.assertEqual(client.host, 'bch.imaginary.cash')
+        self.assertEqual(client.port, 50002)
 
     @override_settings(
         BCH_NETWORK='chipnet',
