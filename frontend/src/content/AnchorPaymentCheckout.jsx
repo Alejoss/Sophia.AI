@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -22,13 +21,9 @@ import {
   getPaymentGatewayStatus,
   verifyAnchorRequestBchPayment,
 } from '../api/paymentsApi';
-import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from '../payments/MoneroPaymentModal';
-import {
-  PAYMENT_SUPPORT_USER_ID,
-  buildBchVerifyHelpMessage,
-} from '../payments/bchPaymentSupport';
+import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -48,25 +43,26 @@ const AnchorPaymentCheckout = ({
   priceUsd = 1,
   onPaid,
 }) => {
-  const navigate = useNavigate();
   const [methods, setMethods] = useState({ nowpayments: false, bch_direct: false });
   const [bchNetwork, setBchNetwork] = useState(null);
   const [loadingMethods, setLoadingMethods] = useState(false);
   const [method, setMethod] = useState(null); // 'nowpayments' | 'bch' | null
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
-  const [bchError, setBchError] = useState(null);
-  const [supportBusy, setSupportBusy] = useState(false);
+  const [bchError, setBchError] = useState('');
   const [copied, setCopied] = useState('');
   const [paidReview, setPaidReview] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setMethod(null);
       setBchOrder(null);
-      setBchError(null);
-      setPaidReview(false);
+      setBchBusy(false);
+      setBchError('');
       setCopied('');
+      setPaidReview(false);
+      setSupportOpen(false);
       return undefined;
     }
     let cancelled = false;
@@ -75,13 +71,16 @@ const AnchorPaymentCheckout = ({
       .then((data) => {
         if (cancelled) return;
         setMethods({
-          nowpayments: Boolean(data?.methods?.nowpayments ?? data?.enabled),
-          bch_direct: Boolean(data?.methods?.bch_direct ?? data?.bch_direct_enabled),
+          nowpayments: Boolean(data?.nowpayments),
+          bch_direct: Boolean(data?.bch_direct),
         });
         setBchNetwork(data?.bch_network || null);
       })
       .catch(() => {
-        if (!cancelled) setMethods({ nowpayments: true, bch_direct: false });
+        if (!cancelled) {
+          setMethods({ nowpayments: false, bch_direct: false });
+          setBchNetwork(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingMethods(false);
@@ -91,87 +90,71 @@ const AnchorPaymentCheckout = ({
     };
   }, [open]);
 
-  const startBch = async () => {
-    if (!anchorRequestId) return;
-    setMethod('bch');
+  useEffect(() => {
+    if (!open || method !== 'bch' || !anchorRequestId || bchOrder || paidReview) return undefined;
+    let cancelled = false;
     setBchBusy(true);
-    setBchError(null);
-    try {
-      const order = await createAnchorRequestBchPayment(anchorRequestId);
-      setBchOrder(order);
-    } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo crear la orden BCH'));
-    } finally {
-      setBchBusy(false);
-    }
-  };
-
-  const verifyBch = async () => {
-    if (!anchorRequestId) return;
-    setBchBusy(true);
-    setBchError(null);
-    try {
-      const data = await verifyAnchorRequestBchPayment(anchorRequestId);
-      setBchOrder(data.payment);
-      if (data.request?.status === 'paid_pending_review' || data.payment?.status === 'paid') {
-        setPaidReview(true);
-        onPaid?.(data);
-      }
-    } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo verificar el pago'));
-    } finally {
-      setBchBusy(false);
-    }
-  };
+    setBchError('');
+    createAnchorRequestBchPayment(anchorRequestId)
+      .then((order) => {
+        if (!cancelled) setBchOrder(order);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setBchError(formatApiError(err, 'No se pudo crear la orden BCH.'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBchBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, method, anchorRequestId, bchOrder, paidReview]);
 
   const copyText = async (text, key) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(key);
-      setTimeout(() => setCopied(''), 1800);
+      window.setTimeout(() => setCopied(''), 1500);
     } catch {
-      setBchError('No se pudo copiar al portapapeles');
+      setCopied('');
     }
   };
 
-  const contactSupportAboutBch = async () => {
-    if (supportBusy) return;
-    setSupportBusy(true);
+  const handleVerify = async () => {
+    if (!bchOrder?.id) return;
+    setBchBusy(true);
+    setBchError('');
     try {
-      const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
-      const thread = threadRes?.data;
-      if (!thread?.id) {
-        throw new Error('No se pudo abrir la conversación');
+      const result = await verifyAnchorRequestBchPayment(bchOrder.id);
+      setBchOrder((prev) => (prev ? { ...prev, ...result } : result));
+      if (result?.status === 'confirmed' || result?.paid) {
+        setPaidReview(true);
+        onPaid?.(result);
+      } else {
+        setBchError(
+          'Aún no vemos el pago en la cadena. Si ya enviaste, espera unos segundos y vuelve a verificar.',
+        );
       }
-      await sendMessage(
-        thread.id,
-        buildBchVerifyHelpMessage({
-          title,
-          priceUsd,
-          productLabel: 'anclaje a Bitcoin',
-          bchOrder,
-          error: bchError,
-        }),
-      );
-      onClose?.();
-      navigate(`/messages/thread/${PAYMENT_SUPPORT_USER_ID}`);
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo enviar el mensaje de soporte'));
+      setBchError(formatApiError(err, 'No se pudo verificar el pago BCH.'));
     } finally {
-      setSupportBusy(false);
+      setBchBusy(false);
     }
   };
 
-  const showChooser = open && method === null && !paidReview;
+  const showChooser = open && !method;
   const showNowpayments = open && method === 'nowpayments';
   const showBch = open && method === 'bch';
   const showMonero = open && method === 'monero';
+  const bothOff = !methods.nowpayments && !methods.bch_direct;
 
   return (
     <>
       <Dialog open={showChooser} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Anclaje a Bitcoin
+          Elegí cómo pagar
           <IconButton
             aria-label="Cerrar"
             onClick={onClose}
@@ -182,49 +165,49 @@ const AnchorPaymentCheckout = ({
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {title}
-          </Typography>
-          <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
-            ${priceUsd} USD
+            Anclaje a Bitcoin · ${Number(priceUsd).toFixed(2)} USD
+            {title ? ` · ${title}` : ''}
           </Typography>
           {loadingMethods ? (
             <Stack alignItems="center" sx={{ py: 3 }}>
               <CircularProgress size={28} />
             </Stack>
+          ) : bothOff ? (
+            <Alert severity="warning">
+              No hay métodos de pago crypto habilitados en este momento. Podés
+              contactar soporte o intentar más tarde.
+            </Alert>
           ) : (
             <Stack spacing={1.5}>
-              <Typography variant="body2" color="text.secondary">
-                Elige cómo pagar. Tras el pago, un administrador revisará el anclaje a Bitcoin.
-                {bchNetwork && bchNetwork !== 'mainnet' && (
-                  <>
-                    {' '}
-                    BCH directo usa la red de pruebas <strong>{bchNetwork}</strong>.
-                  </>
-                )}
-              </Typography>
+              {methods.nowpayments && (
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => setMethod('nowpayments')}
+                  fullWidth
+                >
+                  Pagar con crypto (NOWPayments)
+                </Button>
+              )}
+              {methods.bch_direct && (
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => setMethod('bch')}
+                  fullWidth
+                >
+                  Bitcoin Cash (BCH)
+                  {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
+                </Button>
+              )}
+              <Divider sx={{ my: 0.5 }}>o</Divider>
               <Button
-                variant="contained"
-                size="large"
-                disabled={!methods.nowpayments}
-                onClick={() => setMethod('nowpayments')}
-              >
-                NOWPayments (varias criptos)
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                disabled={!methods.bch_direct}
-                onClick={startBch}
-              >
-                Bitcoin Cash directo (BCH)
-                {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
-              </Button>
-              <Button
-                variant="outlined"
+                variant="text"
                 size="large"
                 onClick={() => setMethod('monero')}
+                fullWidth
               >
-                Pagar con Monero
+                Quiero pagar con Monero (XMR)
               </Button>
             </Stack>
           )}
@@ -274,20 +257,24 @@ const AnchorPaymentCheckout = ({
         <DialogContent>
           {bchError && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {bchError}
+              <Typography variant="body2" component="div" sx={{ mb: paidReview ? 0 : 1 }}>
+                {bchError}
+              </Typography>
               {!paidReview && (
-                <Box sx={{ mt: 1.5 }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="inherit"
-                    disabled={supportBusy}
-                    onClick={contactSupportAboutBch}
-                    startIcon={supportBusy ? <CircularProgress size={14} color="inherit" /> : null}
-                  >
-                    Avisar por mensaje
-                  </Button>
-                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Si ya enviaste el pago, mandanos el ID de la transacción (TXID).
+                  Revisamos la cadena a mano y activamos tu compra.
+                </Typography>
+              )}
+              {!paidReview && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="inherit"
+                  onClick={() => setSupportOpen(true)}
+                >
+                  Enviar TXID a soporte
+                </Button>
               )}
             </Alert>
           )}
@@ -355,51 +342,57 @@ const AnchorPaymentCheckout = ({
                   {bchOrder.seconds_remaining % 60}s
                 </Typography>
               )}
-              <Divider />
-              <Typography variant="caption" color="text.secondary">
-                Cuando hayas enviado el pago, pulsa verificar. No cierres esta ventana
-                hasta confirmar.
-              </Typography>
             </Stack>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, flexDirection: 'column', gap: 1 }}>
-          {!paidReview && bchOrder?.status === 'pending' && (
-            <Button
-              variant="contained"
-              fullWidth
-              disabled={bchBusy}
-              onClick={verifyBch}
-              startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
-            >
-              Ya realicé el pago
-            </Button>
-          )}
-          {(paidReview || bchOrder?.status === 'expired') && (
-            <Button
-              variant="outlined"
-              fullWidth
-              disabled={bchBusy || paidReview}
-              onClick={startBch}
-            >
-              Generar nueva orden BCH
-            </Button>
-          )}
-          <Button onClick={onClose} fullWidth>
-            {paidReview ? 'Listo' : 'Cerrar'}
-          </Button>
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between' }}>
           <Button
-            size="small"
             onClick={() => {
               setMethod(null);
               setBchOrder(null);
-              setBchError(null);
+              setBchError('');
+              setSupportOpen(false);
             }}
+            disabled={bchBusy}
           >
-            Volver a métodos de pago
+            Cambiar método
           </Button>
+          <Stack direction="row" spacing={1}>
+            {!paidReview && bchOrder && (
+              <Button
+                variant="text"
+                color="inherit"
+                disabled={bchBusy}
+                onClick={() => setSupportOpen(true)}
+              >
+                Ya pagué — enviar TXID
+              </Button>
+            )}
+            <Button onClick={onClose}>Cerrar</Button>
+            {!paidReview && (
+              <Button
+                variant="contained"
+                onClick={handleVerify}
+                disabled={bchBusy || !bchOrder}
+                startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
+              >
+                Ya pagué — verificar
+              </Button>
+            )}
+          </Stack>
         </DialogActions>
       </Dialog>
+
+      <BchPaymentSupportModal
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        onBackToOrder={() => setSupportOpen(false)}
+        productLabel="anclaje a Bitcoin"
+        title={title}
+        priceUsd={priceUsd}
+        bchOrder={bchOrder}
+        verifyError={bchError}
+      />
     </>
   );
 };

@@ -135,7 +135,7 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(screen.getByRole('button', { name: /volver a métodos de pago/i })).toBeInTheDocument();
   });
 
-  it('offers Avisar por mensaje after a BCH verify failure', async () => {
+  it('opens the TXID support modal after a BCH verify failure', async () => {
     const user = userEvent.setup();
     mockVerifyBch.mockRejectedValue({
       error: 'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.',
@@ -160,16 +160,16 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(await screen.findByRole('button', { name: /Ya realicé el pago/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Ya realicé el pago/i }));
 
-    expect(await screen.findByRole('button', { name: /Avisar por mensaje/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Avisar por mensaje/i }));
+    expect(
+      await screen.findByRole('button', { name: /^Enviar TXID a soporte$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Ya pagué — enviar TXID a soporte/i }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Enviar TXID a soporte$/i }));
 
-    await waitFor(() => {
-      expect(mockFetchThread).toHaveBeenCalledWith(2);
-      expect(mockSendMessage).toHaveBeenCalled();
-    });
-    const message = mockSendMessage.mock.calls[0][1];
-    expect(message).toContain('Ucronía Capítulo 33');
-    expect(message).toContain('bitcoincash:qptestaddress');
-    expect(message).toContain('blockchain');
+    expect(await screen.findByText('Ya pagué — avisar a soporte')).toBeInTheDocument();
+    expect(screen.getByLabelText(/ID de transacción/i)).toBeInTheDocument();
+    expect(screen.getByText(/revisaremos el pago manualmente/i)).toBeInTheDocument();
   });
 });

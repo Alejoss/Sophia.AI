@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -18,13 +17,9 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
-import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from './MoneroPaymentModal';
-import {
-  PAYMENT_SUPPORT_USER_ID,
-  buildBchVerifyHelpMessage,
-} from './bchPaymentSupport';
+import BchPaymentSupportModal from './BchPaymentSupportModal';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -50,7 +45,6 @@ const ProductPaymentCheckout = ({
   nowpaymentsProps = {},
   onPaid,
 }) => {
-  const navigate = useNavigate();
   const [methods, setMethods] = useState({
     nowpayments: offerNowpayments,
     bch_direct: offerBch,
@@ -61,7 +55,7 @@ const ProductPaymentCheckout = ({
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState(null);
-  const [supportBusy, setSupportBusy] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [paid, setPaid] = useState(false);
 
@@ -70,6 +64,7 @@ const ProductPaymentCheckout = ({
       setMethod(null);
       setBchOrder(null);
       setBchError(null);
+      setSupportOpen(false);
       setPaid(false);
       setCopied('');
       return undefined;
@@ -108,6 +103,7 @@ const ProductPaymentCheckout = ({
   const startBch = async () => {
     if (!createBchPayment) return;
     setMethod('bch');
+    setSupportOpen(false);
     setBchBusy(true);
     setBchError(null);
     try {
@@ -127,7 +123,11 @@ const ProductPaymentCheckout = ({
     try {
       const data = await verifyBchPayment();
       setBchOrder(data.payment);
-      if (data.purchase?.is_paid || data.purchase?.payment_status === 'PAID' || data.payment?.status === 'paid') {
+      if (
+        data.purchase?.is_paid
+        || data.purchase?.payment_status === 'PAID'
+        || data.payment?.status === 'paid'
+      ) {
         setPaid(true);
         onPaid?.(data);
       }
@@ -148,38 +148,11 @@ const ProductPaymentCheckout = ({
     }
   };
 
-  const contactSupportAboutBch = async () => {
-    if (supportBusy) return;
-    setSupportBusy(true);
-    try {
-      const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
-      const thread = threadRes?.data;
-      if (!thread?.id) {
-        throw new Error('No se pudo abrir la conversación');
-      }
-      await sendMessage(
-        thread.id,
-        buildBchVerifyHelpMessage({
-          title,
-          priceUsd,
-          productLabel,
-          bchOrder,
-          error: bchError,
-        }),
-      );
-      onClose?.();
-      navigate(`/messages/thread/${PAYMENT_SUPPORT_USER_ID}`);
-    } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo enviar el mensaje de soporte'));
-    } finally {
-      setSupportBusy(false);
-    }
-  };
-
   const showChooser = open && method === null && !paid;
   const showNowpayments = open && method === 'nowpayments';
-  const showBch = open && method === 'bch';
+  const showBch = open && method === 'bch' && !supportOpen;
   const showMonero = open && method === 'monero';
+  const showSupport = open && method === 'bch' && supportOpen;
 
   return (
     <>
@@ -274,6 +247,17 @@ const ProductPaymentCheckout = ({
         {...nowpaymentsProps}
       />
 
+      <BchPaymentSupportModal
+        open={showSupport}
+        onClose={() => setSupportOpen(false)}
+        onBackToOrder={() => setSupportOpen(false)}
+        title={title}
+        priceUsd={priceUsd}
+        productLabel={productLabel}
+        bchOrder={bchOrder}
+        verifyError={bchError}
+      />
+
       <Dialog open={showBch} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
           Pago con Bitcoin Cash
@@ -292,17 +276,19 @@ const ProductPaymentCheckout = ({
           {bchError && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {bchError}
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Si ya enviaste el pago, no te preocupes: envíanos el ID de la
+                transacción y lo revisamos manualmente para desbloquear tu acceso.
+              </Typography>
               {!paid && (
                 <Box sx={{ mt: 1.5 }}>
                   <Button
                     size="small"
-                    variant="outlined"
+                    variant="contained"
                     color="inherit"
-                    disabled={supportBusy}
-                    onClick={contactSupportAboutBch}
-                    startIcon={supportBusy ? <CircularProgress size={14} color="inherit" /> : null}
+                    onClick={() => setSupportOpen(true)}
                   >
-                    Avisar por mensaje
+                    Enviar TXID a soporte
                   </Button>
                 </Box>
               )}
@@ -384,6 +370,16 @@ const ProductPaymentCheckout = ({
               Ya realicé el pago
             </Button>
           )}
+          {!paid && Boolean(bchOrder || bchError) && (
+            <Button
+              variant="outlined"
+              fullWidth
+              disabled={bchBusy}
+              onClick={() => setSupportOpen(true)}
+            >
+              Ya pagué — enviar TXID a soporte
+            </Button>
+          )}
           {(paid || bchOrder?.status === 'expired') && (
             <Button
               variant="outlined"
@@ -404,6 +400,7 @@ const ProductPaymentCheckout = ({
                 setMethod(null);
                 setBchOrder(null);
                 setBchError(null);
+                setSupportOpen(false);
               }}
             >
               Volver a métodos de pago
