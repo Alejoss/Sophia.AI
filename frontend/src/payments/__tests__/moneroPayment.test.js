@@ -13,8 +13,7 @@ describe('moneroPayment helpers', () => {
     );
     expect(buildMoneroPaymentMessage({
       title: 'Ucronía Capítulo 33',
-      priceUsd: 40,
       productLabel: 'camino',
-    })).toBe('Hola, quiero pagar con Monero por «Ucronía Capítulo 33» ($40.00 USD).');
+    })).toBe('Hola, quiero pagar con Monero «Ucronía Capítulo 33, larga vida al criptoanarquismo!»');
   });
 });
