@@ -8,5 +8,5 @@ export const buildMoneroPaymentMessage = ({
   productLabel = 'producto',
 } = {}) => {
   const product = title || productLabel;
-  return `Hola, quiero pagar con Monero «${product}, larga vida al criptoanarquismo!»`;
+  return `Hola, quiero pagar con Monero «${product}», larga vida al criptoanarquismo!`;
 };

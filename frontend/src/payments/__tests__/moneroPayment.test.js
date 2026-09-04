@@ -14,6 +14,6 @@ describe('moneroPayment helpers', () => {
     expect(buildMoneroPaymentMessage({
       title: 'Ucronía Capítulo 33',
       productLabel: 'camino',
-    })).toBe('Hola, quiero pagar con Monero «Ucronía Capítulo 33, larga vida al criptoanarquismo!»');
+    })).toBe('Hola, quiero pagar con Monero «Ucronía Capítulo 33», larga vida al criptoanarquismo!');
   });
 });
