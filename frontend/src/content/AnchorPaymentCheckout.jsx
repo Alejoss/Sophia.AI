@@ -22,6 +22,7 @@ import {
   verifyAnchorRequestBchPayment,
 } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
+import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -128,6 +129,7 @@ const AnchorPaymentCheckout = ({
   const showChooser = open && method === null && !paidReview;
   const showNowpayments = open && method === 'nowpayments';
   const showBch = open && method === 'bch';
+  const showMonero = open && method === 'monero';
 
   return (
     <>
@@ -181,11 +183,13 @@ const AnchorPaymentCheckout = ({
                 Bitcoin Cash directo (BCH)
                 {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
               </Button>
-              {!methods.nowpayments && !methods.bch_direct && (
-                <Alert severity="warning">
-                  No hay métodos de pago configurados en el servidor.
-                </Alert>
-              )}
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => setMethod('monero')}
+              >
+                Pagar con Monero
+              </Button>
             </Stack>
           )}
         </DialogContent>
@@ -193,6 +197,15 @@ const AnchorPaymentCheckout = ({
           <Button onClick={onClose}>Cancelar</Button>
         </DialogActions>
       </Dialog>
+
+      <MoneroPaymentModal
+        open={showMonero}
+        onClose={onClose}
+        onBackToMethods={() => setMethod(null)}
+        title={title}
+        priceUsd={priceUsd}
+        productLabel="anclaje a Bitcoin"
+      />
 
       <CryptoPaymentModal
         open={showNowpayments}

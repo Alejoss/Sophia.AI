@@ -67,6 +67,7 @@ describe('ProductPaymentCheckout method switch', () => {
     );
 
     expect(await screen.findByRole('button', { name: /NOWPayments/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pagar con Monero/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /NOWPayments/i }));
 
     expect(await screen.findByRole('button', { name: /Elegir otro método/i })).toBeInTheDocument();
@@ -83,5 +84,33 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(await screen.findByText(/Pago con Bitcoin Cash/i)).toBeInTheDocument();
     expect(screen.getByText('bitcoincash:qptestaddress')).toBeInTheDocument();
     expect(screen.queryByText(/Ya hay un pago NOWPayments en curso/i)).not.toBeInTheDocument();
+  });
+
+  it('opens the Monero message modal from the chooser', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ProductPaymentCheckout
+        open
+        onClose={vi.fn()}
+        title="Ucronía Capítulo 33"
+        priceUsd={40}
+        productLabel="camino"
+        offerNowpayments
+        offerBch
+        createBchPayment={mockCreateBch}
+        verifyBchPayment={mockVerifyBch}
+        nowpaymentsProps={{ pathPurchaseId: 9 }}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /Pagar con Monero/i }));
+
+    expect(
+      await screen.findByText(
+        'Para pagar con Monero, envíame un mensaje y te compartiré mi dirección de billetera.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /volver a métodos de pago/i })).toBeInTheDocument();
   });
 });
