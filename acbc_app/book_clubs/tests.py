@@ -236,7 +236,76 @@ class BookClubAPITestCase(APITestCase):
             2,
         )
 
-    def test_club_schedule_blocks_member_but_not_outsider(self):
+    def test_missions_are_open_by_default_without_schedule_dates(self):
+        """Missing or null opens_at means open; only a future date locks."""
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+
+        self.auth(self.member)
+        path = self.client.get(f'/api/knowledge_paths/{self.path.id}/')
+        self.assertEqual(path.status_code, status.HTTP_200_OK, path.data)
+        for node in path.data['nodes']:
+            self.assertFalse(node['club_schedule_locked'], node)
+            self.assertIsNone(node['club_opens_at'], node)
+
+        # First node is available; second still needs sequential completion.
+        first = next(item for item in path.data['nodes'] if item['id'] == self.node1.id)
+        second = next(item for item in path.data['nodes'] if item['id'] == self.node2.id)
+        self.assertTrue(first['is_available'])
+        self.assertFalse(second['is_available'])
+
+        node1 = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node1.id}/'
+        )
+        self.assertEqual(node1.status_code, status.HTTP_200_OK, node1.data)
+
+        # Explicit null release row also keeps the mission open.
+        BookClubMissionRelease.objects.create(
+            book_club=self.club,
+            node=self.node2,
+            opens_at=None,
+        )
+        self.client.post(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node1.id}/'
+        )
+        node2 = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(node2.status_code, status.HTTP_200_OK, node2.data)
+
+        # Staff can clear a future lock back to open (null).
+        self.auth(self.admin)
+        future = timezone.now() + timezone.timedelta(days=3)
+        locked = self.client.patch(
+            '/api/book_clubs/cypherpunk/mission-schedule/',
+            {
+                'releases': [
+                    {'node_id': self.node1.id, 'opens_at': None},
+                    {'node_id': self.node2.id, 'opens_at': future.isoformat()},
+                ],
+            },
+            format='json',
+        )
+        self.assertEqual(locked.status_code, status.HTTP_200_OK, locked.data)
+        self.assertTrue(locked.data[0]['is_released'])
+        self.assertFalse(locked.data[1]['is_released'])
+
+        cleared = self.client.patch(
+            '/api/book_clubs/cypherpunk/mission-schedule/',
+            {
+                'releases': [
+                    {'node_id': self.node2.id, 'opens_at': None},
+                ],
+            },
+            format='json',
+        )
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.data)
+        second_payload = next(
+            item for item in cleared.data if item['node_id'] == self.node2.id
+        )
+        self.assertTrue(second_payload['is_released'])
+        self.assertIsNone(second_payload['opens_at'])
+
+    def test_club_schedule_blocks_everyone_except_staff_and_path_author(self):
         BookClubMembership.objects.create(book_club=self.club, user=self.member)
         BookClubMissionRelease.objects.create(
             book_club=self.club,
@@ -279,13 +348,50 @@ class BookClubAPITestCase(APITestCase):
         )
         self.assertEqual(completion_bypass.status_code, status.HTTP_403_FORBIDDEN)
 
-        # A non-member retains the normal knowledge-path experience.
+        # Non-members also follow the club schedule (with or without ?club=).
         self.auth(self.outsider)
-        outsider = self.client.get(
+        outsider_with_club = self.client.get(
             f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
             f'?club={self.club.slug}'
         )
-        self.assertEqual(outsider.status_code, status.HTTP_200_OK, outsider.data)
+        self.assertEqual(outsider_with_club.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(outsider_with_club.data['code'], 'club_mission_not_released')
+
+        outsider_without_club = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(outsider_without_club.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            outsider_without_club.data['code'], 'club_mission_not_released'
+        )
+
+        outsider_path = self.client.get(f'/api/knowledge_paths/{self.path.id}/')
+        self.assertEqual(outsider_path.status_code, status.HTTP_200_OK, outsider_path.data)
+        outsider_second = next(
+            item for item in outsider_path.data['nodes'] if item['id'] == self.node2.id
+        )
+        self.assertTrue(outsider_second['club_schedule_locked'])
+        self.assertFalse(outsider_second['is_available'])
+
+        # Staff and the path author always bypass the schedule.
+        # In this fixture the path author is also staff (self.admin).
+        author = User(username='pathauthor')
+        author.set_unusable_password()
+        author.save()
+        self.path.author = author
+        self.path.save(update_fields=['author'])
+
+        self.auth(author)
+        author_node = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(author_node.status_code, status.HTTP_200_OK, author_node.data)
+
+        self.auth(self.admin)
+        staff_node = self.client.get(
+            f'/api/knowledge_paths/{self.path.id}/nodes/{self.node2.id}/'
+        )
+        self.assertEqual(staff_node.status_code, status.HTTP_200_OK, staff_node.data)
 
     def test_member_cannot_edit_mission_schedule(self):
         BookClubMembership.objects.create(book_club=self.club, user=self.member)

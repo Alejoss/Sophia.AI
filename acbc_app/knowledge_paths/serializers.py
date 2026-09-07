@@ -65,22 +65,24 @@ class NodeSerializer(serializers.ModelSerializer):
 
     def get_club_opens_at(self, obj):
         club = self.context.get('book_club')
-        request = self.context.get('request')
-        if not club or not request or not request.user.is_authenticated:
+        if not club:
             return None
+        request = self.context.get('request')
+        user = request.user if request else None
         from book_clubs.services import is_node_released_for_club
 
-        _, opens_at = is_node_released_for_club(obj, club, request.user)
+        _, opens_at = is_node_released_for_club(obj, club, user)
         return opens_at
 
     def get_club_schedule_locked(self, obj):
         club = self.context.get('book_club')
-        request = self.context.get('request')
-        if not club or not request or not request.user.is_authenticated:
+        if not club:
             return False
+        request = self.context.get('request')
+        user = request.user if request else None
         from book_clubs.services import is_node_released_for_club
 
-        released, _ = is_node_released_for_club(obj, club, request.user)
+        released, _ = is_node_released_for_club(obj, club, user)
         return not released
 
     def get_is_completed(self, obj):

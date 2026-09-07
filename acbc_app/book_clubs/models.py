@@ -145,7 +145,7 @@ class BookClubMissionRelease(models.Model):
     opens_at = models.DateTimeField(
         null=True,
         blank=True,
-        help_text='Null keeps the mission locked until staff schedules it.',
+        help_text='Null (or missing row) keeps the mission open. Set a future date to lock it until then.',
     )
     updated_at = models.DateTimeField(auto_now=True)
 

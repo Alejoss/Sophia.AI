@@ -59,9 +59,10 @@ Une un `Event` existente al club (sin alterar el modelo `Event`).
 
 Calendario colectivo del club: una fila por `(book_club, node)` con `opens_at`.
 
-- Sin fecha (o futura) → la misión permanece bloqueada para miembros.
+- Sin fecha (o fila ausente) → la misión está **abierta** por defecto.
+- Con `opens_at` futura → permanece bloqueada hasta esa fecha.
 - Con `opens_at <= now` → se libera para todos; cada persona aún debe cumplir el nodo anterior.
-- Staff puede previsualizar y completar sin esperar la fecha.
+- Staff/superusers y el autor del knowledge path pueden previsualizar y completar sin esperar la fecha.
 - CRUD vía `GET/PATCH /api/book_clubs/<slug>/mission-schedule/` (staff).
 
 ### `DiscussionQuestion`
@@ -157,14 +158,14 @@ Base: `/dashboard/book-clubs/:slug/…`
 
 ## Desbloqueo colectivo de misiones
 
-Los caminos normales conservan su disponibilidad individual. Para miembros de un club,
-`BookClubMissionRelease` agrega una segunda condición: el nodo solo está disponible si
-ya llegó su `opens_at` **y** el usuario cumplió los prerrequisitos del nodo anterior.
-Staff/superusers pueden previsualizar todas las misiones.
+Cuando un knowledge path está vinculado a un book club, `BookClubMissionRelease`
+agrega una condición de calendario para **todos** los visitantes: el nodo solo está
+disponible si ya llegó su `opens_at` **y** el usuario cumplió los prerrequisitos del
+nodo anterior. Staff/superusers y el autor del path pueden previsualizar todas las
+misiones.
 
-El backend resuelve el club aplicable por membresía aunque el cliente elimine `?club=`,
-por lo que quitar el parámetro no permite saltar el calendario. Los no miembros siguen
-usando el mismo Knowledge Path con su comportamiento normal.
+El backend resuelve el club vinculado al path aunque el cliente elimine `?club=`,
+por lo que quitar el parámetro no permite saltar el calendario.
 
 Crear club: `/dashboard/book-clubs/nuevo` (staff).
 
@@ -259,5 +260,6 @@ roster filtrado, permisos staff, desvincular eventos y calendario colectivo de m
 3. Investigación embebe el timeline; el detalle completo del tema abre en otra pestaña.
 4. Foro ≠ quizzes; las respuestas de la cohorte se desbloquean al publicar la propia.
 5. Gestión del club = staff/superuser (sin roles por membresía).
-6. Las misiones del club se liberan por calendario colectivo; el mismo path fuera del club
-   conserva su regla secuencial individual.
+6. Las misiones de un path vinculado a un club se liberan por calendario colectivo para
+   todos (excepto staff y el autor del path); el calendario se configura en
+   `/dashboard/book-clubs/:slug/misiones`.

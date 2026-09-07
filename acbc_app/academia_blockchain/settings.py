@@ -777,7 +777,8 @@ BCH_RECEIVE_ADDRESS = os.getenv('BCH_RECEIVE_ADDRESS', '').strip()
 BCH_RECEIVE_ADDRESS_CHIPNET = os.getenv('BCH_RECEIVE_ADDRESS_CHIPNET', '').strip()
 BCH_RECEIVE_ADDRESS_MAINNET = os.getenv('BCH_RECEIVE_ADDRESS_MAINNET', '').strip()
 _BCH_API_DEFAULTS = {
-    'mainnet': 'https://api.blockchair.com/bitcoin-cash',
+    # Fulcrum Electrum SSL — avoids Blockchair free-tier IP bans on verify.
+    'mainnet': 'ssl://bch.imaginary.cash:50002',
     # Fulcrum Electrum SSL — community chipnet indexer (bch.ninja).
     'chipnet': 'ssl://chipnet.bch.ninja:50002',
     'testnet': 'ssl://chipnet.bch.ninja:50002',
@@ -787,9 +788,11 @@ BCH_API_BASE = os.getenv(
     'BCH_API_BASE',
     _BCH_API_DEFAULTS.get(BCH_NETWORK, _BCH_API_DEFAULTS['chipnet']),
 ).rstrip('/')
+# Optional Blockchair key when BCH_API_BASE points at api.blockchair.com
+BCH_BLOCKCHAIR_API_KEY = os.getenv('BCH_BLOCKCHAIR_API_KEY', '').strip()
 BCH_PAYMENT_TTL_MINUTES = int(os.getenv('BCH_PAYMENT_TTL_MINUTES', '30'))
 BCH_MIN_CONFIRMATIONS = int(os.getenv('BCH_MIN_CONFIRMATIONS', '0'))
-# Optional fixed USD/BCH; 0 = fetch from Blockchair mainnet /stats (also used on chipnet for sizing).
+# Optional fixed USD/BCH; 0 = fetch from Blockchair / CoinGecko (also used on chipnet for sizing).
 BCH_USD_PRICE = float(os.getenv('BCH_USD_PRICE', '0'))
 
 # Sentry: init when SENTRY_DSN is set (production / beta)

@@ -310,7 +310,13 @@ def _reuse_or_refresh_open_payment(queryset):
         return None
     try:
         return refresh_crypto_payment_from_nowpayments(existing)
-    except NOWPaymentsError:
+    except NOWPaymentsError as exc:
+        logger.warning(
+            'Could not refresh open NOWPayments invoice id=%s order=%s: %s',
+            existing.pk,
+            existing.order_id,
+            exc,
+        )
         if existing.invoice_url:
             return existing
     return None
