@@ -110,7 +110,7 @@ const ProductPaymentCheckout = ({
       const order = await createBchPayment();
       setBchOrder(order);
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo crear la orden BCH'));
+      setBchError(formatApiError(err, 'No se pudo crear la orden BCH. Inténtalo de nuevo.'));
     } finally {
       setBchBusy(false);
     }
@@ -132,7 +132,7 @@ const ProductPaymentCheckout = ({
         onPaid?.(data);
       }
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo verificar el pago'));
+      setBchError(formatApiError(err, 'No se pudo verificar el pago. Inténtalo de nuevo.'));
     } finally {
       setBchBusy(false);
     }

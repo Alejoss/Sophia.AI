@@ -119,7 +119,7 @@ def _allocate_unique_sats(base_sats: int) -> int:
         if not taken:
             return sats
         sats += 1
-    raise BchPaymentError('No se pudo asignar un monto BCH único. Inténtelo de nuevo.')
+    raise BchPaymentError('No se pudo asignar un monto BCH único. Inténtalo de nuevo.')
 
 
 def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
@@ -165,7 +165,7 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
 def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if path_purchase is not None:
         path = path_purchase.knowledge_path
@@ -174,7 +174,7 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
             and path.author_id != user.id
             and not getattr(user, 'is_staff', False)
         ):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if topic_purchase is not None:
         topic = topic_purchase.topic
@@ -183,7 +183,7 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
             and not topic.is_moderator_or_creator(user)
             and not getattr(user, 'is_staff', False)
         ):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
@@ -362,11 +362,11 @@ def verify_bch_payment(
         .first()
     )
     if payment is None:
-        raise BchPaymentError('No hay una orden BCH pendiente. Cree una primero.')
+        raise BchPaymentError('No hay una orden BCH pendiente. Crea una primero.')
 
     payment.mark_expired_if_needed()
     if payment.status == BchDirectPayment.STATUS_EXPIRED:
-        raise BchPaymentError('La orden BCH expiró. Genere una nueva orden.')
+        raise BchPaymentError('La orden BCH expiró. Genera una nueva orden.')
 
     client = client or build_bch_client()
     try:
@@ -381,8 +381,8 @@ def verify_bch_payment(
             exc,
         )
         raise BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde '
-            'o avise por mensaje con el monto y la dirección de la orden.'
+            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
+            'o avísanos por mensaje con el monto y la dirección de la orden.'
         ) from exc
 
     min_ts = int((payment.created_at - timedelta(seconds=60)).timestamp())
@@ -417,7 +417,7 @@ def verify_bch_payment(
     )
     raise BchPaymentError(
         'No encontramos un pago BCH con el monto exacto aún. '
-        'Espere unos segundos y vuelva a intentarlo.'
+        'Espera unos segundos y vuelve a intentarlo.'
     )
 
 

@@ -910,7 +910,8 @@ class PathAndTopicBchPaymentTests(TestCase):
     @patch('payments.views.verify_bch_payment')
     def test_path_bch_verify_view_logs_payment_errors(self, mock_verify):
         mock_verify.side_effect = BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.'
+            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
+            'o avísanos por mensaje con el monto y la dirección de la orden.'
         )
         api = APIClient()
         api.force_authenticate(user=self.buyer)
@@ -922,3 +923,5 @@ class PathAndTopicBchPaymentTests(TestCase):
             logs.output,
         )
         self.assertIn('blockchain', response.data['error'].lower())
+        self.assertIn('inténtalo', response.data['error'].lower())
+        self.assertIn('avísanos', response.data['error'].lower())

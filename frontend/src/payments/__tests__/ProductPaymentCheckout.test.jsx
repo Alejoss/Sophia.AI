@@ -138,7 +138,7 @@ describe('ProductPaymentCheckout method switch', () => {
   it('opens the TXID support modal after a BCH verify failure', async () => {
     const user = userEvent.setup();
     mockVerifyBch.mockRejectedValue({
-      error: 'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.',
+      error: 'No se pudo consultar la blockchain de BCH. Inténtalo más tarde.',
     });
     const onClose = vi.fn();
     renderWithProviders(
@@ -163,6 +163,7 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(
       await screen.findByRole('button', { name: /^Enviar TXID a soporte$/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText(/Inténtalo más tarde/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Ya pagué — enviar TXID a soporte/i }),
     ).toBeInTheDocument();
