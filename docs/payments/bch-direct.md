@@ -22,7 +22,7 @@ NOWPayments sigue en `waiting` (aún no hay fondos en camino).
 | Entorno | Default `BCH_NETWORK` | Verificación | Prefijo CashAddr |
 |---------|----------------------|--------------|------------------|
 | `ENVIRONMENT` ≠ `PRODUCTION` (Docker local) | `chipnet` | Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002`) | `bchtest:` |
-| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Blockchair `https://api.blockchair.com/bitcoin-cash` | `bitcoincash:` |
+| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum `ssl://bch.imaginary.cash:50002` | `bitcoincash:` |
 
 Override explícito: `BCH_NETWORK=chipnet` o `mainnet`. Chipnet es la red de pruebas
 permanente de BCH (análogo práctico a signet para este flujo).
@@ -36,7 +36,7 @@ Faucet / explorer chipnet: [chipnet.chaingraph.cash](https://chipnet.chaingraph.
 | Entitlement | Solo `TranscriptAnchorRequest` (no eventos ni caminos) |
 | Tras pagar | `paid_pending_review` vía `mark_anchor_request_paid()` (compartido con NOWPayments) |
 | Admin | Aprueba/rechaza anclaje BTC como hoy (sin reembolso automático) |
-| HTTP / SSL | Blockchair (mainnet) o Electrum SSL (chipnet); sin workers/IPN BCH |
+| HTTP / SSL | Fulcrum/Electrum SSL (mainnet + chipnet); Blockchair HTTP opcional con API key |
 | Workers / IPN BCH | No — el usuario pulsa **Ya realicé el pago** |
 
 ## Flujo
@@ -46,7 +46,7 @@ sequenceDiagram
     participant User
     participant UI as AnchorPaymentCheckout
     participant API as Django API
-    participant Chain as Blockchair / Fulcrum
+    participant Chain as Fulcrum / Blockchair
     participant Admin
 
     User->>API: POST .../transcript/anchor-requests/
@@ -68,12 +68,13 @@ sequenceDiagram
    mientras el invoice NOWPayments esté en `waiting`.
 3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats, desambiguación +1 sat).
 4. Usuario paga el monto **exacto** a la dirección de la red activa.
-5. `POST .../bch/verify/` consulta Blockchair o Fulcrum; si hay match → orden `paid` + solicitud `paid_pending_review`.
+5. `POST .../bch/verify/` consulta Fulcrum (o Blockchair si se fuerza); si hay match → orden `paid` + solicitud `paid_pending_review`.
+   Si el indexer falla, el error se registra en logs y el UI ofrece **Avisar por mensaje**.
 6. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
 
 ## Cómo se calcula el monto
 
-1. Tasa USD/BCH: `BCH_USD_PRICE` si es `> 0`; si no, Blockchair mainnet `GET /stats` → `market_price_usd` (también en chipnet, porque chipnet no tiene mercado).
+1. Tasa USD/BCH: `BCH_USD_PRICE` si es `> 0`; si no, Blockchair mainnet `GET /stats` → `market_price_usd`, con fallback CoinGecko.
 2. `bch_amount = ceil(usd / rate, 8 decimales)`.
 3. `base_sats = bch_amount * 100_000_000`, luego `max(1000, base_sats)`.
 4. Si otra orden `pending` no expirada ya usa esos sats, se suma **1 sat** (hasta 10 000 intentos).
@@ -118,13 +119,15 @@ Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 # Or a single fallback for the active network:
 # BCH_RECEIVE_ADDRESS=bchtest:q...
 
-# Optional overrides (defaults follow BCH_NETWORK):
+# Optional overrides (defaults: Fulcrum Electrum for mainnet + chipnet):
+# BCH_API_BASE=ssl://bch.imaginary.cash:50002
 # BCH_API_BASE=ssl://chipnet.bch.ninja:50002
 # BCH_API_BASE=https://api.blockchair.com/bitcoin-cash
+# BCH_BLOCKCHAIR_API_KEY=
 
 BCH_PAYMENT_TTL_MINUTES=30
 BCH_MIN_CONFIRMATIONS=0
-# 0 = fetch USD/BCH from Blockchair mainnet /stats (also used to size chipnet orders)
+# 0 = fetch USD/BCH from Blockchair, then CoinGecko
 BCH_USD_PRICE=0
 ANCHOR_REQUEST_PRICE_USD=1
 ```
@@ -192,7 +195,8 @@ verificar**, no crear la orden.
 ## Código
 
 - Modelo: `payments.BchDirectPayment`
-- Cliente: `payments/bch_client.py` (`build_bch_client()` → Blockchair HTTP o Electrum SSL)
+- Cliente: `payments/bch_client.py` (`build_bch_client()` → Electrum SSL por defecto; Blockchair HTTP si se fuerza)
+elección chipnet/mainnet (Electrum) vs Blockchair explícito.
 - CashAddr → scripthash: `payments/bch_cashaddr.py`
 - Servicios: `payments/bch_services.py`
 - Admin: `payments/admin.py` → **Payments → Bch direct payments**
@@ -208,4 +212,4 @@ cd acbc_app && . .venv/bin/activate && ENVIRONMENT=DEVELOPMENT \
 
 Los tests mockean el cliente de cadena. No hace falta Blockchair, Fulcrum ni una
 wallet real. Cubren monto único, reuso, match exacto, rechazo por sat de más, y
-elección chipnet (Electrum) vs mainnet (Blockchair).
+elección Electrum (default) vs Blockchair explícito.

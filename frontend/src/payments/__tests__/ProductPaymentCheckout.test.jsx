@@ -4,12 +4,25 @@ import userEvent from '@testing-library/user-event';
 import ProductPaymentCheckout from '../ProductPaymentCheckout';
 import { renderWithProviders } from '../../test/formTestUtils';
 
-const mockGatewayStatus = vi.fn();
-const mockListPathPayments = vi.fn();
-const mockCreatePathPayment = vi.fn();
-const mockGetPaymentStatus = vi.fn();
-const mockCreateBch = vi.fn();
-const mockVerifyBch = vi.fn();
+const {
+  mockGatewayStatus,
+  mockListPathPayments,
+  mockCreatePathPayment,
+  mockGetPaymentStatus,
+  mockCreateBch,
+  mockVerifyBch,
+  mockFetchThread,
+  mockSendMessage,
+} = vi.hoisted(() => ({
+  mockGatewayStatus: vi.fn(),
+  mockListPathPayments: vi.fn(),
+  mockCreatePathPayment: vi.fn(),
+  mockGetPaymentStatus: vi.fn(),
+  mockCreateBch: vi.fn(),
+  mockVerifyBch: vi.fn(),
+  mockFetchThread: vi.fn(),
+  mockSendMessage: vi.fn(),
+}));
 
 vi.mock('../../api/paymentsApi', () => ({
   getPaymentGatewayStatus: (...args) => mockGatewayStatus(...args),
@@ -20,6 +33,11 @@ vi.mock('../../api/paymentsApi', () => ({
   listRegistrationPayments: vi.fn(),
   createAnchorRequestPayment: vi.fn(),
   listAnchorRequestPayments: vi.fn(),
+}));
+
+vi.mock('../../api/messagesApi', () => ({
+  fetchOrCreateThread: (...args) => mockFetchThread(...args),
+  sendMessage: (...args) => mockSendMessage(...args),
 }));
 
 const waitingInvoice = {
@@ -40,6 +58,7 @@ describe('ProductPaymentCheckout method switch', () => {
     mockListPathPayments.mockResolvedValue([waitingInvoice]);
     mockGetPaymentStatus.mockResolvedValue(waitingInvoice);
     mockCreateBch.mockResolvedValue({
+      id: 12,
       address: 'bitcoincash:qptestaddress',
       expected_amount_bch: '0.20000000',
       expected_amount_sats: 20000000,
@@ -47,6 +66,8 @@ describe('ProductPaymentCheckout method switch', () => {
       status: 'pending',
       seconds_remaining: 1800,
     });
+    mockFetchThread.mockResolvedValue({ data: { id: 55 } });
+    mockSendMessage.mockResolvedValue({});
   });
 
   it('returns to the chooser from NOWPayments and then starts BCH', async () => {
@@ -112,5 +133,43 @@ describe('ProductPaymentCheckout method switch', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /volver a métodos de pago/i })).toBeInTheDocument();
+  });
+
+  it('opens the TXID support modal after a BCH verify failure', async () => {
+    const user = userEvent.setup();
+    mockVerifyBch.mockRejectedValue({
+      error: 'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.',
+    });
+    const onClose = vi.fn();
+    renderWithProviders(
+      <ProductPaymentCheckout
+        open
+        onClose={onClose}
+        title="Ucronía Capítulo 33"
+        priceUsd={40}
+        productLabel="camino"
+        offerNowpayments
+        offerBch
+        createBchPayment={mockCreateBch}
+        verifyBchPayment={mockVerifyBch}
+        nowpaymentsProps={{ pathPurchaseId: 9 }}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /Bitcoin Cash directo/i }));
+    expect(await screen.findByRole('button', { name: /Ya realicé el pago/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Ya realicé el pago/i }));
+
+    expect(
+      await screen.findByRole('button', { name: /^Enviar TXID a soporte$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Ya pagué — enviar TXID a soporte/i }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Enviar TXID a soporte$/i }));
+
+    expect(await screen.findByText('Ya pagué — avisar a soporte')).toBeInTheDocument();
+    expect(screen.getByLabelText(/ID de transacción/i)).toBeInTheDocument();
+    expect(screen.getByText(/revisaremos el pago manualmente/i)).toBeInTheDocument();
   });
 });

@@ -3,10 +3,13 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import logging
 
 from content.models import Topic
 from content.serializers import TopicPurchaseSerializer
 from content.topic_access import get_or_create_topic_purchase, get_user_topic_purchase
+
+logger = logging.getLogger(__name__)
 
 
 class TopicPurchaseView(APIView):
@@ -36,7 +39,25 @@ class TopicPurchaseView(APIView):
         try:
             purchase = get_or_create_topic_purchase(topic=topic, user=request.user)
         except ValueError as exc:
+            logger.info(
+                'Topic purchase rejected topic_id=%s user_id=%s: %s',
+                pk,
+                request.user.id,
+                exc,
+            )
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.error(
+                'Unexpected topic purchase error topic_id=%s user_id=%s: %s',
+                pk,
+                request.user.id,
+                exc,
+                exc_info=True,
+            )
+            return Response(
+                {'error': 'No se pudo crear la compra. Inténtelo de nuevo.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(
             TopicPurchaseSerializer(purchase).data,
             status=status.HTTP_200_OK if purchase.payment_status == 'PAID' else status.HTTP_201_CREATED,

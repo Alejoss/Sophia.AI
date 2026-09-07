@@ -49,7 +49,8 @@ class NOWPaymentsClient:
                 payload = response.json()
             except ValueError:
                 payload = {'detail': response.text}
-            logger.warning('NOWPayments error %s: %s', response.status_code, payload)
+            log_fn = logger.error if response.status_code >= 500 else logger.warning
+            log_fn('NOWPayments error %s %s %s: %s', method, path, response.status_code, payload)
             raise NOWPaymentsError(
                 payload.get('message') or payload.get('detail') or 'NOWPayments API error',
                 status_code=response.status_code,
@@ -115,7 +116,13 @@ class NOWPaymentsClient:
                     '/invoice-payment',
                     params={param_name: invoice_id},
                 )
-            except NOWPaymentsError:
+            except NOWPaymentsError as exc:
+                logger.warning(
+                    'NOWPayments invoice-payment lookup failed invoice_id=%s param=%s: %s',
+                    invoice_id,
+                    param_name,
+                    exc,
+                )
                 continue
             if payload.get('payment_id') is not None:
                 return payload
