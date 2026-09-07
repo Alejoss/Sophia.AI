@@ -5,34 +5,41 @@ from book_clubs.models import BookClub, BookClubMissionRelease
 
 def resolve_book_club_context(knowledge_path, user, slug=None):
     """
-    Resolve the club schedule that applies to a user on a knowledge path.
+    Resolve the club schedule that applies on a knowledge path.
 
-    A valid explicit slug wins. Without one, a club linked to this path still
-    applies to its members, preventing schedule bypass by deleting ?club=.
-    Non-members keep the normal knowledge-path experience.
+    When a path is linked to one or more book clubs, the mission schedule
+    applies to every viewer (members and non-members). An explicit ``?club=``
+    slug selects that club when it belongs to the path; otherwise the viewer's
+    membership club wins, then the latest club linked to the path.
+
+    Release exemptions (staff / path author) are handled in
+    ``is_node_released_for_club``, not here — so schedule metadata can still
+    be resolved for those users when useful.
     """
-    if not user or not user.is_authenticated:
-        return None
-
     clubs = BookClub.objects.filter(knowledge_path=knowledge_path)
     if slug:
-        club = clubs.filter(slug=slug).first()
-        if club and (club.user_is_member(user) or club.user_can_manage(user)):
-            return club
+        return clubs.filter(slug=slug).first()
 
-    if user.is_staff or user.is_superuser:
-        return None
+    if user and getattr(user, 'is_authenticated', False):
+        member_club = (
+            clubs.filter(memberships__user=user)
+            .distinct()
+            .order_by('-starts_at', '-created_at')
+            .first()
+        )
+        if member_club:
+            return member_club
 
-    return (
-        clubs.filter(memberships__user=user)
-        .distinct()
-        .order_by('-starts_at', '-created_at')
-        .first()
-    )
+    return clubs.order_by('-starts_at', '-created_at').first()
 
 
 def get_collective_release(node, club):
-    """Return (released, opens_at) for a node in a club context."""
+    """Return (released, opens_at) for a node in a club context.
+
+    Nodes are open by default. A mission is schedule-locked only when staff
+    sets an explicit future ``opens_at``. Missing release rows or ``opens_at=None``
+    mean the mission is already available (sequential prerequisites still apply).
+    """
     if club is None:
         return True, None
 
@@ -41,18 +48,23 @@ def get_collective_release(node, club):
         node=node,
     ).first()
     opens_at = release.opens_at if release else None
-
-    # A newly created club/path remains usable: its first mission opens at the
-    # club start (or immediately if no start exists). Later unscheduled nodes
-    # stay locked until staff assigns a date.
-    if release is None and node.get_preceding_node() is None:
-        opens_at = club.starts_at or club.created_at
-        return opens_at <= timezone.now(), opens_at
-
-    return bool(opens_at and opens_at <= timezone.now()), opens_at
+    if opens_at is None:
+        return True, None
+    return opens_at <= timezone.now(), opens_at
 
 
 def is_node_released_for_club(node, club, user):
-    if club is None or club.user_can_manage(user):
+    """
+    Whether ``user`` may open ``node`` under the club schedule.
+
+    Staff/superusers and the knowledge-path author always bypass the schedule.
+    Everyone else follows ``BookClubMissionRelease.opens_at``.
+    """
+    if club is None:
         return True, None
+    if user and getattr(user, 'is_authenticated', False):
+        if club.user_can_manage(user):
+            return True, None
+        if node.knowledge_path.author_id == user.id:
+            return True, None
     return get_collective_release(node, club)

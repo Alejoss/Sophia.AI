@@ -430,12 +430,11 @@ class BookClubMissionScheduleView(APIView):
         now = timezone.now()
         payload = []
         nodes = club.knowledge_path.nodes.order_by('order')
-        for index, node in enumerate(nodes):
+        for node in nodes:
             release = releases.get(node.id)
-            opens_at = release.opens_at if release else (
-                (club.starts_at or club.created_at) if index == 0 else None
-            )
-            is_released = bool(opens_at and opens_at <= now)
+            opens_at = release.opens_at if release else None
+            # Open by default; only an explicit future opens_at locks the mission.
+            is_released = opens_at is None or opens_at <= now
             payload.append({
                 'node_id': node.id,
                 'title': node.title,
@@ -494,19 +493,9 @@ class BookClubMissionScheduleView(APIView):
             release.node_id: release.opens_at
             for release in club.mission_releases.all()
         }
-        if nodes and nodes[0].id not in proposed:
-            proposed[nodes[0].id] = club.starts_at or club.created_at
         proposed.update(dict(normalized))
         dates_in_order = [proposed.get(node.id) for node in nodes]
-        seen_unscheduled = False
-        for opens_at in dates_in_order:
-            if opens_at is None:
-                seen_unscheduled = True
-            elif seen_unscheduled:
-                return Response(
-                    {'detail': 'No puedes programar una misión si una anterior sigue sin fecha.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        # Null means open now. Only explicit dates must advance in mission order.
         dated = [opens_at for opens_at in dates_in_order if opens_at is not None]
         if dated != sorted(dated):
             return Response(
