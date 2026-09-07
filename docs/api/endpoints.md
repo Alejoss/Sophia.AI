@@ -340,10 +340,12 @@ Full product docs: [book-clubs.md](../architecture/book-clubs.md).
 - **GET/PATCH** `/api/book_clubs/{slug}/mission-schedule/`
 - **Auth**: Django staff/superusers
 - **PATCH body**: `{ "releases": [{ "node_id": 1, "opens_at": "2026-07-20T18:00:00Z" }] }`
-- Dates must follow node order; `null` leaves a mission unscheduled/locked.
+- Dates must follow node order; `null` (or no row) leaves a mission **open**.
+  Set a future `opens_at` to lock it until that time.
 - Knowledge Path and Node endpoints accept `?club={slug}` and return
-  `club_opens_at` / `club_schedule_locked`. For club members the schedule is
-  also enforced server-side when the parameter is absent.
+  `club_opens_at` / `club_schedule_locked`. When a path is linked to a book
+  club, the schedule is enforced for everyone (with or without `?club=`),
+  except Django staff/superusers and the knowledge-path author.
 
 ### Join / Guest Access
 - **POST** `/api/book_clubs/{slug}/join/`
