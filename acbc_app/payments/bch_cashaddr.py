@@ -26,6 +26,11 @@ class CashAddrError(ValueError):
 
 
 def _polymod(values: list[int]) -> int:
+    """CashAddr checksum (Electron-Cash / cashaddr.md).
+
+    Reference implementations return ``c ^ 1`` so a valid address yields 0.
+    Omitting that XOR made every real mainnet CashAddr fail verification.
+    """
     generators = [0x98F2BC8E61, 0x79B76D99E2, 0xF33E5FB3C4, 0xAE2EABE2A8, 0x1E4F43E470]
     chk = 1
     for value in values:
@@ -34,7 +39,7 @@ def _polymod(values: list[int]) -> int:
         for i in range(5):
             if (top >> i) & 1:
                 chk ^= generators[i]
-    return chk
+    return chk ^ 1
 
 
 def _prefix_expand(prefix: str) -> list[int]:
@@ -46,10 +51,11 @@ def _convertbits(data: list[int], from_bits: int, to_bits: int, pad: bool = True
     bits = 0
     ret: list[int] = []
     maxv = (1 << to_bits) - 1
+    max_acc = (1 << (from_bits + to_bits - 1)) - 1
     for value in data:
         if value < 0 or value >> from_bits:
             raise CashAddrError('Invalid cashaddr payload')
-        acc = (acc << from_bits) | value
+        acc = ((acc << from_bits) | value) & max_acc
         bits += from_bits
         while bits >= to_bits:
             bits -= to_bits
