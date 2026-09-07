@@ -109,6 +109,22 @@ Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
 
 Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 
+## Manual confirmation (staff dashboard)
+
+If auto-verify fails or the order expires after the buyer already paid, they
+message support with the **TXID**. Staff confirm from **Pagos Bitcoin Cash**
+(`/profiles/.../pagos-bch`):
+
+1. Open **Confirmar pagos reportados** (pending / expired / cancelled orders).
+2. Paste the TXID and click **Confirmar pago**.
+3. The API marks the `BchDirectPayment` as `paid` and unlocks the entitlement
+   (`path` / `topic` / `anchor`) — no Django admin required.
+
+| Método | Ruta | Auth |
+|--------|------|------|
+| GET | `/api/payments/admin/bch-orders/` | Staff |
+| POST | `/api/payments/admin/bch-orders/<id>/confirm/` | Staff (`{ "txid": "…" }`) |
+
 ## Variables de entorno
 
 ```env

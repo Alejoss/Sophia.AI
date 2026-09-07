@@ -766,6 +766,83 @@ class AdminBchCatalogTests(TestCase):
         self.assertEqual(self.topic.reference_price, 3.5)
         self.assertTrue(self.topic.bch_direct_enabled)
 
+    def test_staff_lists_and_confirms_expired_bch_order_by_txid(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from unittest.mock import MagicMock
+
+        buyer = UserFactory()
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        order.status = BchDirectPayment.STATUS_EXPIRED
+        order.expires_at = timezone.now() - timedelta(minutes=1)
+        order.save(update_fields=['status', 'expires_at', 'updated_at'])
+
+        self.client.force_authenticate(user=self.staff)
+        listed = self.client.get('/api/payments/admin/bch-orders/')
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        ids = {item['id'] for item in listed.data['orders']}
+        self.assertIn(order.id, ids)
+        row = next(item for item in listed.data['orders'] if item['id'] == order.id)
+        self.assertEqual(row['buyer_username'], buyer.username)
+        self.assertEqual(row['product_type'], 'path')
+        self.assertEqual(row['status'], 'expired')
+
+        txid = 'ab' * 32
+        confirmed = self.client.post(
+            f'/api/payments/admin/bch-orders/{order.id}/confirm/',
+            {'txid': txid},
+            format='json',
+        )
+        self.assertEqual(confirmed.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        purchase.refresh_from_db()
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(order.payment_txid, txid)
+        self.assertEqual(purchase.payment_status, 'PAID')
+        self.assertTrue(order.provider_payload.get('manual_confirm'))
+
+    def test_confirm_rejects_invalid_txid(self):
+        from unittest.mock import MagicMock
+
+        buyer = UserFactory()
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        self.client.force_authenticate(user=self.staff)
+        bad = self.client.post(
+            f'/api/payments/admin/bch-orders/{order.id}/confirm/',
+            {'txid': 'not-a-txid'},
+            format='json',
+        )
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('txid', bad.data['error'].lower())
+
 
 @override_settings(
     BCH_NETWORK='mainnet',

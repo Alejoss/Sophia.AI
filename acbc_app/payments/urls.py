@@ -18,6 +18,12 @@ urlpatterns = [
     path('topic-purchase/<int:purchase_id>/bch/', views.TopicPurchaseBchPaymentView.as_view(), name='topic-purchase-bch'),
     path('topic-purchase/<int:purchase_id>/bch/verify/', views.TopicPurchaseBchVerifyView.as_view(), name='topic-purchase-bch-verify'),
     path('admin/bch-catalog/', views.AdminBchCatalogView.as_view(), name='admin-bch-catalog'),
+    path('admin/bch-orders/', views.AdminBchOrdersView.as_view(), name='admin-bch-orders'),
+    path(
+        'admin/bch-orders/<int:pk>/confirm/',
+        views.AdminBchOrderConfirmView.as_view(),
+        name='admin-bch-order-confirm',
+    ),
     path('admin/knowledge-paths/<int:pk>/', views.AdminKnowledgePathBchView.as_view(), name='admin-knowledge-path-bch'),
     path('admin/topics/<int:pk>/', views.AdminTopicBchView.as_view(), name='admin-topic-bch'),
     path('<int:payment_id>/', views.CryptoPaymentDetailView.as_view(), name='crypto-payment-detail'),

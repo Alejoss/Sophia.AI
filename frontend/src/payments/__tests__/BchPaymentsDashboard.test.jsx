@@ -5,11 +5,15 @@ import BchPaymentsDashboard from '../BchPaymentsDashboard';
 import { renderWithProviders, mockAuthValue } from '../../test/formTestUtils';
 
 const mockGetCatalog = vi.fn();
+const mockGetOrders = vi.fn();
+const mockConfirmOrder = vi.fn();
 const mockUpdatePath = vi.fn();
 const mockUpdateTopic = vi.fn();
 
 vi.mock('../../api/paymentsApi', () => ({
   getAdminBchCatalog: (...args) => mockGetCatalog(...args),
+  getAdminBchOrders: (...args) => mockGetOrders(...args),
+  confirmAdminBchOrder: (...args) => mockConfirmOrder(...args),
   updateKnowledgePathBch: (...args) => mockUpdatePath(...args),
   updateTopicBch: (...args) => mockUpdateTopic(...args),
 }));
@@ -51,10 +55,24 @@ const catalog = {
   ],
 };
 
+const expiredOrder = {
+  id: 44,
+  product_type: 'path',
+  product_id: 11,
+  product_title: 'Camino de pago',
+  buyer_username: 'bchbuyer',
+  expected_amount_bch: '0.04000000',
+  expected_amount_sats: 4000000,
+  usd_amount: 8,
+  address: 'bitcoincash:qptestaddress',
+  status: 'expired',
+};
+
 describe('BchPaymentsDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCatalog.mockResolvedValue(catalog);
+    mockGetOrders.mockResolvedValue({ orders: [expiredOrder], bch_network: 'chipnet' });
   });
 
   it('lists knowledge paths and topics for staff', async () => {
@@ -64,6 +82,8 @@ describe('BchPaymentsDashboard', () => {
     expect(screen.getByText('Camino de pago')).toBeInTheDocument();
     expect(screen.getByText('Tema Bitcoin')).toBeInTheDocument();
     expect(screen.getByText(/BCH servidor/)).toBeInTheDocument();
+    expect(screen.getByText('Confirmar pagos reportados')).toBeInTheDocument();
+    expect(screen.getByText('bchbuyer')).toBeInTheDocument();
   });
 
   it('activates BCH on a paid knowledge path', async () => {
@@ -82,5 +102,27 @@ describe('BchPaymentsDashboard', () => {
     await waitFor(() => {
       expect(mockUpdatePath).toHaveBeenCalledWith(11, { bch_direct_enabled: true });
     });
+  });
+
+  it('confirms an expired order with a pasted TXID', async () => {
+    const user = userEvent.setup();
+    const txid = 'ab'.repeat(32);
+    mockConfirmOrder.mockResolvedValue({
+      detail: 'Pago BCH confirmado. El acceso quedó desbloqueado.',
+      payment: { ...expiredOrder, status: 'paid', payment_txid: txid },
+    });
+    renderWithProviders(<BchPaymentsDashboard />, { auth: staffAuth });
+    await screen.findByText('bchbuyer');
+
+    await user.type(screen.getByPlaceholderText(/TXID/i), txid);
+    await user.click(screen.getByRole('button', { name: /Confirmar pago/i }));
+
+    await waitFor(() => {
+      expect(mockConfirmOrder).toHaveBeenCalledWith(44, txid);
+    });
+    expect(
+      await screen.findByText(/Pago BCH confirmado/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('bchbuyer')).not.toBeInTheDocument();
   });
 });

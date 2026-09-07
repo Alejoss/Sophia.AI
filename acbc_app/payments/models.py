@@ -208,6 +208,16 @@ class BchDirectPayment(models.Model):
     def expected_amount_bch(self):
         return (self.expected_amount_sats or 0) / 100_000_000
 
+    @property
+    def buyer(self):
+        if self.path_purchase_id:
+            return self.path_purchase.user
+        if self.topic_purchase_id:
+            return self.topic_purchase.user
+        if self.anchor_request_id:
+            return self.anchor_request.requester
+        return None
+
     def mark_expired_if_needed(self):
         if self.status == self.STATUS_PENDING and timezone.now() >= self.expires_at:
             self.status = self.STATUS_EXPIRED
