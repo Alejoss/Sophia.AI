@@ -115,6 +115,30 @@ export const getAdminBchCatalog = async () => {
   }
 };
 
+export const getAdminBchOrders = async ({ status, limit } = {}) => {
+  try {
+    const params = {};
+    if (status) params.status = status;
+    if (limit != null) params.limit = limit;
+    const response = await axiosInstance.get('/payments/admin/bch-orders/', { params });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar las órdenes BCH');
+  }
+};
+
+export const confirmAdminBchOrder = async (orderId, txid) => {
+  try {
+    const response = await axiosInstance.post(
+      `/payments/admin/bch-orders/${orderId}/confirm/`,
+      { txid },
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo confirmar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
 export const updateKnowledgePathBch = async (pathId, payload) => {
   try {
     const response = await axiosInstance.patch(`/payments/admin/knowledge-paths/${pathId}/`, payload);
