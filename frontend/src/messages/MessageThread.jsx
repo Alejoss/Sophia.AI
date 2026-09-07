@@ -136,38 +136,51 @@ const MessageThread = () => {
           {(!messages || messages.length === 0) && (
             <ListItem><ListItemText primary="Aún no hay mensajes." /></ListItem>
           )}
-          {messages && messages.map(msg => (
-            <ListItem
-              key={msg.id}
-              sx={{
-                justifyContent: msg.sender.id === currentUser.id ? 'flex-end' : 'flex-start',
-                mb: 1
-              }}
-            >
-              <Box
+          {messages && messages.map(msg => {
+            const isOwn = msg.sender.id === currentUser.id;
+            return (
+              <ListItem
+                key={msg.id}
                 sx={{
-                  maxWidth: '70%',
-                  backgroundColor: msg.sender.id === currentUser.id ? 'primary.main' : 'grey.200',
-                  color: msg.sender.id === currentUser.id ? 'white' : 'text.primary',
-                  borderRadius: 1,
-                  p: 1.5,
-                  px: 2
+                  justifyContent: isOwn ? 'flex-end' : 'flex-start',
+                  mb: 1
                 }}
               >
-                <Typography variant="body1">{msg.text}</Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    display: 'block',
-                    color: msg.sender.id === currentUser.id ? 'rgba(255,255,255,0.7)' : 'text.secondary',
-                    mt: 0.5
-                  }}
+                <Box
+                  sx={(theme) => ({
+                    maxWidth: '70%',
+                    // grey.200 is always light; in dark mode text.primary is light too —
+                    // use a dark surface so received bubbles stay readable.
+                    backgroundColor: isOwn
+                      ? theme.palette.primary.main
+                      : theme.palette.mode === 'dark'
+                        ? theme.palette.grey[800]
+                        : theme.palette.grey[200],
+                    color: isOwn
+                      ? theme.palette.primary.contrastText
+                      : theme.palette.text.primary,
+                    borderRadius: 1,
+                    p: 1.5,
+                    px: 2,
+                  })}
                 >
-                  {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString('es-ES')}
-                </Typography>
-              </Box>
-            </ListItem>
-          ))}
+                  <Typography variant="body1" sx={{ color: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {msg.text}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: 'block',
+                      color: isOwn ? 'rgba(255,255,255,0.7)' : 'text.secondary',
+                      mt: 0.5
+                    }}
+                  >
+                    {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString('es-ES')}
+                  </Typography>
+                </Box>
+              </ListItem>
+            );
+          })}
           <div ref={messagesEndRef} />
         </List>
         <Box
