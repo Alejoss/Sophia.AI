@@ -18,6 +18,7 @@ from payments.bch_services import (
     create_or_reuse_bch_payment,
     list_staff_bch_orders,
     manual_confirm_bch_payment,
+    report_bch_payment_txid,
     verify_bch_payment,
 )
 from payments.models import BchDirectPayment, CryptoPayment
@@ -787,6 +788,60 @@ class AdminBchOrderConfirmView(APIView):
         return Response({
             'payment': AdminBchOrderSerializer(payment).data,
             'detail': 'Pago BCH confirmado. El acceso quedó desbloqueado.',
+        })
+
+
+class BchOrderReportTxidView(APIView):
+    """
+    Buyer: report an on-chain TXID after auto-verify failed.
+
+    Stores the report for the staff dashboard and notifies admins (email +
+    in-app) and the product owner (in-app).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        txid = request.data.get('txid') or request.data.get('payment_txid')
+        note = request.data.get('note') or request.data.get('message') or ''
+        try:
+            payment, should_notify = report_bch_payment_txid(
+                payment_id=pk,
+                txid=txid,
+                user=request.user,
+                note=note,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except PermissionError as exc:
+            return _permission_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except Exception as exc:  # noqa: BLE001
+            return _unexpected_payment_error_response(
+                exc,
+                action='report_bch_txid',
+                public_message='No se pudo registrar el TXID. Inténtalo de nuevo.',
+                payment_id=pk,
+            )
+
+        if should_notify:
+            try:
+                from utils.notification_utils import notify_bch_txid_reported
+                notify_bch_txid_reported(payment, note=note)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    'Failed notifying after BCH TXID report payment_id=%s',
+                    pk,
+                )
+
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'reported_txid': (payment.provider_payload or {}).get('reported_txid'),
+            'notified': should_notify,
+            'detail': (
+                'TXID registrado. Avisamos al staff y al dueño del producto.'
+                if should_notify
+                else 'TXID actualizado (ya lo habías reportado).'
+            ),
         })
 
 

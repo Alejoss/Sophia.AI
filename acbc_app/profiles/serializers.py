@@ -38,6 +38,14 @@ TOPIC_CREATION_REQUEST_VERBS = (
     'rechazó tu solicitud de tema',
 )
 
+BCH_TXID_REPORT_STAFF_VERBS = (
+    'reportó un pago BCH',
+)
+
+BCH_TXID_REPORT_OWNER_VERBS = (
+    'reportó un pago BCH de',
+)
+
 KNOWLEDGE_PATH_VERBS = (
     'comentó en tu camino de conocimiento',
     'completó tu camino de conocimiento',
@@ -85,6 +93,8 @@ EVENT_TARGET_VERB_KEYS = frozenset(verb_key(v) for v in EVENT_TARGET_VERBS)
 CERTIFICATE_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_DECISION_VERBS)
 CERTIFICATE_REQUEST_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_REQUEST_VERBS)
 TOPIC_REQUEST_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_REQUEST_DECISION_VERBS)
+BCH_TXID_REPORT_STAFF_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_STAFF_VERBS)
+BCH_TXID_REPORT_OWNER_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_OWNER_VERBS)
 
 # Get logger for profiles serializers
 logger = logging.getLogger('academia_blockchain.profiles.serializers')
@@ -340,6 +350,9 @@ class NotificationSerializer(serializers.ModelSerializer):
                     or getattr(obj.target, 'proposed_title', None)
                 )
 
+            if self._verb_in(verb, BCH_TXID_REPORT_OWNER_VERB_KEYS) and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
             if self._verb_is(verb, 'aprobó tu solicitud de tema') and obj.action_object:
                 request = obj.action_object
                 if getattr(request, 'topic_id', None):
@@ -449,6 +462,20 @@ class NotificationSerializer(serializers.ModelSerializer):
 
             if self._verb_is(verb, 'solicitó crear un tema'):
                 return '/dashboard'
+
+            if self._verb_in(verb, BCH_TXID_REPORT_STAFF_VERB_KEYS):
+                return '/dashboard/pagos-bch'
+
+            if self._verb_in(verb, BCH_TXID_REPORT_OWNER_VERB_KEYS) and obj.target:
+                model_name = (
+                    obj.target_content_type.model
+                    if obj.target_content_type else ''
+                )
+                if model_name == 'knowledgepath':
+                    return f'/knowledge_path/{obj.target.id}'
+                if model_name == 'topic':
+                    return f'/content/topics/{obj.target.id}'
+                return '/dashboard/pagos-bch'
 
             if self._verb_in(verb, TOPIC_REQUEST_DECISION_VERB_KEYS):
                 topic_id = None

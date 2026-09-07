@@ -112,16 +112,23 @@ Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 ## Manual confirmation (staff dashboard)
 
 If auto-verify fails or the order expires after the buyer already paid, they
-message support with the **TXID**. Staff confirm from **Pagos Bitcoin Cash**
-(`/profiles/.../pagos-bch`):
+report the **TXID** from checkout (support modal). That:
 
-1. Open **Confirmar pagos reportados** (pending / expired / cancelled orders).
-2. Paste the TXID and click **Confirmar pago**.
+1. Stores the TXID on the order for the staff inbox
+2. Sends **admins** an email + in-app notification (link → Pagos BCH)
+3. Notifies the **product owner** (path author / topic creator) in-app
+4. Still opens a message thread with support (user id 2)
+
+Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
+
+1. Open **Confirmar pagos reportados** (pending / expired / cancelled; reported first).
+2. TXID is prefilled when the buyer already reported it — confirm after checking the explorer.
 3. The API marks the `BchDirectPayment` as `paid` and unlocks the entitlement
    (`path` / `topic` / `anchor`) — no Django admin required.
 
 | Método | Ruta | Auth |
 |--------|------|------|
+| POST | `/api/payments/bch-orders/<id>/report-txid/` | Buyer (`{ "txid": "…", "note": "…" }`) |
 | GET | `/api/payments/admin/bch-orders/` | Staff |
 | POST | `/api/payments/admin/bch-orders/<id>/confirm/` | Staff (`{ "txid": "…" }`) |
 

@@ -16,6 +16,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../context/AuthContext';
 import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
+import { reportBchOrderTxid } from '../api/paymentsApi';
 import {
   BCH_SUPPORT_DESCRIPTION,
   PAYMENT_SUPPORT_USER_ID,
@@ -74,6 +75,9 @@ const BchPaymentSupportModal = ({
     setBusy(true);
     setError(null);
     try {
+      if (bchOrder?.id != null) {
+        await reportBchOrderTxid(bchOrder.id, { txid: cleanTxid, note });
+      }
       const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
       const thread = threadRes?.data;
       if (!thread?.id) {

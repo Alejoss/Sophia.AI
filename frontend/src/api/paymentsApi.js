@@ -139,6 +139,18 @@ export const confirmAdminBchOrder = async (orderId, txid) => {
   }
 };
 
+export const reportBchOrderTxid = async (orderId, { txid, note } = {}) => {
+  try {
+    const response = await axiosInstance.post(
+      `/payments/bch-orders/${orderId}/report-txid/`,
+      { txid, note: note || '' },
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo registrar el TXID. Inténtalo de nuevo');
+  }
+};
+
 export const updateKnowledgePathBch = async (pathId, payload) => {
   try {
     const response = await axiosInstance.patch(`/payments/admin/knowledge-paths/${pathId}/`, payload);

@@ -98,6 +98,9 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
     product_title = serializers.SerializerMethodField()
     buyer_id = serializers.SerializerMethodField()
     buyer_username = serializers.SerializerMethodField()
+    reported_txid = serializers.SerializerMethodField()
+    reported_note = serializers.SerializerMethodField()
+    reported_at = serializers.SerializerMethodField()
     path_purchase_id = serializers.IntegerField(read_only=True)
     topic_purchase_id = serializers.IntegerField(read_only=True)
     anchor_request_id = serializers.IntegerField(read_only=True)
@@ -109,6 +112,9 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             'product_title',
             'buyer_id',
             'buyer_username',
+            'reported_txid',
+            'reported_note',
+            'reported_at',
             'path_purchase_id',
             'topic_purchase_id',
             'anchor_request_id',
@@ -148,3 +154,15 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
     def get_buyer_username(self, obj):
         buyer = obj.buyer
         return buyer.username if buyer else None
+
+    def get_reported_txid(self, obj):
+        payload = obj.provider_payload or {}
+        return payload.get('reported_txid') or ''
+
+    def get_reported_note(self, obj):
+        payload = obj.provider_payload or {}
+        return payload.get('reported_note') or ''
+
+    def get_reported_at(self, obj):
+        payload = obj.provider_payload or {}
+        return payload.get('reported_at') or None

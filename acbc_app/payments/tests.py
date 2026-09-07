@@ -843,6 +843,109 @@ class AdminBchCatalogTests(TestCase):
         self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('txid', bad.data['error'].lower())
 
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_buyer_reports_txid_notifies_staff_and_owner(self, mock_send_to_admins):
+        from unittest.mock import MagicMock
+        from notifications.models import Notification
+        from utils.db_encoding import to_ascii_safe
+
+        mock_send_to_admins.return_value = {'sent': ['staff@example.com'], 'failed': []}
+        buyer = UserFactory()
+        self.staff.email = 'staff@example.com'
+        self.staff.save(update_fields=['email'])
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        txid = 'cd' * 32
+
+        self.client.force_authenticate(user=buyer)
+        reported = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': txid, 'note': 'Desde Electron Cash'},
+            format='json',
+        )
+        self.assertEqual(reported.status_code, status.HTTP_200_OK)
+        self.assertTrue(reported.data['notified'])
+        self.assertEqual(reported.data['reported_txid'], txid)
+
+        order.refresh_from_db()
+        self.assertEqual(order.provider_payload.get('reported_txid'), txid)
+        self.assertEqual(order.provider_payload.get('reported_note'), 'Desde Electron Cash')
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+        self.assertFalse(order.payment_txid)
+
+        staff_verb = to_ascii_safe('reportó un pago BCH')
+        staff_notes = Notification.objects.filter(recipient=self.staff, actor_object_id=buyer.id)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == staff_verb for n in staff_notes),
+            f'staff verbs={[n.verb for n in staff_notes]}',
+        )
+        owner_verb = to_ascii_safe('reportó un pago BCH de')
+        owner_notes = Notification.objects.filter(recipient=self.author, actor_object_id=buyer.id)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == owner_verb for n in owner_notes),
+            f'owner verbs={[n.verb for n in owner_notes]}',
+        )
+        self.assertTrue(mock_send_to_admins.called)
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertEqual(call_kwargs['template_name'], 'bch_txid_reported')
+        self.assertIn(str(order.id), call_kwargs['subject'])
+
+        self.client.force_authenticate(user=self.staff)
+        listed = self.client.get('/api/payments/admin/bch-orders/')
+        row = next(item for item in listed.data['orders'] if item['id'] == order.id)
+        self.assertEqual(row['reported_txid'], txid)
+
+        # Same TXID again → no duplicate notify flag
+        self.client.force_authenticate(user=buyer)
+        again = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': txid},
+            format='json',
+        )
+        self.assertEqual(again.status_code, status.HTTP_200_OK)
+        self.assertFalse(again.data['notified'])
+
+    def test_report_txid_rejects_non_buyer(self):
+        from unittest.mock import MagicMock
+
+        buyer = UserFactory()
+        other = UserFactory()
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        self.client.force_authenticate(user=other)
+        response = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': 'ab' * 32},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 @override_settings(
     BCH_NETWORK='mainnet',
