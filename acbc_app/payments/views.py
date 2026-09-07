@@ -16,11 +16,17 @@ from payments.bch_client import get_bch_network, is_bch_direct_configured
 from payments.bch_services import (
     BchPaymentError,
     create_or_reuse_bch_payment,
+    list_staff_bch_orders,
+    manual_confirm_bch_payment,
     verify_bch_payment,
 )
 from payments.models import BchDirectPayment, CryptoPayment
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
-from payments.serializers import BchDirectPaymentSerializer, CryptoPaymentSerializer
+from payments.serializers import (
+    AdminBchOrderSerializer,
+    BchDirectPaymentSerializer,
+    CryptoPaymentSerializer,
+)
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
@@ -731,6 +737,56 @@ class AdminTopicBchView(APIView):
             'bch_direct_available': bool(
                 is_bch_direct_configured() and topic.bch_direct_enabled and topic.is_paid_topic
             ),
+        })
+
+
+class AdminBchOrdersView(APIView):
+    """Staff inbox of BCH orders that may need manual TXID confirmation."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        raw = (request.query_params.get('status') or '').strip()
+        statuses = [s.strip() for s in raw.split(',') if s.strip()] or None
+        try:
+            limit = int(request.query_params.get('limit') or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        orders = list_staff_bch_orders(statuses=statuses, limit=limit)
+        return Response({
+            'orders': AdminBchOrderSerializer(orders, many=True).data,
+            'bch_network': get_bch_network(),
+            'bch_direct_configured': is_bch_direct_configured(),
+        })
+
+
+class AdminBchOrderConfirmView(APIView):
+    """Staff: unlock entitlement after manually checking a reported TXID."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, pk):
+        txid = request.data.get('txid') or request.data.get('payment_txid')
+        try:
+            payment = manual_confirm_bch_payment(
+                payment_id=pk,
+                txid=txid,
+                staff_user=request.user,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(exc, action='confirm_bch_order', payment_id=pk)
+        except PermissionError as exc:
+            return _permission_error_response(exc, action='confirm_bch_order', payment_id=pk)
+        except Exception as exc:  # noqa: BLE001
+            return _unexpected_payment_error_response(
+                exc,
+                action='confirm_bch_order',
+                public_message='No se pudo confirmar el pago BCH. Inténtalo de nuevo.',
+                payment_id=pk,
+            )
+        return Response({
+            'payment': AdminBchOrderSerializer(payment).data,
+            'detail': 'Pago BCH confirmado. El acceso quedó desbloqueado.',
         })
 
 

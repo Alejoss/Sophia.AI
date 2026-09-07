@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import timedelta
 from decimal import ROUND_UP, Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from content.models import TopicPurchase, TranscriptAnchorRequest
@@ -459,5 +460,137 @@ def _fulfill_bch_payment(
         'BCH direct payment fulfilled id=%s txid=%s',
         locked.pk,
         txid,
+    )
+    return locked
+
+
+_TXID_RE = re.compile(r'^[0-9a-f]{64}$')
+
+
+def normalize_bch_txid(value: str) -> str:
+    clean = (value or '').strip().lower()
+    if clean.startswith('0x'):
+        clean = clean[2:]
+    if not _TXID_RE.fullmatch(clean):
+        raise BchPaymentError('El TXID debe tener 64 caracteres hexadecimales.')
+    return clean
+
+
+def list_staff_bch_orders(
+    *,
+    statuses: list[str] | None = None,
+    limit: int = 50,
+) -> QuerySet[BchDirectPayment]:
+    """Staff inbox: unpaid BCH orders that may need manual TXID confirmation."""
+    _expire_stale_pending()
+    allowed = {
+        BchDirectPayment.STATUS_PENDING,
+        BchDirectPayment.STATUS_EXPIRED,
+        BchDirectPayment.STATUS_CANCELLED,
+        BchDirectPayment.STATUS_PAID,
+    }
+    if statuses:
+        chosen = [s for s in statuses if s in allowed]
+    else:
+        chosen = [
+            BchDirectPayment.STATUS_PENDING,
+            BchDirectPayment.STATUS_EXPIRED,
+        ]
+    return (
+        BchDirectPayment.objects.filter(status__in=chosen)
+        .select_related(
+            'path_purchase__user',
+            'path_purchase__knowledge_path',
+            'topic_purchase__user',
+            'topic_purchase__topic',
+            'anchor_request__requester',
+        )
+        .order_by('-created_at')[: max(1, min(int(limit or 50), 200))]
+    )
+
+
+@transaction.atomic
+def manual_confirm_bch_payment(
+    *,
+    payment_id: int,
+    txid: str,
+    staff_user,
+) -> BchDirectPayment:
+    """
+    Staff confirms a reported on-chain payment by TXID.
+
+    Works for pending, expired, or cancelled orders (buyer may have paid after
+    expiry). Does not re-query the chain — staff already checked the explorer.
+    """
+    if not getattr(staff_user, 'is_staff', False):
+        raise PermissionError('Solo el staff puede confirmar pagos BCH manualmente.')
+
+    clean_txid = normalize_bch_txid(txid)
+    locked = (
+        BchDirectPayment.objects.select_for_update(of=('self',))
+        .select_related(
+            'anchor_request',
+            'path_purchase',
+            'topic_purchase',
+            'topic_purchase__topic',
+            'path_purchase__knowledge_path',
+            'path_purchase__user',
+            'topic_purchase__user',
+            'anchor_request__requester',
+        )
+        .filter(pk=payment_id)
+        .first()
+    )
+    if locked is None:
+        raise BchPaymentError('Orden BCH no encontrada.')
+
+    if locked.status == BchDirectPayment.STATUS_PAID:
+        if (locked.payment_txid or '').lower() == clean_txid:
+            return locked
+        raise BchPaymentError('Esta orden ya está marcada como pagada con otro TXID.')
+
+    if locked.status not in (
+        BchDirectPayment.STATUS_PENDING,
+        BchDirectPayment.STATUS_EXPIRED,
+        BchDirectPayment.STATUS_CANCELLED,
+    ):
+        raise BchPaymentError('Esta orden BCH no se puede confirmar.')
+
+    if (
+        BchDirectPayment.objects.filter(payment_txid=clean_txid)
+        .exclude(pk=locked.pk)
+        .exists()
+    ):
+        raise BchPaymentError('Ese TXID ya está asociado a otra orden BCH.')
+
+    payload = dict(locked.provider_payload or {})
+    payload.update({
+        'manual_confirm': True,
+        'confirmed_by_id': staff_user.id,
+        'confirmed_by_username': getattr(staff_user, 'username', ''),
+        'txid': clean_txid,
+        'previous_status': locked.status,
+    })
+
+    locked.status = BchDirectPayment.STATUS_PAID
+    locked.payment_txid = clean_txid
+    locked.paid_at = timezone.now()
+    locked.provider_payload = payload
+    locked.save(
+        update_fields=['status', 'payment_txid', 'paid_at', 'provider_payload', 'updated_at']
+    )
+
+    if locked.anchor_request_id:
+        mark_anchor_request_paid(locked.anchor_request, source='bch_direct_manual')
+    elif locked.path_purchase_id:
+        mark_path_purchase_paid(locked.path_purchase, source='bch_direct_manual')
+    elif locked.topic_purchase_id:
+        mark_topic_purchase_paid(locked.topic_purchase, source='bch_direct_manual')
+
+    logger.info(
+        'BCH direct payment manually confirmed id=%s txid=%s by user_id=%s',
+        locked.pk,
+        clean_txid,
+        staff_user.id,
     )
     return locked

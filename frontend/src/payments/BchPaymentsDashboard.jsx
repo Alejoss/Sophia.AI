@@ -21,7 +21,9 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  confirmAdminBchOrder,
   getAdminBchCatalog,
+  getAdminBchOrders,
   updateKnowledgePathBch,
   updateTopicBch,
 } from '../api/paymentsApi';
@@ -32,6 +34,13 @@ const FILTERS = [
   { value: 'paid', label: 'Con precio' },
   { value: 'free', label: 'Sin precio' },
 ];
+
+const ORDER_STATUS_LABEL = {
+  pending: 'Pendiente',
+  expired: 'Expirada',
+  cancelled: 'Cancelada',
+  paid: 'Pagada',
+};
 
 const formatError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message || err?.response?.data?.error;
@@ -46,35 +55,59 @@ const matchesFilter = (item, filter, enabledKey, paidKey) => {
   return true;
 };
 
+const productLabel = (order) => {
+  if (order.product_type === 'path') return 'Camino';
+  if (order.product_type === 'topic') return 'Consultas';
+  if (order.product_type === 'anchor') return 'Anclaje';
+  return 'Producto';
+};
+
+const productLink = (order) => {
+  if (order.product_type === 'path' && order.product_id) {
+    return `/knowledge_path/${order.product_id}`;
+  }
+  if (order.product_type === 'topic' && order.product_id) {
+    return `/content/topics/${order.product_id}`;
+  }
+  return null;
+};
+
 const BchPaymentsDashboard = () => {
   const [catalog, setCatalog] = useState(null);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [filter, setFilter] = useState('all');
   const [savingKey, setSavingKey] = useState(null);
   const [topicPrices, setTopicPrices] = useState({});
+  const [txidDrafts, setTxidDrafts] = useState({});
 
-  const loadCatalog = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getAdminBchCatalog();
-      setCatalog(data);
+      const [catalogData, ordersData] = await Promise.all([
+        getAdminBchCatalog(),
+        getAdminBchOrders({ status: 'pending,expired,cancelled', limit: 50 }),
+      ]);
+      setCatalog(catalogData);
+      setOrders(ordersData?.orders || []);
       const prices = {};
-      (data.topics || []).forEach((topic) => {
+      (catalogData.topics || []).forEach((topic) => {
         prices[topic.id] = String(topic.reference_price ?? 0);
       });
       setTopicPrices(prices);
       setError(null);
     } catch (err) {
-      setError(formatError(err, 'No se pudo cargar el catálogo de pagos BCH.'));
+      setError(formatError(err, 'No se pudo cargar el panel de pagos BCH.'));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
+    loadDashboard();
+  }, [loadDashboard]);
 
   const paths = catalog?.knowledge_paths || [];
   const topics = catalog?.topics || [];
@@ -151,6 +184,34 @@ const BchPaymentsDashboard = () => {
     }
   };
 
+  const handleConfirmOrder = async (order) => {
+    const txid = (txidDrafts[order.id] || '').trim();
+    if (!txid) {
+      setError('Pega el TXID que te envió el comprador antes de confirmar.');
+      return;
+    }
+    setSavingKey(`order-${order.id}`);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await confirmAdminBchOrder(order.id, txid);
+      setOrders((prev) => prev.filter((item) => item.id !== order.id));
+      setTxidDrafts((prev) => {
+        const next = { ...prev };
+        delete next[order.id];
+        return next;
+      });
+      setSuccess(
+        result?.detail
+        || `Orden #${order.id} confirmada. Acceso desbloqueado para ${order.buyer_username || 'el comprador'}.`,
+      );
+    } catch (err) {
+      setError(formatError(err, 'No se pudo confirmar el pago BCH.'));
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -173,9 +234,8 @@ const BchPaymentsDashboard = () => {
             Pagos Bitcoin Cash
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Activa el cobro autocustodia en BCH para caminos de conocimiento
-            (desbloqueo de nodos) o temas (Consultas). El precio del camino lo
-            define el autor; el del tema se configura aquí.
+            Activa el cobro autocustodia en BCH y confirma pagos reportados por
+            TXID cuando la verificación automática falle o la orden expire.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -184,6 +244,7 @@ const BchPaymentsDashboard = () => {
             color={configured ? 'success' : 'warning'}
             label={configured ? `BCH servidor · ${network || 'red'}` : 'BCH no configurado'}
           />
+          <Chip size="small" color="warning" label={`${orders.length} por confirmar`} />
           <Chip size="small" color="success" label={`${paths.filter((p) => p.bch_direct_enabled).length} caminos`} />
           <Chip size="small" color="info" label={`${topics.filter((t) => t.bch_direct_enabled).length} temas`} />
         </Stack>
@@ -194,6 +255,118 @@ const BchPaymentsDashboard = () => {
           Configura BCH_RECEIVE_ADDRESS (o la dirección de la red activa) en el
           servidor para que el checkout BCH aparezca a los alumnos.
         </Alert>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        Confirmar pagos reportados
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Cuando un comprador te manda el TXID (orden expirada o fallo de
+        verificación), pégalo aquí. Revisamos la cadena fuera de la app y
+        desbloqueamos el acceso.
+      </Typography>
+      {orders.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          No hay órdenes BCH pendientes, expiradas o canceladas.
+        </Typography>
+      ) : (
+        <Paper variant="outlined" sx={{ mb: 4 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Orden</TableCell>
+                <TableCell>Comprador</TableCell>
+                <TableCell>Producto</TableCell>
+                <TableCell>Monto</TableCell>
+                <TableCell>Estado</TableCell>
+                <TableCell>TXID</TableCell>
+                <TableCell align="right">Acción</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {orders.map((order) => {
+                const link = productLink(order);
+                return (
+                  <TableRow key={order.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>
+                        #{order.id}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', fontFamily: 'monospace', wordBreak: 'break-all' }}
+                      >
+                        {order.address}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{order.buyer_username || '—'}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {productLabel(order)}
+                        {order.product_title ? `: ${order.product_title}` : ''}
+                      </Typography>
+                      {link && (
+                        <Button size="small" component={RouterLink} to={link} sx={{ px: 0 }}>
+                          Ver
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>
+                        {order.expected_amount_bch} BCH
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {order.expected_amount_sats} sats · ${Number(order.usd_amount || 0).toFixed(2)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={order.status === 'pending' ? 'warning' : 'default'}
+                        label={ORDER_STATUS_LABEL[order.status] || order.status}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 220 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        placeholder="TXID (64 hex)"
+                        value={txidDrafts[order.id] || ''}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setTxidDrafts((prev) => ({ ...prev, [order.id]: value }));
+                        }}
+                        inputProps={{ spellCheck: false, autoComplete: 'off' }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={savingKey === `order-${order.id}`}
+                        onClick={() => handleConfirmOrder(order)}
+                      >
+                        {savingKey === `order-${order.id}` ? 'Confirmando…' : 'Confirmar pago'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Paper>
       )}
 
       <ToggleButtonGroup
@@ -211,12 +384,6 @@ const BchPaymentsDashboard = () => {
           </ToggleButton>
         ))}
       </ToggleButtonGroup>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
 
       <Typography variant="h6" sx={{ mb: 1 }}>
         Caminos del conocimiento
