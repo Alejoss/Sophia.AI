@@ -70,9 +70,9 @@ def is_bch_direct_configured() -> bool:
     network = get_bch_network()
     try:
         prefix = address_prefix(address)
-    except CashAddrError:
-        # Still enable if address is set; verification will surface a clearer error.
-        return True
+    except CashAddrError as exc:
+        logger.error('BCH receive address is not valid CashAddr: %s (%s)', address, exc)
+        return False
     if network == 'mainnet' and prefix not in ('bitcoincash', 'bchreg'):
         logger.warning(
             'BCH receive address prefix %r does not match BCH_NETWORK=mainnet',
