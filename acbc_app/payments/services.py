@@ -181,17 +181,30 @@ def _mark_event_registration_paid_if_needed(crypto_payment: CryptoPayment) -> No
 
 def mark_path_purchase_paid(path_purchase: KnowledgePathPurchase, *, source: str = '') -> KnowledgePathPurchase:
     """Mark a knowledge-path purchase PAID (idempotent). Shared by NOWPayments and BCH."""
+    newly_paid = False
     with transaction.atomic():
         purchase = KnowledgePathPurchase.objects.select_for_update().get(pk=path_purchase.pk)
         if purchase.payment_status == 'PAID':
             return purchase
         purchase.payment_status = 'PAID'
         purchase.save(update_fields=['payment_status', 'updated_at'])
+        newly_paid = True
     logger.info(
         'Path purchase %s marked PAID (source=%s)',
         purchase.pk,
         source or 'unknown',
     )
+    if newly_paid:
+        try:
+            from utils.notification_utils import notify_path_purchase_paid
+            notify_path_purchase_paid(purchase)
+        except Exception as exc:
+            logger.error(
+                'Path purchase paid notification failed for purchase %s: %s',
+                purchase.pk,
+                exc,
+                exc_info=True,
+            )
     return purchase
 
 
@@ -199,17 +212,30 @@ def mark_topic_purchase_paid(topic_purchase, *, source: str = ''):
     """Mark a topic Consultas purchase PAID (idempotent)."""
     from content.models import TopicPurchase
 
+    newly_paid = False
     with transaction.atomic():
         purchase = TopicPurchase.objects.select_for_update().get(pk=topic_purchase.pk)
         if purchase.payment_status == 'PAID':
             return purchase
         purchase.payment_status = 'PAID'
         purchase.save(update_fields=['payment_status', 'updated_at'])
+        newly_paid = True
     logger.info(
         'Topic purchase %s marked PAID (source=%s)',
         purchase.pk,
         source or 'unknown',
     )
+    if newly_paid:
+        try:
+            from utils.notification_utils import notify_topic_purchase_paid
+            notify_topic_purchase_paid(purchase)
+        except Exception as exc:
+            logger.error(
+                'Topic purchase paid notification failed for purchase %s: %s',
+                purchase.pk,
+                exc,
+                exc_info=True,
+            )
     return purchase
 
 

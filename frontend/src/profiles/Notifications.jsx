@@ -132,6 +132,12 @@ const Notifications = ({
       || verbIs(notification.verb, 'reportó un pago BCH de')
     ) {
       return notification.description || `${notification.actor} ${notification.verb}`;
+    } else if (
+      verbIs(notification.verb, 'confirmó tu pago de')
+      || verbIs(notification.verb, 'compró tu camino de conocimiento')
+      || verbIs(notification.verb, 'compró acceso a las consultas de')
+    ) {
+      return notification.description || `${notification.actor} ${notification.verb}`;
     } else if (verbIn(notification.verb, TOPIC_SUGGESTION_VERBS)) {
       return stripActorFromDescription(
         notification.description || `${notification.actor} ${notification.verb}`,
