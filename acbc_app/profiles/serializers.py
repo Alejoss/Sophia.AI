@@ -24,6 +24,7 @@ TOPIC_TARGET_VERBS = (
     'sugirió vincular contenido a una entrada de la línea de tiempo en',
     'aceptó tu sugerencia de vincular contenido a una entrada en',
     'rechazó tu sugerencia de vincular contenido a una entrada en',
+    'compró acceso a las consultas de',
 )
 
 TOPIC_MODERATION_VERBS = (
@@ -53,6 +54,11 @@ KNOWLEDGE_PATH_VERBS = (
     'aprobó tu solicitud de certificado para',
     'rechazó tu solicitud de certificado para',
     'votó positivamente tu camino de conocimiento',
+    'compró tu camino de conocimiento',
+)
+
+PURCHASE_PAID_BUYER_VERBS = (
+    'confirmó tu pago de',
 )
 
 MODERATOR_ACTION_VERBS = (
@@ -95,6 +101,7 @@ CERTIFICATE_REQUEST_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_REQUE
 TOPIC_REQUEST_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_REQUEST_DECISION_VERBS)
 BCH_TXID_REPORT_STAFF_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_STAFF_VERBS)
 BCH_TXID_REPORT_OWNER_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_OWNER_VERBS)
+PURCHASE_PAID_BUYER_VERB_KEYS = frozenset(verb_key(v) for v in PURCHASE_PAID_BUYER_VERBS)
 
 # Get logger for profiles serializers
 logger = logging.getLogger('academia_blockchain.profiles.serializers')
@@ -353,6 +360,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             if self._verb_in(verb, BCH_TXID_REPORT_OWNER_VERB_KEYS) and obj.target:
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
+            if self._verb_in(verb, PURCHASE_PAID_BUYER_VERB_KEYS) and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
             if self._verb_is(verb, 'aprobó tu solicitud de tema') and obj.action_object:
                 request = obj.action_object
                 if getattr(request, 'topic_id', None):
@@ -476,6 +486,17 @@ class NotificationSerializer(serializers.ModelSerializer):
                 if model_name == 'topic':
                     return f'/content/topics/{obj.target.id}'
                 return '/dashboard/pagos-bch'
+
+            if self._verb_in(verb, PURCHASE_PAID_BUYER_VERB_KEYS) and obj.target:
+                model_name = (
+                    obj.target_content_type.model
+                    if obj.target_content_type else ''
+                )
+                if model_name == 'knowledgepath':
+                    return f'/knowledge_path/{obj.target.id}'
+                if model_name == 'topic':
+                    return f'/content/topics/{obj.target.id}'
+                return None
 
             if self._verb_in(verb, TOPIC_REQUEST_DECISION_VERB_KEYS):
                 topic_id = None

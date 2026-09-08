@@ -125,6 +125,8 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 2. TXID is prefilled when the buyer already reported it — confirm after checking the explorer.
 3. The API marks the `BchDirectPayment` as `paid` and unlocks the entitlement
    (`path` / `topic` / `anchor`) — no Django admin required.
+4. For path/topic purchases, the **buyer** and **content owner** get in-app
+   notifications when payment is confirmed (same on auto-verify).
 
 | Método | Ruta | Auth |
 |--------|------|------|
