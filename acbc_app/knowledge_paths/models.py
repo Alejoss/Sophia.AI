@@ -65,9 +65,9 @@ class KnowledgePath(models.Model):
         null=True,
         help_text="Price in USD. 0 or null means the path is free.",
     )
-    bch_direct_enabled = models.BooleanField(
-        default=False,
-        help_text="Staff: offer self-custody Bitcoin Cash checkout for this paid path.",
+    sales_enabled = models.BooleanField(
+        default=True,
+        help_text="Staff: allow buyers to purchase this path when it has a price.",
     )
 
     class Meta:
@@ -76,6 +76,11 @@ class KnowledgePath(models.Model):
     @property
     def is_paid_path(self):
         return bool(self.reference_price and self.reference_price > 0)
+
+    @property
+    def is_for_sale(self):
+        """Paid path that staff currently allows buyers to purchase."""
+        return self.is_paid_path and self.sales_enabled
 
     @property
     def vote_count(self):

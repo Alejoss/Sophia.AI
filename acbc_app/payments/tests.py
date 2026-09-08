@@ -776,7 +776,7 @@ class AdminBchCatalogTests(TestCase):
         self.client.force_authenticate(user=self.staff)
         response = self.client.patch(
             f'/api/payments/admin/knowledge-paths/{self.path.id}/',
-            {'bch_direct_enabled': True},
+            {'sales_enabled': True},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -785,12 +785,12 @@ class AdminBchCatalogTests(TestCase):
         self.client.force_authenticate(user=self.staff)
         response = self.client.patch(
             f'/api/payments/admin/knowledge-paths/{self.path.id}/',
-            {'bch_direct_enabled': True},
+            {'sales_enabled': True},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.path.refresh_from_db()
-        self.assertTrue(self.path.bch_direct_enabled)
+        self.assertTrue(self.path.sales_enabled)
 
     def test_set_topic_price_and_enable_bch(self):
         self.client.force_authenticate(user=self.staff)
@@ -802,13 +802,13 @@ class AdminBchCatalogTests(TestCase):
         self.assertEqual(price.status_code, status.HTTP_200_OK)
         enabled = self.client.patch(
             f'/api/payments/admin/topics/{self.topic.id}/',
-            {'bch_direct_enabled': True},
+            {'sales_enabled': True},
             format='json',
         )
         self.assertEqual(enabled.status_code, status.HTTP_200_OK)
         self.topic.refresh_from_db()
         self.assertEqual(self.topic.reference_price, 3.5)
-        self.assertTrue(self.topic.bch_direct_enabled)
+        self.assertTrue(self.topic.sales_enabled)
 
     def test_staff_lists_and_confirms_expired_bch_order_by_txid(self):
         from datetime import timedelta
@@ -816,8 +816,8 @@ class AdminBchCatalogTests(TestCase):
         from unittest.mock import MagicMock
 
         buyer = UserFactory()
-        self.path.bch_direct_enabled = True
-        self.path.save(update_fields=['bch_direct_enabled'])
+        self.path.sales_enabled = True
+        self.path.save(update_fields=['sales_enabled'])
         purchase = KnowledgePathPurchase.objects.create(
             user=buyer,
             knowledge_path=self.path,
@@ -884,8 +884,8 @@ class AdminBchCatalogTests(TestCase):
         from unittest.mock import MagicMock
 
         buyer = UserFactory()
-        self.path.bch_direct_enabled = True
-        self.path.save(update_fields=['bch_direct_enabled'])
+        self.path.sales_enabled = True
+        self.path.save(update_fields=['sales_enabled'])
         purchase = KnowledgePathPurchase.objects.create(
             user=buyer,
             knowledge_path=self.path,
@@ -918,8 +918,8 @@ class AdminBchCatalogTests(TestCase):
         buyer = UserFactory()
         self.staff.email = 'staff@example.com'
         self.staff.save(update_fields=['email'])
-        self.path.bch_direct_enabled = True
-        self.path.save(update_fields=['bch_direct_enabled'])
+        self.path.sales_enabled = True
+        self.path.save(update_fields=['sales_enabled'])
         purchase = KnowledgePathPurchase.objects.create(
             user=buyer,
             knowledge_path=self.path,
@@ -988,8 +988,8 @@ class AdminBchCatalogTests(TestCase):
 
         buyer = UserFactory()
         other = UserFactory()
-        self.path.bch_direct_enabled = True
-        self.path.save(update_fields=['bch_direct_enabled'])
+        self.path.sales_enabled = True
+        self.path.save(update_fields=['sales_enabled'])
         purchase = KnowledgePathPurchase.objects.create(
             user=buyer,
             knowledge_path=self.path,
@@ -1027,7 +1027,7 @@ class PathAndTopicBchPaymentTests(TestCase):
             title='BCH Path',
             author=self.author,
             reference_price=2,
-            bch_direct_enabled=True,
+            sales_enabled=True,
             is_visible=True,
         )
         self.purchase = KnowledgePathPurchase.objects.create(
@@ -1041,7 +1041,7 @@ class PathAndTopicBchPaymentTests(TestCase):
             title='BCH Topic',
             creator=self.author,
             reference_price=4,
-            bch_direct_enabled=True,
+            sales_enabled=True,
             chat_enabled=True,
         )
         self.topic_purchase = TopicPurchase.objects.create(
@@ -1064,8 +1064,8 @@ class PathAndTopicBchPaymentTests(TestCase):
         ]
 
     def test_path_bch_requires_flag(self):
-        self.path.bch_direct_enabled = False
-        self.path.save(update_fields=['bch_direct_enabled'])
+        self.path.sales_enabled = False
+        self.path.save(update_fields=['sales_enabled'])
         client = MagicMock()
         client.get_bch_usd_rate.return_value = Decimal('200')
         with self.assertRaises(BchPaymentError):

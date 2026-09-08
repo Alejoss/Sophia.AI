@@ -438,6 +438,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
     indexed_transcript_count = serializers.SerializerMethodField()
     chat_can_enable = serializers.SerializerMethodField()
     is_paid_topic = serializers.BooleanField(read_only=True)
+    is_for_sale = serializers.BooleanField(read_only=True)
     bch_direct_available = serializers.SerializerMethodField()
     user_has_consultas_access = serializers.SerializerMethodField()
     user_purchase_id = serializers.SerializerMethodField()
@@ -447,13 +448,13 @@ class TopicBasicSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'creator', 'creator_username', 'is_public',
             'chat_enabled', 'indexed_transcript_count', 'chat_can_enable',
-            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'reference_price', 'is_paid_topic', 'sales_enabled', 'is_for_sale',
             'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
             'topic_image', 'topic_image_thumbnail', 'topic_image_focal_x', 'topic_image_focal_y',
         ]
         read_only_fields = [
             'creator', 'indexed_transcript_count', 'chat_can_enable',
-            'reference_price', 'is_paid_topic', 'bch_direct_enabled',
+            'reference_price', 'is_paid_topic', 'sales_enabled', 'is_for_sale',
             'bch_direct_available', 'user_has_consultas_access', 'user_purchase_id',
         ]
 
@@ -468,7 +469,7 @@ class TopicBasicSerializer(serializers.ModelSerializer):
 
     def get_bch_direct_available(self, obj):
         from payments.bch_client import is_bch_direct_configured
-        return bool(is_bch_direct_configured() and obj.bch_direct_enabled and obj.is_paid_topic)
+        return bool(is_bch_direct_configured() and obj.is_for_sale)
 
     def get_user_has_consultas_access(self, obj):
         from content.topic_access import user_has_topic_consultas_access
