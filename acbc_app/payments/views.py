@@ -18,6 +18,7 @@ from payments.bch_services import (
     create_or_reuse_bch_payment,
     list_staff_bch_orders,
     manual_confirm_bch_payment,
+    report_bch_payment_txid,
     verify_bch_payment,
 )
 from payments.models import BchDirectPayment, CryptoPayment
@@ -193,7 +194,7 @@ class EventRegistrationPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_event_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 registration_id=registration_id,
                 user_id=request.user.id,
             )
@@ -244,7 +245,7 @@ class PathPurchasePaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_path_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -389,7 +390,7 @@ class AnchorRequestPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_anchor_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -491,7 +492,7 @@ class AnchorRequestBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_anchor_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -532,7 +533,7 @@ class AnchorRequestBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_anchor_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -790,6 +791,60 @@ class AdminBchOrderConfirmView(APIView):
         })
 
 
+class BchOrderReportTxidView(APIView):
+    """
+    Buyer: report an on-chain TXID after auto-verify failed.
+
+    Stores the report for the staff dashboard and notifies admins (email +
+    in-app) and the product owner (in-app).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        txid = request.data.get('txid') or request.data.get('payment_txid')
+        note = request.data.get('note') or request.data.get('message') or ''
+        try:
+            payment, should_notify = report_bch_payment_txid(
+                payment_id=pk,
+                txid=txid,
+                user=request.user,
+                note=note,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except PermissionError as exc:
+            return _permission_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except Exception as exc:  # noqa: BLE001
+            return _unexpected_payment_error_response(
+                exc,
+                action='report_bch_txid',
+                public_message='No se pudo registrar el TXID. Inténtalo de nuevo.',
+                payment_id=pk,
+            )
+
+        if should_notify:
+            try:
+                from utils.notification_utils import notify_bch_txid_reported
+                notify_bch_txid_reported(payment, note=note)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    'Failed notifying after BCH TXID report payment_id=%s',
+                    pk,
+                )
+
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'reported_txid': (payment.provider_payload or {}).get('reported_txid'),
+            'notified': should_notify,
+            'detail': (
+                'TXID registrado. Avisamos al staff y al dueño del producto.'
+                if should_notify
+                else 'TXID actualizado (ya lo habías reportado).'
+            ),
+        })
+
+
 class PathPurchaseBchPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -837,7 +892,7 @@ class PathPurchaseBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_path_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -868,7 +923,7 @@ class PathPurchaseBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_path_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -928,7 +983,7 @@ class TopicPurchaseBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_topic_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -957,7 +1012,7 @@ class TopicPurchaseBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_topic_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )

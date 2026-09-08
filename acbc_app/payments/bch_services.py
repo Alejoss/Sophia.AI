@@ -8,7 +8,7 @@ from decimal import ROUND_UP, Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Q
 from django.utils import timezone
 
 from content.models import TopicPurchase, TranscriptAnchorRequest
@@ -120,7 +120,7 @@ def _allocate_unique_sats(base_sats: int) -> int:
         if not taken:
             return sats
         sats += 1
-    raise BchPaymentError('No se pudo asignar un monto BCH único. Inténtelo de nuevo.')
+    raise BchPaymentError('No se pudo asignar un monto BCH único. Inténtalo de nuevo.')
 
 
 def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
@@ -166,7 +166,7 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
 def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if path_purchase is not None:
         path = path_purchase.knowledge_path
@@ -175,7 +175,7 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
             and path.author_id != user.id
             and not getattr(user, 'is_staff', False)
         ):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if topic_purchase is not None:
         topic = topic_purchase.topic
@@ -184,7 +184,7 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
             and not topic.is_moderator_or_creator(user)
             and not getattr(user, 'is_staff', False)
         ):
-            raise PermissionError('No tiene permiso para verificar este pago.')
+            raise PermissionError('No tienes permiso para verificar este pago.')
         return
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
@@ -363,11 +363,11 @@ def verify_bch_payment(
         .first()
     )
     if payment is None:
-        raise BchPaymentError('No hay una orden BCH pendiente. Cree una primero.')
+        raise BchPaymentError('No hay una orden BCH pendiente. Crea una primero.')
 
     payment.mark_expired_if_needed()
     if payment.status == BchDirectPayment.STATUS_EXPIRED:
-        raise BchPaymentError('La orden BCH expiró. Genere una nueva orden.')
+        raise BchPaymentError('La orden BCH expiró. Genera una nueva orden.')
 
     client = client or build_bch_client()
     try:
@@ -382,8 +382,8 @@ def verify_bch_payment(
             exc,
         )
         raise BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde '
-            'o avise por mensaje con el monto y la dirección de la orden.'
+            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
+            'o avísanos por mensaje con el monto y la dirección de la orden.'
         ) from exc
 
     min_ts = int((payment.created_at - timedelta(seconds=60)).timestamp())
@@ -418,7 +418,7 @@ def verify_bch_payment(
     )
     raise BchPaymentError(
         'No encontramos un pago BCH con el monto exacto aún. '
-        'Espere unos segundos y vuelva a intentarlo.'
+        'Espera unos segundos y vuelve a intentarlo.'
     )
 
 
@@ -476,11 +476,40 @@ def normalize_bch_txid(value: str) -> str:
     return clean
 
 
+def get_bch_payment_product_meta(payment: BchDirectPayment) -> dict:
+    """Product type/title and marketplace owner (path author / topic creator)."""
+    if payment.path_purchase_id:
+        path = getattr(payment.path_purchase, 'knowledge_path', None)
+        return {
+            'product_type': 'path',
+            'product_id': getattr(path, 'id', None) or payment.path_purchase.knowledge_path_id,
+            'product_title': getattr(path, 'title', None) or f'Camino #{payment.path_purchase.knowledge_path_id}',
+            'owner': getattr(path, 'author', None),
+            'product': path,
+        }
+    if payment.topic_purchase_id:
+        topic = getattr(payment.topic_purchase, 'topic', None)
+        return {
+            'product_type': 'topic',
+            'product_id': getattr(topic, 'id', None) or payment.topic_purchase.topic_id,
+            'product_title': getattr(topic, 'title', None) or f'Tema #{payment.topic_purchase.topic_id}',
+            'owner': getattr(topic, 'creator', None),
+            'product': topic,
+        }
+    return {
+        'product_type': 'anchor',
+        'product_id': payment.anchor_request_id,
+        'product_title': f'Anclaje #{payment.anchor_request_id}',
+        'owner': None,
+        'product': None,
+    }
+
+
 def list_staff_bch_orders(
     *,
     statuses: list[str] | None = None,
     limit: int = 50,
-) -> QuerySet[BchDirectPayment]:
+) -> list[BchDirectPayment]:
     """Staff inbox: unpaid BCH orders that may need manual TXID confirmation."""
     _expire_stale_pending()
     allowed = {
@@ -496,17 +525,97 @@ def list_staff_bch_orders(
             BchDirectPayment.STATUS_PENDING,
             BchDirectPayment.STATUS_EXPIRED,
         ]
-    return (
+    cap = max(1, min(int(limit or 50), 200))
+    orders = list(
         BchDirectPayment.objects.filter(status__in=chosen)
         .select_related(
             'path_purchase__user',
-            'path_purchase__knowledge_path',
+            'path_purchase__knowledge_path__author',
             'topic_purchase__user',
-            'topic_purchase__topic',
+            'topic_purchase__topic__creator',
             'anchor_request__requester',
         )
-        .order_by('-created_at')[: max(1, min(int(limit or 50), 200))]
+        .order_by('-created_at')[:cap]
     )
+    # Buyer-reported TXIDs first so staff see the actionable inbox.
+    orders.sort(
+        key=lambda order: (
+            0 if (order.provider_payload or {}).get('reported_txid') else 1,
+            -(order.created_at.timestamp() if order.created_at else 0),
+        )
+    )
+    return orders
+
+
+@transaction.atomic
+def report_bch_payment_txid(
+    *,
+    payment_id: int,
+    txid: str,
+    user,
+    note: str = '',
+) -> tuple[BchDirectPayment, bool]:
+    """
+    Buyer reports an on-chain TXID after auto-verify failed.
+
+    Stores the report on provider_payload (does not mark paid). Returns
+    (payment, should_notify) — notify only when the reported TXID changes.
+    """
+    clean_txid = normalize_bch_txid(txid)
+    clean_note = (note or '').strip()[:1000]
+
+    locked = (
+        BchDirectPayment.objects.select_for_update(of=('self',))
+        .select_related(
+            'anchor_request__requester',
+            'path_purchase__user',
+            'path_purchase__knowledge_path__author',
+            'topic_purchase__user',
+            'topic_purchase__topic__creator',
+        )
+        .filter(pk=payment_id)
+        .first()
+    )
+    if locked is None:
+        raise BchPaymentError('Orden BCH no encontrada.')
+
+    buyer = locked.buyer
+    if buyer is None or buyer.id != getattr(user, 'id', None):
+        raise PermissionError('Solo el comprador puede reportar el TXID de esta orden.')
+
+    if locked.status == BchDirectPayment.STATUS_PAID:
+        raise BchPaymentError('Esta orden ya está marcada como pagada.')
+
+    if locked.status not in (
+        BchDirectPayment.STATUS_PENDING,
+        BchDirectPayment.STATUS_EXPIRED,
+        BchDirectPayment.STATUS_CANCELLED,
+    ):
+        raise BchPaymentError('Esta orden BCH no admite reporte de TXID.')
+
+    payload = dict(locked.provider_payload or {})
+    previous = (payload.get('reported_txid') or '').lower()
+    should_notify = previous != clean_txid
+
+    payload.update({
+        'reported_txid': clean_txid,
+        'reported_at': timezone.now().isoformat(),
+        'reported_by_id': user.id,
+        'reported_by_username': getattr(user, 'username', ''),
+        'reported_note': clean_note,
+        'txid_report_pending_staff': True,
+    })
+    locked.provider_payload = payload
+    locked.save(update_fields=['provider_payload', 'updated_at'])
+
+    logger.info(
+        'BCH TXID reported payment_id=%s txid=%s by user_id=%s notify=%s',
+        locked.pk,
+        clean_txid,
+        user.id,
+        should_notify,
+    )
+    return locked, should_notify
 
 
 @transaction.atomic

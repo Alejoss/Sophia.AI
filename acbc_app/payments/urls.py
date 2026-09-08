@@ -24,6 +24,11 @@ urlpatterns = [
         views.AdminBchOrderConfirmView.as_view(),
         name='admin-bch-order-confirm',
     ),
+    path(
+        'bch-orders/<int:pk>/report-txid/',
+        views.BchOrderReportTxidView.as_view(),
+        name='bch-order-report-txid',
+    ),
     path('admin/knowledge-paths/<int:pk>/', views.AdminKnowledgePathBchView.as_view(), name='admin-knowledge-path-bch'),
     path('admin/topics/<int:pk>/', views.AdminTopicBchView.as_view(), name='admin-topic-bch'),
     path('<int:payment_id>/', views.CryptoPaymentDetailView.as_view(), name='crypto-payment-detail'),

@@ -12,6 +12,7 @@ import {
 const mockNavigate = vi.fn();
 const mockFetchOrCreateThread = vi.fn();
 const mockSendMessage = vi.fn();
+const mockReportBchOrderTxid = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -29,6 +30,10 @@ vi.mock('../../api/messagesApi', () => ({
   deleteMessage: vi.fn(),
 }));
 
+vi.mock('../../api/paymentsApi', () => ({
+  reportBchOrderTxid: (...args) => mockReportBchOrderTxid(...args),
+}));
+
 const sampleOrder = {
   id: 12,
   address: 'bitcoincash:qptestaddress',
@@ -44,6 +49,10 @@ describe('BchPaymentSupportModal', () => {
     vi.clearAllMocks();
     mockFetchOrCreateThread.mockResolvedValue({ data: { id: 55 } });
     mockSendMessage.mockResolvedValue({ data: { id: 91 } });
+    mockReportBchOrderTxid.mockResolvedValue({
+      notified: true,
+      reported_txid: validTxid,
+    });
   });
 
   it('shows comfort copy and requires a TXID', async () => {
@@ -87,8 +96,12 @@ describe('BchPaymentSupportModal', () => {
     await user.click(screen.getByRole('button', { name: /Enviar TXID a soporte/i }));
 
     await waitFor(() => {
-      expect(mockFetchOrCreateThread).toHaveBeenCalledWith(PAYMENT_SUPPORT_USER_ID);
+      expect(mockReportBchOrderTxid).toHaveBeenCalledWith(12, {
+        txid: validTxid,
+        note: 'Desde Electron Cash',
+      });
     });
+    expect(mockFetchOrCreateThread).toHaveBeenCalledWith(PAYMENT_SUPPORT_USER_ID);
     expect(mockSendMessage).toHaveBeenCalledWith(
       55,
       buildBchVerifyHelpMessage({
@@ -123,6 +136,7 @@ describe('BchPaymentSupportModal', () => {
     expect(
       await screen.findByText(/64 caracteres hexadecimales/i),
     ).toBeInTheDocument();
+    expect(mockReportBchOrderTxid).not.toHaveBeenCalled();
     expect(mockFetchOrCreateThread).not.toHaveBeenCalled();
   });
 });

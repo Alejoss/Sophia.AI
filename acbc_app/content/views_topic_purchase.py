@@ -55,7 +55,7 @@ class TopicPurchaseView(APIView):
                 exc_info=True,
             )
             return Response(
-                {'error': 'No se pudo crear la compra. Inténtelo de nuevo.'},
+                {'error': 'No se pudo crear la compra. Inténtalo de nuevo.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return Response(

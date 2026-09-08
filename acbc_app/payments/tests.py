@@ -453,7 +453,7 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -646,6 +646,50 @@ class BchNetworkClientTests(TestCase):
         self.assertEqual(len(scripthash), 64)
         self.assertTrue(all(c in '0123456789abcdef' for c in scripthash))
 
+    def test_cashaddr_official_vectors_and_production_address(self):
+        """Regression: polymod must XOR 1 or every real CashAddr fails checksum."""
+        from payments.bch_cashaddr import (
+            CashAddrError,
+            address_to_scripthash,
+            decode_cashaddr,
+            encode_cashaddr,
+        )
+
+        # Spec / Electron-Cash vectors (hash160 → expected CashAddr).
+        vectors = [
+            (
+                '76a04053bda0a88bda5177b86a15c3b29f559873',
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            ),
+            (
+                'cb481232299cd5743151ac4b2d63ae198e7bb0a9',
+                'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            ),
+            (
+                '011f28e473c95f4013d7d53ec5fbc3b42df8ed10',
+                'bitcoincash:qqq3728yw0y47sqn6l2na30mcw6zm78dzqre909m2r',
+            ),
+        ]
+        for hash_hex, expected_addr in vectors:
+            payload = bytes.fromhex(hash_hex)
+            encoded = encode_cashaddr('bitcoincash', 0, payload)
+            self.assertEqual(encoded, expected_addr)
+            prefix, version, decoded = decode_cashaddr(expected_addr)
+            self.assertEqual(prefix, 'bitcoincash')
+            self.assertEqual(version >> 3, 0)
+            self.assertEqual(decoded, payload)
+
+        # Live production receive address that previously raised Bad CashAddr checksum.
+        prod = 'bitcoincash:qpnq74gum4tstjat4803zav9lr37v5wqaqyqrh9wjd'
+        prefix, version, payload = decode_cashaddr(prod)
+        self.assertEqual(prefix, 'bitcoincash')
+        self.assertEqual(version >> 3, 0)
+        self.assertEqual(payload.hex(), '660f551cdd5705cbaba9df117585f8e3e651c0e8')
+        self.assertEqual(len(address_to_scripthash(prod)), 64)
+
+        with self.assertRaises(CashAddrError):
+            decode_cashaddr('bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6u')
+
     @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
     def test_build_client_chipnet_is_electrum(self):
         from payments.bch_client import BchElectrumClient, build_bch_client
@@ -677,8 +721,8 @@ class BchNetworkClientTests(TestCase):
     @override_settings(
         BCH_NETWORK='chipnet',
         BCH_RECEIVE_ADDRESS='',
-        BCH_RECEIVE_ADDRESS_CHIPNET='bchtest:qpechipnetplaceholder00000000000000000',
-        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpemainnetplaceholder000000000000000',
+        BCH_RECEIVE_ADDRESS_CHIPNET='bchtest:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvupc7a6v7',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     )
     def test_receive_address_prefers_chipnet_override(self):
         from payments.bch_client import get_bch_receive_address
@@ -687,7 +731,7 @@ class BchNetworkClientTests(TestCase):
 
 @override_settings(
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -843,10 +887,113 @@ class AdminBchCatalogTests(TestCase):
         self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('txid', bad.data['error'].lower())
 
+    @patch('profiles.email_service.EmailService.send_to_admins')
+    def test_buyer_reports_txid_notifies_staff_and_owner(self, mock_send_to_admins):
+        from unittest.mock import MagicMock
+        from notifications.models import Notification
+        from utils.db_encoding import to_ascii_safe
+
+        mock_send_to_admins.return_value = {'sent': ['staff@example.com'], 'failed': []}
+        buyer = UserFactory()
+        self.staff.email = 'staff@example.com'
+        self.staff.save(update_fields=['email'])
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        txid = 'cd' * 32
+
+        self.client.force_authenticate(user=buyer)
+        reported = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': txid, 'note': 'Desde Electron Cash'},
+            format='json',
+        )
+        self.assertEqual(reported.status_code, status.HTTP_200_OK)
+        self.assertTrue(reported.data['notified'])
+        self.assertEqual(reported.data['reported_txid'], txid)
+
+        order.refresh_from_db()
+        self.assertEqual(order.provider_payload.get('reported_txid'), txid)
+        self.assertEqual(order.provider_payload.get('reported_note'), 'Desde Electron Cash')
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+        self.assertFalse(order.payment_txid)
+
+        staff_verb = to_ascii_safe('reportó un pago BCH')
+        staff_notes = Notification.objects.filter(recipient=self.staff, actor_object_id=buyer.id)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == staff_verb for n in staff_notes),
+            f'staff verbs={[n.verb for n in staff_notes]}',
+        )
+        owner_verb = to_ascii_safe('reportó un pago BCH de')
+        owner_notes = Notification.objects.filter(recipient=self.author, actor_object_id=buyer.id)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == owner_verb for n in owner_notes),
+            f'owner verbs={[n.verb for n in owner_notes]}',
+        )
+        self.assertTrue(mock_send_to_admins.called)
+        call_kwargs = mock_send_to_admins.call_args[1]
+        self.assertEqual(call_kwargs['template_name'], 'bch_txid_reported')
+        self.assertIn(str(order.id), call_kwargs['subject'])
+
+        self.client.force_authenticate(user=self.staff)
+        listed = self.client.get('/api/payments/admin/bch-orders/')
+        row = next(item for item in listed.data['orders'] if item['id'] == order.id)
+        self.assertEqual(row['reported_txid'], txid)
+
+        # Same TXID again → no duplicate notify flag
+        self.client.force_authenticate(user=buyer)
+        again = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': txid},
+            format='json',
+        )
+        self.assertEqual(again.status_code, status.HTTP_200_OK)
+        self.assertFalse(again.data['notified'])
+
+    def test_report_txid_rejects_non_buyer(self):
+        from unittest.mock import MagicMock
+
+        buyer = UserFactory()
+        other = UserFactory()
+        self.path.bch_direct_enabled = True
+        self.path.save(update_fields=['bch_direct_enabled'])
+        purchase = KnowledgePathPurchase.objects.create(
+            user=buyer,
+            knowledge_path=self.path,
+            price_amount=10,
+            payment_status='PENDING',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            path_purchase=purchase,
+            user=buyer,
+            client=client,
+        )
+        self.client.force_authenticate(user=other)
+        response = self.client.post(
+            f'/api/payments/bch-orders/{order.id}/report-txid/',
+            {'txid': 'ab' * 32},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 @override_settings(
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -981,13 +1128,14 @@ class PathAndTopicBchPaymentTests(TestCase):
 
     @override_settings(
         BCH_NETWORK='mainnet',
-        BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+        BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
         BCH_USD_PRICE=200,
     )
     @patch('payments.views.verify_bch_payment')
     def test_path_bch_verify_view_logs_payment_errors(self, mock_verify):
         mock_verify.side_effect = BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtelo más tarde.'
+            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
+            'o avísanos por mensaje con el monto y la dirección de la orden.'
         )
         api = APIClient()
         api.force_authenticate(user=self.buyer)
@@ -999,3 +1147,5 @@ class PathAndTopicBchPaymentTests(TestCase):
             logs.output,
         )
         self.assertIn('blockchain', response.data['error'].lower())
+        self.assertIn('inténtalo', response.data['error'].lower())
+        self.assertIn('avísanos', response.data['error'].lower())
