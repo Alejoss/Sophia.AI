@@ -21,7 +21,7 @@ export const createRegistrationPayment = async (registrationId) => {
     const response = await axiosInstance.post(`/payments/registration/${registrationId}/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear el pago');
+    throwApiError(error, 'No se pudo crear el pago. Inténtalo de nuevo');
   }
 };
 
@@ -48,7 +48,7 @@ export const createPathPurchasePayment = async (purchaseId) => {
     const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear el pago del camino');
+    throwApiError(error, 'No se pudo crear el pago del camino. Inténtalo de nuevo');
   }
 };
 
@@ -66,7 +66,7 @@ export const createAnchorRequestPayment = async (requestId) => {
     const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear el pago del anclaje');
+    throwApiError(error, 'No se pudo crear el pago del anclaje. Inténtalo de nuevo');
   }
 };
 
@@ -84,7 +84,7 @@ export const createAnchorRequestBchPayment = async (requestId) => {
     const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/bch/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear la orden BCH');
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
   }
 };
 
@@ -102,7 +102,7 @@ export const verifyAnchorRequestBchPayment = async (requestId) => {
     const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/bch/verify/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo verificar el pago BCH');
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
   }
 };
 
@@ -162,7 +162,7 @@ export const createPathPurchaseBchPayment = async (purchaseId) => {
     const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/bch/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear la orden BCH');
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
   }
 };
 
@@ -171,7 +171,7 @@ export const verifyPathPurchaseBchPayment = async (purchaseId) => {
     const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/bch/verify/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo verificar el pago BCH');
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
   }
 };
 
@@ -180,7 +180,7 @@ export const createTopicPurchaseBchPayment = async (purchaseId) => {
     const response = await axiosInstance.post(`/payments/topic-purchase/${purchaseId}/bch/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo crear la orden BCH');
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
   }
 };
 
@@ -189,6 +189,6 @@ export const verifyTopicPurchaseBchPayment = async (purchaseId) => {
     const response = await axiosInstance.post(`/payments/topic-purchase/${purchaseId}/bch/verify/`, {});
     return response.data;
   } catch (error) {
-    throwApiError(error, 'No se pudo verificar el pago BCH');
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
   }
 };

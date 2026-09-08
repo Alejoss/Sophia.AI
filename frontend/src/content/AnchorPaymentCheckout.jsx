@@ -101,7 +101,7 @@ const AnchorPaymentCheckout = ({
       })
       .catch((err) => {
         if (!cancelled) {
-          setBchError(formatApiError(err, 'No se pudo crear la orden BCH.'));
+          setBchError(formatApiError(err, 'No se pudo crear la orden BCH. Inténtalo de nuevo.'));
         }
       })
       .finally(() => {
@@ -138,7 +138,7 @@ const AnchorPaymentCheckout = ({
         );
       }
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo verificar el pago BCH.'));
+      setBchError(formatApiError(err, 'No se pudo verificar el pago BCH. Inténtalo de nuevo.'));
     } finally {
       setBchBusy(false);
     }
@@ -154,7 +154,7 @@ const AnchorPaymentCheckout = ({
     <>
       <Dialog open={showChooser} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Elegí cómo pagar
+          Elige cómo pagar
           <IconButton
             aria-label="Cerrar"
             onClick={onClose}
@@ -174,7 +174,7 @@ const AnchorPaymentCheckout = ({
             </Stack>
           ) : bothOff ? (
             <Alert severity="warning">
-              No hay métodos de pago crypto habilitados en este momento. Podés
+              No hay métodos de pago crypto habilitados en este momento. Puedes
               contactar soporte o intentar más tarde.
             </Alert>
           ) : (

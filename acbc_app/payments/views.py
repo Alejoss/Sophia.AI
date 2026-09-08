@@ -193,7 +193,7 @@ class EventRegistrationPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_event_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 registration_id=registration_id,
                 user_id=request.user.id,
             )
@@ -244,7 +244,7 @@ class PathPurchasePaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_path_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -389,7 +389,7 @@ class AnchorRequestPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_anchor_payment',
-                public_message='No se pudo iniciar el pago. Inténtelo de nuevo.',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -491,7 +491,7 @@ class AnchorRequestBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_anchor_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -532,7 +532,7 @@ class AnchorRequestBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_anchor_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 request_id=request_id,
                 user_id=request.user.id,
             )
@@ -837,7 +837,7 @@ class PathPurchaseBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_path_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -868,7 +868,7 @@ class PathPurchaseBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_path_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -928,7 +928,7 @@ class TopicPurchaseBchPaymentView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='create_topic_bch',
-                public_message='No se pudo crear la orden BCH. Inténtelo de nuevo.',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
@@ -957,7 +957,7 @@ class TopicPurchaseBchVerifyView(APIView):
             return _unexpected_payment_error_response(
                 exc,
                 action='verify_topic_bch',
-                public_message='No se pudo verificar el pago BCH. Inténtelo de nuevo.',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
                 user_id=request.user.id,
             )
