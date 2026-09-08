@@ -277,8 +277,11 @@ const ProductPaymentCheckout = ({
             <Alert severity="warning" sx={{ mb: 2 }}>
               {bchError}
               <Typography variant="body2" sx={{ mt: 1 }}>
-                Si ya enviaste el pago, no te preocupes: envíanos el ID de la
-                transacción y lo revisamos manualmente para desbloquear tu acceso.
+                Si ya enviaste el pago, no te preocupes, primero vuelve a intentar
+                clickeando en el botón &quot;Ya realicé el pago&quot; dentro de 5
+                minutos, a veces la blockchain se demora en actualizarse. Si aún así
+                no encontramos automáticamente tu transacción, envíanos el ID de la
+                transacción y la revisaremos manualmente para desbloquear tu acceso.
               </Typography>
               {!paid && (
                 <Box sx={{ mt: 1.5 }}>
