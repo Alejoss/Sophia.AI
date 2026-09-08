@@ -453,7 +453,7 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -646,6 +646,50 @@ class BchNetworkClientTests(TestCase):
         self.assertEqual(len(scripthash), 64)
         self.assertTrue(all(c in '0123456789abcdef' for c in scripthash))
 
+    def test_cashaddr_official_vectors_and_production_address(self):
+        """Regression: polymod must XOR 1 or every real CashAddr fails checksum."""
+        from payments.bch_cashaddr import (
+            CashAddrError,
+            address_to_scripthash,
+            decode_cashaddr,
+            encode_cashaddr,
+        )
+
+        # Spec / Electron-Cash vectors (hash160 → expected CashAddr).
+        vectors = [
+            (
+                '76a04053bda0a88bda5177b86a15c3b29f559873',
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            ),
+            (
+                'cb481232299cd5743151ac4b2d63ae198e7bb0a9',
+                'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            ),
+            (
+                '011f28e473c95f4013d7d53ec5fbc3b42df8ed10',
+                'bitcoincash:qqq3728yw0y47sqn6l2na30mcw6zm78dzqre909m2r',
+            ),
+        ]
+        for hash_hex, expected_addr in vectors:
+            payload = bytes.fromhex(hash_hex)
+            encoded = encode_cashaddr('bitcoincash', 0, payload)
+            self.assertEqual(encoded, expected_addr)
+            prefix, version, decoded = decode_cashaddr(expected_addr)
+            self.assertEqual(prefix, 'bitcoincash')
+            self.assertEqual(version >> 3, 0)
+            self.assertEqual(decoded, payload)
+
+        # Live production receive address that previously raised Bad CashAddr checksum.
+        prod = 'bitcoincash:qpnq74gum4tstjat4803zav9lr37v5wqaqyqrh9wjd'
+        prefix, version, payload = decode_cashaddr(prod)
+        self.assertEqual(prefix, 'bitcoincash')
+        self.assertEqual(version >> 3, 0)
+        self.assertEqual(payload.hex(), '660f551cdd5705cbaba9df117585f8e3e651c0e8')
+        self.assertEqual(len(address_to_scripthash(prod)), 64)
+
+        with self.assertRaises(CashAddrError):
+            decode_cashaddr('bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6u')
+
     @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
     def test_build_client_chipnet_is_electrum(self):
         from payments.bch_client import BchElectrumClient, build_bch_client
@@ -677,8 +721,8 @@ class BchNetworkClientTests(TestCase):
     @override_settings(
         BCH_NETWORK='chipnet',
         BCH_RECEIVE_ADDRESS='',
-        BCH_RECEIVE_ADDRESS_CHIPNET='bchtest:qpechipnetplaceholder00000000000000000',
-        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpemainnetplaceholder000000000000000',
+        BCH_RECEIVE_ADDRESS_CHIPNET='bchtest:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvupc7a6v7',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     )
     def test_receive_address_prefers_chipnet_override(self):
         from payments.bch_client import get_bch_receive_address
@@ -687,7 +731,7 @@ class BchNetworkClientTests(TestCase):
 
 @override_settings(
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -846,7 +890,7 @@ class AdminBchCatalogTests(TestCase):
 
 @override_settings(
     BCH_NETWORK='mainnet',
-    BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
@@ -981,7 +1025,7 @@ class PathAndTopicBchPaymentTests(TestCase):
 
     @override_settings(
         BCH_NETWORK='mainnet',
-        BCH_RECEIVE_ADDRESS='bitcoincash:qpetestplaceholder0000000000000000000000',
+        BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
         BCH_USD_PRICE=200,
     )
     @patch('payments.views.verify_bch_payment')
