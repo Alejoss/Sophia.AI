@@ -2343,6 +2343,173 @@ def _send_topic_creation_request_email_to_admins(creation_request):
         )
 
 
+def notify_bch_txid_reported(payment, *, note: str = ''):
+    """
+    When a buyer reports a BCH TXID after failed auto-verify:
+    - in-app notification for all staff (dashboard inbox)
+    - in-app notification for the product owner (path author / topic creator)
+    - email to platform admins
+    """
+    from django.contrib.auth.models import User
+    from payments.bch_services import get_bch_payment_product_meta
+
+    buyer = payment.buyer
+    if buyer is None:
+        logger.warning(
+            'Skipping BCH TXID report notifications — no buyer',
+            extra={'payment_id': getattr(payment, 'id', None)},
+        )
+        return
+
+    meta = get_bch_payment_product_meta(payment)
+    product_title = meta.get('product_title') or 'producto'
+    product_type = meta.get('product_type') or 'product'
+    owner = meta.get('owner')
+    product = meta.get('product')
+    payload = payment.provider_payload or {}
+    reported_txid = payload.get('reported_txid') or payment.payment_txid or ''
+    note_text = (note or payload.get('reported_note') or '').strip()
+
+    logger.info(
+        'Creating BCH TXID report notifications',
+        extra={
+            'payment_id': payment.id,
+            'buyer_id': buyer.id,
+            'product_type': product_type,
+            'owner_id': getattr(owner, 'id', None),
+        },
+    )
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        payment_ct = ContentType.objects.get_for_model(payment)
+        staff_users = User.objects.filter(is_staff=True, is_active=True)
+        staff_description = (
+            f'{buyer.username} reportó el TXID de la orden BCH #{payment.id} '
+            f'por "{product_title}". Revisa Pagos Bitcoin Cash en el dashboard.'
+        )
+
+        for staff_user in staff_users:
+            if staff_user.id == buyer.id:
+                continue
+            create_notification(
+                recipient=staff_user,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                verb='reportó un pago BCH',
+                action_object_content_type=payment_ct,
+                action_object_object_id=payment.id,
+                target_content_type=payment_ct,
+                target_object_id=payment.id,
+                description=staff_description,
+            )
+    except Exception as e:
+        logger.error(
+            f'Error creating staff BCH TXID report notifications: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
+            exc_info=True,
+        )
+
+    if owner is not None and owner.id != buyer.id:
+        try:
+            buyer_ct = ContentType.objects.get_for_model(buyer)
+            payment_ct = ContentType.objects.get_for_model(payment)
+            target_ct = ContentType.objects.get_for_model(product) if product is not None else payment_ct
+            target_id = product.id if product is not None else payment.id
+            type_label = {
+                'path': 'camino',
+                'topic': 'tema',
+            }.get(product_type, 'producto')
+            owner_description = (
+                f'{buyer.username} reportó el pago BCH de su compra del {type_label} '
+                f'"{product_title}" (orden #{payment.id}). El staff lo confirmará en el dashboard.'
+            )
+            create_notification(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                verb='reportó un pago BCH de',
+                action_object_content_type=payment_ct,
+                action_object_object_id=payment.id,
+                target_content_type=target_ct,
+                target_object_id=target_id,
+                description=owner_description,
+            )
+        except Exception as e:
+            logger.error(
+                f'Error creating owner BCH TXID report notification: {str(e)}',
+                extra={'payment_id': getattr(payment, 'id', None)},
+                exc_info=True,
+            )
+
+    _send_bch_txid_reported_email_to_admins(
+        payment,
+        buyer=buyer,
+        product_title=product_title,
+        product_type=product_type,
+        reported_txid=reported_txid,
+        note=note_text,
+    )
+
+
+def _send_bch_txid_reported_email_to_admins(
+    payment,
+    *,
+    buyer,
+    product_title: str,
+    product_type: str,
+    reported_txid: str,
+    note: str = '',
+):
+    """Email all administrators about a buyer-reported BCH TXID."""
+    from profiles.email_service import EmailService, EmailServiceError
+
+    brand = EmailService.get_brand_context()
+    dashboard_url = f"{brand['frontend_url']}/dashboard/pagos-bch"
+    type_label = {
+        'path': 'Camino de conocimiento',
+        'topic': 'Consultas de tema',
+        'anchor': 'Anclaje de transcript',
+    }.get(product_type, 'Producto')
+
+    try:
+        EmailService.send_to_admins(
+            subject=f'TXID BCH reportado — orden #{payment.id}: {product_title}',
+            template_name='bch_txid_reported',
+            context={
+                'buyer_username': buyer.username,
+                'buyer_email': buyer.email or '',
+                'order_id': payment.id,
+                'product_type_label': type_label,
+                'product_title': product_title,
+                'usd_amount': str(payment.usd_amount),
+                'expected_amount_bch': f'{payment.expected_amount_bch:.8f}',
+                'address': payment.address,
+                'reported_txid': reported_txid,
+                'note': note or 'Sin nota.',
+                'order_status': payment.status,
+                'dashboard_url': dashboard_url,
+            },
+            tags=['bch-txid-reported', 'admin', 'payment', 'notification'],
+        )
+        logger.info(
+            'BCH TXID report email dispatched to administrators',
+            extra={'payment_id': payment.id},
+        )
+    except EmailServiceError as e:
+        logger.error(
+            f'Error sending BCH TXID report admin email: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
+            exc_info=True,
+        )
+    except Exception as e:
+        logger.error(
+            f'Unexpected error sending BCH TXID report admin email: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
+            exc_info=True,
+        )
+
+
 def notify_topic_creation_request_approved(creation_request):
     """Notify the requester that their topic creation request was approved."""
     logger.info("Creating topic creation approval notification", extra={

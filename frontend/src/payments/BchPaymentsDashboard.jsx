@@ -92,6 +92,13 @@ const BchPaymentsDashboard = () => {
       ]);
       setCatalog(catalogData);
       setOrders(ordersData?.orders || []);
+      const drafts = {};
+      (ordersData?.orders || []).forEach((order) => {
+        if (order.reported_txid) {
+          drafts[order.id] = order.reported_txid;
+        }
+      });
+      setTxidDrafts(drafts);
       const prices = {};
       (catalogData.topics || []).forEach((topic) => {
         prices[topic.id] = String(topic.reference_price ?? 0);
@@ -272,9 +279,10 @@ const BchPaymentsDashboard = () => {
         Confirmar pagos reportados
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Cuando un comprador te manda el TXID (orden expirada o fallo de
-        verificación), pégalo aquí. Revisamos la cadena fuera de la app y
-        desbloqueamos el acceso.
+        Cuando un comprador reporta el TXID (orden expirada o fallo de
+        verificación), llega aquí precompletado. Revisa la cadena y confirma
+        para desbloquear el acceso. También recibes un aviso en notificaciones
+        y por email.
       </Typography>
       {orders.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
@@ -337,6 +345,14 @@ const BchPaymentsDashboard = () => {
                         color={order.status === 'pending' ? 'warning' : 'default'}
                         label={ORDER_STATUS_LABEL[order.status] || order.status}
                       />
+                      {order.reported_txid ? (
+                        <Chip
+                          size="small"
+                          color="info"
+                          label="TXID reportado"
+                          sx={{ mt: 0.5, display: 'flex' }}
+                        />
+                      ) : null}
                     </TableCell>
                     <TableCell sx={{ minWidth: 220 }}>
                       <TextField

@@ -125,4 +125,15 @@ describe('BchPaymentsDashboard', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('bchbuyer')).not.toBeInTheDocument();
   });
+
+  it('prefills a buyer-reported TXID in the staff inbox', async () => {
+    const txid = 'cd'.repeat(32);
+    mockGetOrders.mockResolvedValue({
+      orders: [{ ...expiredOrder, reported_txid: txid, reported_note: 'Electron Cash' }],
+      bch_network: 'chipnet',
+    });
+    renderWithProviders(<BchPaymentsDashboard />, { auth: staffAuth });
+    expect(await screen.findByText('TXID reportado')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/TXID/i)).toHaveValue(txid);
+  });
 });
