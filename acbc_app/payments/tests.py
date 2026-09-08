@@ -859,6 +859,27 @@ class AdminBchCatalogTests(TestCase):
         self.assertEqual(purchase.payment_status, 'PAID')
         self.assertTrue(order.provider_payload.get('manual_confirm'))
 
+        from notifications.models import Notification
+        from utils.db_encoding import to_ascii_safe
+
+        buyer_verb = to_ascii_safe('confirmó tu pago de')
+        owner_verb = to_ascii_safe('compró tu camino de conocimiento')
+        self.assertTrue(
+            Notification.objects.filter(recipient=buyer).filter(
+                verb__in=[buyer_verb, 'confirmó tu pago de']
+            ).exists()
+            or any(
+                to_ascii_safe(n.verb or '') == buyer_verb
+                for n in Notification.objects.filter(recipient=buyer)
+            )
+        )
+        self.assertTrue(
+            any(
+                to_ascii_safe(n.verb or '') == owner_verb
+                for n in Notification.objects.filter(recipient=self.author)
+            )
+        )
+
     def test_confirm_rejects_invalid_txid(self):
         from unittest.mock import MagicMock
 
@@ -1072,6 +1093,22 @@ class PathAndTopicBchPaymentTests(TestCase):
         self.purchase.refresh_from_db()
         self.assertEqual(self.purchase.payment_status, 'PAID')
 
+        from notifications.models import Notification
+        from utils.db_encoding import to_ascii_safe
+
+        buyer_verb = to_ascii_safe('confirmó tu pago de')
+        owner_verb = to_ascii_safe('compró tu camino de conocimiento')
+        buyer_notes = Notification.objects.filter(recipient=self.buyer)
+        owner_notes = Notification.objects.filter(recipient=self.author)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == buyer_verb for n in buyer_notes),
+            f'buyer verbs={[n.verb for n in buyer_notes]}',
+        )
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == owner_verb for n in owner_notes),
+            f'owner verbs={[n.verb for n in owner_notes]}',
+        )
+
     def test_topic_bch_verify_unlocks(self):
         client = MagicMock()
         client.get_bch_usd_rate.return_value = Decimal('200')
@@ -1089,6 +1126,22 @@ class PathAndTopicBchPaymentTests(TestCase):
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
         self.topic_purchase.refresh_from_db()
         self.assertEqual(self.topic_purchase.payment_status, 'PAID')
+
+        from notifications.models import Notification
+        from utils.db_encoding import to_ascii_safe
+
+        buyer_verb = to_ascii_safe('confirmó tu pago de')
+        owner_verb = to_ascii_safe('compró acceso a las consultas de')
+        buyer_notes = Notification.objects.filter(recipient=self.buyer)
+        owner_notes = Notification.objects.filter(recipient=self.author)
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == buyer_verb for n in buyer_notes),
+            f'buyer verbs={[n.verb for n in buyer_notes]}',
+        )
+        self.assertTrue(
+            any(to_ascii_safe(n.verb or '') == owner_verb for n in owner_notes),
+            f'owner verbs={[n.verb for n in owner_notes]}',
+        )
 
     def test_waiting_nowpayments_is_abandoned_when_starting_path_bch(self):
         CryptoPayment.objects.create(

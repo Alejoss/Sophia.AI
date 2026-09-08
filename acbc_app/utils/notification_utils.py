@@ -1126,6 +1126,177 @@ def notify_payment_accepted(registration):
             'student_id': registration.user.id,
         }, exc_info=True)
 
+
+def notify_path_purchase_paid(path_purchase):
+    """
+    Notify buyer and path author when a knowledge-path purchase becomes PAID
+    (auto-verify, staff TXID confirm, or NOWPayments).
+    """
+    try:
+        from knowledge_paths.models import KnowledgePathPurchase
+        purchase = KnowledgePathPurchase.objects.select_related(
+            'knowledge_path__author', 'user'
+        ).get(pk=path_purchase.pk)
+    except Exception as e:
+        logger.error(
+            f'Error loading path purchase for notifications: {str(e)}',
+            extra={'purchase_id': getattr(path_purchase, 'pk', None)},
+            exc_info=True,
+        )
+        return
+
+    buyer = purchase.user
+    path = purchase.knowledge_path
+    owner = getattr(path, 'author', None) if path else None
+    title = path.title if path else 'camino'
+
+    logger.info('Creating path purchase paid notifications', extra={
+        'purchase_id': purchase.id,
+        'buyer_id': getattr(buyer, 'id', None),
+        'path_id': getattr(path, 'id', None),
+        'owner_id': getattr(owner, 'id', None),
+    })
+
+    if not buyer or not path:
+        return
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        path_ct = ContentType.objects.get_for_model(path)
+        actor = owner if (owner and owner.id != buyer.id) else buyer
+        actor_ct = ContentType.objects.get_for_model(actor)
+
+        existing_buyer = Notification.objects.filter(
+            recipient=buyer,
+            target_content_type=path_ct,
+            target_object_id=path.id,
+        ).filter(matching_verb_q('confirmó tu pago de'))
+        if not existing_buyer.exists():
+            create_notification(
+                recipient=buyer,
+                actor_content_type=actor_ct,
+                actor_object_id=actor.id,
+                verb='confirmó tu pago de',
+                target_content_type=path_ct,
+                target_object_id=path.id,
+                description=(
+                    f'Tu pago por el camino "{title}" fue confirmado. Ya tienes acceso.'
+                ),
+            )
+
+        if owner and owner.id != buyer.id:
+            existing_owner = Notification.objects.filter(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                target_content_type=path_ct,
+                target_object_id=path.id,
+            ).filter(matching_verb_q('compró tu camino de conocimiento'))
+            if not existing_owner.exists():
+                create_notification(
+                    recipient=owner,
+                    actor_content_type=buyer_ct,
+                    actor_object_id=buyer.id,
+                    verb='compró tu camino de conocimiento',
+                    target_content_type=path_ct,
+                    target_object_id=path.id,
+                    description=(
+                        f'{buyer.username} compró tu camino de conocimiento "{title}".'
+                    ),
+                )
+    except Exception as e:
+        logger.error(
+            f'Error creating path purchase paid notifications: {str(e)}',
+            extra={'purchase_id': getattr(purchase, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_topic_purchase_paid(topic_purchase):
+    """
+    Notify buyer and topic creator when a Consultas purchase becomes PAID.
+    """
+    try:
+        from content.models import TopicPurchase
+        purchase = TopicPurchase.objects.select_related(
+            'topic__creator', 'user'
+        ).get(pk=topic_purchase.pk)
+    except Exception as e:
+        logger.error(
+            f'Error loading topic purchase for notifications: {str(e)}',
+            extra={'purchase_id': getattr(topic_purchase, 'pk', None)},
+            exc_info=True,
+        )
+        return
+
+    buyer = purchase.user
+    topic = purchase.topic
+    owner = getattr(topic, 'creator', None) if topic else None
+    title = topic.title if topic else 'tema'
+
+    logger.info('Creating topic purchase paid notifications', extra={
+        'purchase_id': purchase.id,
+        'buyer_id': getattr(buyer, 'id', None),
+        'topic_id': getattr(topic, 'id', None),
+        'owner_id': getattr(owner, 'id', None),
+    })
+
+    if not buyer or not topic:
+        return
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        topic_ct = ContentType.objects.get_for_model(topic)
+        actor = owner if (owner and owner.id != buyer.id) else buyer
+        actor_ct = ContentType.objects.get_for_model(actor)
+
+        existing_buyer = Notification.objects.filter(
+            recipient=buyer,
+            target_content_type=topic_ct,
+            target_object_id=topic.id,
+        ).filter(matching_verb_q('confirmó tu pago de'))
+        if not existing_buyer.exists():
+            create_notification(
+                recipient=buyer,
+                actor_content_type=actor_ct,
+                actor_object_id=actor.id,
+                verb='confirmó tu pago de',
+                target_content_type=topic_ct,
+                target_object_id=topic.id,
+                description=(
+                    f'Tu pago por las consultas del tema "{title}" fue confirmado. '
+                    f'Ya tienes acceso.'
+                ),
+            )
+
+        if owner and owner.id != buyer.id:
+            existing_owner = Notification.objects.filter(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                target_content_type=topic_ct,
+                target_object_id=topic.id,
+            ).filter(matching_verb_q('compró acceso a las consultas de'))
+            if not existing_owner.exists():
+                create_notification(
+                    recipient=owner,
+                    actor_content_type=buyer_ct,
+                    actor_object_id=buyer.id,
+                    verb='compró acceso a las consultas de',
+                    target_content_type=topic_ct,
+                    target_object_id=topic.id,
+                    description=(
+                        f'{buyer.username} compró acceso a las consultas de "{title}".'
+                    ),
+                )
+    except Exception as e:
+        logger.error(
+            f'Error creating topic purchase paid notifications: {str(e)}',
+            extra={'purchase_id': getattr(purchase, 'id', None)},
+            exc_info=True,
+        )
+
+
 def notify_certificate_sent(registration):
     """
     Create a notification when a teacher sends a certificate for an event.
