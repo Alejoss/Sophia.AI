@@ -165,6 +165,12 @@ describe('ProductPaymentCheckout method switch', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Inténtalo más tarde/i)).toBeInTheDocument();
     expect(
+      screen.getByText(/vuelve a intentar clickeando en el botón "Ya realicé el pago"/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/dentro de 5 minutos/i),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('button', { name: /Ya pagué — enviar TXID a soporte/i }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Enviar TXID a soporte$/i }));
