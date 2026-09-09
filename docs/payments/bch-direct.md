@@ -85,6 +85,7 @@ sequenceDiagram
 4. Si otra orden `pending` no expirada ya usa esos sats, se suma **1 sat** (hasta 10 000 intentos).
 
 El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe enviar **exactamente** esos sats; un sat de más o de menos no cuenta.
+En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar desajustes por fee/redondeo de wallets.
 
 ## Cómo se verifica (match on-chain)
 
