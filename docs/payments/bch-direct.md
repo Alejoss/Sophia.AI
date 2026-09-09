@@ -28,7 +28,7 @@ NOWPayments sigue en `waiting` (aún no hay fondos en camino).
 | Entorno | Default `BCH_NETWORK` | Verificación | Prefijo CashAddr |
 |---------|----------------------|--------------|------------------|
 | `ENVIRONMENT` ≠ `PRODUCTION` (Docker local) | `chipnet` | Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002`) | `bchtest:` |
-| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum `ssl://bch.imaginary.cash:50002` | `bitcoincash:` |
+| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum pool (`bch.imaginary.cash` + fallbacks) → Blockchair HTTP | `bitcoincash:` |
 
 Override explícito: `BCH_NETWORK=chipnet` o `mainnet`. Chipnet es la red de pruebas
 permanente de BCH (análogo práctico a signet para este flujo).
@@ -179,10 +179,11 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 # Or a single fallback for the active network:
 # BCH_RECEIVE_ADDRESS=bchtest:q...
 
-# Optional overrides (defaults: Fulcrum Electrum for mainnet + chipnet):
+# Optional overrides (defaults: Fulcrum Electrum pool for mainnet + chipnet):
 # BCH_API_BASE=ssl://bch.imaginary.cash:50002
 # BCH_API_BASE=ssl://chipnet.bch.ninja:50002
 # BCH_API_BASE=https://api.blockchair.com/bitcoin-cash
+# BCH_ELECTRUM_SERVERS=ssl://bch.imaginary.cash:50002,ssl://electrum.imaginary.cash:50002,ssl://blackie.c3-soft.com:50002
 # BCH_BLOCKCHAIR_API_KEY=
 
 BCH_PAYMENT_TTL_MINUTES=30

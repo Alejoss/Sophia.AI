@@ -860,9 +860,9 @@ class BchNetworkClientTests(TestCase):
 
     @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
     def test_build_client_chipnet_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'chipnet.bch.ninja')
         self.assertEqual(client.port, 50002)
 
@@ -878,13 +878,55 @@ class BchNetworkClientTests(TestCase):
     @override_settings(
         BCH_NETWORK='mainnet',
         BCH_API_BASE='ssl://bch.imaginary.cash:50002',
+        BCH_ELECTRUM_SERVERS='',
     )
-    def test_build_client_mainnet_default_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+    def test_build_client_mainnet_default_is_failover(self):
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'bch.imaginary.cash')
         self.assertEqual(client.port, 50002)
+        self.assertGreaterEqual(len(client.servers), 2)
+        self.assertIsNotNone(client.http_fallback)
+
+    def test_failover_fills_missing_tx_via_http(self):
+        from payments.bch_client import BchFailoverClient
+
+        primary = MagicMock()
+        primary.host = 'primary.example'
+        primary.port = 50002
+        primary.fetch_address_history.return_value = (
+            [{'tx_hash': 'aa' * 32, 'height': 100}],
+            110,
+        )
+        primary.__enter__ = MagicMock(return_value=primary)
+        primary.__exit__ = MagicMock(return_value=False)
+        primary.get_transaction.side_effect = BchApiError('timed out')
+
+        secondary = MagicMock()
+        secondary.host = 'secondary.example'
+        secondary.port = 50002
+        secondary.get_transaction.side_effect = BchApiError('also down')
+
+        http = MagicMock()
+        expected = BchTransaction(
+            txid='aa' * 32,
+            timestamp=1_700_000_000,
+            confirmations=11,
+            outputs=[BchTxOutput(address='bitcoincash:qtest', amount_sats=123)],
+        )
+        http.get_transaction.return_value = expected
+
+        client = BchFailoverClient.__new__(BchFailoverClient)
+        client.servers = [primary, secondary]
+        client.http_fallback = http
+        client.host = primary.host
+        client.port = primary.port
+
+        txs = client.list_recent_transactions('bitcoincash:qtest', limit=5)
+        self.assertEqual(len(txs), 1)
+        self.assertEqual(txs[0].txid, 'aa' * 32)
+        http.get_transaction.assert_called_once()
 
     @override_settings(
         BCH_NETWORK='chipnet',

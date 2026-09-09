@@ -17,6 +17,7 @@ from payments.bch_client import (
     SATS_PER_BCH,
     BchApiError,
     BchElectrumClient,
+    BchFailoverClient,
     BchPublicClient,
     build_bch_client,
     get_bch_network,
@@ -336,7 +337,7 @@ def create_or_reuse_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
         t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
@@ -436,7 +437,7 @@ def verify_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
         t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
