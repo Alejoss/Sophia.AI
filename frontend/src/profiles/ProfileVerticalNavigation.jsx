@@ -25,7 +25,8 @@ import {
   Lightbulb as LightbulbIcon,
   Security as SecurityIcon,
   AcUnit as TopicIcon,
-  LibraryBooks as LibraryIcon
+  LibraryBooks as LibraryIcon,
+  Toll as TollIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 
@@ -75,6 +76,16 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       path: null
     }
   ];
+
+  if (isOwnProfile) {
+    const cryptoIndex = baseItems.findIndex((item) => item.section === 'cryptos');
+    baseItems.splice(cryptoIndex + 1, 0, {
+      label: 'Mis tokens',
+      section: 'tokens',
+      icon: TollIcon,
+      path: null
+    });
+  }
 
   // Add profile-specific items
   if (isOwnProfile) {

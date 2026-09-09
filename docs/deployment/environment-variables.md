@@ -230,6 +230,12 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Required**: No
 - **Default**: `1`
 
+#### `TOKEN_CONTENT_DISCOUNT_PERCENT`
+- **Description**: Reserved discount when spending platform tokens on paid content. Unused until token checkout ships.
+- **Required**: No
+- **Default**: `0`
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
 #### `BCH_NETWORK`
 - **Default**: `chipnet` when `ENVIRONMENT` ≠ `PRODUCTION` (local Docker); `mainnet` in production
 - **Values**: `chipnet` (test net, like BTC signet), `mainnet`

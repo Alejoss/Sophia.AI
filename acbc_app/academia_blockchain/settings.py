@@ -767,6 +767,8 @@ BTC_MAX_FEE_USD = float(os.getenv('BTC_MAX_FEE_USD', '1'))
 BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 # Fixed USD price charged via NOWPayments for a public transcript-anchor request.
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
+# Reserved for later token checkout (paths, Consultas, events, anchors). Unused in v1.
+TOKEN_CONTENT_DISCOUNT_PERCENT = int(os.getenv('TOKEN_CONTENT_DISCOUNT_PERCENT', '0') or 0)
 
 # Self-custody Bitcoin Cash payments (USD-tolerance amount match on a single address).
 # Network mirrors BTC: chipnet in non-PRODUCTION (like signet), mainnet on server.

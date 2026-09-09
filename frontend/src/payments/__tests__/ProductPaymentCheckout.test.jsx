@@ -33,6 +33,8 @@ vi.mock('../../api/paymentsApi', () => ({
   listRegistrationPayments: vi.fn(),
   createAnchorRequestPayment: vi.fn(),
   listAnchorRequestPayments: vi.fn(),
+  createTokenPurchasePayment: vi.fn(),
+  listTokenPurchasePayments: vi.fn(),
 }));
 
 vi.mock('../../api/messagesApi', () => ({

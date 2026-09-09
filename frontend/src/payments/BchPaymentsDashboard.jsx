@@ -59,6 +59,7 @@ const productLabel = (order) => {
   if (order.product_type === 'path') return 'Camino';
   if (order.product_type === 'topic') return 'Consultas';
   if (order.product_type === 'anchor') return 'Anclaje';
+  if (order.product_type === 'token_package') return 'Tokens';
   return 'Producto';
 };
 

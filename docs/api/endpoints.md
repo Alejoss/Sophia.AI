@@ -553,6 +553,17 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match
 - **Auth**: Required (requester; staff may GET/verify)
 
+### Platform token packages
+- **GET** `/api/payments/token-packages/` — active SKUs
+- **GET** `/api/payments/token-purchases/` — own purchases
+- **POST** `/api/payments/token-purchases/` — `{ "package_id": N }` start a checkout
+- **POST** `/api/payments/token-purchase/{id}/` — NOWPayments invoice (buyer only)
+- **GET** `/api/payments/token-purchase/{id}/list/` — buyer or staff
+- **GET/POST** `/api/payments/token-purchase/{id}/bch/` — BCH order
+- **POST** `/api/payments/token-purchase/{id}/bch/verify/`
+- **Auth**: Required
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
 ### Payment detail / IPN
 - **GET** `/api/payments/{id}/` — NOWPayments row; syncs with the provider
 - **POST** `/api/payments/ipn/` — NOWPayments webhook (no JWT; HMAC `x-nowpayments-sig`)

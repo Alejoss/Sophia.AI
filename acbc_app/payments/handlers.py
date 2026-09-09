@@ -19,6 +19,7 @@ def on_crypto_payment_completed(
     event_registration=None,
     path_purchase=None,
     anchor_request=None,
+    token_purchase=None,
 ):
     """
     Called once when an entitlement transitions to PAID via the crypto gateway.
@@ -45,6 +46,13 @@ def on_crypto_payment_completed(
             anchor_request.id,
             anchor_request.content_id,
         )
+    elif token_purchase is not None:
+        logger.info(
+            'Crypto payment completed: order=%s token_purchase=%s tokens=%s',
+            crypto_payment.order_id,
+            token_purchase.id,
+            token_purchase.token_amount,
+        )
     else:
         logger.info('Crypto payment completed: order=%s', crypto_payment.order_id)
 
@@ -54,6 +62,7 @@ def on_crypto_payment_completed(
         event_registration=event_registration,
         path_purchase=path_purchase,
         anchor_request=anchor_request,
+        token_purchase=token_purchase,
         # Backwards-compatible kwarg for existing listeners
         registration=event_registration,
     )
