@@ -653,7 +653,7 @@ class AdminBchCatalogView(APIView):
 
 
 class AdminKnowledgePathBchView(APIView):
-    """Staff: activate/deactivate selling on a knowledge path."""
+    """Staff: set path price and activate/deactivate selling on a knowledge path."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -661,23 +661,49 @@ class AdminKnowledgePathBchView(APIView):
         path = KnowledgePath.objects.select_related('author').filter(pk=pk).first()
         if path is None:
             return Response({'error': 'Camino no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
-        if 'sales_enabled' not in request.data and 'bch_direct_enabled' not in request.data:
+
+        update_fields = ['updated_at']
+        if 'reference_price' in request.data:
+            try:
+                price = float(request.data.get('reference_price') or 0)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'El precio debe ser un número.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if price < 0:
+                return Response(
+                    {'error': 'El precio no puede ser negativo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            path.reference_price = price
+            update_fields.append('reference_price')
+            if price <= 0:
+                path.sales_enabled = False
+                update_fields.append('sales_enabled')
+
+        if 'sales_enabled' in request.data or 'bch_direct_enabled' in request.data:
+            enabled = bool(
+                request.data['sales_enabled']
+                if 'sales_enabled' in request.data
+                else request.data.get('bch_direct_enabled')
+            )
+            # Re-evaluate paid state after possible price update above.
+            is_paid = bool(path.reference_price and path.reference_price > 0)
+            if enabled and not is_paid:
+                return Response(
+                    {'error': 'Define un precio mayor a 0 en el camino antes de activar la venta.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            path.sales_enabled = enabled
+            update_fields.append('sales_enabled')
+        elif 'reference_price' not in request.data:
             return Response(
-                {'error': 'Falta sales_enabled.'},
+                {'error': 'Falta sales_enabled o reference_price.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        enabled = bool(
-            request.data['sales_enabled']
-            if 'sales_enabled' in request.data
-            else request.data.get('bch_direct_enabled')
-        )
-        if enabled and not path.is_paid_path:
-            return Response(
-                {'error': 'Define un precio mayor a 0 en el camino antes de activar la venta.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        path.sales_enabled = enabled
-        path.save(update_fields=['sales_enabled', 'updated_at'])
+
+        path.save(update_fields=list(dict.fromkeys(update_fields)))
         return Response({
             'id': path.id,
             'title': path.title,

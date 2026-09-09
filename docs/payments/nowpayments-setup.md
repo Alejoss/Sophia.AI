@@ -59,7 +59,7 @@ Para anclajes y caminos, el usuario puede cambiar de NOWPayments a [BCH directo]
 7. Cuando el estado es `finished`, el backend marca el `EventRegistration` como `PAID` y ejecuta `on_crypto_payment_completed`.
 
 ### Caminos del Conocimiento
-1. El autor define `reference_price > 0` en el camino.
+1. El autor (edición del camino → Guardar precio) o el staff (`/dashboard/pagos-bch`) define `reference_price > 0`.
 2. El alumno llama `POST /api/knowledge_paths/<id>/purchase/` → crea `KnowledgePathPurchase` (`PENDING`).
 3. `POST /api/payments/path-purchase/<purchase_id>/` crea la invoice (`order_id` = `kp-purchase-...`).
 4. IPN/polling con status `finished` marca la compra `PAID` y desbloquea los nodos.

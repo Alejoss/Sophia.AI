@@ -180,7 +180,7 @@ verificar**, no crear la orden.
 |--------|------|------|-----------|
 | GET | `/api/payments/status/` | Público | `bch_direct_enabled`, `bch_network`, `methods.bch_direct` |
 | GET | `/api/payments/admin/bch-catalog/` | Staff | Caminos y temas + flags BCH |
-| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled }` |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
