@@ -259,6 +259,7 @@ function TranscriptChecklist({
   }
 
   const allSelected = selectedIds.length === sources.length;
+  const showAllSelectedWarning = allSelected && sources.length > 1;
 
   return (
     <Box>
@@ -287,6 +288,13 @@ function TranscriptChecklist({
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         Marca los archivos cuyos contenidos quieres usar en esta consulta.
       </Typography>
+      {showAllSelectedWarning && (
+        <Alert severity="warning" sx={{ borderRadius: 0, mb: 1 }}>
+          Al seleccionar todos los archivos, el modelo procesa demasiado contenido
+          y las respuestas suelen ser menos precisas. Elige solo los archivos
+          relevantes para obtener mejores resultados.
+        </Alert>
+      )}
       <FormGroup
         sx={{
           // One column + vertical scroll. FormGroup defaults to column + wrap,
@@ -401,7 +409,8 @@ function TopicChat({ topicId }) {
       const data = await contentApi.listTopicChatSources(topicId);
       const rows = data.results || [];
       setSources(rows);
-      setSelectedIds(rows.map((row) => row.content_id));
+      // Start unchecked so the user chooses which files to query.
+      setSelectedIds([]);
     } catch {
       setSources([]);
       setSelectedIds([]);
@@ -428,7 +437,7 @@ function TopicChat({ topicId }) {
     setComposing(true);
     setError(null);
     setInput('');
-    setSelectedIds(sources.map((row) => row.content_id));
+    setSelectedIds([]);
   };
 
   const toggleSource = (contentId) => {
