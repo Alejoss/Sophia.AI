@@ -99,9 +99,10 @@ export const getAnchorRequestBchPayment = async (requestId) => {
 
 export const verifyAnchorRequestBchPayment = async (requestId, txid) => {
   try {
+    const body = txid ? { txid } : {};
     const response = await axiosInstance.post(
       `/payments/anchor-request/${requestId}/bch/verify/`,
-      { txid },
+      body,
     );
     return response.data;
   } catch (error) {
@@ -183,9 +184,10 @@ export const createPathPurchaseBchPayment = async (purchaseId) => {
 
 export const verifyPathPurchaseBchPayment = async (purchaseId, txid) => {
   try {
+    const body = txid ? { txid } : {};
     const response = await axiosInstance.post(
       `/payments/path-purchase/${purchaseId}/bch/verify/`,
-      { txid },
+      body,
     );
     return response.data;
   } catch (error) {
@@ -204,9 +206,10 @@ export const createTopicPurchaseBchPayment = async (purchaseId) => {
 
 export const verifyTopicPurchaseBchPayment = async (purchaseId, txid) => {
   try {
+    const body = txid ? { txid } : {};
     const response = await axiosInstance.post(
       `/payments/topic-purchase/${purchaseId}/bch/verify/`,
-      { txid },
+      body,
     );
     return response.data;
   } catch (error) {
@@ -270,9 +273,10 @@ export const createTokenPurchaseBchPayment = async (purchaseId) => {
 
 export const verifyTokenPurchaseBchPayment = async (purchaseId, txid) => {
   try {
+    const body = txid ? { txid } : {};
     const response = await axiosInstance.post(
       `/payments/token-purchase/${purchaseId}/bch/verify/`,
-      { txid },
+      body,
     );
     return response.data;
   } catch (error) {

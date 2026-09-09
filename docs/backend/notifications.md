@@ -107,11 +107,11 @@ Most helpers in `notification_utils.py` skip creation when an identical notifica
 
 ### Performance
 
-The unread-count endpoint is optimized for frequent polling from the header badge:
+The unread-count endpoint is optimized for lightweight badge refreshes from the header:
 
 - **DB index**: composite index on `(recipient_id, unread)` on `notifications_notification` (migration `profiles.0004_notification_unread_index`).
 - **Server cache**: in-process cache (30s TTL) per user via `utils/notification_cache.py`. Invalidated on notification create/update/delete and when marking as read.
-- **Client**: `NotificationsContext` polls every 60s, refreshes when the tab becomes visible, and throttles manual refreshes to at most once every 15s. Header and profile sidebar share the same context (one request, not two).
+- **Client**: `NotificationsContext` fetches unread count on auth ready and when the tab becomes visible, and throttles manual refreshes to at most once every 15s. It does not poll on an interval. Header and profile sidebar share the same context (one request, not two).
 
 
 High-traffic features (comments, votes, suggestions) can create many rows. Monitor DB growth; consider caps or batching if needed.

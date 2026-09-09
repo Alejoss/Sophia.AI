@@ -164,11 +164,11 @@ describe('ProductPaymentCheckout method switch', () => {
     const qr = await screen.findByTestId('bch-address-qr');
     expect(qr).toHaveAttribute('data-qr-value', 'bitcoincash:qptestaddress');
     expect(qr.getAttribute('data-qr-value')).not.toMatch(/amount=/i);
-    const txid = 'ab'.repeat(32);
-    await user.type(screen.getByLabelText(/ID de transacción/i), txid);
+    // Auto-verify: no TXID required on first attempt.
+    expect(screen.queryByLabelText(/ID de transacción/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Ya realicé el pago/i }));
 
-    expect(mockVerifyBch).toHaveBeenCalledWith(txid);
+    expect(mockVerifyBch).toHaveBeenCalledWith(undefined);
     expect(
       await screen.findByRole('button', { name: /^Enviar TXID a soporte$/i }),
     ).toBeInTheDocument();
@@ -179,13 +179,12 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(
       screen.getByText(/dentro de 5 minutos/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Ya pagué — enviar TXID a soporte/i }),
-    ).toBeInTheDocument();
+    // After auto-verify fails, optional TXID field appears for retry / support.
+    expect(screen.getByLabelText(/ID de transacción/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^Enviar TXID a soporte$/i }));
 
     expect(await screen.findByText('Ya pagué — avisar a soporte')).toBeInTheDocument();
     expect(screen.getAllByLabelText(/ID de transacción/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/revisaremos el pago manualmente/i)).toBeInTheDocument();
+    expect(screen.getByText(/Revisaremos el pago manualmente/i)).toBeInTheDocument();
   });
 });
