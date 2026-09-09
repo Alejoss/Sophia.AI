@@ -184,8 +184,9 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **POST** `/api/content/topics/{topic_id}/chat/`
 - **Auth**: Required (JWT)
 - **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
-- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at }`
-- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history
+- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining }`
+- **429**: free-tier daily cap (`code=daily_consultation_limit`; default 3/day/user across topics)
+- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` quota fields)
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
 - **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)

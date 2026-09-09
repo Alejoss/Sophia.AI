@@ -59,7 +59,7 @@ describe('TopicChat component', () => {
     ).toBeInTheDocument();
   });
 
-  it('lets the user uncheck transcripts before consulting', async () => {
+  it('starts with all transcripts unchecked and lets the user pick before consulting', async () => {
     const user = userEvent.setup();
     mockTopicChat.mockResolvedValue({
       id: 101,
@@ -90,11 +90,14 @@ describe('TopicChat component', () => {
 
     const firstCheckbox = screen.getByRole('checkbox', { name: /libro blanco bitcoin/i });
     const secondCheckbox = screen.getByRole('checkbox', { name: /explicación en video/i });
-    expect(firstCheckbox).toBeChecked();
-    expect(secondCheckbox).toBeChecked();
-
-    await user.click(firstCheckbox);
     expect(firstCheckbox).not.toBeChecked();
+    expect(secondCheckbox).not.toBeChecked();
+    expect(
+      screen.queryByText(/procesa demasiado contenido/i)
+    ).not.toBeInTheDocument();
+
+    await user.click(secondCheckbox);
+    expect(secondCheckbox).toBeChecked();
 
     const input = screen.getByPlaceholderText(/escribe tu pregunta/i);
     await user.type(input, '¿Qué es Bitcoin?');
@@ -119,6 +122,31 @@ describe('TopicChat component', () => {
     expect(videoSourceLinks[0].getAttribute('href')).toBe(
       '/content/88/transcript?context=topic&topicId=5'
     );
+  });
+
+  it('warns when all transcripts are selected', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: mockAuthValue,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/contenidos a consultar \(0\/2\)/i)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^todas$/i }));
+
+    expect(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /explicación en video/i })).toBeChecked();
+    expect(
+      screen.getByText(/procesa demasiado contenido/i)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^ninguna$/i }));
+    expect(
+      screen.queryByText(/procesa demasiado contenido/i)
+    ).not.toBeInTheDocument();
   });
 
   it('renders consultation response with text and video sources correctly linked', async () => {
@@ -158,6 +186,9 @@ describe('TopicChat component', () => {
       expect(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i })).toBeInTheDocument();
     });
 
+    await user.click(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i }));
+    await user.click(screen.getByRole('checkbox', { name: /explicación en video/i }));
+
     const input = screen.getByPlaceholderText(/escribe tu pregunta/i);
     await user.type(input, '¿Qué es Bitcoin?');
 
@@ -168,14 +199,69 @@ describe('TopicChat component', () => {
       expect(screen.getByText(/bitcoin es efectivo electrónico/i)).toBeInTheDocument();
     });
 
-    // Verify the text source links to the topic content path
     const textSourceLink = screen.getAllByRole('link', { name: /libro blanco bitcoin/i })[0];
     expect(textSourceLink).toBeInTheDocument();
     expect(textSourceLink.getAttribute('href')).toBe('/content/42/topic/5');
 
-    // Verify the video source links to the transcript page
     const videoSourceLink = screen.getAllByRole('link', { name: /explicación en video/i })[0];
     expect(videoSourceLink).toBeInTheDocument();
-    expect(videoSourceLink.getAttribute('href')).toBe('/content/88/transcript?context=topic&topicId=5');
+    expect(videoSourceLink.getAttribute('href')).toBe(
+      '/content/88/transcript?context=topic&topicId=5'
+    );
+  });
+
+  it('shows the daily free-tier limit from history payload', async () => {
+    mockListTopicChatQueries.mockResolvedValue({
+      count: 0,
+      limit: 50,
+      daily_limit: 3,
+      daily_used: 1,
+      daily_remaining: 2,
+      results: [],
+    });
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: mockAuthValue,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/límite gratuito: 3 consultas por día/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/\(2 restantes hoy\)/i)).toBeInTheDocument();
+  });
+
+  it('surfaces the daily limit error from the API', async () => {
+    const user = userEvent.setup();
+    mockTopicChat.mockRejectedValue({
+      response: {
+        status: 429,
+        data: {
+          error:
+            'Has alcanzado el límite de 3 consultas por día. Podrás hacer más consultas mañana.',
+          code: 'daily_consultation_limit',
+          daily_limit: 3,
+          daily_used: 3,
+          daily_remaining: 0,
+        },
+      },
+    });
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: mockAuthValue,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i })).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText(/escribe tu pregunta/i);
+    await user.type(input, '¿Qué es Bitcoin?');
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/has alcanzado el límite de 3 consultas por día/i)
+      ).toBeInTheDocument();
+    });
   });
 });

@@ -16,6 +16,7 @@ from content.models import (
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
+from datetime import timedelta
 from django.db import IntegrityError
 import json
 import os
@@ -5697,6 +5698,12 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertEqual(list_response.data['count'], 1)
         self.assertEqual(list_response.data['results'][0]['id'], query_id)
+        self.assertEqual(list_response.data['daily_limit'], TopicChatQuery.MAX_PER_USER_PER_DAY)
+        self.assertEqual(list_response.data['daily_used'], 1)
+        self.assertEqual(
+            list_response.data['daily_remaining'],
+            TopicChatQuery.MAX_PER_USER_PER_DAY - 1,
+        )
 
         detail = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
@@ -5714,6 +5721,128 @@ class TopicChatAPITests(APITestCase):
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
         )
         self.assertEqual(forbidden.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_daily_consultation_limit_blocks_fourth(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Respuesta [1].',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        limit = TopicChatQuery.MAX_PER_USER_PER_DAY
+        for i in range(limit):
+            response = self.client.post(
+                f'/api/content/topics/{self.topic.id}/chat/',
+                {'message': f'Pregunta {i}'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            self.assertEqual(response.data['daily_limit'], limit)
+            self.assertEqual(response.data['daily_used'], i + 1)
+            self.assertEqual(response.data['daily_remaining'], limit - (i + 1))
+
+        blocked = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Pregunta de más'},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(blocked.data['code'], 'daily_consultation_limit')
+        self.assertEqual(blocked.data['daily_limit'], limit)
+        self.assertEqual(blocked.data['daily_used'], limit)
+        self.assertEqual(blocked.data['daily_remaining'], 0)
+        self.assertIn('límite', blocked.data['error'].lower())
+        self.assertEqual(mock_run.call_count, limit)
+        self.assertEqual(
+            TopicChatQuery.objects.filter(user=self.user).count(),
+            limit,
+        )
+
+        other = User.objects.create_user(
+            username='quotaother',
+            email='quotaother@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        other_ok = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Pregunta de otro usuario'},
+            format='json',
+        )
+        self.assertEqual(other_ok.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(other_ok.data['daily_used'], 1)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_daily_consultation_limit_counts_across_topics(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Ok',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        other_topic = Topic.objects.create(
+            title='Otro tema RAG',
+            description='Desc',
+            creator=self.user,
+            is_public=True,
+            chat_enabled=True,
+        )
+        limit = TopicChatQuery.MAX_PER_USER_PER_DAY
+        for i in range(limit):
+            topic = self.topic if i % 2 == 0 else other_topic
+            mock_run.return_value = {
+                'topic_id': topic.id,
+                'answer': 'Ok',
+                'sources': [],
+                'retrieved_chunk_count': 0,
+                'used_chunk_count': 0,
+            }
+            response = self.client.post(
+                f'/api/content/topics/{topic.id}/chat/',
+                {'message': f'Pregunta {i}'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        blocked = self.client.post(
+            f'/api/content/topics/{other_topic.id}/chat/',
+            {'message': 'Una más'},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_daily_consultation_limit_resets_next_day(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Ok',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        limit = TopicChatQuery.MAX_PER_USER_PER_DAY
+        yesterday = timezone.now() - timedelta(days=1)
+        for i in range(limit):
+            query = TopicChatQuery.objects.create(
+                topic=self.topic,
+                user=self.user,
+                question=f'Ayer {i}',
+                answer='Ok',
+                sources=[],
+            )
+            TopicChatQuery.objects.filter(pk=query.pk).update(created_at=yesterday)
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Hoy permitido'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['daily_used'], 1)
+        self.assertEqual(response.data['daily_remaining'], limit - 1)
 
     def _index_transcript(self, content, text='Texto indexado de prueba.'):
         transcript = ContentTranscript.objects.create(
@@ -6084,6 +6213,55 @@ class TopicChatAPITests(APITestCase):
             f'/content/{self.video.id}/transcript?context=topic&topicId={self.topic.id}',
         )
         self.assertNotIn('text', result['sources'][0])
+
+    def test_system_prompt_matches_user_question_language(self):
+        from content.topic_chat import SYSTEM_PROMPT
+
+        lowered = SYSTEM_PROMPT.casefold()
+        self.assertIn('mismo idioma', lowered)
+        self.assertNotIn('responde en español, de forma clara', lowered)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_passes_language_matching_system_prompt(
+        self, mock_qdrant_cls, mock_openai_cls
+    ):
+        from content.topic_chat import SYSTEM_PROMPT, run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = (
+            'For Peter Thiel, the Antichrist relates to a global totalitarian '
+            'state [1].'
+        )
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.88,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Peter Thiel links the Antichrist to one-world government.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='What is the antichrist for peter thiel?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        messages = openai.chat.call_args.args[0]
+        self.assertEqual(messages[0]['role'], 'system')
+        self.assertEqual(messages[0]['content'], SYSTEM_PROMPT)
+        self.assertIn('mismo idioma de la pregunta', messages[0]['content'])
+        self.assertIn(
+            'What is the antichrist for peter thiel?',
+            messages[1]['content'],
+        )
+        self.assertTrue(result['answer'].startswith('For Peter Thiel'))
 
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')

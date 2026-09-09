@@ -265,7 +265,19 @@ class BchPublicClient:
             confirmations = 1
 
         timestamp = tx.get('time')
-        if timestamp is not None:
+        if isinstance(timestamp, str):
+            # Blockchair returns "YYYY-MM-DD HH:MM:SS" UTC for some payloads.
+            try:
+                from datetime import datetime, timezone as dt_timezone
+
+                timestamp = int(
+                    datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                    .replace(tzinfo=dt_timezone.utc)
+                    .timestamp()
+                )
+            except ValueError:
+                timestamp = None
+        elif timestamp is not None:
             try:
                 timestamp = int(timestamp)
             except (TypeError, ValueError):

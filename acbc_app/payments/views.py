@@ -52,8 +52,12 @@ def _bch_error_response(exc, *, action, **ctx):
 
     Infrastructure errors are also logged in bch_services; this adds the
     endpoint + entitlement ids that operators grep for in access logs.
+    Extra ``exc.details`` (e.g. verify mismatch diagnostics) are appended so a
+    single WARNING line is enough when a buyer reports a failed verify.
     """
-    logger.warning('BCH %s failed %s: %s', action, _ctx_bits(**ctx), exc)
+    details = getattr(exc, 'details', None) or {}
+    extra = {**ctx, **details}
+    logger.warning('BCH %s failed %s: %s', action, _ctx_bits(**extra), exc)
     return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 

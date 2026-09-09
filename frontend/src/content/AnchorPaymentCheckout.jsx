@@ -25,6 +25,7 @@ import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 import BchAddressQr from '../payments/BchAddressQr';
+import BchOrderExpiryNotice from '../payments/BchOrderExpiryNotice';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -295,7 +296,8 @@ const AnchorPaymentCheckout = ({
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía <strong>exactamente</strong> este monto a la dirección
+                Envía este monto a la dirección (usa el valor en sats si tu
+                wallet redondea; toleramos hasta ~$0.20 de diferencia).
                 {(bchOrder.network || bchNetwork) && (bchOrder.network || bchNetwork) !== 'mainnet'
                   ? ` en ${bchOrder.network || bchNetwork}`
                   : ''}
@@ -347,12 +349,7 @@ const AnchorPaymentCheckout = ({
                   </Box>
                 </Stack>
               </Box>
-              {bchOrder.seconds_remaining != null && bchOrder.status === 'pending' && (
-                <Typography variant="caption" color="text.secondary">
-                  Tiempo restante: {Math.floor(bchOrder.seconds_remaining / 60)}m{' '}
-                  {bchOrder.seconds_remaining % 60}s
-                </Typography>
-              )}
+              <BchOrderExpiryNotice bchOrder={bchOrder} />
             </Stack>
           )}
         </DialogContent>
