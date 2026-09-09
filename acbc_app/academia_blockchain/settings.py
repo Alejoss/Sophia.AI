@@ -792,6 +792,12 @@ BCH_API_BASE = os.getenv(
 BCH_BLOCKCHAIR_API_KEY = os.getenv('BCH_BLOCKCHAIR_API_KEY', '').strip()
 BCH_PAYMENT_TTL_MINUTES = int(os.getenv('BCH_PAYMENT_TTL_MINUTES', '30'))
 BCH_MIN_CONFIRMATIONS = int(os.getenv('BCH_MIN_CONFIRMATIONS', '0'))
+# How far before order created_at a chain tx may still match (seconds).
+# Empty/unset → max(3600, BCH_PAYMENT_TTL_MINUTES * 60) in bch_services.
+_BCH_VERIFY_GRACE_RAW = os.getenv('BCH_VERIFY_TIMESTAMP_GRACE_SECONDS', '').strip()
+BCH_VERIFY_TIMESTAMP_GRACE_SECONDS = (
+    int(_BCH_VERIFY_GRACE_RAW) if _BCH_VERIFY_GRACE_RAW else None
+)
 # Optional fixed USD/BCH; 0 = fetch from Blockchair / CoinGecko (also used on chipnet for sizing).
 BCH_USD_PRICE = float(os.getenv('BCH_USD_PRICE', '0'))
 

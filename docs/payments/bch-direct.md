@@ -95,7 +95,7 @@ Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la direc
 | Monto exacto | `output.amount_sats == expected_amount_sats` |
 | Dirección | CashAddr completa o payload tras `bitcoincash:` / `bchtest:` (case-insensitive) |
 | Confirmaciones | `>= BCH_MIN_CONFIRMATIONS` (default `0` = mempool OK) |
-| Reloj | `tx.timestamp >= created_at − 60s` (si el indexer no manda timestamp, no se filtra) |
+| Reloj | `tx.timestamp >= created_at − grace` (default grace = `max(3600, TTL×60)` s; override `BCH_VERIFY_TIMESTAMP_GRACE_SECONDS`). Si el indexer no manda timestamp, no se filtra. |
 | Txid único | `payment_txid` no puede repetirse en otra fila |
 
 Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
@@ -157,6 +157,8 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 
 BCH_PAYMENT_TTL_MINUTES=30
 BCH_MIN_CONFIRMATIONS=0
+# Optional; default max(3600, TTL*60). Widen if buyers pay then recreate orders.
+# BCH_VERIFY_TIMESTAMP_GRACE_SECONDS=3600
 # 0 = fetch USD/BCH from Blockchair, then CoinGecko
 BCH_USD_PRICE=0
 ANCHOR_REQUEST_PRICE_USD=1

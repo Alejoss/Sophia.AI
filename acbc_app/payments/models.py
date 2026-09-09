@@ -206,7 +206,9 @@ class BchDirectPayment(models.Model):
 
     @property
     def expected_amount_bch(self):
-        return (self.expected_amount_sats or 0) / 100_000_000
+        from decimal import Decimal
+
+        return Decimal(self.expected_amount_sats or 0) / Decimal(100_000_000)
 
     @property
     def buyer(self):

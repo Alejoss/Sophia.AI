@@ -554,6 +554,38 @@ class BchDirectPaymentTests(TestCase):
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
 
+    def test_verify_accepts_tx_with_blocktime_before_order_within_grace(self):
+        """Block timestamps can precede order creation; 60s grace was too tight."""
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        # Payment block time 5 minutes before the order — still within default grace.
+        early_ts = int(order.created_at.timestamp()) - 300
+        client.list_recent_transactions.return_value = [
+            BchTransaction(
+                txid='ef' * 32,
+                timestamp=early_ts,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(
+                        address=order.address,
+                        amount_sats=order.expected_amount_sats,
+                    ),
+                ],
+            ),
+        ]
+        paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(paid.payment_txid, 'ef' * 32)
+
     def test_waiting_nowpayments_is_abandoned_when_starting_bch(self):
         CryptoPayment.objects.create(
             anchor_request=self.req,
