@@ -1126,6 +1126,177 @@ def notify_payment_accepted(registration):
             'student_id': registration.user.id,
         }, exc_info=True)
 
+
+def notify_path_purchase_paid(path_purchase):
+    """
+    Notify buyer and path author when a knowledge-path purchase becomes PAID
+    (auto-verify, staff TXID confirm, or NOWPayments).
+    """
+    try:
+        from knowledge_paths.models import KnowledgePathPurchase
+        purchase = KnowledgePathPurchase.objects.select_related(
+            'knowledge_path__author', 'user'
+        ).get(pk=path_purchase.pk)
+    except Exception as e:
+        logger.error(
+            f'Error loading path purchase for notifications: {str(e)}',
+            extra={'purchase_id': getattr(path_purchase, 'pk', None)},
+            exc_info=True,
+        )
+        return
+
+    buyer = purchase.user
+    path = purchase.knowledge_path
+    owner = getattr(path, 'author', None) if path else None
+    title = path.title if path else 'camino'
+
+    logger.info('Creating path purchase paid notifications', extra={
+        'purchase_id': purchase.id,
+        'buyer_id': getattr(buyer, 'id', None),
+        'path_id': getattr(path, 'id', None),
+        'owner_id': getattr(owner, 'id', None),
+    })
+
+    if not buyer or not path:
+        return
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        path_ct = ContentType.objects.get_for_model(path)
+        actor = owner if (owner and owner.id != buyer.id) else buyer
+        actor_ct = ContentType.objects.get_for_model(actor)
+
+        existing_buyer = Notification.objects.filter(
+            recipient=buyer,
+            target_content_type=path_ct,
+            target_object_id=path.id,
+        ).filter(matching_verb_q('confirmó tu pago de'))
+        if not existing_buyer.exists():
+            create_notification(
+                recipient=buyer,
+                actor_content_type=actor_ct,
+                actor_object_id=actor.id,
+                verb='confirmó tu pago de',
+                target_content_type=path_ct,
+                target_object_id=path.id,
+                description=(
+                    f'Tu pago por el camino "{title}" fue confirmado. Ya tienes acceso.'
+                ),
+            )
+
+        if owner and owner.id != buyer.id:
+            existing_owner = Notification.objects.filter(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                target_content_type=path_ct,
+                target_object_id=path.id,
+            ).filter(matching_verb_q('compró tu camino de conocimiento'))
+            if not existing_owner.exists():
+                create_notification(
+                    recipient=owner,
+                    actor_content_type=buyer_ct,
+                    actor_object_id=buyer.id,
+                    verb='compró tu camino de conocimiento',
+                    target_content_type=path_ct,
+                    target_object_id=path.id,
+                    description=(
+                        f'{buyer.username} compró tu camino de conocimiento "{title}".'
+                    ),
+                )
+    except Exception as e:
+        logger.error(
+            f'Error creating path purchase paid notifications: {str(e)}',
+            extra={'purchase_id': getattr(purchase, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_topic_purchase_paid(topic_purchase):
+    """
+    Notify buyer and topic creator when a Consultas purchase becomes PAID.
+    """
+    try:
+        from content.models import TopicPurchase
+        purchase = TopicPurchase.objects.select_related(
+            'topic__creator', 'user'
+        ).get(pk=topic_purchase.pk)
+    except Exception as e:
+        logger.error(
+            f'Error loading topic purchase for notifications: {str(e)}',
+            extra={'purchase_id': getattr(topic_purchase, 'pk', None)},
+            exc_info=True,
+        )
+        return
+
+    buyer = purchase.user
+    topic = purchase.topic
+    owner = getattr(topic, 'creator', None) if topic else None
+    title = topic.title if topic else 'tema'
+
+    logger.info('Creating topic purchase paid notifications', extra={
+        'purchase_id': purchase.id,
+        'buyer_id': getattr(buyer, 'id', None),
+        'topic_id': getattr(topic, 'id', None),
+        'owner_id': getattr(owner, 'id', None),
+    })
+
+    if not buyer or not topic:
+        return
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        topic_ct = ContentType.objects.get_for_model(topic)
+        actor = owner if (owner and owner.id != buyer.id) else buyer
+        actor_ct = ContentType.objects.get_for_model(actor)
+
+        existing_buyer = Notification.objects.filter(
+            recipient=buyer,
+            target_content_type=topic_ct,
+            target_object_id=topic.id,
+        ).filter(matching_verb_q('confirmó tu pago de'))
+        if not existing_buyer.exists():
+            create_notification(
+                recipient=buyer,
+                actor_content_type=actor_ct,
+                actor_object_id=actor.id,
+                verb='confirmó tu pago de',
+                target_content_type=topic_ct,
+                target_object_id=topic.id,
+                description=(
+                    f'Tu pago por las consultas del tema "{title}" fue confirmado. '
+                    f'Ya tienes acceso.'
+                ),
+            )
+
+        if owner and owner.id != buyer.id:
+            existing_owner = Notification.objects.filter(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                target_content_type=topic_ct,
+                target_object_id=topic.id,
+            ).filter(matching_verb_q('compró acceso a las consultas de'))
+            if not existing_owner.exists():
+                create_notification(
+                    recipient=owner,
+                    actor_content_type=buyer_ct,
+                    actor_object_id=buyer.id,
+                    verb='compró acceso a las consultas de',
+                    target_content_type=topic_ct,
+                    target_object_id=topic.id,
+                    description=(
+                        f'{buyer.username} compró acceso a las consultas de "{title}".'
+                    ),
+                )
+    except Exception as e:
+        logger.error(
+            f'Error creating topic purchase paid notifications: {str(e)}',
+            extra={'purchase_id': getattr(purchase, 'id', None)},
+            exc_info=True,
+        )
+
+
 def notify_certificate_sent(registration):
     """
     Create a notification when a teacher sends a certificate for an event.
@@ -2339,6 +2510,173 @@ def _send_topic_creation_request_email_to_admins(creation_request):
         logger.error(
             f'Unexpected error sending topic creation request admin email: {str(e)}',
             extra={'request_id': getattr(creation_request, 'id', None)},
+            exc_info=True,
+        )
+
+
+def notify_bch_txid_reported(payment, *, note: str = ''):
+    """
+    When a buyer reports a BCH TXID after failed auto-verify:
+    - in-app notification for all staff (dashboard inbox)
+    - in-app notification for the product owner (path author / topic creator)
+    - email to platform admins
+    """
+    from django.contrib.auth.models import User
+    from payments.bch_services import get_bch_payment_product_meta
+
+    buyer = payment.buyer
+    if buyer is None:
+        logger.warning(
+            'Skipping BCH TXID report notifications — no buyer',
+            extra={'payment_id': getattr(payment, 'id', None)},
+        )
+        return
+
+    meta = get_bch_payment_product_meta(payment)
+    product_title = meta.get('product_title') or 'producto'
+    product_type = meta.get('product_type') or 'product'
+    owner = meta.get('owner')
+    product = meta.get('product')
+    payload = payment.provider_payload or {}
+    reported_txid = payload.get('reported_txid') or payment.payment_txid or ''
+    note_text = (note or payload.get('reported_note') or '').strip()
+
+    logger.info(
+        'Creating BCH TXID report notifications',
+        extra={
+            'payment_id': payment.id,
+            'buyer_id': buyer.id,
+            'product_type': product_type,
+            'owner_id': getattr(owner, 'id', None),
+        },
+    )
+
+    try:
+        buyer_ct = ContentType.objects.get_for_model(buyer)
+        payment_ct = ContentType.objects.get_for_model(payment)
+        staff_users = User.objects.filter(is_staff=True, is_active=True)
+        staff_description = (
+            f'{buyer.username} reportó el TXID de la orden BCH #{payment.id} '
+            f'por "{product_title}". Revisa Pagos Bitcoin Cash en el dashboard.'
+        )
+
+        for staff_user in staff_users:
+            if staff_user.id == buyer.id:
+                continue
+            create_notification(
+                recipient=staff_user,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                verb='reportó un pago BCH',
+                action_object_content_type=payment_ct,
+                action_object_object_id=payment.id,
+                target_content_type=payment_ct,
+                target_object_id=payment.id,
+                description=staff_description,
+            )
+    except Exception as e:
+        logger.error(
+            f'Error creating staff BCH TXID report notifications: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
+            exc_info=True,
+        )
+
+    if owner is not None and owner.id != buyer.id:
+        try:
+            buyer_ct = ContentType.objects.get_for_model(buyer)
+            payment_ct = ContentType.objects.get_for_model(payment)
+            target_ct = ContentType.objects.get_for_model(product) if product is not None else payment_ct
+            target_id = product.id if product is not None else payment.id
+            type_label = {
+                'path': 'camino',
+                'topic': 'tema',
+            }.get(product_type, 'producto')
+            owner_description = (
+                f'{buyer.username} reportó el pago BCH de su compra del {type_label} '
+                f'"{product_title}" (orden #{payment.id}). El staff lo confirmará en el dashboard.'
+            )
+            create_notification(
+                recipient=owner,
+                actor_content_type=buyer_ct,
+                actor_object_id=buyer.id,
+                verb='reportó un pago BCH de',
+                action_object_content_type=payment_ct,
+                action_object_object_id=payment.id,
+                target_content_type=target_ct,
+                target_object_id=target_id,
+                description=owner_description,
+            )
+        except Exception as e:
+            logger.error(
+                f'Error creating owner BCH TXID report notification: {str(e)}',
+                extra={'payment_id': getattr(payment, 'id', None)},
+                exc_info=True,
+            )
+
+    _send_bch_txid_reported_email_to_admins(
+        payment,
+        buyer=buyer,
+        product_title=product_title,
+        product_type=product_type,
+        reported_txid=reported_txid,
+        note=note_text,
+    )
+
+
+def _send_bch_txid_reported_email_to_admins(
+    payment,
+    *,
+    buyer,
+    product_title: str,
+    product_type: str,
+    reported_txid: str,
+    note: str = '',
+):
+    """Email all administrators about a buyer-reported BCH TXID."""
+    from profiles.email_service import EmailService, EmailServiceError
+
+    brand = EmailService.get_brand_context()
+    dashboard_url = f"{brand['frontend_url']}/dashboard/pagos-bch"
+    type_label = {
+        'path': 'Camino de conocimiento',
+        'topic': 'Consultas de tema',
+        'anchor': 'Anclaje de transcript',
+    }.get(product_type, 'Producto')
+
+    try:
+        EmailService.send_to_admins(
+            subject=f'TXID BCH reportado — orden #{payment.id}: {product_title}',
+            template_name='bch_txid_reported',
+            context={
+                'buyer_username': buyer.username,
+                'buyer_email': buyer.email or '',
+                'order_id': payment.id,
+                'product_type_label': type_label,
+                'product_title': product_title,
+                'usd_amount': str(payment.usd_amount),
+                'expected_amount_bch': f'{payment.expected_amount_bch:.8f}',
+                'address': payment.address,
+                'reported_txid': reported_txid,
+                'note': note or 'Sin nota.',
+                'order_status': payment.status,
+                'dashboard_url': dashboard_url,
+            },
+            tags=['bch-txid-reported', 'admin', 'payment', 'notification'],
+        )
+        logger.info(
+            'BCH TXID report email dispatched to administrators',
+            extra={'payment_id': payment.id},
+        )
+    except EmailServiceError as e:
+        logger.error(
+            f'Error sending BCH TXID report admin email: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
+            exc_info=True,
+        )
+    except Exception as e:
+        logger.error(
+            f'Unexpected error sending BCH TXID report admin email: {str(e)}',
+            extra={'payment_id': getattr(payment, 'id', None)},
             exc_info=True,
         )
 

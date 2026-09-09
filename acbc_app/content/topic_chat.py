@@ -30,8 +30,10 @@ SYSTEM_PROMPT = (
     '- Para cada afirmación, incluye una cita breve entre comillas tomada '
     'literalmente del fragmento [n], o di explícitamente que ese detalle no está '
     'en el contexto.\n'
-    '- Responde en español, de forma clara y concisa. Sin tono de tutor ni '
-    'relleno educativo fuera de los fragmentos.\n'
+    '- Responde en el mismo idioma de la pregunta del usuario (si pregunta en '
+    'inglés, responde en inglés; si pregunta en español, responde en español), '
+    'de forma clara y concisa. Sin tono de tutor ni relleno educativo fuera de '
+    'los fragmentos.\n'
     '- No inventes citas, títulos ni hechos fuera del contexto.'
 )
 

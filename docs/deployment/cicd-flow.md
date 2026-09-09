@@ -37,7 +37,7 @@ Docs-only changes (for example `*.md` outside those paths) skip tests and image 
 
 ### Backend tests
 
-- Python **3.12**, PostgreSQL 15 service.
+- Python **3.12**, PostgreSQL 15 service (GitHub healthcheck `pg_isready` inside the container; job steps do not `apt-get install postgresql-client`).
 - Runs only when backend-related paths (or CI workflow) changed.
 - Timeout: 30 minutes.
 

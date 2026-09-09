@@ -4,12 +4,18 @@ Además de [NOWPayments](nowpayments-setup.md), Academia Blockchain puede cobrar
 precio fijo de una `TranscriptAnchorRequest` (`price_amount`, default
 `ANCHOR_REQUEST_PRICE_USD`) en **Bitcoin Cash** hacia una wallet propia.
 
-Cubre tres productos cuando el staff los activa en el dashboard
-(`/dashboard/pagos-bch`):
+Cubre tres productos cuando tienen precio y la venta está activa
+(`/dashboard/pagos-bch` → **En venta**):
 
 - Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
-- Caminos de conocimiento con `reference_price > 0` y `bch_direct_enabled`
-- Consultas de un tema con `reference_price > 0` y `bch_direct_enabled`
+- Caminos de conocimiento con `reference_price > 0` y `sales_enabled`
+- Consultas de un tema con `reference_price > 0` y `sales_enabled`
+- Paquetes de tokens de plataforma (siempre, si hay dirección BCH)
+
+Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
+configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por
+mensaje. El toggle del dashboard ya no activa BCH por producto: activa o pausa
+la venta del contenido.
 
 Eventos siguen en NOWPayments. Un camino de pago también puede seguir cobrando
 por NOWPayments. El usuario puede cambiar de método mientras el invoice
@@ -22,7 +28,7 @@ NOWPayments sigue en `waiting` (aún no hay fondos en camino).
 | Entorno | Default `BCH_NETWORK` | Verificación | Prefijo CashAddr |
 |---------|----------------------|--------------|------------------|
 | `ENVIRONMENT` ≠ `PRODUCTION` (Docker local) | `chipnet` | Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002`) | `bchtest:` |
-| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Blockchair `https://api.blockchair.com/bitcoin-cash` | `bitcoincash:` |
+| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum `ssl://bch.imaginary.cash:50002` | `bitcoincash:` |
 
 Override explícito: `BCH_NETWORK=chipnet` o `mainnet`. Chipnet es la red de pruebas
 permanente de BCH (análogo práctico a signet para este flujo).
@@ -36,7 +42,7 @@ Faucet / explorer chipnet: [chipnet.chaingraph.cash](https://chipnet.chaingraph.
 | Entitlement | Solo `TranscriptAnchorRequest` (no eventos ni caminos) |
 | Tras pagar | `paid_pending_review` vía `mark_anchor_request_paid()` (compartido con NOWPayments) |
 | Admin | Aprueba/rechaza anclaje BTC como hoy (sin reembolso automático) |
-| HTTP / SSL | Blockchair (mainnet) o Electrum SSL (chipnet); sin workers/IPN BCH |
+| HTTP / SSL | Fulcrum/Electrum SSL (mainnet + chipnet); Blockchair HTTP opcional con API key |
 | Workers / IPN BCH | No — el usuario pulsa **Ya realicé el pago** |
 
 ## Flujo
@@ -46,7 +52,7 @@ sequenceDiagram
     participant User
     participant UI as AnchorPaymentCheckout
     participant API as Django API
-    participant Chain as Blockchair / Fulcrum
+    participant Chain as Fulcrum / Blockchair
     participant Admin
 
     User->>API: POST .../transcript/anchor-requests/
@@ -66,33 +72,63 @@ sequenceDiagram
 1. Usuario crea solicitud de anclaje (`pending_payment`).
 2. Elige método: NOWPayments o BCH directo. Puede volver atrás y cambiar
    mientras el invoice NOWPayments esté en `waiting`.
-3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats, desambiguación +1 sat).
-4. Usuario paga el monto **exacto** a la dirección de la red activa.
-5. `POST .../bch/verify/` consulta Blockchair o Fulcrum; si hay match → orden `paid` + solicitud `paid_pending_review`.
+3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats;
+   desambiguación por ventana de tolerancia USD para no solapar órdenes concurrentes).
+4. Usuario paga el monto mostrado a la dirección de la red activa (se tolera hasta
+   `BCH_AMOUNT_TOLERANCE_USD`, default $0.20, por redondeo/fee de wallet).
+5. `POST .../bch/verify/` consulta Fulcrum (o Blockchair si se fuerza); si hay match → orden `paid` + solicitud `paid_pending_review`.
+   Si el indexer falla, el error se registra en logs y el UI ofrece **Avisar por mensaje**.
 6. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
 
 ## Cómo se calcula el monto
 
-1. Tasa USD/BCH: `BCH_USD_PRICE` si es `> 0`; si no, Blockchair mainnet `GET /stats` → `market_price_usd` (también en chipnet, porque chipnet no tiene mercado).
+1. Tasa USD/BCH: `BCH_USD_PRICE` si es `> 0`; si no, Blockchair mainnet `GET /stats` → `market_price_usd`, con fallback CoinGecko.
 2. `bch_amount = ceil(usd / rate, 8 decimales)`.
 3. `base_sats = bch_amount * 100_000_000`, luego `max(1000, base_sats)`.
-4. Si otra orden `pending` no expirada ya usa esos sats, se suma **1 sat** (hasta 10 000 intentos).
+4. Si otra orden `pending` no expirada cae dentro de la ventana de tolerancia de este monto,
+   se desplaza el monto por `2 × tol_sats + 1` (hasta 10 000 intentos).
 
-El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe enviar **exactamente** esos sats; un sat de más o de menos no cuenta.
+`tol_sats = ceil(BCH_AMOUNT_TOLERANCE_USD / usd_bch_rate × 1e8)` usando la tasa **congelada** de la orden.
+
+El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe
+enviar ese monto; se aceptan desviaciones de hasta ~$0.20 al rate de la orden.
+En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar desajustes por fee/redondeo de wallets.
 
 ## Cómo se verifica (match on-chain)
 
-Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta la primera que cumpla todo:
+Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta
+el candidato **más cercano** a `expected_amount_sats` que cumpla:
 
 | Regla | Detalle |
 |-------|---------|
-| Monto exacto | `output.amount_sats == expected_amount_sats` |
+| Monto | `\|output.amount_sats − expected_amount_sats\| ≤ tol_sats` (`tol_sats` desde `usd_bch_rate` + `BCH_AMOUNT_TOLERANCE_USD`) |
 | Dirección | CashAddr completa o payload tras `bitcoincash:` / `bchtest:` (case-insensitive) |
 | Confirmaciones | `>= BCH_MIN_CONFIRMATIONS` (default `0` = mempool OK) |
-| Reloj | `tx.timestamp >= created_at − 60s` (si el indexer no manda timestamp, no se filtra) |
+| Reloj | `tx.timestamp >= created_at − grace` (default grace = `max(3600, TTL×60)` s; override `BCH_VERIFY_TIMESTAMP_GRACE_SECONDS`). Si el indexer no manda timestamp, no se filtra. |
 | Txid único | `payment_txid` no puede repetirse en otra fila |
+| Otras órdenes | Si otro `pending` está más cerca del monto pagado (y dentro de su tolerancia), no se reclama |
 
-Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
+Si no hay match: `400` *No encontramos un pago BCH con un monto cercano al de la orden aún.*
+El WARNING de borde HTTP incluye `expected_sats`, `amounts_seen`, `tol_sats`, skips, etc.
+
+## Probe / debugging sin nuevo pago
+
+```bash
+cd acbc_app && . .venv/bin/activate
+export ENVIRONMENT=DEVELOPMENT BCH_NETWORK=mainnet \
+  BCH_RECEIVE_ADDRESS_MAINNET=bitcoincash:qpnq74gum4tstjat4803zav9lr37v5wqaqyqrh9wjd
+
+# Look up a known buyer TXID against the receive address
+python manage.py probe_bch_chain \
+  --txid 4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a \
+  --expected-sats 1945676
+
+# Or list recent history only
+python manage.py probe_bch_chain --limit 10
+```
+
+This talks to the same Electrum/Blockchair client as `verify_bch_payment` and does
+**not** create or fulfill orders.
 
 ## Reuso, expiración y exclusión mutua
 
@@ -108,6 +144,31 @@ Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
 
 Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 
+## Manual confirmation (staff dashboard)
+
+If auto-verify fails or the order expires after the buyer already paid, they
+report the **TXID** from checkout (support modal). That:
+
+1. Stores the TXID on the order for the staff inbox
+2. Sends **admins** an email + in-app notification (link → Pagos BCH)
+3. Notifies the **product owner** (path author / topic creator) in-app
+4. Still opens a message thread with support (user id 2)
+
+Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
+
+1. Open **Confirmar pagos reportados** (pending / expired / cancelled; reported first).
+2. TXID is prefilled when the buyer already reported it — confirm after checking the explorer.
+3. The API marks the `BchDirectPayment` as `paid` and unlocks the entitlement
+   (`path` / `topic` / `anchor`) — no Django admin required.
+4. For path/topic purchases, the **buyer** and **content owner** get in-app
+   notifications when payment is confirmed (same on auto-verify).
+
+| Método | Ruta | Auth |
+|--------|------|------|
+| POST | `/api/payments/bch-orders/<id>/report-txid/` | Buyer (`{ "txid": "…", "note": "…" }`) |
+| GET | `/api/payments/admin/bch-orders/` | Staff |
+| POST | `/api/payments/admin/bch-orders/<id>/confirm/` | Staff (`{ "txid": "…" }`) |
+
 ## Variables de entorno
 
 ```env
@@ -118,13 +179,19 @@ Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 # Or a single fallback for the active network:
 # BCH_RECEIVE_ADDRESS=bchtest:q...
 
-# Optional overrides (defaults follow BCH_NETWORK):
+# Optional overrides (defaults: Fulcrum Electrum for mainnet + chipnet):
+# BCH_API_BASE=ssl://bch.imaginary.cash:50002
 # BCH_API_BASE=ssl://chipnet.bch.ninja:50002
 # BCH_API_BASE=https://api.blockchair.com/bitcoin-cash
+# BCH_BLOCKCHAIR_API_KEY=
 
 BCH_PAYMENT_TTL_MINUTES=30
 BCH_MIN_CONFIRMATIONS=0
-# 0 = fetch USD/BCH from Blockchair mainnet /stats (also used to size chipnet orders)
+# Optional; default max(3600, TTL*60). Widen if buyers pay then recreate orders.
+# BCH_VERIFY_TIMESTAMP_GRACE_SECONDS=3600
+# Max |paid − expected| in USD at the order's frozen rate (default $0.20).
+BCH_AMOUNT_TOLERANCE_USD=0.20
+# 0 = fetch USD/BCH from Blockchair, then CoinGecko
 BCH_USD_PRICE=0
 ANCHOR_REQUEST_PRICE_USD=1
 ```
@@ -145,8 +212,8 @@ verificar**, no crear la orden.
 |--------|------|------|-----------|
 | GET | `/api/payments/status/` | Público | `bch_direct_enabled`, `bch_network`, `methods.bch_direct` |
 | GET | `/api/payments/admin/bch-catalog/` | Staff | Caminos y temas + flags BCH |
-| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ bch_direct_enabled }` |
-| PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ bch_direct_enabled, reference_price }` |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled, reference_price }` |
+| PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
 | POST | `/api/payments/anchor-request/<id>/bch/verify/` | Requester o staff | `{ payment, request }` |
@@ -192,7 +259,8 @@ verificar**, no crear la orden.
 ## Código
 
 - Modelo: `payments.BchDirectPayment`
-- Cliente: `payments/bch_client.py` (`build_bch_client()` → Blockchair HTTP o Electrum SSL)
+- Cliente: `payments/bch_client.py` (`build_bch_client()` → Electrum SSL por defecto; Blockchair HTTP si se fuerza)
+elección chipnet/mainnet (Electrum) vs Blockchair explícito.
 - CashAddr → scripthash: `payments/bch_cashaddr.py`
 - Servicios: `payments/bch_services.py`
 - Admin: `payments/admin.py` → **Payments → Bch direct payments**
@@ -208,4 +276,4 @@ cd acbc_app && . .venv/bin/activate && ENVIRONMENT=DEVELOPMENT \
 
 Los tests mockean el cliente de cadena. No hace falta Blockchair, Fulcrum ni una
 wallet real. Cubren monto único, reuso, match exacto, rechazo por sat de más, y
-elección chipnet (Electrum) vs mainnet (Blockchair).
+elección Electrum (default) vs Blockchair explícito.

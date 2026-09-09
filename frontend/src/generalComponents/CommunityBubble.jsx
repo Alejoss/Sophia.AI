@@ -10,7 +10,6 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
-import { useThemeMode } from '../context/ThemeContext.jsx';
 
 /** Resto del mensaje tras la frase con enlace al inicio. */
 const BUBBLE_REST = `Puedes sugerir contenido.
@@ -28,7 +27,6 @@ const CommunityBubble = () => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const theme = useTheme();
-  const { mode } = useThemeMode();
   const visible = isBubbleRoute(pathname);
 
   const toggle = useCallback(() => {
@@ -161,27 +159,12 @@ const CommunityBubble = () => {
           },
         }}
       >
-        {mode === 'light' ? (
-          <Box
-            component="img"
-            src="/images/logo.png"
-            alt="Logo Academia Blockchain"
-            sx={{ height: 32, width: 'auto', display: 'block' }}
-          />
-        ) : (
-          <Typography
-            component="span"
-            sx={{
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              letterSpacing: '-0.02em',
-              color: 'primary.main',
-              fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
-            }}
-          >
-            AB
-          </Typography>
-        )}
+        <Box
+          component="img"
+          src="/images/logo.png"
+          alt="Logo Academia Blockchain"
+          sx={{ height: 32, width: 'auto', display: 'block' }}
+        />
       </Box>
     </Box>
   );

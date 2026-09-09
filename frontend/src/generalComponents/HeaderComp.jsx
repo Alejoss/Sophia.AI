@@ -208,18 +208,16 @@ const HeaderComp = () => {
             position: 'relative',
           }}
         >
-          {mode === 'light' && (
-            <Box
-              component="img"
-              src="/images/logo.png"
-              alt="Logo"
-              sx={{
-                height: { xs: '24px', lg: '28px' },
-                width: 'auto',
-                display: 'block',
-              }}
-            />
-          )}
+          <Box
+            component="img"
+            src="/images/logo.png"
+            alt="Logo Academia Blockchain"
+            sx={{
+              height: { xs: '24px', lg: '28px' },
+              width: 'auto',
+              display: 'block',
+            }}
+          />
           <Typography
             variant="h6"
             component="span"

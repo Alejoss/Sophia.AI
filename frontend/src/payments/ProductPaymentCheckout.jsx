@@ -19,6 +19,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from './MoneroPaymentModal';
+import BchPaymentSupportModal from './BchPaymentSupportModal';
+import BchAddressQr from './BchAddressQr';
+import BchOrderExpiryNotice from './BchOrderExpiryNotice';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -54,6 +57,7 @@ const ProductPaymentCheckout = ({
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState(null);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [paid, setPaid] = useState(false);
 
@@ -62,6 +66,7 @@ const ProductPaymentCheckout = ({
       setMethod(null);
       setBchOrder(null);
       setBchError(null);
+      setSupportOpen(false);
       setPaid(false);
       setCopied('');
       return undefined;
@@ -100,13 +105,14 @@ const ProductPaymentCheckout = ({
   const startBch = async () => {
     if (!createBchPayment) return;
     setMethod('bch');
+    setSupportOpen(false);
     setBchBusy(true);
     setBchError(null);
     try {
       const order = await createBchPayment();
       setBchOrder(order);
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo crear la orden BCH'));
+      setBchError(formatApiError(err, 'No se pudo crear la orden BCH. Inténtalo de nuevo.'));
     } finally {
       setBchBusy(false);
     }
@@ -119,12 +125,16 @@ const ProductPaymentCheckout = ({
     try {
       const data = await verifyBchPayment();
       setBchOrder(data.payment);
-      if (data.purchase?.is_paid || data.purchase?.payment_status === 'PAID' || data.payment?.status === 'paid') {
+      if (
+        data.purchase?.is_paid
+        || data.purchase?.payment_status === 'PAID'
+        || data.payment?.status === 'paid'
+      ) {
         setPaid(true);
         onPaid?.(data);
       }
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo verificar el pago'));
+      setBchError(formatApiError(err, 'No se pudo verificar el pago. Inténtalo de nuevo.'));
     } finally {
       setBchBusy(false);
     }
@@ -142,8 +152,9 @@ const ProductPaymentCheckout = ({
 
   const showChooser = open && method === null && !paid;
   const showNowpayments = open && method === 'nowpayments';
-  const showBch = open && method === 'bch';
+  const showBch = open && method === 'bch' && !supportOpen;
   const showMonero = open && method === 'monero';
+  const showSupport = open && method === 'bch' && supportOpen;
 
   return (
     <>
@@ -238,6 +249,17 @@ const ProductPaymentCheckout = ({
         {...nowpaymentsProps}
       />
 
+      <BchPaymentSupportModal
+        open={showSupport}
+        onClose={() => setSupportOpen(false)}
+        onBackToOrder={() => setSupportOpen(false)}
+        title={title}
+        priceUsd={priceUsd}
+        productLabel={productLabel}
+        bchOrder={bchOrder}
+        verifyError={bchError}
+      />
+
       <Dialog open={showBch} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
           Pago con Bitcoin Cash
@@ -256,6 +278,25 @@ const ProductPaymentCheckout = ({
           {bchError && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {bchError}
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Si ya enviaste el pago, no te preocupes, primero vuelve a intentar
+                clickeando en el botón &quot;Ya realicé el pago&quot; dentro de 5
+                minutos, a veces la blockchain se demora en actualizarse. Si aún así
+                no encontramos automáticamente tu transacción, envíanos el ID de la
+                transacción y la revisaremos manualmente para desbloquear tu acceso.
+              </Typography>
+              {!paid && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="inherit"
+                    onClick={() => setSupportOpen(true)}
+                  >
+                    Enviar TXID a soporte
+                  </Button>
+                </Box>
+              )}
             </Alert>
           )}
           {paid && (
@@ -274,7 +315,8 @@ const ProductPaymentCheckout = ({
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía <strong>exactamente</strong> este monto a la dirección.
+                Envía este monto a la dirección (usa el valor en sats si tu
+                wallet redondea; toleramos hasta ~$0.20 de diferencia).
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
@@ -291,33 +333,38 @@ const ProductPaymentCheckout = ({
                 <Typography variant="caption" color="text.secondary">
                   Dirección
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <Typography
-                    variant="body2"
-                    sx={{ wordBreak: 'break-all', fontFamily: 'monospace', flex: 1 }}
-                  >
-                    {bchOrder.address}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    aria-label="Copiar dirección"
-                    onClick={() => copyText(bchOrder.address, 'addr')}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  alignItems={{ xs: 'center', sm: 'flex-start' }}
+                  sx={{ mt: 0.5 }}
+                >
+                  <BchAddressQr address={bchOrder.address} />
+                  <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <Typography
+                        variant="body2"
+                        sx={{ wordBreak: 'break-all', fontFamily: 'monospace', flex: 1 }}
+                      >
+                        {bchOrder.address}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        aria-label="Copiar dirección"
+                        onClick={() => copyText(bchOrder.address, 'addr')}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                    {copied === 'addr' && (
+                      <Typography variant="caption" color="success.main">
+                        Copiado
+                      </Typography>
+                    )}
+                  </Box>
                 </Stack>
-                {copied === 'addr' && (
-                  <Typography variant="caption" color="success.main">
-                    Copiado
-                  </Typography>
-                )}
               </Box>
-              {bchOrder.seconds_remaining != null && bchOrder.status === 'pending' && (
-                <Typography variant="caption" color="text.secondary">
-                  Tiempo restante: {Math.floor(bchOrder.seconds_remaining / 60)}m{' '}
-                  {bchOrder.seconds_remaining % 60}s
-                </Typography>
-              )}
+              <BchOrderExpiryNotice bchOrder={bchOrder} />
               <Divider />
             </Stack>
           )}
@@ -332,6 +379,16 @@ const ProductPaymentCheckout = ({
               startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
             >
               Ya realicé el pago
+            </Button>
+          )}
+          {!paid && Boolean(bchOrder || bchError) && (
+            <Button
+              variant="outlined"
+              fullWidth
+              disabled={bchBusy}
+              onClick={() => setSupportOpen(true)}
+            >
+              Ya pagué — enviar TXID a soporte
             </Button>
           )}
           {(paid || bchOrder?.status === 'expired') && (
@@ -354,6 +411,7 @@ const ProductPaymentCheckout = ({
                 setMethod(null);
                 setBchOrder(null);
                 setBchError(null);
+                setSupportOpen(false);
               }}
             >
               Volver a métodos de pago

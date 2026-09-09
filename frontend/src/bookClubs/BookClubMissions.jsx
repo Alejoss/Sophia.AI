@@ -92,7 +92,7 @@ const BookClubMissions = () => {
               {next.club_schedule_locked
                 ? next.opens_at
                   ? `Esta misión se abrirá para todo el club el ${new Date(next.opens_at).toLocaleString('es-ES')}.`
-                  : 'Esta misión sigue bloqueada hasta que el staff defina su fecha.'
+                  : 'Esta misión todavía no está disponible según el calendario del club.'
                 : 'Esta misión está bloqueada hasta completar la anterior.'}
             </Typography>
           ) : (

@@ -16,23 +16,79 @@ from payments.bch_client import get_bch_network, is_bch_direct_configured
 from payments.bch_services import (
     BchPaymentError,
     create_or_reuse_bch_payment,
+    list_staff_bch_orders,
+    manual_confirm_bch_payment,
+    report_bch_payment_txid,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment
+from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
-from payments.serializers import BchDirectPaymentSerializer, CryptoPaymentSerializer
+from payments.serializers import (
+    AdminBchOrderSerializer,
+    BchDirectPaymentSerializer,
+    CryptoPaymentSerializer,
+    TokenPackageSerializer,
+    TokenPurchaseSerializer,
+)
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
     create_anchor_request_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
+    create_token_purchase,
+    create_token_purchase_payment,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
 from content.serializers import TranscriptAnchorRequestSerializer
 
 logger = logging.getLogger(__name__)
+
+
+def _ctx_bits(**ctx):
+    return ' '.join(f'{key}={value}' for key, value in ctx.items() if value is not None)
+
+
+def _bch_error_response(exc, *, action, **ctx):
+    """
+    Log BCH business/infra failures at the HTTP boundary.
+
+    Infrastructure errors are also logged in bch_services; this adds the
+    endpoint + entitlement ids that operators grep for in access logs.
+    Extra ``exc.details`` (e.g. verify mismatch diagnostics) are appended so a
+    single WARNING line is enough when a buyer reports a failed verify.
+    """
+    details = getattr(exc, 'details', None) or {}
+    extra = {**ctx, **details}
+    logger.warning('BCH %s failed %s: %s', action, _ctx_bits(**extra), exc)
+    return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _permission_error_response(exc, *, action, **ctx):
+    logger.info('Payment %s forbidden %s: %s', action, _ctx_bits(**ctx), exc)
+    return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+
+def _validation_error_response(exc, *, action, **ctx):
+    logger.info('Payment %s rejected %s: %s', action, _ctx_bits(**ctx), exc)
+    return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _nowpayments_error_response(exc, *, action, **ctx):
+    logger.warning('NOWPayments %s failed %s: %s', action, _ctx_bits(**ctx), exc)
+    return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+def _unexpected_payment_error_response(exc, *, action, public_message, **ctx):
+    logger.error(
+        'Unexpected error during payment %s %s: %s',
+        action,
+        _ctx_bits(**ctx),
+        exc,
+        exc_info=True,
+    )
+    return Response({'error': public_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _find_crypto_payment_for_ipn(body: dict):
@@ -44,6 +100,7 @@ def _find_crypto_payment_for_ipn(body: dict):
                 'event_registration',
                 'path_purchase',
                 'anchor_request',
+                'token_purchase',
             ).get(order_id=order_id)
         except CryptoPayment.DoesNotExist:
             pass
@@ -81,6 +138,8 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
         return user.id in (purchase.user_id, purchase.knowledge_path.author_id)
     if payment.anchor_request_id:
         return user.id == payment.anchor_request.requester_id or user.is_staff
+    if payment.token_purchase_id:
+        return user.id == payment.token_purchase.user_id or user.is_staff
     return False
 
 
@@ -131,26 +190,24 @@ class EventRegistrationPaymentView(APIView):
                 user=request.user,
             )
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            return _permission_error_response(
+                exc, action='create_event_payment', registration_id=registration_id, user_id=request.user.id,
+            )
         except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_error_response(
+                exc, action='create_event_payment', registration_id=registration_id, user_id=request.user.id,
+            )
         except NOWPaymentsError as exc:
-            logger.warning(
-                'NOWPayments error for event_registration=%s: %s',
-                registration_id,
-                exc,
+            return _nowpayments_error_response(
+                exc, action='create_event_payment', registration_id=registration_id, user_id=request.user.id,
             )
-            return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
         except Exception as exc:
-            logger.error(
-                'Unexpected error creating payment for event_registration=%s: %s',
-                registration_id,
+            return _unexpected_payment_error_response(
                 exc,
-                exc_info=True,
-            )
-            return Response(
-                {'error': 'No se pudo iniciar el pago. Inténtelo de nuevo.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                action='create_event_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                registration_id=registration_id,
+                user_id=request.user.id,
             )
 
         logger.info(
@@ -184,22 +241,24 @@ class PathPurchasePaymentView(APIView):
                 user=request.user,
             )
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except NOWPaymentsError as exc:
-            logger.warning('NOWPayments error for path_purchase=%s: %s', purchase_id, exc)
-            return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-        except Exception as exc:
-            logger.error(
-                'Unexpected error creating payment for path_purchase=%s: %s',
-                purchase_id,
-                exc,
-                exc_info=True,
+            return _permission_error_response(
+                exc, action='create_path_payment', purchase_id=purchase_id, user_id=request.user.id,
             )
-            return Response(
-                {'error': 'No se pudo iniciar el pago. Inténtelo de nuevo.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_path_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_path_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_path_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
             )
 
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
@@ -221,6 +280,8 @@ class CryptoPaymentDetailView(APIView):
                 'path_purchase__knowledge_path',
                 'anchor_request',
                 'anchor_request__requester',
+                'token_purchase',
+                'token_purchase__user',
             ).get(pk=payment_id)
         except CryptoPayment.DoesNotExist:
             return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
@@ -327,22 +388,24 @@ class AnchorRequestPaymentView(APIView):
                 user=request.user,
             )
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except NOWPaymentsError as exc:
-            logger.warning('NOWPayments error for anchor_request=%s: %s', request_id, exc)
-            return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-        except Exception as exc:
-            logger.error(
-                'Unexpected error creating payment for anchor_request=%s: %s',
-                request_id,
-                exc,
-                exc_info=True,
+            return _permission_error_response(
+                exc, action='create_anchor_payment', request_id=request_id, user_id=request.user.id,
             )
-            return Response(
-                {'error': 'No se pudo iniciar el pago. Inténtelo de nuevo.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_anchor_payment', request_id=request_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_anchor_payment', request_id=request_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_anchor_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                request_id=request_id,
+                user_id=request.user.id,
             )
 
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
@@ -431,19 +494,20 @@ class AnchorRequestBchPaymentView(APIView):
                 user=request.user,
             )
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as exc:
-            logger.error(
-                'Unexpected error creating BCH payment for anchor_request=%s: %s',
-                request_id,
-                exc,
-                exc_info=True,
+            return _permission_error_response(
+                exc, action='create_anchor_bch', request_id=request_id, user_id=request.user.id,
             )
-            return Response(
-                {'error': 'No se pudo crear la orden BCH. Inténtelo de nuevo.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='create_anchor_bch', request_id=request_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_anchor_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                request_id=request_id,
+                user_id=request.user.id,
             )
 
         return Response(
@@ -471,19 +535,20 @@ class AnchorRequestBchVerifyView(APIView):
                 user=request.user,
             )
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as exc:
-            logger.error(
-                'Unexpected error verifying BCH payment for anchor_request=%s: %s',
-                request_id,
-                exc,
-                exc_info=True,
+            return _permission_error_response(
+                exc, action='verify_anchor_bch', request_id=request_id, user_id=request.user.id,
             )
-            return Response(
-                {'error': 'No se pudo verificar el pago BCH. Inténtelo de nuevo.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='verify_anchor_bch', request_id=request_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_anchor_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                request_id=request_id,
+                user_id=request.user.id,
             )
 
         anchor_request.refresh_from_db()
@@ -504,7 +569,8 @@ class NOWPaymentsIPNView(APIView):
         try:
             raw = request.body.decode('utf-8') if request.body else ''
             body = json.loads(raw) if raw else {}
-        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as exc:
+            logger.warning('NOWPayments IPN rejected: invalid JSON (%s)', exc)
             return Response({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
 
         signature = request.headers.get('x-nowpayments-sig', '')
@@ -517,6 +583,7 @@ class NOWPaymentsIPNView(APIView):
         if not client.ipn_secret:
             logger.warning('NOWPayments IPN accepted without signature verification (dev only)')
         elif not signature:
+            logger.warning('NOWPayments IPN rejected: missing signature for order %s', body.get('order_id'))
             return Response({'error': 'Missing signature'}, status=status.HTTP_403_FORBIDDEN)
         elif not client.verify_ipn_signature(body, signature):
             logger.warning('NOWPayments IPN signature mismatch for order %s', body.get('order_id'))
@@ -554,7 +621,7 @@ def _latest_bch_for(**filters):
 
 
 class AdminBchCatalogView(APIView):
-    """Staff dashboard: knowledge paths and topics that can accept BCH."""
+    """Staff dashboard: knowledge paths and topics that can be sold."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -574,10 +641,9 @@ class AdminBchCatalogView(APIView):
                     'is_visible': path.is_visible,
                     'reference_price': path.reference_price or 0,
                     'is_paid_path': path.is_paid_path,
-                    'bch_direct_enabled': path.bch_direct_enabled,
-                    'bch_direct_available': bool(
-                        configured and path.bch_direct_enabled and path.is_paid_path
-                    ),
+                    'sales_enabled': path.sales_enabled,
+                    'is_for_sale': path.is_for_sale,
+                    'bch_direct_available': bool(configured and path.is_for_sale),
                 }
                 for path in paths
             ],
@@ -590,10 +656,9 @@ class AdminBchCatalogView(APIView):
                     'chat_enabled': topic.chat_enabled,
                     'reference_price': topic.reference_price or 0,
                     'is_paid_topic': topic.is_paid_topic,
-                    'bch_direct_enabled': topic.bch_direct_enabled,
-                    'bch_direct_available': bool(
-                        configured and topic.bch_direct_enabled and topic.is_paid_topic
-                    ),
+                    'sales_enabled': topic.sales_enabled,
+                    'is_for_sale': topic.is_for_sale,
+                    'bch_direct_available': bool(configured and topic.is_for_sale),
                 }
                 for topic in topics
             ],
@@ -601,7 +666,7 @@ class AdminBchCatalogView(APIView):
 
 
 class AdminKnowledgePathBchView(APIView):
-    """Staff: activate/deactivate BCH checkout on a knowledge path."""
+    """Staff: set path price and activate/deactivate selling on a knowledge path."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -609,33 +674,64 @@ class AdminKnowledgePathBchView(APIView):
         path = KnowledgePath.objects.select_related('author').filter(pk=pk).first()
         if path is None:
             return Response({'error': 'Camino no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
-        if 'bch_direct_enabled' not in request.data:
+
+        update_fields = ['updated_at']
+        if 'reference_price' in request.data:
+            try:
+                price = float(request.data.get('reference_price') or 0)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'El precio debe ser un número.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if price < 0:
+                return Response(
+                    {'error': 'El precio no puede ser negativo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            path.reference_price = price
+            update_fields.append('reference_price')
+            if price <= 0:
+                path.sales_enabled = False
+                update_fields.append('sales_enabled')
+
+        if 'sales_enabled' in request.data or 'bch_direct_enabled' in request.data:
+            enabled = bool(
+                request.data['sales_enabled']
+                if 'sales_enabled' in request.data
+                else request.data.get('bch_direct_enabled')
+            )
+            # Re-evaluate paid state after possible price update above.
+            is_paid = bool(path.reference_price and path.reference_price > 0)
+            if enabled and not is_paid:
+                return Response(
+                    {'error': 'Define un precio mayor a 0 en el camino antes de activar la venta.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            path.sales_enabled = enabled
+            update_fields.append('sales_enabled')
+        elif 'reference_price' not in request.data:
             return Response(
-                {'error': 'Falta bch_direct_enabled.'},
+                {'error': 'Falta sales_enabled o reference_price.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        enabled = bool(request.data.get('bch_direct_enabled'))
-        if enabled and not path.is_paid_path:
-            return Response(
-                {'error': 'Define un precio mayor a 0 en el camino antes de activar BCH.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        path.bch_direct_enabled = enabled
-        path.save(update_fields=['bch_direct_enabled', 'updated_at'])
+
+        path.save(update_fields=list(dict.fromkeys(update_fields)))
         return Response({
             'id': path.id,
             'title': path.title,
             'reference_price': path.reference_price or 0,
             'is_paid_path': path.is_paid_path,
-            'bch_direct_enabled': path.bch_direct_enabled,
+            'sales_enabled': path.sales_enabled,
+            'is_for_sale': path.is_for_sale,
             'bch_direct_available': bool(
-                is_bch_direct_configured() and path.bch_direct_enabled and path.is_paid_path
+                is_bch_direct_configured() and path.is_for_sale
             ),
         })
 
 
 class AdminTopicBchView(APIView):
-    """Staff: set Consultas price and activate BCH on a topic."""
+    """Staff: set Consultas price and activate/deactivate selling on a topic."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -661,18 +757,24 @@ class AdminTopicBchView(APIView):
             topic.reference_price = price
             update_fields.append('reference_price')
             if price <= 0:
-                topic.bch_direct_enabled = False
-                update_fields.append('bch_direct_enabled')
+                topic.sales_enabled = False
+                update_fields.append('sales_enabled')
 
-        if 'bch_direct_enabled' in request.data:
-            enabled = bool(request.data.get('bch_direct_enabled'))
-            if enabled and not topic.is_paid_topic:
+        if 'sales_enabled' in request.data or 'bch_direct_enabled' in request.data:
+            enabled = bool(
+                request.data['sales_enabled']
+                if 'sales_enabled' in request.data
+                else request.data.get('bch_direct_enabled')
+            )
+            # Re-evaluate paid state after possible price update above.
+            is_paid = bool(topic.reference_price and topic.reference_price > 0)
+            if enabled and not is_paid:
                 return Response(
-                    {'error': 'Define un precio mayor a 0 antes de activar BCH.'},
+                    {'error': 'Define un precio mayor a 0 antes de activar la venta.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            topic.bch_direct_enabled = enabled
-            update_fields.append('bch_direct_enabled')
+            topic.sales_enabled = enabled
+            update_fields.append('sales_enabled')
 
         topic.save(update_fields=list(dict.fromkeys(update_fields)))
         return Response({
@@ -680,9 +782,114 @@ class AdminTopicBchView(APIView):
             'title': topic.title,
             'reference_price': topic.reference_price or 0,
             'is_paid_topic': topic.is_paid_topic,
-            'bch_direct_enabled': topic.bch_direct_enabled,
+            'sales_enabled': topic.sales_enabled,
+            'is_for_sale': topic.is_for_sale,
             'bch_direct_available': bool(
-                is_bch_direct_configured() and topic.bch_direct_enabled and topic.is_paid_topic
+                is_bch_direct_configured() and topic.is_for_sale
+            ),
+        })
+
+
+class AdminBchOrdersView(APIView):
+    """Staff inbox of BCH orders that may need manual TXID confirmation."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        raw = (request.query_params.get('status') or '').strip()
+        statuses = [s.strip() for s in raw.split(',') if s.strip()] or None
+        try:
+            limit = int(request.query_params.get('limit') or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        orders = list_staff_bch_orders(statuses=statuses, limit=limit)
+        return Response({
+            'orders': AdminBchOrderSerializer(orders, many=True).data,
+            'bch_network': get_bch_network(),
+            'bch_direct_configured': is_bch_direct_configured(),
+        })
+
+
+class AdminBchOrderConfirmView(APIView):
+    """Staff: unlock entitlement after manually checking a reported TXID."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, pk):
+        txid = request.data.get('txid') or request.data.get('payment_txid')
+        try:
+            payment = manual_confirm_bch_payment(
+                payment_id=pk,
+                txid=txid,
+                staff_user=request.user,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(exc, action='confirm_bch_order', payment_id=pk)
+        except PermissionError as exc:
+            return _permission_error_response(exc, action='confirm_bch_order', payment_id=pk)
+        except Exception as exc:  # noqa: BLE001
+            return _unexpected_payment_error_response(
+                exc,
+                action='confirm_bch_order',
+                public_message='No se pudo confirmar el pago BCH. Inténtalo de nuevo.',
+                payment_id=pk,
+            )
+        return Response({
+            'payment': AdminBchOrderSerializer(payment).data,
+            'detail': 'Pago BCH confirmado. El acceso quedó desbloqueado.',
+        })
+
+
+class BchOrderReportTxidView(APIView):
+    """
+    Buyer: report an on-chain TXID after auto-verify failed.
+
+    Stores the report for the staff dashboard and notifies admins (email +
+    in-app) and the product owner (in-app).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        txid = request.data.get('txid') or request.data.get('payment_txid')
+        note = request.data.get('note') or request.data.get('message') or ''
+        try:
+            payment, should_notify = report_bch_payment_txid(
+                payment_id=pk,
+                txid=txid,
+                user=request.user,
+                note=note,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except PermissionError as exc:
+            return _permission_error_response(exc, action='report_bch_txid', payment_id=pk)
+        except Exception as exc:  # noqa: BLE001
+            return _unexpected_payment_error_response(
+                exc,
+                action='report_bch_txid',
+                public_message='No se pudo registrar el TXID. Inténtalo de nuevo.',
+                payment_id=pk,
+            )
+
+        if should_notify:
+            try:
+                from utils.notification_utils import notify_bch_txid_reported
+                notify_bch_txid_reported(payment, note=note)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    'Failed notifying after BCH TXID report payment_id=%s',
+                    pk,
+                )
+
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'reported_txid': (payment.provider_payload or {}).get('reported_txid'),
+            'notified': should_notify,
+            'detail': (
+                'TXID registrado. Avisamos al staff y al dueño del producto.'
+                if should_notify
+                else 'TXID actualizado (ya lo habías reportado).'
             ),
         })
 
@@ -712,7 +919,7 @@ class PathPurchaseBchPaymentView(APIView):
         payment = _latest_bch_for(path_purchase=purchase)
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data if payment else None,
-            'bch_direct_enabled': is_bch_direct_configured() and path.bch_direct_enabled,
+            'bch_direct_enabled': is_bch_direct_configured() and path.is_for_sale,
             'bch_network': get_bch_network(),
         })
 
@@ -723,9 +930,21 @@ class PathPurchaseBchPaymentView(APIView):
         try:
             payment = create_or_reuse_bch_payment(user=request.user, path_purchase=purchase)
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            return _permission_error_response(
+                exc, action='create_path_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
         except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _bch_error_response(
+                exc, action='create_path_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_path_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
         return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 
@@ -742,9 +961,21 @@ class PathPurchaseBchVerifyView(APIView):
         try:
             payment = verify_bch_payment(user=request.user, path_purchase=purchase)
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            return _permission_error_response(
+                exc, action='verify_path_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
         except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _bch_error_response(
+                exc, action='verify_path_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_path_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
         purchase.refresh_from_db()
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data,
@@ -779,7 +1010,7 @@ class TopicPurchaseBchPaymentView(APIView):
         payment = _latest_bch_for(topic_purchase=purchase)
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data if payment else None,
-            'bch_direct_enabled': is_bch_direct_configured() and topic.bch_direct_enabled,
+            'bch_direct_enabled': is_bch_direct_configured() and topic.is_for_sale,
             'bch_network': get_bch_network(),
         })
 
@@ -790,9 +1021,21 @@ class TopicPurchaseBchPaymentView(APIView):
         try:
             payment = create_or_reuse_bch_payment(user=request.user, topic_purchase=purchase)
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            return _permission_error_response(
+                exc, action='create_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
         except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _bch_error_response(
+                exc, action='create_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_topic_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
         return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 
@@ -807,9 +1050,21 @@ class TopicPurchaseBchVerifyView(APIView):
         try:
             payment = verify_bch_payment(user=request.user, topic_purchase=purchase)
         except PermissionError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            return _permission_error_response(
+                exc, action='verify_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
         except BchPaymentError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _bch_error_response(
+                exc, action='verify_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_topic_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
         purchase.refresh_from_db()
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data,
@@ -817,5 +1072,197 @@ class TopicPurchaseBchVerifyView(APIView):
                 'id': purchase.id,
                 'payment_status': purchase.payment_status,
                 'is_paid': purchase.is_paid,
+            },
+        })
+
+
+def _get_token_purchase(purchase_id):
+    try:
+        return TokenPurchase.objects.select_related('package', 'user').get(pk=purchase_id)
+    except TokenPurchase.DoesNotExist:
+        return None
+
+
+class TokenPackageListView(APIView):
+    """Active platform token packages, cheapest first via sort_order."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        packages = TokenPackage.objects.filter(is_active=True).order_by(
+            'sort_order', 'token_amount', 'id',
+        )
+        return Response(TokenPackageSerializer(packages, many=True).data)
+
+
+class TokenPurchaseListCreateView(APIView):
+    """List own token purchases, or start a new package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        purchases = TokenPurchase.objects.filter(user=request.user).order_by('-created_at')[:50]
+        return Response(TokenPurchaseSerializer(purchases, many=True).data)
+
+    def post(self, request):
+        package_id = request.data.get('package_id') or request.data.get('package')
+        try:
+            package = TokenPackage.objects.get(pk=package_id)
+        except (TokenPackage.DoesNotExist, TypeError, ValueError):
+            return Response({'error': 'Paquete no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            purchase = create_token_purchase(package=package, user=request.user)
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_token_purchase', package_id=package_id, user_id=request.user.id,
+            )
+        return Response(TokenPurchaseSerializer(purchase).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchasePaymentView(APIView):
+    """Create or refresh a NOWPayments invoice for a token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_token_purchase_payment(
+                token_purchase=purchase,
+                pay_currency=pay_currency,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_token_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchasePaymentsListView(APIView):
+    """List NOWPayments invoices for a token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payments = CryptoPayment.objects.filter(token_purchase=purchase).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for token_purchase %s: %s',
+                            payment.id,
+                            purchase_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
+        return Response(CryptoPaymentSerializer(payments, many=True).data)
+
+
+class TokenPurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(token_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, token_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='create_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_token_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(user=request.user, token_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_token_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+                'token_amount': purchase.token_amount,
             },
         })

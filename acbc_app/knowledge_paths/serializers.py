@@ -65,22 +65,24 @@ class NodeSerializer(serializers.ModelSerializer):
 
     def get_club_opens_at(self, obj):
         club = self.context.get('book_club')
-        request = self.context.get('request')
-        if not club or not request or not request.user.is_authenticated:
+        if not club:
             return None
+        request = self.context.get('request')
+        user = request.user if request else None
         from book_clubs.services import is_node_released_for_club
 
-        _, opens_at = is_node_released_for_club(obj, club, request.user)
+        _, opens_at = is_node_released_for_club(obj, club, user)
         return opens_at
 
     def get_club_schedule_locked(self, obj):
         club = self.context.get('book_club')
-        request = self.context.get('request')
-        if not club or not request or not request.user.is_authenticated:
+        if not club:
             return False
+        request = self.context.get('request')
+        user = request.user if request else None
         from book_clubs.services import is_node_released_for_club
 
-        released, _ = is_node_released_for_club(obj, club, request.user)
+        released, _ = is_node_released_for_club(obj, club, user)
         return not released
 
     def get_is_completed(self, obj):
@@ -116,6 +118,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     image_preview = serializers.SerializerMethodField()
     can_be_visible = serializers.SerializerMethodField()
     is_paid_path = serializers.BooleanField(read_only=True)
+    is_for_sale = serializers.BooleanField(read_only=True)
     bch_direct_available = serializers.SerializerMethodField()
     user_has_access = serializers.SerializerMethodField()
     user_purchase_status = serializers.SerializerMethodField()
@@ -128,13 +131,13 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'updated_at', 'nodes', 'progress', 'vote_count', 'user_vote', 'image',
             'image_preview', 'image_focal_x', 'image_focal_y', 'is_visible', 'can_be_visible',
             'certificates_enabled', 'reference_price', 'is_paid_path',
-            'bch_direct_enabled', 'bch_direct_available',
+            'sales_enabled', 'is_for_sale', 'bch_direct_available',
             'user_has_access', 'user_purchase_status', 'user_purchase_id',
         ]
 
     def get_bch_direct_available(self, obj):
         from payments.bch_client import is_bch_direct_configured
-        return bool(is_bch_direct_configured() and obj.bch_direct_enabled and obj.is_paid_path)
+        return bool(is_bch_direct_configured() and obj.is_for_sale)
 
     def get_user_has_access(self, obj):
         request = self.context.get('request')

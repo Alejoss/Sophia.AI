@@ -25,10 +25,12 @@ import {
   createAnchorRequestPayment,
   createPathPurchasePayment,
   createRegistrationPayment,
+  createTokenPurchasePayment,
   getPaymentStatus,
   listAnchorRequestPayments,
   listPathPurchasePayments,
   listRegistrationPayments,
+  listTokenPurchasePayments,
 } from '../api/paymentsApi';
 
 const STATUS_LABELS = {
@@ -74,6 +76,7 @@ const MSG = {
   paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
   paidAnchor:
     '\u00A1Pago completado! Tu solicitud de anclaje a Bitcoin est\u00E1 en revisi\u00F3n.',
+  paidTokens: '\u00A1Pago completado! Los tokens ya est\u00E1n en tu perfil.',
   polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
   initError: 'No se pudo iniciar el pago',
   copyError: 'No se pudo copiar al portapapeles',
@@ -111,6 +114,7 @@ const CryptoPaymentModal = ({
   registrationId,
   pathPurchaseId,
   anchorRequestId,
+  tokenPurchaseId,
   title,
   eventTitle,
   priceUsd,
@@ -126,18 +130,23 @@ const CryptoPaymentModal = ({
   const displayTitle = title || eventTitle;
   const isPathCheckout = Boolean(pathPurchaseId);
   const isAnchorCheckout = Boolean(anchorRequestId);
-  const entitlementId = anchorRequestId || pathPurchaseId || registrationId;
+  const isTokenCheckout = Boolean(tokenPurchaseId);
+  const entitlementId = tokenPurchaseId || anchorRequestId || pathPurchaseId || registrationId;
 
-  const listPayments = isAnchorCheckout
-    ? listAnchorRequestPayments
-    : isPathCheckout
-      ? listPathPurchasePayments
-      : listRegistrationPayments;
-  const createPayment = isAnchorCheckout
-    ? createAnchorRequestPayment
-    : isPathCheckout
-      ? createPathPurchasePayment
-      : createRegistrationPayment;
+  const listPayments = isTokenCheckout
+    ? listTokenPurchasePayments
+    : isAnchorCheckout
+      ? listAnchorRequestPayments
+      : isPathCheckout
+        ? listPathPurchasePayments
+        : listRegistrationPayments;
+  const createPayment = isTokenCheckout
+    ? createTokenPurchasePayment
+    : isAnchorCheckout
+      ? createAnchorRequestPayment
+      : isPathCheckout
+        ? createPathPurchasePayment
+        : createRegistrationPayment;
 
   const refreshPayment = useCallback(async (paymentId) => {
     const data = await getPaymentStatus(paymentId);
@@ -357,11 +366,13 @@ const CryptoPaymentModal = ({
             )}
             {payment.is_paid && (
               <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
-                {isAnchorCheckout
-                  ? MSG.paidAnchor
-                  : isPathCheckout
-                    ? MSG.paidPath
-                    : MSG.paidEvent}
+                {isTokenCheckout
+                  ? MSG.paidTokens
+                  : isAnchorCheckout
+                    ? MSG.paidAnchor
+                    : isPathCheckout
+                      ? MSG.paidPath
+                      : MSG.paidEvent}
               </Alert>
             )}
 

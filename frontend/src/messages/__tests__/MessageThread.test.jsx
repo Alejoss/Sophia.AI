@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import MessageThread from '../MessageThread';
 import { renderWithProviders } from '../../test/formTestUtils';
+import createThemeConfig from '../../theme/theme';
 
 const mockFetchOrCreateThread = vi.fn();
 const mockFetchMessages = vi.fn();
@@ -26,6 +28,13 @@ const thread = {
   id: 9,
   participant1: { id: 1, username: 'testuser' },
   participant2: { id: 2, username: 'bob' },
+};
+
+const receivedMessage = {
+  id: 1,
+  text: 'Hola Ale, como te va?',
+  timestamp: '2026-04-16T12:18:19Z',
+  sender: { id: 2, username: 'bob' },
 };
 
 describe('MessageThread form', () => {
@@ -82,5 +91,25 @@ describe('MessageThread form', () => {
     expect(
       await screen.findByText(/no se pudo enviar el mensaje/i),
     ).toBeInTheDocument();
+  });
+
+  it('keeps received message text readable in dark mode', async () => {
+    mockFetchMessages.mockResolvedValue({ data: [receivedMessage] });
+    const darkTheme = createTheme(createThemeConfig('dark'));
+
+    renderWithProviders(
+      <ThemeProvider theme={darkTheme}>
+        <MessageThread />
+      </ThemeProvider>,
+    );
+
+    const messageText = await screen.findByText(/hola ale, como te va/i);
+    const bubble = messageText.closest('div');
+    expect(bubble).not.toBeNull();
+
+    const styles = window.getComputedStyle(bubble);
+    // Dark-mode received bubbles use grey.800 (#424242), not light grey.200.
+    expect(styles.backgroundColor).toBe('rgb(66, 66, 66)');
+    expect(styles.color).toBe('rgb(224, 224, 224)');
   });
 });

@@ -1,0 +1,59 @@
+{% extends "profiles/emails/base_email.html" %}
+
+{% block email_title %}TXID BCH reportado — {{ brand_name|default:"Academia Blockchain" }}{% endblock %}
+
+{% block preheader %}Orden #{{ order_id }}: {{ product_title }}{% endblock %}
+
+{% block header_subtitle %}
+<p style="margin:10px 0 0 0;font-size:14px;font-weight:600;color:{{ brand_color|default:'#E86A00' }};">
+    Pago BCH por confirmar
+</p>
+{% endblock %}
+
+{% block email_content %}
+<h2 style="margin:0 0 12px 0;font-size:20px;line-height:1.3;color:#213547;font-weight:700;">
+    Un comprador reportó un TXID de Bitcoin Cash
+</h2>
+
+<p style="margin:0 0 16px 0;color:#374151;">
+    La verificación automática no desbloqueó el acceso. Revisa el TXID en el
+    dashboard de Pagos Bitcoin Cash y confirma el pago si corresponde.
+</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 20px 0;background-color:#fff7ed;border-left:4px solid {{ brand_color|default:'#E86A00' }};border-radius:0 6px 6px 0;">
+    <tr>
+        <td style="padding:14px 16px;font-size:15px;color:#213547;">
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Comprador:</strong> {{ buyer_username }}{% if buyer_email %} ({{ buyer_email }}){% endif %}</p>
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Orden:</strong> #{{ order_id }} ({{ order_status }})</p>
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Producto:</strong> {{ product_type_label }} — {{ product_title }}</p>
+            <p style="margin:0 0 6px 0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Monto:</strong> {{ expected_amount_bch }} BCH (${{ usd_amount }} USD)</p>
+            <p style="margin:0;"><strong style="color:{{ brand_color|default:'#E86A00' }};">Dirección:</strong> <span style="font-family:monospace;word-break:break-all;">{{ address }}</span></p>
+        </td>
+    </tr>
+</table>
+
+<p style="margin:0 0 8px 0;font-weight:700;color:#213547;">TXID reportado:</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 16px 0;border:1px solid #e5e7eb;border-radius:6px;">
+    <tr>
+        <td style="padding:14px 16px;font-family:monospace;word-break:break-all;color:#374151;">{{ reported_txid }}</td>
+    </tr>
+</table>
+
+<p style="margin:0 0 8px 0;font-weight:700;color:#213547;">Nota del comprador:</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;border:1px solid #e5e7eb;border-radius:6px;">
+    <tr>
+        <td style="padding:14px 16px;white-space:pre-wrap;color:#374151;">{{ note }}</td>
+    </tr>
+</table>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+        <td align="center" bgcolor="{{ brand_color|default:'#E86A00' }}" style="border-radius:6px;background-color:{{ brand_color|default:'#E86A00' }};">
+            <a href="{{ dashboard_url }}" target="_blank"
+               style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff !important;text-decoration:none;border-radius:6px;">
+                <span style="color:#ffffff !important;">Abrir Pagos Bitcoin Cash</span>
+            </a>
+        </td>
+    </tr>
+</table>
+{% endblock %}

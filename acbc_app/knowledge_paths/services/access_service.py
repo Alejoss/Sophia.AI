@@ -8,8 +8,9 @@ def user_has_path_access(user, knowledge_path: KnowledgePath, book_club=None) ->
     Whether the user may enter nodes of this path.
 
     Free paths are open. Authors always have access. Book-club members accessing
-    via club context bypass the paywall (club schedule still applies separately).
-    Otherwise a PAID KnowledgePathPurchase is required.
+    via club context bypass the paywall (club schedule still applies separately
+    for non-staff, non-author viewers). Otherwise a PAID KnowledgePathPurchase
+    is required.
     """
     if not knowledge_path.is_paid_path:
         return True

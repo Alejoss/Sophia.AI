@@ -68,6 +68,7 @@ describe('TopicEdit general tab', () => {
       description: 'Descripción original',
       creator: mockAuthValue.user.id,
       moderators: [],
+      is_public: true,
       chat_enabled: false,
       chat_can_enable: true,
       indexed_transcript_count: 2,
@@ -100,6 +101,8 @@ describe('TopicEdit general tab', () => {
       description: 'Descripción original',
       creator: mockAuthValue.user.id,
       moderators: [],
+      is_public: true,
+      chat_enabled: false,
     });
 
     renderWithProviders(<TopicEdit />, { route: '/content/topics/9/edit' });
@@ -113,6 +116,7 @@ describe('TopicEdit general tab', () => {
       expect(mockUpdateTopic).toHaveBeenCalledWith('9', {
         title: 'Tema actualizado',
         description: 'Descripción original',
+        is_public: true,
         chat_enabled: false,
       });
     });
@@ -125,6 +129,43 @@ describe('TopicEdit general tab', () => {
     expect(await screen.findByText('Mostrar pestaña Consultas')).toBeInTheDocument();
     expect(screen.getByText(/los usuarios verán la pestaña Consultas/i)).toBeInTheDocument();
     expect(screen.queryByText(/Conversación/i)).not.toBeInTheDocument();
+  });
+
+  it('lets the creator toggle is_public and include it in the save payload', async () => {
+    const user = userEvent.setup();
+    mockUpdateTopic.mockResolvedValue({
+      id: 9,
+      title: 'Tema original',
+      description: 'Descripción original',
+      creator: mockAuthValue.user.id,
+      moderators: [],
+      is_public: false,
+      chat_enabled: false,
+    });
+
+    renderWithProviders(<TopicEdit />, { route: '/content/topics/9/edit' });
+
+    expect(await screen.findByText('Público')).toBeInTheDocument();
+    expect(
+      screen.getByText(/no aparece en el listado público ni en búsquedas/i),
+    ).toBeInTheDocument();
+
+    const publicSwitch = screen.getByRole('checkbox', { name: /público/i });
+    expect(publicSwitch).toBeChecked();
+    await user.click(publicSwitch);
+    expect(publicSwitch).not.toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateTopic).toHaveBeenCalledWith('9', {
+        title: 'Tema original',
+        description: 'Descripción original',
+        is_public: false,
+        chat_enabled: false,
+      });
+    });
+    expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument();
   });
 
   it('shows a Spanish alert when the API call fails', async () => {

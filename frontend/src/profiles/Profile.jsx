@@ -19,6 +19,7 @@ import KnowledgePathsByUser from '../knowledgePaths/KnowledgePathsByUser';
 import TopicsUser from '../topics/TopicsUser';
 import TopicsByUser from '../topics/TopicsByUser';
 import FavoriteCryptos from './FavoriteCryptos';
+import ProfileTokens from './ProfileTokens';
 import FeaturedBadgeSelector from '../gamification/FeaturedBadgeSelector';
 import BadgeList from '../gamification/BadgeList';
 import SuggestionModal from './SuggestionModal';
@@ -326,6 +327,7 @@ const Profile = () => {
                 'certificates': 'certificates',
                 'saved-items': 'saved-items',
                 'cryptos': 'cryptos',
+                'tokens': 'tokens',
                 'badges': 'badges',
                 'notifications': 'notifications',
                 'security': 'security',
@@ -453,6 +455,20 @@ const Profile = () => {
                 return isOwnProfile ? <Bookmarks /> : null;
             case 'cryptos':
                 return <FavoriteCryptos isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
+            case 'tokens':
+                return isOwnProfile ? (
+                    <ProfileTokens
+                        tokenBalance={profile?.token_balance}
+                        onBalanceChange={async () => {
+                            try {
+                                const data = await getUserProfile();
+                                setProfile(data);
+                            } catch (err) {
+                                console.error('Error refreshing profile after token purchase:', err);
+                            }
+                        }}
+                    />
+                ) : null;
             case 'knowledge-paths':
                 return isOwnProfile ? <KnowledgePathsUser /> : (
                     <KnowledgePathsByUser 

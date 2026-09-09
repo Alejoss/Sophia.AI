@@ -184,8 +184,9 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **POST** `/api/content/topics/{topic_id}/chat/`
 - **Auth**: Required (JWT)
 - **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
-- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at }`
-- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history
+- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining }`
+- **429**: free-tier daily cap (`code=daily_consultation_limit`; default 3/day/user across topics)
+- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` quota fields)
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
 - **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
@@ -340,10 +341,12 @@ Full product docs: [book-clubs.md](../architecture/book-clubs.md).
 - **GET/PATCH** `/api/book_clubs/{slug}/mission-schedule/`
 - **Auth**: Django staff/superusers
 - **PATCH body**: `{ "releases": [{ "node_id": 1, "opens_at": "2026-07-20T18:00:00Z" }] }`
-- Dates must follow node order; `null` leaves a mission unscheduled/locked.
+- Dates must follow node order; `null` (or no row) leaves a mission **open**.
+  Set a future `opens_at` to lock it until that time.
 - Knowledge Path and Node endpoints accept `?club={slug}` and return
-  `club_opens_at` / `club_schedule_locked`. For club members the schedule is
-  also enforced server-side when the parameter is absent.
+  `club_opens_at` / `club_schedule_locked`. When a path is linked to a book
+  club, the schedule is enforced for everyone (with or without `?club=`),
+  except Django staff/superusers and the knowledge-path author.
 
 ### Join / Guest Access
 - **POST** `/api/book_clubs/{slug}/join/`
@@ -549,6 +552,17 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/anchor-request/{id}/bch/` — create or reuse exact-amount order (requester only)
 - **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match
 - **Auth**: Required (requester; staff may GET/verify)
+
+### Platform token packages
+- **GET** `/api/payments/token-packages/` — active SKUs
+- **GET** `/api/payments/token-purchases/` — own purchases
+- **POST** `/api/payments/token-purchases/` — `{ "package_id": N }` start a checkout
+- **POST** `/api/payments/token-purchase/{id}/` — NOWPayments invoice (buyer only)
+- **GET** `/api/payments/token-purchase/{id}/list/` — buyer or staff
+- **GET/POST** `/api/payments/token-purchase/{id}/bch/` — BCH order
+- **POST** `/api/payments/token-purchase/{id}/bch/verify/`
+- **Auth**: Required
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
 
 ### Payment detail / IPN
 - **GET** `/api/payments/{id}/` — NOWPayments row; syncs with the provider

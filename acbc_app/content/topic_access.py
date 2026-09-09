@@ -38,6 +38,8 @@ def get_user_topic_purchase(user, topic: Topic):
 def get_or_create_topic_purchase(*, topic: Topic, user) -> TopicPurchase:
     if not topic.is_paid_topic:
         raise ValueError('Las consultas de este tema son gratuitas.')
+    if not topic.sales_enabled:
+        raise ValueError('La venta de consultas de este tema está desactivada.')
     if topic.is_moderator_or_creator(user) or getattr(user, 'is_staff', False):
         raise ValueError('Ya tienes acceso a las consultas de este tema.')
 

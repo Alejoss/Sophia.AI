@@ -100,8 +100,9 @@ const BookClubAdminMissions = () => {
           Calendario de misiones
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 720 }}>
-          Define cuándo se abre cada lectura para todos los miembros. Además de llegar la fecha,
-          cada persona debe haber completado la misión anterior.
+          Por defecto cada misión está abierta. Asigna una fecha solo si quieres bloquearla
+          hasta ese momento. Además de llegar la fecha, cada persona debe haber completado
+          la misión anterior.
         </Typography>
       </Box>
 
@@ -147,7 +148,7 @@ const BookClubAdminMissions = () => {
                 />
                 <TextField
                   type="datetime-local"
-                  label="Se desbloquea"
+                  label="Se desbloquea (vacío = abierta)"
                   value={mission.localOpensAt}
                   onChange={(event) => updateDate(mission.node_id, event.target.value)}
                   InputLabelProps={{ shrink: true }}

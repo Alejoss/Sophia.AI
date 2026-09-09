@@ -41,11 +41,11 @@ def is_node_available_for_user(node, user, book_club=None):
     Returns:
         bool: True if the node is available, False otherwise.
     """
-    # Staff managing a club can preview all missions. Path authors retain the
-    # existing unrestricted behavior outside a club context.
+    # Staff managing a club can preview all missions. Path authors always
+    # bypass both the club schedule and sequential unlock rules.
     if book_club and book_club.user_can_manage(user):
         return True
-    if book_club is None and node.knowledge_path.author == user:
+    if node.knowledge_path.author_id == getattr(user, 'id', None):
         return True
 
     if not user_has_path_access(user, node.knowledge_path, book_club=book_club):

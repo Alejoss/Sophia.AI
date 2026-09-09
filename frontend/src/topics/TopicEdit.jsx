@@ -31,6 +31,8 @@ import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import contentApi from "../api/contentApi";
 import { useAuth } from "../context/AuthContext";
@@ -49,6 +51,7 @@ const topicSchema = yup.object({
     .trim()
     .required("El título es requerido."),
   description: yup.string().trim().default(""),
+  is_public: yup.boolean().default(true),
   chat_enabled: yup.boolean().default(false),
 });
 
@@ -95,7 +98,7 @@ const TopicEdit = () => {
     formState: { errors, isSubmitting, isDirty },
   } = useForm({
     resolver: yupResolver(topicSchema),
-    defaultValues: { title: "", description: "", chat_enabled: false },
+    defaultValues: { title: "", description: "", is_public: true, chat_enabled: false },
   });
 
   const titleValue = watch("title");
@@ -137,6 +140,7 @@ const TopicEdit = () => {
         reset({
           title: data.title || "",
           description: data.description || "",
+          is_public: data.is_public !== false,
           chat_enabled: Boolean(data.chat_enabled),
         });
         setPageError(null);
@@ -201,6 +205,7 @@ const TopicEdit = () => {
       reset({
         title: updatedTopic.title || "",
         description: updatedTopic.description || "",
+        is_public: updatedTopic.is_public !== false,
         chat_enabled: Boolean(updatedTopic.chat_enabled),
       });
       setSaveMessage("Cambios guardados.");
@@ -409,6 +414,43 @@ const TopicEdit = () => {
               placeholder="Describe el tema"
             />
             <Box sx={{ mt: 2, mb: 1 }}>
+              <Controller
+                name="is_public"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {field.value ? (
+                          <VisibilityIcon fontSize="small" />
+                        ) : (
+                          <VisibilityOffIcon fontSize="small" />
+                        )}
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Público
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                )}
+              />
+              {errors.is_public && (
+                <Typography variant="body2" color="error" sx={{ ml: 0.5, mb: 0.5 }}>
+                  {errors.is_public.message}
+                </Typography>
+              )}
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5, mb: 2 }}>
+                Si está desactivado, el tema no aparece en el listado público ni en búsquedas.
+                Solo tú, los moderadores y el staff pueden verlo.
+              </Typography>
+
               <Controller
                 name="chat_enabled"
                 control={control}

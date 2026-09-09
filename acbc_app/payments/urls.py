@@ -18,7 +18,40 @@ urlpatterns = [
     path('topic-purchase/<int:purchase_id>/bch/', views.TopicPurchaseBchPaymentView.as_view(), name='topic-purchase-bch'),
     path('topic-purchase/<int:purchase_id>/bch/verify/', views.TopicPurchaseBchVerifyView.as_view(), name='topic-purchase-bch-verify'),
     path('admin/bch-catalog/', views.AdminBchCatalogView.as_view(), name='admin-bch-catalog'),
+    path('admin/bch-orders/', views.AdminBchOrdersView.as_view(), name='admin-bch-orders'),
+    path(
+        'admin/bch-orders/<int:pk>/confirm/',
+        views.AdminBchOrderConfirmView.as_view(),
+        name='admin-bch-order-confirm',
+    ),
+    path(
+        'bch-orders/<int:pk>/report-txid/',
+        views.BchOrderReportTxidView.as_view(),
+        name='bch-order-report-txid',
+    ),
     path('admin/knowledge-paths/<int:pk>/', views.AdminKnowledgePathBchView.as_view(), name='admin-knowledge-path-bch'),
     path('admin/topics/<int:pk>/', views.AdminTopicBchView.as_view(), name='admin-topic-bch'),
+    path('token-packages/', views.TokenPackageListView.as_view(), name='token-packages'),
+    path('token-purchases/', views.TokenPurchaseListCreateView.as_view(), name='token-purchases'),
+    path(
+        'token-purchase/<int:purchase_id>/',
+        views.TokenPurchasePaymentView.as_view(),
+        name='token-purchase-payment-create',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/list/',
+        views.TokenPurchasePaymentsListView.as_view(),
+        name='token-purchase-payments-list',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/bch/',
+        views.TokenPurchaseBchPaymentView.as_view(),
+        name='token-purchase-bch',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/bch/verify/',
+        views.TokenPurchaseBchVerifyView.as_view(),
+        name='token-purchase-bch-verify',
+    ),
     path('<int:payment_id>/', views.CryptoPaymentDetailView.as_view(), name='crypto-payment-detail'),
 ]

@@ -542,7 +542,7 @@ const ManageEvent = () => {
                 <Typography variant="body2"><strong>Cantidad:</strong> ${event.reference_price}</Typography>
               </Box>
             )}
-            <Typography variant="body2">¿Está seguro de que desea aceptar este pago?</Typography>
+            <Typography variant="body2">¿Estás seguro de que quieres aceptar este pago?</Typography>
           </Box>
         </DialogContent>
         <DialogActions>

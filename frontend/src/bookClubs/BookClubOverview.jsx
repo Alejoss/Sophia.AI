@@ -191,7 +191,7 @@ const BookClubOverview = () => {
               hour: '2-digit',
               minute: '2-digit',
             })}.`
-          : 'El staff todavía no ha definido la fecha de apertura.'
+          : 'Esta misión todavía no está disponible según el calendario del club.'
         : 'Completa la misión anterior para continuar.';
       return {
         eyebrow: 'Próxima misión',

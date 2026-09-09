@@ -24,6 +24,7 @@ TOPIC_TARGET_VERBS = (
     'sugirió vincular contenido a una entrada de la línea de tiempo en',
     'aceptó tu sugerencia de vincular contenido a una entrada en',
     'rechazó tu sugerencia de vincular contenido a una entrada en',
+    'compró acceso a las consultas de',
 )
 
 TOPIC_MODERATION_VERBS = (
@@ -38,6 +39,14 @@ TOPIC_CREATION_REQUEST_VERBS = (
     'rechazó tu solicitud de tema',
 )
 
+BCH_TXID_REPORT_STAFF_VERBS = (
+    'reportó un pago BCH',
+)
+
+BCH_TXID_REPORT_OWNER_VERBS = (
+    'reportó un pago BCH de',
+)
+
 KNOWLEDGE_PATH_VERBS = (
     'comentó en tu camino de conocimiento',
     'completó tu camino de conocimiento',
@@ -45,6 +54,11 @@ KNOWLEDGE_PATH_VERBS = (
     'aprobó tu solicitud de certificado para',
     'rechazó tu solicitud de certificado para',
     'votó positivamente tu camino de conocimiento',
+    'compró tu camino de conocimiento',
+)
+
+PURCHASE_PAID_BUYER_VERBS = (
+    'confirmó tu pago de',
 )
 
 MODERATOR_ACTION_VERBS = (
@@ -85,6 +99,9 @@ EVENT_TARGET_VERB_KEYS = frozenset(verb_key(v) for v in EVENT_TARGET_VERBS)
 CERTIFICATE_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_DECISION_VERBS)
 CERTIFICATE_REQUEST_VERB_KEYS = frozenset(verb_key(v) for v in CERTIFICATE_REQUEST_VERBS)
 TOPIC_REQUEST_DECISION_VERB_KEYS = frozenset(verb_key(v) for v in TOPIC_REQUEST_DECISION_VERBS)
+BCH_TXID_REPORT_STAFF_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_STAFF_VERBS)
+BCH_TXID_REPORT_OWNER_VERB_KEYS = frozenset(verb_key(v) for v in BCH_TXID_REPORT_OWNER_VERBS)
+PURCHASE_PAID_BUYER_VERB_KEYS = frozenset(verb_key(v) for v in PURCHASE_PAID_BUYER_VERBS)
 
 # Get logger for profiles serializers
 logger = logging.getLogger('academia_blockchain.profiles.serializers')
@@ -160,6 +177,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     profile_picture = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     total_points = serializers.IntegerField(read_only=True)
+    token_balance = serializers.SerializerMethodField()
     featured_badge = serializers.SerializerMethodField()
     featured_badge_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
@@ -169,7 +187,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             'user', 'interests', 'profile_description', 'external_url', 'country', 'timezone', 'is_teacher',
-            'profile_picture', 'badges', 'total_points', 'username_change_count', 'featured_badge', 'featured_badge_id'
+            'profile_picture', 'badges', 'total_points', 'token_balance',
+            'username_change_count', 'featured_badge', 'featured_badge_id'
         ]
 
     def get_profile_picture(self, obj):
@@ -186,6 +205,13 @@ class ProfileSerializer(serializers.ModelSerializer):
         except Exception as e:
             logger.error("Error getting badges", extra={'error': str(e)}, exc_info=True)
             return []
+
+    def get_token_balance(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request, 'user', None) and request.user.is_authenticated:
+            if request.user.id == obj.user_id:
+                return obj.token_balance
+        return None
 
     def get_featured_badge(self, obj):
         """Get featured badge details if set."""
@@ -340,6 +366,12 @@ class NotificationSerializer(serializers.ModelSerializer):
                     or getattr(obj.target, 'proposed_title', None)
                 )
 
+            if self._verb_in(verb, BCH_TXID_REPORT_OWNER_VERB_KEYS) and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
+            if self._verb_in(verb, PURCHASE_PAID_BUYER_VERB_KEYS) and obj.target:
+                return obj.target.title if hasattr(obj.target, 'title') else None
+
             if self._verb_is(verb, 'aprobó tu solicitud de tema') and obj.action_object:
                 request = obj.action_object
                 if getattr(request, 'topic_id', None):
@@ -449,6 +481,31 @@ class NotificationSerializer(serializers.ModelSerializer):
 
             if self._verb_is(verb, 'solicitó crear un tema'):
                 return '/dashboard'
+
+            if self._verb_in(verb, BCH_TXID_REPORT_STAFF_VERB_KEYS):
+                return '/dashboard/pagos-bch'
+
+            if self._verb_in(verb, BCH_TXID_REPORT_OWNER_VERB_KEYS) and obj.target:
+                model_name = (
+                    obj.target_content_type.model
+                    if obj.target_content_type else ''
+                )
+                if model_name == 'knowledgepath':
+                    return f'/knowledge_path/{obj.target.id}'
+                if model_name == 'topic':
+                    return f'/content/topics/{obj.target.id}'
+                return '/dashboard/pagos-bch'
+
+            if self._verb_in(verb, PURCHASE_PAID_BUYER_VERB_KEYS) and obj.target:
+                model_name = (
+                    obj.target_content_type.model
+                    if obj.target_content_type else ''
+                )
+                if model_name == 'knowledgepath':
+                    return f'/knowledge_path/{obj.target.id}'
+                if model_name == 'topic':
+                    return f'/content/topics/{obj.target.id}'
+                return None
 
             if self._verb_in(verb, TOPIC_REQUEST_DECISION_VERB_KEYS):
                 topic_id = None

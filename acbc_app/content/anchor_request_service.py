@@ -55,7 +55,7 @@ def create_anchor_request(*, content: Content, user) -> TranscriptAnchorRequest:
         if active.requester_id == user.id:
             return active
         raise AnchorRequestError(
-            'Ya existe una solicitud activa para este hash. Inténtelo más tarde.'
+            'Ya existe una solicitud activa para este hash. Inténtalo más tarde.'
         )
 
     try:
@@ -69,7 +69,7 @@ def create_anchor_request(*, content: Content, user) -> TranscriptAnchorRequest:
         )
     except IntegrityError as exc:
         raise AnchorRequestError(
-            'Ya existe una solicitud activa para este hash. Inténtelo más tarde.'
+            'Ya existe una solicitud activa para este hash. Inténtalo más tarde.'
         ) from exc
 
 
@@ -122,7 +122,7 @@ def approve_anchor_request(
         )
         raise AnchorRequestError(
             'No se pudo emitir aún (comisiones o fondos). La solicitud sigue en revisión; '
-            'reintente más tarde.'
+            'reinténtalo más tarde.'
         ) from exc
 
     req.anchor = anchor
