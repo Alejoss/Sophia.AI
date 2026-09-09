@@ -790,6 +790,9 @@ BCH_API_BASE = os.getenv(
     'BCH_API_BASE',
     _BCH_API_DEFAULTS.get(BCH_NETWORK, _BCH_API_DEFAULTS['chipnet']),
 ).rstrip('/')
+# Optional comma-separated Fulcrum SSL endpoints (tried in order before Blockchair HTTP).
+# Empty → built-in mainnet/chipnet defaults in payments.bch_client.
+BCH_ELECTRUM_SERVERS = os.getenv('BCH_ELECTRUM_SERVERS', '').strip()
 # Optional Blockchair key when BCH_API_BASE points at api.blockchair.com
 BCH_BLOCKCHAIR_API_KEY = os.getenv('BCH_BLOCKCHAIR_API_KEY', '').strip()
 BCH_PAYMENT_TTL_MINUTES = int(os.getenv('BCH_PAYMENT_TTL_MINUTES', '30'))
