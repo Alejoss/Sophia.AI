@@ -259,6 +259,7 @@ function TranscriptChecklist({
   }
 
   const allSelected = selectedIds.length === sources.length;
+  const showAllSelectedWarning = allSelected && sources.length > 1;
 
   return (
     <Box>
@@ -287,10 +288,21 @@ function TranscriptChecklist({
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         Marca los archivos cuyos contenidos quieres usar en esta consulta.
       </Typography>
+      {showAllSelectedWarning && (
+        <Alert severity="warning" sx={{ borderRadius: 0, mb: 1 }}>
+          Al seleccionar todos los archivos, el modelo procesa demasiado contenido
+          y las respuestas suelen ser menos precisas. Elige solo los archivos
+          relevantes para obtener mejores resultados.
+        </Alert>
+      )}
       <FormGroup
         sx={{
-          maxHeight: 220,
+          // One column + vertical scroll. FormGroup defaults to column + wrap,
+          // which fills sideways under maxHeight and creates a horizontal scrollbar.
+          flexWrap: 'nowrap',
+          maxHeight: 380,
           overflowY: 'auto',
+          overflowX: 'hidden',
           border: '1px solid',
           borderColor: 'divider',
           px: 1.5,
@@ -300,11 +312,22 @@ function TranscriptChecklist({
         {sources.map((src) => {
           const checked = selectedIds.includes(src.content_id);
           const label = (
-            <Box sx={{ py: 0.25 }}>
-              <Typography variant="body2" sx={{ fontWeight: checked ? 600 : 400 }}>
+            <Box sx={{ py: 0.25, minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: checked ? 600 : 400,
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word',
+                }}
+              >
                 {src.title}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+              >
                 {mediaTypeLabel(src.media_type)}
                 {src.original_author ? ` · ${src.original_author}` : ''}
                 {typeof src.chunk_count === 'number' ? ` · ${src.chunk_count} fragmentos` : ''}
@@ -323,7 +346,17 @@ function TranscriptChecklist({
                 />
               }
               label={label}
-              sx={{ alignItems: 'flex-start', mr: 0, py: 0.25 }}
+              sx={{
+                alignItems: 'flex-start',
+                mr: 0,
+                py: 0.25,
+                width: '100%',
+                ml: 0,
+                '& .MuiFormControlLabel-label': {
+                  minWidth: 0,
+                  flex: 1,
+                },
+              }}
             />
           );
         })}
@@ -394,7 +427,8 @@ function TopicChat({ topicId }) {
       const data = await contentApi.listTopicChatSources(topicId);
       const rows = data.results || [];
       setSources(rows);
-      setSelectedIds(rows.map((row) => row.content_id));
+      // Start unchecked so the user chooses which files to query.
+      setSelectedIds([]);
     } catch {
       setSources([]);
       setSelectedIds([]);
@@ -429,7 +463,7 @@ function TopicChat({ topicId }) {
     setComposing(true);
     setError(null);
     setInput('');
-    setSelectedIds(sources.map((row) => row.content_id));
+    setSelectedIds([]);
   };
 
   const toggleSource = (contentId) => {
