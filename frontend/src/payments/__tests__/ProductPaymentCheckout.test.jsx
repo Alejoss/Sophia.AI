@@ -65,6 +65,7 @@ describe('ProductPaymentCheckout method switch', () => {
       usd_amount: 40,
       status: 'pending',
       seconds_remaining: 1800,
+      expires_at: '2026-09-09T02:00:00.000Z',
     });
     mockFetchThread.mockResolvedValue({ data: { id: 55 } });
     mockSendMessage.mockResolvedValue({});
