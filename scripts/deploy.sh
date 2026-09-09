@@ -25,7 +25,8 @@ Options:
   --full-down              Stop all containers (docker compose down) before starting
   --allow-non-production   Allow deploy when ENVIRONMENT is not PRODUCTION
   --allow-stale-images     Do not fail when GHCR images are older than git HEAD
-  --wait-for-ci            Poll GHCR until frontend image matches git HEAD (for low-RAM servers)
+  --wait-for-ci            Poll GHCR until sha-<git HEAD> backend+frontend images exist (low-RAM servers)
+  --use-floating-main      Pull mutable :main instead of immutable sha-<commit> (not recommended)
   -h, --help               Show this help
 EOF
 }
@@ -38,6 +39,7 @@ FULL_DOWN=false
 ALLOW_NON_PRODUCTION=false
 ALLOW_STALE_IMAGES=false
 WAIT_FOR_CI=false
+USE_FLOATING_MAIN=false
 LOCAL_BUILD_FULL_MIN_MB=2800
 LOCAL_BUILD_BACKEND_MIN_MB=1200
 
@@ -57,6 +59,7 @@ for arg in "$@"; do
         --allow-non-production) ALLOW_NON_PRODUCTION=true ;;
         --allow-stale-images) ALLOW_STALE_IMAGES=true ;;
         --wait-for-ci) WAIT_FOR_CI=true ;;
+        --use-floating-main) USE_FLOATING_MAIN=true ;;
         -h|--help)
             usage
             exit 0
@@ -125,8 +128,9 @@ mem_available_mb() {
 }
 
 ghcr_deploy_hint() {
-    echo -e "${RED}      1. Push to main and wait for GitHub Actions (job Publish frontend image).${NC}"
-    echo -e "${RED}      2. On the server: ./scripts/deploy.sh --wait-for-ci${NC}"
+    echo -e "${RED}      1. Push to main and wait for GitHub Actions (Publish backend/frontend images).${NC}"
+    echo -e "${RED}      2. On the server: git pull && ./scripts/deploy.sh --wait-for-ci${NC}"
+    echo -e "${RED}         (deploys immutable sha-<commit> tags — not floating :main).${NC}"
     echo -e "${RED}      Do not use --build-local on this droplet (npm build needs ~3GB+ free RAM).${NC}"
 }
 
@@ -163,34 +167,112 @@ image_build_sha_from_tar() {
     fi
 }
 
-wait_for_ghcr_frontend_image() {
+write_compose_env_file() {
+    {
+        cat "${COMPOSE_ENV_FILE}.db"
+        echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX"
+        echo "IMAGE_TAG=$IMAGE_TAG"
+        if [ -n "${NGINX_CONF:-}" ]; then
+            echo "NGINX_CONF=$NGINX_CONF"
+        fi
+    } > "$COMPOSE_ENV_FILE"
+}
+
+commit_image_tag() {
+    # docker/metadata-action type=sha,format=long → sha-<fullsha>
+    printf 'sha-%s\n' "$LOCAL_GIT_SHA"
+}
+
+image_matches_git_head() {
+    local name="$1"
+    local path="$2"
+    local image="${GHCR_IMAGE_PREFIX}-${name}:${IMAGE_TAG}"
+    local sha=""
+    sha="$(image_build_sha_from_tar "$image" "$path")" || return 1
+    [ -n "$sha" ] && [ "$sha" = "$LOCAL_GIT_SHA" ]
+}
+
+wait_for_ghcr_images() {
     local max_attempts="${WAIT_FOR_CI_ATTEMPTS:-40}"
     local sleep_secs="${WAIT_FOR_CI_SLEEP:-90}"
     local attempt=1
+    local backend_image="${GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG}"
     local frontend_image="${GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG}"
-    local sha=""
+    local backend_sha=""
+    local frontend_sha=""
+    local backend_ok=false
+    local frontend_ok=false
 
-    echo -e "${YELLOW}⏳ Waiting for GHCR frontend image to match git HEAD (${LOCAL_GIT_SHA})...${NC}"
+    echo -e "${YELLOW}⏳ Waiting for GHCR images to match git HEAD (${LOCAL_GIT_SHA})...${NC}"
+    echo -e "${YELLOW}   Tag: ${IMAGE_TAG}${NC}"
     echo -e "${YELLOW}   Polling every ${sleep_secs}s (max ${max_attempts} attempts). Ctrl+C to abort.${NC}"
 
     while [ "$attempt" -le "$max_attempts" ]; do
+        backend_ok=false
+        frontend_ok=false
+        echo -e "${YELLOW}   [${attempt}/${max_attempts}] docker pull ${backend_image}${NC}"
+        if docker pull "$backend_image" >/dev/null 2>&1; then
+            backend_sha="$(image_build_sha_from_tar "$backend_image" /app/.build_sha || true)"
+            if [ -n "$backend_sha" ] && [ "$backend_sha" = "$LOCAL_GIT_SHA" ]; then
+                backend_ok=true
+            fi
+            echo -e "${YELLOW}   Backend BUILD_SHA=${backend_sha:-missing}${NC}"
+        else
+            echo -e "${YELLOW}   Backend pull failed (CI may not have published ${IMAGE_TAG} yet).${NC}"
+        fi
+
         echo -e "${YELLOW}   [${attempt}/${max_attempts}] docker pull ${frontend_image}${NC}"
         if docker pull "$frontend_image" >/dev/null 2>&1; then
-            sha="$(image_build_sha_from_tar "$frontend_image" /usr/share/nginx/html/.build_sha)"
-            if [ -n "$sha" ] && [ "$sha" = "$LOCAL_GIT_SHA" ]; then
-                echo -e "${GREEN}✅ GHCR frontend image matches git HEAD.${NC}"
-                return 0
+            frontend_sha="$(image_build_sha_from_tar "$frontend_image" /usr/share/nginx/html/.build_sha || true)"
+            if [ -n "$frontend_sha" ] && [ "$frontend_sha" = "$LOCAL_GIT_SHA" ]; then
+                frontend_ok=true
             fi
-            echo -e "${YELLOW}   Image BUILD_SHA=${sha:-missing} — still waiting for CI...${NC}"
+            echo -e "${YELLOW}   Frontend BUILD_SHA=${frontend_sha:-missing}${NC}"
         else
-            echo -e "${YELLOW}   Pull failed (CI may not have published yet). Retrying...${NC}"
+            echo -e "${YELLOW}   Frontend pull failed (CI may not have published ${IMAGE_TAG} yet).${NC}"
         fi
+
+        if [ "$backend_ok" = true ] && [ "$frontend_ok" = true ]; then
+            echo -e "${GREEN}✅ GHCR backend + frontend images match git HEAD.${NC}"
+            return 0
+        fi
+
+        echo -e "${YELLOW}   Still waiting for CI publish of ${IMAGE_TAG}...${NC}"
         sleep "$sleep_secs"
         attempt=$((attempt + 1))
     done
 
-    echo -e "${RED}❌ Timed out waiting for GHCR frontend image for ${LOCAL_GIT_SHA}.${NC}"
+    echo -e "${RED}❌ Timed out waiting for GHCR images for ${LOCAL_GIT_SHA} (tag ${IMAGE_TAG}).${NC}"
     echo -e "${RED}   Check GitHub Actions on main finished successfully, then retry.${NC}"
+    return 1
+}
+
+ensure_local_images_match_git_head() {
+    local backend_sha=""
+    local frontend_sha=""
+    local ok=true
+
+    if [ -z "$LOCAL_GIT_SHA" ]; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}🔎 Checking pulled images match git HEAD before recreate...${NC}"
+    backend_sha="$(image_build_sha_from_tar "${GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG}" /app/.build_sha || true)"
+    frontend_sha="$(image_build_sha_from_tar "${GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG}" /usr/share/nginx/html/.build_sha || true)"
+    echo -e "${YELLOW}   Backend BUILD_SHA=${backend_sha:-missing}  Frontend BUILD_SHA=${frontend_sha:-missing}  git HEAD=${LOCAL_GIT_SHA}${NC}"
+
+    if [ "$backend_sha" != "$LOCAL_GIT_SHA" ] || [ "$frontend_sha" != "$LOCAL_GIT_SHA" ]; then
+        ok=false
+    fi
+
+    if [ "$ok" = true ]; then
+        echo -e "${GREEN}✅ Pulled images match git HEAD.${NC}"
+        return 0
+    fi
+
+    echo -e "${RED}❌ Pulled GHCR images do not match git HEAD.${NC}"
+    echo -e "${RED}   This usually means :main is cached/stale, or CI has not published sha-${LOCAL_GIT_SHA} yet.${NC}"
+    ghcr_deploy_hint
     return 1
 }
 
@@ -298,23 +380,25 @@ if [ -f "nginx/nginx-ssl.conf" ]; then
     export NGINX_CONF=./nginx/nginx-ssl.conf
 fi
 
-# Write compose env in one shot (avoids duplicate GHCR_IMAGE_PREFIX/IMAGE_TAG from past deploys)
-{
-    cat "${COMPOSE_ENV_FILE}.db"
-    echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX"
-    echo "IMAGE_TAG=$IMAGE_TAG"
-    if [ -n "${NGINX_CONF:-}" ]; then
-        echo "NGINX_CONF=$NGINX_CONF"
-    fi
-} > "$COMPOSE_ENV_FILE"
+LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+
+# Prefer immutable sha-<commit> tags published by CI. Floating :main can stay
+# cached/stale on the droplet even after GitHub Actions has published HEAD.
+if [ "$LOCAL_BUILD" != true ] && [ "$USE_FLOATING_MAIN" != true ] && [ -n "$LOCAL_GIT_SHA" ] && [ "$IMAGE_TAG" = "main" ]; then
+    IMAGE_TAG="$(commit_image_tag)"
+    echo -e "${YELLOW}📌 Using immutable image tag ${IMAGE_TAG} (git HEAD).${NC}"
+    echo -e "${YELLOW}   (Pass --use-floating-main to force mutable :main — not recommended.)${NC}"
+fi
+
+# Keep .db fragment until after tag selection; write final compose env once.
+write_compose_env_file
 rm -f "${COMPOSE_ENV_FILE}.db"
 
 echo -e "${YELLOW}🐳 Using images: ${GHCR_IMAGE_PREFIX}-{backend,frontend,nginx}:${IMAGE_TAG}${NC}"
-LOCAL_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 if [ -n "$LOCAL_GIT_SHA" ]; then
     echo -e "${YELLOW}📌 git HEAD: ${LOCAL_GIT_SHA}${NC}"
-    if [ "$IMAGE_TAG" = "main" ] && [ "$LOCAL_BUILD" != true ] && [ "$SKIP_PULL" != true ]; then
-        echo -e "${YELLOW}   Tip: use --wait-for-ci after git pull if the droplet cannot run --build-local (low RAM).${NC}"
+    if [ "$LOCAL_BUILD" != true ] && [ "$SKIP_PULL" != true ]; then
+        echo -e "${YELLOW}   Tip: use --wait-for-ci after git pull if CI has not published ${IMAGE_TAG} yet.${NC}"
     fi
 fi
 if [ "$LOCAL_BUILD_BACKEND_ONLY" = true ]; then
@@ -409,18 +493,33 @@ else
       echo -e "${RED}❌ Cannot use --wait-for-ci outside a git checkout.${NC}"
       exit 1
     fi
-    wait_for_ghcr_frontend_image
+    wait_for_ghcr_images
   fi
 
   if [ "$SKIP_PULL" = true ]; then
     echo -e "${YELLOW}⏭️  Skipping image pull (--skip-pull)${NC}"
   else
     echo -e "${YELLOW}📥 Pulling prebuilt images from GHCR (tag: ${IMAGE_TAG})...${NC}"
-    docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" pull
+    if ! docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" pull; then
+      echo -e "${RED}❌ Failed to pull ${IMAGE_TAG} from GHCR.${NC}"
+      echo -e "${RED}   If CI just finished, wait a few seconds and retry. Otherwise run:${NC}"
+      echo -e "${RED}   ./scripts/deploy.sh --wait-for-ci${NC}"
+      exit 1
+    fi
     echo -e "${YELLOW}   Pulled image metadata:${NC}"
     log_image_metadata backend
     log_image_metadata frontend
     log_image_metadata nginx
+
+    if [ "$ALLOW_STALE_IMAGES" != true ]; then
+      if ! ensure_local_images_match_git_head; then
+        exit 1
+      fi
+    else
+      if ! ensure_local_images_match_git_head; then
+        echo -e "${YELLOW}   Continuing because --allow-stale-images was set.${NC}"
+      fi
+    fi
   fi
 fi
 
@@ -479,8 +578,8 @@ fi
 echo -e "${YELLOW}🔎 Verifying backend image matches git HEAD...${NC}"
 BACKEND_VERIFY=0
 if docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T backend test -f /app/content/views_youtube_migration.py 2>/dev/null; then
-    verify_service_build_sha backend /app/.build_sha Backend
-    BACKEND_VERIFY=$?
+    BACKEND_VERIFY=0
+    verify_service_build_sha backend /app/.build_sha Backend || BACKEND_VERIFY=$?
     if [ "$BACKEND_VERIFY" -eq 2 ]; then
         echo -e "${YELLOW}   Backend has no .build_sha; using legacy file presence check only.${NC}"
         BACKEND_VERIFY=0
@@ -512,8 +611,7 @@ fi
 # Verify frontend bundle matches git HEAD (critical for React deploys)
 echo -e "${YELLOW}🔎 Verifying frontend image matches git HEAD...${NC}"
 FRONTEND_VERIFY=0
-verify_service_build_sha frontend /usr/share/nginx/html/.build_sha Frontend
-FRONTEND_VERIFY=$?
+verify_service_build_sha frontend /usr/share/nginx/html/.build_sha Frontend || FRONTEND_VERIFY=$?
 if [ "$FRONTEND_VERIFY" -eq 2 ]; then
     CONTAINER_BUNDLE="$(docker compose "${COMPOSE_ENV_ARGS[@]}" "${PROD_COMPOSE_FILES[@]}" exec -T frontend sh -c 'grep -oE "assets/index-[^.]+\.js" /usr/share/nginx/html/index.html | head -n1' 2>/dev/null | tr -d '\r')"
     SERVED_BUNDLE="$(curl -sf http://localhost/ | grep -oE 'assets/index-[^.]+\.js' | head -n1 || true)"

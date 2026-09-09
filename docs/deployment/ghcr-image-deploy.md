@@ -37,7 +37,7 @@ git pull origin main
 ./scripts/deploy.sh --wait-for-ci
 ```
 
-`--wait-for-ci` hace `docker pull` del frontend en GHCR cada ~90s hasta que `.build_sha` dentro de la imagen coincide con `git rev-parse HEAD`. No compila nada en el servidor.
+`--wait-for-ci` hace `docker pull` de **backend y frontend** con el tag inmutable `sha-<git HEAD>` cada ~90s hasta que existan y su `.build_sha` coincida con `git rev-parse HEAD`. Por defecto `deploy.sh` ya no usa el tag flotante `:main` (puede quedar cacheado/stale). No compila nada en el servidor.
 
 **No uses `--build-local` en producción** si el build de frontend se queda sin memoria (~3GB+ libres para `npm run build`). GitHub Actions construye las imágenes en runners con RAM suficiente.
 

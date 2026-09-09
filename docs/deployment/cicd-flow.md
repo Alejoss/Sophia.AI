@@ -8,7 +8,7 @@
 | **Backend tests** | Backend, compose, deploy script, or CI workflow changed | Django tests + `check --deploy`. |
 | **Frontend check** | Frontend, compose, deploy script, or CI workflow changed | `npm ci` + `npm run build`. |
 | **Publish images** | Push to `main` or manual dispatch only | Builds/pushes only the images for components that changed. |
-| **Deploy** | Manual on server | `git pull` + wait for CI + `./scripts/deploy.sh` (pull GHCR + rolling recreate + verify BUILD_SHA). |
+| **Deploy** | Manual on server | `git pull` + wait for CI + `./scripts/deploy.sh --wait-for-ci` (pull immutable `sha-<HEAD>` from GHCR + rolling recreate + verify BUILD_SHA). |
 
 ## GitHub Actions ([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))
 
@@ -68,7 +68,8 @@ Default flow (safer for uptime):
 3. **Pull** images from GHCR (`pull_policy: always` on services; or `--build-local` to build on server)
 4. **`docker compose up -d --force-recreate`** (rolling recreate; stack stays up during pull)
 5. Migrate, collectstatic, health checks
-6. **Verify** `BUILD_SHA` inside backend/frontend containers matches `git rev-parse HEAD` (fails deploy if stale; override with `--allow-stale-images`)
+6. **Pull immutable** `sha-<git HEAD>` tags by default (not floating `:main`, which can stay cached/stale)
+7. **Verify** `BUILD_SHA` inside backend/frontend containers matches `git rev-parse HEAD` (fails deploy if stale; override with `--allow-stale-images`)
 
 **Common pitfall:** `./scripts/deploy.sh --build-local-backend` recreates **only** the backend container. Frontend/nginx images are unchanged — React fixes will not appear.
 
