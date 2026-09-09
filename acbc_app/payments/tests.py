@@ -824,6 +824,43 @@ class AdminBchCatalogTests(TestCase):
         self.path.refresh_from_db()
         self.assertTrue(self.path.sales_enabled)
 
+    def test_set_path_price_and_enable_bch(self):
+        self.path.reference_price = 0
+        self.path.save(update_fields=['reference_price'])
+        self.client.force_authenticate(user=self.staff)
+        price = self.client.patch(
+            f'/api/payments/admin/knowledge-paths/{self.path.id}/',
+            {'reference_price': 12.5},
+            format='json',
+        )
+        self.assertEqual(price.status_code, status.HTTP_200_OK)
+        self.assertTrue(price.data['is_paid_path'])
+        enabled = self.client.patch(
+            f'/api/payments/admin/knowledge-paths/{self.path.id}/',
+            {'sales_enabled': True},
+            format='json',
+        )
+        self.assertEqual(enabled.status_code, status.HTTP_200_OK)
+        self.path.refresh_from_db()
+        self.assertEqual(self.path.reference_price, 12.5)
+        self.assertTrue(self.path.sales_enabled)
+
+    def test_zeroing_path_price_disables_sales(self):
+        self.path.sales_enabled = True
+        self.path.save(update_fields=['sales_enabled'])
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.patch(
+            f'/api/payments/admin/knowledge-paths/{self.path.id}/',
+            {'reference_price': 0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.path.refresh_from_db()
+        self.assertEqual(self.path.reference_price, 0)
+        self.assertFalse(self.path.sales_enabled)
+        self.assertFalse(response.data['is_paid_path'])
+        self.assertFalse(response.data['is_for_sale'])
+
     def test_set_topic_price_and_enable_bch(self):
         self.client.force_authenticate(user=self.staff)
         price = self.client.patch(

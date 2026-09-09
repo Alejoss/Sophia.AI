@@ -69,8 +69,9 @@ const KnowledgePathEdit = () => {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(0);
 
-  // Autosave state
+  // Autosave state (title, description, visibility, certificates — not price)
   const [saveState, setSaveState] = useState({ status: "idle", message: null, updatedAt: null });
+  const [priceSaveState, setPriceSaveState] = useState({ status: "idle", message: null });
   const lastSavedRef = useRef({
     title: "",
     description: "",
@@ -124,6 +125,7 @@ const KnowledgePathEdit = () => {
         setLoadError(null);
         setQuizWarning(null);
         setSaveState({ status: "idle", message: null, updatedAt: null });
+        setPriceSaveState({ status: "idle", message: null });
 
         const data = await knowledgePathsApi.getKnowledgePath(pathId);
         setKnowledgePath(data);
@@ -208,7 +210,8 @@ const KnowledgePathEdit = () => {
         description,
         is_visible: isVisible,
         certificates_enabled: certificatesEnabled,
-        reference_price: Number(referencePrice) || 0,
+        // Keep the last confirmed price; draft price only saves via explicit submit.
+        reference_price: Number(lastSavedRef.current.referencePrice) || 0,
         image: file,
         image_focal_x: focalX,
         image_focal_y: focalY,
@@ -221,6 +224,10 @@ const KnowledgePathEdit = () => {
       lastSavedRef.current = {
         ...lastSavedRef.current,
         imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
+        referencePrice:
+          updated?.reference_price !== undefined
+            ? Number(updated.reference_price) || 0
+            : lastSavedRef.current.referencePrice,
       };
     } catch (err) {
       setSaveState({
@@ -254,10 +261,13 @@ const KnowledgePathEdit = () => {
       title !== last.title ||
       description !== last.description ||
       isVisible !== last.isVisible ||
-      certificatesEnabled !== last.certificatesEnabled ||
-      Number(referencePrice) !== Number(last.referencePrice);
+      certificatesEnabled !== last.certificatesEnabled;
     return fieldsDirty || Boolean(imageFile);
-  }, [title, description, isVisible, certificatesEnabled, referencePrice, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, imageFile]);
+
+  const isPriceDirty = useMemo(() => {
+    return Number(referencePrice) !== Number(lastSavedRef.current.referencePrice);
+  }, [referencePrice, knowledgePath?.reference_price, priceSaveState.status]);
 
   const runAutosave = async () => {
     if (isHydratingRef.current) return;
@@ -270,7 +280,6 @@ const KnowledgePathEdit = () => {
         description,
         is_visible: isVisible,
         certificates_enabled: certificatesEnabled,
-        reference_price: Number(referencePrice) || 0,
       };
       if (imageFile) payload.image = imageFile;
 
@@ -286,6 +295,7 @@ const KnowledgePathEdit = () => {
       setImageFile(null);
 
       lastSavedRef.current = {
+        ...lastSavedRef.current,
         title: updated?.title ?? title,
         description: updated?.description ?? description,
         isVisible: typeof updated?.is_visible === "boolean" ? updated.is_visible : isVisible,
@@ -293,10 +303,6 @@ const KnowledgePathEdit = () => {
           typeof updated?.certificates_enabled === "boolean"
             ? updated.certificates_enabled
             : certificatesEnabled,
-        referencePrice:
-          updated?.reference_price !== undefined
-            ? Number(updated.reference_price) || 0
-            : Number(referencePrice) || 0,
         imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
       };
 
@@ -310,7 +316,41 @@ const KnowledgePathEdit = () => {
     }
   };
 
-  // Debounced autosave
+  const handlePriceSave = async () => {
+    const price = Number(referencePrice);
+    if (Number.isNaN(price) || price < 0) {
+      setPriceSaveState({
+        status: "error",
+        message: "El precio debe ser un número mayor o igual a 0.",
+      });
+      return;
+    }
+
+    setPriceSaveState({ status: "saving", message: null });
+    try {
+      const updated = await knowledgePathsApi.updateKnowledgePath(pathId, {
+        reference_price: price || 0,
+      });
+      setKnowledgePath((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+      const savedPrice =
+        updated?.reference_price !== undefined
+          ? Number(updated.reference_price) || 0
+          : price || 0;
+      setReferencePrice(savedPrice);
+      lastSavedRef.current = {
+        ...lastSavedRef.current,
+        referencePrice: savedPrice,
+      };
+      setPriceSaveState({ status: "saved", message: "Precio guardado" });
+    } catch (err) {
+      setPriceSaveState({
+        status: "error",
+        message: err.response?.data?.error || err.message || "No se pudo guardar el precio",
+      });
+    }
+  };
+
+  // Debounced autosave (excludes price — price requires explicit submit)
   useEffect(() => {
     if (isHydratingRef.current) return;
     if (!isDirty) return;
@@ -324,7 +364,7 @@ const KnowledgePathEdit = () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, isVisible, certificatesEnabled, referencePrice, imageFile]);
+  }, [title, description, isVisible, certificatesEnabled, imageFile]);
 
   const refreshPath = async () => {
     try {
@@ -710,16 +750,42 @@ const KnowledgePathEdit = () => {
                 sx={{ alignItems: "flex-start", mt: 1, ml: 0 }}
               />
 
-              <TextField
-                label="Precio (USD)"
-                type="number"
-                value={referencePrice}
-                onChange={(e) => setReferencePrice(e.target.value === "" ? 0 : Number(e.target.value))}
-                inputProps={{ min: 0, step: "0.01" }}
-                fullWidth
-                helperText="0 = gratuito. Si es mayor a 0, los alumnos pagan con cripto (NOWPayments) para desbloquear los nodos."
-                sx={{ mt: 1 }}
-              />
+              <Box sx={{ mt: 1 }}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
+                  <TextField
+                    label="Precio (USD)"
+                    type="number"
+                    value={referencePrice}
+                    onChange={(e) => {
+                      setReferencePrice(e.target.value === "" ? 0 : Number(e.target.value));
+                      if (priceSaveState.status !== "idle") {
+                        setPriceSaveState({ status: "idle", message: null });
+                      }
+                    }}
+                    inputProps={{ min: 0, step: "0.01" }}
+                    fullWidth
+                    helperText="0 = gratuito. Si es mayor a 0, los alumnos pagan con cripto (NOWPayments) para desbloquear los nodos. Este valor no se guarda automáticamente."
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handlePriceSave}
+                    disabled={!isPriceDirty || priceSaveState.status === "saving"}
+                    sx={{ flexShrink: 0, mt: { sm: 0.5 }, minWidth: 140 }}
+                  >
+                    {priceSaveState.status === "saving" ? "Guardando…" : "Guardar precio"}
+                  </Button>
+                </Stack>
+                {priceSaveState.status === "saved" && (
+                  <Typography variant="caption" color="success.main" sx={{ display: "block", mt: 0.75 }}>
+                    {priceSaveState.message}
+                  </Typography>
+                )}
+                {priceSaveState.status === "error" && (
+                  <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.75 }}>
+                    {priceSaveState.message}
+                  </Typography>
+                )}
+              </Box>
 
               <TextField
                 label="Título"
