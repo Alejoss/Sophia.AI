@@ -159,6 +159,9 @@ describe('ProductPaymentCheckout method switch', () => {
 
     await user.click(await screen.findByRole('button', { name: /Bitcoin Cash directo/i }));
     expect(await screen.findByRole('button', { name: /Ya realicé el pago/i })).toBeInTheDocument();
+    const qr = await screen.findByTestId('bch-address-qr');
+    expect(qr).toHaveAttribute('data-qr-value', 'bitcoincash:qptestaddress');
+    expect(qr.getAttribute('data-qr-value')).not.toMatch(/amount=/i);
     await user.click(screen.getByRole('button', { name: /Ya realicé el pago/i }));
 
     expect(
