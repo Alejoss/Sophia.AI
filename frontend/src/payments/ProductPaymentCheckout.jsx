@@ -124,15 +124,18 @@ const ProductPaymentCheckout = ({
 
   const verifyBch = async () => {
     if (!verifyBchPayment) return;
+    // Auto-verify by default. TXID is only used after auto-verify already failed
+    // (field is shown then) or when the buyer pastes one to force a lookup.
     const cleanTxid = normalizeBchTxid(verifyTxid);
-    if (!isLikelyBchTxid(cleanTxid)) {
-      setBchError('Pega el TXID de tu pago (64 caracteres hexadecimales).');
+    const txidForVerify = isLikelyBchTxid(cleanTxid) ? cleanTxid : undefined;
+    if (verifyTxid.trim() && !txidForVerify) {
+      setBchError('El TXID debe tener 64 caracteres hexadecimales.');
       return;
     }
     setBchBusy(true);
     setBchError(null);
     try {
-      const data = await verifyBchPayment(cleanTxid);
+      const data = await verifyBchPayment(txidForVerify);
       setBchOrder(data.payment);
       if (
         data.purchase?.is_paid
@@ -374,16 +377,18 @@ const ProductPaymentCheckout = ({
                 </Stack>
               </Box>
               <BchOrderExpiryNotice bchOrder={bchOrder} />
-              <TextField
-                label="ID de transacción (TXID)"
-                placeholder="Pega el TXID de 64 caracteres de tu wallet"
-                value={verifyTxid}
-                onChange={(e) => setVerifyTxid(e.target.value)}
-                fullWidth
-                size="small"
-                autoComplete="off"
-                helperText="Después de pagar, copia el TXID desde tu wallet y pégalo aquí para verificar."
-              />
+              {bchError && (
+                <TextField
+                  label="ID de transacción (TXID) — solo si el auto-verify falló"
+                  placeholder="Pega el TXID de 64 caracteres de tu wallet"
+                  value={verifyTxid}
+                  onChange={(e) => setVerifyTxid(e.target.value)}
+                  fullWidth
+                  size="small"
+                  autoComplete="off"
+                  helperText="Opcional: pégalo aquí para reintentar, o envíalo a soporte abajo."
+                />
+              )}
               <Divider />
             </Stack>
           )}
@@ -393,21 +398,11 @@ const ProductPaymentCheckout = ({
             <Button
               variant="contained"
               fullWidth
-              disabled={bchBusy || !isLikelyBchTxid(verifyTxid)}
+              disabled={bchBusy}
               onClick={verifyBch}
               startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
             >
               Ya realicé el pago
-            </Button>
-          )}
-          {!paid && Boolean(bchOrder || bchError) && (
-            <Button
-              variant="outlined"
-              fullWidth
-              disabled={bchBusy}
-              onClick={() => setSupportOpen(true)}
-            >
-              Ya pagué — enviar TXID a soporte
             </Button>
           )}
           {(paid || bchOrder?.status === 'expired') && (
