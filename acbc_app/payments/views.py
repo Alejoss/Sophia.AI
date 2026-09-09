@@ -65,6 +65,11 @@ def _bch_error_response(exc, *, action, **ctx):
     return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _request_bch_txid(request) -> str:
+    """TXID from verify body (required for buyer-triggered chain lookup)."""
+    return (request.data.get('txid') or request.data.get('payment_txid') or '').strip()
+
+
 def _permission_error_response(exc, *, action, **ctx):
     logger.info('Payment %s forbidden %s: %s', action, _ctx_bits(**ctx), exc)
     return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
@@ -533,6 +538,7 @@ class AnchorRequestBchVerifyView(APIView):
             payment = verify_bch_payment(
                 anchor_request=anchor_request,
                 user=request.user,
+                payment_txid=_request_bch_txid(request),
             )
         except PermissionError as exc:
             return _permission_error_response(
@@ -959,7 +965,11 @@ class PathPurchaseBchVerifyView(APIView):
         except KnowledgePathPurchase.DoesNotExist:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, path_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                path_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_path_bch', purchase_id=purchase_id, user_id=request.user.id,
@@ -1048,7 +1058,11 @@ class TopicPurchaseBchVerifyView(APIView):
         except TopicPurchase.DoesNotExist:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, topic_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                topic_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
@@ -1239,7 +1253,11 @@ class TokenPurchaseBchVerifyView(APIView):
         if purchase is None:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, token_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                token_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
