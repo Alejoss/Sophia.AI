@@ -74,6 +74,9 @@ jobs:
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.ci == 'true'
     timeout-minutes: 30
 
+    # GitHub waits for this container healthcheck before job steps start.
+    # Do not add a host apt-get / pg_isready loop: ubuntu-latest's Chrome apt
+    # repo has caused Hash Sum mismatch failures on apt-get update.
     services:
       postgres:
         image: postgres:15
@@ -126,20 +129,8 @@ jobs:
           echo "ENVIRONMENT=CI" >> $GITHUB_ENV
           echo "DJANGO_SETTINGS_MODULE=academia_blockchain.settings" >> $GITHUB_ENV
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
       - name: Create logs directory
         run: mkdir -p acbc_app/logs
-
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          until pg_isready -h localhost -p 5432 -U postgres; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
 
       - name: Test database connection
         run: |
