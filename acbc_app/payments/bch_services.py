@@ -680,7 +680,10 @@ def _fulfill_bch_payment(
     *,
     tx_payload: dict,
 ) -> BchDirectPayment:
-    locked = BchDirectPayment.objects.select_for_update().select_related(
+    # Postgres rejects FOR UPDATE on the nullable side of OUTER JOINs from
+    # select_related() on optional FKs (anchor/path/topic/token). Lock only
+    # the payment row — same pattern as report_bch_payment_txid / manual_confirm.
+    locked = BchDirectPayment.objects.select_for_update(of=('self',)).select_related(
         'anchor_request',
         'path_purchase',
         'topic_purchase',
