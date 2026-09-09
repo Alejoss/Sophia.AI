@@ -294,7 +294,8 @@ const AnchorPaymentCheckout = ({
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía <strong>exactamente</strong> este monto a la dirección
+                Envía este monto a la dirección (usa el valor en sats si tu
+                wallet redondea; toleramos hasta ~$0.20 de diferencia).
                 {(bchOrder.network || bchNetwork) && (bchOrder.network || bchNetwork) !== 'mainnet'
                   ? ` en ${bchOrder.network || bchNetwork}`
                   : ''}

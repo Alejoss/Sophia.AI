@@ -105,10 +105,11 @@ class CryptoPayment(models.Model):
 
 class BchDirectPayment(models.Model):
     """
-    Self-custody BCH payment for a TranscriptAnchorRequest.
+    Self-custody BCH payment for anchors, paths, or topics.
 
-    Unique exact amount (sats) on a single receive address; user-triggered
-    verification against a public chain API (no webhooks/workers).
+    Unique amount (sats) on a single receive address; verify accepts payments
+    within ``BCH_AMOUNT_TOLERANCE_USD`` of ``expected_amount_sats`` at the
+    order's frozen ``usd_bch_rate``. User-triggered verification (no IPN).
     """
 
     STATUS_PENDING = 'pending'
@@ -145,7 +146,7 @@ class BchDirectPayment(models.Model):
     )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
-        help_text='Exact amount in satoshis the payer must send.',
+        help_text='Target amount in satoshis; verify allows BCH_AMOUNT_TOLERANCE_USD variance.',
     )
     usd_amount = models.DecimalField(max_digits=12, decimal_places=2)
     usd_bch_rate = models.DecimalField(

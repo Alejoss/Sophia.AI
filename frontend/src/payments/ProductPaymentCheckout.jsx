@@ -313,7 +313,8 @@ const ProductPaymentCheckout = ({
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía <strong>exactamente</strong> este monto a la dirección.
+                Envía este monto a la dirección (usa el valor en sats si tu
+                wallet redondea; toleramos hasta ~$0.20 de diferencia).
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
