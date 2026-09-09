@@ -24,6 +24,7 @@ import {
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
+import BchAddressQr from '../payments/BchAddressQr';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -315,26 +316,36 @@ const AnchorPaymentCheckout = ({
                 <Typography variant="caption" color="text.secondary">
                   Dirección
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <Typography
-                    variant="body2"
-                    sx={{ wordBreak: 'break-all', fontFamily: 'monospace', flex: 1 }}
-                  >
-                    {bchOrder.address}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    aria-label="Copiar dirección"
-                    onClick={() => copyText(bchOrder.address, 'addr')}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  alignItems={{ xs: 'center', sm: 'flex-start' }}
+                  sx={{ mt: 0.5 }}
+                >
+                  <BchAddressQr address={bchOrder.address} />
+                  <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <Typography
+                        variant="body2"
+                        sx={{ wordBreak: 'break-all', fontFamily: 'monospace', flex: 1 }}
+                      >
+                        {bchOrder.address}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        aria-label="Copiar dirección"
+                        onClick={() => copyText(bchOrder.address, 'addr')}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                    {copied === 'addr' && (
+                      <Typography variant="caption" color="success.main">
+                        Copiado
+                      </Typography>
+                    )}
+                  </Box>
                 </Stack>
-                {copied === 'addr' && (
-                  <Typography variant="caption" color="success.main">
-                    Copiado
-                  </Typography>
-                )}
               </Box>
               {bchOrder.seconds_remaining != null && bchOrder.status === 'pending' && (
                 <Typography variant="caption" color="text.secondary">
