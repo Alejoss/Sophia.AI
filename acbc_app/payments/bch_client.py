@@ -19,10 +19,22 @@ from payments.bch_cashaddr import CashAddrError, address_prefix, address_to_scri
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 30
+# Connect must fail fast so we can try the next Fulcrum / HTTP fallback.
+ELECTRUM_CONNECT_TIMEOUT = 10
 SATS_PER_BCH = 100_000_000
 BLOCKCHAIR_MAINNET = 'https://api.blockchair.com/bitcoin-cash'
 DEFAULT_MAINNET_ELECTRUM = 'ssl://bch.imaginary.cash:50002'
 DEFAULT_CHIPNET_ELECTRUM = 'ssl://chipnet.bch.ninja:50002'
+# Prod often sees intermittent connect timeouts on a single Fulcrum host.
+DEFAULT_MAINNET_ELECTRUM_SERVERS = (
+    'ssl://bch.imaginary.cash:50002',
+    'ssl://electrum.imaginary.cash:50002',
+    'ssl://blackie.c3-soft.com:50002',
+    'ssl://bch.loping.net:50002',
+)
+DEFAULT_CHIPNET_ELECTRUM_SERVERS = (
+    'ssl://chipnet.bch.ninja:50002',
+)
 COINGECKO_BCH_PRICE_URL = (
     'https://api.coingecko.com/api/v3/simple/price'
     '?ids=bitcoin-cash&vs_currencies=usd'
@@ -88,10 +100,32 @@ def is_bch_direct_configured() -> bool:
     return True
 
 
-def build_bch_client(session: requests.Session | None = None) -> 'BchPublicClient | BchElectrumClient':
+def _electrum_server_list(*, network: str, api_base: str) -> list[str]:
+    """Ordered Fulcrum endpoints: env list, else defaults (api_base first)."""
+    configured = (getattr(settings, 'BCH_ELECTRUM_SERVERS', '') or '').strip()
+    if configured:
+        servers = [s.strip() for s in configured.split(',') if s.strip()]
+        if servers:
+            return servers
+    if network == 'mainnet':
+        defaults = list(DEFAULT_MAINNET_ELECTRUM_SERVERS)
+        primary = api_base or DEFAULT_MAINNET_ELECTRUM
+    else:
+        defaults = list(DEFAULT_CHIPNET_ELECTRUM_SERVERS)
+        primary = api_base or DEFAULT_CHIPNET_ELECTRUM
+    ordered: list[str] = []
+    for candidate in [primary, *defaults]:
+        if candidate and candidate not in ordered:
+            ordered.append(candidate)
+    return ordered
+
+
+def build_bch_client(
+    session: requests.Session | None = None,
+) -> 'BchPublicClient | BchElectrumClient | BchFailoverClient':
     """
-    Default: Fulcrum/Electrum SSL (mainnet + chipnet).
-    Explicit ``https://…blockchair.com…`` → Blockchair HTTP (optional API key).
+    Default: Fulcrum/Electrum SSL with multi-server + Blockchair HTTP failover.
+    Explicit ``https://…blockchair.com…`` → Blockchair HTTP only (optional API key).
     """
     network = get_bch_network()
     api_base = (getattr(settings, 'BCH_API_BASE', '') or '').strip()
@@ -100,9 +134,11 @@ def build_bch_client(session: requests.Session | None = None) -> 'BchPublicClien
     if api_base.startswith('https://') and not api_base.startswith('ssl://'):
         # Legacy/custom HTTP explorer still using the Blockchair-shaped client.
         return BchPublicClient(api_base=api_base, session=session)
+    servers = _electrum_server_list(network=network, api_base=api_base)
+    http_fallback = None
     if network == 'mainnet':
-        return BchElectrumClient.from_api_base(api_base or DEFAULT_MAINNET_ELECTRUM)
-    return BchElectrumClient.from_api_base(api_base or DEFAULT_CHIPNET_ELECTRUM)
+        http_fallback = BchPublicClient(api_base=BLOCKCHAIR_MAINNET, session=session)
+    return BchFailoverClient(servers=servers, http_fallback=http_fallback)
 
 
 class BchPublicClient:
@@ -330,11 +366,14 @@ def _fetch_coingecko_bch_usd_rate() -> Decimal:
 
 class BchElectrumClient:
     """
-    Fulcrum / ElectrumX SSL client for BCH chipnet (and other test nets).
+    Fulcrum / ElectrumX SSL client for BCH mainnet and chipnet.
 
     ``BCH_API_BASE`` examples:
+      - ssl://bch.imaginary.cash:50002
       - ssl://chipnet.bch.ninja:50002
-      - chipnet.bch.ninja:50002
+
+    Opens one TCP/SSL session per batch of RPC calls (history + tx details)
+    so verify does not pay a fresh connect timeout for every txid.
     """
 
     def __init__(self, host: str, port: int, *, use_ssl: bool = True):
@@ -342,6 +381,7 @@ class BchElectrumClient:
         self.port = port
         self.use_ssl = use_ssl
         self._req_id = 0
+        self._sock: socket.socket | ssl.SSLSocket | None = None
 
     @classmethod
     def from_api_base(cls, api_base: str) -> 'BchElectrumClient':
@@ -354,7 +394,56 @@ class BchElectrumClient:
         use_ssl = parsed.scheme in ('ssl', 'electrums', '')
         return cls(host, port, use_ssl=use_ssl)
 
+    def _open(self) -> socket.socket | ssl.SSLSocket:
+        try:
+            sock = socket.create_connection(
+                (self.host, self.port),
+                timeout=ELECTRUM_CONNECT_TIMEOUT,
+            )
+            sock.settimeout(DEFAULT_TIMEOUT)
+            if self.use_ssl:
+                ctx = ssl.create_default_context()
+                return ctx.wrap_socket(sock, server_hostname=self.host)
+            return sock
+        except (OSError, ssl.SSLError) as exc:
+            logger.error(
+                'Electrum %s:%s connect failed: %s',
+                self.host,
+                self.port,
+                exc,
+                exc_info=True,
+            )
+            raise BchApiError(
+                f'Electrum {self.host}:{self.port} connect failed: {exc}'
+            ) from exc
+
+    def _close(self) -> None:
+        sock = self._sock
+        self._sock = None
+        if sock is None:
+            return
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+    def __enter__(self) -> 'BchElectrumClient':
+        self._close()
+        self._sock = self._open()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._close()
+
     def _call(self, method: str, params: list | None = None) -> Any:
+        """JSON-RPC over the open session, or a one-shot connection."""
+        if self._sock is not None:
+            return self._rpc(self._sock, method, params)
+        with self:
+            assert self._sock is not None
+            return self._rpc(self._sock, method, params)
+
+    def _rpc(self, sock: socket.socket | ssl.SSLSocket, method: str, params: list | None = None) -> Any:
         self._req_id += 1
         payload = {
             'id': self._req_id,
@@ -363,27 +452,18 @@ class BchElectrumClient:
         }
         line = json.dumps(payload, separators=(',', ':')) + '\n'
         try:
-            with socket.create_connection((self.host, self.port), timeout=DEFAULT_TIMEOUT) as sock:
-                if self.use_ssl:
-                    ctx = ssl.create_default_context()
-                    ssock = ctx.wrap_socket(sock, server_hostname=self.host)
-                else:
-                    ssock = sock
-                try:
-                    ssock.sendall(line.encode('utf-8'))
-                    chunks: list[bytes] = []
-                    while True:
-                        chunk = ssock.recv(65536)
-                        if not chunk:
-                            break
-                        chunks.append(chunk)
-                        if b'\n' in chunk:
-                            break
-                    raw = b''.join(chunks).split(b'\n', 1)[0]
-                finally:
-                    if self.use_ssl:
-                        ssock.close()
+            sock.sendall(line.encode('utf-8'))
+            chunks: list[bytes] = []
+            while True:
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                if b'\n' in chunk:
+                    break
+            raw = b''.join(chunks).split(b'\n', 1)[0]
         except (OSError, ssl.SSLError) as exc:
+            self._close()
             logger.error(
                 'Electrum %s:%s %s failed: %s',
                 self.host,
@@ -426,12 +506,13 @@ class BchElectrumClient:
             logger.warning('USD rate via Blockchair failed (%s); CoinGecko fallback', exc)
             return _fetch_coingecko_bch_usd_rate()
 
-    def list_recent_transactions(
+    def fetch_address_history(
         self,
         address: str,
         *,
         limit: int = 25,
-    ) -> list[BchTransaction]:
+    ) -> tuple[list[dict], int]:
+        """Return ``({tx_hash, height}, …)`` newest-first and tip height."""
         addr = (address or '').strip()
         if not addr:
             raise BchApiError('Address BCH vacía.')
@@ -440,41 +521,75 @@ class BchElectrumClient:
         except CashAddrError as exc:
             raise BchApiError(f'Dirección BCH inválida: {exc}') from exc
 
-        try:
-            history = self._call('blockchain.scripthash.get_history', [scripthash]) or []
-        except BchApiError:
-            raise
-        except Exception as exc:
-            logger.error(
-                'Unexpected Electrum history error for %s: %s',
-                addr,
-                exc,
-                exc_info=True,
-            )
-            raise BchApiError(f'No se pudo leer historial Electrum: {exc}') from exc
-
-        # Newest last in Electrum; reverse for recent-first.
-        history = list(reversed(history))[:limit]
-        tip_height = 0
-        try:
-            header = self._call('blockchain.headers.subscribe')
-            if isinstance(header, dict):
-                tip_height = int(header.get('height') or 0)
-        except BchApiError:
-            tip_height = 0
-
-        results: list[BchTransaction] = []
-        for item in history:
-            txid = str(item.get('tx_hash') or '')
-            height = int(item.get('height') or 0)
-            if not txid:
-                continue
+        def _load() -> tuple[list[dict], int]:
             try:
-                results.append(
-                    self.get_transaction(txid, tip_height=tip_height, tx_height=height)
+                history = self._call('blockchain.scripthash.get_history', [scripthash]) or []
+            except BchApiError:
+                raise
+            except Exception as exc:
+                logger.error(
+                    'Unexpected Electrum history error for %s: %s',
+                    addr,
+                    exc,
+                    exc_info=True,
                 )
-            except BchApiError as exc:
-                logger.warning('Skip BCH electrum tx %s: %s', txid, exc)
+                raise BchApiError(f'No se pudo leer historial Electrum: {exc}') from exc
+
+            history = list(reversed(history))[:limit]
+            tip_height = 0
+            try:
+                header = self._call('blockchain.headers.subscribe')
+                if isinstance(header, dict):
+                    tip_height = int(header.get('height') or 0)
+            except BchApiError:
+                tip_height = 0
+            return history, tip_height
+
+        if self._sock is not None:
+            return _load()
+        with self:
+            return _load()
+
+    def list_recent_transactions(
+        self,
+        address: str,
+        *,
+        limit: int = 25,
+    ) -> list[BchTransaction]:
+        results: list[BchTransaction] = []
+        failures: list[str] = []
+        with self:
+            history, tip_height = self.fetch_address_history(address, limit=limit)
+            for item in history:
+                txid = str(item.get('tx_hash') or '')
+                height = int(item.get('height') or 0)
+                if not txid:
+                    continue
+                try:
+                    results.append(
+                        self.get_transaction(
+                            txid,
+                            tip_height=tip_height,
+                            tx_height=height,
+                            _reuse_session=True,
+                        )
+                    )
+                except BchApiError as exc:
+                    failures.append(txid)
+                    logger.warning(
+                        'Skip BCH electrum tx %s on %s:%s: %s',
+                        txid,
+                        self.host,
+                        self.port,
+                        exc,
+                    )
+
+        if history and not results:
+            raise BchApiError(
+                f'Electrum {self.host}:{self.port} returned {len(history)} history '
+                f'entries but failed to load any transaction details '
+                f'(failures={len(failures)}).'
+            )
         return results
 
     def get_transaction(
@@ -483,14 +598,33 @@ class BchElectrumClient:
         *,
         tip_height: int | None = None,
         tx_height: int | None = None,
+        _reuse_session: bool = False,
     ) -> BchTransaction:
-        raw = self._call('blockchain.transaction.get', [txid, True])
+        if _reuse_session and self._sock is not None:
+            raw = self._call('blockchain.transaction.get', [txid, True])
+        else:
+            with self:
+                raw = self._call('blockchain.transaction.get', [txid, True])
+        return self._parse_verbose_tx(
+            txid,
+            raw,
+            tip_height=tip_height,
+            tx_height=tx_height,
+        )
+
+    def _parse_verbose_tx(
+        self,
+        txid: str,
+        raw: Any,
+        *,
+        tip_height: int | None = None,
+        tx_height: int | None = None,
+    ) -> BchTransaction:
         if isinstance(raw, str):
             raise BchApiError('Electrum returned non-verbose transaction')
         if not isinstance(raw, dict):
             raise BchApiError('Unexpected Electrum transaction payload')
 
-        height = tx_height if tx_height is not None else int(raw.get('confirmations') and 0 or 0)
         # Prefer explicit height from history; confirmations from tip.
         confirmations = 0
         if tx_height is not None and tx_height > 0 and tip_height:
@@ -545,7 +679,6 @@ class BchElectrumClient:
             if not addresses and spk.get('address'):
                 addresses = [spk['address']]
             if not addresses:
-                # Match by amount only against expected receive later; keep empty addr skip
                 continue
             for recipient in addresses:
                 outputs.append(
@@ -557,4 +690,188 @@ class BchElectrumClient:
             timestamp=timestamp,
             confirmations=confirmations,
             outputs=outputs,
+        )
+
+
+class BchFailoverClient:
+    """
+    Try Fulcrum servers in order, then Blockchair HTTP for missing tx details.
+
+    Prod logs showed ``bch.imaginary.cash`` connect timeouts on
+    ``blockchain.transaction.get`` while history still listed the buyer tx —
+    verify then returned an empty amounts_seen list and a false "no match".
+    """
+
+    def __init__(
+        self,
+        servers: list[str],
+        *,
+        http_fallback: BchPublicClient | None = None,
+    ):
+        if not servers:
+            raise ValueError('BchFailoverClient requires at least one Electrum server')
+        self.servers = [BchElectrumClient.from_api_base(s) for s in servers]
+        self.http_fallback = http_fallback
+        # Expose primary host/port for older tests / probe output.
+        self.host = self.servers[0].host
+        self.port = self.servers[0].port
+
+    def get_bch_usd_rate(self) -> Decimal:
+        last_err: Exception | None = None
+        for client in self.servers:
+            try:
+                return client.get_bch_usd_rate()
+            except BchApiError as exc:
+                last_err = exc
+                logger.warning('USD rate via Electrum %s:%s failed: %s', client.host, client.port, exc)
+        if self.http_fallback is not None:
+            try:
+                return self.http_fallback.get_bch_usd_rate()
+            except BchApiError as exc:
+                last_err = exc
+        try:
+            return _fetch_coingecko_bch_usd_rate()
+        except BchApiError as exc:
+            last_err = exc
+        raise BchApiError(f'No se pudo obtener el precio de BCH en USD: {last_err}')
+
+    def list_recent_transactions(
+        self,
+        address: str,
+        *,
+        limit: int = 25,
+    ) -> list[BchTransaction]:
+        last_err: Exception | None = None
+        history: list[dict] | None = None
+        tip_height = 0
+        history_client: BchElectrumClient | None = None
+        results: list[BchTransaction] = []
+        missing: list[tuple[str, int]] = []
+
+        for client in self.servers:
+            try:
+                # One TCP/SSL session for history + as many tx details as possible.
+                with client:
+                    history, tip_height = client.fetch_address_history(address, limit=limit)
+                    history_client = client
+                    logger.info(
+                        'BCH history ids via Electrum %s:%s → %s entries',
+                        client.host,
+                        client.port,
+                        len(history),
+                    )
+                    if not history:
+                        return []
+                    for item in history:
+                        txid = str(item.get('tx_hash') or '')
+                        height = int(item.get('height') or 0)
+                        if not txid:
+                            continue
+                        try:
+                            results.append(
+                                client.get_transaction(
+                                    txid,
+                                    tip_height=tip_height,
+                                    tx_height=height,
+                                    _reuse_session=True,
+                                )
+                            )
+                        except BchApiError as exc:
+                            missing.append((txid, height))
+                            logger.warning(
+                                'Primary Electrum %s:%s missed tx %s: %s',
+                                client.host,
+                                client.port,
+                                txid,
+                                exc,
+                            )
+                break
+            except BchApiError as exc:
+                last_err = exc
+                history = None
+                results = []
+                missing = []
+                history_client = None
+                logger.warning(
+                    'Electrum history/details failed on %s:%s: %s',
+                    client.host,
+                    client.port,
+                    exc,
+                )
+
+        if history is None:
+            if self.http_fallback is not None:
+                try:
+                    txs = self.http_fallback.list_recent_transactions(address, limit=limit)
+                    logger.info(
+                        'BCH history via Blockchair HTTP fallback → %s txs',
+                        len(txs),
+                    )
+                    return txs
+                except BchApiError as exc:
+                    last_err = exc
+                    logger.warning('Blockchair history fallback failed: %s', exc)
+            raise BchApiError(
+                f'No se pudo consultar la blockchain de BCH '
+                f'(último error: {last_err})'
+            )
+
+        for txid, height in missing:
+            if not txid or history_client is None:
+                continue
+            try:
+                results.append(
+                    self.get_transaction(
+                        txid,
+                        tip_height=tip_height,
+                        tx_height=height,
+                        skip_hosts={history_client.host},
+                    )
+                )
+            except BchApiError as exc:
+                logger.warning('Could not load BCH tx %s after failover: %s', txid, exc)
+
+        if not results:
+            raise BchApiError(
+                f'Se listaron {len(history)} transacciones BCH pero no se pudo '
+                f'cargar el detalle de ninguna. Último error: {last_err}'
+            )
+        return results
+
+    def get_transaction(
+        self,
+        txid: str,
+        *,
+        tip_height: int | None = None,
+        tx_height: int | None = None,
+        skip_hosts: set[str] | None = None,
+    ) -> BchTransaction:
+        errors: list[str] = []
+        skip = skip_hosts or set()
+        for client in self.servers:
+            if client.host in skip:
+                continue
+            try:
+                return client.get_transaction(
+                    txid, tip_height=tip_height, tx_height=tx_height,
+                )
+            except BchApiError as exc:
+                errors.append(f'{client.host}:{client.port}={exc}')
+                logger.warning(
+                    'Electrum get_transaction %s failed on %s:%s: %s',
+                    txid,
+                    client.host,
+                    client.port,
+                    exc,
+                )
+        if self.http_fallback is not None:
+            try:
+                tx = self.http_fallback.get_transaction(txid, tip_height=tip_height)
+                logger.info('BCH tx %s loaded via Blockchair HTTP fallback', txid)
+                return tx
+            except BchApiError as exc:
+                errors.append(f'blockchair={exc}')
+        raise BchApiError(
+            f'No se pudo cargar la transacción {txid} '
+            f'({" | ".join(errors[:4])})'
         )

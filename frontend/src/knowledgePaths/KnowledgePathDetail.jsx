@@ -940,7 +940,7 @@ const KnowledgePathDetail = () => {
         offerBch={Boolean(knowledgePath?.bch_direct_available)}
         offerMonero={Boolean(knowledgePath?.is_for_sale)}
         createBchPayment={() => createPathPurchaseBchPayment(pathPurchaseId)}
-        verifyBchPayment={() => verifyPathPurchaseBchPayment(pathPurchaseId)}
+        verifyBchPayment={(txid) => verifyPathPurchaseBchPayment(pathPurchaseId, txid)}
         nowpaymentsProps={{ pathPurchaseId }}
         onPaid={handlePaymentComplete}
       />

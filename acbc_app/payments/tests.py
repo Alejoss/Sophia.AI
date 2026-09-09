@@ -511,26 +511,26 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ab' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ab' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'ab' * 32)
+        self.assertEqual(paid.payment_txid, txid)
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
 
@@ -543,21 +543,25 @@ class BchDirectPaymentTests(TestCase):
             client=client,
         )
         # At $200/BCH, $0.20 tolerance ≈ 100_000 sats — stay outside that window.
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='cd' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats + 150_000,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'cd' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats + 150_000,
+                ),
+            ],
+        )
         with self.assertRaises(BchPaymentError):
-            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                payment_txid=txid,
+                client=client,
+            )
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
 
@@ -571,23 +575,23 @@ class BchDirectPaymentTests(TestCase):
             client=client,
         )
         paid_sats = order.expected_amount_sats - 1441
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='c4' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=paid_sats),
-                ],
-            ),
-        ]
+        txid = 'c4' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=paid_sats),
+            ],
+        )
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'c4' * 32)
+        self.assertEqual(paid.payment_txid, txid)
         self.assertEqual(paid.provider_payload.get('amount_sats'), paid_sats)
         self.assertEqual(paid.provider_payload.get('amount_delta_sats'), -1441)
 
@@ -621,23 +625,23 @@ class BchDirectPaymentTests(TestCase):
                 expires_at=timezone.now() + timedelta(minutes=30),
                 provider_payload={'network': 'mainnet'},
             )
-            client.list_recent_transactions.return_value = [
-                BchTransaction(
-                    txid='4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a',
-                    timestamp=int(order.created_at.timestamp()) + 60,
-                    confirmations=0,
-                    outputs=[
-                        BchTxOutput(
-                            address='bitcoincash:qzqna5s34njc3exw6l3u6jm8wzkd0l324sa6ytrkgl',
-                            amount_sats=12_757_089,
-                        ),
-                        BchTxOutput(address=receive, amount_sats=paid_sats),
-                    ],
-                ),
-            ]
+            txid = '4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a'
+            client.get_transaction.return_value = BchTransaction(
+                txid=txid,
+                timestamp=int(order.created_at.timestamp()) + 60,
+                confirmations=0,
+                outputs=[
+                    BchTxOutput(
+                        address='bitcoincash:qzqna5s34njc3exw6l3u6jm8wzkd0l324sa6ytrkgl',
+                        amount_sats=12_757_089,
+                    ),
+                    BchTxOutput(address=receive, amount_sats=paid_sats),
+                ],
+            )
             paid = verify_bch_payment(
                 anchor_request=self.req,
                 user=self.user,
+                payment_txid=txid,
                 client=client,
             )
             self.assertEqual(paid.pk, order.pk)
@@ -656,21 +660,25 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ee' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats + 250_000,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ee' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats + 250_000,
+                ),
+            ],
+        )
         with self.assertRaises(BchPaymentError) as ctx:
-            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                payment_txid=txid,
+                client=client,
+            )
         details = ctx.exception.details
         self.assertEqual(details.get('expected_sats'), order.expected_amount_sats)
         self.assertIn(order.expected_amount_sats + 250_000, details.get('amounts_seen') or [])
@@ -701,26 +709,26 @@ class BchDirectPaymentTests(TestCase):
         )
         # Payment block time 5 minutes before the order — still within default grace.
         early_ts = int(order.created_at.timestamp()) - 300
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ef' * 32,
-                timestamp=early_ts,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ef' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=early_ts,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'ef' * 32)
+        self.assertEqual(paid.payment_txid, txid)
 
     def test_waiting_nowpayments_is_abandoned_when_starting_bch(self):
         CryptoPayment.objects.create(
@@ -785,14 +793,20 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.side_effect = BchApiError(
-            'Blockchair error 430: blacklisted'
+        txid = 'aa' * 32
+        client.get_transaction.side_effect = BchApiError(
+            'Electrum timed out'
         )
         with self.assertLogs('payments.bch_services', level='ERROR') as logs:
             with self.assertRaises(BchPaymentError) as ctx:
-                verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
-        self.assertIn('blockchain', str(ctx.exception).lower())
-        self.assertTrue(any('chain lookup failed' in line.lower() for line in logs.output))
+                verify_bch_payment(
+                    anchor_request=self.req,
+                    user=self.user,
+                    payment_txid=txid,
+                    client=client,
+                )
+        self.assertIn('transacción', str(ctx.exception).lower())
+        self.assertTrue(any('txid lookup failed' in line.lower() for line in logs.output))
         order.refresh_from_db()
         self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
 
@@ -860,9 +874,9 @@ class BchNetworkClientTests(TestCase):
 
     @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
     def test_build_client_chipnet_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'chipnet.bch.ninja')
         self.assertEqual(client.port, 50002)
 
@@ -878,13 +892,55 @@ class BchNetworkClientTests(TestCase):
     @override_settings(
         BCH_NETWORK='mainnet',
         BCH_API_BASE='ssl://bch.imaginary.cash:50002',
+        BCH_ELECTRUM_SERVERS='',
     )
-    def test_build_client_mainnet_default_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+    def test_build_client_mainnet_default_is_failover(self):
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'bch.imaginary.cash')
         self.assertEqual(client.port, 50002)
+        self.assertGreaterEqual(len(client.servers), 2)
+        self.assertIsNotNone(client.http_fallback)
+
+    def test_failover_fills_missing_tx_via_http(self):
+        from payments.bch_client import BchFailoverClient
+
+        primary = MagicMock()
+        primary.host = 'primary.example'
+        primary.port = 50002
+        primary.fetch_address_history.return_value = (
+            [{'tx_hash': 'aa' * 32, 'height': 100}],
+            110,
+        )
+        primary.__enter__ = MagicMock(return_value=primary)
+        primary.__exit__ = MagicMock(return_value=False)
+        primary.get_transaction.side_effect = BchApiError('timed out')
+
+        secondary = MagicMock()
+        secondary.host = 'secondary.example'
+        secondary.port = 50002
+        secondary.get_transaction.side_effect = BchApiError('also down')
+
+        http = MagicMock()
+        expected = BchTransaction(
+            txid='aa' * 32,
+            timestamp=1_700_000_000,
+            confirmations=11,
+            outputs=[BchTxOutput(address='bitcoincash:qtest', amount_sats=123)],
+        )
+        http.get_transaction.return_value = expected
+
+        client = BchFailoverClient.__new__(BchFailoverClient)
+        client.servers = [primary, secondary]
+        client.http_fallback = http
+        client.host = primary.host
+        client.port = primary.port
+
+        txs = client.list_recent_transactions('bitcoincash:qtest', limit=5)
+        self.assertEqual(len(txs), 1)
+        self.assertEqual(txs[0].txid, 'aa' * 32)
+        http.get_transaction.assert_called_once()
 
     @override_settings(
         BCH_NETWORK='chipnet',
@@ -1256,17 +1312,15 @@ class PathAndTopicBchPaymentTests(TestCase):
             price_amount=4,
         )
 
-    def _paid_tx(self, order):
-        return [
-            BchTransaction(
-                txid='ef' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
-                ],
-            ),
-        ]
+    def _paid_tx(self, order, txid='ef' * 32):
+        return BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
 
     def test_path_bch_requires_flag(self):
         self.path.sales_enabled = False
@@ -1288,10 +1342,12 @@ class PathAndTopicBchPaymentTests(TestCase):
             user=self.buyer,
             client=client,
         )
-        client.list_recent_transactions.return_value = self._paid_tx(order)
+        txid = 'ef' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
         paid = verify_bch_payment(
             path_purchase=self.purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -1322,10 +1378,12 @@ class PathAndTopicBchPaymentTests(TestCase):
             user=self.buyer,
             client=client,
         )
-        client.list_recent_transactions.return_value = self._paid_tx(order)
+        txid = 'ef' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
         paid = verify_bch_payment(
             topic_purchase=self.topic_purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -1398,7 +1456,11 @@ class PathAndTopicBchPaymentTests(TestCase):
         api = APIClient()
         api.force_authenticate(user=self.buyer)
         with self.assertLogs('payments.views', level='WARNING') as logs:
-            response = api.post(f'/api/payments/path-purchase/{self.purchase.id}/bch/verify/')
+            response = api.post(
+                f'/api/payments/path-purchase/{self.purchase.id}/bch/verify/',
+                {'txid': 'ab' * 32},
+                format='json',
+            )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(
             any('verify_path_bch failed' in line for line in logs.output),
@@ -1505,19 +1567,19 @@ class TokenPackagePurchaseTests(TestCase):
         )
         self.assertEqual(order.token_purchase_id, purchase.id)
         self.assertIsNone(order.path_purchase_id)
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ab' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
-                ],
-            ),
-        ]
+        txid = 'ab' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
         paid = verify_bch_payment(
             token_purchase=purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)

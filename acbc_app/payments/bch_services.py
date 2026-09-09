@@ -17,6 +17,7 @@ from payments.bch_client import (
     SATS_PER_BCH,
     BchApiError,
     BchElectrumClient,
+    BchFailoverClient,
     BchPublicClient,
     build_bch_client,
     get_bch_network,
@@ -336,7 +337,7 @@ def create_or_reuse_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
         t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
@@ -429,6 +430,127 @@ def create_or_reuse_bch_payment(
     return payment
 
 
+def _match_payment_on_transactions(
+    payment: BchDirectPayment,
+    txs: list,
+    *,
+    lookup_txid: str | None = None,
+):
+    """
+    Pick the best matching receive output within USD tolerance.
+
+    Returns the fulfilled payment, or raises ``BchPaymentError`` with diagnostics.
+    """
+    grace = _verify_timestamp_grace_seconds()
+    min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
+    min_conf = _min_confirmations()
+    receive = payment.address
+    expected = int(payment.expected_amount_sats)
+    tol_sats = _tolerance_sats_for_rate(payment.usd_bch_rate)
+    skipped_conf = 0
+    skipped_time = 0
+    skipped_txid = 0
+    skipped_other_order = 0
+    amounts_to_receive: list[int] = []
+    # (abs_delta, -confirmations, -timestamp, txid, amount_sats, confirmations, timestamp)
+    best: tuple | None = None
+
+    for tx in txs:
+        if tx.confirmations < min_conf:
+            skipped_conf += 1
+            continue
+        if tx.timestamp is not None and tx.timestamp < min_ts:
+            skipped_time += 1
+            continue
+        if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
+            skipped_txid += 1
+            continue
+        for out in tx.outputs:
+            if not _addresses_match(out.address, receive):
+                continue
+            amounts_to_receive.append(out.amount_sats)
+            delta = abs(int(out.amount_sats) - expected)
+            if delta > tol_sats:
+                continue
+            if _amount_closer_to_other_pending(amount_sats=out.amount_sats, payment=payment):
+                skipped_other_order += 1
+                continue
+            candidate = (
+                delta,
+                -int(tx.confirmations or 0),
+                -int(tx.timestamp or 0),
+                str(tx.txid),
+                int(out.amount_sats),
+                int(tx.confirmations or 0),
+                tx.timestamp,
+            )
+            if best is None or candidate[:3] < best[:3]:
+                best = candidate
+
+    if best is not None:
+        _delta, _nc, _nts, txid, amount_sats, confirmations, timestamp = best
+        return _fulfill_bch_payment(payment, txid, tx_payload={
+            'txid': txid,
+            'timestamp': timestamp,
+            'confirmations': confirmations,
+            'amount_sats': amount_sats,
+            'expected_amount_sats': expected,
+            'amount_delta_sats': amount_sats - expected,
+            'amount_tolerance_sats': tol_sats,
+            'amount_tolerance_usd': str(_amount_tolerance_usd()),
+            'verify_mode': 'txid' if lookup_txid else 'address_scan',
+        })
+
+    logger.warning(
+        'BCH verify no amount match within tolerance payment_id=%s address=%s '
+        'expected_sats=%s tol_sats=%s tol_usd=%s txs_scanned=%s amounts_seen=%s '
+        'skipped_conf=%s skipped_time=%s skipped_txid=%s skipped_other_order=%s '
+        'grace_s=%s created_at=%s lookup_txid=%s',
+        payment.pk,
+        payment.address,
+        expected,
+        tol_sats,
+        str(_amount_tolerance_usd()),
+        len(txs),
+        amounts_to_receive[:20],
+        skipped_conf,
+        skipped_time,
+        skipped_txid,
+        skipped_other_order,
+        grace,
+        payment.created_at.isoformat(),
+        lookup_txid or '',
+    )
+    details = {
+        'payment_id': payment.pk,
+        'address': payment.address,
+        'expected_sats': expected,
+        'tol_sats': tol_sats,
+        'tol_usd': str(_amount_tolerance_usd()),
+        'txs_scanned': len(txs),
+        'amounts_seen': amounts_to_receive[:20],
+        'skipped_conf': skipped_conf,
+        'skipped_time': skipped_time,
+        'skipped_txid': skipped_txid,
+        'skipped_other_order': skipped_other_order,
+        'grace_s': grace,
+        'created_at': payment.created_at.isoformat(),
+        'network': get_bch_network(),
+        'lookup_txid': lookup_txid or '',
+    }
+    if lookup_txid:
+        raise BchPaymentError(
+            'Esa transacción no envía a nuestra dirección un monto cercano al de la orden. '
+            'Revisa el TXID, el monto (sats) y vuelve a intentarlo.',
+            details=details,
+        )
+    raise BchPaymentError(
+        'No encontramos un pago BCH con un monto cercano al de la orden aún. '
+        'Espera unos segundos y vuelve a intentarlo.',
+        details=details,
+    )
+
+
 def verify_bch_payment(
     *,
     user,
@@ -436,7 +558,8 @@ def verify_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    payment_txid: str | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
         t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
@@ -522,122 +645,32 @@ def verify_bch_payment(
     if payment.status == BchDirectPayment.STATUS_EXPIRED:
         raise BchPaymentError('La orden BCH expiró. Genera una nueva orden.')
 
+    # Prefer a single get_transaction(txid) — much more reliable than scanning
+    # address history across flaky Electrum servers.
+    clean_txid = normalize_bch_txid(payment_txid) if payment_txid else ''
+    if not clean_txid:
+        raise BchPaymentError(
+            'Indica el ID de la transacción (TXID, 64 caracteres hex) para verificar el pago.'
+        )
+
     client = client or build_bch_client()
     try:
-        txs = client.list_recent_transactions(payment.address, limit=30)
+        tx = client.get_transaction(clean_txid)
     except BchApiError as exc:
         logger.exception(
-            'BCH chain lookup failed network=%s payment_id=%s address=%s sats=%s: %s',
+            'BCH txid lookup failed network=%s payment_id=%s txid=%s: %s',
             get_bch_network(),
             payment.pk,
-            payment.address,
-            payment.expected_amount_sats,
+            clean_txid,
             exc,
         )
         raise BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
-            'o avísanos por mensaje con el monto y la dirección de la orden.'
+            'No se pudo consultar esa transacción en la blockchain de BCH. '
+            'Revisa el TXID o inténtalo más tarde.',
+            details={'payment_id': payment.pk, 'lookup_txid': clean_txid},
         ) from exc
 
-    grace = _verify_timestamp_grace_seconds()
-    min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
-    min_conf = _min_confirmations()
-    receive = payment.address
-    expected = int(payment.expected_amount_sats)
-    tol_sats = _tolerance_sats_for_rate(payment.usd_bch_rate)
-    skipped_conf = 0
-    skipped_time = 0
-    skipped_txid = 0
-    skipped_other_order = 0
-    amounts_to_receive: list[int] = []
-    # (abs_delta, -confirmations, -timestamp, txid, amount_sats, tx_payload fields)
-    best: tuple | None = None
-
-    for tx in txs:
-        if tx.confirmations < min_conf:
-            skipped_conf += 1
-            continue
-        if tx.timestamp is not None and tx.timestamp < min_ts:
-            skipped_time += 1
-            continue
-        if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
-            skipped_txid += 1
-            continue
-        for out in tx.outputs:
-            if not _addresses_match(out.address, receive):
-                continue
-            amounts_to_receive.append(out.amount_sats)
-            delta = abs(int(out.amount_sats) - expected)
-            if delta > tol_sats:
-                continue
-            if _amount_closer_to_other_pending(amount_sats=out.amount_sats, payment=payment):
-                skipped_other_order += 1
-                continue
-            candidate = (
-                delta,
-                -int(tx.confirmations or 0),
-                -int(tx.timestamp or 0),
-                str(tx.txid),
-                int(out.amount_sats),
-                int(tx.confirmations or 0),
-                tx.timestamp,
-            )
-            if best is None or candidate[:3] < best[:3]:
-                best = candidate
-
-    if best is not None:
-        _delta, _nc, _nts, txid, amount_sats, confirmations, timestamp = best
-        return _fulfill_bch_payment(payment, txid, tx_payload={
-            'txid': txid,
-            'timestamp': timestamp,
-            'confirmations': confirmations,
-            'amount_sats': amount_sats,
-            'expected_amount_sats': expected,
-            'amount_delta_sats': amount_sats - expected,
-            'amount_tolerance_sats': tol_sats,
-            'amount_tolerance_usd': str(_amount_tolerance_usd()),
-        })
-
-    logger.warning(
-        'BCH verify no amount match within tolerance payment_id=%s address=%s '
-        'expected_sats=%s tol_sats=%s tol_usd=%s txs_scanned=%s amounts_seen=%s '
-        'skipped_conf=%s skipped_time=%s skipped_txid=%s skipped_other_order=%s '
-        'grace_s=%s created_at=%s',
-        payment.pk,
-        payment.address,
-        expected,
-        tol_sats,
-        str(_amount_tolerance_usd()),
-        len(txs),
-        amounts_to_receive[:20],
-        skipped_conf,
-        skipped_time,
-        skipped_txid,
-        skipped_other_order,
-        grace,
-        payment.created_at.isoformat(),
-    )
-    details = {
-        'payment_id': payment.pk,
-        'address': payment.address,
-        'expected_sats': expected,
-        'tol_sats': tol_sats,
-        'tol_usd': str(_amount_tolerance_usd()),
-        'txs_scanned': len(txs),
-        'amounts_seen': amounts_to_receive[:20],
-        'skipped_conf': skipped_conf,
-        'skipped_time': skipped_time,
-        'skipped_txid': skipped_txid,
-        'skipped_other_order': skipped_other_order,
-        'grace_s': grace,
-        'created_at': payment.created_at.isoformat(),
-        'network': get_bch_network(),
-    }
-    raise BchPaymentError(
-        'No encontramos un pago BCH con un monto cercano al de la orden aún. '
-        'Espera unos segundos y vuelve a intentarlo.',
-        details=details,
-    )
+    return _match_payment_on_transactions(payment, [tx], lookup_txid=clean_txid)
 
 
 @transaction.atomic
@@ -647,7 +680,10 @@ def _fulfill_bch_payment(
     *,
     tx_payload: dict,
 ) -> BchDirectPayment:
-    locked = BchDirectPayment.objects.select_for_update().select_related(
+    # Postgres rejects FOR UPDATE on the nullable side of OUTER JOINs from
+    # select_related() on optional FKs (anchor/path/topic/token). Lock only
+    # the payment row — same pattern as report_bch_payment_txid / manual_confirm.
+    locked = BchDirectPayment.objects.select_for_update(of=('self',)).select_related(
         'anchor_request',
         'path_purchase',
         'topic_purchase',
