@@ -748,9 +748,9 @@ class Topic(models.Model):
         null=True,
         help_text='USD price for Consultas. 0 or null means consultations are free.',
     )
-    bch_direct_enabled = models.BooleanField(
-        default=False,
-        help_text='Staff: offer self-custody Bitcoin Cash checkout for paid Consultas.',
+    sales_enabled = models.BooleanField(
+        default=True,
+        help_text='Staff: allow buyers to purchase Consultas when the topic has a price.',
     )
     activity_score = models.IntegerField(
         default=0,
@@ -794,6 +794,11 @@ class Topic(models.Model):
     @property
     def is_paid_topic(self):
         return bool(self.reference_price and self.reference_price > 0)
+
+    @property
+    def is_for_sale(self):
+        """Paid Consultas that staff currently allows buyers to purchase."""
+        return self.is_paid_topic and self.sales_enabled
 
 
 class TopicPurchase(models.Model):

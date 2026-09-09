@@ -446,6 +446,8 @@ def create_event_registration_payment(*, event_registration: EventRegistration, 
 def get_or_create_path_purchase(*, knowledge_path, user) -> KnowledgePathPurchase:
     if not knowledge_path.is_paid_path:
         raise ValueError('Este camino de conocimiento es gratuito.')
+    if not knowledge_path.sales_enabled:
+        raise ValueError('La venta de este camino está desactivada.')
     if knowledge_path.author_id == user.id:
         raise ValueError('El autor ya tiene acceso a este camino.')
 

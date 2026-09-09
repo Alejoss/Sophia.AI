@@ -939,23 +939,24 @@ const TopicDetail = () => {
                                     variant="contained"
                                     startIcon={<Payments />}
                                     onClick={handleStartTopicPurchase}
-                                    disabled={purchaseLoading || !topic.bch_direct_available}
+                                    disabled={purchaseLoading || !topic.is_for_sale}
                                     sx={{ textTransform: 'none' }}
                                 >
-                                    {purchaseLoading ? 'Preparando...' : 'Pagar con BCH'}
+                                    {purchaseLoading ? 'Preparando...' : 'Pagar consultas'}
                                 </Button>
                                 <Button
                                     variant="outlined"
                                     startIcon={<Payments />}
                                     onClick={handleStartMoneroPayment}
+                                    disabled={!topic.is_for_sale}
                                     sx={{ textTransform: 'none' }}
                                 >
                                     Pagar con Monero
                                 </Button>
                             </Stack>
-                            {!topic.bch_direct_available && (
+                            {!topic.is_for_sale && (
                                 <Typography variant="caption" color="text.secondary">
-                                    El pago BCH aún no está activado para este tema.
+                                    La venta de consultas de este tema está desactivada.
                                 </Typography>
                             )}
                         </Stack>
@@ -1035,7 +1036,7 @@ const TopicDetail = () => {
                 priceUsd={topic?.reference_price}
                 productLabel="consultas del tema"
                 offerNowpayments={false}
-                offerBch
+                offerBch={Boolean(topic?.bch_direct_available)}
                 offerMonero={false}
                 createBchPayment={() => createTopicPurchaseBchPayment(topicPurchaseId)}
                 verifyBchPayment={() => verifyTopicPurchaseBchPayment(topicPurchaseId)}

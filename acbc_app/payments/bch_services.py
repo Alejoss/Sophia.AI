@@ -143,8 +143,8 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Este camino ya está desbloqueado.')
         if not path.is_paid_path:
             raise BchPaymentError('Este camino de conocimiento es gratuito.')
-        if not path.bch_direct_enabled:
-            raise BchPaymentError('El pago BCH no está activado para este camino.')
+        if not path.sales_enabled:
+            raise BchPaymentError('La venta de este camino está desactivada.')
         _release_waiting_nowpayments(path_purchase=path_purchase)
         return
 
@@ -156,8 +156,8 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Las consultas de este tema ya están desbloqueadas.')
         if not topic.is_paid_topic:
             raise BchPaymentError('Las consultas de este tema son gratuitas.')
-        if not topic.bch_direct_enabled:
-            raise BchPaymentError('El pago BCH no está activado para este tema.')
+        if not topic.sales_enabled:
+            raise BchPaymentError('La venta de consultas de este tema está desactivada.')
         return
 
     raise BchPaymentError('Falta el entitlement del pago BCH.')

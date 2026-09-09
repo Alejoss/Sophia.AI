@@ -122,8 +122,8 @@ Staff dashboard (`IsAdminUser`):
 | Method | Endpoint | Auth |
 |--------|----------|------|
 | GET | `/api/payments/admin/bch-catalog/` | JWT staff |
-| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | JWT staff (`bch_direct_enabled`) |
-| PATCH | `/api/payments/admin/topics/<id>/` | JWT staff (`bch_direct_enabled`, `reference_price`) |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | JWT staff (`sales_enabled`) |
+| PATCH | `/api/payments/admin/topics/<id>/` | JWT staff (`sales_enabled`, `reference_price`) |
 | POST | `/api/content/topics/<id>/purchase/` | JWT; buyer for paid Consultas |
 | GET/POST | `/api/payments/path-purchase/<id>/bch/` | JWT; buyer (POST), buyer/author/staff (GET) |
 | POST | `/api/payments/path-purchase/<id>/bch/verify/` | JWT; buyer, author, or staff |
