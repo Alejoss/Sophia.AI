@@ -5,7 +5,7 @@ Crypto checkout for Academia Blockchain. Complementary paths:
 | Path | Use | Docs |
 |------|-----|------|
 | **NOWPayments** (hosted) | Event registrations, knowledge-path purchases, transcript-anchor requests, and platform token packages. User pays BCH or Monero on NOWPayments (token packages: BCH via the hosted invoice, no Monero in our UI). | [nowpayments-setup.md](nowpayments-setup.md) |
-| **BCH directo** (self-custody) | Transcript-anchor requests, plus staff-activated knowledge paths and topic Consultas, and token packages. Exact-amount Bitcoin Cash to a platform wallet; user taps **Ya realicé el pago**. | [bch-direct.md](bch-direct.md) |
+| **BCH directo** (self-custody) | Transcript-anchor requests, plus staff-activated knowledge paths and topic Consultas, and token packages. Exact-amount Bitcoin Cash to a platform wallet; user taps **Ya realicé el pago** (auto address-scan; TXID only after failure / support). | [bch-direct.md](bch-direct.md) |
 | **Platform tokens** | Buy and hold platform credits from **Mis tokens**. Spending on content comes later. | [platform-tokens.md](platform-tokens.md) |
 | **Monero (mensaje)** | No extra server setup. Checkout shows **Pagar con Monero**; a modal sends a direct message to user `#2` to request a wallet address. | UI only (`frontend/src/payments/MoneroPaymentModal.jsx`) |
 

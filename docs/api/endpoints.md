@@ -550,7 +550,7 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 ### Transcript-anchor request (BCH directo)
 - **GET** `/api/payments/anchor-request/{id}/bch/` — current order (`payment` may be `null`)
 - **POST** `/api/payments/anchor-request/{id}/bch/` — create or reuse exact-amount order (requester only)
-- **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match
+- **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match (`{}` auto address-scan; optional `{ "txid": "…" }` fallback)
 - **Auth**: Required (requester; staff may GET/verify)
 
 ### Platform token packages

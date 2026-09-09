@@ -512,7 +512,7 @@ class BchDirectPaymentTests(TestCase):
             client=client,
         )
         txid = 'ab' * 32
-        client.get_transaction.return_value = BchTransaction(
+        tx = BchTransaction(
             txid=txid,
             timestamp=int(order.created_at.timestamp()) + 10,
             confirmations=1,
@@ -523,10 +523,10 @@ class BchDirectPaymentTests(TestCase):
                 ),
             ],
         )
+        client.list_recent_transactions.return_value = [tx]
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
-            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -544,7 +544,7 @@ class BchDirectPaymentTests(TestCase):
         )
         # At $200/BCH, $0.20 tolerance ≈ 100_000 sats — stay outside that window.
         txid = 'cd' * 32
-        client.get_transaction.return_value = BchTransaction(
+        tx = BchTransaction(
             txid=txid,
             timestamp=int(order.created_at.timestamp()) + 10,
             confirmations=1,
@@ -555,11 +555,11 @@ class BchDirectPaymentTests(TestCase):
                 ),
             ],
         )
+        client.list_recent_transactions.return_value = [tx]
         with self.assertRaises(BchPaymentError):
             verify_bch_payment(
                 anchor_request=self.req,
                 user=self.user,
-                payment_txid=txid,
                 client=client,
             )
         self.req.refresh_from_db()
@@ -576,7 +576,7 @@ class BchDirectPaymentTests(TestCase):
         )
         paid_sats = order.expected_amount_sats - 1441
         txid = 'c4' * 32
-        client.get_transaction.return_value = BchTransaction(
+        tx = BchTransaction(
             txid=txid,
             timestamp=int(order.created_at.timestamp()) + 10,
             confirmations=1,
@@ -584,10 +584,10 @@ class BchDirectPaymentTests(TestCase):
                 BchTxOutput(address=order.address, amount_sats=paid_sats),
             ],
         )
+        client.list_recent_transactions.return_value = [tx]
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
-            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -727,6 +727,67 @@ class BchDirectPaymentTests(TestCase):
             payment_txid=txid,
             client=client,
         )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(paid.payment_txid, txid)
+
+    def test_verify_without_txid_scans_address_and_txid_unlocks_expired(self):
+        """Auto-verify needs no TXID; TXID fallback can still unlock an expired order."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        txid = '11' * 32
+        matching_tx = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
+
+        # Auto path (no TXID) finds the payment via address history.
+        client.list_recent_transactions.return_value = []
+        with self.assertRaises(BchPaymentError) as empty_scan:
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
+        self.assertIn('soporte', str(empty_scan.exception).lower())
+
+        order.status = BchDirectPayment.STATUS_EXPIRED
+        order.expires_at = timezone.now() - timedelta(minutes=1)
+        order.save(update_fields=['status', 'expires_at', 'updated_at'])
+
+        # Without TXID, expired orders are not auto-scanned.
+        with self.assertRaises(BchPaymentError) as expired_auto:
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
+        self.assertIn('expir', str(expired_auto.exception).lower())
+
+        # With TXID, the same expired order can still be fulfilled.
+        client.get_transaction.return_value = matching_tx
+        paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.pk, order.pk)
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
         self.assertEqual(paid.payment_txid, txid)
 

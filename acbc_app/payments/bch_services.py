@@ -561,6 +561,16 @@ def verify_bch_payment(
     payment_txid: str | None = None,
     client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
+    """
+    Confirm an on-chain BCH payment for one product entitlement.
+
+    Primary path (no TXID): scan the receive address for a recent output that
+    matches the pending order amount (within USD tolerance).
+
+    Optional TXID: used only as a fallback after auto-verify fails (or when the
+    buyer/staff already has the tx id). Looks up that single transaction and
+    may fulfill a pending, expired, or cancelled order for the same product.
+    """
     targets = [
         t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
     ]
@@ -633,44 +643,167 @@ def verify_bch_payment(
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
     )
+
+    raw_txid = (payment_txid or '').strip()
+    clean_txid = ''
+    if raw_txid:
+        clean_txid = normalize_bch_txid(raw_txid)
+
+    client = client or build_bch_client()
+
+    if clean_txid:
+        return _verify_bch_by_txid(target_q=target_q, clean_txid=clean_txid, client=client)
+
+    return _verify_bch_by_address_scan(target_q=target_q, client=client, user=user)
+
+
+def _verify_bch_by_address_scan(*, target_q, client, user) -> BchDirectPayment:
+    """Automatic verify: find a matching payment on the shared receive address."""
     payment = (
         BchDirectPayment.objects.filter(target_q, status=BchDirectPayment.STATUS_PENDING)
         .order_by('-created_at')
         .first()
     )
     if payment is None:
+        expired = (
+            BchDirectPayment.objects.filter(target_q, status=BchDirectPayment.STATUS_EXPIRED)
+            .order_by('-created_at')
+            .first()
+        )
+        if expired is not None:
+            raise BchPaymentError(
+                'La orden BCH expiró. Genera una nueva orden. Si ya enviaste el pago, '
+                'pega el TXID para verificarlo o envíalo a soporte.',
+                details={
+                    'payment_id': expired.pk,
+                    'expected_sats': expired.expected_amount_sats,
+                    'status': expired.status,
+                },
+            )
         raise BchPaymentError('No hay una orden BCH pendiente. Crea una primero.')
 
     payment.mark_expired_if_needed()
     if payment.status == BchDirectPayment.STATUS_EXPIRED:
-        raise BchPaymentError('La orden BCH expiró. Genera una nueva orden.')
-
-    # Prefer a single get_transaction(txid) — much more reliable than scanning
-    # address history across flaky Electrum servers.
-    clean_txid = normalize_bch_txid(payment_txid) if payment_txid else ''
-    if not clean_txid:
         raise BchPaymentError(
-            'Indica el ID de la transacción (TXID, 64 caracteres hex) para verificar el pago.'
+            'La orden BCH expiró. Genera una nueva orden. Si ya enviaste el pago, '
+            'pega el TXID para verificarlo o envíalo a soporte.',
+            details={
+                'payment_id': payment.pk,
+                'expected_sats': payment.expected_amount_sats,
+                'status': payment.status,
+            },
         )
 
-    client = client or build_bch_client()
+    logger.info(
+        'BCH auto-verify address scan payment_id=%s expected_sats=%s address=%s user_id=%s',
+        payment.pk,
+        payment.expected_amount_sats,
+        payment.address,
+        getattr(user, 'id', None),
+    )
+    try:
+        txs = client.list_recent_transactions(payment.address, limit=30)
+    except BchApiError as exc:
+        logger.exception(
+            'BCH address scan failed network=%s payment_id=%s address=%s sats=%s: %s',
+            get_bch_network(),
+            payment.pk,
+            payment.address,
+            payment.expected_amount_sats,
+            exc,
+        )
+        raise BchPaymentError(
+            'No se pudo consultar la blockchain de BCH automáticamente. '
+            'Espera un momento e inténtalo de nuevo, o envía el TXID a soporte.',
+            details={
+                'payment_id': payment.pk,
+                'expected_sats': payment.expected_amount_sats,
+                'status': payment.status,
+            },
+        ) from exc
+
+    try:
+        return _match_payment_on_transactions(payment, txs, lookup_txid=None)
+    except BchPaymentError as exc:
+        # Nudge the buyer toward the support TXID path after auto-verify misses.
+        if not getattr(exc, 'details', None):
+            exc.details = {}
+        exc.details.setdefault('payment_id', payment.pk)
+        exc.details.setdefault('expected_sats', payment.expected_amount_sats)
+        exc.details['auto_verify_failed'] = True
+        raise BchPaymentError(
+            'No encontramos tu pago BCH todavía. Espera unos segundos y vuelve a '
+            'intentarlo. Si ya pagaste hace un rato, envía el TXID a soporte.',
+            details=exc.details,
+        ) from exc
+
+
+def _verify_bch_by_txid(*, target_q, clean_txid: str, client) -> BchDirectPayment:
+    """Fallback verify with an explicit TXID (support / retry after auto-fail)."""
+    candidates = list(
+        BchDirectPayment.objects.filter(target_q)
+        .exclude(status=BchDirectPayment.STATUS_PAID)
+        .order_by('-created_at')[:12]
+    )
+    if not candidates:
+        raise BchPaymentError(
+            'No hay una orden BCH para este producto. Crea una primero.',
+            details={'lookup_txid': clean_txid},
+        )
+
+    for payment in candidates:
+        payment.mark_expired_if_needed()
+
     try:
         tx = client.get_transaction(clean_txid)
     except BchApiError as exc:
         logger.exception(
-            'BCH txid lookup failed network=%s payment_id=%s txid=%s: %s',
+            'BCH txid lookup failed network=%s payment_ids=%s txid=%s: %s',
             get_bch_network(),
-            payment.pk,
+            [p.pk for p in candidates],
             clean_txid,
             exc,
         )
         raise BchPaymentError(
             'No se pudo consultar esa transacción en la blockchain de BCH. '
             'Revisa el TXID o inténtalo más tarde.',
-            details={'payment_id': payment.pk, 'lookup_txid': clean_txid},
+            details={
+                'payment_ids': [p.pk for p in candidates],
+                'lookup_txid': clean_txid,
+            },
         ) from exc
 
-    return _match_payment_on_transactions(payment, [tx], lookup_txid=clean_txid)
+    last_error: BchPaymentError | None = None
+    for payment in candidates:
+        if payment.status not in (
+            BchDirectPayment.STATUS_PENDING,
+            BchDirectPayment.STATUS_EXPIRED,
+            BchDirectPayment.STATUS_CANCELLED,
+        ):
+            continue
+        try:
+            return _match_payment_on_transactions(
+                payment, [tx], lookup_txid=clean_txid,
+            )
+        except BchPaymentError as exc:
+            last_error = exc
+            logger.info(
+                'BCH txid candidate miss payment_id=%s status=%s expected_sats=%s txid=%s: %s',
+                payment.pk,
+                payment.status,
+                payment.expected_amount_sats,
+                clean_txid,
+                exc,
+            )
+    if last_error is not None:
+        raise last_error
+    raise BchPaymentError(
+        'Esa transacción no coincide con ninguna orden BCH de este producto.',
+        details={
+            'payment_ids': [p.pk for p in candidates],
+            'lookup_txid': clean_txid,
+        },
+    )
 
 
 @transaction.atomic
@@ -695,7 +828,13 @@ def _fulfill_bch_payment(
     ).get(pk=payment.pk)
     if locked.status == BchDirectPayment.STATUS_PAID:
         return locked
-    if locked.status != BchDirectPayment.STATUS_PENDING:
+    # PENDING is the normal auto-verify path. EXPIRED/CANCELLED are allowed so a
+    # TXID fallback can still unlock after TTL or after a replacement order.
+    if locked.status not in (
+        BchDirectPayment.STATUS_PENDING,
+        BchDirectPayment.STATUS_EXPIRED,
+        BchDirectPayment.STATUS_CANCELLED,
+    ):
         raise BchPaymentError('La orden BCH ya no está pendiente.')
 
     locked.status = BchDirectPayment.STATUS_PAID
