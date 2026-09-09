@@ -6214,6 +6214,55 @@ class TopicChatAPITests(APITestCase):
         )
         self.assertNotIn('text', result['sources'][0])
 
+    def test_system_prompt_matches_user_question_language(self):
+        from content.topic_chat import SYSTEM_PROMPT
+
+        lowered = SYSTEM_PROMPT.casefold()
+        self.assertIn('mismo idioma', lowered)
+        self.assertNotIn('responde en español, de forma clara', lowered)
+
+    @patch('content.topic_chat.OpenAIClient')
+    @patch('content.topic_chat.QdrantClient')
+    def test_run_topic_chat_passes_language_matching_system_prompt(
+        self, mock_qdrant_cls, mock_openai_cls
+    ):
+        from content.topic_chat import SYSTEM_PROMPT, run_topic_chat
+
+        openai = mock_openai_cls.return_value
+        openai.embed.return_value = [0.1] * 8
+        openai.chat.return_value = (
+            'For Peter Thiel, the Antichrist relates to a global totalitarian '
+            'state [1].'
+        )
+        qdrant = mock_qdrant_cls.return_value
+        qdrant.search.return_value = [
+            {
+                'score': 0.88,
+                'payload': {
+                    'topic_id': self.topic.id,
+                    'content_id': self.video.id,
+                    'chunk_index': 0,
+                    'text': 'Peter Thiel links the Antichrist to one-world government.',
+                },
+            }
+        ]
+        result = run_topic_chat(
+            topic_id=self.topic.id,
+            topic_title=self.topic.title,
+            message='What is the antichrist for peter thiel?',
+            openai_client=openai,
+            qdrant_client=qdrant,
+        )
+        messages = openai.chat.call_args.args[0]
+        self.assertEqual(messages[0]['role'], 'system')
+        self.assertEqual(messages[0]['content'], SYSTEM_PROMPT)
+        self.assertIn('mismo idioma de la pregunta', messages[0]['content'])
+        self.assertIn(
+            'What is the antichrist for peter thiel?',
+            messages[1]['content'],
+        )
+        self.assertTrue(result['answer'].startswith('For Peter Thiel'))
+
     @patch('content.topic_chat.OpenAIClient')
     @patch('content.topic_chat.QdrantClient')
     def test_run_topic_chat_text_file_source_points_to_topic_content(self, mock_qdrant_cls, mock_openai_cls):

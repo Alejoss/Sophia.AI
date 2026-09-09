@@ -173,7 +173,8 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 - Entity keywords from the question must appear in the assembled prompt after
   keyword fallback; otherwise the chat model is skipped.
 - System prompt requires `[n]` citations plus a short verbatim quote from
-  fragment `[n]` (or an explicit “not in context”).
+  fragment `[n]` (or an explicit “not in context”). Answers must use the **same
+  language as the user’s question** (not forced Spanish).
 - Previous consultations are never sent back to the LLM (one-shot only).
 - Entity keywords missing from dense hits are backfilled from indexed Postgres
   transcript windows when present.
