@@ -71,8 +71,10 @@ sequenceDiagram
 1. Usuario crea solicitud de anclaje (`pending_payment`).
 2. Elige método: NOWPayments o BCH directo. Puede volver atrás y cambiar
    mientras el invoice NOWPayments esté en `waiting`.
-3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats, desambiguación +1 sat).
-4. Usuario paga el monto **exacto** a la dirección de la red activa.
+3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats;
+   desambiguación por ventana de tolerancia USD para no solapar órdenes concurrentes).
+4. Usuario paga el monto mostrado a la dirección de la red activa (se tolera hasta
+   `BCH_AMOUNT_TOLERANCE_USD`, default $0.20, por redondeo/fee de wallet).
 5. `POST .../bch/verify/` consulta Fulcrum (o Blockchair si se fuerza); si hay match → orden `paid` + solicitud `paid_pending_review`.
    Si el indexer falla, el error se registra en logs y el UI ofrece **Avisar por mensaje**.
 6. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
@@ -82,24 +84,30 @@ sequenceDiagram
 1. Tasa USD/BCH: `BCH_USD_PRICE` si es `> 0`; si no, Blockchair mainnet `GET /stats` → `market_price_usd`, con fallback CoinGecko.
 2. `bch_amount = ceil(usd / rate, 8 decimales)`.
 3. `base_sats = bch_amount * 100_000_000`, luego `max(1000, base_sats)`.
-4. Si otra orden `pending` no expirada ya usa esos sats, se suma **1 sat** (hasta 10 000 intentos).
+4. Si otra orden `pending` no expirada cae dentro de la ventana de tolerancia de este monto,
+   se desplaza el monto por `2 × tol_sats + 1` (hasta 10 000 intentos).
 
-El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe enviar **exactamente** esos sats; un sat de más o de menos no cuenta.
+`tol_sats = ceil(BCH_AMOUNT_TOLERANCE_USD / usd_bch_rate × 1e8)` usando la tasa **congelada** de la orden.
+
+El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe
+enviar ese monto; se aceptan desviaciones de hasta ~$0.20 al rate de la orden.
 En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar desajustes por fee/redondeo de wallets.
 
 ## Cómo se verifica (match on-chain)
 
-Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta la primera que cumpla todo:
+Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta
+el candidato **más cercano** a `expected_amount_sats` que cumpla:
 
 | Regla | Detalle |
 |-------|---------|
-| Monto exacto | `output.amount_sats == expected_amount_sats` |
+| Monto | `\|output.amount_sats − expected_amount_sats\| ≤ tol_sats` (`tol_sats` desde `usd_bch_rate` + `BCH_AMOUNT_TOLERANCE_USD`) |
 | Dirección | CashAddr completa o payload tras `bitcoincash:` / `bchtest:` (case-insensitive) |
 | Confirmaciones | `>= BCH_MIN_CONFIRMATIONS` (default `0` = mempool OK) |
 | Reloj | `tx.timestamp >= created_at − grace` (default grace = `max(3600, TTL×60)` s; override `BCH_VERIFY_TIMESTAMP_GRACE_SECONDS`). Si el indexer no manda timestamp, no se filtra. |
 | Txid único | `payment_txid` no puede repetirse en otra fila |
+| Otras órdenes | Si otro `pending` está más cerca del monto pagado (y dentro de su tolerancia), no se reclama |
 
-Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
+Si no hay match: `400` *No encontramos un pago BCH con un monto cercano al de la orden aún.*
 
 ## Reuso, expiración y exclusión mutua
 
@@ -160,6 +168,8 @@ BCH_PAYMENT_TTL_MINUTES=30
 BCH_MIN_CONFIRMATIONS=0
 # Optional; default max(3600, TTL*60). Widen if buyers pay then recreate orders.
 # BCH_VERIFY_TIMESTAMP_GRACE_SECONDS=3600
+# Max |paid − expected| in USD at the order's frozen rate (default $0.20).
+BCH_AMOUNT_TOLERANCE_USD=0.20
 # 0 = fetch USD/BCH from Blockchair, then CoinGecko
 BCH_USD_PRICE=0
 ANCHOR_REQUEST_PRICE_USD=1

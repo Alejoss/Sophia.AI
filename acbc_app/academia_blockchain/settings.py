@@ -768,7 +768,7 @@ BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 # Fixed USD price charged via NOWPayments for a public transcript-anchor request.
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
 
-# Self-custody Bitcoin Cash payments (exact-amount match on a single address).
+# Self-custody Bitcoin Cash payments (USD-tolerance amount match on a single address).
 # Network mirrors BTC: chipnet in non-PRODUCTION (like signet), mainnet on server.
 _BCH_NETWORK_DEFAULT = 'mainnet' if ENVIRONMENT == 'PRODUCTION' else 'chipnet'
 BCH_NETWORK = os.getenv('BCH_NETWORK', _BCH_NETWORK_DEFAULT).strip().lower()
@@ -798,6 +798,8 @@ _BCH_VERIFY_GRACE_RAW = os.getenv('BCH_VERIFY_TIMESTAMP_GRACE_SECONDS', '').stri
 BCH_VERIFY_TIMESTAMP_GRACE_SECONDS = (
     int(_BCH_VERIFY_GRACE_RAW) if _BCH_VERIFY_GRACE_RAW else None
 )
+# Max |paid − expected| in USD at the order's frozen usd_bch_rate (wallet rounding / fees).
+BCH_AMOUNT_TOLERANCE_USD = float(os.getenv('BCH_AMOUNT_TOLERANCE_USD', '0.20'))
 # Optional fixed USD/BCH; 0 = fetch from Blockchair / CoinGecko (also used on chipnet for sizing).
 BCH_USD_PRICE = float(os.getenv('BCH_USD_PRICE', '0'))
 

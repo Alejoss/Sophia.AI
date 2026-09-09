@@ -43,13 +43,43 @@ def _ttl_minutes() -> int:
     return max(5, int(getattr(settings, 'BCH_PAYMENT_TTL_MINUTES', 30) or 30))
 
 
+def _amount_tolerance_usd() -> Decimal:
+    """Max |paid − expected| in USD at the order's frozen rate (default $0.20)."""
+    raw = getattr(settings, 'BCH_AMOUNT_TOLERANCE_USD', '0.20')
+    try:
+        value = Decimal(str(raw))
+    except (ArithmeticError, ValueError, TypeError):
+        value = Decimal('0.20')
+    return max(Decimal('0'), value)
+
+
+def _tolerance_sats_for_rate(rate: Decimal | None) -> int:
+    """Convert USD tolerance → sats using the order's USD/BCH rate."""
+    if rate is None:
+        return 0
+    rate_dec = Decimal(str(rate))
+    if rate_dec <= 0:
+        return 0
+    tol_usd = _amount_tolerance_usd()
+    if tol_usd <= 0:
+        return 0
+    sats = (tol_usd / rate_dec) * Decimal(SATS_PER_BCH)
+    return int(sats.to_integral_value(rounding=ROUND_UP))
+
+
+def _unique_sats_step(rate: Decimal | None) -> int:
+    """Space pending expected amounts so ±tolerance windows do not overlap."""
+    tol = _tolerance_sats_for_rate(rate)
+    return max(1, 2 * tol + 1)
+
+
 def _verify_timestamp_grace_seconds() -> int:
     """How far before ``created_at`` a chain tx may still count.
 
-    Exact satoshi matching is the real discriminator on the shared receive
-    address. The old 60s grace rejected legitimate payments when block time
-    was slightly earlier than order creation, or when the buyer paid and then
-    regenerated the order a minute later.
+    Amount matching (within USD tolerance) is the main discriminator on the
+    shared receive address. The old 60s grace rejected legitimate payments when
+    block time was slightly earlier than order creation, or when the buyer paid
+    and then regenerated the order a minute later.
     """
     configured = getattr(settings, 'BCH_VERIFY_TIMESTAMP_GRACE_SECONDS', None)
     if configured is not None:
@@ -121,21 +151,64 @@ def _expire_stale_pending() -> None:
     ).update(status=BchDirectPayment.STATUS_EXPIRED, updated_at=now)
 
 
-def _allocate_unique_sats(base_sats: int) -> int:
-    """Reserve an unused expected_amount_sats among non-expired pending orders."""
+def _allocate_unique_sats(base_sats: int, *, rate: Decimal) -> int:
+    """Reserve expected_amount_sats whose ±USD-tolerance window is free.
+
+    Pending orders on the shared address must not have overlapping acceptance
+    windows, otherwise one payment could match two orders.
+    """
     _expire_stale_pending()
+    tol = _tolerance_sats_for_rate(rate)
+    step = _unique_sats_step(rate)
     sats = max(1000, int(base_sats))
     now = timezone.now()
-    for _ in range(10_000):
-        taken = BchDirectPayment.objects.filter(
-            expected_amount_sats=sats,
+    pending = list(
+        BchDirectPayment.objects.filter(
             status=BchDirectPayment.STATUS_PENDING,
             expires_at__gt=now,
-        ).exists()
-        if not taken:
+        ).values_list('expected_amount_sats', 'usd_bch_rate')
+    )
+    for _ in range(10_000):
+        conflict = False
+        for other_sats, other_rate in pending:
+            other_tol = _tolerance_sats_for_rate(Decimal(str(other_rate)))
+            window = max(tol, other_tol)
+            if abs(int(other_sats) - sats) <= window:
+                conflict = True
+                break
+        if not conflict:
             return sats
-        sats += 1
+        sats += step
     raise BchPaymentError('No se pudo asignar un monto BCH único. Inténtalo de nuevo.')
+
+
+def _amount_closer_to_other_pending(
+    *,
+    amount_sats: int,
+    payment: BchDirectPayment,
+) -> bool:
+    """True if another pending order is a better (closer) owner for this output."""
+    now = timezone.now()
+    my_delta = abs(int(amount_sats) - int(payment.expected_amount_sats))
+    others = (
+        BchDirectPayment.objects.filter(
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at__gt=now,
+            address=payment.address,
+        )
+        .exclude(pk=payment.pk)
+        .only('id', 'expected_amount_sats', 'usd_bch_rate')
+    )
+    for other in others:
+        other_tol = _tolerance_sats_for_rate(other.usd_bch_rate)
+        other_delta = abs(int(amount_sats) - int(other.expected_amount_sats))
+        if other_delta > other_tol:
+            continue
+        if other_delta < my_delta:
+            return True
+        if other_delta == my_delta and other.pk < payment.pk:
+            return True
+    return False
 
 
 def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
@@ -281,7 +354,7 @@ def create_or_reuse_bch_payment(
 
     bch_amount = (usd / rate).quantize(Decimal('0.00000001'), rounding=ROUND_UP)
     base_sats = int(bch_amount * SATS_PER_BCH)
-    sats = _allocate_unique_sats(base_sats)
+    sats = _allocate_unique_sats(base_sats, rate=rate)
     address = _receive_address()
     expires_at = timezone.now() + timedelta(minutes=_ttl_minutes())
     network = get_bch_network()
@@ -296,13 +369,18 @@ def create_or_reuse_bch_payment(
         usd_bch_rate=rate,
         status=BchDirectPayment.STATUS_PENDING,
         expires_at=expires_at,
-        provider_payload={'network': network},
+        provider_payload={
+            'network': network,
+            'amount_tolerance_usd': str(_amount_tolerance_usd()),
+            'amount_tolerance_sats': _tolerance_sats_for_rate(rate),
+        },
     )
     logger.info(
-        'BCH direct order created id=%s network=%s sats=%s expires=%s',
+        'BCH direct order created id=%s network=%s sats=%s tol_sats=%s expires=%s',
         payment.pk,
         network,
         sats,
+        _tolerance_sats_for_rate(rate),
         expires_at.isoformat(),
     )
     return payment
@@ -405,11 +483,15 @@ def verify_bch_payment(
     min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
     min_conf = _min_confirmations()
     receive = payment.address
-    expected = payment.expected_amount_sats
+    expected = int(payment.expected_amount_sats)
+    tol_sats = _tolerance_sats_for_rate(payment.usd_bch_rate)
     skipped_conf = 0
     skipped_time = 0
     skipped_txid = 0
+    skipped_other_order = 0
     amounts_to_receive: list[int] = []
+    # (abs_delta, -confirmations, -timestamp, txid, amount_sats, tx_payload fields)
+    best: tuple | None = None
 
     for tx in txs:
         if tx.confirmations < min_conf:
@@ -425,33 +507,58 @@ def verify_bch_payment(
             if not _addresses_match(out.address, receive):
                 continue
             amounts_to_receive.append(out.amount_sats)
-            if out.amount_sats != expected:
+            delta = abs(int(out.amount_sats) - expected)
+            if delta > tol_sats:
                 continue
-            return _fulfill_bch_payment(payment, tx.txid, tx_payload={
-                'txid': tx.txid,
-                'timestamp': tx.timestamp,
-                'confirmations': tx.confirmations,
-                'amount_sats': out.amount_sats,
-            })
+            if _amount_closer_to_other_pending(amount_sats=out.amount_sats, payment=payment):
+                skipped_other_order += 1
+                continue
+            candidate = (
+                delta,
+                -int(tx.confirmations or 0),
+                -int(tx.timestamp or 0),
+                str(tx.txid),
+                int(out.amount_sats),
+                int(tx.confirmations or 0),
+                tx.timestamp,
+            )
+            if best is None or candidate[:3] < best[:3]:
+                best = candidate
 
-    logger.info(
-        'BCH verify no exact-amount match yet payment_id=%s address=%s sats=%s '
-        'txs_scanned=%s amounts_seen=%s skipped_conf=%s skipped_time=%s skipped_txid=%s '
-        'grace_s=%s min_ts=%s created_at=%s',
+    if best is not None:
+        _delta, _nc, _nts, txid, amount_sats, confirmations, timestamp = best
+        return _fulfill_bch_payment(payment, txid, tx_payload={
+            'txid': txid,
+            'timestamp': timestamp,
+            'confirmations': confirmations,
+            'amount_sats': amount_sats,
+            'expected_amount_sats': expected,
+            'amount_delta_sats': amount_sats - expected,
+            'amount_tolerance_sats': tol_sats,
+            'amount_tolerance_usd': str(_amount_tolerance_usd()),
+        })
+
+    logger.warning(
+        'BCH verify no amount match within tolerance payment_id=%s address=%s '
+        'expected_sats=%s tol_sats=%s tol_usd=%s txs_scanned=%s amounts_seen=%s '
+        'skipped_conf=%s skipped_time=%s skipped_txid=%s skipped_other_order=%s '
+        'grace_s=%s created_at=%s',
         payment.pk,
         payment.address,
         expected,
+        tol_sats,
+        str(_amount_tolerance_usd()),
         len(txs),
         amounts_to_receive[:20],
         skipped_conf,
         skipped_time,
         skipped_txid,
+        skipped_other_order,
         grace,
-        min_ts,
         payment.created_at.isoformat(),
     )
     raise BchPaymentError(
-        'No encontramos un pago BCH con el monto exacto aún. '
+        'No encontramos un pago BCH con un monto cercano al de la orden aún. '
         'Espera unos segundos y vuelve a intentarlo.'
     )
 

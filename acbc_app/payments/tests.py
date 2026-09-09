@@ -531,7 +531,7 @@ class BchDirectPaymentTests(TestCase):
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
 
-    def test_verify_wrong_amount_fails(self):
+    def test_verify_amount_outside_usd_tolerance_fails(self):
         client = MagicMock()
         client.get_bch_usd_rate.return_value = Decimal('200')
         order = create_or_reuse_bch_payment(
@@ -539,13 +539,17 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
+        # At $200/BCH, $0.20 tolerance ≈ 100_000 sats — stay outside that window.
         client.list_recent_transactions.return_value = [
             BchTransaction(
                 txid='cd' * 32,
                 timestamp=int(order.created_at.timestamp()) + 10,
                 confirmations=1,
                 outputs=[
-                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats + 1),
+                    BchTxOutput(
+                        address=order.address,
+                        amount_sats=order.expected_amount_sats + 150_000,
+                    ),
                 ],
             ),
         ]
@@ -553,6 +557,50 @@ class BchDirectPaymentTests(TestCase):
             verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_verify_accepts_amount_within_usd_tolerance(self):
+        """Prod regression: wallet sent 1161215 vs expected 1162656 (~$0.004)."""
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        paid_sats = order.expected_amount_sats - 1441
+        client.list_recent_transactions.return_value = [
+            BchTransaction(
+                txid='c4' * 32,
+                timestamp=int(order.created_at.timestamp()) + 10,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(address=order.address, amount_sats=paid_sats),
+                ],
+            ),
+        ]
+        paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(paid.payment_txid, 'c4' * 32)
+        self.assertEqual(paid.provider_payload.get('amount_sats'), paid_sats)
+        self.assertEqual(paid.provider_payload.get('amount_delta_sats'), -1441)
+
+    def test_allocate_unique_sats_spaces_by_tolerance_window(self):
+        from payments.bch_services import _allocate_unique_sats, _unique_sats_step
+
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        first = create_or_reuse_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            client=client,
+        )
+        step = _unique_sats_step(Decimal('200'))
+        second_sats = _allocate_unique_sats(first.expected_amount_sats, rate=Decimal('200'))
+        self.assertGreaterEqual(second_sats - first.expected_amount_sats, step)
 
     def test_verify_accepts_tx_with_blocktime_before_order_within_grace(self):
         """Block timestamps can precede order creation; 60s grace was too tight."""
