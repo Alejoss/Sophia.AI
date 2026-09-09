@@ -108,6 +108,26 @@ el candidato **más cercano** a `expected_amount_sats` que cumpla:
 | Otras órdenes | Si otro `pending` está más cerca del monto pagado (y dentro de su tolerancia), no se reclama |
 
 Si no hay match: `400` *No encontramos un pago BCH con un monto cercano al de la orden aún.*
+El WARNING de borde HTTP incluye `expected_sats`, `amounts_seen`, `tol_sats`, skips, etc.
+
+## Probe / debugging sin nuevo pago
+
+```bash
+cd acbc_app && . .venv/bin/activate
+export ENVIRONMENT=DEVELOPMENT BCH_NETWORK=mainnet \
+  BCH_RECEIVE_ADDRESS_MAINNET=bitcoincash:qpnq74gum4tstjat4803zav9lr37v5wqaqyqrh9wjd
+
+# Look up a known buyer TXID against the receive address
+python manage.py probe_bch_chain \
+  --txid 4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a \
+  --expected-sats 1945676
+
+# Or list recent history only
+python manage.py probe_bch_chain --limit 10
+```
+
+This talks to the same Electrum/Blockchair client as `verify_bch_payment` and does
+**not** create or fulfill orders.
 
 ## Reuso, expiración y exclusión mutua
 

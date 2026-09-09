@@ -36,7 +36,15 @@ logger = logging.getLogger(__name__)
 
 
 class BchPaymentError(Exception):
-    """Business/validation error for BCH direct payments."""
+    """Business/validation error for BCH direct payments.
+
+    Optional ``details`` is merged into HTTP-boundary WARNING logs so operators
+    can see expected_sats / amounts_seen without digging into INFO service logs.
+    """
+
+    def __init__(self, message: str, *, details: dict | None = None):
+        super().__init__(message)
+        self.details = details or {}
 
 
 def _ttl_minutes() -> int:
@@ -557,9 +565,26 @@ def verify_bch_payment(
         grace,
         payment.created_at.isoformat(),
     )
+    details = {
+        'payment_id': payment.pk,
+        'address': payment.address,
+        'expected_sats': expected,
+        'tol_sats': tol_sats,
+        'tol_usd': str(_amount_tolerance_usd()),
+        'txs_scanned': len(txs),
+        'amounts_seen': amounts_to_receive[:20],
+        'skipped_conf': skipped_conf,
+        'skipped_time': skipped_time,
+        'skipped_txid': skipped_txid,
+        'skipped_other_order': skipped_other_order,
+        'grace_s': grace,
+        'created_at': payment.created_at.isoformat(),
+        'network': get_bch_network(),
+    }
     raise BchPaymentError(
         'No encontramos un pago BCH con un monto cercano al de la orden aún. '
-        'Espera unos segundos y vuelve a intentarlo.'
+        'Espera unos segundos y vuelve a intentarlo.',
+        details=details,
     )
 
 
