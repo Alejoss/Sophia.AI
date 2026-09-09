@@ -20,6 +20,7 @@ import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from './MoneroPaymentModal';
 import BchPaymentSupportModal from './BchPaymentSupportModal';
+import BchOrderExpiryNotice from './BchOrderExpiryNotice';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -351,12 +352,7 @@ const ProductPaymentCheckout = ({
                   </Typography>
                 )}
               </Box>
-              {bchOrder.seconds_remaining != null && bchOrder.status === 'pending' && (
-                <Typography variant="caption" color="text.secondary">
-                  Tiempo restante: {Math.floor(bchOrder.seconds_remaining / 60)}m{' '}
-                  {bchOrder.seconds_remaining % 60}s
-                </Typography>
-              )}
+              <BchOrderExpiryNotice bchOrder={bchOrder} />
               <Divider />
             </Stack>
           )}

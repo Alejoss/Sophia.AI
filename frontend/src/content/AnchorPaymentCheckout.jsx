@@ -24,6 +24,7 @@ import {
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
+import BchOrderExpiryNotice from '../payments/BchOrderExpiryNotice';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -336,12 +337,7 @@ const AnchorPaymentCheckout = ({
                   </Typography>
                 )}
               </Box>
-              {bchOrder.seconds_remaining != null && bchOrder.status === 'pending' && (
-                <Typography variant="caption" color="text.secondary">
-                  Tiempo restante: {Math.floor(bchOrder.seconds_remaining / 60)}m{' '}
-                  {bchOrder.seconds_remaining % 60}s
-                </Typography>
-              )}
+              <BchOrderExpiryNotice bchOrder={bchOrder} />
             </Stack>
           )}
         </DialogContent>
