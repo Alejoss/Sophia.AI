@@ -289,8 +289,12 @@ function TranscriptChecklist({
       </Typography>
       <FormGroup
         sx={{
-          maxHeight: 220,
+          // One column + vertical scroll. FormGroup defaults to column + wrap,
+          // which fills sideways under maxHeight and creates a horizontal scrollbar.
+          flexWrap: 'nowrap',
+          maxHeight: 380,
           overflowY: 'auto',
+          overflowX: 'hidden',
           border: '1px solid',
           borderColor: 'divider',
           px: 1.5,
@@ -300,11 +304,22 @@ function TranscriptChecklist({
         {sources.map((src) => {
           const checked = selectedIds.includes(src.content_id);
           const label = (
-            <Box sx={{ py: 0.25 }}>
-              <Typography variant="body2" sx={{ fontWeight: checked ? 600 : 400 }}>
+            <Box sx={{ py: 0.25, minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: checked ? 600 : 400,
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word',
+                }}
+              >
                 {src.title}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+              >
                 {mediaTypeLabel(src.media_type)}
                 {src.original_author ? ` · ${src.original_author}` : ''}
                 {typeof src.chunk_count === 'number' ? ` · ${src.chunk_count} fragmentos` : ''}
@@ -323,7 +338,17 @@ function TranscriptChecklist({
                 />
               }
               label={label}
-              sx={{ alignItems: 'flex-start', mr: 0, py: 0.25 }}
+              sx={{
+                alignItems: 'flex-start',
+                mr: 0,
+                py: 0.25,
+                width: '100%',
+                ml: 0,
+                '& .MuiFormControlLabel-label': {
+                  minWidth: 0,
+                  flex: 1,
+                },
+              }}
             />
           );
         })}
