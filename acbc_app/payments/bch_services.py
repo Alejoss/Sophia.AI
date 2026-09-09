@@ -23,12 +23,13 @@ from payments.bch_client import (
     get_bch_receive_address,
     is_bch_direct_configured,
 )
-from payments.models import BchDirectPayment
+from payments.models import BchDirectPayment, TokenPurchase
 from payments.services import (
     abandon_waiting_nowpayments,
     has_in_flight_nowpayments,
     mark_anchor_request_paid,
     mark_path_purchase_paid,
+    mark_token_purchase_paid,
     mark_topic_purchase_paid,
 )
 
@@ -132,6 +133,7 @@ def _target_filter(
     anchor_request=None,
     path_purchase=None,
     topic_purchase=None,
+    token_purchase=None,
 ) -> Q:
     if anchor_request is not None:
         return Q(anchor_request=anchor_request)
@@ -139,16 +141,26 @@ def _target_filter(
         return Q(path_purchase=path_purchase)
     if topic_purchase is not None:
         return Q(topic_purchase=topic_purchase)
+    if token_purchase is not None:
+        return Q(token_purchase=token_purchase)
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _release_waiting_nowpayments(*, anchor_request=None, path_purchase=None) -> None:
+def _release_waiting_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> None:
     """Allow switching from an unused NOWPayments invoice to BCH."""
-    if has_in_flight_nowpayments(anchor_request=anchor_request, path_purchase=path_purchase):
+    if has_in_flight_nowpayments(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+        token_purchase=token_purchase,
+    ):
         raise BchPaymentError(
             'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
         )
-    abandon_waiting_nowpayments(anchor_request=anchor_request, path_purchase=path_purchase)
+    abandon_waiting_nowpayments(
+        anchor_request=anchor_request,
+        path_purchase=path_purchase,
+        token_purchase=token_purchase,
+    )
 
 
 def _expire_stale_pending() -> None:
@@ -219,7 +231,7 @@ def _amount_closer_to_other_pending(
     return False
 
 
-def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
+def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> None:
     if not is_bch_direct_configured():
         raise BchPaymentError('Pagos BCH directos no están configurados en el servidor.')
 
@@ -256,10 +268,20 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('La venta de consultas de este tema está desactivada.')
         return
 
+    if token_purchase is not None:
+        if token_purchase.user_id != user.id:
+            raise PermissionError('Solo el comprador puede iniciar el pago BCH.')
+        if token_purchase.payment_status == 'PAID':
+            raise BchPaymentError('Esta compra de tokens ya está pagada.')
+        if token_purchase.usd_price <= 0 or token_purchase.token_amount <= 0:
+            raise BchPaymentError('Este paquete de tokens no es válido.')
+        _release_waiting_nowpayments(token_purchase=token_purchase)
+        return
+
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_purchase=None) -> None:
+def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
             raise PermissionError('No tienes permiso para verificar este pago.')
@@ -282,10 +304,14 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
         ):
             raise PermissionError('No tienes permiso para verificar este pago.')
         return
+    if token_purchase is not None:
+        if token_purchase.user_id != user.id and not getattr(user, 'is_staff', False):
+            raise PermissionError('No tienes permiso para verificar este pago.')
+        return
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _usd_for_target(*, anchor_request=None, path_purchase=None, topic_purchase=None) -> Decimal:
+def _usd_for_target(*, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> Decimal:
     if anchor_request is not None:
         return Decimal(str(
             anchor_request.price_amount or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)
@@ -298,6 +324,8 @@ def _usd_for_target(*, anchor_request=None, path_purchase=None, topic_purchase=N
         return Decimal(str(
             topic_purchase.price_amount or topic_purchase.topic.reference_price or 0
         ))
+    if token_purchase is not None:
+        return Decimal(str(token_purchase.usd_price or 0))
     return Decimal('0')
 
 
@@ -307,9 +335,12 @@ def create_or_reuse_bch_payment(
     anchor_request: TranscriptAnchorRequest | None = None,
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
+    token_purchase: TokenPurchase | None = None,
     client: BchPublicClient | BchElectrumClient | None = None,
 ) -> BchDirectPayment:
-    targets = [t for t in (anchor_request, path_purchase, topic_purchase) if t is not None]
+    targets = [
+        t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
+    ]
     if len(targets) != 1:
         raise BchPaymentError('El pago BCH debe apuntar a un solo producto.')
 
@@ -318,12 +349,14 @@ def create_or_reuse_bch_payment(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
     )
 
     target_q = _target_filter(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
     )
     _expire_stale_pending()
     existing = (
@@ -356,6 +389,7 @@ def create_or_reuse_bch_payment(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
     )
     if usd <= 0 or rate <= 0:
         raise BchPaymentError('No se pudo calcular el monto BCH.')
@@ -371,6 +405,7 @@ def create_or_reuse_bch_payment(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
         address=address,
         expected_amount_sats=sats,
         usd_amount=usd.quantize(Decimal('0.01')),
@@ -400,9 +435,12 @@ def verify_bch_payment(
     anchor_request: TranscriptAnchorRequest | None = None,
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
+    token_purchase: TokenPurchase | None = None,
     client: BchPublicClient | BchElectrumClient | None = None,
 ) -> BchDirectPayment:
-    targets = [t for t in (anchor_request, path_purchase, topic_purchase) if t is not None]
+    targets = [
+        t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
+    ]
     if len(targets) != 1:
         raise BchPaymentError('El pago BCH debe apuntar a un solo producto.')
 
@@ -411,6 +449,7 @@ def verify_bch_payment(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
     )
 
     if anchor_request is not None:
@@ -452,11 +491,24 @@ def verify_bch_payment(
         if paid:
             return paid
         raise BchPaymentError('Las consultas de este tema ya están desbloqueadas.')
+    elif token_purchase is not None and token_purchase.payment_status == 'PAID':
+        paid = (
+            BchDirectPayment.objects.filter(
+                token_purchase=token_purchase,
+                status=BchDirectPayment.STATUS_PAID,
+            )
+            .order_by('-paid_at')
+            .first()
+        )
+        if paid:
+            return paid
+        raise BchPaymentError('Esta compra de tokens ya está pagada.')
 
     target_q = _target_filter(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
+        token_purchase=token_purchase,
     )
     payment = (
         BchDirectPayment.objects.filter(target_q, status=BchDirectPayment.STATUS_PENDING)
@@ -601,6 +653,9 @@ def _fulfill_bch_payment(
         'topic_purchase',
         'topic_purchase__topic',
         'path_purchase__knowledge_path',
+        'token_purchase',
+        'token_purchase__user',
+        'token_purchase__package',
     ).get(pk=payment.pk)
     if locked.status == BchDirectPayment.STATUS_PAID:
         return locked
@@ -621,6 +676,8 @@ def _fulfill_bch_payment(
         mark_path_purchase_paid(locked.path_purchase, source='bch_direct')
     elif locked.topic_purchase_id:
         mark_topic_purchase_paid(locked.topic_purchase, source='bch_direct')
+    elif locked.token_purchase_id:
+        mark_token_purchase_paid(locked.token_purchase, source='bch_direct')
 
     logger.info(
         'BCH direct payment fulfilled id=%s txid=%s',
@@ -662,6 +719,21 @@ def get_bch_payment_product_meta(payment: BchDirectPayment) -> dict:
             'owner': getattr(topic, 'creator', None),
             'product': topic,
         }
+    if payment.token_purchase_id:
+        purchase = payment.token_purchase
+        package = getattr(purchase, 'package', None)
+        title = (
+            getattr(purchase, 'package_name', None)
+            or getattr(package, 'name', None)
+            or f'{getattr(purchase, "token_amount", 0)} tokens'
+        )
+        return {
+            'product_type': 'token_package',
+            'product_id': getattr(purchase, 'package_id', None) or getattr(purchase, 'pk', None),
+            'product_title': title,
+            'owner': None,
+            'product': package,
+        }
     return {
         'product_type': 'anchor',
         'product_id': payment.anchor_request_id,
@@ -700,6 +772,8 @@ def list_staff_bch_orders(
             'topic_purchase__user',
             'topic_purchase__topic__creator',
             'anchor_request__requester',
+            'token_purchase__user',
+            'token_purchase__package',
         )
         .order_by('-created_at')[:cap]
     )
@@ -738,6 +812,8 @@ def report_bch_payment_txid(
             'path_purchase__knowledge_path__author',
             'topic_purchase__user',
             'topic_purchase__topic__creator',
+            'token_purchase__user',
+            'token_purchase__package',
         )
         .filter(pk=payment_id)
         .first()
@@ -812,6 +888,9 @@ def manual_confirm_bch_payment(
             'path_purchase__user',
             'topic_purchase__user',
             'anchor_request__requester',
+            'token_purchase',
+            'token_purchase__user',
+            'token_purchase__package',
         )
         .filter(pk=payment_id)
         .first()
@@ -861,6 +940,8 @@ def manual_confirm_bch_payment(
         mark_path_purchase_paid(locked.path_purchase, source='bch_direct_manual')
     elif locked.topic_purchase_id:
         mark_topic_purchase_paid(locked.topic_purchase, source='bch_direct_manual')
+    elif locked.token_purchase_id:
+        mark_token_purchase_paid(locked.token_purchase, source='bch_direct_manual')
 
     logger.info(
         'BCH direct payment manually confirmed id=%s txid=%s by user_id=%s',

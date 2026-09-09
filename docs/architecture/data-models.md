@@ -370,12 +370,19 @@ NOWPayments invoice/payment linked to **exactly one** entitlement (`cryptopaymen
 - `event_registration` → `EventRegistration`
 - `path_purchase` → `KnowledgePathPurchase`
 - `anchor_request` → `TranscriptAnchorRequest`
+- `token_purchase` → `TokenPurchase`
 
-**Location**: `payments/models.py`. Setup: [nowpayments-setup.md](../payments/nowpayments-setup.md).
+**Location**: `payments/models.py`. Setup: [nowpayments-setup.md](../payments/nowpayments-setup.md). Tokens: [platform-tokens.md](../payments/platform-tokens.md).
+
+### TokenPackage / TokenPurchase / TokenLedgerEntry
+
+Platform-only credits sold in USD packages (paid with NOWPayments or BCH). `Profile.token_balance` is a cached integer mutated only via `credit_platform_tokens`. v1 is buy/hold; spend is later.
+
+**Location**: `payments/models.py` + `profiles.Profile.token_balance`. Docs: [platform-tokens.md](../payments/platform-tokens.md).
 
 ### BchDirectPayment
 
-Self-custody exact-amount Bitcoin Cash for a `TranscriptAnchorRequest`. Unique `expected_amount_sats` on a single receive address; user-triggered verification (no IPN).
+Self-custody Bitcoin Cash for a `TranscriptAnchorRequest`, paid knowledge path, topic Consultas, or token package. Unique `expected_amount_sats` on a single receive address; user-triggered verification (no IPN).
 
 Statuses: `pending` → `paid` \| `expired` \| `cancelled`.
 
@@ -420,8 +427,11 @@ User's accepted cryptocurrency addresses.
 | Comment | N:1 User/Content, N:1 Comment (parent) |
 | Vote | N:1 User, Generic (ContentType), N:1 Topic (optional) |
 | TranscriptAnchorRequest | N:1 User (requester), N:1 Content, optional N:1 TranscriptAnchor |
-| CryptoPayment | XOR FK to EventRegistration / KnowledgePathPurchase / TranscriptAnchorRequest |
-| BchDirectPayment | N:1 TranscriptAnchorRequest |
+| CryptoPayment | XOR FK to EventRegistration / KnowledgePathPurchase / TranscriptAnchorRequest / TokenPurchase |
+| BchDirectPayment | XOR FK to TranscriptAnchorRequest / KnowledgePathPurchase / TopicPurchase / TokenPurchase |
+| TokenPackage | Staff SKUs of platform tokens |
+| TokenPurchase | N:1 User, optional N:1 TokenPackage |
+| TokenLedgerEntry | N:1 User, optional N:1 TokenPurchase |
 
 ## Database Indexes
 

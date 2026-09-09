@@ -21,12 +21,14 @@ from payments.bch_services import (
     report_bch_payment_txid,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment
+from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.serializers import (
     AdminBchOrderSerializer,
     BchDirectPaymentSerializer,
     CryptoPaymentSerializer,
+    TokenPackageSerializer,
+    TokenPurchaseSerializer,
 )
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
@@ -34,6 +36,8 @@ from payments.services import (
     create_anchor_request_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
+    create_token_purchase,
+    create_token_purchase_payment,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
@@ -96,6 +100,7 @@ def _find_crypto_payment_for_ipn(body: dict):
                 'event_registration',
                 'path_purchase',
                 'anchor_request',
+                'token_purchase',
             ).get(order_id=order_id)
         except CryptoPayment.DoesNotExist:
             pass
@@ -133,6 +138,8 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
         return user.id in (purchase.user_id, purchase.knowledge_path.author_id)
     if payment.anchor_request_id:
         return user.id == payment.anchor_request.requester_id or user.is_staff
+    if payment.token_purchase_id:
+        return user.id == payment.token_purchase.user_id or user.is_staff
     return False
 
 
@@ -273,6 +280,8 @@ class CryptoPaymentDetailView(APIView):
                 'path_purchase__knowledge_path',
                 'anchor_request',
                 'anchor_request__requester',
+                'token_purchase',
+                'token_purchase__user',
             ).get(pk=payment_id)
         except CryptoPayment.DoesNotExist:
             return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1063,5 +1072,197 @@ class TopicPurchaseBchVerifyView(APIView):
                 'id': purchase.id,
                 'payment_status': purchase.payment_status,
                 'is_paid': purchase.is_paid,
+            },
+        })
+
+
+def _get_token_purchase(purchase_id):
+    try:
+        return TokenPurchase.objects.select_related('package', 'user').get(pk=purchase_id)
+    except TokenPurchase.DoesNotExist:
+        return None
+
+
+class TokenPackageListView(APIView):
+    """Active platform token packages, cheapest first via sort_order."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        packages = TokenPackage.objects.filter(is_active=True).order_by(
+            'sort_order', 'token_amount', 'id',
+        )
+        return Response(TokenPackageSerializer(packages, many=True).data)
+
+
+class TokenPurchaseListCreateView(APIView):
+    """List own token purchases, or start a new package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        purchases = TokenPurchase.objects.filter(user=request.user).order_by('-created_at')[:50]
+        return Response(TokenPurchaseSerializer(purchases, many=True).data)
+
+    def post(self, request):
+        package_id = request.data.get('package_id') or request.data.get('package')
+        try:
+            package = TokenPackage.objects.get(pk=package_id)
+        except (TokenPackage.DoesNotExist, TypeError, ValueError):
+            return Response({'error': 'Paquete no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            purchase = create_token_purchase(package=package, user=request.user)
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_token_purchase', package_id=package_id, user_id=request.user.id,
+            )
+        return Response(TokenPurchaseSerializer(purchase).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchasePaymentView(APIView):
+    """Create or refresh a NOWPayments invoice for a token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_token_purchase_payment(
+                token_purchase=purchase,
+                pay_currency=pay_currency,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_token_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_token_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchasePaymentsListView(APIView):
+    """List NOWPayments invoices for a token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payments = CryptoPayment.objects.filter(token_purchase=purchase).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for token_purchase %s: %s',
+                            payment.id,
+                            purchase_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
+        return Response(CryptoPaymentSerializer(payments, many=True).data)
+
+
+class TokenPurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(token_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, token_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='create_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_token_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(user=request.user, token_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_token_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+                'token_amount': purchase.token_amount,
             },
         })

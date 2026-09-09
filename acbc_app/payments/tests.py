@@ -15,13 +15,16 @@ from payments.bch_client import BchApiError, BchTransaction, BchTxOutput
 from payments.bch_services import (
     BchPaymentError,
     create_or_reuse_bch_payment,
+    get_bch_payment_product_meta,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment
+from payments.models import BchDirectPayment, CryptoPayment, TokenLedgerEntry, TokenPackage
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
     create_anchor_request_payment,
     create_path_purchase_payment,
+    create_token_purchase,
+    create_token_purchase_payment,
     fetch_remote_payment_payload,
     get_or_create_path_purchase,
     refresh_crypto_payment_from_nowpayments,
@@ -1404,3 +1407,194 @@ class PathAndTopicBchPaymentTests(TestCase):
         self.assertIn('blockchain', response.data['error'].lower())
         self.assertIn('inténtalo', response.data['error'].lower())
         self.assertIn('avísanos', response.data['error'].lower())
+
+
+@override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class TokenPackagePurchaseTests(TestCase):
+    def setUp(self):
+        self.buyer = UserFactory()
+        self.other = UserFactory()
+        self.staff = UserFactory(is_staff=True)
+        self.package = TokenPackage.objects.create(
+            name='Test 50 tokens',
+            token_amount=50,
+            usd_price=Decimal('4.00'),
+            is_active=True,
+            sort_order=99,
+        )
+        self.api = APIClient()
+
+    def test_list_active_packages(self):
+        TokenPackage.objects.create(
+            name='Hidden pack',
+            token_amount=10,
+            usd_price=Decimal('1.00'),
+            is_active=False,
+        )
+        self.api.force_authenticate(user=self.buyer)
+        response = self.api.get('/api/payments/token-packages/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [row['name'] for row in response.data]
+        self.assertIn('Test 50 tokens', names)
+        self.assertNotIn('Hidden pack', names)
+
+    def test_create_purchase_and_forbid_other_user_payment(self):
+        self.api.force_authenticate(user=self.buyer)
+        created = self.api.post(
+            '/api/payments/token-purchases/',
+            {'package_id': self.package.id},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        purchase_id = created.data['id']
+        self.assertEqual(created.data['payment_status'], 'PENDING')
+        self.assertEqual(created.data['token_amount'], 50)
+
+        self.api.force_authenticate(user=self.other)
+        denied = self.api.post(f'/api/payments/token-purchase/{purchase_id}/')
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(NOWPAYMENTS_API_KEY='test-key')
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_nowpayments_fulfill_credits_once(self, mock_create_invoice):
+        mock_create_invoice.return_value = {
+            'id': 4242,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=4242',
+        }
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        payment = create_token_purchase_payment(token_purchase=purchase, user=self.buyer)
+        self.assertEqual(payment.token_purchase_id, purchase.id)
+        self.assertTrue(payment.order_id.startswith('tok-purchase-'))
+        self.assertIsNone(payment.path_purchase_id)
+        self.assertIsNone(payment.event_registration_id)
+
+        payload = {
+            'payment_status': 'finished',
+            'actually_paid': '0.02',
+            'pay_amount': '0.02',
+        }
+        sync_payment_from_provider(payment, payload)
+        sync_payment_from_provider(payment, payload)
+
+        purchase.refresh_from_db()
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(purchase.payment_status, 'PAID')
+        self.assertEqual(self.buyer.profile.token_balance, 50)
+        self.assertEqual(
+            TokenLedgerEntry.objects.filter(
+                token_purchase=purchase,
+                reason=TokenLedgerEntry.REASON_PURCHASE,
+            ).count(),
+            1,
+        )
+
+    def test_bch_verify_credits_tokens(self):
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            token_purchase=purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.token_purchase_id, purchase.id)
+        self.assertIsNone(order.path_purchase_id)
+        client.list_recent_transactions.return_value = [
+            BchTransaction(
+                txid='ab' * 32,
+                timestamp=int(order.created_at.timestamp()) + 10,
+                confirmations=1,
+                outputs=[
+                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+                ],
+            ),
+        ]
+        paid = verify_bch_payment(
+            token_purchase=purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        purchase.refresh_from_db()
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(purchase.payment_status, 'PAID')
+        self.assertEqual(self.buyer.profile.token_balance, 50)
+
+    def test_staff_confirm_credits_tokens(self):
+        from payments.bch_services import manual_confirm_bch_payment
+
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            token_purchase=purchase,
+            user=self.buyer,
+            client=client,
+        )
+        confirmed = manual_confirm_bch_payment(
+            payment_id=order.pk,
+            txid='cd' * 32,
+            staff_user=self.staff,
+        )
+        self.assertEqual(confirmed.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(
+            get_bch_payment_product_meta(confirmed)['product_type'],
+            'token_package',
+        )
+        purchase.refresh_from_db()
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(purchase.payment_status, 'PAID')
+        self.assertEqual(self.buyer.profile.token_balance, 50)
+
+        confirmed_again = manual_confirm_bch_payment(
+            payment_id=order.pk,
+            txid='cd' * 32,
+            staff_user=self.staff,
+        )
+        self.assertEqual(confirmed_again.pk, confirmed.pk)
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(self.buyer.profile.token_balance, 50)
+
+    def test_xor_constraint_rejects_two_targets(self):
+        from django.db import IntegrityError
+
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        path = KnowledgePath.objects.create(
+            title='XOR Path',
+            author=self.other,
+            reference_price=5,
+            is_visible=True,
+        )
+        path_purchase = KnowledgePathPurchase.objects.create(
+            user=self.buyer,
+            knowledge_path=path,
+            payment_status='PENDING',
+            price_amount=5,
+        )
+        with self.assertRaises(IntegrityError):
+            CryptoPayment.objects.create(
+                path_purchase=path_purchase,
+                token_purchase=purchase,
+                order_id='tok-xor-invalid',
+                price_amount=5,
+                payment_status='waiting',
+            )
+
+    def test_profile_token_balance_only_for_owner(self):
+        self.buyer.profile.token_balance = 12
+        self.buyer.profile.save(update_fields=['token_balance'])
+        self.api.force_authenticate(user=self.buyer)
+        own = self.api.get('/api/profiles/user_profile/')
+        self.assertEqual(own.status_code, status.HTTP_200_OK)
+        self.assertEqual(own.data['token_balance'], 12)
+
+        self.api.force_authenticate(user=self.other)
+        other = self.api.get(f'/api/profiles/{self.buyer.id}/')
+        self.assertEqual(other.status_code, status.HTTP_200_OK)
+        self.assertIsNone(other.data.get('token_balance'))
