@@ -7,7 +7,7 @@ import socket
 import ssl
 import time
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -507,16 +507,24 @@ class BchElectrumClient:
             value = out.get('value')
             # Electrum verbose often uses BCH float for value
             try:
-                if isinstance(value, str) and '.' in value:
-                    amount_sats = int(Decimal(value) * SATS_PER_BCH)
+                if out.get('valueSat') is not None:
+                    amount_sats = int(out['valueSat'])
+                elif isinstance(value, str) and '.' in value:
+                    amount_sats = int(
+                        (Decimal(value) * SATS_PER_BCH).to_integral_value(rounding=ROUND_HALF_UP)
+                    )
                 elif isinstance(value, float):
-                    amount_sats = int(Decimal(str(value)) * SATS_PER_BCH)
+                    amount_sats = int(
+                        (Decimal(str(value)) * SATS_PER_BCH).to_integral_value(
+                            rounding=ROUND_HALF_UP
+                        )
+                    )
                 else:
-                    # some servers return sats as int already when valueSat present
-                    if out.get('valueSat') is not None:
-                        amount_sats = int(out['valueSat'])
-                    else:
-                        amount_sats = int(Decimal(str(value)) * SATS_PER_BCH)
+                    amount_sats = int(
+                        (Decimal(str(value)) * SATS_PER_BCH).to_integral_value(
+                            rounding=ROUND_HALF_UP
+                        )
+                    )
             except (TypeError, ValueError, ArithmeticError):
                 continue
 

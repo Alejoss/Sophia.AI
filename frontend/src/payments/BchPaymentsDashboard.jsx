@@ -30,7 +30,7 @@ import {
 
 const FILTERS = [
   { value: 'all', label: 'Todos' },
-  { value: 'enabled', label: 'BCH activo' },
+  { value: 'for_sale', label: 'En venta' },
   { value: 'paid', label: 'Con precio' },
   { value: 'free', label: 'Sin precio' },
 ];
@@ -48,8 +48,8 @@ const formatError = (err, fallback) => {
   return fallback;
 };
 
-const matchesFilter = (item, filter, enabledKey, paidKey) => {
-  if (filter === 'enabled') return Boolean(item[enabledKey]);
+const matchesFilter = (item, filter, paidKey) => {
+  if (filter === 'for_sale') return Boolean(item.is_for_sale);
   if (filter === 'paid') return Boolean(item[paidKey]);
   if (filter === 'free') return !item[paidKey];
   return true;
@@ -122,11 +122,11 @@ const BchPaymentsDashboard = () => {
   const network = catalog?.bch_network;
 
   const filteredPaths = useMemo(
-    () => paths.filter((item) => matchesFilter(item, filter, 'bch_direct_enabled', 'is_paid_path')),
+    () => paths.filter((item) => matchesFilter(item, filter, 'is_paid_path')),
     [paths, filter],
   );
   const filteredTopics = useMemo(
-    () => topics.filter((item) => matchesFilter(item, filter, 'bch_direct_enabled', 'is_paid_topic')),
+    () => topics.filter((item) => matchesFilter(item, filter, 'is_paid_topic')),
     [topics, filter],
   );
 
@@ -134,7 +134,7 @@ const BchPaymentsDashboard = () => {
     setSavingKey(`path-${path.id}`);
     setError(null);
     try {
-      const updated = await updateKnowledgePathBch(path.id, { bch_direct_enabled: nextEnabled });
+      const updated = await updateKnowledgePathBch(path.id, { sales_enabled: nextEnabled });
       setCatalog((prev) => ({
         ...prev,
         knowledge_paths: (prev.knowledge_paths || []).map((item) => (
@@ -152,7 +152,7 @@ const BchPaymentsDashboard = () => {
     setSavingKey(`topic-${topic.id}`);
     setError(null);
     try {
-      const updated = await updateTopicBch(topic.id, { bch_direct_enabled: nextEnabled });
+      const updated = await updateTopicBch(topic.id, { sales_enabled: nextEnabled });
       setCatalog((prev) => ({
         ...prev,
         topics: (prev.topics || []).map((item) => (
@@ -241,8 +241,9 @@ const BchPaymentsDashboard = () => {
             Pagos Bitcoin Cash
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Activa el cobro autocustodia en BCH y confirma pagos reportados por
-            TXID cuando la verificación automática falle o la orden expire.
+            Activa o pausa la venta de caminos y temas con precio. Si están en
+            venta, el checkout ofrece NOWPayments, Bitcoin Cash y Monero.
+            También confirma pagos BCH reportados por TXID.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -252,8 +253,8 @@ const BchPaymentsDashboard = () => {
             label={configured ? `BCH servidor · ${network || 'red'}` : 'BCH no configurado'}
           />
           <Chip size="small" color="warning" label={`${orders.length} por confirmar`} />
-          <Chip size="small" color="success" label={`${paths.filter((p) => p.bch_direct_enabled).length} caminos`} />
-          <Chip size="small" color="info" label={`${topics.filter((t) => t.bch_direct_enabled).length} temas`} />
+          <Chip size="small" color="success" label={`${paths.filter((p) => p.is_for_sale).length} en venta`} />
+          <Chip size="small" color="info" label={`${topics.filter((t) => t.is_for_sale).length} temas`} />
         </Stack>
       </Stack>
 
@@ -416,7 +417,7 @@ const BchPaymentsDashboard = () => {
                 <TableCell>Camino</TableCell>
                 <TableCell>Autor</TableCell>
                 <TableCell>Precio</TableCell>
-                <TableCell>BCH</TableCell>
+                <TableCell>En venta</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -442,12 +443,12 @@ const BchPaymentsDashboard = () => {
                       control={
                         <Switch
                           size="small"
-                          checked={Boolean(path.bch_direct_enabled)}
+                          checked={Boolean(path.sales_enabled && path.is_paid_path)}
                           disabled={!path.is_paid_path || savingKey === `path-${path.id}`}
                           onChange={(event) => handlePathToggle(path, event.target.checked)}
                         />
                       }
-                      label={path.bch_direct_enabled ? 'On' : 'Off'}
+                      label={path.is_for_sale ? 'On' : 'Off'}
                     />
                     {!path.is_paid_path && (
                       <Typography variant="caption" color="text.secondary" display="block">
@@ -482,7 +483,7 @@ const BchPaymentsDashboard = () => {
                 <TableCell>Tema</TableCell>
                 <TableCell>Creador</TableCell>
                 <TableCell>Precio Consultas</TableCell>
-                <TableCell>BCH</TableCell>
+                <TableCell>En venta</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -525,16 +526,16 @@ const BchPaymentsDashboard = () => {
                       control={
                         <Switch
                           size="small"
-                          checked={Boolean(topic.bch_direct_enabled)}
+                          checked={Boolean(topic.sales_enabled && topic.is_paid_topic)}
                           disabled={!topic.is_paid_topic || savingKey === `topic-${topic.id}`}
                           onChange={(event) => handleTopicToggle(topic, event.target.checked)}
                         />
                       }
-                      label={topic.bch_direct_enabled ? 'On' : 'Off'}
+                      label={topic.is_for_sale ? 'On' : 'Off'}
                     />
                     {!topic.is_paid_topic && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Guarda un precio mayor a 0 para activar BCH.
+                        Guarda un precio mayor a 0 para poner en venta.
                       </Typography>
                     )}
                   </TableCell>

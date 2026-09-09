@@ -608,7 +608,7 @@ def _latest_bch_for(**filters):
 
 
 class AdminBchCatalogView(APIView):
-    """Staff dashboard: knowledge paths and topics that can accept BCH."""
+    """Staff dashboard: knowledge paths and topics that can be sold."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -628,10 +628,9 @@ class AdminBchCatalogView(APIView):
                     'is_visible': path.is_visible,
                     'reference_price': path.reference_price or 0,
                     'is_paid_path': path.is_paid_path,
-                    'bch_direct_enabled': path.bch_direct_enabled,
-                    'bch_direct_available': bool(
-                        configured and path.bch_direct_enabled and path.is_paid_path
-                    ),
+                    'sales_enabled': path.sales_enabled,
+                    'is_for_sale': path.is_for_sale,
+                    'bch_direct_available': bool(configured and path.is_for_sale),
                 }
                 for path in paths
             ],
@@ -644,10 +643,9 @@ class AdminBchCatalogView(APIView):
                     'chat_enabled': topic.chat_enabled,
                     'reference_price': topic.reference_price or 0,
                     'is_paid_topic': topic.is_paid_topic,
-                    'bch_direct_enabled': topic.bch_direct_enabled,
-                    'bch_direct_available': bool(
-                        configured and topic.bch_direct_enabled and topic.is_paid_topic
-                    ),
+                    'sales_enabled': topic.sales_enabled,
+                    'is_for_sale': topic.is_for_sale,
+                    'bch_direct_available': bool(configured and topic.is_for_sale),
                 }
                 for topic in topics
             ],
@@ -655,7 +653,7 @@ class AdminBchCatalogView(APIView):
 
 
 class AdminKnowledgePathBchView(APIView):
-    """Staff: activate/deactivate BCH checkout on a knowledge path."""
+    """Staff: activate/deactivate selling on a knowledge path."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -663,33 +661,38 @@ class AdminKnowledgePathBchView(APIView):
         path = KnowledgePath.objects.select_related('author').filter(pk=pk).first()
         if path is None:
             return Response({'error': 'Camino no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
-        if 'bch_direct_enabled' not in request.data:
+        if 'sales_enabled' not in request.data and 'bch_direct_enabled' not in request.data:
             return Response(
-                {'error': 'Falta bch_direct_enabled.'},
+                {'error': 'Falta sales_enabled.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        enabled = bool(request.data.get('bch_direct_enabled'))
+        enabled = bool(
+            request.data['sales_enabled']
+            if 'sales_enabled' in request.data
+            else request.data.get('bch_direct_enabled')
+        )
         if enabled and not path.is_paid_path:
             return Response(
-                {'error': 'Define un precio mayor a 0 en el camino antes de activar BCH.'},
+                {'error': 'Define un precio mayor a 0 en el camino antes de activar la venta.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        path.bch_direct_enabled = enabled
-        path.save(update_fields=['bch_direct_enabled', 'updated_at'])
+        path.sales_enabled = enabled
+        path.save(update_fields=['sales_enabled', 'updated_at'])
         return Response({
             'id': path.id,
             'title': path.title,
             'reference_price': path.reference_price or 0,
             'is_paid_path': path.is_paid_path,
-            'bch_direct_enabled': path.bch_direct_enabled,
+            'sales_enabled': path.sales_enabled,
+            'is_for_sale': path.is_for_sale,
             'bch_direct_available': bool(
-                is_bch_direct_configured() and path.bch_direct_enabled and path.is_paid_path
+                is_bch_direct_configured() and path.is_for_sale
             ),
         })
 
 
 class AdminTopicBchView(APIView):
-    """Staff: set Consultas price and activate BCH on a topic."""
+    """Staff: set Consultas price and activate/deactivate selling on a topic."""
 
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -715,18 +718,24 @@ class AdminTopicBchView(APIView):
             topic.reference_price = price
             update_fields.append('reference_price')
             if price <= 0:
-                topic.bch_direct_enabled = False
-                update_fields.append('bch_direct_enabled')
+                topic.sales_enabled = False
+                update_fields.append('sales_enabled')
 
-        if 'bch_direct_enabled' in request.data:
-            enabled = bool(request.data.get('bch_direct_enabled'))
-            if enabled and not topic.is_paid_topic:
+        if 'sales_enabled' in request.data or 'bch_direct_enabled' in request.data:
+            enabled = bool(
+                request.data['sales_enabled']
+                if 'sales_enabled' in request.data
+                else request.data.get('bch_direct_enabled')
+            )
+            # Re-evaluate paid state after possible price update above.
+            is_paid = bool(topic.reference_price and topic.reference_price > 0)
+            if enabled and not is_paid:
                 return Response(
-                    {'error': 'Define un precio mayor a 0 antes de activar BCH.'},
+                    {'error': 'Define un precio mayor a 0 antes de activar la venta.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            topic.bch_direct_enabled = enabled
-            update_fields.append('bch_direct_enabled')
+            topic.sales_enabled = enabled
+            update_fields.append('sales_enabled')
 
         topic.save(update_fields=list(dict.fromkeys(update_fields)))
         return Response({
@@ -734,9 +743,10 @@ class AdminTopicBchView(APIView):
             'title': topic.title,
             'reference_price': topic.reference_price or 0,
             'is_paid_topic': topic.is_paid_topic,
-            'bch_direct_enabled': topic.bch_direct_enabled,
+            'sales_enabled': topic.sales_enabled,
+            'is_for_sale': topic.is_for_sale,
             'bch_direct_available': bool(
-                is_bch_direct_configured() and topic.bch_direct_enabled and topic.is_paid_topic
+                is_bch_direct_configured() and topic.is_for_sale
             ),
         })
 
@@ -870,7 +880,7 @@ class PathPurchaseBchPaymentView(APIView):
         payment = _latest_bch_for(path_purchase=purchase)
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data if payment else None,
-            'bch_direct_enabled': is_bch_direct_configured() and path.bch_direct_enabled,
+            'bch_direct_enabled': is_bch_direct_configured() and path.is_for_sale,
             'bch_network': get_bch_network(),
         })
 
@@ -961,7 +971,7 @@ class TopicPurchaseBchPaymentView(APIView):
         payment = _latest_bch_for(topic_purchase=purchase)
         return Response({
             'payment': BchDirectPaymentSerializer(payment).data if payment else None,
-            'bch_direct_enabled': is_bch_direct_configured() and topic.bch_direct_enabled,
+            'bch_direct_enabled': is_bch_direct_configured() and topic.is_for_sale,
             'bch_network': get_bch_network(),
         })
 

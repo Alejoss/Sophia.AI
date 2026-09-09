@@ -38,7 +38,8 @@ const catalog = {
       is_visible: true,
       reference_price: 8,
       is_paid_path: true,
-      bch_direct_enabled: false,
+      sales_enabled: false,
+      is_for_sale: false,
     },
   ],
   topics: [
@@ -50,7 +51,8 @@ const catalog = {
       chat_enabled: true,
       reference_price: 2,
       is_paid_topic: true,
-      bch_direct_enabled: false,
+      sales_enabled: false,
+      is_for_sale: false,
     },
   ],
 };
@@ -86,11 +88,12 @@ describe('BchPaymentsDashboard', () => {
     expect(screen.getByText('bchbuyer')).toBeInTheDocument();
   });
 
-  it('activates BCH on a paid knowledge path', async () => {
+  it('activates selling on a paid knowledge path', async () => {
     const user = userEvent.setup();
     mockUpdatePath.mockResolvedValue({
       ...catalog.knowledge_paths[0],
-      bch_direct_enabled: true,
+      sales_enabled: true,
+      is_for_sale: true,
       bch_direct_available: true,
     });
     renderWithProviders(<BchPaymentsDashboard />, { auth: staffAuth });
@@ -100,7 +103,7 @@ describe('BchPaymentsDashboard', () => {
     await user.click(switches[0]);
 
     await waitFor(() => {
-      expect(mockUpdatePath).toHaveBeenCalledWith(11, { bch_direct_enabled: true });
+      expect(mockUpdatePath).toHaveBeenCalledWith(11, { sales_enabled: true });
     });
   });
 

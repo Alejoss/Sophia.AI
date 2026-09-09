@@ -4,12 +4,17 @@ Además de [NOWPayments](nowpayments-setup.md), Academia Blockchain puede cobrar
 precio fijo de una `TranscriptAnchorRequest` (`price_amount`, default
 `ANCHOR_REQUEST_PRICE_USD`) en **Bitcoin Cash** hacia una wallet propia.
 
-Cubre tres productos cuando el staff los activa en el dashboard
-(`/dashboard/pagos-bch`):
+Cubre tres productos cuando tienen precio y la venta está activa
+(`/dashboard/pagos-bch` → **En venta**):
 
 - Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
-- Caminos de conocimiento con `reference_price > 0` y `bch_direct_enabled`
-- Consultas de un tema con `reference_price > 0` y `bch_direct_enabled`
+- Caminos de conocimiento con `reference_price > 0` y `sales_enabled`
+- Consultas de un tema con `reference_price > 0` y `sales_enabled`
+
+Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
+configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por
+mensaje. El toggle del dashboard ya no activa BCH por producto: activa o pausa
+la venta del contenido.
 
 Eventos siguen en NOWPayments. Un camino de pago también puede seguir cobrando
 por NOWPayments. El usuario puede cambiar de método mientras el invoice
@@ -90,7 +95,7 @@ Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la direc
 | Monto exacto | `output.amount_sats == expected_amount_sats` |
 | Dirección | CashAddr completa o payload tras `bitcoincash:` / `bchtest:` (case-insensitive) |
 | Confirmaciones | `>= BCH_MIN_CONFIRMATIONS` (default `0` = mempool OK) |
-| Reloj | `tx.timestamp >= created_at − 60s` (si el indexer no manda timestamp, no se filtra) |
+| Reloj | `tx.timestamp >= created_at − grace` (default grace = `max(3600, TTL×60)` s; override `BCH_VERIFY_TIMESTAMP_GRACE_SECONDS`). Si el indexer no manda timestamp, no se filtra. |
 | Txid único | `payment_txid` no puede repetirse en otra fila |
 
 Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
@@ -152,6 +157,8 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 
 BCH_PAYMENT_TTL_MINUTES=30
 BCH_MIN_CONFIRMATIONS=0
+# Optional; default max(3600, TTL*60). Widen if buyers pay then recreate orders.
+# BCH_VERIFY_TIMESTAMP_GRACE_SECONDS=3600
 # 0 = fetch USD/BCH from Blockchair, then CoinGecko
 BCH_USD_PRICE=0
 ANCHOR_REQUEST_PRICE_USD=1
@@ -173,8 +180,8 @@ verificar**, no crear la orden.
 |--------|------|------|-----------|
 | GET | `/api/payments/status/` | Público | `bch_direct_enabled`, `bch_network`, `methods.bch_direct` |
 | GET | `/api/payments/admin/bch-catalog/` | Staff | Caminos y temas + flags BCH |
-| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ bch_direct_enabled }` |
-| PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ bch_direct_enabled, reference_price }` |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled }` |
+| PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
 | POST | `/api/payments/anchor-request/<id>/bch/verify/` | Requester o staff | `{ payment, request }` |

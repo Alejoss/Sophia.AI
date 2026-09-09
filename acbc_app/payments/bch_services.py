@@ -43,6 +43,21 @@ def _ttl_minutes() -> int:
     return max(5, int(getattr(settings, 'BCH_PAYMENT_TTL_MINUTES', 30) or 30))
 
 
+def _verify_timestamp_grace_seconds() -> int:
+    """How far before ``created_at`` a chain tx may still count.
+
+    Exact satoshi matching is the real discriminator on the shared receive
+    address. The old 60s grace rejected legitimate payments when block time
+    was slightly earlier than order creation, or when the buyer paid and then
+    regenerated the order a minute later.
+    """
+    configured = getattr(settings, 'BCH_VERIFY_TIMESTAMP_GRACE_SECONDS', None)
+    if configured is not None:
+        return max(60, int(configured))
+    # Default: full order TTL (minutes → seconds), at least 1 hour.
+    return max(3600, _ttl_minutes() * 60)
+
+
 def _min_confirmations() -> int:
     return max(0, int(getattr(settings, 'BCH_MIN_CONFIRMATIONS', 0) or 0))
 
@@ -143,8 +158,8 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Este camino ya está desbloqueado.')
         if not path.is_paid_path:
             raise BchPaymentError('Este camino de conocimiento es gratuito.')
-        if not path.bch_direct_enabled:
-            raise BchPaymentError('El pago BCH no está activado para este camino.')
+        if not path.sales_enabled:
+            raise BchPaymentError('La venta de este camino está desactivada.')
         _release_waiting_nowpayments(path_purchase=path_purchase)
         return
 
@@ -156,8 +171,8 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Las consultas de este tema ya están desbloqueadas.')
         if not topic.is_paid_topic:
             raise BchPaymentError('Las consultas de este tema son gratuitas.')
-        if not topic.bch_direct_enabled:
-            raise BchPaymentError('El pago BCH no está activado para este tema.')
+        if not topic.sales_enabled:
+            raise BchPaymentError('La venta de consultas de este tema está desactivada.')
         return
 
     raise BchPaymentError('Falta el entitlement del pago BCH.')
@@ -371,7 +386,7 @@ def verify_bch_payment(
 
     client = client or build_bch_client()
     try:
-        txs = client.list_recent_transactions(payment.address, limit=15)
+        txs = client.list_recent_transactions(payment.address, limit=30)
     except BchApiError as exc:
         logger.exception(
             'BCH chain lookup failed network=%s payment_id=%s address=%s sats=%s: %s',
@@ -386,21 +401,31 @@ def verify_bch_payment(
             'o avísanos por mensaje con el monto y la dirección de la orden.'
         ) from exc
 
-    min_ts = int((payment.created_at - timedelta(seconds=60)).timestamp())
+    grace = _verify_timestamp_grace_seconds()
+    min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
     min_conf = _min_confirmations()
     receive = payment.address
+    expected = payment.expected_amount_sats
+    skipped_conf = 0
+    skipped_time = 0
+    skipped_txid = 0
+    amounts_to_receive: list[int] = []
 
     for tx in txs:
         if tx.confirmations < min_conf:
+            skipped_conf += 1
             continue
         if tx.timestamp is not None and tx.timestamp < min_ts:
+            skipped_time += 1
             continue
         if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
+            skipped_txid += 1
             continue
         for out in tx.outputs:
             if not _addresses_match(out.address, receive):
                 continue
-            if out.amount_sats != payment.expected_amount_sats:
+            amounts_to_receive.append(out.amount_sats)
+            if out.amount_sats != expected:
                 continue
             return _fulfill_bch_payment(payment, tx.txid, tx_payload={
                 'txid': tx.txid,
@@ -410,11 +435,20 @@ def verify_bch_payment(
             })
 
     logger.info(
-        'BCH verify no exact-amount match yet payment_id=%s address=%s sats=%s txs_scanned=%s',
+        'BCH verify no exact-amount match yet payment_id=%s address=%s sats=%s '
+        'txs_scanned=%s amounts_seen=%s skipped_conf=%s skipped_time=%s skipped_txid=%s '
+        'grace_s=%s min_ts=%s created_at=%s',
         payment.pk,
         payment.address,
-        payment.expected_amount_sats,
+        expected,
         len(txs),
+        amounts_to_receive[:20],
+        skipped_conf,
+        skipped_time,
+        skipped_txid,
+        grace,
+        min_ts,
+        payment.created_at.isoformat(),
     )
     raise BchPaymentError(
         'No encontramos un pago BCH con el monto exacto aún. '

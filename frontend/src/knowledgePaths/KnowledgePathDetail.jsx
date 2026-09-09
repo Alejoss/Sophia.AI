@@ -936,8 +936,9 @@ const KnowledgePathDetail = () => {
         title={knowledgePath?.title}
         priceUsd={knowledgePath?.reference_price}
         productLabel="camino"
-        offerNowpayments
+        offerNowpayments={Boolean(knowledgePath?.is_for_sale)}
         offerBch={Boolean(knowledgePath?.bch_direct_available)}
+        offerMonero={Boolean(knowledgePath?.is_for_sale)}
         createBchPayment={() => createPathPurchaseBchPayment(pathPurchaseId)}
         verifyBchPayment={() => verifyPathPurchaseBchPayment(pathPurchaseId)}
         nowpaymentsProps={{ pathPurchaseId }}
