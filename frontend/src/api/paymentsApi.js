@@ -204,3 +204,66 @@ export const verifyTopicPurchaseBchPayment = async (purchaseId) => {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
   }
 };
+
+export const getTokenPackages = async () => {
+  try {
+    const response = await axiosInstance.get('/payments/token-packages/');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar los paquetes de tokens');
+  }
+};
+
+export const listTokenPurchases = async () => {
+  try {
+    const response = await axiosInstance.get('/payments/token-purchases/');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron cargar las compras de tokens');
+  }
+};
+
+export const createTokenPurchase = async (packageId) => {
+  try {
+    const response = await axiosInstance.post('/payments/token-purchases/', { package_id: packageId });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar la compra de tokens');
+  }
+};
+
+export const createTokenPurchasePayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago de tokens');
+  }
+};
+
+export const listTokenPurchasePayments = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/token-purchase/${purchaseId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudieron listar los pagos de tokens');
+  }
+};
+
+export const createTokenPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
+  }
+};
+
+export const verifyTokenPurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/bch/verify/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};

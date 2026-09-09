@@ -44,6 +44,13 @@ class CryptoPayment(models.Model):
         null=True,
         blank=True,
     )
+    token_purchase = models.ForeignKey(
+        'payments.TokenPurchase',
+        on_delete=models.CASCADE,
+        related_name='crypto_payments',
+        null=True,
+        blank=True,
+    )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     pay_currency = models.CharField(max_length=16, blank=True, default='')
@@ -67,16 +74,25 @@ class CryptoPayment(models.Model):
                         event_registration__isnull=False,
                         path_purchase__isnull=True,
                         anchor_request__isnull=True,
+                        token_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=False,
                         anchor_request__isnull=True,
+                        token_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=True,
                         anchor_request__isnull=False,
+                        token_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=False,
                     )
                 ),
                 name='cryptopayment_exactly_one_target',
@@ -100,12 +116,14 @@ class CryptoPayment(models.Model):
             return self.path_purchase.user
         if self.anchor_request_id:
             return self.anchor_request.requester
+        if self.token_purchase_id:
+            return self.token_purchase.user
         return None
 
 
 class BchDirectPayment(models.Model):
     """
-    Self-custody BCH payment for anchors, paths, or topics.
+    Self-custody BCH payment for anchors, paths, topics, or token packages.
 
     Unique amount (sats) on a single receive address; verify accepts payments
     within ``BCH_AMOUNT_TOLERANCE_USD`` of ``expected_amount_sats`` at the
@@ -139,6 +157,13 @@ class BchDirectPayment(models.Model):
     )
     topic_purchase = models.ForeignKey(
         'content.TopicPurchase',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
+    token_purchase = models.ForeignKey(
+        'payments.TokenPurchase',
         on_delete=models.CASCADE,
         related_name='bch_direct_payments',
         null=True,
@@ -180,16 +205,25 @@ class BchDirectPayment(models.Model):
                         anchor_request__isnull=False,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=False,
                         topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=False,
+                        token_purchase__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        token_purchase__isnull=False,
                     )
                 ),
                 name='bchdirectpayment_exactly_one_target',
@@ -219,6 +253,8 @@ class BchDirectPayment(models.Model):
             return self.topic_purchase.user
         if self.anchor_request_id:
             return self.anchor_request.requester
+        if self.token_purchase_id:
+            return self.token_purchase.user
         return None
 
     def mark_expired_if_needed(self):
@@ -226,3 +262,108 @@ class BchDirectPayment(models.Model):
             self.status = self.STATUS_EXPIRED
             self.save(update_fields=['status', 'updated_at'])
         return self
+
+
+class TokenPackage(models.Model):
+    """Staff-editable SKU of platform tokens sold for USD (paid in BCH / NOWPayments)."""
+
+    name = models.CharField(max_length=80)
+    token_amount = models.PositiveIntegerField()
+    usd_price = models.DecimalField(max_digits=12, decimal_places=2)
+    is_active = models.BooleanField(default=True, db_index=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'token_amount', 'id']
+
+    def __str__(self):
+        return f'{self.name} ({self.token_amount} tokens / ${self.usd_price})'
+
+
+class TokenPurchase(models.Model):
+    """A user's attempt to buy a token package. Repeatable (same package many times)."""
+
+    PAYMENT_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('REFUNDED', 'Refunded'),
+    )
+
+    user = models.ForeignKey(
+        'auth.User',
+        on_delete=models.CASCADE,
+        related_name='token_purchases',
+    )
+    package = models.ForeignKey(
+        TokenPackage,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='purchases',
+    )
+    package_name = models.CharField(max_length=80, blank=True, default='')
+    token_amount = models.PositiveIntegerField()
+    usd_price = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='PENDING',
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → {self.token_amount} tokens ({self.payment_status})'
+
+    @property
+    def is_paid(self):
+        return self.payment_status == 'PAID'
+
+
+class TokenLedgerEntry(models.Model):
+    """Append-only platform token movements. Purchase credits are unique per TokenPurchase."""
+
+    REASON_PURCHASE = 'purchase'
+    REASON_ADJUSTMENT = 'adjustment'
+    REASON_SPEND = 'spend'
+    REASON_CHOICES = (
+        (REASON_PURCHASE, 'Purchase'),
+        (REASON_ADJUSTMENT, 'Adjustment'),
+        (REASON_SPEND, 'Spend'),
+    )
+
+    user = models.ForeignKey(
+        'auth.User',
+        on_delete=models.CASCADE,
+        related_name='token_ledger_entries',
+    )
+    delta = models.IntegerField(help_text='Signed token amount. Credits are positive.')
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, db_index=True)
+    token_purchase = models.ForeignKey(
+        TokenPurchase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ledger_entries',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['token_purchase'],
+                condition=Q(reason='purchase') & Q(token_purchase__isnull=False),
+                name='unique_token_purchase_ledger_credit',
+            ),
+        ]
+
+    def __str__(self):
+        sign = '+' if self.delta >= 0 else ''
+        return f'{self.user_id} {sign}{self.delta} ({self.reason})'

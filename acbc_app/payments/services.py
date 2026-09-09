@@ -7,9 +7,10 @@ from django.db import transaction
 from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
-from payments.models import CryptoPayment
+from payments.models import CryptoPayment, TokenLedgerEntry, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.handlers import on_crypto_payment_completed
+from payments.token_ledger import credit_platform_tokens
 from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
 from utils.notification_utils import notify_payment_accepted
 
@@ -297,6 +298,47 @@ def _mark_anchor_request_paid_if_needed(crypto_payment: CryptoPayment) -> None:
         )
 
 
+def mark_token_purchase_paid(token_purchase: TokenPurchase, *, source: str = '') -> TokenPurchase:
+    """Mark a token-package purchase PAID and credit the ledger (idempotent)."""
+    with transaction.atomic():
+        purchase = TokenPurchase.objects.select_for_update().select_related('user').get(
+            pk=token_purchase.pk,
+        )
+        if purchase.payment_status != 'PAID':
+            purchase.payment_status = 'PAID'
+            purchase.save(update_fields=['payment_status', 'updated_at'])
+        credit_platform_tokens(
+            user=purchase.user,
+            amount=purchase.token_amount,
+            reason=TokenLedgerEntry.REASON_PURCHASE,
+            token_purchase=purchase,
+        )
+    logger.info(
+        'Token purchase %s marked PAID (source=%s tokens=%s)',
+        purchase.pk,
+        source or 'unknown',
+        purchase.token_amount,
+    )
+    return purchase
+
+
+def _mark_token_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    purchase = mark_token_purchase_paid(
+        TokenPurchase.objects.get(pk=crypto_payment.token_purchase_id),
+        source='nowpayments',
+    )
+    purchase = TokenPurchase.objects.select_related('user', 'package').get(pk=purchase.pk)
+    try:
+        on_crypto_payment_completed(crypto_payment, token_purchase=purchase)
+    except Exception as exc:
+        logger.error(
+            'on_crypto_payment_completed failed for token_purchase %s: %s',
+            purchase.id,
+            exc,
+            exc_info=True,
+        )
+
+
 def _fulfill_if_needed(crypto_payment: CryptoPayment) -> None:
     if crypto_payment.event_registration_id:
         _mark_event_registration_paid_if_needed(crypto_payment)
@@ -304,6 +346,8 @@ def _fulfill_if_needed(crypto_payment: CryptoPayment) -> None:
         _mark_path_purchase_paid_if_needed(crypto_payment)
     elif crypto_payment.anchor_request_id:
         _mark_anchor_request_paid_if_needed(crypto_payment)
+    elif crypto_payment.token_purchase_id:
+        _mark_token_purchase_paid_if_needed(crypto_payment)
 
 
 def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> CryptoPayment:
@@ -348,26 +392,30 @@ def _reuse_or_refresh_open_payment(queryset):
     return None
 
 
-def nowpayments_queryset(*, anchor_request=None, path_purchase=None):
+def nowpayments_queryset(*, anchor_request=None, path_purchase=None, token_purchase=None):
     if anchor_request is not None:
         return CryptoPayment.objects.filter(anchor_request=anchor_request)
     if path_purchase is not None:
         return CryptoPayment.objects.filter(path_purchase=path_purchase)
+    if token_purchase is not None:
+        return CryptoPayment.objects.filter(token_purchase=token_purchase)
     return CryptoPayment.objects.none()
 
 
-def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None) -> bool:
+def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> bool:
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
+        token_purchase=token_purchase,
     ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
 
 
-def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None) -> int:
+def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> int:
     """Mark unused hosted invoices expired so the user can switch to BCH."""
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
+        token_purchase=token_purchase,
     ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
         payment_status='expired',
     )
@@ -606,6 +654,86 @@ def create_anchor_request_payment(
     with transaction.atomic():
         crypto_payment = CryptoPayment.objects.create(
             anchor_request=anchor_request,
+            order_id=order_id,
+            nowpayments_payment_id=payload.get('id'),
+            pay_currency=(pay_currency or '').lower().strip(),
+            price_amount=price_amount,
+            price_currency='usd',
+            payment_status='waiting',
+            invoice_url=invoice_url,
+            provider_payload=stored_payload,
+        )
+    return crypto_payment
+
+
+def create_token_purchase(*, package: TokenPackage, user) -> TokenPurchase:
+    if not package.is_active:
+        raise ValueError('Este paquete de tokens no está disponible.')
+    if package.token_amount <= 0 or package.usd_price <= 0:
+        raise ValueError('Este paquete de tokens no es válido.')
+    return TokenPurchase.objects.create(
+        user=user,
+        package=package,
+        package_name=package.name,
+        token_amount=package.token_amount,
+        usd_price=package.usd_price,
+        payment_status='PENDING',
+    )
+
+
+def create_token_purchase_payment(*, token_purchase: TokenPurchase, user, pay_currency=None) -> CryptoPayment:
+    if token_purchase.user_id != user.id:
+        raise PermissionError('Solo el comprador puede iniciar el pago.')
+    if token_purchase.payment_status == 'PAID':
+        raise ValueError('Esta compra de tokens ya está pagada.')
+
+    client = NOWPaymentsClient()
+    if not client.configured:
+        raise NOWPaymentsError('La pasarela de pagos no está configurada en el servidor.')
+
+    reused = _reuse_or_refresh_open_payment(
+        CryptoPayment.objects.filter(token_purchase=token_purchase)
+    )
+    if reused:
+        return reused
+
+    from django.conf import settings
+
+    order_id = f'tok-purchase-{token_purchase.id}-{uuid.uuid4().hex[:12]}'
+    ipn_url = f'{_public_base_url()}/api/payments/ipn/'
+    frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
+    success_url = f'{frontend_base}/profiles/my_profile?section=tokens'
+    package_label = token_purchase.package_name or f'{token_purchase.token_amount} tokens'
+    order_description = f'Tokens: {prepare_text_for_db(package_label)}'
+    price_amount = float(token_purchase.usd_price)
+    payload = client.create_invoice(
+        price_amount=price_amount,
+        price_currency='usd',
+        order_id=order_id,
+        order_description=order_description,
+        ipn_callback_url=ipn_url,
+        success_url=success_url,
+        cancel_url=success_url,
+    )
+
+    invoice_url = payload.get('invoice_url') or ''
+    if not invoice_url:
+        raise NOWPaymentsError('NOWPayments no devolvió invoice_url.')
+
+    logger.info(
+        'NOWPayments invoice created order=%s token_purchase=%s invoice_id=%s',
+        order_id,
+        token_purchase.id,
+        payload.get('id'),
+    )
+
+    stored_payload = prepare_json_for_db(payload)
+    if payload.get('id') is not None and not stored_payload.get('invoice_id'):
+        stored_payload['invoice_id'] = payload.get('id')
+
+    with transaction.atomic():
+        crypto_payment = CryptoPayment.objects.create(
+            token_purchase=token_purchase,
             order_id=order_id,
             nowpayments_payment_id=payload.get('id'),
             pay_currency=(pay_currency or '').lower().strip(),

@@ -31,5 +31,27 @@ urlpatterns = [
     ),
     path('admin/knowledge-paths/<int:pk>/', views.AdminKnowledgePathBchView.as_view(), name='admin-knowledge-path-bch'),
     path('admin/topics/<int:pk>/', views.AdminTopicBchView.as_view(), name='admin-topic-bch'),
+    path('token-packages/', views.TokenPackageListView.as_view(), name='token-packages'),
+    path('token-purchases/', views.TokenPurchaseListCreateView.as_view(), name='token-purchases'),
+    path(
+        'token-purchase/<int:purchase_id>/',
+        views.TokenPurchasePaymentView.as_view(),
+        name='token-purchase-payment-create',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/list/',
+        views.TokenPurchasePaymentsListView.as_view(),
+        name='token-purchase-payments-list',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/bch/',
+        views.TokenPurchaseBchPaymentView.as_view(),
+        name='token-purchase-bch',
+    ),
+    path(
+        'token-purchase/<int:purchase_id>/bch/verify/',
+        views.TokenPurchaseBchVerifyView.as_view(),
+        name='token-purchase-bch-verify',
+    ),
     path('<int:payment_id>/', views.CryptoPaymentDetailView.as_view(), name='crypto-payment-detail'),
 ]

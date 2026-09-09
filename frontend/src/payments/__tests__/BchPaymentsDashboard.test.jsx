@@ -88,6 +88,22 @@ describe('BchPaymentsDashboard', () => {
     expect(screen.getByText('bchbuyer')).toBeInTheDocument();
   });
 
+  it('labels token-package BCH orders', async () => {
+    mockGetOrders.mockResolvedValue({
+      orders: [{
+        ...expiredOrder,
+        id: 90,
+        product_type: 'token_package',
+        product_title: '300 tokens',
+        buyer_username: 'tokener',
+      }],
+      bch_network: 'chipnet',
+    });
+    renderWithProviders(<BchPaymentsDashboard />, { auth: staffAuth });
+    expect(await screen.findByText(/Tokens: 300 tokens/)).toBeInTheDocument();
+    expect(screen.getByText('tokener')).toBeInTheDocument();
+  });
+
   it('activates selling on a paid knowledge path', async () => {
     const user = userEvent.setup();
     mockUpdatePath.mockResolvedValue({

@@ -177,6 +177,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     profile_picture = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     total_points = serializers.IntegerField(read_only=True)
+    token_balance = serializers.SerializerMethodField()
     featured_badge = serializers.SerializerMethodField()
     featured_badge_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
@@ -186,7 +187,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             'user', 'interests', 'profile_description', 'external_url', 'country', 'timezone', 'is_teacher',
-            'profile_picture', 'badges', 'total_points', 'username_change_count', 'featured_badge', 'featured_badge_id'
+            'profile_picture', 'badges', 'total_points', 'token_balance',
+            'username_change_count', 'featured_badge', 'featured_badge_id'
         ]
 
     def get_profile_picture(self, obj):
@@ -203,6 +205,13 @@ class ProfileSerializer(serializers.ModelSerializer):
         except Exception as e:
             logger.error("Error getting badges", extra={'error': str(e)}, exc_info=True)
             return []
+
+    def get_token_balance(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request, 'user', None) and request.user.is_authenticated:
+            if request.user.id == obj.user_id:
+                return obj.token_balance
+        return None
 
     def get_featured_badge(self, obj):
         """Get featured badge details if set."""

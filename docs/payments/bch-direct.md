@@ -10,6 +10,7 @@ Cubre tres productos cuando tienen precio y la venta está activa
 - Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
 - Caminos de conocimiento con `reference_price > 0` y `sales_enabled`
 - Consultas de un tema con `reference_price > 0` y `sales_enabled`
+- Paquetes de tokens de plataforma (siempre, si hay dirección BCH)
 
 Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
 configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por

@@ -7,11 +7,13 @@ import {
     Paper, 
     Grid, 
     Tooltip,
-    CircularProgress
+    CircularProgress,
+    Chip
 } from '@mui/material';
 import MessageIcon from '@mui/icons-material/Message';
 import EditIcon from '@mui/icons-material/Edit';
 import PostAddIcon from '@mui/icons-material/PostAdd';
+import TollIcon from '@mui/icons-material/Toll';
 import BadgeDisplay from '../gamification/BadgeDisplay';
 import UserAvatar from '../components/UserAvatar';
 
@@ -64,6 +66,18 @@ const ProfileHeader = ({
                                     badge={profile.featured_badge} 
                                     showName={false} 
                                     context="profile"
+                                />
+                            )}
+                            {isOwnProfile && (
+                                <Chip
+                                    component={Link}
+                                    to="/profiles/my_profile?section=tokens"
+                                    clickable
+                                    icon={<TollIcon />}
+                                    label={`${Number(profile.token_balance || 0)} ${Number(profile.token_balance || 0) === 1 ? 'token' : 'tokens'}`}
+                                    color="primary"
+                                    variant="outlined"
+                                    sx={{ textDecoration: 'none' }}
                                 />
                             )}
                         </Box>
