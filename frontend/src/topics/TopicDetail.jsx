@@ -1039,7 +1039,7 @@ const TopicDetail = () => {
                 offerBch={Boolean(topic?.bch_direct_available)}
                 offerMonero={false}
                 createBchPayment={() => createTopicPurchaseBchPayment(topicPurchaseId)}
-                verifyBchPayment={() => verifyTopicPurchaseBchPayment(topicPurchaseId)}
+                verifyBchPayment={(txid) => verifyTopicPurchaseBchPayment(topicPurchaseId, txid)}
                 onPaid={handleTopicPaymentComplete}
             />
             <MoneroPaymentModal

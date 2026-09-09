@@ -12,6 +12,7 @@ import {
   IconButton,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -26,6 +27,7 @@ import MoneroPaymentModal from '../payments/MoneroPaymentModal';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 import BchAddressQr from '../payments/BchAddressQr';
 import BchOrderExpiryNotice from '../payments/BchOrderExpiryNotice';
+import { isLikelyBchTxid, normalizeBchTxid } from '../payments/bchPaymentSupport';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -55,6 +57,7 @@ const AnchorPaymentCheckout = ({
   const [copied, setCopied] = useState('');
   const [paidReview, setPaidReview] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [verifyTxid, setVerifyTxid] = useState('');
 
   useEffect(() => {
     if (!open) {
@@ -65,6 +68,7 @@ const AnchorPaymentCheckout = ({
       setCopied('');
       setPaidReview(false);
       setSupportOpen(false);
+      setVerifyTxid('');
       return undefined;
     }
     let cancelled = false;
@@ -125,18 +129,24 @@ const AnchorPaymentCheckout = ({
   };
 
   const handleVerify = async () => {
-    if (!bchOrder?.id) return;
+    if (!anchorRequestId) return;
+    const cleanTxid = normalizeBchTxid(verifyTxid);
+    if (!isLikelyBchTxid(cleanTxid)) {
+      setBchError('Pega el TXID de tu pago (64 caracteres hexadecimales).');
+      return;
+    }
     setBchBusy(true);
     setBchError('');
     try {
-      const result = await verifyAnchorRequestBchPayment(bchOrder.id);
-      setBchOrder((prev) => (prev ? { ...prev, ...result } : result));
-      if (result?.status === 'confirmed' || result?.paid) {
+      const result = await verifyAnchorRequestBchPayment(anchorRequestId, cleanTxid);
+      const payment = result?.payment || result;
+      setBchOrder((prev) => (prev ? { ...prev, ...payment } : payment));
+      if (payment?.status === 'paid') {
         setPaidReview(true);
         onPaid?.(result);
       } else {
         setBchError(
-          'Aún no vemos el pago en la cadena. Si ya enviaste, espera unos segundos y vuelve a verificar.',
+          'Aún no confirmamos el pago con ese TXID. Revisa el ID o espera unos segundos.',
         );
       }
     } catch (err) {
@@ -350,6 +360,16 @@ const AnchorPaymentCheckout = ({
                 </Stack>
               </Box>
               <BchOrderExpiryNotice bchOrder={bchOrder} />
+              <TextField
+                label="ID de transacción (TXID)"
+                placeholder="Pega el TXID de 64 caracteres de tu wallet"
+                value={verifyTxid}
+                onChange={(e) => setVerifyTxid(e.target.value)}
+                fullWidth
+                size="small"
+                autoComplete="off"
+                helperText="Después de pagar, copia el TXID desde tu wallet y pégalo aquí."
+              />
             </Stack>
           )}
         </DialogContent>
@@ -360,6 +380,7 @@ const AnchorPaymentCheckout = ({
               setBchOrder(null);
               setBchError('');
               setSupportOpen(false);
+              setVerifyTxid('');
             }}
             disabled={bchBusy}
           >
@@ -381,7 +402,7 @@ const AnchorPaymentCheckout = ({
               <Button
                 variant="contained"
                 onClick={handleVerify}
-                disabled={bchBusy || !bchOrder}
+                disabled={bchBusy || !bchOrder || !isLikelyBchTxid(verifyTxid)}
                 startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
               >
                 Ya pagué — verificar

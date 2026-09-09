@@ -12,6 +12,7 @@ import {
   IconButton,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -22,6 +23,7 @@ import MoneroPaymentModal from './MoneroPaymentModal';
 import BchPaymentSupportModal from './BchPaymentSupportModal';
 import BchAddressQr from './BchAddressQr';
 import BchOrderExpiryNotice from './BchOrderExpiryNotice';
+import { isLikelyBchTxid, normalizeBchTxid } from './bchPaymentSupport';
 
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
@@ -60,6 +62,7 @@ const ProductPaymentCheckout = ({
   const [supportOpen, setSupportOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [paid, setPaid] = useState(false);
+  const [verifyTxid, setVerifyTxid] = useState('');
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +72,7 @@ const ProductPaymentCheckout = ({
       setSupportOpen(false);
       setPaid(false);
       setCopied('');
+      setVerifyTxid('');
       return undefined;
     }
     let cancelled = false;
@@ -120,10 +124,15 @@ const ProductPaymentCheckout = ({
 
   const verifyBch = async () => {
     if (!verifyBchPayment) return;
+    const cleanTxid = normalizeBchTxid(verifyTxid);
+    if (!isLikelyBchTxid(cleanTxid)) {
+      setBchError('Pega el TXID de tu pago (64 caracteres hexadecimales).');
+      return;
+    }
     setBchBusy(true);
     setBchError(null);
     try {
-      const data = await verifyBchPayment();
+      const data = await verifyBchPayment(cleanTxid);
       setBchOrder(data.payment);
       if (
         data.purchase?.is_paid
@@ -365,6 +374,16 @@ const ProductPaymentCheckout = ({
                 </Stack>
               </Box>
               <BchOrderExpiryNotice bchOrder={bchOrder} />
+              <TextField
+                label="ID de transacción (TXID)"
+                placeholder="Pega el TXID de 64 caracteres de tu wallet"
+                value={verifyTxid}
+                onChange={(e) => setVerifyTxid(e.target.value)}
+                fullWidth
+                size="small"
+                autoComplete="off"
+                helperText="Después de pagar, copia el TXID desde tu wallet y pégalo aquí para verificar."
+              />
               <Divider />
             </Stack>
           )}
@@ -374,7 +393,7 @@ const ProductPaymentCheckout = ({
             <Button
               variant="contained"
               fullWidth
-              disabled={bchBusy}
+              disabled={bchBusy || !isLikelyBchTxid(verifyTxid)}
               onClick={verifyBch}
               startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
             >

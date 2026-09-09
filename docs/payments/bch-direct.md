@@ -60,9 +60,9 @@ sequenceDiagram
     User->>UI: Elige BCH directo
     UI->>API: POST /api/payments/anchor-request/{id}/bch/
     API-->>UI: address + expected_amount_sats + TTL
-    User->>Chain: Envía el monto exacto
-    User->>UI: Ya realicé el pago
-    UI->>API: POST .../bch/verify/
+    User->>Chain: Envía el monto (QR = solo dirección)
+    User->>UI: Pega TXID + Ya realicé el pago
+    UI->>API: POST .../bch/verify/ {txid}
     API->>Chain: list_recent_transactions(address)
     Chain-->>API: txs recientes
     API-->>UI: paid + request paid_pending_review
@@ -76,7 +76,9 @@ sequenceDiagram
    desambiguación por ventana de tolerancia USD para no solapar órdenes concurrentes).
 4. Usuario paga el monto mostrado a la dirección de la red activa (se tolera hasta
    `BCH_AMOUNT_TOLERANCE_USD`, default $0.20, por redondeo/fee de wallet).
-5. `POST .../bch/verify/` consulta Fulcrum (o Blockchair si se fuerza); si hay match → orden `paid` + solicitud `paid_pending_review`.
+5. Usuario pega el **TXID** y pulsa `POST .../bch/verify/` con `{ "txid": "…" }`.
+   El servidor hace `get_transaction(txid)` (Fulcrum pool + Blockchair fallback) y
+   valida dirección + monto (±`$0.20`). Si hay match → orden `paid`.
    Si el indexer falla, el error se registra en logs y el UI ofrece **Avisar por mensaje**.
 6. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
 
@@ -96,8 +98,8 @@ En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar de
 
 ## Cómo se verifica (match on-chain)
 
-Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta
-el candidato **más cercano** a `expected_amount_sats` que cumpla:
+Sin webhooks. El comprador pega el **TXID**. `verify_bch_payment(payment_txid=…)` carga
+**esa** transacción (`get_transaction`) y acepta el output a la dirección de cobro que cumpla:
 
 | Regla | Detalle |
 |-------|---------|

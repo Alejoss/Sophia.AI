@@ -277,7 +277,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         }
         verifyBchPayment={
           checkout
-            ? () => verifyTokenPurchaseBchPayment(checkout.purchaseId)
+            ? (txid) => verifyTokenPurchaseBchPayment(checkout.purchaseId, txid)
             : undefined
         }
         nowpaymentsProps={{ tokenPurchaseId: checkout?.purchaseId }}
