@@ -372,6 +372,13 @@ function TopicChat({ topicId }) {
       }
       if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
         setDailyRemaining(data.daily_remaining);
+        if (
+          data.daily_limit != null &&
+          data.daily_remaining != null &&
+          data.daily_remaining <= 0
+        ) {
+          setComposing(false);
+        }
       }
     } catch {
       // Non-fatal: form still works.
