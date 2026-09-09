@@ -106,6 +106,9 @@ GET /api/content/topics/{topic_id}/chat/queries/?limit=50
 {
   "count": 2,
   "limit": 50,
+  "daily_limit": 3,
+  "daily_used": 1,
+  "daily_remaining": 2,
   "results": [
     {
       "id": 12,
@@ -117,6 +120,9 @@ GET /api/content/topics/{topic_id}/chat/queries/?limit=50
 }
 ```
 
+`daily_*` is the authenticated user's free-tier quota across **all** topics
+(calendar day in server timezone). `daily_limit` / `daily_remaining` are `null`
+when unlimited (future premium).
 ### Get one consultation
 
 ```http
@@ -134,6 +140,7 @@ Same shape as the create response. Other users get **404**.
 | 404 | Topic missing or not visible |
 | 503 | `OPENAI_API_KEY` or Qdrant env missing |
 | 502 | OpenAI / Qdrant upstream failure |
+| 429 | Free-tier daily cap exceeded (`code=daily_consultation_limit`) |
 
 ---
 
@@ -174,7 +181,10 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
   answer (retrieval miss / index gap / empty / low score) — **no** chat-model call,
   and it does **not** claim the entity is absent from the whole topic when Postgres
   still has matches.
-- Per-user / per-topic daily rate limits are **not** implemented yet.
+- Free users are limited to **3 consultations per calendar day** (all topics
+  combined). Enforced in `TopicChatView` before RAG; **429** with
+  `code=daily_consultation_limit`. Hook for future premium/unlimited:
+  `content.topic_chat_quota.user_daily_consultation_limit`.
 - The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
   Enabling the flag via topic edit / PATCH fails with **400** if nothing is

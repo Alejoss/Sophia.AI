@@ -841,6 +841,10 @@ class TopicChatQuery(models.Model):
     embedding of chat history is out of scope for this model.
     """
 
+    # Free-tier cap across all topics. Premium/token unlimited is wired later via
+    # content.topic_chat_quota.user_daily_consultation_limit.
+    MAX_PER_USER_PER_DAY = 3
+
     topic = models.ForeignKey(
         Topic,
         on_delete=models.CASCADE,

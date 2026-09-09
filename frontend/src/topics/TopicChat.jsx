@@ -347,6 +347,8 @@ function TopicChat({ topicId }) {
   const [composing, setComposing] = useState(true);
   const [sources, setSources] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [dailyLimit, setDailyLimit] = useState(null);
+  const [dailyRemaining, setDailyRemaining] = useState(null);
 
   const sourceById = useMemo(() => {
     const map = {};
@@ -356,12 +358,21 @@ function TopicChat({ topicId }) {
     return map;
   }, [sources]);
 
+  const atDailyLimit =
+    dailyLimit != null && dailyRemaining != null && dailyRemaining <= 0;
+
   const loadHistory = useCallback(async () => {
     if (!isAuthenticated || !topicId) return;
     setHistoryLoading(true);
     try {
       const data = await contentApi.listTopicChatQueries(topicId);
       setHistory(data.results || []);
+      if (Object.prototype.hasOwnProperty.call(data, 'daily_limit')) {
+        setDailyLimit(data.daily_limit);
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
+        setDailyRemaining(data.daily_remaining);
+      }
     } catch {
       // Non-fatal: form still works.
     } finally {
@@ -399,6 +410,14 @@ function TopicChat({ topicId }) {
   }
 
   const startNewConsultation = () => {
+    if (atDailyLimit) {
+      setError(
+        dailyLimit != null
+          ? `Has alcanzado el límite de ${dailyLimit} consultas por día. Podrás hacer más consultas mañana.`
+          : 'Has alcanzado el límite de consultas por día.'
+      );
+      return;
+    }
     setActiveQuery(null);
     setComposing(true);
     setError(null);
@@ -436,6 +455,14 @@ function TopicChat({ topicId }) {
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
+    if (atDailyLimit) {
+      setError(
+        dailyLimit != null
+          ? `Has alcanzado el límite de ${dailyLimit} consultas por día. Podrás hacer más consultas mañana.`
+          : 'Has alcanzado el límite de consultas por día.'
+      );
+      return;
+    }
     if (selectedIds.length === 0) {
       setError('Selecciona al menos un contenido para consultar.');
       return;
@@ -451,6 +478,12 @@ function TopicChat({ topicId }) {
       setActiveQuery(data);
       setComposing(false);
       setInput('');
+      if (Object.prototype.hasOwnProperty.call(data, 'daily_limit')) {
+        setDailyLimit(data.daily_limit);
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
+        setDailyRemaining(data.daily_remaining);
+      }
       setHistory((prev) => {
         const preview =
           text.length <= 120 ? text : `${text.slice(0, 117)}…`;
@@ -466,9 +499,22 @@ function TopicChat({ topicId }) {
     } catch (err) {
       const apiError = err?.response?.data?.error || err?.response?.data?.detail;
       const status = err?.response?.status;
+      const code = err?.response?.data?.code;
+      if (code === 'daily_consultation_limit') {
+        if (Object.prototype.hasOwnProperty.call(err.response.data, 'daily_limit')) {
+          setDailyLimit(err.response.data.daily_limit);
+        }
+        if (Object.prototype.hasOwnProperty.call(err.response.data, 'daily_remaining')) {
+          setDailyRemaining(err.response.data.daily_remaining);
+        } else {
+          setDailyRemaining(0);
+        }
+      }
       let detail = apiError;
       if (typeof detail !== 'string' || !detail.trim()) {
-        if (status >= 500) {
+        if (status === 429) {
+          detail = 'Has alcanzado el límite de consultas por día.';
+        } else if (status >= 500) {
           detail = 'No se pudo completar la consulta. Inténtalo de nuevo en unos segundos.';
         } else {
           detail = err?.message || 'No se pudo obtener una respuesta.';
@@ -500,6 +546,13 @@ function TopicChat({ topicId }) {
       <Typography variant="body2" color="text.secondary">
         Cada consulta es independiente: eliges qué contenidos indexados
         usar, se responde solo con esos archivos y se guarda en tu historial.
+        {dailyLimit != null && (
+          <>
+            {' '}
+            Límite gratuito: {dailyLimit} consultas por día
+            {dailyRemaining != null ? ` (${dailyRemaining} restantes hoy)` : ''}.
+          </>
+        )}
       </Typography>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -508,7 +561,7 @@ function TopicChat({ topicId }) {
           size="small"
           startIcon={<AddIcon />}
           onClick={startNewConsultation}
-          disabled={composing}
+          disabled={composing || atDailyLimit}
         >
           Nueva consulta
         </Button>
@@ -558,7 +611,7 @@ function TopicChat({ topicId }) {
             <Button
               variant="contained"
               onClick={send}
-              disabled={loading || !input.trim() || selectedIds.length === 0}
+              disabled={loading || atDailyLimit || !input.trim() || selectedIds.length === 0}
               endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             >
               Consultar

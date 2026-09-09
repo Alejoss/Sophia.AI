@@ -19,6 +19,7 @@ from content.serializers import (
 )
 from content.topic_access import user_has_topic_consultas_access
 from content.topic_chat import TopicChatError, run_topic_chat, topic_chat_ready
+from content.topic_chat_quota import daily_quota_exceeded_payload, daily_quota_payload
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,14 @@ class TopicChatView(APIView):
         if selection_error:
             return selection_error
 
+        # Enforce free-tier daily cap before OpenAI/Qdrant spend.
+        quota_error = daily_quota_exceeded_payload(request.user)
+        if quota_error:
+            return Response(
+                quota_error,
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         ready, reason = topic_chat_ready()
         if not ready:
             return Response(
@@ -234,7 +243,10 @@ class TopicChatView(APIView):
             selected_ids,
         )
         return Response(
-            TopicChatQuerySerializer(query).data,
+            {
+                **TopicChatQuerySerializer(query).data,
+                **daily_quota_payload(request.user),
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -267,11 +279,13 @@ class TopicChatQueryListView(APIView):
         limit = max(1, min(limit, 100))
 
         items = qs[:limit]
-        return Response({
+        payload = {
             'count': qs.count(),
             'limit': limit,
             'results': TopicChatQueryListSerializer(items, many=True).data,
-        })
+        }
+        payload.update(daily_quota_payload(request.user))
+        return Response(payload)
 
 
 class TopicChatQueryDetailView(APIView):
