@@ -36,7 +36,15 @@ logger = logging.getLogger(__name__)
 
 
 class BchPaymentError(Exception):
-    """Business/validation error for BCH direct payments."""
+    """Business/validation error for BCH direct payments.
+
+    Optional ``details`` is merged into HTTP-boundary WARNING logs so operators
+    can diagnose verify failures from Docker/nginx logs alone.
+    """
+
+    def __init__(self, message: str, *, details: dict | None = None):
+        super().__init__(message)
+        self.details = details or {}
 
 
 def _ttl_minutes() -> int:
@@ -410,6 +418,8 @@ def verify_bch_payment(
     skipped_time = 0
     skipped_txid = 0
     amounts_to_receive: list[int] = []
+    amounts_outside_window: list[int] = []
+    candidate_txids: list[str] = []
 
     for tx in txs:
         if tx.confirmations < min_conf:
@@ -417,6 +427,9 @@ def verify_bch_payment(
             continue
         if tx.timestamp is not None and tx.timestamp < min_ts:
             skipped_time += 1
+            for out in tx.outputs:
+                if _addresses_match(out.address, receive):
+                    amounts_outside_window.append(out.amount_sats)
             continue
         if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
             skipped_txid += 1
@@ -434,25 +447,43 @@ def verify_bch_payment(
                 'amount_sats': out.amount_sats,
             })
 
-    logger.info(
-        'BCH verify no exact-amount match yet payment_id=%s address=%s sats=%s '
-        'txs_scanned=%s amounts_seen=%s skipped_conf=%s skipped_time=%s skipped_txid=%s '
-        'grace_s=%s min_ts=%s created_at=%s',
-        payment.pk,
-        payment.address,
-        expected,
-        len(txs),
-        amounts_to_receive[:20],
-        skipped_conf,
-        skipped_time,
-        skipped_txid,
-        grace,
-        min_ts,
-        payment.created_at.isoformat(),
+    # Keep short fingerprints of scanned txs for support (not full history dumps).
+    for tx in txs[:10]:
+        if tx.txid:
+            candidate_txids.append(str(tx.txid)[:16])
+
+    target_ids = {
+        'path_purchase_id': getattr(path_purchase, 'id', None) or payment.path_purchase_id,
+        'topic_purchase_id': getattr(topic_purchase, 'id', None) or payment.topic_purchase_id,
+        'anchor_request_id': getattr(anchor_request, 'id', None) or payment.anchor_request_id,
+        'user_id': getattr(user, 'id', None),
+    }
+    details = {
+        'payment_id': payment.pk,
+        'network': get_bch_network(),
+        'address': payment.address,
+        'expected_sats': expected,
+        'txs_scanned': len(txs),
+        'amounts_seen': amounts_to_receive[:20],
+        'amounts_outside_window': amounts_outside_window[:20],
+        'skipped_conf': skipped_conf,
+        'skipped_time': skipped_time,
+        'skipped_txid': skipped_txid,
+        'grace_s': grace,
+        'min_ts': min_ts,
+        'created_at': payment.created_at.isoformat(),
+        'recent_txids': candidate_txids,
+        **{k: v for k, v in target_ids.items() if v is not None},
+    }
+    # WARNING (not INFO): must show next to the HTTP 400 line in prod Docker logs.
+    logger.warning(
+        'BCH verify no exact-amount match yet %s',
+        ' '.join(f'{key}={value}' for key, value in details.items()),
     )
     raise BchPaymentError(
         'No encontramos un pago BCH con el monto exacto aún. '
-        'Espera unos segundos y vuelve a intentarlo.'
+        'Espera unos segundos y vuelve a intentarlo.',
+        details=details,
     )
 
 

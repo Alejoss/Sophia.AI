@@ -549,8 +549,22 @@ class BchDirectPaymentTests(TestCase):
                 ],
             ),
         ]
-        with self.assertRaises(BchPaymentError):
-            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+        with self.assertLogs('payments.bch_services', level='WARNING') as logs:
+            with self.assertRaises(BchPaymentError) as ctx:
+                verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+        self.assertIn('amounts_seen', str(ctx.exception.details))
+        self.assertEqual(
+            ctx.exception.details.get('expected_sats'),
+            order.expected_amount_sats,
+        )
+        self.assertEqual(
+            ctx.exception.details.get('amounts_seen'),
+            [order.expected_amount_sats + 1],
+        )
+        self.assertTrue(
+            any('no exact-amount match yet' in line for line in logs.output),
+            logs.output,
+        )
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
 

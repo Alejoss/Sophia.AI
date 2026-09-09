@@ -99,6 +99,8 @@ Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la direc
 | Txid único | `payment_txid` no puede repetirse en otra fila |
 
 Si no hay match: `400` *No encontramos un pago BCH con el monto exacto aún.*
+En logs (`WARNING`): `payment_id`, `expected_sats`, `amounts_seen`, `amounts_outside_window`,
+`skipped_time` / `skipped_conf` / `skipped_txid`, `recent_txids`, y el id de compra.
 
 ## Reuso, expiración y exclusión mutua
 
