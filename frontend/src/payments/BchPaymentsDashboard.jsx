@@ -80,6 +80,7 @@ const BchPaymentsDashboard = () => {
   const [success, setSuccess] = useState(null);
   const [filter, setFilter] = useState('all');
   const [savingKey, setSavingKey] = useState(null);
+  const [pathPrices, setPathPrices] = useState({});
   const [topicPrices, setTopicPrices] = useState({});
   const [txidDrafts, setTxidDrafts] = useState({});
 
@@ -99,11 +100,16 @@ const BchPaymentsDashboard = () => {
         }
       });
       setTxidDrafts(drafts);
-      const prices = {};
-      (catalogData.topics || []).forEach((topic) => {
-        prices[topic.id] = String(topic.reference_price ?? 0);
+      const nextPathPrices = {};
+      (catalogData.knowledge_paths || []).forEach((path) => {
+        nextPathPrices[path.id] = String(path.reference_price ?? 0);
       });
-      setTopicPrices(prices);
+      setPathPrices(nextPathPrices);
+      const nextTopicPrices = {};
+      (catalogData.topics || []).forEach((topic) => {
+        nextTopicPrices[topic.id] = String(topic.reference_price ?? 0);
+      });
+      setTopicPrices(nextTopicPrices);
       setError(null);
     } catch (err) {
       setError(formatError(err, 'No se pudo cargar el panel de pagos BCH.'));
@@ -141,8 +147,38 @@ const BchPaymentsDashboard = () => {
           item.id === path.id ? { ...item, ...updated } : item
         )),
       }));
+      if (updated?.reference_price !== undefined) {
+        setPathPrices((prev) => ({ ...prev, [path.id]: String(updated.reference_price ?? 0) }));
+      }
     } catch (err) {
       setError(formatError(err, 'No se pudo actualizar el camino.'));
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const handlePathPriceSave = async (path) => {
+    const raw = pathPrices[path.id];
+    const price = Number(raw);
+    if (Number.isNaN(price) || price < 0) {
+      setError('El precio del camino debe ser un número mayor o igual a 0.');
+      return;
+    }
+    setSavingKey(`path-price-${path.id}`);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await updateKnowledgePathBch(path.id, { reference_price: price });
+      setCatalog((prev) => ({
+        ...prev,
+        knowledge_paths: (prev.knowledge_paths || []).map((item) => (
+          item.id === path.id ? { ...item, ...updated } : item
+        )),
+      }));
+      setPathPrices((prev) => ({ ...prev, [path.id]: String(updated.reference_price ?? 0) }));
+      setSuccess(`Precio del camino «${path.title}» actualizado.`);
+    } catch (err) {
+      setError(formatError(err, 'No se pudo guardar el precio del camino.'));
     } finally {
       setSavingKey(null);
     }
@@ -241,9 +277,9 @@ const BchPaymentsDashboard = () => {
             Pagos Bitcoin Cash
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Activa o pausa la venta de caminos y temas con precio. Si están en
-            venta, el checkout ofrece NOWPayments, Bitcoin Cash y Monero.
-            También confirma pagos BCH reportados por TXID.
+            Edita el precio de caminos y temas, y activa o pausa la venta. Si
+            están en venta, el checkout ofrece NOWPayments, Bitcoin Cash y
+            Monero. También confirma pagos BCH reportados por TXID.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -434,9 +470,26 @@ const BchPaymentsDashboard = () => {
                   </TableCell>
                   <TableCell>{path.author || '—'}</TableCell>
                   <TableCell>
-                    {path.is_paid_path
-                      ? `$${Number(path.reference_price).toFixed(2)}`
-                      : 'Gratis'}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <TextField
+                        size="small"
+                        type="number"
+                        inputProps={{ min: 0, step: '0.01' }}
+                        value={pathPrices[path.id] ?? '0'}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setPathPrices((prev) => ({ ...prev, [path.id]: value }));
+                        }}
+                        sx={{ width: 110 }}
+                      />
+                      <Button
+                        size="small"
+                        disabled={savingKey === `path-price-${path.id}`}
+                        onClick={() => handlePathPriceSave(path)}
+                      >
+                        Guardar
+                      </Button>
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     <FormControlLabel
@@ -452,7 +505,7 @@ const BchPaymentsDashboard = () => {
                     />
                     {!path.is_paid_path && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        El autor debe poner un precio mayor a 0.
+                        Guarda un precio mayor a 0 para poner en venta.
                       </Typography>
                     )}
                   </TableCell>

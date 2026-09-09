@@ -107,6 +107,31 @@ describe('BchPaymentsDashboard', () => {
     });
   });
 
+  it('saves a knowledge path price from the dashboard', async () => {
+    const user = userEvent.setup();
+    mockUpdatePath.mockResolvedValue({
+      ...catalog.knowledge_paths[0],
+      reference_price: 15,
+      is_paid_path: true,
+      sales_enabled: false,
+      is_for_sale: false,
+    });
+    renderWithProviders(<BchPaymentsDashboard />, { auth: staffAuth });
+    await screen.findByText('Camino de pago');
+
+    const priceInputs = screen.getAllByDisplayValue('8');
+    await user.clear(priceInputs[0]);
+    await user.type(priceInputs[0], '15');
+
+    const saveButtons = screen.getAllByRole('button', { name: 'Guardar' });
+    await user.click(saveButtons[0]);
+
+    await waitFor(() => {
+      expect(mockUpdatePath).toHaveBeenCalledWith(11, { reference_price: 15 });
+    });
+    expect(await screen.findByText(/Precio del camino «Camino de pago» actualizado/i)).toBeInTheDocument();
+  });
+
   it('confirms an expired order with a pasted TXID', async () => {
     const user = userEvent.setup();
     const txid = 'ab'.repeat(32);

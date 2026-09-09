@@ -85,6 +85,7 @@ sequenceDiagram
 4. Si otra orden `pending` no expirada ya usa esos sats, se suma **1 sat** (hasta 10 000 intentos).
 
 El frontend muestra `expected_amount_bch` (8 decimales) y `expected_amount_sats`. El pagador debe enviar **exactamente** esos sats; un sat de más o de menos no cuenta.
+En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar desajustes por fee/redondeo de wallets.
 
 ## Cómo se verifica (match on-chain)
 
@@ -180,7 +181,7 @@ verificar**, no crear la orden.
 |--------|------|------|-----------|
 | GET | `/api/payments/status/` | Público | `bch_direct_enabled`, `bch_network`, `methods.bch_direct` |
 | GET | `/api/payments/admin/bch-catalog/` | Staff | Caminos y temas + flags BCH |
-| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled }` |
+| PATCH | `/api/payments/admin/knowledge-paths/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
