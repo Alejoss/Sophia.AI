@@ -5704,6 +5704,10 @@ class TopicChatAPITests(APITestCase):
             list_response.data['daily_remaining'],
             TopicChatQuery.MAX_PER_USER_PER_DAY - 1,
         )
+        self.assertEqual(
+            list_response.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
 
         detail = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
@@ -5753,7 +5757,11 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(blocked.data['daily_limit'], limit)
         self.assertEqual(blocked.data['daily_used'], limit)
         self.assertEqual(blocked.data['daily_remaining'], 0)
-        self.assertIn('límite', blocked.data['error'].lower())
+        self.assertEqual(
+            blocked.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
+        self.assertIn('tokens acbc', blocked.data['error'].casefold())
         self.assertEqual(mock_run.call_count, limit)
         self.assertEqual(
             TopicChatQuery.objects.filter(user=self.user).count(),
@@ -6610,6 +6618,12 @@ class TranscriptAnchorAPITests(APITestCase):
             email='owneranchor@example.com',
             password='testpass123',
         )
+        self.staff = User.objects.create_user(
+            username='staffanchor',
+            email='staffanchor@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
         self.other = User.objects.create_user(
             username='otheranchor',
             email='otheranchor@example.com',
@@ -6636,8 +6650,21 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertIsNone(response.data['anchor'])
         self.assertFalse(response.data['can_certify'])
 
-    def test_owner_can_create_pending_anchor(self):
+    def test_owner_cannot_free_certify_must_pay(self):
         self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {'ipfs_cid': 'bafytestcid'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        current = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+        )
+        self.assertFalse(current.data['can_certify'])
+
+    def test_staff_can_create_pending_anchor(self):
+        self.client.force_authenticate(user=self.staff)
         response = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchors/',
             {'ipfs_cid': 'bafytestcid'},
@@ -6667,7 +6694,7 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_duplicate_anchor_conflict(self):
-        self.client.force_authenticate(user=self.owner)
+        self.client.force_authenticate(user=self.staff)
         first = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchors/',
             {},
@@ -6737,7 +6764,7 @@ class TranscriptAnchorAPITests(APITestCase):
         err.__cause__ = cause
         mock_broadcast.side_effect = err
 
-        self.client.force_authenticate(user=self.owner)
+        self.client.force_authenticate(user=self.staff)
         response = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchor/',
             {},

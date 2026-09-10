@@ -17,6 +17,26 @@ indexed by the external embed worker (see [qdrant-embeddings.md](qdrant-embeddin
 
 ---
 
+## Access and free-tier quota
+
+Current product rules for Consultas:
+
+| Who | What happens |
+|-----|----------------|
+| **Anonymous / not logged in** | Cannot create consultations. API `POST …/chat/` returns **401**. UI shows “Inicia sesión para consultar…”. |
+| **Logged-in free user** | Can create up to **3 consultations per calendar day** (server timezone), counted across **all** topics. |
+| **After the 3rd consultation today** | Further `POST …/chat/` returns **429** (`code=daily_consultation_limit`). UI shows a warning and a link **Ir a Mis tokens** → `/profiles/my_profile?section=tokens` so they can buy ACBC tokens. |
+
+Notes:
+
+- Buying tokens is the intended next step to raise the daily cap later. **Token balance does not increase the consultation limit yet** (see [platform-tokens.md](../payments/platform-tokens.md)).
+- Paid topics still require Consultas access (`topic_payment_required`) separately from this free-tier daily cap.
+- Staff/creator exemptions for the daily cap are not implemented; the cap applies to every authenticated user for now.
+
+Implementation: `TopicChatQuery.MAX_PER_USER_PER_DAY`, `content.topic_chat_quota`, enforced in `TopicChatView` **before** OpenAI/Qdrant spend. Frontend: `TopicChat.jsx`.
+
+---
+
 ## Endpoints
 
 All require JWT. Only the owning user can list/read their consultations.
@@ -89,12 +109,30 @@ Response `201`:
   "retrieved_chunk_count": 4,
   "used_chunk_count": 3,
   "selected_content_ids": [46, 88],
-  "created_at": "2026-07-28T18:00:00Z"
+  "created_at": "2026-07-28T18:00:00Z",
+  "daily_limit": 3,
+  "daily_used": 1,
+  "daily_remaining": 2,
+  "tokens_url": "/profiles/my_profile?section=tokens"
 }
 ```
 
 `selected_content_ids` is empty when the client omitted `content_ids` (all
-indexed files were eligible).
+indexed files were eligible). Create and list responses include the free-tier
+quota snapshot (`daily_*`) plus `tokens_url` for the buy-tokens CTA.
+
+When the daily cap is exceeded, create returns **429**:
+
+```json
+{
+  "error": "Has alcanzado el límite de 3 consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.",
+  "code": "daily_consultation_limit",
+  "daily_limit": 3,
+  "daily_used": 3,
+  "daily_remaining": 0,
+  "tokens_url": "/profiles/my_profile?section=tokens"
+}
+```
 
 ### List own consultations
 
@@ -109,6 +147,7 @@ GET /api/content/topics/{topic_id}/chat/queries/?limit=50
   "daily_limit": 3,
   "daily_used": 1,
   "daily_remaining": 2,
+  "tokens_url": "/profiles/my_profile?section=tokens",
   "results": [
     {
       "id": 12,
@@ -122,7 +161,9 @@ GET /api/content/topics/{topic_id}/chat/queries/?limit=50
 
 `daily_*` is the authenticated user's free-tier quota across **all** topics
 (calendar day in server timezone). `daily_limit` / `daily_remaining` are `null`
-when unlimited (future premium).
+when unlimited (future premium). `tokens_url` is always the Mis tokens path so
+the Consultas UI can link there when remaining is 0.
+
 ### Get one consultation
 
 ```http
@@ -135,12 +176,13 @@ Same shape as the create response. Other users get **404**.
 
 | Status | When |
 |--------|------|
-| 401 | Not authenticated |
+| 401 | Not authenticated (guests cannot create consultations) |
 | 400 | Empty / invalid body |
+| 403 | Topic chat disabled, or Consultas payment required |
 | 404 | Topic missing or not visible |
 | 503 | `OPENAI_API_KEY` or Qdrant env missing |
 | 502 | OpenAI / Qdrant upstream failure |
-| 429 | Free-tier daily cap exceeded (`code=daily_consultation_limit`) |
+| 429 | Free-tier daily cap exceeded (`code=daily_consultation_limit`, includes `tokens_url`) |
 
 ---
 
@@ -183,8 +225,12 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
   and it does **not** claim the entity is absent from the whole topic when Postgres
   still has matches.
 - Free users are limited to **3 consultations per calendar day** (all topics
-  combined). Enforced in `TopicChatView` before RAG; **429** with
-  `code=daily_consultation_limit`. Hook for future premium/unlimited:
+  combined). Guests get **401**; logged-in users over the cap get **429** with
+  `code=daily_consultation_limit` and `tokens_url` pointing at
+  `/profiles/my_profile?section=tokens`. The Consultas UI prompts **Ir a Mis
+  tokens**. Token balance does **not** raise the cap yet — see Access and
+  free-tier quota above and [platform-tokens.md](../payments/platform-tokens.md).
+  Hook for future premium/unlimited:
   `content.topic_chat_quota.user_daily_consultation_limit`.
 - The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
   the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.

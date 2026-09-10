@@ -182,11 +182,11 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 
 ### Topic RAG chat (consultations)
 - **POST** `/api/content/topics/{topic_id}/chat/`
-- **Auth**: Required (JWT)
+- **Auth**: Required (JWT). Guests cannot create consultations (**401**).
 - **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
-- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining }`
-- **429**: free-tier daily cap (`code=daily_consultation_limit`; default 3/day/user across topics)
-- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` quota fields)
+- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining, tokens_url }`
+- **429**: free-tier daily cap (`code=daily_consultation_limit`; default **3/day/user** across topics). Body includes `tokens_url` → `/profiles/my_profile?section=tokens` (buy ACBC tokens CTA; tokens do not raise the cap yet)
+- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` + `tokens_url`)
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
 - **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
@@ -552,6 +552,11 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/anchor-request/{id}/bch/` — create or reuse exact-amount order (requester only)
 - **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match (`{}` auto address-scan; optional `{ "txid": "…" }` fallback)
 - **Auth**: Required (requester; staff may GET/verify)
+
+### Transcript-anchor request (platform tokens)
+- **POST** `/api/payments/anchor-request/{id}/tokens/` — debit face-value tokens ($1 → 100 at `$0.01`/token) and mark `paid_pending_review`
+- **Auth**: Required (requester only)
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
 
 ### Platform token packages
 - **GET** `/api/payments/token-packages/` — active SKUs

@@ -63,7 +63,7 @@ class Profile(models.Model):
     total_points = models.IntegerField(default=0, help_text="Total gamification points earned by the user")
     token_balance = models.PositiveIntegerField(
         default=0,
-        help_text='Cached platform token balance. Mutate only via credit_platform_tokens.',
+        help_text='Cached platform token balance. Mutate only via credit/debit_platform_tokens.',
     )
     username_change_count = models.PositiveSmallIntegerField(default=0, help_text="Number of times the user has changed their username (max 2)")
     featured_badge = models.ForeignKey(

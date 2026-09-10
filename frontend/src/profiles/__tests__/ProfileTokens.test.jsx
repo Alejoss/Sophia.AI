@@ -22,8 +22,8 @@ vi.mock('../../payments/ProductPaymentCheckout', () => ({
 }));
 
 const packages = [
-  { id: 1, name: '100 tokens', token_amount: 100, usd_price: '5.00', is_active: true },
-  { id: 2, name: '800 tokens', token_amount: 800, usd_price: '25.00', is_active: true },
+  { id: 1, name: '100 tokens', token_amount: 100, usd_price: '1.00', is_active: true },
+  { id: 2, name: '800 tokens', token_amount: 800, usd_price: '8.00', is_active: true },
 ];
 
 describe('ProfileTokens', () => {
@@ -36,7 +36,7 @@ describe('ProfileTokens', () => {
       package_id: 1,
       package_name: '100 tokens',
       token_amount: 100,
-      usd_price: '5.00',
+      usd_price: '1.00',
       payment_status: 'PENDING',
     });
     mockOnBalanceChange.mockResolvedValue();
@@ -45,11 +45,12 @@ describe('ProfileTokens', () => {
   it('shows empty balance copy and package cards', async () => {
     renderWithProviders(<ProfileTokens tokenBalance={0} onBalanceChange={mockOnBalanceChange} />);
 
-    expect(await screen.findByText(/a├║n no tienes tokens/i)).toBeInTheDocument();
+    expect(await screen.findByText(/aún no tienes tokens/i)).toBeInTheDocument();
     expect(screen.getByText('100 tokens')).toBeInTheDocument();
     expect(screen.getByText('800 tokens')).toBeInTheDocument();
-    expect(screen.getByText('Mejor valor')).toBeInTheDocument();
-    expect(screen.getByText(/existen solo en academia blockchain/i)).toBeInTheDocument();
+    expect(screen.queryByText('Mejor valor')).not.toBeInTheDocument();
+    expect(screen.getByText(/1 token = \$0\.01 usd/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/\$0\.01 por token/i).length).toBeGreaterThan(0);
   });
 
   it('starts checkout when buying a package', async () => {
@@ -72,7 +73,7 @@ describe('ProfileTokens', () => {
         package_id: 1,
         package_name: '100 tokens',
         token_amount: 100,
-        usd_price: '5.00',
+        usd_price: '1.00',
         payment_status: 'PENDING',
       },
     ]);

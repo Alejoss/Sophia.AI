@@ -88,6 +88,15 @@ export const createAnchorRequestBchPayment = async (requestId) => {
   }
 };
 
+export const payAnchorRequestWithTokens = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/tokens/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo pagar el anclaje con tokens. Inténtalo de nuevo');
+  }
+};
+
 export const getAnchorRequestBchPayment = async (requestId) => {
   try {
     const response = await axiosInstance.get(`/payments/anchor-request/${requestId}/bch/`);

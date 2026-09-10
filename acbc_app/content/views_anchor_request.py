@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from content.anchor_request_service import AnchorRequestError, create_anchor_request
 from content.models import Content, TranscriptAnchorRequest
 from content.serializers import TranscriptAnchorRequestSerializer
+from payments.token_pricing import tokens_required_for_usd
+from profiles.models import Profile
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +48,20 @@ class ContentTranscriptAnchorRequestView(APIView):
                     text_hash=text_hash,
                     status__in=TranscriptAnchorRequest.ACTIVE_STATUSES,
                 ).first()
+        price_usd = float(getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
+        if req is not None and req.price_amount:
+            price_usd = float(req.price_amount)
+        token_balance = (
+            Profile.objects.filter(user_id=request.user.id)
+            .values_list('token_balance', flat=True)
+            .first()
+        )
         return Response({
             'content_id': content.id,
             'current_text_hash': text_hash,
-            'price_usd': float(getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)),
+            'price_usd': price_usd,
+            'price_tokens': tokens_required_for_usd(price_usd),
+            'token_balance': token_balance if token_balance is not None else 0,
             'request': TranscriptAnchorRequestSerializer(req).data if req else None,
             'is_mine': is_mine,
         })

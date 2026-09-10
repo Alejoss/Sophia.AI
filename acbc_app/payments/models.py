@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -281,6 +283,30 @@ class TokenPackage(models.Model):
     def __str__(self):
         return f'{self.name} ({self.token_amount} tokens / ${self.usd_price})'
 
+    @staticmethod
+    def unit_usd_price() -> Decimal:
+        from django.conf import settings
+        return Decimal(str(settings.PLATFORM_TOKEN_USD_PRICE)).quantize(Decimal('0.01'))
+
+    @classmethod
+    def usd_price_for_amount(cls, token_amount: int) -> Decimal:
+        return (Decimal(int(token_amount)) * cls.unit_usd_price()).quantize(Decimal('0.01'))
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.token_amount and self.usd_price is not None:
+            expected = self.usd_price_for_amount(self.token_amount)
+            actual = Decimal(self.usd_price).quantize(Decimal('0.01'))
+            if actual != expected:
+                unit = self.unit_usd_price()
+                raise ValidationError({
+                    'usd_price': (
+                        f'Debe ser ${expected} ({self.token_amount} tokens × ${unit}/token).'
+                    ),
+                })
+
 
 class TokenPurchase(models.Model):
     """A user's attempt to buy a token package. Repeatable (same package many times)."""
@@ -327,7 +353,7 @@ class TokenPurchase(models.Model):
 
 
 class TokenLedgerEntry(models.Model):
-    """Append-only platform token movements. Purchase credits are unique per TokenPurchase."""
+    """Append-only platform token movements. Purchase credits / anchor spends are unique."""
 
     REASON_PURCHASE = 'purchase'
     REASON_ADJUSTMENT = 'adjustment'
@@ -352,6 +378,14 @@ class TokenLedgerEntry(models.Model):
         blank=True,
         related_name='ledger_entries',
     )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='token_ledger_entries',
+        help_text='Set when reason=spend for a paid Bitcoin anchor request.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -361,6 +395,11 @@ class TokenLedgerEntry(models.Model):
                 fields=['token_purchase'],
                 condition=Q(reason='purchase') & Q(token_purchase__isnull=False),
                 name='unique_token_purchase_ledger_credit',
+            ),
+            models.UniqueConstraint(
+                fields=['anchor_request'],
+                condition=Q(reason='spend') & Q(anchor_request__isnull=False),
+                name='unique_token_anchor_request_spend',
             ),
         ]
 
