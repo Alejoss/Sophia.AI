@@ -5704,6 +5704,10 @@ class TopicChatAPITests(APITestCase):
             list_response.data['daily_remaining'],
             TopicChatQuery.MAX_PER_USER_PER_DAY - 1,
         )
+        self.assertEqual(
+            list_response.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
 
         detail = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
@@ -5753,7 +5757,11 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(blocked.data['daily_limit'], limit)
         self.assertEqual(blocked.data['daily_used'], limit)
         self.assertEqual(blocked.data['daily_remaining'], 0)
-        self.assertIn('límite', blocked.data['error'].lower())
+        self.assertEqual(
+            blocked.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
+        self.assertIn('tokens acbc', blocked.data['error'].casefold())
         self.assertEqual(mock_run.call_count, limit)
         self.assertEqual(
             TopicChatQuery.objects.filter(user=self.user).count(),
