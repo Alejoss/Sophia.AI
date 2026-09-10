@@ -34,6 +34,16 @@ Pay with tokens: `POST /api/payments/anchor-request/<id>/tokens/`. Marks the req
 
 `CryptoPayment` and `BchDirectPayment` XOR targets include `token_purchase`. Fulfillment (`mark_token_purchase_paid`) credits the ledger once (NOWPayments IPN/poll, BCH verify, or staff TXID confirm).
 
+### Consultas daily limit (current UX, no spend yet)
+
+Topic Consultas still use a **free-tier daily cap** of 3 per logged-in user (see [topic-rag-chat.md](../operations/topic-rag-chat.md#access-and-free-tier-quota)):
+
+1. Guests cannot create consultations (**401** / login prompt).
+2. Logged-in users get up to 3 consultations per calendar day.
+3. When the cap is hit, the Consultas UI prompts them to buy tokens via **Ir a Mis tokens** (`/profiles/my_profile?section=tokens`).
+
+Owning tokens does **not** raise that cap yet. Wiring `Profile.token_balance` (or a spend) into `user_daily_consultation_limit` is future work; the CTA is in place so the purchase path is ready.
+
 ```mermaid
 flowchart LR
   profile[Own profile]

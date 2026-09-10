@@ -49,6 +49,8 @@ class ContentTranscriptAnchorRequestView(APIView):
                     status__in=TranscriptAnchorRequest.ACTIVE_STATUSES,
                 ).first()
         price_usd = float(getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
+        if req is not None and req.price_amount:
+            price_usd = float(req.price_amount)
         token_balance = (
             Profile.objects.filter(user_id=request.user.id)
             .values_list('token_balance', flat=True)

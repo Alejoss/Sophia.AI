@@ -567,6 +567,100 @@ class AnchorRequestTokenPaymentTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_token_pay_blocks_in_flight_nowpayments(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-req-inflight',
+            pay_currency='bch',
+            price_amount=1.0,
+            payment_status='confirming',
+            invoice_url='https://nowpayments.io/payment/?iid=1',
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('NOWPayments', response.data['error'])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_token_pay_abandons_waiting_nowpayments(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        waiting = CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-req-waiting',
+            pay_currency='bch',
+            price_amount=1.0,
+            payment_status='waiting',
+            invoice_url='https://nowpayments.io/payment/?iid=2',
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        waiting.refresh_from_db()
+        self.assertEqual(waiting.payment_status, 'expired')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+
+    def test_token_pay_blocks_pending_bch(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from payments.models import BchDirectPayment
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        BchDirectPayment.objects.create(
+            anchor_request=self.req,
+            address='bitcoincash:qtest',
+            expected_amount_sats=5000,
+            usd_amount=Decimal('1.00'),
+            usd_bch_rate=Decimal('200'),
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at=timezone.now() + timedelta(minutes=20),
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('BCH', response.data['error'])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_request_info_uses_snapshotted_price(self):
+        self.req.price_amount = 2.0
+        self.req.save(update_fields=['price_amount', 'updated_at'])
+        response = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor-requests/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_usd'], 2.0)
+        self.assertEqual(response.data['price_tokens'], 200)
+
 
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,

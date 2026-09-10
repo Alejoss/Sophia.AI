@@ -10,6 +10,9 @@ from django.utils import timezone
 
 from content.models import TopicChatQuery
 
+# Own-profile tokens section where users buy ACBC platform tokens.
+TOKENS_PROFILE_PATH = '/profiles/my_profile?section=tokens'
+
 
 def user_daily_consultation_limit(user) -> int | None:
     """
@@ -43,11 +46,13 @@ def daily_quota_payload(user) -> dict:
             'daily_limit': None,
             'daily_used': used,
             'daily_remaining': None,
+            'tokens_url': TOKENS_PROFILE_PATH,
         }
     return {
         'daily_limit': limit,
         'daily_used': used,
         'daily_remaining': max(0, limit - used),
+        'tokens_url': TOKENS_PROFILE_PATH,
     }
 
 
@@ -65,11 +70,12 @@ def daily_quota_exceeded_payload(user) -> dict | None:
         return None
     return {
         'error': (
-            f'Has alcanzado el límite de {limit} consultas por día. '
-            'Podrás hacer más consultas mañana.'
+            f'Has alcanzado el límite de {limit} consultas gratuitas por día. '
+            'Compra tokens ACBC para seguir creando consultas.'
         ),
         'code': 'daily_consultation_limit',
         'daily_limit': limit,
         'daily_used': used,
         'daily_remaining': 0,
+        'tokens_url': TOKENS_PROFILE_PATH,
     }

@@ -103,9 +103,6 @@ const AnchorPaymentCheckout = ({
           platform_tokens: data?.methods?.platform_tokens !== false,
         });
         setBchNetwork(data?.bch_network || null);
-        if (data?.anchor_price_tokens != null) {
-          setLocalPriceTokens(Number(data.anchor_price_tokens));
-        }
       })
       .catch(() => {
         if (!cancelled) {

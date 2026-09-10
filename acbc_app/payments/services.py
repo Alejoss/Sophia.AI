@@ -288,9 +288,15 @@ def pay_anchor_request_with_tokens(
     Debit platform tokens for ``anchor_request`` and mark it paid_pending_review.
 
     Idempotent: a second call after a successful spend returns the already-paid request.
+
+    Blocks when NOWPayments coins are in flight or a non-expired BCH order is pending
+    (avoids double payment). Unused ``waiting`` NOWPayments invoices are abandoned,
+    matching the BCH switch path.
     """
     from django.conf import settings
+    from django.utils import timezone
 
+    from payments.models import BchDirectPayment
     from payments.token_ledger import debit_platform_tokens
     from payments.token_pricing import tokens_required_for_usd
 
@@ -318,6 +324,23 @@ def pay_anchor_request_with_tokens(
             return req
         if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
             raise ValueError('Esta solicitud no está pendiente de pago.')
+
+        if has_in_flight_nowpayments(anchor_request=req):
+            raise ValueError(
+                'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+            )
+        abandon_waiting_nowpayments(anchor_request=req)
+
+        pending_bch = BchDirectPayment.objects.filter(
+            anchor_request=req,
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at__gt=timezone.now(),
+        ).exists()
+        if pending_bch:
+            raise ValueError(
+                'Hay una orden BCH pendiente. Verifícala o espera a que expire '
+                'antes de pagar con tokens.'
+            )
 
         debit_platform_tokens(
             user=user,
