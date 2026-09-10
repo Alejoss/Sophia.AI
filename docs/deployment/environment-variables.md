@@ -237,7 +237,7 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)
 
 #### `TOKEN_CONTENT_DISCOUNT_PERCENT`
-- **Description**: Reserved discount when spending platform tokens on paid content. Unused until token checkout ships.
+- **Description**: Percent discount when spending platform tokens on paid content (transcript anchors today). Example: `10` → 90 tokens for a $1 anchor at `$0.01`/token.
 - **Required**: No
 - **Default**: `0`
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)

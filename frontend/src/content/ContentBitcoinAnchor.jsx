@@ -36,6 +36,8 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payRequestId, setPayRequestId] = useState(null);
   const [priceUsd, setPriceUsd] = useState(1);
+  const [priceTokens, setPriceTokens] = useState(100);
+  const [tokenBalance, setTokenBalance] = useState(0);
 
   const loadAnchor = useCallback(async () => {
     if (!contentId) {
@@ -59,6 +61,8 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       const data = await contentApi.getTranscriptAnchorRequest(contentId);
       setRequestInfo(data);
       if (data?.price_usd != null) setPriceUsd(Number(data.price_usd));
+      if (data?.price_tokens != null) setPriceTokens(Number(data.price_tokens));
+      if (data?.token_balance != null) setTokenBalance(Number(data.token_balance));
     } catch {
       setRequestInfo(null);
     }
@@ -266,7 +270,12 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
         anchorRequestId={payRequestId}
         title={contentTitle || `Contenido ${contentId}`}
         priceUsd={priceUsd}
-        onPaid={async () => {
+        priceTokens={priceTokens}
+        tokenBalance={tokenBalance}
+        onPaid={async (result) => {
+          if (result?.token_balance != null) {
+            setTokenBalance(Number(result.token_balance));
+          }
           await loadRequest();
           await loadAnchor();
         }}

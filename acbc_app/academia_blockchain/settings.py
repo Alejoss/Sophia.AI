@@ -770,7 +770,7 @@ BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
 # Platform token face value: 1 token = $0.01 USD (packages should price at this rate).
 PLATFORM_TOKEN_USD_PRICE = Decimal(os.getenv('PLATFORM_TOKEN_USD_PRICE', '0.01') or '0.01')
-# Reserved for later token checkout (paths, Consultas, events, anchors). Unused in v1.
+# Discount when spending platform tokens on paid content (anchors today).
 TOKEN_CONTENT_DISCOUNT_PERCENT = int(os.getenv('TOKEN_CONTENT_DISCOUNT_PERCENT', '0') or 0)
 
 # Self-custody Bitcoin Cash payments (USD-tolerance amount match on a single address).

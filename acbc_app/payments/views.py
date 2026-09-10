@@ -38,9 +38,12 @@ from payments.services import (
     create_path_purchase_payment,
     create_token_purchase,
     create_token_purchase_payment,
+    pay_anchor_request_with_tokens,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
+from payments.token_ledger import InsufficientTokenBalance
+from payments.token_pricing import tokens_required_for_usd
 from content.serializers import TranscriptAnchorRequestSerializer
 
 logger = logging.getLogger(__name__)
@@ -155,6 +158,7 @@ class PaymentGatewayStatusView(APIView):
 
     def get(self, request):
         client = NOWPaymentsClient()
+        price_usd = float(getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
         return Response({
             'enabled': client.configured,
             'currencies': sorted(ALLOWED_PAY_CURRENCIES),
@@ -164,7 +168,10 @@ class PaymentGatewayStatusView(APIView):
             'methods': {
                 'nowpayments': client.configured,
                 'bch_direct': is_bch_direct_configured(),
+                'platform_tokens': True,
             },
+            'anchor_price_usd': price_usd,
+            'anchor_price_tokens': tokens_required_for_usd(price_usd),
         })
 
 
@@ -519,6 +526,60 @@ class AnchorRequestBchPaymentView(APIView):
             BchDirectPaymentSerializer(payment).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class AnchorRequestTokenPaymentView(APIView):
+    """Pay a transcript anchor request with platform tokens ($1 → face-value tokens)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.select_related(
+                'content', 'requester'
+            ).get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            paid = pay_anchor_request_with_tokens(
+                anchor_request=anchor_request,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='pay_anchor_tokens', request_id=request_id, user_id=request.user.id,
+            )
+        except InsufficientTokenBalance as exc:
+            return Response(
+                {
+                    'error': str(exc),
+                    'code': 'insufficient_tokens',
+                    'required': exc.required,
+                    'available': exc.available,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='pay_anchor_tokens', request_id=request_id, user_id=request.user.id,
+            )
+
+        from profiles.models import Profile
+
+        balance = (
+            Profile.objects.filter(user_id=request.user.id)
+            .values_list('token_balance', flat=True)
+            .first()
+        )
+
+        return Response({
+            'request': TranscriptAnchorRequestSerializer(paid).data,
+            'token_balance': balance if balance is not None else 0,
+            'tokens_spent': tokens_required_for_usd(
+                float(paid.price_amount or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
+            ),
+        })
 
 
 class AnchorRequestBchVerifyView(APIView):

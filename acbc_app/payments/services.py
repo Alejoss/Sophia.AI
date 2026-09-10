@@ -263,7 +263,7 @@ def mark_anchor_request_paid(anchor_request: TranscriptAnchorRequest, *, source:
     """
     Transition TranscriptAnchorRequest → paid_pending_review (idempotent).
 
-    Shared by NOWPayments fulfillment and BCH direct verification.
+    Shared by NOWPayments fulfillment, BCH direct verification, and token spend.
     """
     with transaction.atomic():
         req = TranscriptAnchorRequest.objects.select_for_update().get(pk=anchor_request.pk)
@@ -275,6 +275,88 @@ def mark_anchor_request_paid(anchor_request: TranscriptAnchorRequest, *, source:
         'Anchor request %s marked paid_pending_review (source=%s)',
         req.pk,
         source or 'unknown',
+    )
+    return req
+
+
+def pay_anchor_request_with_tokens(
+    *,
+    anchor_request: TranscriptAnchorRequest,
+    user,
+) -> TranscriptAnchorRequest:
+    """
+    Debit platform tokens for ``anchor_request`` and mark it paid_pending_review.
+
+    Idempotent: a second call after a successful spend returns the already-paid request.
+
+    Blocks when NOWPayments coins are in flight or a non-expired BCH order is pending
+    (avoids double payment). Unused ``waiting`` NOWPayments invoices are abandoned,
+    matching the BCH switch path.
+    """
+    from django.conf import settings
+    from django.utils import timezone
+
+    from payments.models import BchDirectPayment
+    from payments.token_ledger import debit_platform_tokens
+    from payments.token_pricing import tokens_required_for_usd
+
+    if anchor_request.requester_id != user.id:
+        raise PermissionError('Solo quien solicitó el anclaje puede pagar con tokens.')
+    if anchor_request.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+        return anchor_request
+    if anchor_request.status in (
+        TranscriptAnchorRequest.STATUS_APPROVED,
+        TranscriptAnchorRequest.STATUS_REJECTED,
+    ):
+        raise ValueError('Esta solicitud ya fue resuelta.')
+    if anchor_request.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
+        raise ValueError('Esta solicitud no está pendiente de pago.')
+
+    price_usd = float(
+        anchor_request.price_amount
+        or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)
+    )
+    tokens_needed = tokens_required_for_usd(price_usd)
+
+    with transaction.atomic():
+        req = TranscriptAnchorRequest.objects.select_for_update().get(pk=anchor_request.pk)
+        if req.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+            return req
+        if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
+            raise ValueError('Esta solicitud no está pendiente de pago.')
+
+        if has_in_flight_nowpayments(anchor_request=req):
+            raise ValueError(
+                'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+            )
+        abandon_waiting_nowpayments(anchor_request=req)
+
+        pending_bch = BchDirectPayment.objects.filter(
+            anchor_request=req,
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at__gt=timezone.now(),
+        ).exists()
+        if pending_bch:
+            raise ValueError(
+                'Hay una orden BCH pendiente. Verifícala o espera a que expire '
+                'antes de pagar con tokens.'
+            )
+
+        debit_platform_tokens(
+            user=user,
+            amount=tokens_needed,
+            reason=TokenLedgerEntry.REASON_SPEND,
+            anchor_request=req,
+        )
+
+        req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+        req.save(update_fields=['status', 'updated_at'])
+
+    logger.info(
+        'Anchor request %s paid with tokens (tokens=%s user=%s)',
+        req.pk,
+        tokens_needed,
+        user.pk,
     )
     return req
 

@@ -13,6 +13,7 @@ urlpatterns = [
     path('anchor-request/<int:request_id>/list/', views.AnchorRequestPaymentsListView.as_view(), name='anchor-request-payments-list'),
     path('anchor-request/<int:request_id>/bch/', views.AnchorRequestBchPaymentView.as_view(), name='anchor-request-bch'),
     path('anchor-request/<int:request_id>/bch/verify/', views.AnchorRequestBchVerifyView.as_view(), name='anchor-request-bch-verify'),
+    path('anchor-request/<int:request_id>/tokens/', views.AnchorRequestTokenPaymentView.as_view(), name='anchor-request-tokens'),
     path('path-purchase/<int:purchase_id>/bch/', views.PathPurchaseBchPaymentView.as_view(), name='path-purchase-bch'),
     path('path-purchase/<int:purchase_id>/bch/verify/', views.PathPurchaseBchVerifyView.as_view(), name='path-purchase-bch-verify'),
     path('topic-purchase/<int:purchase_id>/bch/', views.TopicPurchaseBchPaymentView.as_view(), name='topic-purchase-bch'),

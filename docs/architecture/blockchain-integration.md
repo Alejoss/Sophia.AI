@@ -10,14 +10,15 @@ transcript in a Bitcoin `OP_RETURN`.** There is no EVM registry for this flow.
 | Piece | Role |
 |-------|------|
 | `TranscriptAnchor` | Snapshot of hash + BTC tx metadata (`pending` → `btc_broadcast` → `anchored`) |
-| HTTP API | Prepare / list anchors (does not broadcast) |
+| HTTP API | Prepare / list anchors (staff/ops; does not replace paid public flow) |
+| Paid request | `$1` via platform tokens, NOWPayments, or BCH → admin review → broadcast |
 | `content.bitcoin` | Build/sign OP_RETURN tx via platform WIF + Esplora (mempool.space) |
 | `broadcast_transcript_anchor` | Ops command to broadcast and refresh confirmations |
-| UI panel | Shows status; creates pending rows for uploader/staff |
+| UI panel | Paid request CTA + checkout chooser (tokens / crypto / BCH) |
 
 Full contract (payload format, endpoints, CLI): **[transcript-anchor.md](../api/transcript-anchor.md)**.
 
-Public paid requests (`TranscriptAnchorRequest`) use a checkout chooser: hosted [NOWPayments](../payments/nowpayments-setup.md) or self-custody [BCH directo](../payments/bch-direct.md). After payment the request is `paid_pending_review` until staff approve the Bitcoin broadcast.
+Public paid requests (`TranscriptAnchorRequest`) use a checkout chooser: platform tokens, hosted [NOWPayments](../payments/nowpayments-setup.md), or self-custody [BCH directo](../payments/bch-direct.md). After payment the request is `paid_pending_review` until staff approve the Bitcoin broadcast.
 
 Env: [Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring).
 
