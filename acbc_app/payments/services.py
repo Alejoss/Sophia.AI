@@ -261,22 +261,43 @@ def _mark_path_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
 
 def mark_anchor_request_paid(anchor_request: TranscriptAnchorRequest, *, source: str = '') -> TranscriptAnchorRequest:
     """
-    Transition TranscriptAnchorRequest → paid_pending_review (idempotent).
+    Mark TranscriptAnchorRequest paid, then attempt automatic Bitcoin broadcast.
 
     Shared by NOWPayments fulfillment, BCH direct verification, and token spend.
+    Broadcast failures leave the row paid for later retry (never refunds).
     """
     with transaction.atomic():
         req = TranscriptAnchorRequest.objects.select_for_update().get(pk=anchor_request.pk)
         if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
-            return req
-        req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
-        req.save(update_fields=['status', 'updated_at'])
-    logger.info(
-        'Anchor request %s marked paid_pending_review (source=%s)',
-        req.pk,
-        source or 'unknown',
-    )
-    return req
+            already = req
+        else:
+            req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+            req.save(update_fields=['status', 'updated_at'])
+            already = None
+            logger.info(
+                'Anchor request %s marked paid_pending_review (source=%s)',
+                req.pk,
+                source or 'unknown',
+            )
+
+    # Broadcast outside the payment lock so Esplora/fee I/O cannot hold it.
+    target = already or req
+    if target.status == TranscriptAnchorRequest.STATUS_APPROVED:
+        return target
+    if target.status != TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+        return target
+
+    from content.anchor_request_service import fulfill_paid_anchor_request
+
+    try:
+        return fulfill_paid_anchor_request(target, actor=None, raise_on_defer=False)
+    except Exception:
+        logger.exception(
+            'Auto-fulfill after payment failed for anchor_request=%s source=%s',
+            target.pk,
+            source or 'unknown',
+        )
+        return TranscriptAnchorRequest.objects.get(pk=target.pk)
 
 
 def pay_anchor_request_with_tokens(
@@ -302,13 +323,12 @@ def pay_anchor_request_with_tokens(
 
     if anchor_request.requester_id != user.id:
         raise PermissionError('Solo quien solicitó el anclaje puede pagar con tokens.')
-    if anchor_request.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+    if anchor_request.status == TranscriptAnchorRequest.STATUS_APPROVED:
         return anchor_request
-    if anchor_request.status in (
-        TranscriptAnchorRequest.STATUS_APPROVED,
-        TranscriptAnchorRequest.STATUS_REJECTED,
-    ):
+    if anchor_request.status == TranscriptAnchorRequest.STATUS_REJECTED:
         raise ValueError('Esta solicitud ya fue resuelta.')
+    if anchor_request.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+        return mark_anchor_request_paid(anchor_request, source='tokens')
     if anchor_request.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
         raise ValueError('Esta solicitud no está pendiente de pago.')
 
@@ -320,37 +340,40 @@ def pay_anchor_request_with_tokens(
 
     with transaction.atomic():
         req = TranscriptAnchorRequest.objects.select_for_update().get(pk=anchor_request.pk)
-        if req.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+        if req.status == TranscriptAnchorRequest.STATUS_APPROVED:
             return req
-        if req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
+        if req.status == TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW:
+            # Fall through to mark_anchor_request_paid → fulfill.
+            pass
+        elif req.status != TranscriptAnchorRequest.STATUS_PENDING_PAYMENT:
             raise ValueError('Esta solicitud no está pendiente de pago.')
+        else:
+            if has_in_flight_nowpayments(anchor_request=req):
+                raise ValueError(
+                    'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+                )
+            abandon_waiting_nowpayments(anchor_request=req)
 
-        if has_in_flight_nowpayments(anchor_request=req):
-            raise ValueError(
-                'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+            pending_bch = BchDirectPayment.objects.filter(
+                anchor_request=req,
+                status=BchDirectPayment.STATUS_PENDING,
+                expires_at__gt=timezone.now(),
+            ).exists()
+            if pending_bch:
+                raise ValueError(
+                    'Hay una orden BCH pendiente. Verifícala o espera a que expire '
+                    'antes de pagar con tokens.'
+                )
+
+            debit_platform_tokens(
+                user=user,
+                amount=tokens_needed,
+                reason=TokenLedgerEntry.REASON_SPEND,
+                anchor_request=req,
             )
-        abandon_waiting_nowpayments(anchor_request=req)
 
-        pending_bch = BchDirectPayment.objects.filter(
-            anchor_request=req,
-            status=BchDirectPayment.STATUS_PENDING,
-            expires_at__gt=timezone.now(),
-        ).exists()
-        if pending_bch:
-            raise ValueError(
-                'Hay una orden BCH pendiente. Verifícala o espera a que expire '
-                'antes de pagar con tokens.'
-            )
-
-        debit_platform_tokens(
-            user=user,
-            amount=tokens_needed,
-            reason=TokenLedgerEntry.REASON_SPEND,
-            anchor_request=req,
-        )
-
-        req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
-        req.save(update_fields=['status', 'updated_at'])
+            req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+            req.save(update_fields=['status', 'updated_at'])
 
     logger.info(
         'Anchor request %s paid with tokens (tokens=%s user=%s)',
@@ -358,7 +381,7 @@ def pay_anchor_request_with_tokens(
         tokens_needed,
         user.pk,
     )
-    return req
+    return mark_anchor_request_paid(req, source='tokens')
 
 
 def _mark_anchor_request_paid_if_needed(crypto_payment: CryptoPayment) -> None:

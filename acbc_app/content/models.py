@@ -618,9 +618,10 @@ class TranscriptAnchorRequest(models.Model):
     """
     Paid request to anchor a transcript hash on Bitcoin.
 
-    Any authenticated user may request; after NOWPayments or BCH-direct payment
-    succeeds, status becomes paid_pending_review until staff approves (broadcast)
-    or rejects (no automatic refund).
+    Any authenticated user may start; after NOWPayments, BCH-direct, or token
+    payment succeeds, the platform wallet broadcasts the OP_RETURN automatically.
+    ``paid_pending_review`` means paid and broadcast is in progress or deferred
+    (fees/funds); staff can retry emit or reject (no automatic refund).
     """
 
     STATUS_PENDING_PAYMENT = 'pending_payment'
@@ -629,7 +630,7 @@ class TranscriptAnchorRequest(models.Model):
     STATUS_REJECTED = 'rejected'
     STATUS_CHOICES = [
         (STATUS_PENDING_PAYMENT, 'Pending payment'),
-        (STATUS_PAID_PENDING_REVIEW, 'Paid — pending review'),
+        (STATUS_PAID_PENDING_REVIEW, 'Paid — broadcasting / retry'),
         (STATUS_APPROVED, 'Approved (broadcast)'),
         (STATUS_REJECTED, 'Rejected'),
     ]

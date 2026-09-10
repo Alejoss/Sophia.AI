@@ -11,7 +11,7 @@ Crypto checkout for Academia Blockchain. Complementary paths:
 
 Public paid Bitcoin anchors (`TranscriptAnchorRequest`) show a method chooser (tokens, NOWPayments, and/or BCH when configured). Crypto methods cannot both be **pending** on the same request.
 
-After payment succeeds, the request is `paid_pending_review`. Staff approve (broadcast OP_RETURN) or reject in Django admin. There is no automatic refund.
+After payment succeeds, the platform **automatically broadcasts** the Bitcoin OP_RETURN. Status becomes `approved` on success, or stays `paid_pending_review` if broadcast is deferred (fees/funds) for staff/ops retry. There is no automatic refund on reject.
 
 Related:
 

@@ -179,7 +179,7 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
             return ''
         return f'{obj.text_hash[:12]}…'
 
-    @admin.action(description='Aprobar y emitir anclaje Bitcoin')
+    @admin.action(description='Reintentar emisión del anclaje Bitcoin')
     def approve_selected(self, request, queryset):
         ok = 0
         for req in queryset:
@@ -189,7 +189,11 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
             except AnchorRequestError as exc:
                 self.message_user(request, f'#{req.pk}: {exc}', level=messages.WARNING)
         if ok:
-            self.message_user(request, f'{ok} solicitud(es) aprobada(s).', level=messages.SUCCESS)
+            self.message_user(
+                request,
+                f'{ok} anclaje(s) emitido(s).',
+                level=messages.SUCCESS,
+            )
 
     @admin.action(description='Rechazar (sin reembolso automático)')
     def reject_selected(self, request, queryset):

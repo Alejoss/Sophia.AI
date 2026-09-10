@@ -19,7 +19,7 @@ Staff edit packages in Django admin (`Token packages`). Face value is **1 token 
 |---------|-------|----------------------|
 | Transcript Bitcoin anchor (`TranscriptAnchorRequest`) | `$ANCHOR_REQUEST_PRICE_USD` (default `$1`) | 100 |
 
-Pay with tokens: `POST /api/payments/anchor-request/<id>/tokens/`. Marks the request `paid_pending_review` (same as NOWPayments / BCH). Staff still approve the Bitcoin broadcast in admin.
+Pay with tokens: `POST /api/payments/anchor-request/<id>/tokens/`. Marks paid and triggers automatic Bitcoin broadcast (same as NOWPayments / BCH). `paid_pending_review` only if broadcast is deferred.
 
 `TOKEN_CONTENT_DISCOUNT_PERCENT` reduces the token cost (e.g. `10` → 90 tokens for a $1 anchor). Spending on paths, Consultas, and events is still a later phase.
 

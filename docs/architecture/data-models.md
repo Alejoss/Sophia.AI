@@ -100,7 +100,7 @@ Transcript text for VIDEO/AUDIO content, plus optional Bitcoin certification.
 
 **TranscriptAnchor** (FK to `Content`, unique on `(content, text_hash)`): snapshot of `text_hash` certified via Bitcoin `OP_RETURN` (`pending` → `btc_broadcast` → `anchored`). No EVM fields.
 
-**TranscriptAnchorRequest** (FK to requester + `Content`): paid public request to certify the current hash (`pending_payment` → `paid_pending_review` → `approved` \| `rejected`). At most one active request per `text_hash`. Paid via NOWPayments (`CryptoPayment`) or self-custody BCH (`BchDirectPayment`).
+**TranscriptAnchorRequest** (FK to requester + `Content`): paid public request to certify the current hash (`pending_payment` → auto-broadcast → `approved`, or `paid_pending_review` while deferred → `approved` \| `rejected`). At most one active request per `text_hash`. Paid via platform tokens, NOWPayments (`CryptoPayment`), or self-custody BCH (`BchDirectPayment`).
 
 Full API/ops: [transcript-anchor.md](../api/transcript-anchor.md). Payments: [payments/](../payments/README.md). Ingest: [transcript-ingest.md](../api/transcript-ingest.md). Embeddings + topic RAG: [topic-rag-embeddings.md](topic-rag-embeddings.md).
 
