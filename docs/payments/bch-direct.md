@@ -40,7 +40,7 @@ Faucet / explorer chipnet: [chipnet.chaingraph.cash](https://chipnet.chaingraph.
 | Concepto | Implementación |
 |----------|----------------|
 | Entitlement | Solo `TranscriptAnchorRequest` (no eventos ni caminos) |
-| Tras pagar | `paid_pending_review` vía `mark_anchor_request_paid()` (compartido con NOWPayments) |
+| Tras pagar | `mark_anchor_request_paid()` auto-emite OP_RETURN; `approved` o `paid_pending_review` si diferido (compartido con NOWPayments) |
 | Admin | Aprueba/rechaza anclaje BTC como hoy (sin reembolso automático) |
 | HTTP / SSL | Fulcrum/Electrum SSL (mainnet + chipnet); Blockchair HTTP opcional con API key |
 | Workers / IPN BCH | No — el usuario pulsa **Ya realicé el pago** |
@@ -95,7 +95,7 @@ sequenceDiagram
    comprador puede reintentar `POST .../bch/verify/` con `{ "txid": "…" }`
    (`get_transaction`) — eso también puede confirmar órdenes `expired` o
    `cancelled` del mismo producto — o reportar el TXID para confirmación manual.
-7. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
+7. Tras confirmar el pago, la plataforma emite automáticamente el OP_RETURN. Si queda diferido, staff puede reintentar desde Django admin (**Content → Transcript anchor requests**).
 
 ## Cómo se calcula el monto
 

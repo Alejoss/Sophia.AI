@@ -664,12 +664,111 @@ class AnchorRequestTokenPaymentTests(TestCase):
 
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,
+    PLATFORM_TOKEN_USD_PRICE=Decimal('0.01'),
+    TOKEN_CONTENT_DISCOUNT_PERCENT=0,
+)
+class AnchorRequestAutoBroadcastTests(TestCase):
+    """Payment marks paid then auto-fulfills Bitcoin broadcast."""
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video auto-broadcast',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para auto broadcast del anclaje.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+
+    @patch('content.anchor_request_service.fulfill_paid_anchor_request')
+    def test_mark_paid_calls_fulfill_with_raise_on_defer_false(self, mock_fulfill):
+        from payments.services import mark_anchor_request_paid
+
+        mock_fulfill.side_effect = lambda req, **kwargs: req
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        mock_fulfill.assert_called_once()
+        _, kwargs = mock_fulfill.call_args
+        self.assertEqual(kwargs.get('raise_on_defer'), False)
+        self.assertIsNone(kwargs.get('actor'))
+
+    @patch('content.anchor_request_service.broadcast_anchor')
+    @patch('content.anchor_request_service.ensure_pending_anchor')
+    def test_mark_paid_approves_when_broadcast_succeeds(self, mock_ensure, mock_broadcast):
+        from content.models import TranscriptAnchor
+        from payments.services import mark_anchor_request_paid
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+
+        def _broadcast(a, *, dry_run=False):
+            a.status = TranscriptAnchor.STATUS_BTC_BROADCAST
+            a.btc_txid = 'ab' * 32
+            a.save(update_fields=['status', 'btc_txid', 'updated_at'])
+            return a
+
+        mock_ensure.return_value = anchor
+        mock_broadcast.side_effect = _broadcast
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_APPROVED)
+        self.assertEqual(result.anchor_id, anchor.pk)
+        mock_broadcast.assert_called()
+
+    @patch('content.anchor_request_service.broadcast_anchor')
+    @patch('content.anchor_request_service.ensure_pending_anchor')
+    def test_mark_paid_stays_pending_when_broadcast_defers(self, mock_ensure, mock_broadcast):
+        from content.bitcoin.service import AnchorBroadcastError
+        from content.models import TranscriptAnchor
+        from payments.services import mark_anchor_request_paid
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+        mock_ensure.return_value = anchor
+        mock_broadcast.side_effect = AnchorBroadcastError('fee too high')
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.assertIsNone(result.anchor_id)
+
+
+
+@override_settings(
+    ANCHOR_REQUEST_PRICE_USD=1,
     BCH_NETWORK='mainnet',
     BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
 )
+
 class BchDirectPaymentTests(TestCase):
     def setUp(self):
         self.user = UserFactory()
