@@ -391,16 +391,16 @@ def mark_token_purchase_paid(token_purchase: TokenPurchase, *, source: str = '')
             purchase.save(update_fields=['payment_status', 'updated_at'])
         credit_platform_tokens(
             user=purchase.user,
-            amount=purchase.token_amount,
+            amount=purchase.total_tokens,
             reason=TokenLedgerEntry.REASON_PURCHASE,
             token_purchase=purchase,
         )
-    logger.info(
-        'Token purchase %s marked PAID (source=%s tokens=%s)',
-        purchase.pk,
-        source or 'unknown',
-        purchase.token_amount,
-    )
+        logger.info(
+            'Token purchase %s marked PAID (source=%s tokens=%s)',
+            purchase.pk,
+            source or 'unknown',
+            purchase.total_tokens,
+        )
     return purchase
 
 
@@ -758,6 +758,7 @@ def create_token_purchase(*, package: TokenPackage, user) -> TokenPurchase:
         package=package,
         package_name=package.name,
         token_amount=package.token_amount,
+        bonus_tokens=int(package.bonus_tokens or 0),
         usd_price=package.usd_price,
         payment_status='PENDING',
     )

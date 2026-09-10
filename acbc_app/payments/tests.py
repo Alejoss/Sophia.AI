@@ -1945,6 +1945,28 @@ class TokenPackagePurchaseTests(TestCase):
         good = TokenPackage(
             name='Correct price',
             token_amount=100,
+            bonus_tokens=50,
             usd_price=Decimal('1.00'),
         )
         good.full_clean()
+        self.assertEqual(good.total_tokens, 150)
+
+    def test_bonus_tokens_credited_on_pay(self):
+        bonus_package = TokenPackage.objects.create(
+            name='800 + 50',
+            token_amount=800,
+            bonus_tokens=50,
+            usd_price=Decimal('8.00'),
+            is_active=True,
+            sort_order=50,
+        )
+        purchase = create_token_purchase(package=bonus_package, user=self.buyer)
+        self.assertEqual(purchase.token_amount, 800)
+        self.assertEqual(purchase.bonus_tokens, 50)
+        self.assertEqual(purchase.total_tokens, 850)
+
+        from payments.services import mark_token_purchase_paid
+
+        mark_token_purchase_paid(purchase, source='test')
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(self.buyer.profile.token_balance, 850)

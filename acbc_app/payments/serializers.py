@@ -181,12 +181,16 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
 
 
 class TokenPackageSerializer(serializers.ModelSerializer):
+    total_tokens = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = TokenPackage
         fields = [
             'id',
             'name',
             'token_amount',
+            'bonus_tokens',
+            'total_tokens',
             'usd_price',
             'is_active',
             'sort_order',
@@ -197,6 +201,7 @@ class TokenPackageSerializer(serializers.ModelSerializer):
 class TokenPurchaseSerializer(serializers.ModelSerializer):
     is_paid = serializers.BooleanField(read_only=True)
     package_id = serializers.IntegerField(read_only=True)
+    total_tokens = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = TokenPurchase
@@ -205,6 +210,8 @@ class TokenPurchaseSerializer(serializers.ModelSerializer):
             'package_id',
             'package_name',
             'token_amount',
+            'bonus_tokens',
+            'total_tokens',
             'usd_price',
             'payment_status',
             'is_paid',

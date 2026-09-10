@@ -6,12 +6,25 @@ Index: [README.md](README.md).
 
 ## What users see
 
-Own profile only (`/profiles/my_profile?section=tokens`):
+Wallet on own profile (`/profiles/my_profile?section=tokens`):
 
-- Header chip with the current balance
-- **Mis tokens** section: explanation, package cards, NOWPayments + Bitcoin Cash checkout (no Monero), recent purchases
+- Header chip with the current balance (links here)
+- **Mis tokens**: balance, short explanation, activity, resume pending payment
+- Primary CTA to the shop
 
-Staff edit packages in Django admin (`Token packages`). Face value is **1 token = $0.01 USD** (`PLATFORM_TOKEN_USD_PRICE`). Seeded catalog: 100 / 300 / 800 tokens ($1 / $3 / $8).
+Shop (`/acbc-tokens`, signed-in):
+
+- What tokens are (platform credits, not a cryptocurrency; cannot withdraw)
+- Benefits: later discount on knowledge paths, topic Consultas, events, and transcript anchors
+- Package cards and NOWPayments + Bitcoin Cash checkout (no Monero)
+
+Staff edit packages in Django admin (`Token packages`). Face value is **1 token = $0.01 USD** (`PLATFORM_TOKEN_USD_PRICE`); `usd_price` must equal paid `token_amount × $0.01`. Larger SKUs may include free `bonus_tokens`. Seeded catalog:
+
+| Package | Paid | Bonus | Credited | USD |
+|---------|------|-------|----------|-----|
+| 300 tokens | 300 | 0 | 300 | $3 |
+| 800 tokens + 50 bonus | 800 | 50 | 850 | $8 |
+| 1200 tokens + 200 bonus | 1200 | 200 | 1400 | $12 |
 
 ## Spending today
 
@@ -27,8 +40,8 @@ Pay with tokens: `POST /api/payments/anchor-request/<id>/tokens/`. Marks the req
 
 | Model | Role |
 |-------|------|
-| `TokenPackage` | SKU: name, `token_amount`, `usd_price`, `is_active`, `sort_order` |
-| `TokenPurchase` | One checkout attempt (`PENDING` / `PAID` / `REFUNDED`). Same package can be bought many times. Snapshots amount and USD price. |
+| `TokenPackage` | SKU: name, `token_amount` (paid), `bonus_tokens`, `usd_price`, `is_active`, `sort_order` |
+| `TokenPurchase` | One checkout attempt (`PENDING` / `PAID` / `REFUNDED`). Same package can be bought many times. Snapshots paid amount, bonus, and USD price. Credits `token_amount + bonus_tokens`. |
 | `TokenLedgerEntry` | Append-only movements (`purchase`, `adjustment`, `spend`). Unique purchase credit per `TokenPurchase`; unique spend per `TranscriptAnchorRequest`. |
 | `Profile.token_balance` | Cached non-negative integer. Mutated only by `credit_platform_tokens` / `debit_platform_tokens`. |
 
@@ -46,7 +59,8 @@ Owning tokens does **not** raise that cap yet. Wiring `Profile.token_balance` (o
 
 ```mermaid
 flowchart LR
-  profile[Own profile]
+  wallet[Own profile wallet]
+  shop[Buy page /acbc-tokens]
   packages[TokenPackage]
   purchase[TokenPurchase]
   nowPay[NOWPayments]
@@ -55,14 +69,15 @@ flowchart LR
   balance[Profile.token_balance]
   anchor[TranscriptAnchorRequest]
 
-  profile --> packages
+  wallet --> shop
+  shop --> packages
   packages --> purchase
   purchase --> nowPay
   purchase --> bchPay
   nowPay --> ledger
   bchPay --> ledger
   ledger --> balance
-  balance --> profile
+  balance --> wallet
   balance -->|"spend"| anchor
 ```
 

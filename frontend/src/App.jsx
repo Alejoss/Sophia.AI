@@ -46,6 +46,7 @@ import Register from './profiles/Register.jsx';
 import ForgotPassword from './profiles/ForgotPassword.jsx';
 import PasswordResetConfirm from './profiles/PasswordResetConfirm.jsx';
 import Welcome from './profiles/Welcome.jsx';
+import TokenBuyPage from './profiles/TokenBuyPage.jsx';
 import LibraryUploadContent from './content/LibraryUploadContent.jsx';
 import LibraryFolderUpload from './content/LibraryFolderUpload.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
@@ -271,6 +272,7 @@ const AppContent = () => {
               </Route>
             </Route>
             <Route path="welcome" element={<Welcome />} />
+            <Route path="acbc-tokens" element={<ProtectedRoute><TokenBuyPage /></ProtectedRoute>} />
             <Route path="messages" element={<MessagesLayout />}>
               <Route path="thread/:userId" element={<MessageThread />} />
             </Route>
