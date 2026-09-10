@@ -1,56 +1,32 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
   CircularProgress,
-  Grid,
   Stack,
   Typography,
 } from '@mui/material';
 import TollIcon from '@mui/icons-material/Toll';
-import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
+import TokenCheckout from '../payments/TokenCheckout';
 import {
-  createTokenPurchase,
-  createTokenPurchaseBchPayment,
-  getTokenPackages,
-  listTokenPurchases,
-  verifyTokenPurchaseBchPayment,
-} from '../api/paymentsApi';
-
-const formatApiError = (err, fallback) => {
-  const msg = err?.error || err?.detail || err?.message;
-  if (typeof msg === 'string') return msg;
-  if (msg) return JSON.stringify(msg);
-  return fallback;
-};
-
-const statusLabel = (status) => {
-  if (status === 'PAID') return 'Pagado';
-  if (status === 'PENDING') return 'Pendiente';
-  if (status === 'REFUNDED') return 'Reembolsado';
-  return status;
-};
+  checkoutFromPurchase,
+  formatApiError,
+  purchaseStatusLabel,
+} from '../payments/tokenPackages';
+import { listTokenPurchases } from '../api/paymentsApi';
 
 const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
-  const [packages, setPackages] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [busyPackageId, setBusyPackageId] = useState(null);
   const [checkout, setCheckout] = useState(null);
 
   const load = useCallback(async () => {
-    const [packageRows, purchaseRows] = await Promise.all([
-      getTokenPackages(),
-      listTokenPurchases(),
-    ]);
-    setPackages(Array.isArray(packageRows) ? packageRows : []);
+    const purchaseRows = await listTokenPurchases();
     setPurchases(Array.isArray(purchaseRows) ? purchaseRows : []);
   }, []);
 
@@ -72,46 +48,6 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
     };
   }, [load]);
 
-  const bestValueId = useMemo(() => {
-    if (packages.length < 2) return null;
-    const unitPrice = (pkg) => Number(pkg.usd_price) / Math.max(1, Number(pkg.token_amount));
-    const best = packages.reduce((a, b) => (unitPrice(b) < unitPrice(a) ? b : a));
-    const worst = packages.reduce((a, b) => (unitPrice(b) > unitPrice(a) ? b : a));
-    // Flat $0.01/token catalog: no package is cheaper per token.
-    if (unitPrice(best) >= unitPrice(worst) - 1e-9) return null;
-    return best.id;
-  }, [packages]);
-
-  const openCheckout = (purchase, pkg) => {
-    setCheckout({
-      purchaseId: purchase.id,
-      title: purchase.package_name || pkg?.name || `${purchase.token_amount} tokens`,
-      priceUsd: Number(purchase.usd_price || pkg?.usd_price || 0),
-      tokenAmount: purchase.token_amount,
-    });
-  };
-
-  const handleBuy = async (pkg) => {
-    const pending = purchases.find(
-      (row) => row.package_id === pkg.id && row.payment_status === 'PENDING',
-    );
-    if (pending) {
-      openCheckout(pending, pkg);
-      return;
-    }
-    setBusyPackageId(pkg.id);
-    setError(null);
-    try {
-      const purchase = await createTokenPurchase(pkg.id);
-      setPurchases((prev) => [purchase, ...prev]);
-      openCheckout(purchase, pkg);
-    } catch (err) {
-      setError(formatApiError(err, 'No se pudo iniciar la compra.'));
-    } finally {
-      setBusyPackageId(null);
-    }
-  };
-
   const handlePaid = async () => {
     setSuccess('Pago recibido. Los tokens ya están en tu saldo.');
     setCheckout(null);
@@ -124,6 +60,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
   };
 
   const balance = Number(tokenBalance || 0);
+  const pending = purchases.filter((row) => row.payment_status === 'PENDING');
 
   if (loading) {
     return (
@@ -149,9 +86,19 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-          Estos tokens existen solo en Academia Blockchain: no son una criptomoneda.
-          1 token = $0.01 USD. Más adelante podrás usarlos para pagar contenidos con descuento.
+          Créditos internos de Academia Blockchain. No son una criptomoneda.
+          1 token = $0.01 USD. Sirven para pagar contenidos y consultas en la plataforma.
         </Typography>
+        <Box>
+          <Button
+            component={RouterLink}
+            to="/acbc-tokens"
+            variant="contained"
+            startIcon={<TollIcon />}
+          >
+            Comprar tokens
+          </Button>
+        </Box>
       </Stack>
 
       {error && (
@@ -165,68 +112,33 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Alert>
       )}
 
-      {balance === 0 && (
+      {balance === 0 && pending.length === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Aún no tienes tokens. Elige un paquete y págalo con Bitcoin Cash o NOWPayments.
+          Aún no tienes tokens.{' '}
+          <Button
+            component={RouterLink}
+            to="/acbc-tokens"
+            size="small"
+            sx={{ verticalAlign: 'baseline', textTransform: 'none', p: 0, minWidth: 0 }}
+          >
+            Elige un paquete
+          </Button>
+          {' '}para empezar.
+        </Alert>
+      )}
+
+      {pending.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Tienes un pago pendiente. Puedes continuarlo aquí o desde la página de compra.
         </Alert>
       )}
 
       <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Comprar tokens
-      </Typography>
-      {packages.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          No hay paquetes disponibles por ahora.
-        </Typography>
-      ) : (
-        <Grid container spacing={2} sx={{ mb: 4 }}>
-          {packages.map((pkg) => (
-            <Grid item xs={12} sm={6} md={4} key={pkg.id}>
-              <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      {pkg.name}
-                    </Typography>
-                    {pkg.id === bestValueId && packages.length > 1 && (
-                      <Chip size="small" color="primary" label="Mejor valor" />
-                    )}
-                  </Stack>
-                  <Typography variant="h4" fontWeight={800} sx={{ mt: 1 }}>
-                    {pkg.token_amount}
-                    <Typography component="span" variant="body1" color="text.secondary">
-                      {' '}tokens
-                    </Typography>
-                  </Typography>
-                  <Typography variant="h6" color="primary" sx={{ mt: 0.5 }}>
-                    ${Number(pkg.usd_price).toFixed(2)} USD
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    $0.01 por token
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ px: 2, pb: 2 }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disabled={busyPackageId === pkg.id}
-                    onClick={() => handleBuy(pkg)}
-                  >
-                    {busyPackageId === pkg.id ? 'Preparando…' : 'Comprar'}
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-
-      <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Compras recientes
+        Actividad
       </Typography>
       {purchases.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Todavía no has comprado tokens.
+          Todavía no has comprado tokens. Aquí verás compras y, más adelante, el gasto.
         </Typography>
       ) : (
         <Stack spacing={1}>
@@ -249,16 +161,22 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                   {row.package_name || `${row.token_amount} tokens`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {row.token_amount} tokens · ${Number(row.usd_price).toFixed(2)} USD
+                  {(row.total_tokens ?? row.token_amount)} tokens
+                  {Number(row.bonus_tokens || 0) > 0 ? ` (incl. +${row.bonus_tokens} bonus)` : ''}
+                  {' · '}${Number(row.usd_price).toFixed(2)} USD
                 </Typography>
               </Box>
               <Chip
                 size="small"
                 color={row.payment_status === 'PAID' ? 'success' : 'warning'}
-                label={statusLabel(row.payment_status)}
+                label={purchaseStatusLabel(row.payment_status)}
               />
               {row.payment_status === 'PENDING' && (
-                <Button size="small" variant="outlined" onClick={() => openCheckout(row)}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setCheckout(checkoutFromPurchase(row))}
+                >
                   Continuar pago
                 </Button>
               )}
@@ -267,26 +185,9 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Stack>
       )}
 
-      <ProductPaymentCheckout
-        open={Boolean(checkout)}
+      <TokenCheckout
+        checkout={checkout}
         onClose={() => setCheckout(null)}
-        title={checkout?.title || 'Paquete de tokens'}
-        priceUsd={checkout?.priceUsd || 0}
-        productLabel="paquete de tokens"
-        offerNowpayments
-        offerBch
-        offerMonero={false}
-        createBchPayment={
-          checkout
-            ? () => createTokenPurchaseBchPayment(checkout.purchaseId)
-            : undefined
-        }
-        verifyBchPayment={
-          checkout
-            ? (txid) => verifyTokenPurchaseBchPayment(checkout.purchaseId, txid)
-            : undefined
-        }
-        nowpaymentsProps={{ tokenPurchaseId: checkout?.purchaseId }}
         onPaid={handlePaid}
       />
     </Box>

@@ -270,7 +270,11 @@ class TokenPackage(models.Model):
     """Staff-editable SKU of platform tokens sold for USD (paid in BCH / NOWPayments)."""
 
     name = models.CharField(max_length=80)
-    token_amount = models.PositiveIntegerField()
+    token_amount = models.PositiveIntegerField(help_text='Paid tokens (face value).')
+    bonus_tokens = models.PositiveIntegerField(
+        default=0,
+        help_text='Extra tokens credited on purchase (reward). Not charged.',
+    )
     usd_price = models.DecimalField(max_digits=12, decimal_places=2)
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
@@ -281,7 +285,12 @@ class TokenPackage(models.Model):
         ordering = ['sort_order', 'token_amount', 'id']
 
     def __str__(self):
-        return f'{self.name} ({self.token_amount} tokens / ${self.usd_price})'
+        bonus = f' +{self.bonus_tokens} bonus' if self.bonus_tokens else ''
+        return f'{self.name} ({self.token_amount}{bonus} tokens / ${self.usd_price})'
+
+    @property
+    def total_tokens(self) -> int:
+        return int(self.token_amount or 0) + int(self.bonus_tokens or 0)
 
     @staticmethod
     def unit_usd_price() -> Decimal:
@@ -303,7 +312,8 @@ class TokenPackage(models.Model):
                 unit = self.unit_usd_price()
                 raise ValidationError({
                     'usd_price': (
-                        f'Debe ser ${expected} ({self.token_amount} tokens × ${unit}/token).'
+                        f'Debe ser ${expected} ({self.token_amount} tokens × ${unit}/token). '
+                        'Los tokens de recompensa no se cobran.'
                     ),
                 })
 
@@ -330,7 +340,11 @@ class TokenPurchase(models.Model):
         related_name='purchases',
     )
     package_name = models.CharField(max_length=80, blank=True, default='')
-    token_amount = models.PositiveIntegerField()
+    token_amount = models.PositiveIntegerField(help_text='Paid tokens snapshot.')
+    bonus_tokens = models.PositiveIntegerField(
+        default=0,
+        help_text='Bonus tokens snapshot credited with the purchase.',
+    )
     usd_price = models.DecimalField(max_digits=12, decimal_places=2)
     payment_status = models.CharField(
         max_length=20,
@@ -345,7 +359,11 @@ class TokenPurchase(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.user_id} → {self.token_amount} tokens ({self.payment_status})'
+        return f'{self.user_id} → {self.total_tokens} tokens ({self.payment_status})'
+
+    @property
+    def total_tokens(self) -> int:
+        return int(self.token_amount or 0) + int(self.bonus_tokens or 0)
 
     @property
     def is_paid(self):

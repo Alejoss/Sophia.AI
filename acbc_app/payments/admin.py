@@ -65,9 +65,11 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
 
 @admin.register(TokenPackage)
 class TokenPackageAdmin(admin.ModelAdmin):
-    list_display = ('name', 'token_amount', 'usd_price', 'is_active', 'sort_order', 'updated_at')
+    list_display = (
+        'name', 'token_amount', 'bonus_tokens', 'usd_price', 'is_active', 'sort_order', 'updated_at',
+    )
     list_filter = ('is_active',)
-    list_editable = ('token_amount', 'usd_price', 'is_active', 'sort_order')
+    list_editable = ('token_amount', 'bonus_tokens', 'usd_price', 'is_active', 'sort_order')
     search_fields = ('name',)
     ordering = ('sort_order', 'token_amount')
 
@@ -79,6 +81,7 @@ class TokenPurchaseAdmin(admin.ModelAdmin):
         'user',
         'package_name',
         'token_amount',
+        'bonus_tokens',
         'usd_price',
         'payment_status',
         'created_at',
