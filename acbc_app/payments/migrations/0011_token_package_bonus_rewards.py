@@ -65,7 +65,7 @@ def noop_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('payments', '0008_platform_token_unit_price'),
+        ('payments', '0010_help_text_updates'),
     ]
 
     operations = [
