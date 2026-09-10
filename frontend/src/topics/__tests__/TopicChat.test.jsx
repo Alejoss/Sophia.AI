@@ -237,11 +237,12 @@ describe('TopicChat component', () => {
         status: 429,
         data: {
           error:
-            'Has alcanzado el límite de 3 consultas por día. Podrás hacer más consultas mañana.',
+            'Has alcanzado el límite de 3 consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.',
           code: 'daily_consultation_limit',
           daily_limit: 3,
           daily_used: 3,
           daily_remaining: 0,
+          tokens_url: '/profiles/my_profile?section=tokens',
         },
       },
     });
@@ -254,14 +255,45 @@ describe('TopicChat component', () => {
       expect(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i })).toBeInTheDocument();
     });
 
+    await user.click(screen.getByRole('checkbox', { name: /libro blanco bitcoin/i }));
+    await user.click(screen.getByRole('checkbox', { name: /explicación en video/i }));
+
     const input = screen.getByPlaceholderText(/escribe tu pregunta/i);
     await user.type(input, '¿Qué es Bitcoin?');
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
     await waitFor(() => {
       expect(
-        screen.getByText(/has alcanzado el límite de 3 consultas por día/i)
+        screen.getByText(/has alcanzado el límite de 3 consultas gratuitas por día/i)
       ).toBeInTheDocument();
     });
+    const tokensLink = screen.getByRole('link', { name: /ir a mis tokens/i });
+    expect(tokensLink).toBeInTheDocument();
+    expect(tokensLink.getAttribute('href')).toBe('/profiles/my_profile?section=tokens');
+  });
+
+  it('prompts tokens purchase when the daily quota is already exhausted', async () => {
+    mockListTopicChatQueries.mockResolvedValue({
+      count: 3,
+      limit: 50,
+      daily_limit: 3,
+      daily_used: 3,
+      daily_remaining: 0,
+      tokens_url: '/profiles/my_profile?section=tokens',
+      results: [],
+    });
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: mockAuthValue,
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/compra tokens acbc para seguir creando consultas/i)
+      ).toBeInTheDocument();
+    });
+    const tokensLink = screen.getByRole('link', { name: /ir a mis tokens/i });
+    expect(tokensLink.getAttribute('href')).toBe('/profiles/my_profile?section=tokens');
+    expect(screen.getByRole('button', { name: /nueva consulta/i })).toBeDisabled();
   });
 });
