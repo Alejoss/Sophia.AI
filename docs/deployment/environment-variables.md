@@ -230,6 +230,12 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Required**: No
 - **Default**: `1`
 
+#### `PLATFORM_TOKEN_USD_PRICE`
+- **Description**: Face value of one platform token in USD. Packages in admin must price at `token_amount ×` this rate (default **$0.01**).
+- **Required**: No
+- **Default**: `0.01`
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
 #### `TOKEN_CONTENT_DISCOUNT_PERCENT`
 - **Description**: Reserved discount when spending platform tokens on paid content. Unused until token checkout ships.
 - **Required**: No

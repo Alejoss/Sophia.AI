@@ -73,10 +73,13 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
   }, [load]);
 
   const bestValueId = useMemo(() => {
-    if (!packages.length) return null;
-    return packages.reduce((best, pkg) => (
-      pkg.token_amount > (best?.token_amount || 0) ? pkg : best
-    ), null)?.id ?? null;
+    if (packages.length < 2) return null;
+    const unitPrice = (pkg) => Number(pkg.usd_price) / Math.max(1, Number(pkg.token_amount));
+    const best = packages.reduce((a, b) => (unitPrice(b) < unitPrice(a) ? b : a));
+    const worst = packages.reduce((a, b) => (unitPrice(b) > unitPrice(a) ? b : a));
+    // Flat $0.01/token catalog: no package is cheaper per token.
+    if (unitPrice(best) >= unitPrice(worst) - 1e-9) return null;
+    return best.id;
   }, [packages]);
 
   const openCheckout = (purchase, pkg) => {
@@ -110,13 +113,13 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
   };
 
   const handlePaid = async () => {
-    setSuccess('Pago recibido. Los tokens ya est├ín en tu saldo.');
+    setSuccess('Pago recibido. Los tokens ya están en tu saldo.');
     setCheckout(null);
     try {
       await load();
       await onBalanceChange?.();
     } catch (err) {
-      setError(formatApiError(err, 'El pago se acredit├│, pero no se pudo actualizar el saldo.'));
+      setError(formatApiError(err, 'El pago se acreditó, pero no se pudo actualizar el saldo.'));
     }
   };
 
@@ -147,7 +150,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
           Estos tokens existen solo en Academia Blockchain: no son una criptomoneda.
-          M├ís adelante podr├ís usarlos para pagar contenidos con descuento.
+          1 token = $0.01 USD. Más adelante podrás usarlos para pagar contenidos con descuento.
         </Typography>
       </Stack>
 
@@ -164,7 +167,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
 
       {balance === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          A├║n no tienes tokens. Elige un paquete y p├ígalo con Bitcoin Cash o NOWPayments.
+          Aún no tienes tokens. Elige un paquete y págalo con Bitcoin Cash o NOWPayments.
         </Alert>
       )}
 
@@ -198,6 +201,9 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                   <Typography variant="h6" color="primary" sx={{ mt: 0.5 }}>
                     ${Number(pkg.usd_price).toFixed(2)} USD
                   </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    $0.01 por token
+                  </Typography>
                 </CardContent>
                 <CardActions sx={{ px: 2, pb: 2 }}>
                   <Button
@@ -206,7 +212,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                     disabled={busyPackageId === pkg.id}
                     onClick={() => handleBuy(pkg)}
                   >
-                    {busyPackageId === pkg.id ? 'PreparandoÔÇª' : 'Comprar'}
+                    {busyPackageId === pkg.id ? 'Preparando…' : 'Comprar'}
                   </Button>
                 </CardActions>
               </Card>
@@ -220,7 +226,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
       </Typography>
       {purchases.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Todav├¡a no has comprado tokens.
+          Todavía no has comprado tokens.
         </Typography>
       ) : (
         <Stack spacing={1}>
@@ -243,7 +249,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                   {row.package_name || `${row.token_amount} tokens`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {row.token_amount} tokens ┬À ${Number(row.usd_price).toFixed(2)} USD
+                  {row.token_amount} tokens · ${Number(row.usd_price).toFixed(2)} USD
                 </Typography>
               </Box>
               <Chip
