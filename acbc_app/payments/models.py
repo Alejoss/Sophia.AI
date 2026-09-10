@@ -353,7 +353,7 @@ class TokenPurchase(models.Model):
 
 
 class TokenLedgerEntry(models.Model):
-    """Append-only platform token movements. Purchase credits are unique per TokenPurchase."""
+    """Append-only platform token movements. Purchase credits / anchor spends are unique."""
 
     REASON_PURCHASE = 'purchase'
     REASON_ADJUSTMENT = 'adjustment'
@@ -378,6 +378,14 @@ class TokenLedgerEntry(models.Model):
         blank=True,
         related_name='ledger_entries',
     )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='token_ledger_entries',
+        help_text='Set when reason=spend for a paid Bitcoin anchor request.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -387,6 +395,11 @@ class TokenLedgerEntry(models.Model):
                 fields=['token_purchase'],
                 condition=Q(reason='purchase') & Q(token_purchase__isnull=False),
                 name='unique_token_purchase_ledger_credit',
+            ),
+            models.UniqueConstraint(
+                fields=['anchor_request'],
+                condition=Q(reason='spend') & Q(anchor_request__isnull=False),
+                name='unique_token_anchor_request_spend',
             ),
         ]
 

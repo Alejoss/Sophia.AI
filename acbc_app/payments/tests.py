@@ -457,6 +457,119 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
 
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,
+    PLATFORM_TOKEN_USD_PRICE=Decimal('0.01'),
+    TOKEN_CONTENT_DISCOUNT_PERCENT=0,
+)
+class AnchorRequestTokenPaymentTests(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.other = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video tokens',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para pago con tokens.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_tokens_required_for_one_dollar(self):
+        from payments.token_pricing import tokens_required_for_usd
+
+        self.assertEqual(tokens_required_for_usd(1), 100)
+
+    def test_pay_with_tokens_success(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['request']['status'], 'paid_pending_review')
+        self.assertEqual(response.data['tokens_spent'], 100)
+        self.assertEqual(response.data['token_balance'], 50)
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.token_balance, 50)
+        spend = TokenLedgerEntry.objects.get(
+            anchor_request=self.req,
+            reason=TokenLedgerEntry.REASON_SPEND,
+        )
+        self.assertEqual(spend.delta, -100)
+
+    def test_pay_with_tokens_insufficient_balance(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=10,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['code'], 'insufficient_tokens')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_pay_with_tokens_idempotent(self):
+        from payments.services import pay_anchor_request_with_tokens
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=200,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        first = pay_anchor_request_with_tokens(anchor_request=self.req, user=self.user)
+        second = pay_anchor_request_with_tokens(anchor_request=self.req, user=self.user)
+        self.assertEqual(first.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.assertEqual(second.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.token_balance, 100)
+        self.assertEqual(
+            TokenLedgerEntry.objects.filter(
+                anchor_request=self.req,
+                reason=TokenLedgerEntry.REASON_SPEND,
+            ).count(),
+            1,
+        )
+
+    def test_other_user_cannot_pay_with_tokens(self):
+        self.client.force_authenticate(user=self.other)
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(
+    ANCHOR_REQUEST_PRICE_USD=1,
     BCH_NETWORK='mainnet',
     BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
     BCH_USD_PRICE=200,

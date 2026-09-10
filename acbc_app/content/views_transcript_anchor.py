@@ -25,11 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def _user_can_certify(user, content):
+    """Staff/ops may prepare/broadcast without a paid request; everyone else pays $1."""
     if not user or not user.is_authenticated:
         return False
-    if user.is_staff or user.is_superuser:
-        return True
-    return content.uploaded_by_id == user.id
+    return bool(user.is_staff or user.is_superuser)
 
 
 class ContentTranscriptAnchorListView(APIView):
@@ -38,7 +37,8 @@ class ContentTranscriptAnchorListView(APIView):
     POST /api/content/content_details/<content_id>/transcript/anchors/
 
     GET is public (directory of Bitcoin proofs). POST creates a pending anchor for
-    the current transcript text_hash (uploader or staff).
+    the current transcript text_hash (staff/ops only; public users pay via
+    TranscriptAnchorRequest).
     """
 
     def get_permissions(self):
@@ -126,8 +126,9 @@ class ContentTranscriptAnchorCurrentView(APIView):
     If the matching row is still ``btc_broadcast``, polls Esplora once to update
     confirmations / mark ``anchored`` when ready.
 
-    POST (uploader/staff) ensures a pending row and broadcasts via the platform
+    POST (staff/ops) ensures a pending row and broadcasts via the platform
     wallet. Rejects with 503 when estimated fee USD exceeds ``BTC_MAX_FEE_USD``.
+    Public users must pay via ``TranscriptAnchorRequest`` ($1).
     """
 
     def get_permissions(self):

@@ -20,6 +20,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import {
   createAnchorRequestBchPayment,
   getPaymentGatewayStatus,
+  payAnchorRequestWithTokens,
   verifyAnchorRequestBchPayment,
 } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
@@ -37,7 +38,7 @@ const formatApiError = (err, fallback) => {
 };
 
 /**
- * Checkout chooser: NOWPayments (hosted) vs self-custody BCH direct.
+ * Checkout chooser: NOWPayments, self-custody BCH, or platform tokens.
  */
 const AnchorPaymentCheckout = ({
   open,
@@ -45,12 +46,18 @@ const AnchorPaymentCheckout = ({
   anchorRequestId,
   title,
   priceUsd = 1,
+  priceTokens = 100,
+  tokenBalance = 0,
   onPaid,
 }) => {
-  const [methods, setMethods] = useState({ nowpayments: false, bch_direct: false });
+  const [methods, setMethods] = useState({
+    nowpayments: false,
+    bch_direct: false,
+    platform_tokens: true,
+  });
   const [bchNetwork, setBchNetwork] = useState(null);
   const [loadingMethods, setLoadingMethods] = useState(false);
-  const [method, setMethod] = useState(null); // 'nowpayments' | 'bch' | null
+  const [method, setMethod] = useState(null); // 'nowpayments' | 'bch' | 'tokens' | 'monero' | null
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState('');
@@ -58,6 +65,18 @@ const AnchorPaymentCheckout = ({
   const [paidReview, setPaidReview] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [verifyTxid, setVerifyTxid] = useState('');
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenError, setTokenError] = useState('');
+  const [localTokenBalance, setLocalTokenBalance] = useState(tokenBalance);
+  const [localPriceTokens, setLocalPriceTokens] = useState(priceTokens);
+
+  useEffect(() => {
+    setLocalTokenBalance(tokenBalance);
+  }, [tokenBalance]);
+
+  useEffect(() => {
+    setLocalPriceTokens(priceTokens);
+  }, [priceTokens]);
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +88,8 @@ const AnchorPaymentCheckout = ({
       setPaidReview(false);
       setSupportOpen(false);
       setVerifyTxid('');
+      setTokenBusy(false);
+      setTokenError('');
       return undefined;
     }
     let cancelled = false;
@@ -77,14 +98,22 @@ const AnchorPaymentCheckout = ({
       .then((data) => {
         if (cancelled) return;
         setMethods({
-          nowpayments: Boolean(data?.nowpayments),
-          bch_direct: Boolean(data?.bch_direct),
+          nowpayments: Boolean(data?.methods?.nowpayments ?? data?.nowpayments),
+          bch_direct: Boolean(data?.methods?.bch_direct ?? data?.bch_direct),
+          platform_tokens: data?.methods?.platform_tokens !== false,
         });
         setBchNetwork(data?.bch_network || null);
+        if (data?.anchor_price_tokens != null) {
+          setLocalPriceTokens(Number(data.anchor_price_tokens));
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setMethods({ nowpayments: false, bch_direct: false });
+          setMethods({
+            nowpayments: false,
+            bch_direct: false,
+            platform_tokens: true,
+          });
           setBchNetwork(null);
         }
       })
@@ -162,11 +191,31 @@ const AnchorPaymentCheckout = ({
     }
   };
 
-  const showChooser = open && !method;
+  const handlePayWithTokens = async () => {
+    if (!anchorRequestId || tokenBusy) return;
+    setTokenBusy(true);
+    setTokenError('');
+    try {
+      const result = await payAnchorRequestWithTokens(anchorRequestId);
+      if (result?.token_balance != null) {
+        setLocalTokenBalance(Number(result.token_balance));
+      }
+      setPaidReview(true);
+      onPaid?.(result);
+    } catch (err) {
+      setTokenError(formatApiError(err, 'No se pudo pagar con tokens. Inténtalo de nuevo.'));
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const showChooser = open && !method && !paidReview;
   const showNowpayments = open && method === 'nowpayments';
   const showBch = open && method === 'bch';
   const showMonero = open && method === 'monero';
-  const bothOff = !methods.nowpayments && !methods.bch_direct;
+  const showTokens = open && method === 'tokens';
+  const cryptoOff = !methods.nowpayments && !methods.bch_direct;
+  const canPayTokens = Number(localTokenBalance) >= Number(localPriceTokens);
 
   return (
     <>
@@ -190,16 +239,29 @@ const AnchorPaymentCheckout = ({
             <Stack alignItems="center" sx={{ py: 3 }}>
               <CircularProgress size={28} />
             </Stack>
-          ) : bothOff ? (
-            <Alert severity="warning">
-              No hay métodos de pago crypto habilitados en este momento. Puedes
-              contactar soporte o intentar más tarde.
-            </Alert>
           ) : (
             <Stack spacing={1.5}>
-              {methods.nowpayments && (
+              {methods.platform_tokens && (
                 <Button
                   variant="contained"
+                  size="large"
+                  onClick={() => setMethod('tokens')}
+                  fullWidth
+                  disabled={!canPayTokens}
+                >
+                  Pagar con tokens ({localPriceTokens})
+                  {' · '}
+                  saldo {localTokenBalance}
+                </Button>
+              )}
+              {methods.platform_tokens && !canPayTokens && (
+                <Typography variant="caption" color="text.secondary">
+                  Necesitas {localPriceTokens} tokens (1 token = $0.01). Compra un paquete en Mis tokens.
+                </Typography>
+              )}
+              {methods.nowpayments && (
+                <Button
+                  variant={methods.platform_tokens ? 'outlined' : 'contained'}
                   size="large"
                   onClick={() => setMethod('nowpayments')}
                   fullWidth
@@ -218,6 +280,12 @@ const AnchorPaymentCheckout = ({
                   {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
                 </Button>
               )}
+              {cryptoOff && !methods.platform_tokens && (
+                <Alert severity="warning">
+                  No hay métodos de pago habilitados en este momento. Puedes
+                  contactar soporte o intentar más tarde.
+                </Alert>
+              )}
               <Divider sx={{ my: 0.5 }}>o</Divider>
               <Button
                 variant="text"
@@ -232,6 +300,82 @@ const AnchorPaymentCheckout = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancelar</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showTokens} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pr: 6 }}>
+          Pagar con tokens
+          <IconButton
+            aria-label="Cerrar"
+            onClick={onClose}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {tokenError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {tokenError}
+            </Alert>
+          )}
+          {paidReview ? (
+            <Alert severity="success">
+              ¡Pago con tokens recibido! Tu solicitud de anclaje a Bitcoin está en revisión.
+            </Alert>
+          ) : (
+            <Stack spacing={1.5}>
+              <Typography variant="body2" color="text.secondary">
+                Se descontarán {localPriceTokens} tokens de tu saldo ({localTokenBalance}).
+              </Typography>
+              <Typography variant="body2">
+                Anclaje · ${Number(priceUsd).toFixed(2)} USD
+                {title ? ` · ${title}` : ''}
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between' }}>
+          <Button
+            onClick={() => {
+              setMethod(null);
+              setTokenError('');
+            }}
+            disabled={tokenBusy}
+          >
+            Cambiar método
+          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={onClose}>Cerrar</Button>
+            {!paidReview && (
+              <Button
+                variant="contained"
+                onClick={handlePayWithTokens}
+                disabled={tokenBusy || !canPayTokens}
+                startIcon={tokenBusy ? <CircularProgress size={16} color="inherit" /> : null}
+              >
+                Confirmar pago
+              </Button>
+            )}
+          </Stack>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(open && paidReview && !method)}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Pago recibido</DialogTitle>
+        <DialogContent>
+          <Alert severity="success">
+            Tu solicitud de anclaje a Bitcoin está en revisión.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} variant="contained">Cerrar</Button>
         </DialogActions>
       </Dialog>
 

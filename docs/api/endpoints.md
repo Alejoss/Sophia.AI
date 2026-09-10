@@ -553,6 +553,11 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match (`{}` auto address-scan; optional `{ "txid": "…" }` fallback)
 - **Auth**: Required (requester; staff may GET/verify)
 
+### Transcript-anchor request (platform tokens)
+- **POST** `/api/payments/anchor-request/{id}/tokens/` — debit face-value tokens ($1 → 100 at `$0.01`/token) and mark `paid_pending_review`
+- **Auth**: Required (requester only)
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
 ### Platform token packages
 - **GET** `/api/payments/token-packages/` — active SKUs
 - **GET** `/api/payments/token-purchases/` — own purchases
