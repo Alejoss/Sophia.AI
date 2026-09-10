@@ -11,7 +11,7 @@ Own profile only (`/profiles/my_profile?section=tokens`):
 - Header chip with the current balance
 - **Mis tokens** section: explanation, package cards, NOWPayments + Bitcoin Cash checkout (no Monero), recent purchases
 
-Staff edit packages in Django admin (`Token packages`). Seeded catalog (changeable): 100 / 300 / 800 tokens.
+Staff edit packages in Django admin (`Token packages`). Face value is **1 token = $0.01 USD** (`PLATFORM_TOKEN_USD_PRICE`). Seeded catalog: 100 / 300 / 800 tokens ($1 / $3 / $8).
 
 ## Data
 

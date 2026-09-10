@@ -8,6 +8,7 @@ import os
 import dj_database_url
 import logging
 from datetime import timedelta
+from decimal import Decimal
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -767,6 +768,8 @@ BTC_MAX_FEE_USD = float(os.getenv('BTC_MAX_FEE_USD', '1'))
 BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 # Fixed USD price charged via NOWPayments for a public transcript-anchor request.
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
+# Platform token face value: 1 token = $0.01 USD (packages should price at this rate).
+PLATFORM_TOKEN_USD_PRICE = Decimal(os.getenv('PLATFORM_TOKEN_USD_PRICE', '0.01') or '0.01')
 # Reserved for later token checkout (paths, Consultas, events, anchors). Unused in v1.
 TOKEN_CONTENT_DISCOUNT_PERCENT = int(os.getenv('TOKEN_CONTENT_DISCOUNT_PERCENT', '0') or 0)
 

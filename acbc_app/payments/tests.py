@@ -4,6 +4,8 @@ import json
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -1547,7 +1549,7 @@ class TokenPackagePurchaseTests(TestCase):
         self.package = TokenPackage.objects.create(
             name='Test 50 tokens',
             token_amount=50,
-            usd_price=Decimal('4.00'),
+            usd_price=Decimal('0.50'),
             is_active=True,
             sort_order=99,
         )
@@ -1557,7 +1559,7 @@ class TokenPackagePurchaseTests(TestCase):
         TokenPackage.objects.create(
             name='Hidden pack',
             token_amount=10,
-            usd_price=Decimal('1.00'),
+            usd_price=Decimal('0.10'),
             is_active=False,
         )
         self.api.force_authenticate(user=self.buyer)
@@ -1721,3 +1723,21 @@ class TokenPackagePurchaseTests(TestCase):
         other = self.api.get(f'/api/profiles/{self.buyer.id}/')
         self.assertEqual(other.status_code, status.HTTP_200_OK)
         self.assertIsNone(other.data.get('token_balance'))
+
+
+    def test_package_usd_price_must_match_unit_rate(self):
+        self.assertEqual(TokenPackage.usd_price_for_amount(100), Decimal('1.00'))
+        self.assertEqual(TokenPackage.unit_usd_price(), Decimal('0.01'))
+        bad = TokenPackage(
+            name='Wrong price',
+            token_amount=100,
+            usd_price=Decimal('5.00'),
+        )
+        with self.assertRaises(ValidationError):
+            bad.full_clean()
+        good = TokenPackage(
+            name='Correct price',
+            token_amount=100,
+            usd_price=Decimal('1.00'),
+        )
+        good.full_clean()
