@@ -87,7 +87,8 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
           Créditos internos de Academia Blockchain. No son una criptomoneda.
-          1 token = $0.01 USD. Sirven para pagar contenidos y consultas en la plataforma.
+          1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento, 
+          eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin.
         </Typography>
         <Box>
           <Button
@@ -138,7 +139,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
       </Typography>
       {purchases.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Todavía no has comprado tokens. Aquí verás compras y, más adelante, el gasto.
+          Todavía no has comprado tokens. Aquí verás tus compras y el uso que le has dado a tus tokens.
         </Typography>
       ) : (
         <Stack spacing={1}>
