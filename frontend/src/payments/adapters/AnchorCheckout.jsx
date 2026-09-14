@@ -5,7 +5,7 @@ import {
   payAnchorRequestWithTokens,
   verifyAnchorRequestBchPayment,
 } from '../../api/paymentsApi';
-import { PRODUCT_KINDS } from '../productCatalog';
+import { ANCHOR_PAYMENT_TITLE, PRODUCT_KINDS } from '../productCatalog';
 
 /**
  * Transcript Bitcoin-anchor checkout adapter (tokens + NOW + BCH + Monero).
@@ -14,7 +14,7 @@ const AnchorCheckout = ({
   open,
   onClose,
   anchorRequestId,
-  title,
+  title = ANCHOR_PAYMENT_TITLE,
   priceUsd = 1,
   priceTokens = 100,
   tokenBalance = 0,
@@ -28,7 +28,7 @@ const AnchorCheckout = ({
     <ProductPaymentCheckout
       open={open}
       onClose={onClose}
-      title={title}
+      title={title || ANCHOR_PAYMENT_TITLE}
       priceUsd={priceUsd}
       productKind={PRODUCT_KINDS.ANCHOR}
       productFlags={{}}

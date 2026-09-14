@@ -87,9 +87,15 @@ def fulfill_paid_anchor_request(
     rolled back. Set ``raise_on_defer=True`` for admin UX that needs an error.
     """
     with transaction.atomic():
-        req = TranscriptAnchorRequest.objects.select_for_update().select_related(
-            'content', 'content__transcript', 'requester',
-        ).get(pk=anchor_request.pk)
+        # of=('self',): Postgres rejects FOR UPDATE on the nullable side of an
+        # outer join. select_related('content__transcript') is a LEFT OUTER JOIN
+        # (OneToOne may be missing), so lock only TranscriptAnchorRequest.
+        req = (
+            TranscriptAnchorRequest.objects
+            .select_for_update(of=('self',))
+            .select_related('content', 'content__transcript', 'requester')
+            .get(pk=anchor_request.pk)
+        )
 
         if req.status == TranscriptAnchorRequest.STATUS_APPROVED:
             return req
