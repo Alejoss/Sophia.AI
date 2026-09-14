@@ -31,12 +31,7 @@ import VoteComponent from '../votes/VoteComponent';
 import ContentSuggestionModal from './ContentSuggestionModal';
 import TopicTimeline from './timeline/TopicTimeline';
 import TopicChat from './TopicChat';
-import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
-import MoneroPaymentModal from '../payments/MoneroPaymentModal';
-import {
-  createTopicPurchaseBchPayment,
-  verifyTopicPurchaseBchPayment,
-} from '../api/paymentsApi';
+import TopicCheckout from '../payments/adapters/TopicCheckout';
 import Payments from '@mui/icons-material/Payments';
 
 /** Same value for every topic-image API page request; mixed page_size breaks DRF page offsets. */
@@ -367,7 +362,6 @@ const TopicDetail = () => {
         loading: false,
     });
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showMoneroModal, setShowMoneroModal] = useState(false);
     const [topicPurchaseId, setTopicPurchaseId] = useState(null);
     const [purchaseLoading, setPurchaseLoading] = useState(false);
     const [purchaseError, setPurchaseError] = useState(null);
@@ -504,14 +498,6 @@ const TopicDetail = () => {
         } finally {
             setPurchaseLoading(false);
         }
-    };
-
-    const handleStartMoneroPayment = () => {
-        if (!isAuthenticated) {
-            navigate('/login');
-            return;
-        }
-        setShowMoneroModal(true);
     };
 
     const handleTopicPaymentComplete = async () => {
@@ -944,15 +930,6 @@ const TopicDetail = () => {
                                 >
                                     {purchaseLoading ? 'Preparando...' : 'Pagar consultas'}
                                 </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Payments />}
-                                    onClick={handleStartMoneroPayment}
-                                    disabled={!topic.is_for_sale}
-                                    sx={{ textTransform: 'none' }}
-                                >
-                                    Pagar con Monero
-                                </Button>
                             </Stack>
                             {!topic.is_for_sale && (
                                 <Typography variant="caption" color="text.secondary">
@@ -1029,25 +1006,15 @@ const TopicDetail = () => {
                 onSuccess={handleSuggestionSuccess}
             />
 
-            <ProductPaymentCheckout
+            <TopicCheckout
                 open={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
+                purchaseId={topicPurchaseId}
                 title={topic?.title}
                 priceUsd={topic?.reference_price}
-                productLabel="consultas del tema"
-                offerNowpayments={false}
-                offerBch={Boolean(topic?.bch_direct_available)}
-                offerMonero={false}
-                createBchPayment={() => createTopicPurchaseBchPayment(topicPurchaseId)}
-                verifyBchPayment={(txid) => verifyTopicPurchaseBchPayment(topicPurchaseId, txid)}
+                isForSale={Boolean(topic?.is_for_sale)}
+                bchDirectAvailable={Boolean(topic?.bch_direct_available)}
                 onPaid={handleTopicPaymentComplete}
-            />
-            <MoneroPaymentModal
-                open={showMoneroModal}
-                onClose={() => setShowMoneroModal(false)}
-                title={topic?.title}
-                priceUsd={topic?.reference_price}
-                productLabel="consultas del tema"
             />
         </Box>
     );
