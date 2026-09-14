@@ -13,7 +13,7 @@ import VerifiedIcon from '@mui/icons-material/Verified';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
-import AnchorPaymentCheckout from './AnchorPaymentCheckout';
+import AnchorCheckout from '../payments/adapters/AnchorCheckout';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
 const REQUEST_STATUS_LABELS = {
@@ -262,7 +262,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
         )}
       </Paper>
 
-      <AnchorPaymentCheckout
+      <AnchorCheckout
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         anchorRequestId={payRequestId}

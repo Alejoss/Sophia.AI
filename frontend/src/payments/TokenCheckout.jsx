@@ -4,7 +4,11 @@ import {
   createTokenPurchaseBchPayment,
   verifyTokenPurchaseBchPayment,
 } from '../api/paymentsApi';
+import { PRODUCT_KINDS } from './productCatalog';
 
+/**
+ * Token-package checkout adapter.
+ */
 const TokenCheckout = ({ checkout, onClose, onPaid }) => {
   const lastCheckout = useRef(checkout);
   if (checkout) lastCheckout.current = checkout;
@@ -16,10 +20,8 @@ const TokenCheckout = ({ checkout, onClose, onPaid }) => {
       onClose={onClose}
       title={active?.title || 'Paquete de tokens'}
       priceUsd={active?.priceUsd || 0}
-      productLabel="paquete de tokens"
-      offerNowpayments
-      offerBch
-      offerMonero={false}
+      productKind={PRODUCT_KINDS.TOKEN_PACKAGE}
+      productFlags={{}}
       createBchPayment={
         active
           ? () => createTokenPurchaseBchPayment(active.purchaseId)
@@ -30,7 +32,11 @@ const TokenCheckout = ({ checkout, onClose, onPaid }) => {
           ? (txid) => verifyTokenPurchaseBchPayment(active.purchaseId, txid)
           : undefined
       }
-      nowpaymentsProps={{ tokenPurchaseId: active?.purchaseId }}
+      paymentTarget={
+        active?.purchaseId != null
+          ? { kind: PRODUCT_KINDS.TOKEN_PACKAGE, purchaseId: active.purchaseId }
+          : undefined
+      }
       onPaid={onPaid}
     />
   );

@@ -27,7 +27,7 @@ vi.mock('react', async () => {
   };
 });
 
-vi.mock('../AnchorPaymentCheckout', () => ({
+vi.mock('../../payments/adapters/AnchorCheckout', () => ({
   default: () => null,
 }));
 
