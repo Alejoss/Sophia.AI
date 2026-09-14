@@ -219,6 +219,8 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 # BCH_RECEIVE_ADDRESS_MAINNET=bitcoincash:q...
 # Or a single fallback for the active network:
 # BCH_RECEIVE_ADDRESS=bchtest:q...
+# WIF for the receive address (ops only — `manage.py withdraw_bch`, never HTTP):
+# BCH_PRIVATE_KEY_WIF=
 
 # Optional overrides (defaults: Fulcrum Electrum pool for mainnet + chipnet):
 # BCH_API_BASE=ssl://bch.imaginary.cash:50002
@@ -243,6 +245,31 @@ El método aparece en el checkout solo si hay dirección para la red activa
 coincide con la red se registra como warning; la verificación fallará después.
 
 Referencia completa: [environment-variables.md](../deployment/environment-variables.md#bitcoin-cash-direct-anchor-request-payments).
+
+## Retirar fondos (sweep)
+
+El backend solo *recibe* BCH. Para mover monedas fuera de la dirección de cobro:
+
+1. Pon el WIF de esa dirección en el servidor como `BCH_PRIVATE_KEY_WIF`
+   (mismo `.env` de producción; no lo subas a git).
+2. Dry-run (firma la tx pero no la publica):
+
+```bash
+cd acbc_app && . .venv/bin/activate
+python manage.py withdraw_bch --to bitcoincash:qTU_WALLET... --sweep
+```
+
+3. Si el resumen (red, from, balance) es correcto, broadcast:
+
+```bash
+python manage.py withdraw_bch --to bitcoincash:qTU_WALLET... --sweep --broadcast --yes
+```
+
+El comando comprueba que el WIF derive exactamente `BCH_RECEIVE_ADDRESS*`.
+Envío parcial: `--amount-sats N` (el cambio vuelve a la dirección de cobro).
+
+Recomendación: después del sweep, usa un wallet que controles para custodiar los
+fondos. No hace falta dejar el WIF en el servidor a largo plazo.
 
 ## API
 
@@ -303,6 +330,7 @@ verificar**, no crear la orden.
 - Modelo: `payments.BchDirectPayment`
 - Cliente: `payments/bch_client.py` (`build_bch_client()` → Electrum SSL por defecto; Blockchair HTTP si se fuerza)
 - CashAddr → scripthash: `payments/bch_cashaddr.py`
+- Sweep ops: `payments/bch_withdraw.py` + `manage.py withdraw_bch`
 - Servicios: `payments/bch_services.py`
   - `verify_bch_payment` → auto `list_recent_transactions` o fallback `get_transaction(txid)`
   - `_fulfill_bch_payment` → `pending` / `expired` / `cancelled` → `paid`
