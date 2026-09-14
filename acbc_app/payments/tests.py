@@ -759,6 +759,50 @@ class AnchorRequestAutoBroadcastTests(TestCase):
         self.assertIsNone(result.anchor_id)
 
 
+    def test_fulfill_lock_uses_of_self_with_transcript_select_related(self):
+        """Regression for Postgres: FOR UPDATE + LEFT OUTER JOIN on transcript."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from content.anchor_request_service import fulfill_paid_anchor_request
+        from content.models import TranscriptAnchor
+
+        self.req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+        self.req.save(update_fields=['status', 'updated_at'])
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+
+        def _broadcast(a, *, dry_run=False):
+            a.status = TranscriptAnchor.STATUS_BTC_BROADCAST
+            a.btc_txid = 'cd' * 32
+            a.save(update_fields=['status', 'btc_txid', 'updated_at'])
+            return a
+
+        with patch(
+            'content.anchor_request_service.ensure_pending_anchor',
+            return_value=anchor,
+        ), patch(
+            'content.anchor_request_service.broadcast_anchor',
+            side_effect=_broadcast,
+        ):
+            with CaptureQueriesContext(connection) as ctx:
+                result = fulfill_paid_anchor_request(self.req, raise_on_defer=False)
+
+        lock_sql = next(
+            (q['sql'] for q in ctx.captured_queries if 'FOR UPDATE' in q['sql'].upper()),
+            '',
+        )
+        if lock_sql:
+            self.assertIn('FOR UPDATE OF', lock_sql.upper())
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_APPROVED)
+
 
 @override_settings(
     ANCHOR_REQUEST_PRICE_USD=1,
@@ -768,7 +812,6 @@ class AnchorRequestAutoBroadcastTests(TestCase):
     BCH_MIN_CONFIRMATIONS=0,
     BCH_PAYMENT_TTL_MINUTES=30,
 )
-
 class BchDirectPaymentTests(TestCase):
     def setUp(self):
         self.user = UserFactory()
