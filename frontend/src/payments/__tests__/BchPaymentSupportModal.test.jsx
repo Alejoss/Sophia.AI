@@ -7,6 +7,8 @@ import {
   BCH_SUPPORT_DESCRIPTION,
   PAYMENT_SUPPORT_USER_ID,
   buildBchVerifyHelpMessage,
+  buildAnchorFulfillDeferredHelpMessage,
+  ANCHOR_FULFILL_DEFERRED_DESCRIPTION,
 } from '../bchPaymentSupport';
 
 const mockNavigate = vi.fn();
@@ -139,4 +141,43 @@ describe('BchPaymentSupportModal', () => {
     expect(mockReportBchOrderTxid).not.toHaveBeenCalled();
     expect(mockFetchOrCreateThread).not.toHaveBeenCalled();
   });
+
+
+
+
+  it('allows contacting support without TXID when fulfill is deferred', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderWithProviders(
+      <BchPaymentSupportModal
+        open
+        onClose={onClose}
+        title="Transcripción demo"
+        priceUsd={1}
+        productLabel="anclaje a Bitcoin"
+        mode="fulfill_deferred"
+        reviewNote="Insufficient funds for fee"
+        requestId={2}
+        paymentMethod="bch"
+        bchOrder={sampleOrder}
+      />,
+    );
+
+    expect(screen.getByText(/Pago recibido — contactar soporte/i)).toBeInTheDocument();
+    expect(screen.getByText(ANCHOR_FULFILL_DEFERRED_DESCRIPTION)).toBeInTheDocument();
+    expect(screen.getByText(/Insufficient funds for fee/i)).toBeInTheDocument();
+    const sendBtn = screen.getByRole('button', { name: /^Contactar soporte$/i });
+    expect(sendBtn).toBeEnabled();
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(mockSendMessage).toHaveBeenCalled();
+    });
+    expect(mockReportBchOrderTxid).not.toHaveBeenCalled();
+    const sent = mockSendMessage.mock.calls[0][1];
+    expect(sent).toContain('Solicitud de anclaje #2');
+    expect(sent).toMatch(/No quiero volver a pagar/i);
+    expect(onClose).toHaveBeenCalled();
+  });
+
 });

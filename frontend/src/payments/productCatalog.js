@@ -67,8 +67,14 @@ export const PRODUCT_CATALOG = Object.freeze({
     kind: PRODUCT_KINDS.ANCHOR,
     productLabel: 'anclaje a Bitcoin',
     chooserTitle: 'Elige cómo pagar',
-    paidSuccessMessage: '¡Pago recibido! Anclando el hash a Bitcoin…',
-    tokenPaidSuccessMessage: '¡Pago con tokens recibido! Anclando el hash a Bitcoin…',
+    paidSuccessMessage: '¡Pago recibido! El hash quedó anclado a Bitcoin.',
+    tokenPaidSuccessMessage: '¡Pago con tokens recibido! El hash quedó anclado a Bitcoin.',
+    paidDeferredMessage:
+      'Pago confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
+      + 'No vuelvas a pagar — contacta soporte para completarlo.',
+    tokenPaidDeferredMessage:
+      'Pago con tokens confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
+      + 'No vuelvas a pagar — contacta soporte para completarlo.',
     methods: Object.freeze({
       nowpayments: 'gateway',
       bch: 'gateway',

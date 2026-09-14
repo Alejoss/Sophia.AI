@@ -187,4 +187,57 @@ describe('ProductPaymentCheckout method switch', () => {
     expect(screen.getAllByLabelText(/ID de transacción/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Revisaremos el pago manualmente/i)).toBeInTheDocument();
   });
+
+
+
+
+
+  it('shows a warning and support CTA when BCH payment is confirmed but anchor fulfill is deferred', async () => {
+    const user = userEvent.setup();
+    mockVerifyBch.mockResolvedValue({
+      payment: {
+        id: 12,
+        address: 'bitcoincash:qptestaddress',
+        expected_amount_bch: '0.00442400',
+        expected_amount_sats: 442400,
+        usd_amount: 1,
+        status: 'paid',
+      },
+      request: {
+        id: 2,
+        status: 'paid_pending_review',
+        review_note: 'Insufficient funds for fee',
+      },
+    });
+
+    renderWithProviders(
+      <ProductPaymentCheckout
+        open
+        onClose={vi.fn()}
+        title="Transcripción demo"
+        priceUsd={1}
+        productKind="anchor"
+        offerBch
+        createBchPayment={mockCreateBch}
+        verifyBchPayment={mockVerifyBch}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /Bitcoin Cash directo/i }));
+    expect(await screen.findByRole('button', { name: /Ya realicé el pago/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Ya realicé el pago/i }));
+
+    expect(
+      await screen.findByText(/no se emitió automáticamente/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Insufficient funds for fee/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Contactar soporte/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Contactar soporte/i }));
+    expect(
+      await screen.findByText(/Pago recibido — contactar soporte/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Contactar soporte$/i })).toBeEnabled();
+  });
+
 });

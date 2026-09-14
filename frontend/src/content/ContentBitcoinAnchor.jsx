@@ -14,6 +14,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import AnchorCheckout from '../payments/adapters/AnchorCheckout';
+import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
 const REQUEST_STATUS_LABELS = {
@@ -38,6 +39,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const [priceUsd, setPriceUsd] = useState(1);
   const [priceTokens, setPriceTokens] = useState(100);
   const [tokenBalance, setTokenBalance] = useState(0);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const loadAnchor = useCallback(async () => {
     if (!contentId) {
@@ -204,10 +206,30 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           </Alert>
         )}
 
-        {reqStatus === 'paid_pending_review' && (
-          <Alert severity="info" sx={{ mb: 1.5 }}>
+                {reqStatus === 'paid_pending_review' && (
+          <Alert severity={isMine ? 'warning' : 'info'} sx={{ mb: 1.5 }}>
             {isMine
-              ? 'Pago recibido. Estamos anclando el hash a Bitcoin; esto puede tardar un momento si la red está congestionada.'
+              ? (
+                <>
+                  Pago confirmado, pero el anclaje a Bitcoin aún no se emitió automáticamente.
+                  No vuelvas a pagar.
+                  {req?.review_note ? (
+                    <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                      Detalle: {req.review_note}
+                    </Box>
+                  ) : null}
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="inherit"
+                      onClick={() => setSupportOpen(true)}
+                    >
+                      Contactar soporte
+                    </Button>
+                  </Box>
+                </>
+              )
               : 'Ya hay un anclaje en curso para este hash.'}
           </Alert>
         )}
@@ -277,6 +299,17 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           await loadRequest();
           await loadAnchor();
         }}
+      />
+
+      <BchPaymentSupportModal
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        title={contentTitle || `Contenido ${contentId}`}
+        priceUsd={priceUsd}
+        productLabel="anclaje a Bitcoin"
+        mode="fulfill_deferred"
+        reviewNote={req?.review_note || ''}
+        requestId={req?.id ?? null}
       />
     </>
   );

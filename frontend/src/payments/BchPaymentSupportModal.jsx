@@ -18,8 +18,10 @@ import { useAuth } from '../context/AuthContext';
 import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import { reportBchOrderTxid } from '../api/paymentsApi';
 import {
+  ANCHOR_FULFILL_DEFERRED_DESCRIPTION,
   BCH_SUPPORT_DESCRIPTION,
   PAYMENT_SUPPORT_USER_ID,
+  buildAnchorFulfillDeferredHelpMessage,
   buildBchVerifyHelpMessage,
   isLikelyBchTxid,
   normalizeBchTxid,
@@ -44,7 +46,12 @@ const BchPaymentSupportModal = ({
   productLabel = 'producto',
   bchOrder = null,
   verifyError = null,
+  mode = 'verify_failed',
+  reviewNote = '',
+  requestId = null,
+  paymentMethod = '',
 }) => {
+  const isFulfillDeferred = mode === 'fulfill_deferred';
   const navigate = useNavigate();
   const { authState } = useAuth();
   const currentUser = authState?.user;
@@ -66,8 +73,14 @@ const BchPaymentSupportModal = ({
 
   const handleSend = async () => {
     const cleanTxid = normalizeBchTxid(txid);
-    if (!cleanTxid || busy || isSelf) return;
-    if (!isLikelyBchTxid(cleanTxid)) {
+    if (busy || isSelf) return;
+    if (!isFulfillDeferred) {
+      if (!cleanTxid) return;
+      if (!isLikelyBchTxid(cleanTxid)) {
+        setError('El ID de transacción debe tener 64 caracteres hexadecimales.');
+        return;
+      }
+    } else if (cleanTxid && !isLikelyBchTxid(cleanTxid)) {
       setError('El ID de transacción debe tener 64 caracteres hexadecimales.');
       return;
     }
@@ -75,7 +88,7 @@ const BchPaymentSupportModal = ({
     setBusy(true);
     setError(null);
     try {
-      if (bchOrder?.id != null) {
+      if (bchOrder?.id != null && cleanTxid) {
         await reportBchOrderTxid(bchOrder.id, { txid: cleanTxid, note });
       }
       const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
@@ -83,9 +96,18 @@ const BchPaymentSupportModal = ({
       if (!thread?.id) {
         throw new Error('No se pudo abrir la conversación');
       }
-      await sendMessage(
-        thread.id,
-        buildBchVerifyHelpMessage({
+      const message = isFulfillDeferred
+        ? buildAnchorFulfillDeferredHelpMessage({
+          title,
+          priceUsd,
+          productLabel,
+          bchOrder,
+          reviewNote,
+          requestId,
+          note,
+          paymentMethod,
+        })
+        : buildBchVerifyHelpMessage({
           title,
           priceUsd,
           productLabel,
@@ -93,8 +115,8 @@ const BchPaymentSupportModal = ({
           error: verifyError,
           txid: cleanTxid,
           note,
-        }),
-      );
+        });
+      await sendMessage(thread.id, message);
       onClose?.();
       navigate(`/messages/thread/${PAYMENT_SUPPORT_USER_ID}`);
     } catch (err) {
@@ -109,7 +131,9 @@ const BchPaymentSupportModal = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pr: 6 }}>
-        Ya pagué — avisar a soporte
+        {isFulfillDeferred
+          ? 'Pago recibido — contactar soporte'
+          : 'Ya pagué — avisar a soporte'}
         <IconButton
           aria-label="Cerrar"
           onClick={onClose}
@@ -126,8 +150,17 @@ const BchPaymentSupportModal = ({
               {priceUsd != null ? ` · $${Number(priceUsd || 0).toFixed(2)} USD` : ''}
             </Typography>
           )}
-          <Alert severity="info">{BCH_SUPPORT_DESCRIPTION}</Alert>
-          {verifyError && <Alert severity="warning">{verifyError}</Alert>}
+          <Alert severity="info">
+            {isFulfillDeferred
+              ? ANCHOR_FULFILL_DEFERRED_DESCRIPTION
+              : BCH_SUPPORT_DESCRIPTION}
+          </Alert>
+          {!isFulfillDeferred && verifyError && (
+            <Alert severity="warning">{verifyError}</Alert>
+          )}
+          {isFulfillDeferred && reviewNote && (
+            <Alert severity="warning">{reviewNote}</Alert>
+          )}
           {bchOrder?.address && (
             <Typography variant="body2" color="text.secondary">
               Orden {bchOrder.id != null ? `#${bchOrder.id} · ` : ''}
@@ -147,14 +180,18 @@ const BchPaymentSupportModal = ({
           )}
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
-            label="ID de transacción (TXID)"
+            label={isFulfillDeferred
+              ? 'ID de transacción (TXID) — opcional'
+              : 'ID de transacción (TXID)'}
             value={txid}
             onChange={(event) => setTxid(event.target.value)}
             placeholder="64 caracteres hexadecimales"
             fullWidth
-            required
+            required={!isFulfillDeferred}
             disabled={busy || isSelf}
-            helperText="Cópialo desde tu billetera o explorador BCH después de enviar el pago."
+            helperText={isFulfillDeferred
+              ? 'Opcional si el pago ya quedó confirmado. Útil si tienes el TXID a mano.'
+              : 'Cópialo desde tu billetera o explorador BCH después de enviar el pago.'}
             inputProps={{ spellCheck: false, autoComplete: 'off' }}
           />
           <TextField
@@ -173,11 +210,13 @@ const BchPaymentSupportModal = ({
         <Button
           variant="contained"
           fullWidth
-          disabled={busy || isSelf || !normalizeBchTxid(txid)}
+          disabled={busy || isSelf || (!isFulfillDeferred && !normalizeBchTxid(txid))}
           onClick={handleSend}
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {busy ? 'Enviando...' : 'Enviar TXID a soporte'}
+          {busy
+            ? 'Enviando...'
+            : (isFulfillDeferred ? 'Contactar soporte' : 'Enviar TXID a soporte')}
         </Button>
         {onBackToOrder && (
           <Button onClick={onBackToOrder} fullWidth disabled={busy}>
