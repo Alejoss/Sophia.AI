@@ -20,7 +20,7 @@ from payments.bch_services import (
     get_bch_payment_product_meta,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment, TokenLedgerEntry, TokenPackage
+from payments.models import BchDirectPayment, CryptoPayment, TokenLedgerEntry, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
     create_anchor_request_payment,
@@ -2069,3 +2069,34 @@ class TokenPackagePurchaseTests(TestCase):
         mark_token_purchase_paid(purchase, source='test')
         self.buyer.profile.refresh_from_db()
         self.assertEqual(self.buyer.profile.token_balance, 850)
+
+    def test_buyer_can_cancel_pending_purchase(self):
+        from payments.models import BchDirectPayment
+        from payments.services import cancel_token_purchase
+
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            token_purchase=purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+
+        self.api.force_authenticate(user=self.buyer)
+        response = self.api.post(f'/api/payments/token-purchase/{purchase.id}/cancel/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['payment_status'], 'CANCELLED')
+
+        purchase.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(purchase.payment_status, TokenPurchase.STATUS_CANCELLED)
+        self.assertEqual(order.status, BchDirectPayment.STATUS_CANCELLED)
+
+        again = cancel_token_purchase(token_purchase=purchase, user=self.buyer)
+        self.assertEqual(again.payment_status, TokenPurchase.STATUS_CANCELLED)
+
+        self.api.force_authenticate(user=self.other)
+        denied = self.api.post(f'/api/payments/token-purchase/{purchase.id}/cancel/')
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)

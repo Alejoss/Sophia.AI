@@ -1,14 +1,16 @@
 ﻿import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProfileTokens from '../ProfileTokens';
 import { renderWithProviders } from '../../test/formTestUtils';
 
 const mockListPurchases = vi.fn();
+const mockCancelPurchase = vi.fn();
 const mockOnBalanceChange = vi.fn();
 
 vi.mock('../../api/paymentsApi', () => ({
   listTokenPurchases: (...args) => mockListPurchases(...args),
+  cancelTokenPurchase: (...args) => mockCancelPurchase(...args),
   createTokenPurchaseBchPayment: vi.fn(),
   verifyTokenPurchaseBchPayment: vi.fn(),
 }));
@@ -58,5 +60,41 @@ describe('ProfileTokens', () => {
 
     await user.click(screen.getByRole('button', { name: /continuar pago/i }));
     expect(await screen.findByText(/checkout abierto: 300 tokens/i)).toBeInTheDocument();
+  });
+
+  it('cancels a pending purchase from activity', async () => {
+    mockListPurchases.mockResolvedValue([
+      {
+        id: 12,
+        package_id: 1,
+        package_name: '300 tokens',
+        token_amount: 300,
+        bonus_tokens: 0,
+        total_tokens: 300,
+        usd_price: '3.00',
+        payment_status: 'PENDING',
+      },
+    ]);
+    mockCancelPurchase.mockResolvedValue({
+      id: 12,
+      package_id: 1,
+      package_name: '300 tokens',
+      token_amount: 300,
+      bonus_tokens: 0,
+      total_tokens: 300,
+      usd_price: '3.00',
+      payment_status: 'CANCELLED',
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ProfileTokens tokenBalance={0} onBalanceChange={mockOnBalanceChange} />);
+
+    await user.click(await screen.findByRole('button', { name: /cancelar orden/i }));
+
+    await waitFor(() => {
+      expect(mockCancelPurchase).toHaveBeenCalledWith(12);
+    });
+    expect(await screen.findByText(/orden cancelada/i)).toBeInTheDocument();
+    expect(screen.getByText('Cancelada')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continuar pago/i })).not.toBeInTheDocument();
   });
 });
