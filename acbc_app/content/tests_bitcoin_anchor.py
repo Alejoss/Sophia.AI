@@ -96,6 +96,11 @@ class AnchorBroadcastServiceTests(TestCase):
         a2 = ensure_pending_anchor(self.content, network='signet')
         self.assertEqual(a1.pk, a2.pk)
         self.assertEqual(a1.text_hash, self.transcript.text_hash)
+        self.assertTrue(a1.certified_plain_text)
+        self.assertEqual(
+            a1.certified_plain_text,
+            self.transcript.processed_plain.strip(),
+        )
         self.assertTrue(a1.btc_op_return_hex.startswith(b'ACBC1'.hex()))
 
     @override_settings()

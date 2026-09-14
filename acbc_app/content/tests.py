@@ -5230,6 +5230,58 @@ class ContentTranscriptPublicAPITests(APITestCase):
         self.assertEqual(response.data['segment_count'], 2)
         self.assertEqual(len(response.data['segments']), 2)
 
+
+    def test_get_transcript_text_matches_text_hash_exactly(self):
+        """Public ``text`` is the normalized string that produces ``text_hash``."""
+        import hashlib
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='  Hola,\n\nmundo   con   espacios  ',
+            language='es',
+        )
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        text = response.data['text']
+        self.assertEqual(text, 'Hola, mundo con espacios')
+        self.assertEqual(
+            hashlib.sha256(text.encode('utf-8')).hexdigest(),
+            response.data['text_hash'],
+        )
+        self.assertEqual(response.data['text_length'], len(text))
+
+    def test_get_transcript_prefers_anchor_certified_plain_text(self):
+        from content.models import TranscriptAnchor
+        from content.transcript_utils import compute_text_hash
+
+        certified = 'Texto certificado exacto para el ancla.'
+        transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=certified,
+            language='es',
+        )
+        TranscriptAnchor.objects.create(
+            content=self.video,
+            text_hash=transcript.text_hash,
+            text_length=transcript.text_length,
+            certified_plain_text=certified,
+            status=TranscriptAnchor.STATUS_ANCHORED,
+            btc_network=TranscriptAnchor.BTC_NETWORK_SIGNET,
+            btc_txid='ab' * 32,
+        )
+        # Re-ingest with different whitespace but same normalized hash.
+        transcript.processed_plain = 'Texto   certificado\nexacto para el ancla.'
+        transcript.save()
+        self.assertEqual(transcript.text_hash, compute_text_hash(certified))
+
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text'], certified)
+
     def test_get_transcript_404_when_missing(self):
         response = self.client.get(
             f'/api/content/content_details/{self.video.id}/transcript/',
