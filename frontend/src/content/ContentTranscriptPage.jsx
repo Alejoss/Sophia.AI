@@ -213,6 +213,12 @@ const ContentTranscriptPage = () => {
           )}
         </Box>
 
+        {!error && (
+          <Box sx={{ mb: 2 }}>
+            <ContentBitcoinAnchor contentId={contentId} contentTitle={title} />
+          </Box>
+        )}
+
         {error && (
           <Typography color="error" sx={{ py: 4 }}>
             {error}
@@ -297,10 +303,6 @@ const ContentTranscriptPage = () => {
         )}
 
       </Paper>
-
-      {!error && (
-        <ContentBitcoinAnchor contentId={contentId} contentTitle={title} />
-      )}
     </Container>
   );
 };

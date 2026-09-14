@@ -69,7 +69,8 @@ describe('ContentBitcoinAnchor', () => {
       expect(contentApi.getTranscriptAnchor).toHaveBeenCalledWith(3);
     });
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByRole('button', { name: /solicitar anclaje a bitcoin/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /anclar a bitcoin/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /solicitar anclaje/i })).not.toBeInTheDocument();
   });
 
   it('shows hash, txid and mempool link when anchored', async () => {

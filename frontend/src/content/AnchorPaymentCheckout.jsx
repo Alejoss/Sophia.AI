@@ -319,7 +319,7 @@ const AnchorPaymentCheckout = ({
           )}
           {paidReview ? (
             <Alert severity="success">
-              ¡Pago con tokens recibido! Tu solicitud de anclaje a Bitcoin está en revisión.
+              ¡Pago con tokens recibido! Anclando el hash a Bitcoin…
             </Alert>
           ) : (
             <Stack spacing={1.5}>
@@ -368,7 +368,7 @@ const AnchorPaymentCheckout = ({
         <DialogTitle>Pago recibido</DialogTitle>
         <DialogContent>
           <Alert severity="success">
-            Tu solicitud de anclaje a Bitcoin está en revisión.
+            Anclando el hash a Bitcoin…
           </Alert>
         </DialogContent>
         <DialogActions>
@@ -439,7 +439,7 @@ const AnchorPaymentCheckout = ({
           )}
           {paidReview && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              ¡Pago recibido! Tu solicitud de anclaje a Bitcoin está en revisión.
+              ¡Pago recibido! Anclando el hash a Bitcoin…
             </Alert>
           )}
           {bchBusy && !bchOrder && (

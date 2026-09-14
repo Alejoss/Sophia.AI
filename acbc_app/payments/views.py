@@ -1343,5 +1343,7 @@ class TokenPurchaseBchVerifyView(APIView):
                 'payment_status': purchase.payment_status,
                 'is_paid': purchase.is_paid,
                 'token_amount': purchase.token_amount,
+                'bonus_tokens': purchase.bonus_tokens,
+                'total_tokens': purchase.total_tokens,
             },
         })

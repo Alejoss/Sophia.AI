@@ -78,7 +78,7 @@ Base path under content details:
 |--------|------|------|
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchor/` | Public (`AllowAny`). If status is `btc_broadcast`, polls Esplora once and may promote to `anchored`. |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated **staff** only. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
-| `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → admin review. |
+| `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → auto-broadcast. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated **staff** only (prepare pending row) |
 
@@ -88,7 +88,7 @@ Public paid requests use `TranscriptAnchorRequest` and a payment method chooser:
 - **NOWPayments** — `POST /api/payments/anchor-request/<id>/`
 - **BCH directo** — `POST /api/payments/anchor-request/<id>/bch/` + `.../bch/verify/` ([docs](../payments/bch-direct.md))
 
-After payment, status is `paid_pending_review`. Staff approve/reject in Django admin (**Content → Transcript anchor requests**). No automatic refunds.
+After payment succeeds, the platform hashes the current transcript (already snapshotted as `text_hash` on the request) and **automatically broadcasts** the OP_RETURN. Status becomes `approved` when a `btc_txid` is linked. If fees/funds block broadcast, status stays `paid_pending_review` for retry (admin action **Reintentar emisión** or ops CLI). Staff may still **reject** (no automatic refund).
 
 `POST .../anchors/` **only creates a pending row** (staff/ops).  
 `POST .../anchor/` **broadcasts** via the platform wallet (staff/ops). Uploaders and other users must use the **paid** `TranscriptAnchorRequest` flow ($1). The same USD fee cap applies to the ops CLI.

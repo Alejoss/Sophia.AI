@@ -18,13 +18,13 @@ import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
 const REQUEST_STATUS_LABELS = {
   pending_payment: 'Pago pendiente',
-  paid_pending_review: 'Pagada — en revisión',
-  approved: 'Aprobada',
+  paid_pending_review: 'Pago recibido — emitiendo anclaje',
+  approved: 'Anclada',
   rejected: 'Rechazada',
 };
 
 /**
- * Bitcoin OP_RETURN block + paid anchor request CTA (any authenticated user).
+ * Bitcoin OP_RETURN CTA: pay $1 then auto-hash + broadcast (no admin gate).
  */
 const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const { authState } = useContext(AuthContext);
@@ -81,7 +81,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
     };
   }, [loadAnchor, loadRequest]);
 
-  const handleStartRequest = async () => {
+  const handleStartAnchor = async () => {
     if (!contentId || requesting) return;
     setRequesting(true);
     setActionError(null);
@@ -91,11 +91,11 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       setCheckoutOpen(true);
       await loadRequest();
     } catch (err) {
-      const message =
+      setActionError(
         err?.response?.data?.error
         || err?.error
-        || 'No se pudo crear la solicitud de anclaje a Bitcoin.';
-      setActionError(message);
+        || 'No se pudo iniciar el anclaje a Bitcoin.',
+      );
     } finally {
       setRequesting(false);
     }
@@ -103,7 +103,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
 
   if (info === undefined) {
     return (
-      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
         <Typography variant="body2" color="text.secondary">
           Comprobando anclaje a Bitcoin…
@@ -121,7 +121,6 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const reqStatus = req?.status;
   const isMine = Boolean(requestInfo?.is_mine);
 
-  // No transcript → no request CTA (and nothing to show unless already on-chain).
   if (!hasTxid && !hasTranscript) {
     return null;
   }
@@ -138,7 +137,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
     };
 
     return (
-      <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 1 }}>
           <Chip
             size="small"
@@ -192,14 +191,13 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
     );
   }
 
-  const showRequestCta = isAuthenticated;
-  if (!showRequestCta && !actionError) {
+  if (!isAuthenticated && !actionError) {
     return null;
   }
 
   return (
     <>
-      <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         {actionError && (
           <Alert severity="warning" sx={{ mb: 1.5 }}>
             {actionError}
@@ -209,8 +207,8 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
         {reqStatus === 'paid_pending_review' && (
           <Alert severity="info" sx={{ mb: 1.5 }}>
             {isMine
-              ? 'Tu pago fue recibido. La solicitud de anclaje a Bitcoin está en revisión.'
-              : 'Ya hay una solicitud de anclaje a Bitcoin en revisión para este hash.'}
+              ? 'Pago recibido. Estamos anclando el hash a Bitcoin; esto puede tardar un momento si la red está congestionada.'
+              : 'Ya hay un anclaje en curso para este hash.'}
           </Alert>
         )}
 
@@ -232,7 +230,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
 
         {reqStatus === 'rejected' && isMine && (
           <Alert severity="warning" sx={{ mb: 1.5 }}>
-            Tu solicitud fue rechazada.
+            El anclaje fue rechazado.
             {req.review_note ? ` Motivo: ${req.review_note}` : ''}
           </Alert>
         )}
@@ -242,24 +240,24 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
-              Solicita el anclaje a Bitcoin del hash de esta transcripción por ${priceUsd} USD.
-              Un administrador revisará la solicitud antes de emitirla.
+              Ancla el hash SHA-256 de esta transcripción a Bitcoin por ${priceUsd} USD.
+              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente.
             </Typography>
             <Button
               variant="contained"
               size="small"
               disabled={requesting || (reqStatus === 'pending_payment' && !isMine)}
-              onClick={handleStartRequest}
+              onClick={handleStartAnchor}
               startIcon={requesting ? <CircularProgress size={14} color="inherit" /> : null}
             >
-              {requesting ? 'Creando…' : `Solicitar anclaje a Bitcoin ($${priceUsd})`}
+              {requesting ? 'Preparando…' : `Anclar a Bitcoin ($${priceUsd})`}
             </Button>
           </Box>
         )}
 
         {!isAuthenticated && (
           <Typography variant="body2" color="text.secondary">
-            Inicia sesión para solicitar el anclaje a Bitcoin de esta transcripción.
+            Inicia sesión para anclar esta transcripción a Bitcoin.
           </Typography>
         )}
       </Paper>
