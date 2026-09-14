@@ -33,6 +33,7 @@ from payments.serializers import (
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
+    cancel_token_purchase,
     create_anchor_request_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
@@ -1192,6 +1193,36 @@ class TokenPurchaseListCreateView(APIView):
                 exc, action='create_token_purchase', package_id=package_id, user_id=request.user.id,
             )
         return Response(TokenPurchaseSerializer(purchase).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchaseCancelView(APIView):
+    """Buyer cancels a pending token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            purchase = cancel_token_purchase(token_purchase=purchase, user=request.user)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='cancel_token_purchase', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='cancel_token_purchase', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='cancel_token_purchase',
+                public_message='No se pudo cancelar la orden. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(TokenPurchaseSerializer(purchase).data)
 
 
 class TokenPurchasePaymentView(APIView):

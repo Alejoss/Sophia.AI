@@ -92,10 +92,13 @@ class ContentTranscriptAnchorListView(APIView):
         create.is_valid(raise_exception=True)
         data = create.validated_data
 
+        from content.transcript_utils import resolve_certified_plain_text
+
         anchor = TranscriptAnchor(
             content=content,
             text_hash=transcript.text_hash,
             text_length=transcript.text_length,
+            certified_plain_text=resolve_certified_plain_text(transcript),
             op_return_prefix=data.get(
                 'op_return_prefix',
                 TranscriptAnchor.DEFAULT_OP_RETURN_PREFIX,

@@ -321,10 +321,15 @@ class TokenPackage(models.Model):
 class TokenPurchase(models.Model):
     """A user's attempt to buy a token package. Repeatable (same package many times)."""
 
+    STATUS_PENDING = 'PENDING'
+    STATUS_PAID = 'PAID'
+    STATUS_CANCELLED = 'CANCELLED'
+    STATUS_REFUNDED = 'REFUNDED'
     PAYMENT_STATUS_CHOICES = (
-        ('PENDING', 'Pending'),
-        ('PAID', 'Paid'),
-        ('REFUNDED', 'Refunded'),
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_REFUNDED, 'Refunded'),
     )
 
     user = models.ForeignKey(
@@ -349,7 +354,7 @@ class TokenPurchase(models.Model):
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
-        default='PENDING',
+        default=STATUS_PENDING,
         db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -367,7 +372,7 @@ class TokenPurchase(models.Model):
 
     @property
     def is_paid(self):
-        return self.payment_status == 'PAID'
+        return self.payment_status == self.STATUS_PAID
 
 
 class TokenLedgerEntry(models.Model):

@@ -16,7 +16,14 @@ import {
   formatApiError,
   purchaseStatusLabel,
 } from '../payments/tokenPackages';
-import { listTokenPurchases } from '../api/paymentsApi';
+import { cancelTokenPurchase, listTokenPurchases } from '../api/paymentsApi';
+
+const statusChipColor = (status) => {
+  if (status === 'PAID') return 'success';
+  if (status === 'CANCELLED') return 'default';
+  if (status === 'REFUNDED') return 'info';
+  return 'warning';
+};
 
 const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
   const [purchases, setPurchases] = useState([]);
@@ -24,6 +31,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [checkout, setCheckout] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
 
   const load = useCallback(async () => {
     const purchaseRows = await listTokenPurchases();
@@ -59,6 +67,21 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
     }
   };
 
+  const handleCancel = async (purchase) => {
+    setCancellingId(purchase.id);
+    setError(null);
+    try {
+      const updated = await cancelTokenPurchase(purchase.id);
+      setPurchases((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      if (checkout?.purchaseId === purchase.id) setCheckout(null);
+      setSuccess('Orden cancelada.');
+    } catch (err) {
+      setError(formatApiError(err, 'No se pudo cancelar la orden.'));
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   const balance = Number(tokenBalance || 0);
   const pending = purchases.filter((row) => row.payment_status === 'PENDING');
 
@@ -87,7 +110,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
           Créditos internos de Academia Blockchain. No son una criptomoneda.
-          1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento, 
+          1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento,
           eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin.
         </Typography>
         <Box>
@@ -130,7 +153,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
 
       {pending.length > 0 && (
         <Alert severity="warning" sx={{ mb: 3 }}>
-          Tienes un pago pendiente. Puedes continuarlo aquí o desde la página de compra.
+          Tienes un pago pendiente. Puedes continuarlo aquí, cancelarlo, o seguir desde la página de compra.
         </Alert>
       )}
 
@@ -169,17 +192,27 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
               </Box>
               <Chip
                 size="small"
-                color={row.payment_status === 'PAID' ? 'success' : 'warning'}
+                color={statusChipColor(row.payment_status)}
                 label={purchaseStatusLabel(row.payment_status)}
               />
               {row.payment_status === 'PENDING' && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setCheckout(checkoutFromPurchase(row))}
-                >
-                  Continuar pago
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setCheckout(checkoutFromPurchase(row))}
+                  >
+                    Continuar pago
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    disabled={cancellingId === row.id}
+                    onClick={() => handleCancel(row)}
+                  >
+                    {cancellingId === row.id ? 'Cancelando…' : 'Cancelar orden'}
+                  </Button>
+                </Stack>
               )}
             </Box>
           ))}

@@ -45,11 +45,7 @@ import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
-import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
-import {
-  createPathPurchaseBchPayment,
-  verifyPathPurchaseBchPayment,
-} from '../api/paymentsApi';
+import PathCheckout from '../payments/adapters/PathCheckout';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
@@ -930,18 +926,14 @@ const KnowledgePathDetail = () => {
         </Paper>
       )}
 
-      <ProductPaymentCheckout
+      <PathCheckout
         open={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
+        purchaseId={pathPurchaseId}
         title={knowledgePath?.title}
         priceUsd={knowledgePath?.reference_price}
-        productLabel="camino"
-        offerNowpayments={Boolean(knowledgePath?.is_for_sale)}
-        offerBch={Boolean(knowledgePath?.bch_direct_available)}
-        offerMonero={Boolean(knowledgePath?.is_for_sale)}
-        createBchPayment={() => createPathPurchaseBchPayment(pathPurchaseId)}
-        verifyBchPayment={(txid) => verifyPathPurchaseBchPayment(pathPurchaseId, txid)}
-        nowpaymentsProps={{ pathPurchaseId }}
+        isForSale={Boolean(knowledgePath?.is_for_sale)}
+        bchDirectAvailable={Boolean(knowledgePath?.bch_direct_available)}
         onPaid={handlePaymentComplete}
       />
     </Container>

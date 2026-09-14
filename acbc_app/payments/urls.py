@@ -35,6 +35,11 @@ urlpatterns = [
     path('token-packages/', views.TokenPackageListView.as_view(), name='token-packages'),
     path('token-purchases/', views.TokenPurchaseListCreateView.as_view(), name='token-purchases'),
     path(
+        'token-purchase/<int:purchase_id>/cancel/',
+        views.TokenPurchaseCancelView.as_view(),
+        name='token-purchase-cancel',
+    ),
+    path(
         'token-purchase/<int:purchase_id>/',
         views.TokenPurchasePaymentView.as_view(),
         name='token-purchase-payment-create',

@@ -274,6 +274,8 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise PermissionError('Solo el comprador puede iniciar el pago BCH.')
         if token_purchase.payment_status == 'PAID':
             raise BchPaymentError('Esta compra de tokens ya está pagada.')
+        if token_purchase.payment_status == 'CANCELLED':
+            raise BchPaymentError('Esta compra de tokens fue cancelada.')
         if token_purchase.usd_price <= 0 or token_purchase.token_amount <= 0:
             raise BchPaymentError('Este paquete de tokens no es válido.')
         _release_waiting_nowpayments(token_purchase=token_purchase)

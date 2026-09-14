@@ -194,6 +194,46 @@ def resolve_hash_source_text(transcript):
     return extract_obsidian_body(transcript.obsidian_markdown)
 
 
+def resolve_certified_plain_text(transcript):
+    """
+    Exact UTF-8 string whose SHA-256 is ``transcript.text_hash``.
+
+    Applies the same NFC + whitespace normalization used by ``compute_text_hash``.
+    Prefer this for public display / copy / verification so
+    ``sha256(utf8(text)) == text_hash`` without client-side re-normalization.
+    """
+    return normalize_plain_text_for_hash(resolve_hash_source_text(transcript))
+
+
+def resolve_public_transcript_text(transcript):
+    """
+    Text shown on public transcript pages.
+
+    Prefer a snapshotted ``TranscriptAnchor.certified_plain_text`` when an
+    anchor exists for the current ``text_hash`` (stable after re-ingest of
+    non-matching drafts). Otherwise return the live certified plain text.
+    """
+    current_hash = (getattr(transcript, 'text_hash', None) or '').strip()
+    if current_hash:
+        # Local import avoids circular import with models → transcript_utils.
+        from content.models import TranscriptAnchor
+
+        content_id = getattr(transcript, 'content_id', None)
+        if content_id:
+            certified = (
+                TranscriptAnchor.objects.filter(
+                    content_id=content_id,
+                    text_hash=current_hash,
+                )
+                .exclude(certified_plain_text='')
+                .values_list('certified_plain_text', flat=True)
+                .first()
+            )
+            if certified:
+                return certified
+    return resolve_certified_plain_text(transcript)
+
+
 def _bind_embedding_on_content(content, embedding):
     """Keep content.embedding from returning a stale in-memory reverse OneToOne."""
     cache = getattr(content._state, 'fields_cache', None)

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -21,17 +21,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PaymentsIcon from '@mui/icons-material/Payments';
-import {
-  createAnchorRequestPayment,
-  createPathPurchasePayment,
-  createRegistrationPayment,
-  createTokenPurchasePayment,
-  getPaymentStatus,
-  listAnchorRequestPayments,
-  listPathPurchasePayments,
-  listRegistrationPayments,
-  listTokenPurchasePayments,
-} from '../api/paymentsApi';
+import { getPaymentStatus } from '../api/paymentsApi';
+import { resolveNowpaymentsHandlers } from '../payments/nowpaymentsTarget';
+import { resolvePaymentTarget } from '../payments/productCatalog';
 
 const STATUS_LABELS = {
   waiting: 'Esperando pago',
@@ -67,17 +59,12 @@ const OPEN_PAYMENT_STATUSES = new Set([
 
 const MSG = {
   invoiceInfo:
-    'En NOWPayments podr\u00E1s elegir con qu\u00E9 criptomoneda pagar. '
-    + 'La pasarela acepta decenas de criptos (con un peque\u00F1o cargo por conversi\u00F3n).',
-  payAddress: 'Direcci\u00F3n de pago',
-  expired: 'Este pago expir\u00F3. Cierra y vuelve a intentarlo.',
-  confirming: 'Pago detectado en la red. Esperando confirmaci\u00F3n final...',
-  paidEvent: '\u00A1Pago completado! Tu inscripci\u00F3n est\u00E1 confirmada.',
-  paidPath: '\u00A1Pago completado! El camino ya est\u00E1 desbloqueado.',
-  paidAnchor:
-    '\u00A1Pago completado! Tu solicitud de anclaje a Bitcoin est\u00E1 en revisi\u00F3n.',
-  paidTokens: '\u00A1Pago completado! Los tokens ya est\u00E1n en tu perfil.',
-  polling: 'El estado se actualiza autom\u00E1ticamente cuando completes el pago en NOWPayments.',
+    'En NOWPayments podrás elegir con qué criptomoneda pagar. '
+    + 'La pasarela acepta decenas de criptos (con un pequeño cargo por conversión).',
+  payAddress: 'Dirección de pago',
+  expired: 'Este pago expiró. Cierra y vuelve a intentarlo.',
+  confirming: 'Pago detectado en la red. Esperando confirmación final...',
+  polling: 'El estado se actualiza automáticamente cuando completes el pago en NOWPayments.',
   initError: 'No se pudo iniciar el pago',
   copyError: 'No se pudo copiar al portapapeles',
   preparing: 'Preparando la pasarela de pago...',
@@ -108,9 +95,15 @@ const CopyField = ({ label, value, onCopy, copied }) => (
   </Paper>
 );
 
+/**
+ * NOWPayments invoice UI.
+ *
+ * Prefer `paymentTarget={{ kind, purchaseId }}`. Legacy ID props remain as shims.
+ */
 const CryptoPaymentModal = ({
   open,
   onClose,
+  paymentTarget,
   registrationId,
   pathPurchaseId,
   anchorRequestId,
@@ -128,25 +121,25 @@ const CryptoPaymentModal = ({
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedExtra, setCopiedExtra] = useState(false);
   const displayTitle = title || eventTitle;
-  const isPathCheckout = Boolean(pathPurchaseId);
-  const isAnchorCheckout = Boolean(anchorRequestId);
-  const isTokenCheckout = Boolean(tokenPurchaseId);
-  const entitlementId = tokenPurchaseId || anchorRequestId || pathPurchaseId || registrationId;
 
-  const listPayments = isTokenCheckout
-    ? listTokenPurchasePayments
-    : isAnchorCheckout
-      ? listAnchorRequestPayments
-      : isPathCheckout
-        ? listPathPurchasePayments
-        : listRegistrationPayments;
-  const createPayment = isTokenCheckout
-    ? createTokenPurchasePayment
-    : isAnchorCheckout
-      ? createAnchorRequestPayment
-      : isPathCheckout
-        ? createPathPurchasePayment
-        : createRegistrationPayment;
+  const resolvedTarget = resolvePaymentTarget({
+    paymentTarget,
+    tokenPurchaseId,
+    anchorRequestId,
+    pathPurchaseId,
+    registrationId,
+  });
+  const entitlementId = resolvedTarget?.purchaseId;
+  const targetKind = resolvedTarget?.kind;
+
+  const handlers = useMemo(
+    () => resolveNowpaymentsHandlers({
+      paymentTarget: targetKind && entitlementId != null
+        ? { kind: targetKind, purchaseId: entitlementId }
+        : undefined,
+    }),
+    [targetKind, entitlementId],
+  );
 
   const refreshPayment = useCallback(async (paymentId) => {
     const data = await getPaymentStatus(paymentId);
@@ -168,8 +161,12 @@ const CryptoPaymentModal = ({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !entitlementId) return undefined;
+    if (!open || !entitlementId || !handlers.listPayments || !handlers.createPayment) {
+      return undefined;
+    }
 
+    const listPayments = handlers.listPayments;
+    const createPayment = handlers.createPayment;
     let cancelled = false;
     const initCheckout = async () => {
       try {
@@ -200,7 +197,7 @@ const CryptoPaymentModal = ({
     return () => {
       cancelled = true;
     };
-  }, [open, entitlementId, isPathCheckout, isAnchorCheckout, refreshPayment]);
+  }, [open, entitlementId, targetKind, refreshPayment, handlers.listPayments, handlers.createPayment]);
 
   useEffect(() => {
     if (!open || !payment?.id || payment.is_paid) return undefined;
@@ -231,6 +228,7 @@ const CryptoPaymentModal = ({
   const busy = initializing;
   const hasInvoice = Boolean(payment?.invoice_url);
   const hasOnChainDetails = Boolean(payment?.pay_address);
+  const headerTitle = handlers.headerTitle || `Pago del ${productLabel}`;
   const handleDismiss = () => {
     if (onBackToMethods && !payment?.is_paid) {
       onBackToMethods();
@@ -270,11 +268,7 @@ const CryptoPaymentModal = ({
           <PaymentsIcon />
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              {isAnchorCheckout
-                ? 'Anclaje a Bitcoin'
-                : isPathCheckout
-                  ? 'Pago del camino'
-                  : `Pago del ${productLabel}`}
+              {headerTitle}
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
               {displayTitle}
@@ -366,13 +360,7 @@ const CryptoPaymentModal = ({
             )}
             {payment.is_paid && (
               <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
-                {isTokenCheckout
-                  ? MSG.paidTokens
-                  : isAnchorCheckout
-                    ? MSG.paidAnchor
-                    : isPathCheckout
-                      ? MSG.paidPath
-                      : MSG.paidEvent}
+                {handlers.successMessage}
               </Alert>
             )}
 

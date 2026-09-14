@@ -85,12 +85,13 @@ describe('ContentTranscriptPage', () => {
     expect(screen.getByRole('link', { name: /ver en mempool\.space/i })).toBeInTheDocument();
   });
 
-  it('shows timed segments by default when segments exist, with a view toggle', async () => {
+  it('defaults to continuous text (hash source) when segments exist, with a view toggle', async () => {
     const user = userEvent.setup();
     mockGetContentTranscript.mockResolvedValue({
       language: 'es',
       text: 'hola amigos del mundo',
       text_length: 21,
+      text_hash: 'aa'.repeat(32),
       segments: [
         { index: 0, start_ms: 0, text: 'hola amigos' },
         { index: 1, start_ms: 3000, text: 'del mundo' },
@@ -99,20 +100,21 @@ describe('ContentTranscriptPage', () => {
 
     renderWithProviders(<ContentTranscriptPage />);
 
-    expect(await screen.findByText('hola amigos')).toBeInTheDocument();
-    expect(screen.getByText('0:00')).toBeInTheDocument();
-    expect(screen.getByText('0:03')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /con tiempos/i })).toHaveAttribute(
+    expect(await screen.findByText('hola amigos del mundo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /texto continuo/i })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
+    expect(screen.getByText(/exactamente el que se usó para calcular/i)).toBeInTheDocument();
+    expect(screen.queryByText('0:00')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /texto continuo/i }));
+    await user.click(screen.getByRole('button', { name: /con tiempos/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText('0:00')).not.toBeInTheDocument();
+      expect(screen.getByText('0:00')).toBeInTheDocument();
     });
-    expect(screen.getByText('hola amigos del mundo')).toBeInTheDocument();
+    expect(screen.getByText('hola amigos')).toBeInTheDocument();
+    expect(screen.getByText('0:03')).toBeInTheDocument();
   });
 
   it('shows plain text without inventing timestamps when there are no segments', async () => {

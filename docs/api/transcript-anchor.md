@@ -177,6 +177,12 @@ before running these commands.
 
 ---
 
+The public transcript `GET .../transcript/` field `text` is the **exact**
+normalized UTF-8 string whose SHA-256 is `text_hash` (NFC + collapsed
+whitespace). Anchors also snapshot that string as `certified_plain_text`
+so verification stays stable if the live transcript is later re-ingested
+with equivalent whitespace.
+
 ## Verification (manual)
 
 1. Obtain transcript plain text and recompute SHA-256 (same normalization as

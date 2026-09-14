@@ -3,6 +3,7 @@ import uuid
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 
 from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
@@ -409,8 +410,8 @@ def mark_token_purchase_paid(token_purchase: TokenPurchase, *, source: str = '')
         purchase = TokenPurchase.objects.select_for_update().select_related('user').get(
             pk=token_purchase.pk,
         )
-        if purchase.payment_status != 'PAID':
-            purchase.payment_status = 'PAID'
+        if purchase.payment_status != TokenPurchase.STATUS_PAID:
+            purchase.payment_status = TokenPurchase.STATUS_PAID
             purchase.save(update_fields=['payment_status', 'updated_at'])
         credit_platform_tokens(
             user=purchase.user,
@@ -423,6 +424,43 @@ def mark_token_purchase_paid(token_purchase: TokenPurchase, *, source: str = '')
             purchase.pk,
             source or 'unknown',
             purchase.total_tokens,
+        )
+    return purchase
+
+
+def cancel_token_purchase(*, token_purchase: TokenPurchase, user) -> TokenPurchase:
+    """Buyer cancels a pending package purchase and abandons open crypto checkouts."""
+    if token_purchase.user_id != user.id:
+        raise PermissionError('Solo el comprador puede cancelar esta orden.')
+
+    with transaction.atomic():
+        purchase = TokenPurchase.objects.select_for_update().get(pk=token_purchase.pk)
+        if purchase.user_id != user.id:
+            raise PermissionError('Solo el comprador puede cancelar esta orden.')
+        if purchase.payment_status == TokenPurchase.STATUS_PAID:
+            raise ValueError('Esta compra ya está pagada y no se puede cancelar.')
+        if purchase.payment_status == TokenPurchase.STATUS_CANCELLED:
+            return purchase
+        if purchase.payment_status != TokenPurchase.STATUS_PENDING:
+            raise ValueError('Solo se pueden cancelar órdenes pendientes.')
+
+        purchase.payment_status = TokenPurchase.STATUS_CANCELLED
+        purchase.save(update_fields=['payment_status', 'updated_at'])
+
+        from payments.models import BchDirectPayment
+
+        BchDirectPayment.objects.filter(
+            token_purchase=purchase,
+            status=BchDirectPayment.STATUS_PENDING,
+        ).update(
+            status=BchDirectPayment.STATUS_CANCELLED,
+            updated_at=timezone.now(),
+        )
+        abandon_waiting_nowpayments(token_purchase=purchase)
+        logger.info(
+            'Token purchase %s cancelled by user_id=%s',
+            purchase.pk,
+            getattr(user, 'id', None),
         )
     return purchase
 
@@ -790,8 +828,12 @@ def create_token_purchase(*, package: TokenPackage, user) -> TokenPurchase:
 def create_token_purchase_payment(*, token_purchase: TokenPurchase, user, pay_currency=None) -> CryptoPayment:
     if token_purchase.user_id != user.id:
         raise PermissionError('Solo el comprador puede iniciar el pago.')
-    if token_purchase.payment_status == 'PAID':
+    if token_purchase.payment_status == TokenPurchase.STATUS_PAID:
         raise ValueError('Esta compra de tokens ya está pagada.')
+    if token_purchase.payment_status == TokenPurchase.STATUS_CANCELLED:
+        raise ValueError('Esta compra de tokens fue cancelada.')
+    if token_purchase.payment_status != TokenPurchase.STATUS_PENDING:
+        raise ValueError('Esta compra de tokens no admite pago.')
 
     client = NOWPaymentsClient()
     if not client.configured:

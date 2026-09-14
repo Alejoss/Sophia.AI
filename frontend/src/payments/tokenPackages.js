@@ -8,6 +8,7 @@ export const formatApiError = (err, fallback) => {
 export const purchaseStatusLabel = (status) => {
   if (status === 'PAID') return 'Pagado';
   if (status === 'PENDING') return 'Pendiente';
+  if (status === 'CANCELLED') return 'Cancelada';
   if (status === 'REFUNDED') return 'Reembolsado';
   return status;
 };

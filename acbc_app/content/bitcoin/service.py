@@ -17,6 +17,7 @@ from content.bitcoin.tx_builder import (
     private_key_from_wif,
 )
 from content.models import Content, ContentTranscript, TranscriptAnchor
+from content.transcript_utils import resolve_certified_plain_text
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +53,23 @@ def ensure_pending_anchor(
         raise AnchorBroadcastError('Transcript has no text_hash')
 
     network = (network or settings.BTC_NETWORK).lower()
+    certified_plain_text = resolve_certified_plain_text(transcript)
+
     existing = TranscriptAnchor.objects.filter(
         content=content,
         text_hash=transcript.text_hash,
     ).first()
     if existing is not None:
+        if not (existing.certified_plain_text or '').strip() and certified_plain_text:
+            existing.certified_plain_text = certified_plain_text
+            existing.save(update_fields=['certified_plain_text', 'updated_at'])
         return existing
 
     anchor = TranscriptAnchor(
         content=content,
         text_hash=transcript.text_hash,
         text_length=transcript.text_length,
+        certified_plain_text=certified_plain_text,
         btc_network=network,
         anchored_by=anchored_by,
         status=TranscriptAnchor.STATUS_PENDING,
