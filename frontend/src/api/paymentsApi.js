@@ -253,6 +253,15 @@ export const createTokenPurchase = async (packageId) => {
   }
 };
 
+export const cancelTokenPurchase = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/cancel/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la orden de tokens');
+  }
+};
+
 export const createTokenPurchasePayment = async (purchaseId) => {
   try {
     const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/`, {});
