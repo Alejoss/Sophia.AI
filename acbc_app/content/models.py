@@ -519,6 +519,13 @@ class TranscriptAnchor(models.Model):
         null=True,
         help_text='Length of normalized hash-source text at certify time.',
     )
+    certified_plain_text = models.TextField(
+        blank=True,
+        help_text=(
+            'Exact normalized plain text whose SHA-256 is text_hash '
+            '(snapshot at certify time for public verification).'
+        ),
+    )
     op_return_prefix = models.CharField(
         max_length=16,
         default=DEFAULT_OP_RETURN_PREFIX,

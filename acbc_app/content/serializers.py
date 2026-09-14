@@ -1517,9 +1517,10 @@ class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
         ]
 
     def get_text(self, obj):
-        from content.transcript_utils import resolve_hash_source_text
+        from content.transcript_utils import resolve_public_transcript_text
 
-        return resolve_hash_source_text(obj)
+        # Exact string hashed into text_hash (NFC + collapsed whitespace).
+        return resolve_public_transcript_text(obj)
 
     def get_segment_count(self, obj):
         return len(obj.segments or [])
@@ -1967,6 +1968,7 @@ class TranscriptAnchorSerializer(serializers.ModelSerializer):
             'content',
             'text_hash',
             'text_length',
+            'certified_plain_text',
             'op_return_prefix',
             'btc_network',
             'btc_txid',
