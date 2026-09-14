@@ -66,6 +66,8 @@ export const PRODUCT_CATALOG = Object.freeze({
   [PRODUCT_KINDS.ANCHOR]: Object.freeze({
     kind: PRODUCT_KINDS.ANCHOR,
     productLabel: 'anclaje a Bitcoin',
+    // Buyer-facing product name: the paid action, not the content id/title.
+    defaultTitle: 'Enviar el hash SHA-256 a la blockchain de Bitcoin',
     chooserTitle: 'Elige cómo pagar',
     paidSuccessMessage:
       '¡Pago recibido! El hash ya se envió a Bitcoin. '
@@ -214,7 +216,7 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
   [PRODUCT_KINDS.EVENT]: '¡Pago completado! Tu inscripción está confirmada.',
   [PRODUCT_KINDS.PATH]: '¡Pago completado! El camino ya está desbloqueado.',
   [PRODUCT_KINDS.ANCHOR]:
-    '¡Pago completado! Estamos anclando el hash a Bitcoin. '
+    '¡Pago completado! Publicando el hash SHA-256 en Bitcoin. '
     + 'La confirmación en la red suele tardar unos 10 minutos o más.',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: '¡Pago completado! Los tokens ya están en tu perfil.',
 });
@@ -222,6 +224,10 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
 export const NOWPAYMENTS_HEADER_TITLES = Object.freeze({
   [PRODUCT_KINDS.EVENT]: null, // falls back to `Pago del ${productLabel}`
   [PRODUCT_KINDS.PATH]: 'Pago del camino',
-  [PRODUCT_KINDS.ANCHOR]: 'Anclaje a Bitcoin',
+  [PRODUCT_KINDS.ANCHOR]: 'Enviar hash a Bitcoin',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: null,
 });
+
+/** Checkout / invoice label for transcript Bitcoin anchoring (action, not content id). */
+export const ANCHOR_PAYMENT_TITLE =
+  PRODUCT_CATALOG[PRODUCT_KINDS.ANCHOR].defaultTitle;

@@ -15,6 +15,7 @@ import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import AnchorCheckout from '../payments/adapters/AnchorCheckout';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
+import { ANCHOR_PAYMENT_TITLE } from '../payments/productCatalog';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
 const REQUEST_STATUS_LABELS = {
@@ -297,7 +298,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         anchorRequestId={payRequestId}
-        title={contentTitle || `Contenido ${contentId}`}
+        title={ANCHOR_PAYMENT_TITLE}
         priceUsd={priceUsd}
         priceTokens={priceTokens}
         tokenBalance={tokenBalance}

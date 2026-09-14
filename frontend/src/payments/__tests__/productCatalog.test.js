@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PRODUCT_KINDS,
   PRODUCT_CATALOG,
+  ANCHOR_PAYMENT_TITLE,
   resolveAvailableMethods,
   resolvePaymentTarget,
 } from '../productCatalog';
@@ -27,6 +28,13 @@ describe('productCatalog matrix', () => {
       'token_package',
       'topic',
     ]);
+  });
+
+  it('anchor checkout title describes publishing the hash, not the content id', () => {
+    expect(ANCHOR_PAYMENT_TITLE).toMatch(/hash SHA-256/i);
+    expect(ANCHOR_PAYMENT_TITLE).toMatch(/Bitcoin/i);
+    expect(ANCHOR_PAYMENT_TITLE).not.toMatch(/Contenido/i);
+    expect(PRODUCT_CATALOG[PRODUCT_KINDS.ANCHOR].defaultTitle).toBe(ANCHOR_PAYMENT_TITLE);
   });
 
   it('path: NOW + Monero when for sale; BCH when flag + gateway', () => {

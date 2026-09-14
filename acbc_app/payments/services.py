@@ -760,11 +760,11 @@ def create_anchor_request_payment(
     frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
     content_url = f'{frontend_base}/content/{anchor_request.content_id}/transcript'
 
-    title = (
-        getattr(anchor_request.content, 'original_title', None)
-        or f'Contenido {anchor_request.content_id}'
-    )
-    order_description = f'Anclaje BTC: {prepare_text_for_db(title)[:80]}'
+    # Invoice must describe the paid action (publish hash on Bitcoin), not the
+    # content id — "Contenido 305" is misleading in the payment UI.
+    order_description = prepare_text_for_db(
+        'Enviar el hash SHA-256 a la blockchain de Bitcoin'
+    )[:120]
     price_amount = float(
         anchor_request.price_amount
         or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)

@@ -914,7 +914,7 @@ def get_bch_payment_product_meta(payment: BchDirectPayment) -> dict:
     return {
         'product_type': 'anchor',
         'product_id': payment.anchor_request_id,
-        'product_title': f'Anclaje #{payment.anchor_request_id}',
+        'product_title': 'Enviar hash SHA-256 a Bitcoin',
         'owner': None,
         'product': None,
     }

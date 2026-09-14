@@ -215,7 +215,7 @@ const ContentTranscriptPage = () => {
 
         {!error && (
           <Box sx={{ mb: 2 }}>
-            <ContentBitcoinAnchor contentId={contentId} contentTitle={title} />
+            <ContentBitcoinAnchor contentId={contentId} />
           </Box>
         )}
 

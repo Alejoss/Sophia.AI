@@ -253,6 +253,12 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - Chipnet: CashAddr `bchtest:q...`
 - Mainnet: CashAddr `bitcoincash:q...`
 
+#### `BCH_PRIVATE_KEY_WIF`
+- **Description**: WIF private key for the configured receive address. Used **only** by `manage.py withdraw_bch` to sweep funds; never by HTTP handlers.
+- **Required**: No (only when withdrawing)
+- **Example**: `BCH_PRIVATE_KEY_WIF=K...` or `L...` (mainnet); testnet/chipnet WIFs start with `c`
+- Keep this out of git. After sweeping to a wallet you control, you can remove it from the server.
+
 #### `BCH_API_BASE` / `BCH_BLOCKCHAIR_API_KEY` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
 - **Defaults**: Fulcrum Electrum SSL for mainnet + chipnet / empty / `30` / `0` / `0`
 - Set `BCH_API_BASE=https://api.blockchair.com/bitcoin-cash` to force Blockchair; use `BCH_BLOCKCHAIR_API_KEY` in production
