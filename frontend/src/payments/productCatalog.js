@@ -67,14 +67,20 @@ export const PRODUCT_CATALOG = Object.freeze({
     kind: PRODUCT_KINDS.ANCHOR,
     productLabel: 'anclaje a Bitcoin',
     chooserTitle: 'Elige cómo pagar',
-    paidSuccessMessage: '¡Pago recibido! El hash quedó anclado a Bitcoin.',
-    tokenPaidSuccessMessage: '¡Pago con tokens recibido! El hash quedó anclado a Bitcoin.',
+    paidSuccessMessage:
+      '¡Pago recibido! El hash ya se envió a Bitcoin. '
+      + 'La confirmación en la red suele tardar unos 10 minutos o más; puedes cerrar esta ventana.',
+    tokenPaidSuccessMessage:
+      '¡Pago con tokens recibido! El hash ya se envió a Bitcoin. '
+      + 'La confirmación en la red suele tardar unos 10 minutos o más; puedes cerrar esta ventana.',
     paidDeferredMessage:
       'Pago confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
-      + 'No vuelvas a pagar — contacta soporte para completarlo.',
+      + 'No vuelvas a pagar — contacta soporte para completarlo. '
+      + '(Cuando el anclaje sí se emite, la confirmación en Bitcoin suele tardar ~10 minutos.)',
     tokenPaidDeferredMessage:
       'Pago con tokens confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
-      + 'No vuelvas a pagar — contacta soporte para completarlo.',
+      + 'No vuelvas a pagar — contacta soporte para completarlo. '
+      + '(Cuando el anclaje sí se emite, la confirmación en Bitcoin suele tardar ~10 minutos.)',
     methods: Object.freeze({
       nowpayments: 'gateway',
       bch: 'gateway',
@@ -208,7 +214,8 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
   [PRODUCT_KINDS.EVENT]: '¡Pago completado! Tu inscripción está confirmada.',
   [PRODUCT_KINDS.PATH]: '¡Pago completado! El camino ya está desbloqueado.',
   [PRODUCT_KINDS.ANCHOR]:
-    '¡Pago completado! Tu solicitud de anclaje a Bitcoin está en revisión.',
+    '¡Pago completado! Estamos anclando el hash a Bitcoin. '
+    + 'La confirmación en la red suele tardar unos 10 minutos o más.',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: '¡Pago completado! Los tokens ya están en tu perfil.',
 });
 

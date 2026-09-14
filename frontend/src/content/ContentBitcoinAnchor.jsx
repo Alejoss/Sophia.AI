@@ -189,6 +189,13 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
             </Link>
           </Typography>
         )}
+
+        {!isConfirmed && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            La transacción ya está en la red; la primera confirmación suele tardar
+            unos 10 minutos o más. No hace falta pagar de nuevo.
+          </Typography>
+        )}
       </Paper>
     );
   }
@@ -206,13 +213,14 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           </Alert>
         )}
 
-                {reqStatus === 'paid_pending_review' && (
+        {reqStatus === 'paid_pending_review' && (
           <Alert severity={isMine ? 'warning' : 'info'} sx={{ mb: 1.5 }}>
             {isMine
               ? (
                 <>
-                  Pago confirmado, pero el anclaje a Bitcoin aún no se emitió automáticamente.
-                  No vuelvas a pagar.
+                  Pago confirmado. Si el anclaje se emitió bien, la confirmación en
+                  Bitcoin suele tardar unos 10 minutos o más. Si pasa mucho más tiempo
+                  sin aparecer el txid, no vuelvas a pagar — contacta soporte.
                   {req?.review_note ? (
                     <Box component="span" sx={{ display: 'block', mt: 1 }}>
                       Detalle: {req.review_note}
@@ -263,7 +271,8 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
               Ancla el hash SHA-256 de esta transcripción a Bitcoin por ${priceUsd} USD.
-              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente.
+              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente;
+              la confirmación en la red suele tardar unos 10 minutos o más.
             </Typography>
             <Button
               variant="contained"
