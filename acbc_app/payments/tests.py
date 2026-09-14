@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -2100,3 +2100,121 @@ class TokenPackagePurchaseTests(TestCase):
         self.api.force_authenticate(user=self.other)
         denied = self.api.post(f'/api/payments/token-purchase/{purchase.id}/cancel/')
         self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BchWithdrawTests(SimpleTestCase):
+    def test_addresses_match_ignores_prefix(self):
+        from payments.bch_withdraw import _addresses_match
+
+        self.assertTrue(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'BITCOINCASH:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            )
+        )
+        self.assertTrue(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            )
+        )
+        self.assertFalse(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            )
+        )
+
+    @override_settings(BCH_PRIVATE_KEY_WIF='')
+    def test_missing_wif_raises(self):
+        from payments.bch_withdraw import BchWithdrawError, load_spend_key
+
+        with self.assertRaises(BchWithdrawError):
+            load_spend_key()
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_RECEIVE_ADDRESS_MAINNET='',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_key_address_mismatch_raises(self, mock_load):
+        from payments.bch_withdraw import BchWithdrawError, assert_key_matches_receive_address
+
+        key = MagicMock()
+        key.address = 'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy'
+        mock_load.return_value = key
+        with self.assertRaises(BchWithdrawError):
+            assert_key_matches_receive_address(key)
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_RECEIVE_ADDRESS='',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_build_plan_sweep_dry_run(self, mock_load):
+        from payments.bch_withdraw import build_plan, execute_withdraw
+
+        utxo = MagicMock()
+        utxo.amount = 250_000
+        key = MagicMock()
+        key.address = 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a'
+        key.get_unspents.return_value = [utxo]
+        key.create_transaction.return_value = 'deadbeef'
+        mock_load.return_value = key
+
+        loaded, plan = build_plan(
+            to_address='bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            amount_sats=None,
+            dry_run=True,
+        )
+        self.assertIs(loaded, key)
+        self.assertEqual(plan.balance_sats, 250_000)
+        self.assertIsNone(plan.amount_sats)
+        self.assertTrue(plan.dry_run)
+
+        raw = execute_withdraw(key, plan)
+        self.assertEqual(raw, 'deadbeef')
+        key.create_transaction.assert_called_once()
+        key.send.assert_not_called()
+        args, kwargs = key.create_transaction.call_args
+        self.assertEqual(args[0], [])
+        self.assertEqual(
+            kwargs['leftover'],
+            'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+        )
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_build_plan_partial_broadcast(self, mock_load):
+        from payments.bch_withdraw import build_plan, execute_withdraw
+
+        utxo = MagicMock()
+        utxo.amount = 500_000
+        key = MagicMock()
+        key.address = 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a'
+        key.get_unspents.return_value = [utxo]
+        key.send.return_value = 'txid123'
+        mock_load.return_value = key
+
+        _key, plan = build_plan(
+            to_address='bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            amount_sats=100_000,
+            dry_run=False,
+        )
+        txid = execute_withdraw(key, plan)
+        self.assertEqual(txid, 'txid123')
+        key.send.assert_called_once()
+        args, kwargs = key.send.call_args
+        self.assertEqual(
+            args[0],
+            [('bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy', 100_000, 'satoshi')],
+        )
+        self.assertEqual(kwargs['leftover'], key.address)

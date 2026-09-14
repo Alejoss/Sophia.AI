@@ -781,6 +781,9 @@ BCH_NETWORK = os.getenv('BCH_NETWORK', _BCH_NETWORK_DEFAULT).strip().lower()
 BCH_RECEIVE_ADDRESS = os.getenv('BCH_RECEIVE_ADDRESS', '').strip()
 BCH_RECEIVE_ADDRESS_CHIPNET = os.getenv('BCH_RECEIVE_ADDRESS_CHIPNET', '').strip()
 BCH_RECEIVE_ADDRESS_MAINNET = os.getenv('BCH_RECEIVE_ADDRESS_MAINNET', '').strip()
+# WIF for the receive address — used only by `manage.py withdraw_bch` (never by HTTP).
+# Prefer keeping this off the app server long-term; sweep to a wallet you control.
+BCH_PRIVATE_KEY_WIF = os.getenv('BCH_PRIVATE_KEY_WIF', '').strip()
 _BCH_API_DEFAULTS = {
     # Fulcrum Electrum SSL — avoids Blockchair free-tier IP bans on verify.
     'mainnet': 'ssl://bch.imaginary.cash:50002',
