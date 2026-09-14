@@ -150,7 +150,7 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
         if obj.topic_purchase_id and obj.topic_purchase and obj.topic_purchase.topic_id:
             return obj.topic_purchase.topic.title
         if obj.anchor_request_id:
-            return f'Anclaje #{obj.anchor_request_id}'
+            return 'Enviar hash SHA-256 a Bitcoin'
         if obj.token_purchase_id and obj.token_purchase:
             return (
                 obj.token_purchase.package_name

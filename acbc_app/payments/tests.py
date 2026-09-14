@@ -453,6 +453,11 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
         self.assertEqual(payment.anchor_request_id, req.id)
         self.assertIsNone(payment.path_purchase_id)
         self.assertTrue(payment.order_id.startswith('anchor-req-'))
+        mock_create_invoice.assert_called_once()
+        invoice_kwargs = mock_create_invoice.call_args.kwargs
+        self.assertIn('hash SHA-256', invoice_kwargs['order_description'])
+        self.assertIn('Bitcoin', invoice_kwargs['order_description'])
+        self.assertNotIn('Contenido', invoice_kwargs['order_description'])
 
 
 @override_settings(
