@@ -14,6 +14,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import AnchorCheckout from '../payments/adapters/AnchorCheckout';
+import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 import { ANCHOR_PAYMENT_TITLE } from '../payments/productCatalog';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
@@ -27,7 +28,7 @@ const REQUEST_STATUS_LABELS = {
 /**
  * Bitcoin OP_RETURN CTA: pay $1 then auto-hash + broadcast (no admin gate).
  */
-const ContentBitcoinAnchor = ({ contentId }) => {
+const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const { authState } = useContext(AuthContext);
   const isAuthenticated = Boolean(authState?.isAuthenticated);
   const [info, setInfo] = useState(undefined);
@@ -39,6 +40,7 @@ const ContentBitcoinAnchor = ({ contentId }) => {
   const [priceUsd, setPriceUsd] = useState(1);
   const [priceTokens, setPriceTokens] = useState(100);
   const [tokenBalance, setTokenBalance] = useState(0);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const loadAnchor = useCallback(async () => {
     if (!contentId) {
@@ -188,6 +190,13 @@ const ContentBitcoinAnchor = ({ contentId }) => {
             </Link>
           </Typography>
         )}
+
+        {!isConfirmed && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            La transacción ya está en la red; la primera confirmación suele tardar
+            unos 10 minutos o más. No hace falta pagar de nuevo.
+          </Typography>
+        )}
       </Paper>
     );
   }
@@ -206,9 +215,30 @@ const ContentBitcoinAnchor = ({ contentId }) => {
         )}
 
         {reqStatus === 'paid_pending_review' && (
-          <Alert severity="info" sx={{ mb: 1.5 }}>
+          <Alert severity={isMine ? 'warning' : 'info'} sx={{ mb: 1.5 }}>
             {isMine
-              ? 'Pago recibido. Estamos anclando el hash a Bitcoin; esto puede tardar un momento si la red está congestionada.'
+              ? (
+                <>
+                  Pago confirmado. Si el anclaje se emitió bien, la confirmación en
+                  Bitcoin suele tardar unos 10 minutos o más. Si pasa mucho más tiempo
+                  sin aparecer el txid, no vuelvas a pagar — contacta soporte.
+                  {req?.review_note ? (
+                    <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                      Detalle: {req.review_note}
+                    </Box>
+                  ) : null}
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="inherit"
+                      onClick={() => setSupportOpen(true)}
+                    >
+                      Contactar soporte
+                    </Button>
+                  </Box>
+                </>
+              )
               : 'Ya hay un anclaje en curso para este hash.'}
           </Alert>
         )}
@@ -242,7 +272,8 @@ const ContentBitcoinAnchor = ({ contentId }) => {
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
               Ancla el hash SHA-256 de esta transcripción a Bitcoin por ${priceUsd} USD.
-              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente.
+              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente;
+              la confirmación en la red suele tardar unos 10 minutos o más.
             </Typography>
             <Button
               variant="contained"
@@ -278,6 +309,17 @@ const ContentBitcoinAnchor = ({ contentId }) => {
           await loadRequest();
           await loadAnchor();
         }}
+      />
+
+      <BchPaymentSupportModal
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        title={contentTitle || `Contenido ${contentId}`}
+        priceUsd={priceUsd}
+        productLabel="anclaje a Bitcoin"
+        mode="fulfill_deferred"
+        reviewNote={req?.review_note || ''}
+        requestId={req?.id ?? null}
       />
     </>
   );

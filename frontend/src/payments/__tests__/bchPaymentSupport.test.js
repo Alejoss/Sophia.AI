@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildBchVerifyHelpMessage,
+  buildAnchorFulfillDeferredHelpMessage,
+  ANCHOR_FULFILL_DEFERRED_DESCRIPTION,
   isLikelyBchTxid,
   normalizeBchTxid,
 } from '../bchPaymentSupport';
@@ -49,3 +51,22 @@ describe('buildBchVerifyHelpMessage', () => {
     expect(text).toContain('Pagué desde Electron Cash');
   });
 });
+
+describe('anchor fulfill deferred support copy', () => {
+  it('builds a message that asks support to finish anchoring without re-paying', () => {
+    const message = buildAnchorFulfillDeferredHelpMessage({
+      title: 'Transcripción demo',
+      priceUsd: 1,
+      requestId: 2,
+      reviewNote: 'Insufficient funds for fee',
+      paymentMethod: 'bch',
+      bchOrder: { id: 12, usd_amount: 1 },
+    });
+    expect(message).toMatch(/pago.*confirmado/i);
+    expect(message).toMatch(/no.*volver a pagar|No quiero volver a pagar/i);
+    expect(message).toContain('Solicitud de anclaje #2');
+    expect(message).toContain('Insufficient funds for fee');
+    expect(ANCHOR_FULFILL_DEFERRED_DESCRIPTION).toMatch(/No vuelvas a pagar/i);
+  });
+});
+

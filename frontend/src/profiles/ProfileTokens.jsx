@@ -111,7 +111,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
           Créditos internos de Academia Blockchain. No son una criptomoneda.
           1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento,
-          eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin.
+          eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin con descuento.
         </Typography>
         <Box>
           <Button
