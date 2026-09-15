@@ -43,3 +43,38 @@ export const buildBchVerifyHelpMessage = ({
     + `${errLine}${noteLine} ¿Puedes confirmar el pago y desbloquear el acceso?`
   );
 };
+
+export const ANCHOR_FULFILL_DEFERRED_DESCRIPTION =
+  'Tu pago se confirmó, pero el anclaje a Bitcoin no se emitió automáticamente. '
+  + 'No vuelvas a pagar. Contáctanos y lo completamos manualmente.';
+
+export const buildAnchorFulfillDeferredHelpMessage = ({
+  title,
+  priceUsd,
+  productLabel = 'anclaje a Bitcoin',
+  bchOrder,
+  reviewNote,
+  requestId,
+  note,
+  paymentMethod,
+} = {}) => {
+  const price = Number(priceUsd ?? bchOrder?.usd_amount ?? 0).toFixed(2);
+  const product = title ? `«${title}»` : productLabel;
+  const orderId = bchOrder?.id != null ? `Orden BCH #${bchOrder.id}. ` : '';
+  const reqId = requestId != null ? `Solicitud de anclaje #${requestId}. ` : '';
+  const method = paymentMethod ? `Método: ${paymentMethod}. ` : '';
+  const review = reviewNote?.trim()
+    ? `Detalle técnico: ${reviewNote.trim()}. `
+    : '';
+  const noteLine = note?.trim() ? ` Nota: ${note.trim()}` : '';
+  const txid = bchOrder?.payment_txid || bchOrder?.txid || '';
+  const txLine = txid ? `TXID BCH: ${normalizeBchTxid(txid)}. ` : '';
+  return (
+    `Hola, ya pagué por ${product} ($${price} USD). El pago está confirmado, `
+    + 'pero el anclaje a Bitcoin no se emitió automáticamente. '
+    + `${reqId}${orderId}${method}${txLine}${review}`
+    + 'No quiero volver a pagar. '
+    + `¿Pueden completar el anclaje manualmente?${noteLine}`
+  );
+};
+

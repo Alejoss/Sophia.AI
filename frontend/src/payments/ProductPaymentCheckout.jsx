@@ -25,6 +25,7 @@ import BchAddressQr from './BchAddressQr';
 import BchOrderExpiryNotice from './BchOrderExpiryNotice';
 import { isLikelyBchTxid, normalizeBchTxid } from './bchPaymentSupport';
 import {
+  PRODUCT_KINDS,
   getProductCatalogEntry,
   resolveAvailableMethods,
 } from './productCatalog';
@@ -73,6 +74,13 @@ const ProductPaymentCheckout = ({
     || `¡Pago recibido! Ya puedes usar este ${productLabel}.`;
   const tokenPaidSuccessMessage = catalog?.tokenPaidSuccessMessage
     || paidSuccessMessage;
+  const paidDeferredMessage = catalog?.paidDeferredMessage
+    || (
+      'Pago confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
+      + 'No vuelvas a pagar — contacta soporte para completarlo.'
+    );
+  const tokenPaidDeferredMessage = catalog?.tokenPaidDeferredMessage
+    || paidDeferredMessage;
 
   const explicitOffers = offerNowpayments != null
     || offerBch != null
@@ -95,6 +103,10 @@ const ProductPaymentCheckout = ({
   const [supportOpen, setSupportOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [paid, setPaid] = useState(false);
+  const [fulfillDeferred, setFulfillDeferred] = useState(false);
+  const [fulfillNote, setFulfillNote] = useState('');
+  const [fulfillRequestId, setFulfillRequestId] = useState(null);
+  const [supportMode, setSupportMode] = useState('verify_failed');
   const [verifyTxid, setVerifyTxid] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenError, setTokenError] = useState('');
@@ -116,6 +128,10 @@ const ProductPaymentCheckout = ({
       setBchError(null);
       setSupportOpen(false);
       setPaid(false);
+      setFulfillDeferred(false);
+      setFulfillNote('');
+      setFulfillRequestId(null);
+      setSupportMode('verify_failed');
       setCopied('');
       setVerifyTxid('');
       setTokenBusy(false);
@@ -220,6 +236,23 @@ const ProductPaymentCheckout = ({
     }
   };
 
+
+  const applyPaidResult = (data, { fromTokens = false } = {}) => {
+    setPaid(true);
+    const request = data?.request;
+    const deferred = Boolean(
+      productKind === PRODUCT_KINDS.ANCHOR
+      && request?.status === 'paid_pending_review',
+    );
+    setFulfillDeferred(deferred);
+    setFulfillNote(deferred ? (request?.review_note || '') : '');
+    setFulfillRequestId(deferred ? (request?.id ?? null) : null);
+    if (deferred) {
+      setSupportMode('fulfill_deferred');
+    }
+    onPaid?.(data);
+  };
+
   const verifyBch = async () => {
     if (!verifyBchPayment) return;
     const cleanTxid = normalizeBchTxid(verifyTxid);
@@ -239,8 +272,7 @@ const ProductPaymentCheckout = ({
         || data.payment?.status === 'paid'
         || data.status === 'paid'
       ) {
-        setPaid(true);
-        onPaid?.(data);
+        applyPaidResult(data);
       }
     } catch (err) {
       setBchError(formatApiError(err, 'No se pudo verificar el pago. Inténtalo de nuevo.'));
@@ -258,8 +290,7 @@ const ProductPaymentCheckout = ({
       if (result?.token_balance != null) {
         setLocalTokenBalance(Number(result.token_balance));
       }
-      setPaid(true);
-      onPaid?.(result);
+      applyPaidResult(result, { fromTokens: true });
     } catch (err) {
       setTokenError(formatApiError(err, 'No se pudo pagar con tokens. Inténtalo de nuevo.'));
     } finally {
@@ -283,7 +314,7 @@ const ProductPaymentCheckout = ({
   const showBch = open && method === 'bch' && !supportOpen;
   const showMonero = open && method === 'monero';
   const showTokens = open && method === 'tokens';
-  const showSupport = open && method === 'bch' && supportOpen;
+  const showSupport = open && supportOpen;
   const resolvedPaymentTarget = paymentTarget
     || (nowpaymentsProps.paymentTarget)
     || (nowpaymentsProps.tokenPurchaseId != null
@@ -423,8 +454,28 @@ const ProductPaymentCheckout = ({
             </Alert>
           )}
           {paid ? (
-            <Alert severity="success">
-              {tokenPaidSuccessMessage}
+            <Alert severity={fulfillDeferred ? 'warning' : 'success'}>
+              {fulfillDeferred ? tokenPaidDeferredMessage : tokenPaidSuccessMessage}
+              {fulfillDeferred && fulfillNote ? (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {fulfillNote}
+                </Typography>
+              ) : null}
+              {fulfillDeferred && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="inherit"
+                    onClick={() => {
+                      setSupportMode('fulfill_deferred');
+                      setSupportOpen(true);
+                    }}
+                  >
+                    Contactar soporte
+                  </Button>
+                </Box>
+              )}
             </Alert>
           ) : (
             <Stack spacing={1.5}>
@@ -481,8 +532,8 @@ const ProductPaymentCheckout = ({
         priceUsd={priceUsd}
         productLabel={productLabel}
         onPaymentComplete={(data) => {
-          setPaid(true);
-          onPaid?.(data);
+          // NOWPayments IPN does not always include request status in the poll payload.
+          applyPaidResult(data);
         }}
         {...nowpaymentsProps}
         paymentTarget={resolvedPaymentTarget || nowpaymentsProps.paymentTarget}
@@ -497,6 +548,10 @@ const ProductPaymentCheckout = ({
         productLabel={productLabel}
         bchOrder={bchOrder}
         verifyError={bchError}
+        mode={supportMode}
+        reviewNote={fulfillNote}
+        requestId={fulfillRequestId}
+        paymentMethod={method === 'tokens' ? 'tokens' : (method === 'bch' ? 'bch' : method || '')}
       />
 
       <Dialog open={showBch} onClose={onClose} maxWidth="sm" fullWidth>
@@ -530,7 +585,10 @@ const ProductPaymentCheckout = ({
                     size="small"
                     variant="contained"
                     color="inherit"
-                    onClick={() => setSupportOpen(true)}
+                    onClick={() => {
+                      setSupportMode('verify_failed');
+                      setSupportOpen(true);
+                    }}
                   >
                     Enviar TXID a soporte
                   </Button>
@@ -539,8 +597,28 @@ const ProductPaymentCheckout = ({
             </Alert>
           )}
           {paid && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {paidSuccessMessage}
+            <Alert severity={fulfillDeferred ? 'warning' : 'success'} sx={{ mb: 2 }}>
+              {fulfillDeferred ? paidDeferredMessage : paidSuccessMessage}
+              {fulfillDeferred && fulfillNote ? (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {fulfillNote}
+                </Typography>
+              ) : null}
+              {fulfillDeferred && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="inherit"
+                    onClick={() => {
+                      setSupportMode('fulfill_deferred');
+                      setSupportOpen(true);
+                    }}
+                  >
+                    Contactar soporte
+                  </Button>
+                </Box>
+              )}
             </Alert>
           )}
           {bchBusy && !bchOrder && (

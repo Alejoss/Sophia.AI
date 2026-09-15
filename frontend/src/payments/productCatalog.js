@@ -69,8 +69,20 @@ export const PRODUCT_CATALOG = Object.freeze({
     // Buyer-facing product name: the paid action, not the content id/title.
     defaultTitle: 'Enviar el hash SHA-256 a la blockchain de Bitcoin',
     chooserTitle: 'Elige cómo pagar',
-    paidSuccessMessage: '¡Pago recibido! Publicando el hash en Bitcoin…',
-    tokenPaidSuccessMessage: '¡Pago con tokens recibido! Publicando el hash en Bitcoin…',
+    paidSuccessMessage:
+      '¡Pago recibido! El hash ya se envió a Bitcoin. '
+      + 'La confirmación en la red suele tardar unos 10 minutos o más; puedes cerrar esta ventana.',
+    tokenPaidSuccessMessage:
+      '¡Pago con tokens recibido! El hash ya se envió a Bitcoin. '
+      + 'La confirmación en la red suele tardar unos 10 minutos o más; puedes cerrar esta ventana.',
+    paidDeferredMessage:
+      'Pago confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
+      + 'No vuelvas a pagar — contacta soporte para completarlo. '
+      + '(Cuando el anclaje sí se emite, la confirmación en Bitcoin suele tardar ~10 minutos.)',
+    tokenPaidDeferredMessage:
+      'Pago con tokens confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
+      + 'No vuelvas a pagar — contacta soporte para completarlo. '
+      + '(Cuando el anclaje sí se emite, la confirmación en Bitcoin suele tardar ~10 minutos.)',
     methods: Object.freeze({
       nowpayments: 'gateway',
       bch: 'gateway',
@@ -204,7 +216,8 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
   [PRODUCT_KINDS.EVENT]: '¡Pago completado! Tu inscripción está confirmada.',
   [PRODUCT_KINDS.PATH]: '¡Pago completado! El camino ya está desbloqueado.',
   [PRODUCT_KINDS.ANCHOR]:
-    '¡Pago completado! Publicando el hash SHA-256 en la blockchain de Bitcoin…',
+    '¡Pago completado! Publicando el hash SHA-256 en Bitcoin. '
+    + 'La confirmación en la red suele tardar unos 10 minutos o más.',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: '¡Pago completado! Los tokens ya están en tu perfil.',
 });
 
