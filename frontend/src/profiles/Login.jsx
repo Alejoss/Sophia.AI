@@ -44,6 +44,15 @@ const loginSchema = yup.object({
     .required("La contraseña es requerida."),
 });
 
+const LOGIN_COVER_IMAGES = [
+  "/images/login_cover/login_lucidity_1.png",
+  "/images/login_cover/login_lucidity_2.png",
+  "/images/login_cover/login_lucidity_3.png",
+  "/images/login_cover/login_lucidity_4.png",
+  "/images/login_cover/login_lucidity_5.png",
+  "/images/login_cover/login_lucidity_6.png",
+];
+
 /**
  * Regular Login Component
  * Handles traditional username/email and password login
@@ -76,9 +85,8 @@ const Login = () => {
   const passwordValue = watch("password");
 
   useEffect(() => {
-    // Select a random login cover image (1-10)
-    const randomImageNumber = Math.floor(Math.random() * 10) + 1;
-    setLoginImage(`/images/login_cover/login_cover${randomImageNumber}.jpg`);
+    const randomImageIndex = Math.floor(Math.random() * LOGIN_COVER_IMAGES.length);
+    setLoginImage(LOGIN_COVER_IMAGES[randomImageIndex]);
     const storedUser = getUserFromLocalStorage();
     const localStorageAuth = isAuthenticated();
 

@@ -10,7 +10,7 @@ import MetaPixelTracker from './components/MetaPixelTracker';
 import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import Home from './generalComponents/Home.jsx';
+import Home from './generalComponents/BrandHome.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
