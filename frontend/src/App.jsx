@@ -11,6 +11,7 @@ import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Home from './generalComponents/BrandHome.jsx';
+import HowItWorksGuide from './generalComponents/HowItWorksGuide.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
@@ -186,6 +187,8 @@ const AppContent = () => {
               path="/"
               element={isTelegramInAppBrowser() ? <TelegramNotSupportedMessage /> : <Home />}
             />
+            <Route path="como-funciona" element={<Navigate to="/como-funciona/archivo-y-preservacion" replace />} />
+            <Route path="como-funciona/:slug" element={<HowItWorksGuide />} />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={

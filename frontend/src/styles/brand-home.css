@@ -37,6 +37,9 @@
 .brand-statement-copy p, .brand-section-lead, .brand-transformation-intro, .brand-principle-copy { color: var(--brand-muted) !important; font-size: 1.18rem !important; line-height: 1.75 !important; }
 .brand-statement-copy p { margin: 0 0 24px !important; }.brand-statement-copy p:last-child { margin-bottom: 0 !important; }
 .brand-emphasis-copy { color: var(--brand-ink) !important; font-weight: 700 !important; }
+.brand-guide-prompt { margin-top: 38px !important; padding-top: 28px; border-top: 1px solid var(--brand-line); font-size: 1rem !important; }
+.brand-guide-prompt a { display: inline; color: var(--brand-orange); font-weight: 750; text-decoration: none; }.brand-guide-prompt a:hover { text-decoration: underline; text-underline-offset: 4px; }.brand-guide-prompt svg { width: 17px; vertical-align: -.22em; }
+.brand-guide-prompt-light { border-top-color: rgba(255,255,255,.18); color: #d3cec5 !important; }.brand-guide-prompt-light a { color: #ff9a5c; }
 
 .brand-transformation { padding: 120px 0 130px; color: #f8f5ef; background: var(--brand-ink); }
 .brand-section-index-light { color: #ff873b !important; }
