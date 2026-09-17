@@ -64,6 +64,7 @@ const BrandHome = () => {
             <Typography component="p">Tenemos acceso a más libros, videos, artículos y respuestas que nunca. Aun así, el conocimiento suele llegar fragmentado y fuera de contexto.</Typography>
             <Typography component="p" className="brand-emphasis-copy">Aprender exige relacionar fuentes, contrastar perspectivas y poner las ideas en conversación.</Typography>
             <Typography component="p">Academia Blockchain reúne herramientas y personas para que puedas investigar con curiosidad, construir criterio y decidir qué pensar por ti mismo.</Typography>
+            <Typography component="p" className="brand-guide-prompt">En lugar de entregarle tu atención a un muro de recomendaciones, puedes volver a explorar con intención. <Link to="/como-funciona/aprender-sin-algoritmos">Descubre por qué aprender sin depender del algoritmo <ArrowForwardIcon aria-hidden="true" /></Link></Typography>
           </div>
         </div></Container>
       </section>
@@ -80,6 +81,7 @@ const BrandHome = () => {
               <Typography component="p">Academia Blockchain es un territorio intelectual donde el conocimiento no es un recurso secuestrado por instituciones, algoritmos o intereses económicos. No somos una academia de trading ni una criptomoneda, utilizamos la blockchain de una manera liberadora. Somos un espacio donde la comunidad enlaza saberes, los reorganiza y los libera, como lo hacía el espíritu original de internet.</Typography>
               <Typography component="p">Surgimos frente a una realidad incómoda: la arquitectura del conocimiento moderno está a la merced de la censura, la manipulación y la concentración del poder. El buscador y la IA que deberían abrir puertas en realidad deciden qué mostrar; la universidad, que debería iluminar, se ha convertido en un club elitista y engañoso; las revistas científicas, que deberían custodiar la verdad, a menudo se someten a intereses políticos o económicos. En ese ruido, lo esencial se pierde: la capacidad de comprender un mundo cada vez más complejo.</Typography>
               <Typography component="p">En Academia Blockchain, las ideas se conectan entre sí de forma colaborativa mediante caminos del conocimiento y temas. Los contenidos pueden relacionarse, descargarse, organizarse y preservarse gracias al uso de tecnologías como IPFS (próximamente) y blockchain. Además, puedes utilizar la IA para interactuar con las transcripciones de los temas que investigas.</Typography>
+              <Typography component="p" className="brand-guide-prompt brand-guide-prompt-light">Conservar un archivo cambia tu relación con el conocimiento. <Link to="/como-funciona/archivo-y-preservacion">Conoce por qué puedes descargarlo y ayudar a preservarlo <ArrowForwardIcon aria-hidden="true" /></Link></Typography>
             </div>
           </div>
         </Container>
