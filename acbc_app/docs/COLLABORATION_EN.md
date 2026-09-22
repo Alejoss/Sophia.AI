@@ -17,9 +17,4 @@ You can collaborate creating issues or solving them.
 
 ## How to solve an issue
 
-- Work directly on `develop`; verify the branch before editing or committing.
-- Do not create feature branches, modify `main`, or open pull requests into `main`.
-- Make focused changes, update documentation, review the diff and run relevant local tests.
-- Commit to `develop`, using the real issue code if one exists.
-- Push only `develop` when requested. Releases and deployments are separate.
-- See [workflow](../../docs/hackathon/develop-workflow.md).
+Follow the repository-wide [development workflow](../../CONTRIBUTING.md#development-workflow) for branch restrictions, review, testing and commits.

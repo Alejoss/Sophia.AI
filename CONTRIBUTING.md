@@ -30,7 +30,7 @@ Clone the repository and follow [Setup.md](Setup.md). All development and docume
 5. Commit the reviewed changes directly to `develop`. Use an actual issue code when available; never invent issue numbers.
 6. If publishing changes is requested, push only `develop`. Do not force-push, merge into `main`, or deploy as part of this workflow.
 
-See [the detailed workflow](docs/hackathon/develop-workflow.md).
+This section is the canonical Git workflow for the whole repository. Current CI runs automatically on `main`, not `develop`; validate locally rather than changing branches to trigger CI. Manual dispatch also publishes images and is a separate release operation.
 
 ## Issue Guidelines
 

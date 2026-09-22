@@ -1,6 +1,6 @@
 # CI/CD flow
 
-Development work is restricted to `develop`; see [workflow](../hackathon/develop-workflow.md). The `main` references below describe existing production release infrastructure, not authorization to modify that branch. Manual dispatch also publishes images and is not a test-only operation.
+Development work is restricted to `develop`; see [workflow](../../CONTRIBUTING.md#development-workflow). The `main` references below describe existing production release infrastructure, not authorization to modify that branch. Manual dispatch also publishes images and is not a test-only operation.
 
 ## Overview
 

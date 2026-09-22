@@ -18,9 +18,4 @@ Por favor si encuentras errores toma un screenshot y compártelos. Esto ayudará
 
 ## Cómo resolver un issue
 
-- Trabaja directamente en `develop`; verifica la rama antes de editar o hacer commit.
-- No crees ramas de funcionalidades, no modifiques `main` ni abras PR hacia `main`.
-- Realiza cambios concretos, actualiza la documentación, revisa el diff y ejecuta las pruebas locales pertinentes.
-- Haz commit en `develop`, usando el código real del issue cuando exista.
-- Publica únicamente `develop` cuando se solicite. Los despliegues son un proceso separado.
-- Consulta el [flujo de trabajo](../../docs/hackathon/develop-workflow.md).
+Sigue el [flujo de desarrollo del repositorio](../../CONTRIBUTING.md#development-workflow) para las reglas de ramas, revisión, pruebas y commits.

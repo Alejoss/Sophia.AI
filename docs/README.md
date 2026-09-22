@@ -99,7 +99,7 @@ This documentation is actively maintained. If you find errors or want to contrib
 
 1. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 2. Create an issue with the `DOCS-XXXX` prefix
-3. Review and commit your improvements directly to `develop`; follow [the Git workflow](hackathon/develop-workflow.md).
+3. Review and commit your improvements directly to `develop`; follow [the Git workflow](../CONTRIBUTING.md#development-workflow).
 
 ## 📝 Documentation Standards
 

@@ -2,12 +2,8 @@
 
 ## Required Git workflow
 
-- Work, document, review and commit directly on `develop` only.
-- Verify the branch before editing or committing. Preserve unrelated work.
-- Do not create feature branches, modify `main`, or create pull requests into `main`.
-- Run relevant local checks before committing. Push only `develop` when requested; no force pushes or deployments are implied.
-- See `docs/hackathon/develop-workflow.md` for the complete workflow.
-
+Work and commit only on `develop`; do not create feature branches or modify `main`.
+Follow [CONTRIBUTING.md](CONTRIBUTING.md#development-workflow) for review, testing and publishing rules.
 
 ## Cursor Cloud specific instructions
 

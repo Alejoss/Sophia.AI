@@ -10,5 +10,3 @@ Keep these files with the project; they are not temporary generated output.
 
 Place future hackathon progress reports, demo notes and submission documentation here.
 Distinguish planned, implemented, tested and deployed work.
-
-- [Required Git workflow](develop-workflow.md): work and commit only on `develop`.
