@@ -80,13 +80,46 @@ Done when another person can verify the demo certificate and read its preserved
 curriculum without logging into Sophia; missing files and changed bytes produce
 different, understandable results.
 
-## 6. Validate and prepare the submission
+## 6. Implement the English/Spanish navbar language selector
+
+Required hackathon deliverable, added 2026-09-22; not yet implemented.
+See [language scope and evidence rules](hackathon-ethereum-credentials.md#english-and-spanish-interface-requirement).
+
+- Inventory application-owned text across routes and shared components; use
+  shared translation resources rather than separate copies of pages.
+- Add an accessible English/Spanish selector to desktop and mobile navigation.
+- Selecting English translates the current page immediately and applies to
+  subsequent routes, dialogs, form validation and user-facing API errors.
+- Persist the preference across reloads and browser visits, preserve the current
+  route and unsaved form state, and support switching back to Spanish.
+- Translate all covered interface states, including errors, notifications,
+  loading indicators and empty screens; localize dates/numbers and document lang.
+- Prepare an English demo course. Clearly distinguish original user content from
+  translated UI; do not silently translate or mutate certified artifacts.
+
+Acceptance criteria:
+
+- A visitor can switch to English from the navbar on desktop and mobile and see
+  the entire application-owned interface on the current page change to English.
+- Navigation, reload, and a return visit retain English; switching back restores
+  Spanish without losing current page or form state.
+- The judge can complete sign-in, learning, payment/anchoring and certificate
+  verification flows with English interface text, including failure states.
+- Keyboard operation and accessible labels work; the document language matches.
+- Automated locale coverage checks catch missing translations, and browser checks
+  exercise both languages. No untranslated Spanish interface text remains in the
+  English demo flow; original-language user content is identified as such.
+- Hash verification produces identical results before and after changing locale.
+
+## 7. Validate and prepare the submission
 
 - Backend tests: snapshot consistency, learning-version binding, publication
   permissions, approval integration, recovery policy and transaction retries.
 - Cross-language fixtures: accented Unicode, whitespace, long descriptions,
   multiple nodes/quizzes, deterministic JSON and exact transcript bytes.
 - Contract tests: permissions, invariants and complete certificate lifecycle.
+- Frontend language tests: selector behavior, persistence, both locales, translated
+  error states and unchanged certified evidence.
 - Browser demo: completion -> approval -> mint -> verify -> inspect archived
   materials -> show Bitcoin evidence; demonstrate a changed-file failure.
 - Verify retrieval using backup/pinning recovery and verify deployed source and

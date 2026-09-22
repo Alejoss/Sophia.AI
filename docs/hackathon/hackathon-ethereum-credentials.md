@@ -58,6 +58,34 @@ fixed event/achievement definition; they need not invent a transcript or course.
 Private personal details, answer keys and learner submissions are not public
 on-chain fields or unencrypted public IPFS files.
 
+## English and Spanish interface requirement
+
+Added 2026-09-22 by product decision; implementation pending.
+
+Provide a language selector in the navigation bar, available on desktop and
+mobile, with clearly labeled English and Spanish choices. Selecting English must
+actually translate the current page and the application's interface, not merely
+change the selector label. Retain Spanish for the existing community. Remember
+the choice across navigation, reloads and subsequent visits in the same browser.
+
+Coverage includes navigation, landing pages, authentication, learning paths,
+quizzes, community screens, payments, Bitcoin anchoring, educational certificates,
+issuer controls and public verification. Translate application-owned headings,
+buttons, forms, dialogs, validation errors, loading/empty states and notifications;
+format dates and numbers appropriately and update the document language.
+
+Content supplied by users (course text, posts, transcripts and assessment content)
+retains its original language unless a separate translation is provided. Prepare
+an English demo course and label original-language content clearly. Never modify
+certified snapshot bytes, hashes or archived transcripts when switching the UI
+language; any translated rendition is distinct from the original evidence.
+
+The official rules, section 12(a)(i), require submitted content in English:
+[Crypto World's Fair rules](https://colosseum.com/legal/Crypto%20World%27s%20Fair%20Hackathon%20Rules.pdf).
+They do not explicitly specify a navbar selector or translation of the entire
+historical library. This bilingual interface is our chosen product requirement
+for an English judging experience, not a claim that the rules prescribe this UI.
+
 ## Storage and data model
 
 | Data | Storage |
