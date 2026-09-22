@@ -265,4 +265,4 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 - Model: `ContentTranscript` in `acbc_app/content/models.py`
 - Tests: `ContentTranscriptIngestAPITests` in `acbc_app/content/tests.py`
 - After ingest, index for RAG: [qdrant-embeddings.md](../operations/qdrant-embeddings.md)
-- After ingest, certify the hash on Bitcoin: [transcript-anchor.md](transcript-anchor.md)
+- After ingest, certify the hash on Bitcoin: [transcript-anchor.md](../hackathon/transcript-anchor.md)

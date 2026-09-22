@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Required Git workflow
+
+- Work, document, review and commit directly on `develop` only.
+- Verify the branch before editing or committing. Preserve unrelated work.
+- Do not create feature branches, modify `main`, or create pull requests into `main`.
+- Run relevant local checks before committing. Push only `develop` when requested; no force pushes or deployments are implied.
+- See `docs/hackathon/develop-workflow.md` for the complete workflow.
+
+
 ## Cursor Cloud specific instructions
 
 This repo is a monorepo with three components:
@@ -51,7 +60,7 @@ A placeholder value is fine for local dev (real Google login won't work, but use
 
 ### Contracts (Hardhat) — optional / secondary
 
-Transcript certification is **Bitcoin OP_RETURN** (Django `content.bitcoin` + `broadcast_transcript_anchor`), not an EVM registry. See `docs/api/transcript-anchor.md`.
+Transcript certification is **Bitcoin OP_RETURN** (Django `content.bitcoin` + `broadcast_transcript_anchor`), not an EVM registry. See `docs/hackathon/transcript-anchor.md`.
 
 `npx hardhat compile` may still fail if a draft Chainlink file under `contracts/` uses the deprecated Client API (`buildChainlinkRequest`/`sendChainlinkRequestTo`). Prefer drafts in `contracts/drafts/`. `contracts/test/` is empty (`.gitkeep` only).
 

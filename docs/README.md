@@ -20,7 +20,7 @@ Complete API reference and usage guides:
 - [Authentication](api/authentication.md) - Authentication endpoints and flows
 - [Endpoints](api/endpoints.md) - Complete endpoint reference
 - [Transcript ingest](api/transcript-ingest.md) - External worker queue + transcript upsert (S3 / YouTube)
-- [Transcript certification](api/transcript-anchor.md) - Bitcoin OP_RETURN anchors for transcript `text_hash`
+- [Transcript certification](hackathon/transcript-anchor.md) - Bitcoin OP_RETURN anchors for transcript `text_hash`
 - [Examples](api/examples.md) - API usage examples
 - [Errors](api/errors.md) - Error codes and handling
 
@@ -77,6 +77,9 @@ Security practices and guidelines:
 
 ## 🚀 Quick Links
 
+- **[Ethereum hackathon specification](hackathon/hackathon-ethereum-credentials.md)** — Agreed NFT credentials, IPFS course snapshots, and transcript registry scope (planned).
+- **[Ethereum hackathon development plan](hackathon/hackathon-ethereum-development-plan.md)** — Implementation sequence and acceptance criteria.
+
 - **Getting Started**: [Setup Guide](../Setup.md)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **API Documentation**: [Swagger UI](http://localhost:8000/swagger/) (when running locally)
@@ -96,7 +99,7 @@ This documentation is actively maintained. If you find errors or want to contrib
 
 1. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 2. Create an issue with the `DOCS-XXXX` prefix
-3. Submit a pull request with your improvements
+3. Review and commit your improvements directly to `develop`; follow [the Git workflow](hackathon/develop-workflow.md).
 
 ## 📝 Documentation Standards
 

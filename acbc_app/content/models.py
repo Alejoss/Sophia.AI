@@ -478,6 +478,11 @@ class TranscriptAnchor(models.Model):
     Rows snapshot text_hash at certify time so re-ingested transcripts can be
     re-anchored without rewriting history. Optional ipfs_cid is only a pointer
     to the text off-chain — not part of the Bitcoin proof.
+
+    Planned Ethereum registry integration must reuse the matching archived text
+    and digest, never resolve an old certificate through the latest transcript.
+    A copied btc_txid is a reference, not Ethereum verification of Bitcoin.
+    See docs/hackathon/hackathon-ethereum-credentials.md.
     """
 
     STATUS_PENDING = 'pending'

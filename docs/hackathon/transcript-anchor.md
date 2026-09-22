@@ -6,6 +6,12 @@ it against the on-chain payload (and explorer).
 
 **No EVM / smart-contract path.** Certification is Bitcoin-only.
 
+This describes the current independent transcript-anchoring feature, not
+educational certificate NFTs. The proposed Ethereum work is documented in
+[the hackathon specification](hackathon-ethereum-credentials.md).
+See the [2026-09-22 readiness review](bitcoin-anchor-readiness.md)
+for known reliability gaps and outstanding live validation.
+
 **Implementation**
 
 | Layer | Location |
@@ -17,7 +23,7 @@ it against the on-chain payload (and explorer).
 | Env | [`BTC_*`](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring) |
 
 Prerequisite: a `ContentTranscript` with a non-empty `text_hash` (usually from
-[transcript ingest](transcript-ingest.md)).
+[transcript ingest](../api/transcript-ingest.md)).
 
 ---
 
@@ -139,7 +145,8 @@ Body (all optional):
 | `ipfs_cid` | `""` | Off-chain pointer only |
 
 **201** — created. **409** — already exists for current `text_hash` (includes
-existing `anchor`). **403** — not uploader/staff. **404** — no transcript.
+existing `anchor`). **403** — authenticated user is not staff/superuser (uploading
+the content does not grant this permission). **404** — no transcript.
 
 ```bash
 curl -X POST "http://localhost:8000/api/content/content_details/101/transcript/anchors/" \
@@ -191,13 +198,19 @@ with equivalent whitespace.
 3. Open `btc_txid` on mempool.space for the configured network and confirm the
    `OP_RETURN` data matches.
 
+For an older anchor, use its `certified_plain_text` from the anchor-history API,
+not the current transcript endpoint. Hash its exact UTF-8 bytes without adding
+a newline or BOM. A legacy anchor with no saved text cannot be independently
+reconstructed from its digest alone. An `ipfs_cid` field does not demonstrate
+that upload, pinning or long-term availability has been implemented.
+
 ---
 
 ## Related
 
 - Env: [environment-variables.md — Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring)
 - Payments: [BCH directo](../payments/bch-direct.md) · [NOWPayments](../payments/nowpayments-setup.md) · [payments index](../payments/README.md)
-- Transcript ingest: [transcript-ingest.md](transcript-ingest.md)
+- Transcript ingest: [transcript-ingest.md](../api/transcript-ingest.md)
 - Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md)
 - Permissions: [endpoint-permissions-map.md](../security/endpoint-permissions-map.md)
-- Endpoints index: [endpoints.md](endpoints.md#payments)
+- Endpoints index: [endpoints.md](../api/endpoints.md#payments)

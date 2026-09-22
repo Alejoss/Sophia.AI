@@ -33,6 +33,13 @@ def knowledge_path_image_preview_path(instance, filename):
 
 
 class KnowledgePath(models.Model):
+    """Editable course definition, not an immutable certified course version.
+
+    The planned Ethereum integration must snapshot this course and its ordered
+    nodes before binding learner progress to a published version. Later edits
+    must not change the curriculum referenced by an issued certificate.
+    See docs/hackathon/hackathon-ethereum-credentials.md.
+    """
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_paths')
@@ -158,6 +165,12 @@ class KnowledgePath(models.Model):
 
 
 class Node(models.Model):
+    """Editable lesson whose full title, description and order belong in a snapshot.
+
+    ContentProfile links resolve live content; certification must instead retain
+    version-specific archived material references. A node can have multiple
+    quizzes, all of which need explicit snapshot coverage.
+    """
     MEDIA_TYPES = [
         ('VIDEO', 'Video'),
         ('AUDIO', 'Audio'),

@@ -96,7 +96,7 @@ Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcri
 | GET | `/api/content/content_details/<content_id>/transcript/anchors/` | `AllowAny` |
 | POST | `/api/content/content_details/<content_id>/transcript/anchors/` | JWT; uploader of the content **or** staff |
 
-`POST` only creates a `pending` row (no broadcast). Broadcast uses the server WIF via `manage.py broadcast_transcript_anchor` — not an HTTP endpoint. Full contract: [transcript-anchor.md](../api/transcript-anchor.md).
+`POST` only creates a `pending` row (no broadcast). Broadcast uses the server WIF via `manage.py broadcast_transcript_anchor` — not an HTTP endpoint. Full contract: [transcript-anchor.md](../hackathon/transcript-anchor.md).
 
 ## Payments
 

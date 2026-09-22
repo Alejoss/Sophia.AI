@@ -15,6 +15,14 @@ def upload_question_image(instance, filename):
 
 
 class Quiz(models.Model):
+    """Live assessment definition; changes are not currently versioned.
+
+    Course snapshots must freeze assessment requirements and all relevant quiz
+    versions. Public exports must explicitly select safe fields: Option.is_correct
+    and learner attempts/answers are not public course metadata. Restricted
+    assessment evidence needs separate archival and disclosure rules.
+    See docs/hackathon/hackathon-ethereum-credentials.md.
+    """
     node = models.ForeignKey('knowledge_paths.Node', on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)

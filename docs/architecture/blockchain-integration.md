@@ -16,7 +16,7 @@ transcript in a Bitcoin `OP_RETURN`.** There is no EVM registry for this flow.
 | `broadcast_transcript_anchor` | Ops command to broadcast and refresh confirmations |
 | UI panel | Paid request CTA + checkout chooser (tokens / crypto / BCH) |
 
-Full contract (payload format, endpoints, CLI): **[transcript-anchor.md](../api/transcript-anchor.md)**.
+Full contract (payload format, endpoints, CLI): **[transcript-anchor.md](../hackathon/transcript-anchor.md)**.
 
 Public paid requests (`TranscriptAnchorRequest`) use a checkout chooser: platform tokens, hosted [NOWPayments](../payments/nowpayments-setup.md), or self-custody [BCH directo](../payments/bch-direct.md). After payment the platform wallet broadcasts automatically; `paid_pending_review` only means broadcast is still in progress or deferred.
 
@@ -85,7 +85,7 @@ for Bitcoin transcript anchoring.
 
 ## Related Documentation
 
-- [Transcript certification (Bitcoin)](../api/transcript-anchor.md)
+- [Transcript certification (Bitcoin)](../hackathon/transcript-anchor.md)
 - [Payments](../payments/README.md) (NOWPayments + BCH direct for paid requests)
 - [Transcript ingest](../api/transcript-ingest.md)
 - [Environment variables](../deployment/environment-variables.md)

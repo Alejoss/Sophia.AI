@@ -8,7 +8,7 @@ Thank you for your interest in contributing to Sophia.AI Academia Blockchain! Th
 - [Getting Started](#getting-started)
 - [Development Workflow](#development-workflow)
 - [Issue Guidelines](#issue-guidelines)
-- [Pull Request Process](#pull-request-process)
+- [Change Review Process](#change-review-process)
 - [Code Style](#code-style)
 - [Testing](#testing)
 - [Documentation](#documentation)
@@ -19,48 +19,18 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ## Getting Started
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Sophia.AI-Academia-Blockchain.git
-   cd Sophia.AI-Academia-Blockchain
-   ```
-3. **Set up your development environment** following [Setup.md](Setup.md)
-4. **Create a branch** for your work (see [Development Workflow](#development-workflow))
+Clone the repository and follow [Setup.md](Setup.md). All development and documentation work takes place directly on `develop`.
 
 ## Development Workflow
 
-### Branch Naming Convention
+1. Verify the current branch is `develop` before editing, staging or committing. If it is not, stop and preserve existing work before switching.
+2. Work only on `develop`; do not create feature branches, modify `main`, or open pull requests into `main`.
+3. Make one focused change at a time, with relevant tests and documentation.
+4. Review the diff and run the appropriate local checks.
+5. Commit the reviewed changes directly to `develop`. Use an actual issue code when available; never invent issue numbers.
+6. If publishing changes is requested, push only `develop`. Do not force-push, merge into `main`, or deploy as part of this workflow.
 
-Create branches using the issue code format: `${ISSUE-CODE}`
-
-Issue codes follow this pattern:
-- `DOCS-XXXX` - Documentation issues
-- `FRONT-XXXX` - Frontend issues
-- `BACK-XXXX` - Backend issues
-- `OTHER-XXXX` - Other issues
-
-Example: `FRONT-0123` for a frontend issue numbered 0123
-
-### Workflow Steps
-
-1. **Find or create an issue** in the GitHub Issues section
-2. **Assign the issue to yourself** if you plan to work on it
-3. **Create a feature branch** from `main`:
-   ```bash
-   git checkout main
-   git pull origin main
-   git checkout -b FRONT-0123
-   ```
-4. **Make your changes** following the code style guidelines
-5. **Write or update tests** for your changes
-6. **Update documentation** if needed
-7. **Commit your changes** (see [Commit Guidelines](#commit-guidelines))
-8. **Push to your fork**:
-   ```bash
-   git push origin FRONT-0123
-   ```
-9. **Create a Pull Request** from your fork to the main repository
+See [the detailed workflow](docs/hackathon/develop-workflow.md).
 
 ## Issue Guidelines
 
@@ -88,53 +58,22 @@ When creating a new issue:
 
 Followed by a slash and a four-digit number (e.g., `0123`, `0456`).
 
-## Pull Request Process
+## Change Review Process
 
-### Before Submitting
+Before committing to `develop`:
 
-- [ ] Code follows the project's style guidelines
-- [ ] Tests pass locally (`docker-compose exec backend python manage.py test`)
-- [ ] Documentation is updated if needed
-- [ ] Commit messages follow the convention
-- [ ] Branch is up to date with `main`
+- Review the complete diff and exclude unrelated changes.
+- Run relevant tests and record their results and limitations.
+- Update documentation and comments where behavior changes.
+- Summarize the problem, resulting behavior and validation in the commit.
 
-### PR Description Template
-
-```markdown
-## Description
-Brief description of changes
-
-## Related Issue
-Closes #ISSUE-NUMBER
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-
-## Testing
-Describe the tests you ran and their results
-
-## Checklist
-- [ ] Code follows style guidelines
-- [ ] Self-review completed
-- [ ] Comments added for complex code
-- [ ] Documentation updated
-- [ ] No new warnings generated
-```
-
-### Review Process
-
-1. A project maintainer will review your PR
-2. Address any feedback or requested changes
-3. Once approved, your PR will be merged
+Review takes place on the local diff; a pull request into `main` is not part of this process.
 
 ## Commit Guidelines
 
 ### Commit Message Format
 
-Start commit messages with the issue code:
+When an actual issue exists, start commit messages with its issue code. Otherwise use a descriptive prefix such as `docs:` or `fix:`:
 
 ```
 FRONT-0123: Add user profile edit functionality

@@ -17,13 +17,9 @@ You can collaborate creating issues or solving them.
 
 ## How to solve an issue
 
-- Go to GitHub project, "Issues" section  and read issues.
-- Once you find one issue you can solve, asign it to yourself.
-- Fork the project.
-- From main branch, create a new branch with the name of the issue code.
-- Complete your development in you feature branch.
-- Commit names convention: start your commit names with issue code. For example: "FRONT-0123: some frontend stuff".
-- Push your changes.
-- Create a PR from your feature branch of your fork repo to the main branch in the original repo. 
-- Complete the PR description and other information if it is needed.
-- One ACBC member will review your PR and merge it or comment on it if it is needed.
+- Work directly on `develop`; verify the branch before editing or committing.
+- Do not create feature branches, modify `main`, or open pull requests into `main`.
+- Make focused changes, update documentation, review the diff and run relevant local tests.
+- Commit to `develop`, using the real issue code if one exists.
+- Push only `develop` when requested. Releases and deployments are separate.
+- See [workflow](../../docs/hackathon/develop-workflow.md).
