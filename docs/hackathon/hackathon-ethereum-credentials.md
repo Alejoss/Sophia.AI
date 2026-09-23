@@ -154,8 +154,7 @@ Assessment / quiz objects are intentionally absent from the hashed document.
       "hashAlgorithm": "sha256",
       "contentHash": "<64-hex-character-digest>",
       "textFormat": "sophia-normalized-transcript-v1",
-      "contentId": "sophia:content:55",
-      "coverage": "archived"
+      "contentId": "sophia:content:55"
     }]
   }]
 }

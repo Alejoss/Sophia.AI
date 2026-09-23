@@ -1060,8 +1060,8 @@ const KnowledgePathEdit = () => {
                     color={snapshotPreview.readyForStrictPublish ? "success" : "warning"}
                     label={
                       snapshotPreview.readyForStrictPublish
-                        ? "Listo para publish estricto"
-                        : "No listo para publish estricto"
+                        ? "Listo para publish (hash + IPFS en todos los materiales)"
+                        : "No listo: falta hash y/o IPFS en algún material"
                     }
                   />
                 </Stack>

@@ -29,8 +29,7 @@
           "hashAlgorithm": "sha256",
           "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "textFormat": "sophia-normalized-transcript-v1",
-          "contentId": "sophia:content:55",
-          "coverage": "archived"
+          "contentId": "sophia:content:55"
         }
       ]
     }

@@ -21,7 +21,6 @@ TRANSCRIPT_TEXT_FORMAT = "sophia-normalized-transcript-v1"
 
 ALLOWED_MEDIA_TYPES = frozenset({"VIDEO", "AUDIO", "TEXT", "IMAGE"})
 ALLOWED_MATERIAL_TYPES = frozenset({"transcript", "source"})
-ALLOWED_COVERAGE = frozenset({"archived", "missing", "skipped"})
 
 _ISO_Z_SECOND = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -36,6 +35,18 @@ _ETH_ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 class KnowledgePathSnapshotError(ValueError):
     """Invalid knowledge-path or credential snapshot document."""
+
+
+def material_is_complete(material: Mapping[str, Any]) -> bool:
+    """True when both a real content hash and an IPFS URI are present."""
+    content_hash = material.get("contentHash")
+    uri = material.get("uri")
+    return (
+        isinstance(content_hash, str)
+        and bool(_HEX64.match(content_hash))
+        and isinstance(uri, str)
+        and uri.startswith("ipfs://")
+    )
 
 
 def jcs_dumps(value: Any) -> str:
@@ -143,7 +154,7 @@ def validate_completion_requirements(requirements: Mapping[str, Any]) -> None:
         )
 
 
-def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> None:
+def validate_material(material: Mapping[str, Any], *, require_complete: bool) -> None:
     unexpected = set(material) - {
         "type",
         "uri",
@@ -151,23 +162,21 @@ def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> 
         "contentHash",
         "textFormat",
         "contentId",
-        "coverage",
     }
     if unexpected:
         raise KnowledgePathSnapshotError(
             f"material has unexpected fields: {sorted(unexpected)}"
+        )
+    if "coverage" in material:
+        raise KnowledgePathSnapshotError(
+            'material.coverage was removed; completeness is deduced from '
+            'contentHash + ipfs:// uri'
         )
 
     material_type = material.get("type")
     if material_type not in ALLOWED_MATERIAL_TYPES:
         raise KnowledgePathSnapshotError(
             f"material.type must be one of {sorted(ALLOWED_MATERIAL_TYPES)}"
-        )
-
-    coverage = material.get("coverage")
-    if coverage not in ALLOWED_COVERAGE:
-        raise KnowledgePathSnapshotError(
-            f"material.coverage must be one of {sorted(ALLOWED_COVERAGE)}"
         )
 
     if material.get("hashAlgorithm") != HASH_ALGORITHM:
@@ -186,25 +195,21 @@ def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> 
         )
 
     uri = _require_str(material, "uri")
-    if coverage == "archived":
-        if not uri.startswith("ipfs://"):
-            raise KnowledgePathSnapshotError(
-                'material.uri must be an ipfs:// URI when coverage is "archived"'
-            )
-        if not _HEX64.match(content_hash):
-            raise KnowledgePathSnapshotError(
-                'material.contentHash must be 64 lowercase hex chars when '
-                'coverage is "archived"'
-            )
-        if not _CONTENT_ID.match(content_id):
-            raise KnowledgePathSnapshotError(
-                'material.contentId must match sophia:content:{id} when '
-                'coverage is "archived"'
-            )
-    elif uri != "":
+    if uri != "" and not uri.startswith("ipfs://"):
         raise KnowledgePathSnapshotError(
-            'material.uri must be "" when there is no IPFS archival yet '
-            '(coverage is not "archived")'
+            'material.uri must be "" or an ipfs:// URI'
+        )
+
+    # Completeness is deduced: both hash and IPFS URI means the file is present.
+    has_hash = bool(_HEX64.match(content_hash))
+    has_ipfs = uri.startswith("ipfs://")
+    if has_ipfs and not has_hash:
+        raise KnowledgePathSnapshotError(
+            "material with an ipfs:// uri must also have a contentHash"
+        )
+    if has_hash and has_ipfs and not _CONTENT_ID.match(content_id):
+        raise KnowledgePathSnapshotError(
+            "complete materials require contentId matching sophia:content:{id}"
         )
 
     if material_type == "transcript":
@@ -218,13 +223,14 @@ def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> 
             "source materials must not include textFormat"
         )
 
-    if strict_archived and coverage != "archived":
+    if require_complete and not material_is_complete(material):
         raise KnowledgePathSnapshotError(
-            "strict publication requires every material coverage to be archived"
+            "strict publication requires every material to have contentHash "
+            "and an ipfs:// uri"
         )
 
 
-def validate_node(node: Mapping[str, Any], *, strict_archived: bool) -> None:
+def validate_node(node: Mapping[str, Any], *, require_complete: bool) -> None:
     unexpected = set(node) - {
         "nodeId",
         "position",
@@ -268,13 +274,13 @@ def validate_node(node: Mapping[str, Any], *, strict_archived: bool) -> None:
     for material in materials:
         if not isinstance(material, Mapping):
             raise KnowledgePathSnapshotError("materials entries must be objects")
-        validate_material(material, strict_archived=strict_archived)
+        validate_material(material, require_complete=require_complete)
 
 
 def validate_knowledge_path_snapshot(
     document: Mapping[str, Any],
     *,
-    strict_archived: bool = True,
+    require_complete: bool = True,
 ) -> None:
     """Validate a logical ``sophia-knowledge-path-v1`` document."""
     unexpected = set(document) - {
@@ -339,7 +345,7 @@ def validate_knowledge_path_snapshot(
     for index, node in enumerate(nodes):
         if not isinstance(node, Mapping):
             raise KnowledgePathSnapshotError("nodes entries must be objects")
-        validate_node(node, strict_archived=strict_archived)
+        validate_node(node, require_complete=require_complete)
         position = node["position"]
         if position in seen_positions:
             raise KnowledgePathSnapshotError(
@@ -425,9 +431,9 @@ def validate_credential_artifact(document: Mapping[str, Any]) -> None:
 def hash_knowledge_path_snapshot(
     document: Mapping[str, Any],
     *,
-    strict_archived: bool = True,
+    require_complete: bool = True,
 ) -> str:
-    validate_knowledge_path_snapshot(document, strict_archived=strict_archived)
+    validate_knowledge_path_snapshot(document, require_complete=require_complete)
     return sha256_hex_of_canonical_json(document)
 
 

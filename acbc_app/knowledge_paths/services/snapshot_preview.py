@@ -1,13 +1,14 @@
 """Build live knowledge-path snapshot previews for author testing.
 
-Preview documents follow ``sophia-knowledge-path-v1`` but may use
-``coverage: "missing"`` until IPFS archival exists. Transcripts are preferred
-for VIDEO/AUDIO; ``source`` materials are allowed when no transcript exists.
+Preview documents follow ``sophia-knowledge-path-v1``. Completeness is deduced
+from ``contentHash`` + ``ipfs://`` URI (no separate coverage field). Transcripts
+are preferred for VIDEO/AUDIO; ``source`` materials are allowed when no
+transcript exists.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any
 
 from django.utils import timezone as django_timezone
@@ -18,6 +19,7 @@ from knowledge_paths.knowledge_path_snapshot import (
     HASH_ALGORITHM,
     hash_knowledge_path_snapshot,
     jcs_dumps,
+    material_is_complete,
     validate_knowledge_path_snapshot,
 )
 from knowledge_paths.models import KnowledgePath, Node
@@ -36,7 +38,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Return (material object, issues).
 
     Unknown IPFS URI and unknown content hash are empty strings — never invented
-    placeholder digests.
+    placeholder digests. A file is present only when both are set.
     """
     issues: list[dict[str, str]] = []
     profile = node.content_profile
@@ -55,7 +57,6 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "hashAlgorithm": HASH_ALGORITHM,
             "contentHash": "",
             "contentId": "",
-            "coverage": "missing",
         }, issues
 
     content = profile.content
@@ -69,7 +70,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "nodeId": f"sophia:node:{node.id}",
             "message": (
                 "Transcript hash is known, but there is no IPFS URI yet. "
-                "uri stays \"\" and coverage stays missing until pinned."
+                "uri stays \"\" until pinned."
             ),
         })
         return {
@@ -79,17 +80,14 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "contentHash": text_hash,
             "textFormat": TRANSCRIPT_TEXT_FORMAT,
             "contentId": content_id,
-            "coverage": "missing",
         }, issues
 
-    # No transcript hash yet: leave contentHash empty; still allow snapshot preview.
     issues.append({
         "code": "NO_CONTENT_HASH",
         "nodeId": f"sophia:node:{node.id}",
         "message": (
             "No transcript/source contentHash yet. contentHash is \"\". "
-            "Strict publish needs archived bytes (transcript or source) with a "
-            "real SHA-256 and an ipfs:// URI."
+            "Strict publish needs a real SHA-256 and an ipfs:// URI."
         ),
     })
     return {
@@ -98,7 +96,6 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
         "hashAlgorithm": HASH_ALGORITHM,
         "contentHash": "",
         "contentId": content_id,
-        "coverage": "missing",
     }, issues
 
 
@@ -168,10 +165,6 @@ def build_knowledge_path_snapshot_document(
         "nodes": snapshot_nodes,
     }
 
-    if author_user_id < 1:
-        # Keep document shape valid for hashing demos; flag the issue above.
-        pass
-
     return document, issues
 
 
@@ -191,9 +184,9 @@ def preview_knowledge_path_snapshot(
     canonical = None
     validation_error = None
     try:
-        validate_knowledge_path_snapshot(document, strict_archived=False)
+        validate_knowledge_path_snapshot(document, require_complete=False)
         canonical = jcs_dumps(document)
-        digest = hash_knowledge_path_snapshot(document, strict_archived=False)
+        digest = hash_knowledge_path_snapshot(document, require_complete=False)
         valid_for_hash = True
     except KnowledgePathSnapshotError as exc:
         validation_error = str(exc)
@@ -201,10 +194,17 @@ def preview_knowledge_path_snapshot(
     ready_for_strict_publish = False
     if valid_for_hash:
         try:
-            validate_knowledge_path_snapshot(document, strict_archived=True)
+            validate_knowledge_path_snapshot(document, require_complete=True)
             ready_for_strict_publish = True
         except KnowledgePathSnapshotError:
             ready_for_strict_publish = False
+
+    incomplete = [
+        f"{node['nodeId']}"
+        for node in document.get("nodes", [])
+        for material in node.get("materials", [])
+        if not material_is_complete(material)
+    ]
 
     return {
         "schemaVersion": "sophia-knowledge-path-v1",
@@ -215,6 +215,7 @@ def preview_knowledge_path_snapshot(
         "digest": digest,
         "validForHash": valid_for_hash,
         "readyForStrictPublish": ready_for_strict_publish,
+        "incompleteMaterials": incomplete,
         "issues": issues,
         "validationError": validation_error,
         "notes": {
@@ -222,14 +223,14 @@ def preview_knowledge_path_snapshot(
                 "The digest is SHA-256 of the RFC 8785 JCS canonical JSON "
                 "(UTF-8), not of the pretty-printed document."
             ),
+            "completeness": (
+                "A material is complete only when contentHash is a real SHA-256 "
+                "and uri is an ipfs:// address. There is no separate coverage field."
+            ),
             "transcripts": (
                 "Transcripts are preferred for VIDEO/AUDIO and must match Bitcoin "
                 "text_hash when used. Snapshots may instead use source materials "
                 "when no transcript exists."
-            ),
-            "ipfs": (
-                "Preview sets coverage=missing and uri=\"\" until exact bytes are "
-                "pinned. Filling uri and setting coverage=archived changes the digest."
             ),
         },
     }

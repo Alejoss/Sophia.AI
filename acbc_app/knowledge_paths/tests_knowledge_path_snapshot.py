@@ -107,21 +107,25 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(logical)
 
-    def test_missing_material_blocked_under_strict_policy(self):
+    def test_incomplete_material_blocked_under_strict_policy(self):
         logical = deepcopy(load_json_fixture("minimal.logical.json"))
-        logical["nodes"][0]["materials"][0]["coverage"] = "missing"
         logical["nodes"][0]["materials"][0]["uri"] = ""
         with self.assertRaises(KnowledgePathSnapshotError):
-            validate_knowledge_path_snapshot(logical, strict_archived=True)
+            validate_knowledge_path_snapshot(logical, require_complete=True)
 
-    def test_empty_content_hash_allowed_when_not_archived(self):
+    def test_empty_content_hash_allowed_when_incomplete(self):
         logical = deepcopy(load_json_fixture("minimal.logical.json"))
-        logical["nodes"][0]["materials"][0]["coverage"] = "missing"
         logical["nodes"][0]["materials"][0]["uri"] = ""
         logical["nodes"][0]["materials"][0]["contentHash"] = ""
-        validate_knowledge_path_snapshot(logical, strict_archived=False)
+        validate_knowledge_path_snapshot(logical, require_complete=False)
         with self.assertRaises(KnowledgePathSnapshotError):
-            validate_knowledge_path_snapshot(logical, strict_archived=True)
+            validate_knowledge_path_snapshot(logical, require_complete=True)
+
+    def test_coverage_field_is_rejected(self):
+        logical = deepcopy(load_json_fixture("minimal.logical.json"))
+        logical["nodes"][0]["materials"][0]["coverage"] = "archived"
+        with self.assertRaises(KnowledgePathSnapshotError):
+            validate_knowledge_path_snapshot(logical, require_complete=False)
 
     def test_floats_are_rejected(self):
         with self.assertRaises(KnowledgePathSnapshotError):

@@ -61,7 +61,6 @@ class SnapshotPreviewBuilderTests(TestCase):
         material = document["nodes"][0]["materials"][0]
         self.assertEqual(material["type"], "transcript")
         self.assertEqual(material["contentHash"], self.expected_hash)
-        self.assertEqual(material["coverage"], "missing")
         self.assertEqual(material["uri"], "")
         codes = {issue["code"] for issue in payload["issues"]}
         self.assertIn("IPFS_URI_PENDING", codes)
@@ -71,10 +70,10 @@ class SnapshotPreviewBuilderTests(TestCase):
         payload = preview_knowledge_path_snapshot(self.path, version=1)
         material = payload["document"]["nodes"][0]["materials"][0]
         self.assertEqual(material["type"], "source")
-        self.assertEqual(material["coverage"], "missing")
         self.assertEqual(material["uri"], "")
         self.assertEqual(material["contentHash"], "")
         self.assertNotIn("textFormat", material)
+        self.assertNotIn("coverage", material)
         self.assertTrue(payload["validForHash"])
         codes = {issue["code"] for issue in payload["issues"]}
         self.assertIn("NO_CONTENT_HASH", codes)
@@ -89,12 +88,12 @@ class SnapshotPreviewBuilderTests(TestCase):
         payload = preview_knowledge_path_snapshot(self.path, version=1)
         validate_knowledge_path_snapshot(
             payload["document"],
-            strict_archived=False,
+            require_complete=False,
         )
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(
                 payload["document"],
-                strict_archived=True,
+                require_complete=True,
             )
 
 

@@ -31,7 +31,7 @@ Hackathon hashing scope (product decision):
 
 Recorded in [knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md):
 
-- `sophia-knowledge-path-v1` field rules, stable IDs, issuer object, material coverage.
+- `sophia-knowledge-path-v1` field rules, stable IDs, issuer object, materials.
 - Completion requirements frozen to platform reality: all nodes, **all** node
   quizzes, `quizPassingScore: 100` (not 80%).
 - Canonicalization: RFC 8785 JCS → UTF-8 → SHA-256; transcript materials reuse

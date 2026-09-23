@@ -115,6 +115,11 @@ and the hackathon will not invent unsourced curriculum claims.
 Each material describes one evidence file for a node. Unknown values use empty
 strings — do **not** invent placeholder hashes or fake IPFS URIs.
 
+There is **no `coverage` field**. Completeness is deduced:
+
+- **File present (complete):** `contentHash` is 64 hex **and** `uri` is `ipfs://…`
+- **File not present yet:** `contentHash` and/or `uri` is `""`
+
 | Field | Type | Rule |
 | --- | --- | --- |
 | `type` | string | `transcript` or `source` |
@@ -123,19 +128,13 @@ strings — do **not** invent placeholder hashes or fake IPFS URIs.
 | `contentHash` | string | 64 lowercase hex chars when known; **`""` if there is no hash yet** |
 | `textFormat` | string | Required for `transcript`: `"sophia-normalized-transcript-v1"`; omit for `source` |
 | `contentId` | string | `sophia:content:{id}` when linked; **`""` if no content is linked** |
-| `coverage` | string | One of the three values below |
 
-#### `coverage` options
+**No IPFS URI:** set `uri` to `""`. Never put a temporary HTTP/S3 URL in `uri`.
 
-| Value | Meaning |
-| --- | --- |
-| `missing` | Evidence is not fully available yet (typical in author preview). `uri` must be `""`. `contentHash` may be `""` or a real digest if the bytes are already known but not pinned. |
-| `archived` | Exact bytes are pinned and committed. Requires `uri` starting with `ipfs://` **and** a real 64-hex `contentHash` (and a real `contentId`). |
-| `skipped` | Explicitly out of scope for this published version (not used for the hackathon demo path). `uri` must be `""`. |
+**No content hash:** set `contentHash` to `""`. Do not invent a provisional digest.
 
-**No IPFS URI:** set `uri` to `""` and keep `coverage` as `missing` (or `skipped`). Never put a temporary HTTP/S3 URL in `uri`.
-
-**No content hash:** set `contentHash` to `""`. Do not invent a provisional digest. A certified publish (`coverage: "archived"`) is blocked until a real hash exists.
+An `ipfs://` URI without a `contentHash` is invalid. A certified publish requires
+every material to be complete (hash + IPFS).
 
 Transcript materials (when a hash exists):
 
@@ -156,14 +155,13 @@ Source materials (TEXT files or other non-transcript bodies):
 
 For hackathon publication of a certified version: **strict**.
 
-- Every node must have at least one material with `coverage: "archived"`.
+- Every node must have at least one **complete** material (`contentHash` +
+  `ipfs://` URI).
 - That material may be a **transcript** (preferred for VIDEO/AUDIO; must match
   Bitcoin `text_hash`) **or** a **source** file/bytes archive when no transcript
   exists. Transcripts are not required to create a snapshot preview.
-- Any `missing` material **blocks** certified publication (preview may still
-  show `coverage: "missing"` with empty `uri` / empty `contentHash` for author testing).
-- `skipped` is reserved for explicit, documented non-goals (not used for the
-  demo path).
+- Incomplete materials (`""` hash and/or `""` URI) are fine in author preview and
+  **block** certified publication.
 - Never silently omit a node. Never claim complete archival when a resource is
   unavailable.
 
