@@ -10,7 +10,8 @@ This describes the current independent transcript-anchoring feature, not
 educational certificate NFTs. The proposed Ethereum work is documented in
 [the hackathon specification](hackathon-ethereum-credentials.md).
 See the [2026-09-22 readiness review](bitcoin-anchor-readiness.md)
-for known reliability gaps and outstanding live validation.
+(updated 2026-09-23) for reliability hardening that was applied and what still
+needs a live signet demonstration.
 
 **Implementation**
 
@@ -86,6 +87,7 @@ Base path under content details:
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated **staff** only. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
 | `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → auto-broadcast. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
+| `GET` | `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/` | Public. Exact UTF-8 snapshot download (`text/plain`) with `X-Text-Hash` / `X-Expected-Text-Hash` / `X-Hash-Match` headers. **404** when `certified_plain_text` was never saved. |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated **staff** only (prepare pending row) |
 
 Public paid requests use `TranscriptAnchorRequest` and a payment method chooser:
@@ -198,11 +200,19 @@ with equivalent whitespace.
 3. Open `btc_txid` on mempool.space for the configured network and confirm the
    `OP_RETURN` data matches.
 
-For an older anchor, use its `certified_plain_text` from the anchor-history API,
-not the current transcript endpoint. Hash its exact UTF-8 bytes without adding
-a newline or BOM. A legacy anchor with no saved text cannot be independently
-reconstructed from its digest alone. An `ipfs_cid` field does not demonstrate
-that upload, pinning or long-term availability has been implemented.
+For an older anchor, download
+`GET .../transcript/anchors/{id}/certified-text/` (or use
+`certified_plain_text` from the anchor-history API), not the current transcript
+endpoint. Hash its exact UTF-8 bytes without adding a newline or BOM. A legacy
+anchor with no saved text returns **404** `certified_text_missing` and cannot be
+independently reconstructed from its digest alone. An `ipfs_cid` field does not
+demonstrate that upload, pinning or long-term availability has been implemented.
+
+Broadcast durability: before Esplora submission the service persists
+`metadata.signed_raw_tx_hex` and `metadata.predicted_txid`, then reconciles by
+txid on retry. `btc_network` is immutable after that preparation.
+`refresh_anchor_confirmations` may demote `anchored` → `btc_broadcast` if
+confirmations fall below `BTC_MIN_CONFIRMATIONS` (reorg).
 
 ---
 
