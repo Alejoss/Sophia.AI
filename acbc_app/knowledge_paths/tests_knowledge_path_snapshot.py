@@ -13,6 +13,7 @@ from knowledge_paths.knowledge_path_snapshot import (
     load_json_fixture,
     read_text_fixture,
     sha256_hex_of_canonical_json,
+    transcript_text_sha256,
     validate_knowledge_path_snapshot,
 )
 
@@ -30,6 +31,14 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
         )
         self.assertEqual(hash_knowledge_path_snapshot(logical), expected_digest)
         self.assertEqual(sha256_hex_of_canonical_json(logical), expected_digest)
+
+    def test_embedded_transcript_text_sha256_is_reconstructible(self):
+        logical = load_json_fixture("minimal.logical.json")
+        text = logical["nodes"][0]["materials"][0]["text"]
+        self.assertEqual(
+            transcript_text_sha256(text),
+            read_text_fixture("minimal.transcript-text.sha256").strip(),
+        )
 
     def test_credential_fixture_matches_canonical_bytes_and_digest(self):
         logical = load_json_fixture("credential.logical.json")
@@ -68,6 +77,17 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
             hash_knowledge_path_snapshot(mutated),
         )
 
+    def test_transcript_text_change_changes_digest(self):
+        logical = load_json_fixture("minimal.logical.json")
+        mutated = deepcopy(logical)
+        mutated["nodes"][0]["materials"][0]["text"] = (
+            logical["nodes"][0]["materials"][0]["text"] + " edited"
+        )
+        self.assertNotEqual(
+            hash_knowledge_path_snapshot(logical),
+            hash_knowledge_path_snapshot(mutated),
+        )
+
     def test_node_order_change_changes_digest(self):
         logical = load_json_fixture("minimal.logical.json")
         second = deepcopy(logical["nodes"][0])
@@ -101,31 +121,24 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(logical)
 
+    def test_uri_and_content_hash_fields_are_rejected(self):
+        logical = deepcopy(load_json_fixture("minimal.logical.json"))
+        logical["nodes"][0]["materials"][0]["uri"] = "ipfs://abc"
+        with self.assertRaises(KnowledgePathSnapshotError):
+            validate_knowledge_path_snapshot(logical, require_complete=False)
+
     def test_non_100_passing_score_is_rejected(self):
         logical = deepcopy(load_json_fixture("minimal.logical.json"))
         logical["completionRequirements"]["quizPassingScore"] = 80
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(logical)
 
-    def test_incomplete_material_blocked_under_strict_policy(self):
+    def test_empty_text_blocked_under_strict_policy(self):
         logical = deepcopy(load_json_fixture("minimal.logical.json"))
-        logical["nodes"][0]["materials"][0]["uri"] = ""
-        with self.assertRaises(KnowledgePathSnapshotError):
-            validate_knowledge_path_snapshot(logical, require_complete=True)
-
-    def test_empty_content_hash_allowed_when_incomplete(self):
-        logical = deepcopy(load_json_fixture("minimal.logical.json"))
-        logical["nodes"][0]["materials"][0]["uri"] = ""
-        logical["nodes"][0]["materials"][0]["contentHash"] = ""
+        logical["nodes"][0]["materials"][0]["text"] = ""
         validate_knowledge_path_snapshot(logical, require_complete=False)
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(logical, require_complete=True)
-
-    def test_coverage_field_is_rejected(self):
-        logical = deepcopy(load_json_fixture("minimal.logical.json"))
-        logical["nodes"][0]["materials"][0]["coverage"] = "archived"
-        with self.assertRaises(KnowledgePathSnapshotError):
-            validate_knowledge_path_snapshot(logical, require_complete=False)
 
     def test_floats_are_rejected(self):
         with self.assertRaises(KnowledgePathSnapshotError):

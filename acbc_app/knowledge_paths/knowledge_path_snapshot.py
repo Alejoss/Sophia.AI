@@ -4,6 +4,11 @@ See docs/hackathon/knowledge-path-snapshot-schema.md for the frozen schema
 contract. This module implements RFC 8785 JCS for the constrained value types
 allowed in ``sophia-knowledge-path-v1`` / ``sophia-credential-v1`` documents
 (no floats).
+
+Materials embed the exact normalized transcript ``text`` (not an IPFS URI or
+content hash). Anyone with that text and ``sophia-normalized-transcript-v1``
+can recompute SHA-256 and match Bitcoin anchors; the knowledge-path digest is
+SHA-256 of the JCS canonical snapshot JSON that contains those texts.
 """
 
 from __future__ import annotations
@@ -16,7 +21,6 @@ from typing import Any, Mapping, Sequence
 
 KNOWLEDGE_PATH_SCHEMA_VERSION = "sophia-knowledge-path-v1"
 CREDENTIAL_SCHEMA_VERSION = "sophia-credential-v1"
-HASH_ALGORITHM = "sha256"
 TRANSCRIPT_TEXT_FORMAT = "sophia-normalized-transcript-v1"
 
 ALLOWED_MEDIA_TYPES = frozenset({"VIDEO", "AUDIO", "TEXT", "IMAGE"})
@@ -38,15 +42,18 @@ class KnowledgePathSnapshotError(ValueError):
 
 
 def material_is_complete(material: Mapping[str, Any]) -> bool:
-    """True when both a real content hash and an IPFS URI are present."""
-    content_hash = material.get("contentHash")
-    uri = material.get("uri")
-    return (
-        isinstance(content_hash, str)
-        and bool(_HEX64.match(content_hash))
-        and isinstance(uri, str)
-        and uri.startswith("ipfs://")
-    )
+    """True when the material embeds non-empty source text."""
+    text = material.get("text")
+    return isinstance(text, str) and text != ""
+
+
+def transcript_text_sha256(text: str) -> str:
+    """SHA-256 of exact UTF-8 bytes (no extra normalization).
+
+    Snapshot ``text`` must already be ``sophia-normalized-transcript-v1``
+    bytes-as-unicode, matching Bitcoin ``TranscriptAnchor`` certified text.
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def jcs_dumps(value: Any) -> str:
@@ -157,9 +164,7 @@ def validate_completion_requirements(requirements: Mapping[str, Any]) -> None:
 def validate_material(material: Mapping[str, Any], *, require_complete: bool) -> None:
     unexpected = set(material) - {
         "type",
-        "uri",
-        "hashAlgorithm",
-        "contentHash",
+        "text",
         "textFormat",
         "contentId",
     }
@@ -167,11 +172,12 @@ def validate_material(material: Mapping[str, Any], *, require_complete: bool) ->
         raise KnowledgePathSnapshotError(
             f"material has unexpected fields: {sorted(unexpected)}"
         )
-    if "coverage" in material:
-        raise KnowledgePathSnapshotError(
-            'material.coverage was removed; completeness is deduced from '
-            'contentHash + ipfs:// uri'
-        )
+    for removed in ("uri", "contentHash", "hashAlgorithm", "coverage"):
+        if removed in material:
+            raise KnowledgePathSnapshotError(
+                f'material.{removed} is not part of the snapshot; embed exact '
+                f'text instead (IPFS pinning is out of band)'
+            )
 
     material_type = material.get("type")
     if material_type not in ALLOWED_MATERIAL_TYPES:
@@ -179,37 +185,12 @@ def validate_material(material: Mapping[str, Any], *, require_complete: bool) ->
             f"material.type must be one of {sorted(ALLOWED_MATERIAL_TYPES)}"
         )
 
-    if material.get("hashAlgorithm") != HASH_ALGORITHM:
-        raise KnowledgePathSnapshotError('material.hashAlgorithm must be "sha256"')
-
-    content_hash = _require_str(material, "contentHash")
-    if content_hash != "" and not _HEX64.match(content_hash):
-        raise KnowledgePathSnapshotError(
-            'material.contentHash must be "" or 64 lowercase hex chars'
-        )
+    text = _require_str(material, "text")
 
     content_id = _require_str(material, "contentId")
     if content_id != "" and not _CONTENT_ID.match(content_id):
         raise KnowledgePathSnapshotError(
             'material.contentId must be "" or match sophia:content:{id}'
-        )
-
-    uri = _require_str(material, "uri")
-    if uri != "" and not uri.startswith("ipfs://"):
-        raise KnowledgePathSnapshotError(
-            'material.uri must be "" or an ipfs:// URI'
-        )
-
-    # Completeness is deduced: both hash and IPFS URI means the file is present.
-    has_hash = bool(_HEX64.match(content_hash))
-    has_ipfs = uri.startswith("ipfs://")
-    if has_ipfs and not has_hash:
-        raise KnowledgePathSnapshotError(
-            "material with an ipfs:// uri must also have a contentHash"
-        )
-    if has_hash and has_ipfs and not _CONTENT_ID.match(content_id):
-        raise KnowledgePathSnapshotError(
-            "complete materials require contentId matching sophia:content:{id}"
         )
 
     if material_type == "transcript":
@@ -225,9 +206,14 @@ def validate_material(material: Mapping[str, Any], *, require_complete: bool) ->
 
     if require_complete and not material_is_complete(material):
         raise KnowledgePathSnapshotError(
-            "strict publication requires every material to have contentHash "
-            "and an ipfs:// uri"
+            "strict publication requires every material to embed non-empty text"
         )
+    if require_complete and not _CONTENT_ID.match(content_id):
+        raise KnowledgePathSnapshotError(
+            "complete materials require contentId matching sophia:content:{id}"
+        )
+    # Keep unused local for clarity in validators reading text presence.
+    _ = text
 
 
 def validate_node(node: Mapping[str, Any], *, require_complete: bool) -> None:

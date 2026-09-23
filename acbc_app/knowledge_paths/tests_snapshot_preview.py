@@ -5,8 +5,9 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from content.models import Content, ContentProfile, ContentTranscript
-from content.transcript_utils import compute_text_hash
+from content.transcript_utils import compute_text_hash, resolve_certified_plain_text
 from knowledge_paths.models import KnowledgePath, Node
+from knowledge_paths.knowledge_path_snapshot import transcript_text_sha256
 from knowledge_paths.services.snapshot_preview import preview_knowledge_path_snapshot
 
 
@@ -31,7 +32,6 @@ class SnapshotPreviewBuilderTests(TestCase):
             content=self.content,
             processed_plain=self.transcript_text,
         )
-        self.expected_hash = compute_text_hash(self.transcript_text)
         self.profile = ContentProfile.objects.create(
             content=self.content,
             user=self.author,
@@ -46,9 +46,10 @@ class SnapshotPreviewBuilderTests(TestCase):
             media_type="VIDEO",
         )
 
-    def test_preview_includes_transcript_material_and_digest(self):
+    def test_preview_embeds_transcript_text_and_digest(self):
         payload = preview_knowledge_path_snapshot(self.path, version=1)
         document = payload["document"]
+        expected_text = resolve_certified_plain_text(self.content.transcript)
 
         self.assertEqual(document["schemaVersion"], "sophia-knowledge-path-v1")
         self.assertEqual(
@@ -56,45 +57,27 @@ class SnapshotPreviewBuilderTests(TestCase):
             f"sophia:knowledge-path:{self.path.id}",
         )
         self.assertTrue(payload["validForHash"])
-        self.assertFalse(payload["readyForStrictPublish"])
-        self.assertEqual(len(document["nodes"]), 1)
+        self.assertTrue(payload["readyForStrictPublish"])
         material = document["nodes"][0]["materials"][0]
         self.assertEqual(material["type"], "transcript")
-        self.assertEqual(material["contentHash"], self.expected_hash)
-        self.assertEqual(material["uri"], "")
-        codes = {issue["code"] for issue in payload["issues"]}
-        self.assertIn("IPFS_URI_PENDING", codes)
+        self.assertEqual(material["text"], expected_text)
+        self.assertNotIn("uri", material)
+        self.assertNotIn("contentHash", material)
+        self.assertEqual(
+            transcript_text_sha256(material["text"]),
+            compute_text_hash(self.transcript_text),
+        )
 
-    def test_preview_allows_source_material_without_transcript(self):
+    def test_preview_allows_empty_text_without_transcript(self):
         ContentTranscript.objects.filter(content=self.content).delete()
         payload = preview_knowledge_path_snapshot(self.path, version=1)
         material = payload["document"]["nodes"][0]["materials"][0]
         self.assertEqual(material["type"], "source")
-        self.assertEqual(material["uri"], "")
-        self.assertEqual(material["contentHash"], "")
-        self.assertNotIn("textFormat", material)
-        self.assertNotIn("coverage", material)
+        self.assertEqual(material["text"], "")
         self.assertTrue(payload["validForHash"])
+        self.assertFalse(payload["readyForStrictPublish"])
         codes = {issue["code"] for issue in payload["issues"]}
-        self.assertIn("NO_CONTENT_HASH", codes)
-
-    def test_empty_content_hash_is_allowed_in_preview_schema(self):
-        from knowledge_paths.knowledge_path_snapshot import (
-            KnowledgePathSnapshotError,
-            validate_knowledge_path_snapshot,
-        )
-
-        ContentTranscript.objects.filter(content=self.content).delete()
-        payload = preview_knowledge_path_snapshot(self.path, version=1)
-        validate_knowledge_path_snapshot(
-            payload["document"],
-            require_complete=False,
-        )
-        with self.assertRaises(KnowledgePathSnapshotError):
-            validate_knowledge_path_snapshot(
-                payload["document"],
-                require_complete=True,
-            )
+        self.assertIn("NO_TRANSCRIPT_TEXT", codes)
 
 
 class SnapshotPreviewAPITests(TestCase):

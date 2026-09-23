@@ -150,10 +150,8 @@ Assessment / quiz objects are intentionally absent from the hashed document.
     "mediaType": "VIDEO",
     "materials": [{
       "type": "transcript",
-      "uri": "ipfs://<transcript-CID>",
-      "hashAlgorithm": "sha256",
-      "contentHash": "<64-hex-character-digest>",
       "textFormat": "sophia-normalized-transcript-v1",
+      "text": "Bitcoin is a peer-to-peer electronic cash system. Transactions are broadcast to the network and confirmed in blocks.",
       "contentId": "sophia:content:55"
     }]
   }]

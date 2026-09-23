@@ -25,10 +25,8 @@
       "materials": [
         {
           "type": "transcript",
-          "uri": "ipfs://bafybeigademotranscriptcid000000000000000000000000001",
-          "hashAlgorithm": "sha256",
-          "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "textFormat": "sophia-normalized-transcript-v1",
+          "text": "Bitcoin is a peer-to-peer electronic cash system. Transactions are broadcast to the network and confirmed in blocks.",
           "contentId": "sophia:content:55"
         }
       ]

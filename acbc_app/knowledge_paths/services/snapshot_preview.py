@@ -1,9 +1,8 @@
 """Build live knowledge-path snapshot previews for author testing.
 
-Preview documents follow ``sophia-knowledge-path-v1``. Completeness is deduced
-from ``contentHash`` + ``ipfs://`` URI (no separate coverage field). Transcripts
-are preferred for VIDEO/AUDIO; ``source`` materials are allowed when no
-transcript exists.
+Preview documents follow ``sophia-knowledge-path-v1``. Materials embed exact
+normalized transcript ``text`` (no IPFS URI / contentHash). Completeness means
+non-empty embedded text.
 """
 
 from __future__ import annotations
@@ -13,13 +12,14 @@ from typing import Any
 
 from django.utils import timezone as django_timezone
 
+from content.transcript_utils import resolve_certified_plain_text
 from knowledge_paths.knowledge_path_snapshot import (
     KnowledgePathSnapshotError,
     TRANSCRIPT_TEXT_FORMAT,
-    HASH_ALGORITHM,
     hash_knowledge_path_snapshot,
     jcs_dumps,
     material_is_complete,
+    transcript_text_sha256,
     validate_knowledge_path_snapshot,
 )
 from knowledge_paths.models import KnowledgePath, Node
@@ -35,11 +35,7 @@ def _utc_now_second() -> str:
 
 
 def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Return (material object, issues).
-
-    Unknown IPFS URI and unknown content hash are empty strings — never invented
-    placeholder digests. A file is present only when both are set.
-    """
+    """Return (material object, issues)."""
     issues: list[dict[str, str]] = []
     profile = node.content_profile
     if profile is None or profile.content_id is None:
@@ -53,48 +49,49 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
         })
         return {
             "type": "source",
-            "uri": "",
-            "hashAlgorithm": HASH_ALGORITHM,
-            "contentHash": "",
+            "text": "",
             "contentId": "",
         }, issues
 
     content = profile.content
     content_id = f"sophia:content:{content.id}"
     transcript = getattr(content, "transcript", None)
-    text_hash = (getattr(transcript, "text_hash", None) or "").strip().lower()
 
-    if text_hash and len(text_hash) == 64:
+    if transcript is not None:
+        text = resolve_certified_plain_text(transcript) or ""
+        if text:
+            return {
+                "type": "transcript",
+                "textFormat": TRANSCRIPT_TEXT_FORMAT,
+                "text": text,
+                "contentId": content_id,
+            }, issues
         issues.append({
-            "code": "IPFS_URI_PENDING",
+            "code": "EMPTY_TRANSCRIPT",
             "nodeId": f"sophia:node:{node.id}",
             "message": (
-                "Transcript hash is known, but there is no IPFS URI yet. "
-                "uri stays \"\" until pinned."
+                "Transcript exists but normalized text is empty. "
+                "text stays \"\" until ingest provides certified plain text."
             ),
         })
         return {
             "type": "transcript",
-            "uri": "",
-            "hashAlgorithm": HASH_ALGORITHM,
-            "contentHash": text_hash,
             "textFormat": TRANSCRIPT_TEXT_FORMAT,
+            "text": "",
             "contentId": content_id,
         }, issues
 
     issues.append({
-        "code": "NO_CONTENT_HASH",
+        "code": "NO_TRANSCRIPT_TEXT",
         "nodeId": f"sophia:node:{node.id}",
         "message": (
-            "No transcript/source contentHash yet. contentHash is \"\". "
-            "Strict publish needs a real SHA-256 and an ipfs:// URI."
+            "No transcript text to embed. Strict publish needs the exact "
+            "normalized plain text in the material."
         ),
     })
     return {
         "type": "source",
-        "uri": "",
-        "hashAlgorithm": HASH_ALGORITHM,
-        "contentHash": "",
+        "text": "",
         "contentId": content_id,
     }, issues
 
@@ -199,12 +196,16 @@ def preview_knowledge_path_snapshot(
         except KnowledgePathSnapshotError:
             ready_for_strict_publish = False
 
-    incomplete = [
-        f"{node['nodeId']}"
-        for node in document.get("nodes", [])
-        for material in node.get("materials", [])
-        if not material_is_complete(material)
-    ]
+    material_digests = []
+    for node in document.get("nodes", []):
+        for material in node.get("materials", []):
+            text = material.get("text") or ""
+            material_digests.append({
+                "nodeId": node.get("nodeId"),
+                "contentId": material.get("contentId"),
+                "complete": material_is_complete(material),
+                "textSha256": transcript_text_sha256(text) if text else "",
+            })
 
     return {
         "schemaVersion": "sophia-knowledge-path-v1",
@@ -215,22 +216,18 @@ def preview_knowledge_path_snapshot(
         "digest": digest,
         "validForHash": valid_for_hash,
         "readyForStrictPublish": ready_for_strict_publish,
-        "incompleteMaterials": incomplete,
+        "materialDigests": material_digests,
         "issues": issues,
         "validationError": validation_error,
         "notes": {
             "hashedBytes": (
-                "The digest is SHA-256 of the RFC 8785 JCS canonical JSON "
-                "(UTF-8), not of the pretty-printed document."
+                "The knowledge-path digest is SHA-256 of the RFC 8785 JCS "
+                "canonical JSON (UTF-8), which includes embedded material text."
             ),
-            "completeness": (
-                "A material is complete only when contentHash is a real SHA-256 "
-                "and uri is an ipfs:// address. There is no separate coverage field."
-            ),
-            "transcripts": (
-                "Transcripts are preferred for VIDEO/AUDIO and must match Bitcoin "
-                "text_hash when used. Snapshots may instead use source materials "
-                "when no transcript exists."
+            "transcriptVerification": (
+                "Given material.text and textFormat sophia-normalized-transcript-v1, "
+                "SHA-256(UTF-8 text) matches Bitcoin TranscriptAnchor.text_hash. "
+                "IPFS is not part of this snapshot."
             ),
         },
     }

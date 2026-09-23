@@ -112,62 +112,56 @@ and the hackathon will not invent unsourced curriculum claims.
 
 ### Material object
 
-Each material describes one evidence file for a node. Unknown values use empty
-strings — do **not** invent placeholder hashes or fake IPFS URIs.
-
-There is **no `coverage` field**. Completeness is deduced:
-
-- **File present (complete):** `contentHash` is 64 hex **and** `uri` is `ipfs://…`
-- **File not present yet:** `contentHash` and/or `uri` is `""`
+Each material embeds the **exact source text** for that node. IPFS pinning is
+**not** part of the snapshot. Do not store `uri`, `contentHash`, or `coverage`.
 
 | Field | Type | Rule |
 | --- | --- | --- |
 | `type` | string | `transcript` or `source` |
-| `uri` | string | `ipfs://…` when pinned; **`""` if there is no IPFS URI yet** |
-| `hashAlgorithm` | string | Always `"sha256"` |
-| `contentHash` | string | 64 lowercase hex chars when known; **`""` if there is no hash yet** |
+| `text` | string | Exact bytes-as-unicode to commit; **`""` if not available yet** |
 | `textFormat` | string | Required for `transcript`: `"sophia-normalized-transcript-v1"`; omit for `source` |
 | `contentId` | string | `sophia:content:{id}` when linked; **`""` if no content is linked** |
 
-**No IPFS URI:** set `uri` to `""`. Never put a temporary HTTP/S3 URL in `uri`.
+#### Completeness (deduced)
 
-**No content hash:** set `contentHash` to `""`. Do not invent a provisional digest.
+- **Complete:** `text` is non-empty (and `contentId` matches `sophia:content:{id}` for strict publish)
+- **Incomplete:** `text` is `""`
 
-An `ipfs://` URI without a `contentHash` is invalid. A certified publish requires
-every material to be complete (hash + IPFS).
+#### Transcript verification (reconstruct the hash)
 
-Transcript materials (when a hash exists):
+1. Take `material.text` exactly as stored (`sophia-normalized-transcript-v1`:
+   already NFC + whitespace-collapsed; no BOM; no added trailing newline).
+2. SHA-256 the UTF-8 encoding of that string.
+3. That digest must equal Bitcoin `TranscriptAnchor.text_hash` /
+   `ContentTranscript.text_hash` for the same certified text.
 
-- Bytes must be the exact UTF-8 output of `normalize_plain_text_for_hash`
-  (NFC + whitespace collapse; no BOM; no added trailing newline).
-- `contentHash` **must** equal `ContentTranscript.text_hash` / Bitcoin
-  `TranscriptAnchor.text_hash` for the same certified text.
-- Optional Bitcoin linkage is **not** stored inside the knowledge-path snapshot.
-  Attach `btc_network` / `btc_txid` later as append-only registry evidence bound
-  to the same digest.
+Anyone with the plain text and this format can reconstruct the material hash
+without IPFS. The **knowledge-path digest** is separate: SHA-256 of the RFC 8785
+JCS canonical form of the whole snapshot JSON (which includes those texts).
 
-Source materials (TEXT files or other non-transcript bodies):
+Transcript materials:
 
-- Archive exact retrieved bytes; hash those bytes with SHA-256.
-- Do not run transcript whitespace normalization on arbitrary files.
+- Prefer `resolve_certified_plain_text` / the same normalization as Bitcoin.
+- Optional Bitcoin tx linkage stays out of band (append-only registry evidence),
+  not inside this snapshot.
+
+Source materials (plain TEXT bodies for the hackathon):
+
+- Embed the exact archived text in `text` the same way.
+- Binary media without a transcript is incomplete until a text representation exists.
 
 ### Completeness policy
 
 For hackathon publication of a certified version: **strict**.
 
-- Every node must have at least one **complete** material (`contentHash` +
-  `ipfs://` URI).
-- That material may be a **transcript** (preferred for VIDEO/AUDIO; must match
-  Bitcoin `text_hash`) **or** a **source** file/bytes archive when no transcript
-  exists. Transcripts are not required to create a snapshot preview.
-- Incomplete materials (`""` hash and/or `""` URI) are fine in author preview and
-  **block** certified publication.
-- Never silently omit a node. Never claim complete archival when a resource is
-  unavailable.
+- Every node must have at least one material with non-empty `text`.
+- Incomplete materials (`text: ""`) are fine in author preview and **block**
+  certified publication.
+- Never silently omit a node.
 
 Author testing: `GET /api/knowledge_paths/<id>/snapshot-preview/` (author/staff)
 and the **Snapshot** tab on the knowledge-path edit page show the live logical
-JSON, JCS canonical form, digest, and gap issues before IPFS publish.
+JSON, JCS canonical form, digest, and gap issues.
 
 ### Excluded from the knowledge-path digest
 
