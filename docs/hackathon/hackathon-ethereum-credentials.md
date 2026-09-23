@@ -1,8 +1,10 @@
 # Sophia hackathon: Ethereum educational credentials and course evidence
 
-Status: agreed product direction; implementation pending.
-Date: 2026-09-21.
-Companion: [Development plan](hackathon-ethereum-development-plan.md).
+Status: agreed product direction; Phase 1 course schema frozen 2026-09-23;
+archival/contract implementation still pending.
+Date: 2026-09-21 (updated 2026-09-23).
+Companion: [Development plan](hackathon-ethereum-development-plan.md),
+[frozen course snapshot schema](course-snapshot-schema.md).
 
 ## Objective
 
@@ -43,9 +45,12 @@ Include:
 
 - Immutable transcript records with SHA-256 digest, IPFS URI and format version.
 - Bitcoin network/transaction evidence associated with the correct digest.
-- Immutable course snapshots, including full titles, descriptions, node order,
-  learning objectives, completion requirements, material and assessment references.
-- Educational NFTs for course completion or event attendance, explicitly typed.
+- Immutable **knowledge-path (course)** snapshots, including full titles,
+  descriptions, node order, completion requirements and archived material
+  references. Hackathon scope does **not** hash event definitions or quiz /
+  public-assessment content (see [course-snapshot-schema.md](course-snapshot-schema.md)).
+- Educational NFTs for course completion (demo). Event attendance credentials may
+  remain in the product without a hashed event schema for this hackathon.
 - Issuer permissions scoped to the course/event offering, with separate administration.
 - Permanent non-transferability, credential validity, revocation and linked replacement.
 - Stable certificate identifiers to prevent duplicate minting on retries.
@@ -114,53 +119,53 @@ implementation decision, not automatic publication of existing course files.
 
 ### Illustrative course snapshot
 
-This example contains placeholders, not valid CIDs or computed digests. The
-passing score is illustrative and must reflect the actual approved course rules.
+Authoritative field rules and fixtures live in
+[course-snapshot-schema.md](course-snapshot-schema.md). The example below is
+aligned with that freeze (placeholders are not valid CIDs or real digests).
+Assessment / quiz objects are intentionally absent from the hashed document.
 
 ```json
 {
   "schemaVersion": "sophia-course-v1",
-  "courseId": "sophia:path:42",
+  "courseId": "sophia:knowledge-path:42",
   "version": 1,
   "title": "Introduction to Bitcoin",
   "description": "The full course description.",
   "publishedAt": "2026-10-01T15:00:00Z",
-  "learningObjectives": ["Explain Bitcoin transactions"],
+  "issuer": {
+    "namespace": "sophia",
+    "authorUserId": 7,
+    "authorUsername": "demo-teacher"
+  },
   "completionRequirements": {
     "allNodesRequired": true,
-    "quizPassingPercentage": 80
+    "allNodeQuizzesRequired": true,
+    "quizPassingScore": 100
   },
   "nodes": [{
     "nodeId": "sophia:node:101",
     "position": 1,
     "title": "What is Bitcoin?",
     "description": "The complete node description, without truncation.",
+    "mediaType": "VIDEO",
     "materials": [{
       "type": "transcript",
       "uri": "ipfs://<transcript-CID>",
       "hashAlgorithm": "sha256",
       "contentHash": "<64-hex-character-digest>",
       "textFormat": "sophia-normalized-transcript-v1",
-      "registryReference": "<immutable-transcript-record-ID>",
+      "contentId": "sophia:content:55",
       "coverage": "archived"
-    }],
-    "assessments": [{
-      "assessmentId": "sophia:quiz:7",
-      "version": 1,
-      "publicDefinitionUri": "ipfs://<quiz-definition-CID>",
-      "publicDefinitionHash": "<64-hex-character-digest>",
-      "privateEvidence": "restricted"
     }]
   }]
 }
 ```
 
-Final schema must also identify the issuer and namespace record references by
-deployment/network where appropriate. Snapshot arrays have deliberate order;
-canonical JSON does not sort lessons for us. Preserve every quiz, not just one
-per node. Public quiz exports use an allowlist and exclude correctness flags.
-Private assessment commitments, if implemented, need randomized commitments and
-authorized disclosure; a plain predictable answer-key hash is insufficient.
+Final schema identifies the issuer inside the snapshot. Registry deployment /
+network namespacing lives beside the document on-chain. Snapshot arrays have
+deliberate order; JCS sorts object keys but does not reorder lessons. Quiz
+content is not part of this digest. Private assessment data stays in controlled
+application storage.
 
 ### Exact hashing conventions
 
@@ -168,10 +173,12 @@ authorized disclosure; a plain predictable answer-key hash is insufficient.
    `normalize_plain_text_for_hash`; encode UTF-8, without BOM or an added newline.
    Archive the exact normalized bytes. SHA-256 must equal the matching Bitcoin
    anchor's `text_hash`. Do not relabel a different transcript as that anchor.
-2. Course/assessment JSON: adopt RFC 8785 JSON Canonicalization Scheme (JCS),
-   serialize UTF-8 and hash the exact bytes using SHA-256. Freeze schema rules
-   for missing/null fields, timestamps and numeric values. JCS does not itself
-   normalize Unicode; preserve strings exactly and document any preprocessing.
+2. Course and credential JSON: adopt RFC 8785 JSON Canonicalization Scheme (JCS),
+   serialize UTF-8 and hash the exact bytes using SHA-256. Floats are forbidden
+   in hashed documents. Freeze schema rules for missing/null fields, timestamps
+   and integers as in [course-snapshot-schema.md](course-snapshot-schema.md).
+   JCS does not itself normalize Unicode; preserve strings exactly and document
+   any preprocessing. Do not apply transcript whitespace collapse to course JSON.
 3. Upload those exact canonical bytes to IPFS. Store the returned URI and digest
    outside the document: a snapshot must not contain its own CID/hash.
 4. Ethereum stores SHA-256 digests as 32-byte values. Do not accidentally replace

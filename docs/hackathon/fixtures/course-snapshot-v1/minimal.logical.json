@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "sophia-course-v1",
+  "courseId": "sophia:knowledge-path:42",
+  "version": 1,
+  "title": "Introduction to Bitcoin",
+  "description": "The full course description.",
+  "publishedAt": "2026-10-01T15:00:00Z",
+  "issuer": {
+    "namespace": "sophia",
+    "authorUserId": 7,
+    "authorUsername": "demo-teacher"
+  },
+  "completionRequirements": {
+    "allNodesRequired": true,
+    "allNodeQuizzesRequired": true,
+    "quizPassingScore": 100
+  },
+  "nodes": [
+    {
+      "nodeId": "sophia:node:101",
+      "position": 1,
+      "title": "What is Bitcoin?",
+      "description": "The complete node description, without truncation.",
+      "mediaType": "VIDEO",
+      "materials": [
+        {
+          "type": "transcript",
+          "uri": "ipfs://bafybeigademotranscriptcid000000000000000000000000001",
+          "hashAlgorithm": "sha256",
+          "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "textFormat": "sophia-normalized-transcript-v1",
+          "contentId": "sophia:content:55",
+          "coverage": "archived"
+        }
+      ]
+    }
+  ]
+}

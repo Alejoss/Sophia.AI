@@ -1,0 +1,260 @@
+# Knowledge-path course snapshot schema (frozen)
+
+Status: **decided for hackathon Phase 1** (2026-09-23).
+Companion: [Ethereum credentials](hackathon-ethereum-credentials.md),
+[development plan](hackathon-ethereum-development-plan.md).
+
+This document freezes the hashed curriculum artifact for Sophia's Crypto World's
+Fair demo. Implementation of archival persistence is Phase 2; this file is the
+contract those later phases must follow.
+
+## Scope decision (hackathon)
+
+| Artifact | Hashed immutable snapshot for hackathon? |
+| --- | --- |
+| Knowledge path (course) | **Yes** — sole curriculum commitment |
+| Event definitions / attendance credentials | **No** — out of hashing scope |
+| Public assessments / quiz question banks | **No** — quiz *content* is not hashed |
+| Credential (NFT) artifact | Yes at mint time (separate schema; see below) |
+
+Quizzes remain **application eligibility checks** (completion still requires
+perfect quiz scores under the rules below). Their questions, options and answer
+keys are **not** included in the course snapshot digest. Changing a quiz after
+publication does not change the course digest; it can still change whether a
+learner is eligible to request a certificate under live app rules. Phase 4 must
+bind eligibility evaluation to the published version's declared
+`completionRequirements`, not to mutable quiz text.
+
+Event certificates may continue to exist in the product, but the hackathon
+demonstration and cryptographic work commit only to knowledge-path completion.
+
+## Stable identifiers
+
+| Entity | Format | Notes |
+| --- | --- | --- |
+| Course | `sophia:knowledge-path:{db_id}` | `db_id` is the `KnowledgePath.id` at first publish |
+| Node | `sophia:node:{db_id}` | `Node.id`; stable across republishes of the same row |
+| Content | `sophia:content:{db_id}` | Underlying `Content.id` for material provenance |
+| Course version | positive integer starting at `1` | Monotone per `courseId`; never reuse |
+
+Do not invent content-addressed course IDs for the demo. Registry references on
+Ethereum will namespace these strings by deployment (chain ID + contract address)
+outside the snapshot document.
+
+## Course snapshot schema (`sophia-course-v1`)
+
+Required top-level fields (no additional properties in the hashed document):
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `schemaVersion` | string | Exactly `"sophia-course-v1"` |
+| `courseId` | string | `sophia:knowledge-path:{id}` |
+| `version` | integer | `>= 1` |
+| `title` | string | Full `KnowledgePath.title`; no truncation |
+| `description` | string | Full description; use `""` if blank — **never `null`** |
+| `publishedAt` | string | UTC ISO-8601 with `Z`, **second** precision (`YYYY-MM-DDTHH:MM:SSZ`) |
+| `issuer` | object | See issuer object |
+| `completionRequirements` | object | See completion requirements |
+| `nodes` | array | Ordered by learning sequence (`Node.order` ascending) |
+
+### Issuer object
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `namespace` | string | `"sophia"` |
+| `authorUserId` | integer | `KnowledgePath.author_id` at publish time |
+| `authorUsername` | string | Username snapshotted at publish time (display only) |
+
+### Completion requirements (actual platform rules)
+
+Live unlock logic already requires every quiz on a preceding node at score
+`100`. Path-complete checks incorrectly inspect only `node.quizzes.first()` in
+places today. The **certified** rule for this schema is the stricter, intended
+rule:
+
+```json
+{
+  "allNodesRequired": true,
+  "allNodeQuizzesRequired": true,
+  "quizPassingScore": 100
+}
+```
+
+Meaning:
+
+1. Every node in `nodes` must be marked completed by the learner.
+2. Every quiz attached to every node at **evaluation time for that published
+   version** must have at least one attempt with `score == 100`.
+3. There is no 80% threshold. Do not substitute other percentages.
+
+`learningObjectives` are **not** in the schema: the database has no such field
+and the hackathon will not invent unsourced curriculum claims.
+
+### Node object
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `nodeId` | string | `sophia:node:{id}` |
+| `position` | integer | 1-based position in the ordered snapshot (`order` rank) |
+| `title` | string | Full node title |
+| `description` | string | Full text or `""` — never `null` |
+| `mediaType` | string | One of `VIDEO`, `AUDIO`, `TEXT`, `IMAGE` |
+| `materials` | array | Archived material references; see below |
+
+**Not in the hashed node:** `assessments`, cover images, votes, prices,
+`ContentProfile` personal notes, live URLs alone without archival.
+
+### Material object
+
+Each material is a commitment to **exact archived bytes**, not to a mutable
+`Content.url`.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `type` | string | `transcript` or `source` |
+| `uri` | string | `ipfs://…` URI of the exact archived bytes (empty string only if `coverage` ≠ `archived`) |
+| `hashAlgorithm` | string | Always `"sha256"` |
+| `contentHash` | string | 64 lowercase hex chars of the archived bytes |
+| `textFormat` | string | Required for `transcript`: `"sophia-normalized-transcript-v1"`; omit for `source` |
+| `contentId` | string | `sophia:content:{id}` |
+| `coverage` | string | `archived` \| `missing` \| `skipped` |
+
+Transcript materials:
+
+- Bytes must be the exact UTF-8 output of `normalize_plain_text_for_hash`
+  (NFC + whitespace collapse; no BOM; no added trailing newline).
+- `contentHash` **must** equal `ContentTranscript.text_hash` / Bitcoin
+  `TranscriptAnchor.text_hash` for the same certified text.
+- Optional Bitcoin linkage is **not** stored inside the course snapshot. Attach
+  `btc_network` / `btc_txid` later as append-only registry evidence bound to the
+  same digest.
+
+Source materials (TEXT files or other non-transcript bodies):
+
+- Archive exact retrieved bytes; hash those bytes with SHA-256.
+- Do not run transcript whitespace normalization on arbitrary files.
+
+### Completeness policy
+
+For hackathon publication of a certified version: **strict**.
+
+- Every node must have at least one material with `coverage: "archived"`.
+- Any `missing` material **blocks** publication.
+- `skipped` is reserved for explicit, documented non-goals (not used for the
+  demo path).
+- Never silently omit a node. Never claim complete archival when a resource is
+  unavailable.
+
+### Excluded from the course digest
+
+- Path cover images and focal points
+- `is_visible`, `certificates_enabled`, prices, sales flags, purchases
+- Quiz titles, questions, options, answer keys
+- Learner progress, attempts, grades, PII
+- IPFS CID / snapshot self-hash (stored beside the document, never inside it)
+- Token IDs, transaction hashes, chain IDs
+
+## Exact hashing conventions
+
+### Course snapshot JSON
+
+1. Build the logical document conforming to `sophia-course-v1`.
+2. **Forbid floats** in the hashed document (versions and scores are integers).
+3. Canonicalize with **RFC 8785 JSON Canonicalization Scheme (JCS)**.
+4. Encode the canonical text as UTF-8 (no BOM).
+5. `SHA-256` → 64 lowercase hex characters.
+6. Upload those **exact** canonical bytes to IPFS. Persist `uri` + digest in
+   application storage **outside** the document.
+
+JCS sorts object members by name (UTF-16 code unit order). Array order is
+significant: `nodes` and `materials` must already be in the intended sequence
+before canonicalization. JCS does **not** Unicode-normalize string values;
+preserve NFC for titles/descriptions as stored at publish time (do not apply
+transcript whitespace collapse to course JSON strings).
+
+Pretty-printed JSON is a presentation view only unless it byte-matches the
+committed canonical form. Verification downloads must offer the exact bytes.
+
+Implementation: `knowledge_paths.course_snapshot` and fixtures under
+`docs/hackathon/fixtures/course-snapshot-v1/`.
+
+### Transcript material bytes
+
+Reuse `content.transcript_utils.normalize_plain_text_for_hash` /
+`compute_text_hash`. Archive the normalized UTF-8 text; do not re-normalize
+differently for IPFS.
+
+### Credential artifact (`sophia-credential-v1`)
+
+Hashed at mint time, separate from the course snapshot:
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `schemaVersion` | string | `"sophia-credential-v1"` |
+| `credentialId` | string | `sophia:credential:{uuid}` (stable issuance id) |
+| `type` | string | `"knowledge_path_completion"` for the demo |
+| `recipient` | string | Checksummed `0x` Ethereum address |
+| `courseId` | string | Same as snapshot |
+| `courseVersion` | integer | Same as snapshot |
+| `courseSnapshotHash` | string | 64-hex SHA-256 of the course canonical bytes |
+| `issuedAt` | string | UTC second-precision `Z` timestamp |
+| `issuer` | object | Same shape as course issuer (snapshotted) |
+
+Hash with the same JCS → UTF-8 → SHA-256 pipeline. Do **not** put `tokenId`,
+`txHash`, or `chainId` inside the pre-mint artifact (they would be circular).
+Store chain metadata beside the credential after confirmation.
+
+Event credential types are deferred with event hashing.
+
+## Demo path and publication rights
+
+| Decision | Choice |
+| --- | --- |
+| Demo subject | One dedicated public knowledge path (not faker seed paths) |
+| Working title | “Introduction to Bitcoin” (English demo materials) |
+| Rights | Only author-owned or explicitly licensed public demo materials; no private paid library content |
+| Certificates | `certificates_enabled=true` on the demo path |
+| Language | English curriculum text for judging; UI bilingual is Phase 6 |
+
+Seeded `populate_knowledge_paths` data is **not** the demo cohort. Phase 2 will
+create or select the real path and archive its materials under this schema.
+
+## Deployment / ops decisions (planning only)
+
+| Topic | Decision |
+| --- | --- |
+| Ethereum network | Public test network for demo (default target: **Sepolia**); confirm against current track rules before deploy |
+| Funds | No mainnet spend during planning; platform signer pays testnet gas at issuance |
+| Pinning | Pin exact canonical bytes + material files; keep an offline/backup copy of the same bytes |
+| Backup | Application-controlled object storage or repo fixtures for the demo artifacts |
+| Wallet control | Before binding `recipient`, require a signature proving control of the address (SIWE or personal_sign over a server challenge); details in Phase 4 |
+| Legacy certificates | Do not silently mint NFTs for pre-existing `Certificate` rows |
+
+## Recipient wallet-control flow (summary)
+
+1. Authenticated learner requests certificate for a published course version they
+   completed under `completionRequirements`.
+2. Learner submits a recipient address and signs a challenge bound to
+   `user_id` + `courseId` + `courseVersion` + address.
+3. Server verifies signature, persists wallet + idempotency key, then mints.
+4. Students need no ETH; the platform signer broadcasts.
+
+## Acceptance for Phase 1
+
+- [x] Courses-only hashing scope recorded (events and assessment content excluded)
+- [x] `sophia-course-v1` field rules and completion requirements frozen
+- [x] Hashing pipeline frozen (JCS + SHA-256; transcript rules reused)
+- [x] Exact-byte fixtures and deterministic tests added
+- [x] Demo path policy and testnet/pinning/wallet decisions recorded
+- [ ] Live demo path content authored/archived (Phase 2)
+
+## Fixture index
+
+| File | Purpose |
+| --- | --- |
+| `fixtures/course-snapshot-v1/minimal.logical.json` | Logical document (key order as authored) |
+| `fixtures/course-snapshot-v1/minimal.canonical.json` | RFC 8785 canonical bytes (single line) |
+| `fixtures/course-snapshot-v1/minimal.sha256` | Expected digest |
+| `fixtures/course-snapshot-v1/credential.logical.json` | Minimal credential artifact |
+| `fixtures/course-snapshot-v1/credential.canonical.json` | Canonical credential bytes |
+| `fixtures/course-snapshot-v1/credential.sha256` | Credential digest |
