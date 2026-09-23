@@ -11,6 +11,7 @@ from content.bitcoin.service import (
     AnchorBroadcastError,
     broadcast_anchor,
     ensure_pending_anchor,
+    set_anchor_network,
 )
 from content.models import Content, ContentTranscript, TranscriptAnchor, TranscriptAnchorRequest
 
@@ -85,6 +86,9 @@ def fulfill_paid_anchor_request(
     Idempotent. On fee/wallet failures the request stays ``paid_pending_review``
     (retry via admin or a later payment-fulfillment path). Payment is never
     rolled back. Set ``raise_on_defer=True`` for admin UX that needs an error.
+
+    Network broadcast runs outside the request-row transaction so durable
+    broadcast/failure persistence in ``broadcast_anchor`` can commit.
     """
     with transaction.atomic():
         # of=('self',): Postgres rejects FOR UPDATE on the nullable side of an
@@ -112,6 +116,7 @@ def fulfill_paid_anchor_request(
             or TranscriptAnchor.BTC_NETWORK_SIGNET
         ).lower()
         anchored_by = actor or req.requester
+        req_id = req.pk
 
         try:
             anchor = ensure_pending_anchor(
@@ -123,22 +128,20 @@ def fulfill_paid_anchor_request(
                 raise AnchorRequestError(
                     'El hash de la transcripción cambió; no se puede emitir este anclaje.'
                 )
-            if anchor.btc_network != network:
-                anchor.btc_network = network
-                anchor.save(update_fields=['btc_network', 'updated_at'])
-            if not (anchor.status == TranscriptAnchor.STATUS_ANCHORED and anchor.btc_txid):
-                if not (
-                    anchor.status == TranscriptAnchor.STATUS_BTC_BROADCAST
-                    and anchor.btc_txid
-                ):
-                    # Network I/O while holding the row lock — same as prior admin path.
-                    # Payment is already committed in a separate transaction.
-                    anchor = broadcast_anchor(anchor, dry_run=False)
+            set_anchor_network(anchor, network)
+            already_on_chain = bool(
+                anchor.btc_txid
+                and anchor.status in (
+                    TranscriptAnchor.STATUS_BTC_BROADCAST,
+                    TranscriptAnchor.STATUS_ANCHORED,
+                )
+            )
+            anchor_id = anchor.pk
         except AnchorBroadcastError as exc:
             req.review_note = str(exc)[:2000]
             req.save(update_fields=['review_note', 'updated_at'])
             logger.warning(
-                'Fulfill anchor_request=%s deferred: %s',
+                'Fulfill anchor_request=%s deferred during prepare: %s',
                 req.pk,
                 exc,
             )
@@ -158,6 +161,57 @@ def fulfill_paid_anchor_request(
             )
             return req
 
+        if already_on_chain:
+            req.anchor = anchor
+            req.status = TranscriptAnchorRequest.STATUS_APPROVED
+            if actor is not None:
+                req.reviewed_by = actor
+                req.reviewed_at = timezone.now()
+            req.review_note = ''
+            update_fields = ['anchor', 'status', 'review_note', 'updated_at']
+            if actor is not None:
+                update_fields.extend(['reviewed_by', 'reviewed_at'])
+            req.save(update_fields=update_fields)
+            return req
+
+    # Broadcast outside the request lock so durable tx persistence can commit.
+    try:
+        anchor = broadcast_anchor(
+            TranscriptAnchor.objects.get(pk=anchor_id),
+            dry_run=False,
+        )
+    except AnchorBroadcastError as exc:
+        with transaction.atomic():
+            req = (
+                TranscriptAnchorRequest.objects
+                .select_for_update(of=('self',))
+                .get(pk=req_id)
+            )
+            if req.status == TranscriptAnchorRequest.STATUS_APPROVED:
+                return req
+            req.review_note = str(exc)[:2000]
+            req.save(update_fields=['review_note', 'updated_at'])
+        logger.warning(
+            'Fulfill anchor_request=%s deferred: %s',
+            req_id,
+            exc,
+        )
+        if raise_on_defer:
+            raise AnchorRequestError(
+                'No se pudo emitir aún (comisiones o fondos). '
+                'El pago está confirmado; se reintentará más tarde.'
+            ) from exc
+        return TranscriptAnchorRequest.objects.get(pk=req_id)
+
+    with transaction.atomic():
+        req = (
+            TranscriptAnchorRequest.objects
+            .select_for_update(of=('self',))
+            .select_related('content', 'requester')
+            .get(pk=req_id)
+        )
+        if req.status == TranscriptAnchorRequest.STATUS_APPROVED:
+            return req
         req.anchor = anchor
         req.status = TranscriptAnchorRequest.STATUS_APPROVED
         if actor is not None:
