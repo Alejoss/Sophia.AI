@@ -174,15 +174,15 @@ def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> 
         raise KnowledgePathSnapshotError('material.hashAlgorithm must be "sha256"')
 
     content_hash = _require_str(material, "contentHash")
-    if not _HEX64.match(content_hash):
+    if content_hash != "" and not _HEX64.match(content_hash):
         raise KnowledgePathSnapshotError(
-            "material.contentHash must be 64 lowercase hex chars"
+            'material.contentHash must be "" or 64 lowercase hex chars'
         )
 
     content_id = _require_str(material, "contentId")
-    if not _CONTENT_ID.match(content_id):
+    if content_id != "" and not _CONTENT_ID.match(content_id):
         raise KnowledgePathSnapshotError(
-            "material.contentId must match sophia:content:{id}"
+            'material.contentId must be "" or match sophia:content:{id}'
         )
 
     uri = _require_str(material, "uri")
@@ -191,9 +191,20 @@ def validate_material(material: Mapping[str, Any], *, strict_archived: bool) -> 
             raise KnowledgePathSnapshotError(
                 'material.uri must be an ipfs:// URI when coverage is "archived"'
             )
+        if not _HEX64.match(content_hash):
+            raise KnowledgePathSnapshotError(
+                'material.contentHash must be 64 lowercase hex chars when '
+                'coverage is "archived"'
+            )
+        if not _CONTENT_ID.match(content_id):
+            raise KnowledgePathSnapshotError(
+                'material.contentId must match sophia:content:{id} when '
+                'coverage is "archived"'
+            )
     elif uri != "":
         raise KnowledgePathSnapshotError(
-            'material.uri must be "" when coverage is not "archived"'
+            'material.uri must be "" when there is no IPFS archival yet '
+            '(coverage is not "archived")'
         )
 
     if material_type == "transcript":

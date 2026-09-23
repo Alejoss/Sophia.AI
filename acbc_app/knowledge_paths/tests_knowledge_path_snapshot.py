@@ -114,6 +114,15 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
         with self.assertRaises(KnowledgePathSnapshotError):
             validate_knowledge_path_snapshot(logical, strict_archived=True)
 
+    def test_empty_content_hash_allowed_when_not_archived(self):
+        logical = deepcopy(load_json_fixture("minimal.logical.json"))
+        logical["nodes"][0]["materials"][0]["coverage"] = "missing"
+        logical["nodes"][0]["materials"][0]["uri"] = ""
+        logical["nodes"][0]["materials"][0]["contentHash"] = ""
+        validate_knowledge_path_snapshot(logical, strict_archived=False)
+        with self.assertRaises(KnowledgePathSnapshotError):
+            validate_knowledge_path_snapshot(logical, strict_archived=True)
+
     def test_floats_are_rejected(self):
         with self.assertRaises(KnowledgePathSnapshotError):
             jcs_dumps({"version": 1.0})

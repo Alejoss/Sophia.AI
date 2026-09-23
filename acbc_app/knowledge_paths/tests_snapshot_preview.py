@@ -72,10 +72,30 @@ class SnapshotPreviewBuilderTests(TestCase):
         material = payload["document"]["nodes"][0]["materials"][0]
         self.assertEqual(material["type"], "source")
         self.assertEqual(material["coverage"], "missing")
+        self.assertEqual(material["uri"], "")
+        self.assertEqual(material["contentHash"], "")
         self.assertNotIn("textFormat", material)
         self.assertTrue(payload["validForHash"])
         codes = {issue["code"] for issue in payload["issues"]}
-        self.assertIn("NO_TRANSCRIPT", codes)
+        self.assertIn("NO_CONTENT_HASH", codes)
+
+    def test_empty_content_hash_is_allowed_in_preview_schema(self):
+        from knowledge_paths.knowledge_path_snapshot import (
+            KnowledgePathSnapshotError,
+            validate_knowledge_path_snapshot,
+        )
+
+        ContentTranscript.objects.filter(content=self.content).delete()
+        payload = preview_knowledge_path_snapshot(self.path, version=1)
+        validate_knowledge_path_snapshot(
+            payload["document"],
+            strict_archived=False,
+        )
+        with self.assertRaises(KnowledgePathSnapshotError):
+            validate_knowledge_path_snapshot(
+                payload["document"],
+                strict_archived=True,
+            )
 
 
 class SnapshotPreviewAPITests(TestCase):

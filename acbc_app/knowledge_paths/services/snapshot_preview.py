@@ -7,7 +7,6 @@ for VIDEO/AUDIO; ``source`` materials are allowed when no transcript exists.
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,9 +23,6 @@ from knowledge_paths.knowledge_path_snapshot import (
 from knowledge_paths.models import KnowledgePath, Node
 
 
-EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
-
-
 def _utc_now_second() -> str:
     now = django_timezone.now()
     if django_timezone.is_naive(now):
@@ -36,12 +32,12 @@ def _utc_now_second() -> str:
     return now.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _provisional_hash(label: str) -> str:
-    return hashlib.sha256(label.encode("utf-8")).hexdigest()
-
-
 def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Return (material object, issues)."""
+    """Return (material object, issues).
+
+    Unknown IPFS URI and unknown content hash are empty strings — never invented
+    placeholder digests.
+    """
     issues: list[dict[str, str]] = []
     profile = node.content_profile
     if profile is None or profile.content_id is None:
@@ -57,8 +53,8 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "type": "source",
             "uri": "",
             "hashAlgorithm": HASH_ALGORITHM,
-            "contentHash": _provisional_hash(f"sophia:missing-content:node:{node.id}"),
-            "contentId": "sophia:content:0",
+            "contentHash": "",
+            "contentId": "",
             "coverage": "missing",
         }, issues
 
@@ -72,8 +68,8 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "code": "IPFS_URI_PENDING",
             "nodeId": f"sophia:node:{node.id}",
             "message": (
-                "Transcript hash is available, but IPFS archival is not done yet. "
-                "coverage remains missing until exact bytes are pinned."
+                "Transcript hash is known, but there is no IPFS URI yet. "
+                "uri stays \"\" and coverage stays missing until pinned."
             ),
         })
         return {
@@ -86,26 +82,21 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "coverage": "missing",
         }, issues
 
-    # No transcript: still allow a source-material placeholder for preview.
+    # No transcript hash yet: leave contentHash empty; still allow snapshot preview.
     issues.append({
-        "code": "NO_TRANSCRIPT",
+        "code": "NO_CONTENT_HASH",
         "nodeId": f"sophia:node:{node.id}",
         "message": (
-            "No transcript hash on this content. Preview uses a provisional "
-            "source material; strict publish needs archived source bytes or a "
-            "transcript."
+            "No transcript/source contentHash yet. contentHash is \"\". "
+            "Strict publish needs archived bytes (transcript or source) with a "
+            "real SHA-256 and an ipfs:// URI."
         ),
-    })
-    issues.append({
-        "code": "IPFS_URI_PENDING",
-        "nodeId": f"sophia:node:{node.id}",
-        "message": "Source bytes are not pinned to IPFS yet.",
     })
     return {
         "type": "source",
         "uri": "",
         "hashAlgorithm": HASH_ALGORITHM,
-        "contentHash": _provisional_hash(f"sophia:unarchived-source:{content.id}"),
+        "contentHash": "",
         "contentId": content_id,
         "coverage": "missing",
     }, issues
