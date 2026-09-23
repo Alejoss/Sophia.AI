@@ -159,6 +159,31 @@ For hackathon publication of a certified version: **strict**.
   certified publication.
 - Never silently omit a node.
 
+Author testing / draft preview: `GET /api/knowledge_paths/<id>/snapshot-preview/`
+(author/staff) and the **Snapshot** tab on the knowledge-path edit page.
+
+### Admin publish (persistence)
+
+Snapshots are **not** created when an author creates, edits, or toggles visibility
+on a knowledge path. A staff admin publishes from the dashboard when the path is
+ready:
+
+- UI: `/dashboard/snapshots` → **Tomar snapshot**
+- `POST /api/knowledge_paths/<id>/snapshots/` (staff only)
+- `GET /api/knowledge_paths/<id>/snapshots/` and `.../snapshots/<version>/`
+- `GET /api/knowledge_paths/admin/snapshots/` (dashboard listing)
+
+Postgres model `PublishedKnowledgePathSnapshot` stores:
+
+| Column | Type | Purpose |
+| --- | --- | --- |
+| `document_text` | `TextField` | Exact JCS canonical JSON that was hashed (not JSONField) |
+| `digest` | `CharField(64)` | SHA-256 hex of those UTF-8 bytes |
+| `version` | int | Monotone per knowledge path |
+| `published_by` / `published_at` | admin audit | Who/when |
+
+Rows are immutable: updates raise; publish again to create `version + 1`.
+
 Author testing: `GET /api/knowledge_paths/<id>/snapshot-preview/` (author/staff)
 and the **Snapshot** tab on the knowledge-path edit page show the live logical
 JSON, JCS canonical form, digest, and gap issues.

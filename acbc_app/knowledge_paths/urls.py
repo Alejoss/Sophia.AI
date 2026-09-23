@@ -8,6 +8,9 @@ from .views import (
     KnowledgePathPurchaseView,
     KnowledgePathCreateView,
     KnowledgePathSnapshotPreviewView,
+    KnowledgePathSnapshotListCreateView,
+    KnowledgePathSnapshotDetailView,
+    AdminKnowledgePathSnapshotDashboardView,
     NodeCreateView,
     NodeDeleteView,
     NodeDetailView,
@@ -23,6 +26,11 @@ urlpatterns = [
     path('engaged/', UserEngagedKnowledgePathsView.as_view(), name='user-engaged-knowledge-paths'),
     path('user/<int:user_id>/', UserKnowledgePathsByUserIdView.as_view(), name='user-knowledge-paths-by-id'),
     path('create/', KnowledgePathCreateView.as_view(), name='knowledge-path-create'),
+    path(
+        'admin/snapshots/',
+        AdminKnowledgePathSnapshotDashboardView.as_view(),
+        name='admin-knowledge-path-snapshots',
+    ),
     path('<int:pk>/', KnowledgePathDetailView.as_view(), name='knowledge-path-detail'),
     path('<int:pk>/purchase/', KnowledgePathPurchaseView.as_view(), name='knowledge-path-purchase'),
     path('<int:path_id>/nodes/', NodeCreateView.as_view(), name='node-create'),
@@ -32,6 +40,16 @@ urlpatterns = [
         '<int:pk>/snapshot-preview/',
         KnowledgePathSnapshotPreviewView.as_view(),
         name='knowledge-path-snapshot-preview',
+    ),
+    path(
+        '<int:pk>/snapshots/',
+        KnowledgePathSnapshotListCreateView.as_view(),
+        name='knowledge-path-snapshots',
+    ),
+    path(
+        '<int:pk>/snapshots/<int:version>/',
+        KnowledgePathSnapshotDetailView.as_view(),
+        name='knowledge-path-snapshot-detail',
     ),
     path('<int:path_id>/nodes/reorder/', NodeReorderView.as_view(), name='node-reorder'),
 ] 

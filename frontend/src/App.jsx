@@ -89,6 +89,7 @@ import CommunityBubble from './generalComponents/CommunityBubble.jsx';
 import Dashboard, { DashboardHome } from './generalComponents/Dashboard.jsx';
 import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import BchPaymentsDashboard from './payments/BchPaymentsDashboard.jsx';
+import KnowledgePathSnapshotsDashboard from './knowledgePaths/KnowledgePathSnapshotsDashboard.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -263,6 +264,7 @@ const AppContent = () => {
               <Route index element={<DashboardHome />} />
               <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="pagos-bch" element={<BchPaymentsDashboard />} />
+              <Route path="snapshots" element={<KnowledgePathSnapshotsDashboard />} />
               <Route path="book-clubs/nuevo" element={<BookClubAdminGeneral mode="create" />} />
               <Route path="book-clubs/:slug" element={<BookClubAdminLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
