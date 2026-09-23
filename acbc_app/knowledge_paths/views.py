@@ -23,6 +23,7 @@ from django.db import models
 from django.utils import timezone
 from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
+from knowledge_paths.services.snapshot_preview import preview_knowledge_path_snapshot
 from payments.services import get_or_create_path_purchase
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
@@ -1116,6 +1117,39 @@ class NodeReorderView(APIView):
                 {'error': 'An error occurred while reordering nodes'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class KnowledgePathSnapshotPreviewView(APIView):
+    """Author-only preview of the knowledge-path snapshot JSON and digest."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        if knowledge_path.author_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to preview this snapshot"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        version = request.query_params.get("version", "1")
+        try:
+            version_int = int(version)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "version must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if version_int < 1:
+            return Response(
+                {"error": "version must be >= 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = preview_knowledge_path_snapshot(
+            knowledge_path,
+            version=version_int,
+        )
+        return Response(payload)
+
 
 def knowledge_path_detail(request, path_id):
     try:

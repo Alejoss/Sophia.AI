@@ -296,6 +296,14 @@ const knowledgePathsApi = {
       throw error;
     }
   },
+
+  getSnapshotPreview: async (pathId, { version } = {}) => {
+    const response = await axiosInstance.get(
+      `/knowledge_paths/${pathId}/snapshot-preview/`,
+      { params: version ? { version } : undefined },
+    );
+    return response.data;
+  },
 };
 
 export default knowledgePathsApi;

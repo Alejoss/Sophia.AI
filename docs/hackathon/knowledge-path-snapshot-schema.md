@@ -145,11 +145,19 @@ Source materials (TEXT files or other non-transcript bodies):
 For hackathon publication of a certified version: **strict**.
 
 - Every node must have at least one material with `coverage: "archived"`.
-- Any `missing` material **blocks** publication.
+- That material may be a **transcript** (preferred for VIDEO/AUDIO; must match
+  Bitcoin `text_hash`) **or** a **source** file/bytes archive when no transcript
+  exists. Transcripts are not required to create a snapshot.
+- Any `missing` material **blocks** certified publication (preview may still
+  show `coverage: "missing"` for author testing).
 - `skipped` is reserved for explicit, documented non-goals (not used for the
   demo path).
 - Never silently omit a node. Never claim complete archival when a resource is
   unavailable.
+
+Author testing: `GET /api/knowledge_paths/<id>/snapshot-preview/` (author/staff)
+and the **Snapshot** tab on the knowledge-path edit page show the live logical
+JSON, JCS canonical form, digest, and gap issues before IPFS publish.
 
 ### Excluded from the knowledge-path digest
 

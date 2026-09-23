@@ -7,6 +7,7 @@ from .views import (
     KnowledgePathDetailView,
     KnowledgePathPurchaseView,
     KnowledgePathCreateView,
+    KnowledgePathSnapshotPreviewView,
     NodeCreateView,
     NodeDeleteView,
     NodeDetailView,
@@ -27,5 +28,10 @@ urlpatterns = [
     path('<int:path_id>/nodes/', NodeCreateView.as_view(), name='node-create'),
     path('<int:path_id>/nodes/<int:node_id>/', NodeDetailView.as_view(), name='node-detail'),
     path('<int:pk>/basic/', KnowledgePathBasicDetailView.as_view(), name='knowledge-path-basic-detail'),
+    path(
+        '<int:pk>/snapshot-preview/',
+        KnowledgePathSnapshotPreviewView.as_view(),
+        name='knowledge-path-snapshot-preview',
+    ),
     path('<int:path_id>/nodes/reorder/', NodeReorderView.as_view(), name='node-reorder'),
 ] 
