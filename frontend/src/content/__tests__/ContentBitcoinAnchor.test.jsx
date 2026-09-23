@@ -112,11 +112,8 @@ describe('ContentBitcoinAnchor', () => {
       'https://mempool.space/signet/tx/47bf019be4de25908bf1302a5bf8360ba9cfd54d6a0a38a48909b90d61cdc2e3',
     );
     expect(
-      screen.getByRole('link', { name: /descargar texto certificado/i }),
-    ).toHaveAttribute(
-      'href',
-      '/api/content/content_details/3/transcript/anchors/9/certified-text/',
-    );
+      screen.getByRole('button', { name: /descargar texto certificado/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Texto certificado de prueba.')).toBeInTheDocument();
   });
 });

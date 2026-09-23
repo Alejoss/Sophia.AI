@@ -180,6 +180,11 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
 
     return (
       <Paper variant="outlined" sx={{ p: 2 }}>
+        {actionError && (
+          <Alert severity="warning" sx={{ mb: 1.5 }}>
+            {actionError}
+          </Alert>
+        )}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 1 }}>
           <Chip
             size="small"
@@ -247,10 +252,30 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
               <Button
                 size="small"
                 variant="outlined"
-                href={downloadUrl}
-                download
                 startIcon={<DownloadIcon />}
                 sx={{ mb: certifiedText ? 1 : 0 }}
+                onClick={async () => {
+                  try {
+                    const response = await fetch(downloadUrl);
+                    if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    const objectUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = objectUrl;
+                    link.download = (
+                      response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
+                      || `transcript-anchor-${anchor.id}.txt`
+                    );
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(objectUrl);
+                  } catch {
+                    setActionError('No se pudo descargar el texto certificado.');
+                  }
+                }}
               >
                 Descargar texto certificado
               </Button>
