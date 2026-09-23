@@ -48,13 +48,19 @@ the live demo path materials (starts Phase 2).
 
 ## 2. Implement immutable archival and learner-version binding
 
+**Partial (2026-09-23):** admin-triggered Postgres persistence of immutable
+`PublishedKnowledgePathSnapshot` rows (`document_text` TextField = exact JCS
+bytes + `digest`). Dashboard: `/dashboard/snapshots`. Not created on path
+create/visibility. Still TODO: learner-version binding, IPFS packaging of the
+snapshot artifact (optional), dedicated demo path rights workflow.
+
 - Persist published knowledge-path achievement versions and material snapshots
   from `sophia-acbc-knowledge-path-v1`; never depend on mutable knowledge-path records
   to reconstruct a historical certificate.
-- Export full path/node text, ordered material references; do not archive quiz
+- Export full path/node text with embedded transcript text; do not archive quiz
   banks into the knowledge-path digest (hackathon scope).
 - Reuse transcript normalization and exact anchor text where hashes match.
-- Upload exact bytes, verify retrieval and hashes, and retain backups.
+- Upload exact bytes, verify retrieval and hashes, and retain backups (optional IPFS).
 - Bind learner progress to the published version; block silent mixing of versions.
 - Define retention independent of deletion of editable knowledge-path/content records.
 - Provide explicit completeness errors; strict policy blocks publish on gaps.
