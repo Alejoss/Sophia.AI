@@ -1,6 +1,7 @@
-# Knowledge-path course snapshot schema (frozen)
+# Knowledge-path snapshot schema (frozen)
 
-Status: **decided for hackathon Phase 1** (2026-09-23).
+Status: **decided for hackathon Phase 1** (2026-09-23; terminology aligned to
+knowledge path on 2026-09-23).
 Companion: [Ethereum credentials](hackathon-ethereum-credentials.md),
 [development plan](hackathon-ethereum-development-plan.md).
 
@@ -8,21 +9,24 @@ This document freezes the hashed curriculum artifact for Sophia's Crypto World's
 Fair demo. Implementation of archival persistence is Phase 2; this file is the
 contract those later phases must follow.
 
+Domain language: the product has **knowledge paths** and **events**. Do not name
+hashed curriculum artifacts "courses" in code, schema fields, or fixtures.
+
 ## Scope decision (hackathon)
 
 | Artifact | Hashed immutable snapshot for hackathon? |
 | --- | --- |
-| Knowledge path (course) | **Yes** — sole curriculum commitment |
+| Knowledge path | **Yes** — sole curriculum commitment |
 | Event definitions / attendance credentials | **No** — out of hashing scope |
 | Public assessments / quiz question banks | **No** — quiz *content* is not hashed |
 | Credential (NFT) artifact | Yes at mint time (separate schema; see below) |
 
 Quizzes remain **application eligibility checks** (completion still requires
 perfect quiz scores under the rules below). Their questions, options and answer
-keys are **not** included in the course snapshot digest. Changing a quiz after
-publication does not change the course digest; it can still change whether a
-learner is eligible to request a certificate under live app rules. Phase 4 must
-bind eligibility evaluation to the published version's declared
+keys are **not** included in the knowledge-path snapshot digest. Changing a quiz
+after publication does not change the knowledge-path digest; it can still change
+whether a learner is eligible to request a certificate under live app rules.
+Phase 4 must bind eligibility evaluation to the published version's declared
 `completionRequirements`, not to mutable quiz text.
 
 Event certificates may continue to exist in the product, but the hackathon
@@ -32,23 +36,23 @@ demonstration and cryptographic work commit only to knowledge-path completion.
 
 | Entity | Format | Notes |
 | --- | --- | --- |
-| Course | `sophia:knowledge-path:{db_id}` | `db_id` is the `KnowledgePath.id` at first publish |
+| Knowledge path | `sophia:knowledge-path:{db_id}` | `db_id` is the `KnowledgePath.id` at first publish |
 | Node | `sophia:node:{db_id}` | `Node.id`; stable across republishes of the same row |
 | Content | `sophia:content:{db_id}` | Underlying `Content.id` for material provenance |
-| Course version | positive integer starting at `1` | Monotone per `courseId`; never reuse |
+| Knowledge-path version | positive integer starting at `1` | Monotone per `knowledgePathId`; never reuse |
 
-Do not invent content-addressed course IDs for the demo. Registry references on
-Ethereum will namespace these strings by deployment (chain ID + contract address)
-outside the snapshot document.
+Do not invent content-addressed knowledge-path IDs for the demo. Registry
+references on Ethereum will namespace these strings by deployment (chain ID +
+contract address) outside the snapshot document.
 
-## Course snapshot schema (`sophia-course-v1`)
+## Knowledge-path snapshot schema (`sophia-knowledge-path-v1`)
 
 Required top-level fields (no additional properties in the hashed document):
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `schemaVersion` | string | Exactly `"sophia-course-v1"` |
-| `courseId` | string | `sophia:knowledge-path:{id}` |
+| `schemaVersion` | string | Exactly `"sophia-knowledge-path-v1"` |
+| `knowledgePathId` | string | `sophia:knowledge-path:{id}` |
 | `version` | integer | `>= 1` |
 | `title` | string | Full `KnowledgePath.title`; no truncation |
 | `description` | string | Full description; use `""` if blank — **never `null`** |
@@ -56,6 +60,8 @@ Required top-level fields (no additional properties in the hashed document):
 | `issuer` | object | See issuer object |
 | `completionRequirements` | object | See completion requirements |
 | `nodes` | array | Ordered by learning sequence (`Node.order` ascending) |
+
+Legacy field names such as `courseId` / `sophia-course-v1` are rejected.
 
 ### Issuer object
 
@@ -125,9 +131,9 @@ Transcript materials:
   (NFC + whitespace collapse; no BOM; no added trailing newline).
 - `contentHash` **must** equal `ContentTranscript.text_hash` / Bitcoin
   `TranscriptAnchor.text_hash` for the same certified text.
-- Optional Bitcoin linkage is **not** stored inside the course snapshot. Attach
-  `btc_network` / `btc_txid` later as append-only registry evidence bound to the
-  same digest.
+- Optional Bitcoin linkage is **not** stored inside the knowledge-path snapshot.
+  Attach `btc_network` / `btc_txid` later as append-only registry evidence bound
+  to the same digest.
 
 Source materials (TEXT files or other non-transcript bodies):
 
@@ -145,7 +151,7 @@ For hackathon publication of a certified version: **strict**.
 - Never silently omit a node. Never claim complete archival when a resource is
   unavailable.
 
-### Excluded from the course digest
+### Excluded from the knowledge-path digest
 
 - Path cover images and focal points
 - `is_visible`, `certificates_enabled`, prices, sales flags, purchases
@@ -156,9 +162,9 @@ For hackathon publication of a certified version: **strict**.
 
 ## Exact hashing conventions
 
-### Course snapshot JSON
+### Knowledge-path snapshot JSON
 
-1. Build the logical document conforming to `sophia-course-v1`.
+1. Build the logical document conforming to `sophia-knowledge-path-v1`.
 2. **Forbid floats** in the hashed document (versions and scores are integers).
 3. Canonicalize with **RFC 8785 JSON Canonicalization Scheme (JCS)**.
 4. Encode the canonical text as UTF-8 (no BOM).
@@ -170,13 +176,13 @@ JCS sorts object members by name (UTF-16 code unit order). Array order is
 significant: `nodes` and `materials` must already be in the intended sequence
 before canonicalization. JCS does **not** Unicode-normalize string values;
 preserve NFC for titles/descriptions as stored at publish time (do not apply
-transcript whitespace collapse to course JSON strings).
+transcript whitespace collapse to knowledge-path JSON strings).
 
 Pretty-printed JSON is a presentation view only unless it byte-matches the
 committed canonical form. Verification downloads must offer the exact bytes.
 
-Implementation: `knowledge_paths.course_snapshot` and fixtures under
-`docs/hackathon/fixtures/course-snapshot-v1/`.
+Implementation: `knowledge_paths.knowledge_path_snapshot` and fixtures under
+`docs/hackathon/fixtures/knowledge-path-snapshot-v1/`.
 
 ### Transcript material bytes
 
@@ -186,7 +192,7 @@ differently for IPFS.
 
 ### Credential artifact (`sophia-credential-v1`)
 
-Hashed at mint time, separate from the course snapshot:
+Hashed at mint time, separate from the knowledge-path snapshot:
 
 | Field | Type | Rule |
 | --- | --- | --- |
@@ -194,11 +200,11 @@ Hashed at mint time, separate from the course snapshot:
 | `credentialId` | string | `sophia:credential:{uuid}` (stable issuance id) |
 | `type` | string | `"knowledge_path_completion"` for the demo |
 | `recipient` | string | Checksummed `0x` Ethereum address |
-| `courseId` | string | Same as snapshot |
-| `courseVersion` | integer | Same as snapshot |
-| `courseSnapshotHash` | string | 64-hex SHA-256 of the course canonical bytes |
+| `knowledgePathId` | string | Same as snapshot |
+| `knowledgePathVersion` | integer | Same as snapshot |
+| `knowledgePathSnapshotHash` | string | 64-hex SHA-256 of the knowledge-path canonical bytes |
 | `issuedAt` | string | UTC second-precision `Z` timestamp |
-| `issuer` | object | Same shape as course issuer (snapshotted) |
+| `issuer` | object | Same shape as knowledge-path issuer (snapshotted) |
 
 Hash with the same JCS → UTF-8 → SHA-256 pipeline. Do **not** put `tokenId`,
 `txHash`, or `chainId` inside the pre-mint artifact (they would be circular).
@@ -232,29 +238,30 @@ create or select the real path and archive its materials under this schema.
 
 ## Recipient wallet-control flow (summary)
 
-1. Authenticated learner requests certificate for a published course version they
-   completed under `completionRequirements`.
+1. Authenticated learner requests certificate for a published knowledge-path
+   version they completed under `completionRequirements`.
 2. Learner submits a recipient address and signs a challenge bound to
-   `user_id` + `courseId` + `courseVersion` + address.
+   `user_id` + `knowledgePathId` + `knowledgePathVersion` + address.
 3. Server verifies signature, persists wallet + idempotency key, then mints.
 4. Students need no ETH; the platform signer broadcasts.
 
 ## Acceptance for Phase 1
 
-- [x] Courses-only hashing scope recorded (events and assessment content excluded)
-- [x] `sophia-course-v1` field rules and completion requirements frozen
+- [x] Knowledge-path-only hashing scope recorded (events and assessment content excluded)
+- [x] `sophia-knowledge-path-v1` field rules and completion requirements frozen
 - [x] Hashing pipeline frozen (JCS + SHA-256; transcript rules reused)
 - [x] Exact-byte fixtures and deterministic tests added
 - [x] Demo path policy and testnet/pinning/wallet decisions recorded
+- [x] Code/schema/fixture identifiers use knowledge path, not course
 - [ ] Live demo path content authored/archived (Phase 2)
 
 ## Fixture index
 
 | File | Purpose |
 | --- | --- |
-| `fixtures/course-snapshot-v1/minimal.logical.json` | Logical document (key order as authored) |
-| `fixtures/course-snapshot-v1/minimal.canonical.json` | RFC 8785 canonical bytes (single line) |
-| `fixtures/course-snapshot-v1/minimal.sha256` | Expected digest |
-| `fixtures/course-snapshot-v1/credential.logical.json` | Minimal credential artifact |
-| `fixtures/course-snapshot-v1/credential.canonical.json` | Canonical credential bytes |
-| `fixtures/course-snapshot-v1/credential.sha256` | Credential digest |
+| `fixtures/knowledge-path-snapshot-v1/minimal.logical.json` | Logical document (key order as authored) |
+| `fixtures/knowledge-path-snapshot-v1/minimal.canonical.json` | RFC 8785 canonical bytes (single line) |
+| `fixtures/knowledge-path-snapshot-v1/minimal.sha256` | Expected digest |
+| `fixtures/knowledge-path-snapshot-v1/credential.logical.json` | Minimal credential artifact |
+| `fixtures/knowledge-path-snapshot-v1/credential.canonical.json` | Canonical credential bytes |
+| `fixtures/knowledge-path-snapshot-v1/credential.sha256` | Credential digest |

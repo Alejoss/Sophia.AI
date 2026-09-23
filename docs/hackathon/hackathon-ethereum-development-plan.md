@@ -4,14 +4,14 @@ Status: Phase 1 schema freeze recorded 2026-09-23; later phases still pending
 implementation.
 Date: 2026-09-21 (updated 2026-09-23).
 Specification: [Ethereum credentials and evidence](hackathon-ethereum-credentials.md).
-Frozen schema: [Course snapshot schema](course-snapshot-schema.md).
+Frozen schema: [Knowledge-path snapshot schema](knowledge-path-snapshot-schema.md).
 
 ## Preparation completed
 
-Reviewed course/node models, quiz models, certificate models and issuance entry
-points, transcript normalization and Bitcoin snapshot fields. Added explanatory
-docstrings at these integration boundaries before writing this plan. No runtime
-behavior, database schema or deployed contract was changed.
+Reviewed knowledge-path/node models, quiz models, certificate models and issuance
+entry points, transcript normalization and Bitcoin snapshot fields. Added
+explanatory docstrings at these integration boundaries before writing this plan.
+No runtime behavior, database schema or deployed contract was changed.
 
 Bitcoin anchor reliability hardening landed 2026-09-23 (see
 [Bitcoin readiness](bitcoin-anchor-readiness.md)); it is separate from this
@@ -21,22 +21,23 @@ Ethereum curriculum-commitment work.
 
 Hackathon hashing scope (product decision):
 
-- **Hash knowledge paths (courses) only.**
+- **Hash knowledge paths only** (not events).
 - Do **not** hash event definitions or public-assessment / quiz content for the
   hackathon. Quizzes remain live eligibility checks; their text is outside the
-  course digest.
+  knowledge-path digest.
 - Still define a separate **credential artifact** hash at mint time
-  (`sophia-credential-v1`), which references the course digest.
+  (`sophia-credential-v1`), which references the knowledge-path digest.
+- Code, schema fields and fixtures use **knowledge path** naming — not "course".
 
-Recorded in [course-snapshot-schema.md](course-snapshot-schema.md):
+Recorded in [knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md):
 
-- `sophia-course-v1` field rules, stable IDs, issuer object, material coverage.
+- `sophia-knowledge-path-v1` field rules, stable IDs, issuer object, material coverage.
 - Completion requirements frozen to platform reality: all nodes, **all** node
   quizzes, `quizPassingScore: 100` (not 80%).
 - Canonicalization: RFC 8785 JCS → UTF-8 → SHA-256; transcript materials reuse
   `normalize_plain_text_for_hash`.
-- Exact-byte fixtures under `fixtures/course-snapshot-v1/` with tests in
-  `knowledge_paths.tests_course_snapshot`.
+- Exact-byte fixtures under `fixtures/knowledge-path-snapshot-v1/` with tests in
+  `knowledge_paths.tests_knowledge_path_snapshot`.
 - Demo policy: dedicated public “Introduction to Bitcoin” path with author-owned
   or licensed materials; faker seed paths are not the demo cohort.
 - Test network target Sepolia (confirm track rules), pinning + offline backup of
@@ -48,14 +49,14 @@ the live demo path materials (starts Phase 2).
 ## 2. Implement immutable archival and learner-version binding
 
 - Persist published knowledge-path achievement versions and material snapshots
-  from `sophia-course-v1`; never depend on mutable course records to reconstruct
-  a historical certificate.
+  from `sophia-knowledge-path-v1`; never depend on mutable knowledge-path records
+  to reconstruct a historical certificate.
 - Export full path/node text, ordered material references; do not archive quiz
-  banks into the course digest (hackathon scope).
+  banks into the knowledge-path digest (hackathon scope).
 - Reuse transcript normalization and exact anchor text where hashes match.
 - Upload exact bytes, verify retrieval and hashes, and retain backups.
 - Bind learner progress to the published version; block silent mixing of versions.
-- Define retention independent of deletion of editable course/content records.
+- Define retention independent of deletion of editable knowledge-path/content records.
 - Provide explicit completeness errors; strict policy blocks publish on gaps.
 - Author/select the dedicated “Introduction to Bitcoin” demo path with
   publication rights.
@@ -93,7 +94,7 @@ can be retried or reconciled without losing the original approved credential.
 ## 5. Build public verification and issuer controls
 
 - Add certificate receipt/verification links to existing learner certificate UI.
-- Render the fixed snapshot, not current database course metadata.
+- Render the fixed snapshot, not current database knowledge-path metadata.
 - Implement independent byte hashing and exact artifact downloads.
 - Show separate validity, evidence availability, hash match and Bitcoin statuses.
 - Add issuer issuance/status actions and clearly explain non-transferability.
@@ -117,7 +118,7 @@ See [language scope and evidence rules](hackathon-ethereum-credentials.md#englis
   route and unsaved form state, and support switching back to Spanish.
 - Translate all covered interface states, including errors, notifications,
   loading indicators and empty screens; localize dates/numbers and document lang.
-- Prepare an English demo course. Clearly distinguish original user content from
+- Prepare an English demo knowledge path. Clearly distinguish original user content from
   translated UI; do not silently translate or mutate certified artifacts.
 
 Acceptance criteria:
@@ -172,7 +173,7 @@ updates in English. A weekly update is separate from the final pitch/demo.
 
 ## Scope boundaries
 
-Prioritize course completion and evidence verification as the main demonstration.
+Prioritize knowledge-path completion and evidence verification as the main demonstration.
 Keep event credentials compatible with the data model without expanding into a
 new events product. Defer rewards tokens, marketplaces, bridges and governance.
 Track outstanding decisions in this document as implementation resolves them;

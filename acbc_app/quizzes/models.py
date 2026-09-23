@@ -19,7 +19,7 @@ class Quiz(models.Model):
 
     Course snapshots must freeze assessment requirements and all relevant quiz
     versions. Public exports must explicitly select safe fields: Option.is_correct
-    and learner attempts/answers are not public course metadata. Restricted
+    and learner attempts/answers are not public knowledge-path metadata. Restricted
     assessment evidence needs separate archival and disclosure rules.
     See docs/hackathon/hackathon-ethereum-credentials.md.
     """
