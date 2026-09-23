@@ -273,7 +273,8 @@ create or select the real path and archive its materials under this schema.
 | --- | --- |
 | `fixtures/knowledge-path-snapshot-v1/minimal.logical.json` | Logical document (key order as authored) |
 | `fixtures/knowledge-path-snapshot-v1/minimal.canonical.json` | RFC 8785 canonical bytes (single line) |
-| `fixtures/knowledge-path-snapshot-v1/minimal.sha256` | Expected digest |
+| `fixtures/knowledge-path-snapshot-v1/minimal.sha256` | Knowledge-path snapshot digest |
+| `fixtures/knowledge-path-snapshot-v1/minimal.transcript-text.sha256` | SHA-256 of embedded material.text alone |
 | `fixtures/knowledge-path-snapshot-v1/credential.logical.json` | Minimal credential artifact |
 | `fixtures/knowledge-path-snapshot-v1/credential.canonical.json` | Canonical credential bytes |
 | `fixtures/knowledge-path-snapshot-v1/credential.sha256` | Credential digest |
