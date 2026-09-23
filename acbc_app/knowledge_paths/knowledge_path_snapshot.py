@@ -2,11 +2,11 @@
 
 See docs/hackathon/knowledge-path-snapshot-schema.md for the frozen schema
 contract. This module implements RFC 8785 JCS for the constrained value types
-allowed in ``sophia-knowledge-path-v1`` / ``sophia-credential-v1`` documents
+allowed in ``sophia-acbc-knowledge-path-v1`` / ``sophia-acbc-credential-v1`` documents
 (no floats).
 
 Materials embed the exact normalized transcript ``text`` (not an IPFS URI or
-content hash). Anyone with that text and ``sophia-normalized-transcript-v1``
+content hash). Anyone with that text and ``sophia-acbc-normalized-transcript-v1``
 can recompute SHA-256 and match Bitcoin anchors; the knowledge-path digest is
 SHA-256 of the JCS canonical snapshot JSON that contains those texts.
 """
@@ -19,20 +19,20 @@ import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-KNOWLEDGE_PATH_SCHEMA_VERSION = "sophia-knowledge-path-v1"
-CREDENTIAL_SCHEMA_VERSION = "sophia-credential-v1"
-TRANSCRIPT_TEXT_FORMAT = "sophia-normalized-transcript-v1"
+KNOWLEDGE_PATH_SCHEMA_VERSION = "sophia-acbc-knowledge-path-v1"
+CREDENTIAL_SCHEMA_VERSION = "sophia-acbc-credential-v1"
+TRANSCRIPT_TEXT_FORMAT = "sophia-acbc-normalized-transcript-v1"
 
 ALLOWED_MEDIA_TYPES = frozenset({"VIDEO", "AUDIO", "TEXT", "IMAGE"})
 ALLOWED_MATERIAL_TYPES = frozenset({"transcript", "source"})
 
 _ISO_Z_SECOND = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_KNOWLEDGE_PATH_ID = re.compile(r"^sophia:knowledge-path:\d+$")
-_NODE_ID = re.compile(r"^sophia:node:\d+$")
-_CONTENT_ID = re.compile(r"^sophia:content:\d+$")
+_KNOWLEDGE_PATH_ID = re.compile(r"^sophia-acbc:knowledge-path:\d+$")
+_NODE_ID = re.compile(r"^sophia-acbc:node:\d+$")
+_CONTENT_ID = re.compile(r"^sophia-acbc:content:\d+$")
 _CREDENTIAL_ID = re.compile(
-    r"^sophia:credential:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    r"^sophia-acbc:credential:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 _ETH_ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
@@ -50,7 +50,7 @@ def material_is_complete(material: Mapping[str, Any]) -> bool:
 def transcript_text_sha256(text: str) -> str:
     """SHA-256 of exact UTF-8 bytes (no extra normalization).
 
-    Snapshot ``text`` must already be ``sophia-normalized-transcript-v1``
+    Snapshot ``text`` must already be ``sophia-acbc-normalized-transcript-v1``
     bytes-as-unicode, matching Bitcoin ``TranscriptAnchor`` certified text.
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -138,8 +138,8 @@ def validate_issuer(issuer: Mapping[str, Any]) -> None:
         raise KnowledgePathSnapshotError(
             f"issuer has unexpected fields: {sorted(unexpected)}"
         )
-    if issuer.get("namespace") != "sophia":
-        raise KnowledgePathSnapshotError('issuer.namespace must be "sophia"')
+    if issuer.get("namespace") != "sophia-acbc":
+        raise KnowledgePathSnapshotError('issuer.namespace must be "sophia-acbc"')
     author_user_id = _require_int(issuer, "authorUserId")
     if author_user_id < 1:
         raise KnowledgePathSnapshotError("issuer.authorUserId must be >= 1")
@@ -156,7 +156,7 @@ def validate_completion_requirements(requirements: Mapping[str, Any]) -> None:
     if dict(requirements) != expected:
         raise KnowledgePathSnapshotError(
             "completionRequirements must equal "
-            f"{expected!r} for sophia-knowledge-path-v1 "
+            f"{expected!r} for sophia-acbc-knowledge-path-v1 "
             f"(got {dict(requirements)!r})"
         )
 
@@ -190,7 +190,7 @@ def validate_material(material: Mapping[str, Any], *, require_complete: bool) ->
     content_id = _require_str(material, "contentId")
     if content_id != "" and not _CONTENT_ID.match(content_id):
         raise KnowledgePathSnapshotError(
-            'material.contentId must be "" or match sophia:content:{id}'
+            'material.contentId must be "" or match sophia-acbc:content:{id}'
         )
 
     if material_type == "transcript":
@@ -210,7 +210,7 @@ def validate_material(material: Mapping[str, Any], *, require_complete: bool) ->
         )
     if require_complete and not _CONTENT_ID.match(content_id):
         raise KnowledgePathSnapshotError(
-            "complete materials require contentId matching sophia:content:{id}"
+            "complete materials require contentId matching sophia-acbc:content:{id}"
         )
     # Keep unused local for clarity in validators reading text presence.
     _ = text
@@ -237,7 +237,7 @@ def validate_node(node: Mapping[str, Any], *, require_complete: bool) -> None:
 
     node_id = _require_str(node, "nodeId")
     if not _NODE_ID.match(node_id):
-        raise KnowledgePathSnapshotError("nodeId must match sophia:node:{id}")
+        raise KnowledgePathSnapshotError("nodeId must match sophia-acbc:node:{id}")
 
     position = _require_int(node, "position")
     if position < 1:
@@ -268,7 +268,7 @@ def validate_knowledge_path_snapshot(
     *,
     require_complete: bool = True,
 ) -> None:
-    """Validate a logical ``sophia-knowledge-path-v1`` document."""
+    """Validate a logical ``sophia-acbc-knowledge-path-v1`` document."""
     unexpected = set(document) - {
         "schemaVersion",
         "knowledgePathId",
@@ -287,7 +287,7 @@ def validate_knowledge_path_snapshot(
     if "learningObjectives" in document or "assessments" in document:
         raise KnowledgePathSnapshotError(
             "learningObjectives and top-level assessments are not part of "
-            "sophia-knowledge-path-v1"
+            "sophia-acbc-knowledge-path-v1"
         )
     if "courseId" in document:
         raise KnowledgePathSnapshotError(
@@ -302,7 +302,7 @@ def validate_knowledge_path_snapshot(
     knowledge_path_id = _require_str(document, "knowledgePathId")
     if not _KNOWLEDGE_PATH_ID.match(knowledge_path_id):
         raise KnowledgePathSnapshotError(
-            "knowledgePathId must match sophia:knowledge-path:{id}"
+            "knowledgePathId must match sophia-acbc:knowledge-path:{id}"
         )
 
     version = _require_int(document, "version")
@@ -375,7 +375,7 @@ def validate_credential_artifact(document: Mapping[str, Any]) -> None:
     credential_id = _require_str(document, "credentialId")
     if not _CREDENTIAL_ID.match(credential_id):
         raise KnowledgePathSnapshotError(
-            "credentialId must match sophia:credential:{uuid}"
+            "credentialId must match sophia-acbc:credential:{uuid}"
         )
 
     if document.get("type") != "knowledge_path_completion":
@@ -392,7 +392,7 @@ def validate_credential_artifact(document: Mapping[str, Any]) -> None:
     knowledge_path_id = _require_str(document, "knowledgePathId")
     if not _KNOWLEDGE_PATH_ID.match(knowledge_path_id):
         raise KnowledgePathSnapshotError(
-            "knowledgePathId must match sophia:knowledge-path:{id}"
+            "knowledgePathId must match sophia-acbc:knowledge-path:{id}"
         )
 
     knowledge_path_version = _require_int(document, "knowledgePathVersion")

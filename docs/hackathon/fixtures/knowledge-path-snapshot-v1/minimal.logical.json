@@ -1,12 +1,12 @@
 {
-  "schemaVersion": "sophia-knowledge-path-v1",
-  "knowledgePathId": "sophia:knowledge-path:42",
+  "schemaVersion": "sophia-acbc-knowledge-path-v1",
+  "knowledgePathId": "sophia-acbc:knowledge-path:42",
   "version": 1,
   "title": "Introduction to Bitcoin",
   "description": "The full knowledge path description.",
   "publishedAt": "2026-10-01T15:00:00Z",
   "issuer": {
-    "namespace": "sophia",
+    "namespace": "sophia-acbc",
     "authorUserId": 7,
     "authorUsername": "demo-teacher"
   },
@@ -17,7 +17,7 @@
   },
   "nodes": [
     {
-      "nodeId": "sophia:node:101",
+      "nodeId": "sophia-acbc:node:101",
       "position": 1,
       "title": "What is Bitcoin?",
       "description": "The complete node description, without truncation.",
@@ -25,9 +25,9 @@
       "materials": [
         {
           "type": "transcript",
-          "textFormat": "sophia-normalized-transcript-v1",
+          "textFormat": "sophia-acbc-normalized-transcript-v1",
           "text": "Bitcoin is a peer-to-peer electronic cash system. Transactions are broadcast to the network and confirmed in blocks.",
-          "contentId": "sophia:content:55"
+          "contentId": "sophia-acbc:content:55"
         }
       ]
     }

@@ -36,23 +36,23 @@ demonstration and cryptographic work commit only to knowledge-path completion.
 
 | Entity | Format | Notes |
 | --- | --- | --- |
-| Knowledge path | `sophia:knowledge-path:{db_id}` | `db_id` is the `KnowledgePath.id` at first publish |
-| Node | `sophia:node:{db_id}` | `Node.id`; stable across republishes of the same row |
-| Content | `sophia:content:{db_id}` | Underlying `Content.id` for material provenance |
+| Knowledge path | `sophia-acbc:knowledge-path:{db_id}` | `db_id` is the `KnowledgePath.id` at first publish |
+| Node | `sophia-acbc:node:{db_id}` | `Node.id`; stable across republishes of the same row |
+| Content | `sophia-acbc:content:{db_id}` | Underlying `Content.id` for material provenance |
 | Knowledge-path version | positive integer starting at `1` | Monotone per `knowledgePathId`; never reuse |
 
 Do not invent content-addressed knowledge-path IDs for the demo. Registry
 references on Ethereum will namespace these strings by deployment (chain ID +
 contract address) outside the snapshot document.
 
-## Knowledge-path snapshot schema (`sophia-knowledge-path-v1`)
+## Knowledge-path snapshot schema (`sophia-acbc-knowledge-path-v1`)
 
 Required top-level fields (no additional properties in the hashed document):
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `schemaVersion` | string | Exactly `"sophia-knowledge-path-v1"` |
-| `knowledgePathId` | string | `sophia:knowledge-path:{id}` |
+| `schemaVersion` | string | Exactly `"sophia-acbc-knowledge-path-v1"` |
+| `knowledgePathId` | string | `sophia-acbc:knowledge-path:{id}` |
 | `version` | integer | `>= 1` |
 | `title` | string | Full `KnowledgePath.title`; no truncation |
 | `description` | string | Full description; use `""` if blank — **never `null`** |
@@ -67,7 +67,7 @@ Legacy field names such as `courseId` / `sophia-course-v1` are rejected.
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `namespace` | string | `"sophia"` |
+| `namespace` | string | `"sophia-acbc"` |
 | `authorUserId` | integer | `KnowledgePath.author_id` at publish time |
 | `authorUsername` | string | Username snapshotted at publish time (display only) |
 
@@ -100,7 +100,7 @@ and the hackathon will not invent unsourced curriculum claims.
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `nodeId` | string | `sophia:node:{id}` |
+| `nodeId` | string | `sophia-acbc:node:{id}` |
 | `position` | integer | 1-based position in the ordered snapshot (`order` rank) |
 | `title` | string | Full node title |
 | `description` | string | Full text or `""` — never `null` |
@@ -119,17 +119,17 @@ Each material embeds the **exact source text** for that node. IPFS pinning is
 | --- | --- | --- |
 | `type` | string | `transcript` or `source` |
 | `text` | string | Exact bytes-as-unicode to commit; **`""` if not available yet** |
-| `textFormat` | string | Required for `transcript`: `"sophia-normalized-transcript-v1"`; omit for `source` |
-| `contentId` | string | `sophia:content:{id}` when linked; **`""` if no content is linked** |
+| `textFormat` | string | Required for `transcript`: `"sophia-acbc-normalized-transcript-v1"`; omit for `source` |
+| `contentId` | string | `sophia-acbc:content:{id}` when linked; **`""` if no content is linked** |
 
 #### Completeness (deduced)
 
-- **Complete:** `text` is non-empty (and `contentId` matches `sophia:content:{id}` for strict publish)
+- **Complete:** `text` is non-empty (and `contentId` matches `sophia-acbc:content:{id}` for strict publish)
 - **Incomplete:** `text` is `""`
 
 #### Transcript verification (reconstruct the hash)
 
-1. Take `material.text` exactly as stored (`sophia-normalized-transcript-v1`:
+1. Take `material.text` exactly as stored (`sophia-acbc-normalized-transcript-v1`:
    already NFC + whitespace-collapsed; no BOM; no added trailing newline).
 2. SHA-256 the UTF-8 encoding of that string.
 3. That digest must equal Bitcoin `TranscriptAnchor.text_hash` /
@@ -176,7 +176,7 @@ JSON, JCS canonical form, digest, and gap issues.
 
 ### Knowledge-path snapshot JSON
 
-1. Build the logical document conforming to `sophia-knowledge-path-v1`.
+1. Build the logical document conforming to `sophia-acbc-knowledge-path-v1`.
 2. **Forbid floats** in the hashed document (versions and scores are integers).
 3. Canonicalize with **RFC 8785 JSON Canonicalization Scheme (JCS)**.
 4. Encode the canonical text as UTF-8 (no BOM).
@@ -202,14 +202,14 @@ Reuse `content.transcript_utils.normalize_plain_text_for_hash` /
 `compute_text_hash`. Archive the normalized UTF-8 text; do not re-normalize
 differently for IPFS.
 
-### Credential artifact (`sophia-credential-v1`)
+### Credential artifact (`sophia-acbc-credential-v1`)
 
 Hashed at mint time, separate from the knowledge-path snapshot:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `schemaVersion` | string | `"sophia-credential-v1"` |
-| `credentialId` | string | `sophia:credential:{uuid}` (stable issuance id) |
+| `schemaVersion` | string | `"sophia-acbc-credential-v1"` |
+| `credentialId` | string | `sophia-acbc:credential:{uuid}` (stable issuance id) |
 | `type` | string | `"knowledge_path_completion"` for the demo |
 | `recipient` | string | Checksummed `0x` Ethereum address |
 | `knowledgePathId` | string | Same as snapshot |
@@ -260,7 +260,7 @@ create or select the real path and archive its materials under this schema.
 ## Acceptance for Phase 1
 
 - [x] Knowledge-path-only hashing scope recorded (events and assessment content excluded)
-- [x] `sophia-knowledge-path-v1` field rules and completion requirements frozen
+- [x] `sophia-acbc-knowledge-path-v1` field rules and completion requirements frozen
 - [x] Hashing pipeline frozen (JCS + SHA-256; transcript rules reused)
 - [x] Exact-byte fixtures and deterministic tests added
 - [x] Demo path policy and testnet/pinning/wallet decisions recorded

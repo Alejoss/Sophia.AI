@@ -1,6 +1,6 @@
 """Build live knowledge-path snapshot previews for author testing.
 
-Preview documents follow ``sophia-knowledge-path-v1``. Materials embed exact
+Preview documents follow ``sophia-acbc-knowledge-path-v1``. Materials embed exact
 normalized transcript ``text`` (no IPFS URI / contentHash). Completeness means
 non-empty embedded text.
 """
@@ -41,7 +41,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
     if profile is None or profile.content_id is None:
         issues.append({
             "code": "NO_CONTENT",
-            "nodeId": f"sophia:node:{node.id}",
+            "nodeId": f"sophia-acbc:node:{node.id}",
             "message": (
                 "Node has no linked content. Attach content before a strict "
                 "certified publish."
@@ -54,7 +54,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
         }, issues
 
     content = profile.content
-    content_id = f"sophia:content:{content.id}"
+    content_id = f"sophia-acbc:content:{content.id}"
     transcript = getattr(content, "transcript", None)
 
     if transcript is not None:
@@ -68,7 +68,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             }, issues
         issues.append({
             "code": "EMPTY_TRANSCRIPT",
-            "nodeId": f"sophia:node:{node.id}",
+            "nodeId": f"sophia-acbc:node:{node.id}",
             "message": (
                 "Transcript exists but normalized text is empty. "
                 "text stays \"\" until ingest provides certified plain text."
@@ -83,7 +83,7 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
 
     issues.append({
         "code": "NO_TRANSCRIPT_TEXT",
-        "nodeId": f"sophia:node:{node.id}",
+        "nodeId": f"sophia-acbc:node:{node.id}",
         "message": (
             "No transcript text to embed. Strict publish needs the exact "
             "normalized plain text in the material."
@@ -134,7 +134,7 @@ def build_knowledge_path_snapshot_document(
         material, material_issues = _node_material(node)
         issues.extend(material_issues)
         snapshot_nodes.append({
-            "nodeId": f"sophia:node:{node.id}",
+            "nodeId": f"sophia-acbc:node:{node.id}",
             "position": index + 1,
             "title": node.title or "",
             "description": node.description or "",
@@ -143,14 +143,14 @@ def build_knowledge_path_snapshot_document(
         })
 
     document = {
-        "schemaVersion": "sophia-knowledge-path-v1",
-        "knowledgePathId": f"sophia:knowledge-path:{knowledge_path.id}",
+        "schemaVersion": "sophia-acbc-knowledge-path-v1",
+        "knowledgePathId": f"sophia-acbc:knowledge-path:{knowledge_path.id}",
         "version": version,
         "title": knowledge_path.title or "",
         "description": knowledge_path.description or "",
         "publishedAt": published_at or _utc_now_second(),
         "issuer": {
-            "namespace": "sophia",
+            "namespace": "sophia-acbc",
             "authorUserId": max(author_user_id, 1) if author_user_id else 1,
             "authorUsername": author_username or "unknown",
         },
@@ -208,8 +208,8 @@ def preview_knowledge_path_snapshot(
             })
 
     return {
-        "schemaVersion": "sophia-knowledge-path-v1",
-        "knowledgePathId": f"sophia:knowledge-path:{knowledge_path.id}",
+        "schemaVersion": "sophia-acbc-knowledge-path-v1",
+        "knowledgePathId": f"sophia-acbc:knowledge-path:{knowledge_path.id}",
         "version": version,
         "document": document,
         "canonical": canonical,
@@ -225,7 +225,7 @@ def preview_knowledge_path_snapshot(
                 "canonical JSON (UTF-8), which includes embedded material text."
             ),
             "transcriptVerification": (
-                "Given material.text and textFormat sophia-normalized-transcript-v1, "
+                "Given material.text and textFormat sophia-acbc-normalized-transcript-v1, "
                 "SHA-256(UTF-8 text) matches Bitcoin TranscriptAnchor.text_hash. "
                 "IPFS is not part of this snapshot."
             ),

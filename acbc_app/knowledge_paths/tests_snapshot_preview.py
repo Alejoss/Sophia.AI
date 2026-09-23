@@ -51,10 +51,10 @@ class SnapshotPreviewBuilderTests(TestCase):
         document = payload["document"]
         expected_text = resolve_certified_plain_text(self.content.transcript)
 
-        self.assertEqual(document["schemaVersion"], "sophia-knowledge-path-v1")
+        self.assertEqual(document["schemaVersion"], "sophia-acbc-knowledge-path-v1")
         self.assertEqual(
             document["knowledgePathId"],
-            f"sophia:knowledge-path:{self.path.id}",
+            f"sophia-acbc:knowledge-path:{self.path.id}",
         )
         self.assertTrue(payload["validForHash"])
         self.assertTrue(payload["readyForStrictPublish"])
@@ -107,7 +107,7 @@ class SnapshotPreviewAPITests(TestCase):
         self.assertIn("document", response.data)
         self.assertEqual(
             response.data["document"]["schemaVersion"],
-            "sophia-knowledge-path-v1",
+            "sophia-acbc-knowledge-path-v1",
         )
 
     def test_non_author_forbidden(self):

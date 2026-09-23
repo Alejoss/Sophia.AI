@@ -26,12 +26,12 @@ Hackathon hashing scope (product decision):
   hackathon. Quizzes remain live eligibility checks; their text is outside the
   knowledge-path digest.
 - Still define a separate **credential artifact** hash at mint time
-  (`sophia-credential-v1`), which references the knowledge-path digest.
+  (`sophia-acbc-credential-v1`), which references the knowledge-path digest.
 - Code, schema fields and fixtures use **knowledge path** naming — not "course".
 
 Recorded in [knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md):
 
-- `sophia-knowledge-path-v1` field rules, stable IDs, issuer object, materials.
+- `sophia-acbc-knowledge-path-v1` field rules, stable IDs, issuer object, materials.
 - Completion requirements frozen to platform reality: all nodes, **all** node
   quizzes, `quizPassingScore: 100` (not 80%).
 - Canonicalization: RFC 8785 JCS → UTF-8 → SHA-256; transcript materials reuse
@@ -49,7 +49,7 @@ the live demo path materials (starts Phase 2).
 ## 2. Implement immutable archival and learner-version binding
 
 - Persist published knowledge-path achievement versions and material snapshots
-  from `sophia-knowledge-path-v1`; never depend on mutable knowledge-path records
+  from `sophia-acbc-knowledge-path-v1`; never depend on mutable knowledge-path records
   to reconstruct a historical certificate.
 - Export full path/node text, ordered material references; do not archive quiz
   banks into the knowledge-path digest (hackathon scope).

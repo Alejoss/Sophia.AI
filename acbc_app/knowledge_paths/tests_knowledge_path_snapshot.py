@@ -1,4 +1,4 @@
-"""Exact-byte fixtures for sophia-knowledge-path-v1 / sophia-credential-v1 hashing."""
+"""Exact-byte fixtures for sophia-acbc-knowledge-path-v1 / sophia-acbc-credential-v1 hashing."""
 
 from copy import deepcopy
 
@@ -91,7 +91,7 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
     def test_node_order_change_changes_digest(self):
         logical = load_json_fixture("minimal.logical.json")
         second = deepcopy(logical["nodes"][0])
-        second["nodeId"] = "sophia:node:102"
+        second["nodeId"] = "sophia-acbc:node:102"
         second["position"] = 2
         second["title"] = "Second lesson"
         two_nodes = deepcopy(logical)
@@ -99,7 +99,7 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
         swapped = deepcopy(two_nodes)
         swapped["nodes"] = [
             {**second, "position": 1},
-            {**logical["nodes"][0], "position": 2, "nodeId": "sophia:node:101"},
+            {**logical["nodes"][0], "position": 2, "nodeId": "sophia-acbc:node:101"},
         ]
         self.assertNotEqual(
             hash_knowledge_path_snapshot(two_nodes),
@@ -109,7 +109,7 @@ class KnowledgePathSnapshotHashTests(SimpleTestCase):
     def test_assessments_field_is_rejected(self):
         logical = deepcopy(load_json_fixture("minimal.logical.json"))
         logical["nodes"][0]["assessments"] = [{
-            "assessmentId": "sophia:quiz:7",
+            "assessmentId": "sophia-acbc:quiz:7",
             "version": 1,
         }]
         with self.assertRaises(KnowledgePathSnapshotError):
