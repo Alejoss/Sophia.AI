@@ -134,7 +134,8 @@ def normalize_plain_text_for_hash(plain_text):
 
     Planned IPFS archives must store the resulting exact UTF-8 text so the same
     SHA-256 verifies on both chains. This normalization is transcript-specific;
-    do not apply it to course JSON, which needs a separate canonicalization rule.
+    do not apply it to knowledge-path JSON, which needs a separate
+    canonicalization rule.
     """
     normalized = unicodedata.normalize('NFC', plain_text or '')
     return ' '.join(normalized.split())

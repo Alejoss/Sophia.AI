@@ -41,6 +41,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import DataObjectIcon from "@mui/icons-material/DataObject";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
 import ImageUploadModal from "../components/ImageUploadModal";
@@ -90,8 +92,13 @@ const KnowledgePathEdit = () => {
   const [deletePathDialogOpen, setDeletePathDialogOpen] = useState(false);
   const [isDeletingPath, setIsDeletingPath] = useState(false);
 
+  const [snapshotPreview, setSnapshotPreview] = useState(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState(null);
+
   const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
-  const initialTab = tabFromQuery === "details" ? 0 : 1; // Default to Curriculum (tab 1)
+  const initialTab =
+    tabFromQuery === "details" ? 0 : tabFromQuery === "snapshot" ? 2 : 1;
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const canBePublic = useMemo(() => {
@@ -177,7 +184,8 @@ const KnowledgePathEdit = () => {
 
   // Keep tab selection in URL
   useEffect(() => {
-    const tab = activeTab === 1 ? "curriculum" : "details";
+    const tab =
+      activeTab === 0 ? "details" : activeTab === 2 ? "snapshot" : "curriculum";
     const current = (searchParams.get("tab") || "").toLowerCase();
     if (current !== tab) {
       setSearchParams((prev) => {
@@ -188,6 +196,29 @@ const KnowledgePathEdit = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  const loadSnapshotPreview = async () => {
+    try {
+      setSnapshotLoading(true);
+      setSnapshotError(null);
+      const data = await knowledgePathsApi.getSnapshotPreview(pathId);
+      setSnapshotPreview(data);
+    } catch (err) {
+      setSnapshotError(
+        err.response?.data?.error || err.message || "No se pudo cargar el snapshot"
+      );
+      setSnapshotPreview(null);
+    } finally {
+      setSnapshotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 2 && !loading && !loadError) {
+      loadSnapshotPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, pathId, loading, loadError]);
 
   // Cleanup object URL for image preview
   useEffect(() => {
@@ -592,6 +623,7 @@ const KnowledgePathEdit = () => {
               <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label="knowledge path edit tabs">
                 <Tab icon={<SettingsIcon />} iconPosition="start" label="Detalles" />
                 <Tab icon={<SchoolIcon />} iconPosition="start" label={`Currículum (${nodes.length})`} />
+                <Tab icon={<DataObjectIcon />} iconPosition="start" label="Snapshot" />
               </Tabs>
             </Box>
 
@@ -962,6 +994,172 @@ const KnowledgePathEdit = () => {
                     </Paper>
                   );
                 })}
+              </Stack>
+            )}
+          </Paper>
+        </Stack>
+      )}
+
+      {/* Snapshot Tab */}
+      {activeTab === 2 && (
+        <Stack spacing={3}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: 3 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+              sx={{ mb: 2 }}
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Snapshot del knowledge path
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  JSON lógico que se hashea con RFC 8785 JCS → SHA-256. Esto es una vista previa
+                  desde el camino editable (aún no es una versión publicada en IPFS).
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={loadSnapshotPreview}
+                disabled={snapshotLoading}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Actualizar
+              </Button>
+            </Stack>
+
+            {snapshotLoading && (
+              <Stack alignItems="center" sx={{ py: 4 }}>
+                <CircularProgress size={32} />
+              </Stack>
+            )}
+
+            {snapshotError && (
+              <Alert severity="error" sx={{ borderRadius: 2 }}>
+                {snapshotError}
+              </Alert>
+            )}
+
+            {!snapshotLoading && snapshotPreview && (
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip
+                    size="small"
+                    color={snapshotPreview.validForHash ? "success" : "error"}
+                    label={
+                      snapshotPreview.validForHash
+                        ? "Válido para hash (modo preview)"
+                        : "No válido para hash"
+                    }
+                  />
+                  <Chip
+                    size="small"
+                    color={snapshotPreview.readyForStrictPublish ? "success" : "warning"}
+                    label={
+                      snapshotPreview.readyForStrictPublish
+                        ? "Listo para publish (texto embebido en todos los materiales)"
+                        : "No listo: falta texto en algún material"
+                    }
+                  />
+                </Stack>
+
+                {snapshotPreview.digest && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Digest SHA-256
+                    </Typography>
+                    <Typography
+                      component="code"
+                      variant="body2"
+                      sx={{
+                        display: "block",
+                        mt: 0.5,
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: "action.hover",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {snapshotPreview.digest}
+                    </Typography>
+                  </Box>
+                )}
+
+                {Array.isArray(snapshotPreview.issues) && snapshotPreview.issues.length > 0 && (
+                  <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                    <AlertTitle>Pendientes para certificación</AlertTitle>
+                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                      {snapshotPreview.issues.map((issue, index) => (
+                        <li key={`${issue.code}-${issue.nodeId}-${index}`}>
+                          <Typography variant="body2">
+                            <strong>{issue.code}</strong>
+                            {issue.nodeId ? ` (${issue.nodeId})` : ""}: {issue.message}
+                          </Typography>
+                        </li>
+                      ))}
+                    </Box>
+                  </Alert>
+                )}
+
+                {snapshotPreview.validationError && (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    {snapshotPreview.validationError}
+                  </Alert>
+                )}
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                    Documento (pretty JSON)
+                  </Typography>
+                  <Box
+                    component="pre"
+                    sx={{
+                      m: 0,
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: "grey.900",
+                      color: "grey.100",
+                      overflow: "auto",
+                      maxHeight: 520,
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    }}
+                  >
+                    {JSON.stringify(snapshotPreview.document, null, 2)}
+                  </Box>
+                </Box>
+
+                {snapshotPreview.canonical && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Bytes canónicos JCS (lo que se hashea)
+                    </Typography>
+                    <Box
+                      component="pre"
+                      sx={{
+                        m: 0,
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: "grey.900",
+                        color: "grey.100",
+                        overflow: "auto",
+                        maxHeight: 240,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      }}
+                    >
+                      {snapshotPreview.canonical}
+                    </Box>
+                  </Box>
+                )}
               </Stack>
             )}
           </Paper>

@@ -104,6 +104,7 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestTopicQueueView,
     ContentEmbeddingIngestDetailView,
 )
+from .views_knowledge_path_ingest import KnowledgePathIngestDetailView
 from .views_topic_purchase import TopicPurchaseView
 from .views_topic_chat import (
     TopicChatView,
@@ -290,5 +291,10 @@ urlpatterns = [
         'embedding-ingest/<int:content_id>/',
         ContentEmbeddingIngestDetailView.as_view(),
         name='embedding-ingest-detail',
+    ),
+    path(
+        'knowledge-path-ingest/<int:knowledge_path_id>/',
+        KnowledgePathIngestDetailView.as_view(),
+        name='knowledge-path-ingest-detail',
     ),
 ]

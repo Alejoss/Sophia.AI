@@ -1,13 +1,15 @@
-# Sophia hackathon: Ethereum educational credentials and course evidence
+# Sophia hackathon: Ethereum educational credentials and knowledge-path evidence
 
-Status: agreed product direction; implementation pending.
-Date: 2026-09-21.
-Companion: [Development plan](hackathon-ethereum-development-plan.md).
+Status: agreed product direction; Phase 1 knowledge-path schema frozen 2026-09-23;
+archival/contract implementation still pending.
+Date: 2026-09-21 (updated 2026-09-23).
+Companion: [Development plan](hackathon-ethereum-development-plan.md),
+[frozen knowledge-path snapshot schema](knowledge-path-snapshot-schema.md).
 
 ## Objective
 
 Extend Sophia's learning platform with non-transferable educational certificate
-NFTs on Ethereum and an immutable registry of course versions and transcript
+NFTs on Ethereum and an immutable registry of knowledge-path versions and transcript
 references. Preserve readable evidence on IPFS, retain Bitcoin transcript
 anchoring, and let a learner or third party inspect exactly what a credential
 refers to. A transcript is educational content; it is not the student's NFT.
@@ -19,7 +21,7 @@ not a new token economy. Contract feature count is not a success metric.
 
 | Area | Current implementation | Required extension |
 | --- | --- | --- |
-| Courses | `acbc_app/knowledge_paths/models.py`: editable KnowledgePath and ordered Node records | Immutable published snapshots and learner-version binding |
+| Knowledge paths | `acbc_app/knowledge_paths/models.py`: editable KnowledgePath and ordered Node records | Immutable published snapshots and learner-version binding |
 | Assessments | `acbc_app/quizzes/models.py`: multiple quizzes per node, questions, options and attempts | Versioned public definitions and controlled private evidence |
 | Credentials | `acbc_app/certificates/models.py`: UUID, path OR event, issuer, template, file, transaction field | Wallet, network, contract, token ID, artifact hash, achievement version and status |
 | Approval | `acbc_app/certificates/views.py` and CertificateRequest.approve | Consistent approved issuance across all entry points; retry-safe mint jobs |
@@ -43,18 +45,21 @@ Include:
 
 - Immutable transcript records with SHA-256 digest, IPFS URI and format version.
 - Bitcoin network/transaction evidence associated with the correct digest.
-- Immutable course snapshots, including full titles, descriptions, node order,
-  learning objectives, completion requirements, material and assessment references.
-- Educational NFTs for course completion or event attendance, explicitly typed.
-- Issuer permissions scoped to the course/event offering, with separate administration.
+- Immutable **knowledge-path** snapshots, including full titles,
+  descriptions, node order, completion requirements and archived material
+  references. Hackathon scope does **not** hash event definitions or quiz /
+  public-assessment content (see [knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md)).
+- Educational NFTs for knowledge-path completion (demo). Event attendance credentials may
+  remain in the product without a hashed event schema for this hackathon.
+- Issuer permissions scoped to the knowledge-path/event offering, with separate administration.
 - Permanent non-transferability, credential validity, revocation and linked replacement.
 - Stable certificate identifiers to prevent duplicate minting on retries.
-- Certificate artifact hashing, separate from transcript and course hashing.
+- Certificate artifact hashing, separate from transcript and knowledge-path hashing.
 - Platform-paid issuance, public verification and activity events.
 - Emergency pause of new registry writes/minting; existing verification stays available.
 
-Course certificates reference a course version. Event certificates reference a
-fixed event/achievement definition; they need not invent a transcript or course.
+Knowledge-path certificates reference a knowledge-path version. Event certificates reference a
+fixed event/achievement definition; they need not invent a transcript or knowledge path.
 Private personal details, answer keys and learner submissions are not public
 on-chain fields or unencrypted public IPFS files.
 
@@ -74,9 +79,9 @@ issuer controls and public verification. Translate application-owned headings,
 buttons, forms, dialogs, validation errors, loading/empty states and notifications;
 format dates and numbers appropriately and update the document language.
 
-Content supplied by users (course text, posts, transcripts and assessment content)
+Content supplied by users (knowledge-path text, posts, transcripts and assessment content)
 retains its original language unless a separate translation is provided. Prepare
-an English demo course and label original-language content clearly. Never modify
+an English demo knowledge path and label original-language content clearly. Never modify
 certified snapshot bytes, hashes or archived transcripts when switching the UI
 language; any translated rendition is distinct from the original evidence.
 
@@ -90,77 +95,74 @@ for an English judging experience, not a claim that the rules prescribe this UI.
 
 | Data | Storage |
 | --- | --- |
-| Full node/course titles and descriptions | Canonical course snapshot on IPFS |
+| Full node/knowledge-path titles and descriptions | Canonical knowledge-path snapshot on IPFS |
 | Exact archived transcripts and public source documents | Separate IPFS files with backup copies |
-| Course snapshot digest and URI | Ethereum achievement-version record |
+| Knowledge-path snapshot digest and URI | Ethereum achievement-version record |
 | Transcript digest, URI, normalization version | Ethereum transcript registry |
 | Bitcoin transaction and network | Associated registry evidence; verified off-chain |
 | Recipient, issuer, achievement version, credential digest/URI, status | Ethereum NFT record |
 | Attempts, grades, private identity and restricted assessment evidence | Controlled application storage |
 
-The certificate points to a course snapshot; the snapshot points to exact
+The certificate points to a knowledge-path snapshot; the snapshot points to exact
 archived materials. Titles and long descriptions are protected by hashing the
 whole snapshot. No separate description hash or on-chain description is needed.
 Preserve all materials intended to be certified. Never silently omit a node or
 claim complete archival if a resource is missing. Publication must either report
 the gap explicitly or block publication under a strict completeness policy.
-The demo should use a course with fully available, publishable evidence.
+The demo should use a knowledge path with fully available, publishable evidence.
 
 IPFS content addressing does not guarantee availability. Maintain pinning and
 backups of the exact files; verification must distinguish unavailable evidence
-from a hash mismatch. Public IPFS is not an access-control system for paid courses.
+from a hash mismatch. Public IPFS is not an access-control system for paid knowledge paths.
 Use public demo materials; restricted-material handling remains an explicit
-implementation decision, not automatic publication of existing course files.
+implementation decision, not automatic publication of existing knowledge-path files.
 
-### Illustrative course snapshot
+### Illustrative knowledge-path snapshot
 
-This example contains placeholders, not valid CIDs or computed digests. The
-passing score is illustrative and must reflect the actual approved course rules.
+Authoritative field rules and fixtures live in
+[knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md). The example below is
+aligned with that freeze (placeholders are not valid CIDs or real digests).
+Assessment / quiz objects are intentionally absent from the hashed document.
 
 ```json
 {
-  "schemaVersion": "sophia-course-v1",
-  "courseId": "sophia:path:42",
+  "schemaVersion": "sophia-acbc-knowledge-path-v1",
+  "knowledgePathId": "sophia-acbc:knowledge-path:42",
   "version": 1,
   "title": "Introduction to Bitcoin",
-  "description": "The full course description.",
+  "description": "The full knowledge path description.",
   "publishedAt": "2026-10-01T15:00:00Z",
-  "learningObjectives": ["Explain Bitcoin transactions"],
+  "issuer": {
+    "namespace": "sophia-acbc",
+    "authorUserId": 7,
+    "authorUsername": "demo-teacher"
+  },
   "completionRequirements": {
     "allNodesRequired": true,
-    "quizPassingPercentage": 80
+    "allNodeQuizzesRequired": true,
+    "quizPassingScore": 100
   },
   "nodes": [{
-    "nodeId": "sophia:node:101",
+    "nodeId": "sophia-acbc:node:101",
     "position": 1,
     "title": "What is Bitcoin?",
     "description": "The complete node description, without truncation.",
+    "mediaType": "VIDEO",
     "materials": [{
       "type": "transcript",
-      "uri": "ipfs://<transcript-CID>",
-      "hashAlgorithm": "sha256",
-      "contentHash": "<64-hex-character-digest>",
-      "textFormat": "sophia-normalized-transcript-v1",
-      "registryReference": "<immutable-transcript-record-ID>",
-      "coverage": "archived"
-    }],
-    "assessments": [{
-      "assessmentId": "sophia:quiz:7",
-      "version": 1,
-      "publicDefinitionUri": "ipfs://<quiz-definition-CID>",
-      "publicDefinitionHash": "<64-hex-character-digest>",
-      "privateEvidence": "restricted"
+      "textFormat": "sophia-acbc-normalized-transcript-v1",
+      "text": "Bitcoin is a peer-to-peer electronic cash system. Transactions are broadcast to the network and confirmed in blocks.",
+      "contentId": "sophia-acbc:content:55"
     }]
   }]
 }
 ```
 
-Final schema must also identify the issuer and namespace record references by
-deployment/network where appropriate. Snapshot arrays have deliberate order;
-canonical JSON does not sort lessons for us. Preserve every quiz, not just one
-per node. Public quiz exports use an allowlist and exclude correctness flags.
-Private assessment commitments, if implemented, need randomized commitments and
-authorized disclosure; a plain predictable answer-key hash is insufficient.
+Final schema identifies the issuer inside the snapshot. Registry deployment /
+network namespacing lives beside the document on-chain. Snapshot arrays have
+deliberate order; JCS sorts object keys but does not reorder lessons. Quiz
+content is not part of this digest. Private assessment data stays in controlled
+application storage.
 
 ### Exact hashing conventions
 
@@ -168,10 +170,12 @@ authorized disclosure; a plain predictable answer-key hash is insufficient.
    `normalize_plain_text_for_hash`; encode UTF-8, without BOM or an added newline.
    Archive the exact normalized bytes. SHA-256 must equal the matching Bitcoin
    anchor's `text_hash`. Do not relabel a different transcript as that anchor.
-2. Course/assessment JSON: adopt RFC 8785 JSON Canonicalization Scheme (JCS),
-   serialize UTF-8 and hash the exact bytes using SHA-256. Freeze schema rules
-   for missing/null fields, timestamps and numeric values. JCS does not itself
-   normalize Unicode; preserve strings exactly and document any preprocessing.
+2. Knowledge-path and credential JSON: adopt RFC 8785 JSON Canonicalization Scheme (JCS),
+   serialize UTF-8 and hash the exact bytes using SHA-256. Floats are forbidden
+   in hashed documents. Freeze schema rules for missing/null fields, timestamps
+   and integers as in [knowledge-path-snapshot-schema.md](knowledge-path-snapshot-schema.md).
+   JCS does not itself normalize Unicode; preserve strings exactly and document
+   any preprocessing. Do not apply transcript whitespace collapse to knowledge-path JSON.
 3. Upload those exact canonical bytes to IPFS. Store the returned URI and digest
    outside the document: a snapshot must not contain its own CID/hash.
 4. Ethereum stores SHA-256 digests as 32-byte values. Do not accidentally replace
@@ -188,10 +192,10 @@ the committed bytes. Provide the exact verification file for download.
 
 ## Publication, issuance and lifecycle
 
-Publish a frozen course version before the learner starts the certified path.
+Publish a frozen knowledge-path version before the learner starts the certified path.
 Bind that learner's progress to it. Later edits create a new version and never
 silently migrate existing progress or rewrite issued credentials. For the demo,
-freeze one course/cohort; a general course migration editor is out of scope.
+freeze one knowledge path/cohort; a general path migration editor is out of scope.
 Existing unversioned progress must not be retroactively presented as evidence
 of a previously published immutable version.
 
@@ -217,25 +221,25 @@ or reversible revocation without a documented product rule.
 
 Bitcoin evidence may arrive after transcript registration. Attach it as an
 authorized append-only assertion/event bound to the digest, without changing
-the immutable course snapshot. Corrections preserve earlier assertions. The
+the immutable knowledge-path snapshot. Corrections preserve earlier assertions. The
 verifier checks the transaction's network, payload and confirmations separately;
 copying a txid into Ethereum is not a Bitcoin bridge or trustless proof.
 
 ## Verification experience
 
 Show a readable certificate page with recipient address, issuer, achievement,
-issuance date and current validity. Show the certified course version with full
+issuance date and current validity. Show the certified knowledge-path version with full
 titles/descriptions, ordered lessons and completion criteria. Provide links to
 archived transcripts and a download of the exact snapshot bytes.
 
-Report separate results for credential integrity, course-snapshot integrity,
+Report separate results for credential integrity, knowledge-path-snapshot integrity,
 material integrity/availability, and Bitcoin confirmation. Hash the retrieved
 files rather than merely trusting a backend 'verified' flag. A changed title,
 description, node order, passing score or material pointer invalidates the
 snapshot digest. Changing the material bytes invalidates that material's digest.
-A course hash commits to references; it does not by itself fetch or check files.
+A knowledge-path hash commits to references; it does not by itself fetch or check files.
 
-Course snapshots describe educational content. Educational certificate NFTs
+Knowledge-path snapshots describe educational content. Educational certificate NFTs
 attest to individual achievement. Neither transcript anchoring nor NFT ownership
 proves educational quality, copyright ownership, or correctness of an AI answer.
 
