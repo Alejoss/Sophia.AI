@@ -76,8 +76,16 @@ class SnapshotPreviewBuilderTests(TestCase):
         self.assertEqual(material["text"], "")
         self.assertTrue(payload["validForHash"])
         self.assertFalse(payload["readyForStrictPublish"])
-        codes = {issue["code"] for issue in payload["issues"]}
-        self.assertIn("NO_TRANSCRIPT_TEXT", codes)
+        missing = [
+            issue for issue in payload["issues"]
+            if issue["code"] == "NO_TRANSCRIPT_TEXT"
+        ]
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(missing[0]["nodeTitle"], "What is Bitcoin?")
+        self.assertEqual(
+            missing[0]["nodeId"],
+            f"sophia-acbc:node:{self.node.id}",
+        )
 
 
 class SnapshotPreviewAPITests(TestCase):

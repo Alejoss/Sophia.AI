@@ -34,19 +34,29 @@ def _utc_now_second() -> str:
     return now.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _node_issue(node: Node, *, code: str, message: str) -> dict[str, str]:
+    """Build a preview issue that names the node for authors/admins."""
+    return {
+        "code": code,
+        "nodeId": f"sophia-acbc:node:{node.id}",
+        "nodeTitle": (node.title or "").strip(),
+        "message": message,
+    }
+
+
 def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Return (material object, issues)."""
     issues: list[dict[str, str]] = []
     profile = node.content_profile
     if profile is None or profile.content_id is None:
-        issues.append({
-            "code": "NO_CONTENT",
-            "nodeId": f"sophia-acbc:node:{node.id}",
-            "message": (
+        issues.append(_node_issue(
+            node,
+            code="NO_CONTENT",
+            message=(
                 "Node has no linked content. Attach content before a strict "
                 "certified publish."
             ),
-        })
+        ))
         return {
             "type": "source",
             "text": "",
@@ -66,14 +76,14 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
                 "text": text,
                 "contentId": content_id,
             }, issues
-        issues.append({
-            "code": "EMPTY_TRANSCRIPT",
-            "nodeId": f"sophia-acbc:node:{node.id}",
-            "message": (
+        issues.append(_node_issue(
+            node,
+            code="EMPTY_TRANSCRIPT",
+            message=(
                 "Transcript exists but normalized text is empty. "
                 "text stays \"\" until ingest provides certified plain text."
             ),
-        })
+        ))
         return {
             "type": "transcript",
             "textFormat": TRANSCRIPT_TEXT_FORMAT,
@@ -81,14 +91,14 @@ def _node_material(node: Node) -> tuple[dict[str, Any], list[dict[str, str]]]:
             "contentId": content_id,
         }, issues
 
-    issues.append({
-        "code": "NO_TRANSCRIPT_TEXT",
-        "nodeId": f"sophia-acbc:node:{node.id}",
-        "message": (
+    issues.append(_node_issue(
+        node,
+        code="NO_TRANSCRIPT_TEXT",
+        message=(
             "No transcript text to embed. Strict publish needs the exact "
             "normalized plain text in the material."
         ),
-    })
+    ))
     return {
         "type": "source",
         "text": "",
@@ -109,6 +119,7 @@ def build_knowledge_path_snapshot_document(
         issues.append({
             "code": "NO_AUTHOR",
             "nodeId": "",
+            "nodeTitle": "",
             "message": "Knowledge path has no author; issuer fields are incomplete.",
         })
         author_user_id = 0
@@ -126,6 +137,7 @@ def build_knowledge_path_snapshot_document(
         issues.append({
             "code": "NO_NODES",
             "nodeId": "",
+            "nodeTitle": "",
             "message": "Knowledge path has no nodes.",
         })
 
