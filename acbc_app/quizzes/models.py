@@ -15,6 +15,15 @@ def upload_question_image(instance, filename):
 
 
 class Quiz(models.Model):
+    """Live assessment definition; changes are not currently versioned.
+
+    Hackathon knowledge-path snapshots do not hash quiz content; quizzes remain
+    live eligibility checks under declared completionRequirements. Public exports
+    must explicitly select safe fields: Option.is_correct and learner
+    attempts/answers are not public knowledge-path metadata. Restricted
+    assessment evidence needs separate archival and disclosure rules.
+    See docs/hackathon/knowledge-path-snapshot-schema.md.
+    """
     node = models.ForeignKey('knowledge_paths.Node', on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)

@@ -33,6 +33,14 @@ def knowledge_path_image_preview_path(instance, filename):
 
 
 class KnowledgePath(models.Model):
+    """Editable knowledge path, not an immutable certified published version.
+
+    The planned Ethereum integration must snapshot this knowledge path and its
+    ordered nodes before binding learner progress to a published version. Later
+    edits must not change the curriculum referenced by an issued certificate.
+    See docs/hackathon/hackathon-ethereum-credentials.md and
+    docs/hackathon/knowledge-path-snapshot-schema.md.
+    """
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_paths')
@@ -158,6 +166,12 @@ class KnowledgePath(models.Model):
 
 
 class Node(models.Model):
+    """Editable lesson whose full title, description and order belong in a snapshot.
+
+    ContentProfile links resolve live content; certification must instead retain
+    version-specific archived material references. Quiz content is outside the
+    hackathon knowledge-path digest; see docs/hackathon/knowledge-path-snapshot-schema.md.
+    """
     MEDIA_TYPES = [
         ('VIDEO', 'Video'),
         ('AUDIO', 'Audio'),
@@ -252,3 +266,64 @@ class KnowledgePathPurchase(models.Model):
     @property
     def is_paid(self):
         return self.payment_status == 'PAID'
+
+
+class PublishedKnowledgePathSnapshot(models.Model):
+    """Immutable admin-published knowledge-path snapshot (hackathon Phase 2).
+
+    ``document_text`` stores the exact RFC 8785 JCS canonical JSON (as text)
+    whose SHA-256 is ``digest``. Use TextField rather than JSONField so the
+    exact hashed bytes are preserved without JSON round-trip differences.
+    Snapshots are created only by staff from the dashboard — not on path
+    create/publish/visibility changes.
+    """
+
+    knowledge_path = models.ForeignKey(
+        KnowledgePath,
+        on_delete=models.CASCADE,
+        related_name='published_snapshots',
+    )
+    version = models.PositiveIntegerField()
+    schema_version = models.CharField(max_length=64)
+    document_text = models.TextField(
+        help_text='Exact JCS canonical JSON UTF-8 text that was hashed.',
+    )
+    digest = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest of document_text UTF-8 bytes.',
+    )
+    published_at = models.DateTimeField(auto_now_add=True)
+    published_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='published_knowledge_path_snapshots',
+    )
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['-version']
+        unique_together = [['knowledge_path', 'version']]
+        indexes = [
+            models.Index(fields=['digest'], name='kp_snapshot_digest_idx'),
+        ]
+
+    def __str__(self):
+        return (
+            f'path {self.knowledge_path_id} v{self.version} '
+            f'({(self.digest or "")[:12]})'
+        )
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError(
+                'PublishedKnowledgePathSnapshot rows are immutable; '
+                'create a new version instead of updating.'
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def document(self):
+        """Parse canonical JSON for API display (logical object)."""
+        import json
+        return json.loads(self.document_text)
+

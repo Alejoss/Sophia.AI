@@ -18,13 +18,4 @@ Por favor si encuentras errores toma un screenshot y compártelos. Esto ayudará
 
 ## Cómo resolver un issue
 
-- Ir al proyecto en GitHub, a la sección "Issues" y leer los issues.
-- Una vez que encuentres un issue con el cual puedes colaborar, puedes asignártelo.
-- Haz un fork del proyecto.
-- Sal de la main branch y crea una nueva branch cuyo nombre sea el código del issue.
-- Completa el desarrollo en tu feature branch.
-- Convención para los nombres de los commits: comenzar con el código del issue. Por ejemplo: "FRONT-0123: algo de frontend".
-- Pushea tus cambios a tu repositorio forkeado.
-- Crea un PR desde tu branch hacia main del proyecto original. 
-- Completa la descripción y la información necesaria en tu PR.
-- Un reviewer revisará tu PR y lo mergeará o te hará comentarios en caso de ser necesario.
+Sigue el [flujo de desarrollo del repositorio](../../CONTRIBUTING.md#development-workflow) para las reglas de ramas, revisión, pruebas y commits.

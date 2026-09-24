@@ -146,7 +146,7 @@ sequenceDiagram
 
 Product path: anchor `ContentTranscript.text_hash` in a Bitcoin `OP_RETURN`.
 See [blockchain-integration.md](blockchain-integration.md) and
-[transcript-anchor.md](../api/transcript-anchor.md).
+[transcript-anchor.md](../hackathon/transcript-anchor.md).
 
 ```mermaid
 sequenceDiagram
@@ -234,6 +234,6 @@ sequenceDiagram
 - [Data Models](data-models.md) - Detailed database schema
 - [API Design](api-design.md) - API architecture details
 - [Blockchain Integration](blockchain-integration.md) - Bitcoin transcript anchors + legacy EVM
-- [Transcript certification](../api/transcript-anchor.md) - OP_RETURN API and ops CLI
+- [Transcript certification](../hackathon/transcript-anchor.md) - OP_RETURN API and ops CLI
 - [Deployment Guide](../deployment/production.md) - Production deployment
 

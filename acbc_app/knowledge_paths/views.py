@@ -2,10 +2,10 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import KnowledgePath, Node
+from .models import KnowledgePath, Node, PublishedKnowledgePathSnapshot
 from .serializers import (
     KnowledgePathSerializer,
     KnowledgePathCreateSerializer,
@@ -23,6 +23,12 @@ from django.db import models
 from django.utils import timezone
 from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
+from knowledge_paths.services.snapshot_preview import preview_knowledge_path_snapshot
+from knowledge_paths.services.snapshot_publish import (
+    SnapshotPublishError,
+    publish_knowledge_path_snapshot,
+    serialize_published_snapshot,
+)
 from payments.services import get_or_create_path_purchase
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
@@ -1116,6 +1122,141 @@ class NodeReorderView(APIView):
                 {'error': 'An error occurred while reordering nodes'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class KnowledgePathSnapshotPreviewView(APIView):
+    """Author-only preview of the knowledge-path snapshot JSON and digest."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        if knowledge_path.author_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to preview this snapshot"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        version = request.query_params.get("version", "1")
+        try:
+            version_int = int(version)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "version must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if version_int < 1:
+            return Response(
+                {"error": "version must be >= 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = preview_knowledge_path_snapshot(
+            knowledge_path,
+            version=version_int,
+        )
+        return Response(payload)
+
+
+class KnowledgePathSnapshotListCreateView(APIView):
+    """Staff: list published snapshots for a path, or publish a new version."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        rows = (
+            PublishedKnowledgePathSnapshot.objects.filter(
+                knowledge_path=knowledge_path,
+            )
+            .select_related('published_by', 'knowledge_path')
+            .order_by('-version')
+        )
+        return Response({
+            "knowledgePathDbId": knowledge_path.id,
+            "knowledgePathTitle": knowledge_path.title,
+            "snapshots": [
+                {
+                    "id": row.id,
+                    "version": row.version,
+                    "schemaVersion": row.schema_version,
+                    "digest": row.digest,
+                    "publishedAt": serialize_published_snapshot(row)["publishedAt"],
+                    "publishedBy": serialize_published_snapshot(row)["publishedBy"],
+                }
+                for row in rows
+            ],
+        })
+
+    def post(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        try:
+            snapshot = publish_knowledge_path_snapshot(
+                knowledge_path,
+                published_by=request.user,
+            )
+        except SnapshotPublishError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            serialize_published_snapshot(snapshot),
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class KnowledgePathSnapshotDetailView(APIView):
+    """Staff: fetch one published snapshot by version (includes full document)."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk, version):
+        snapshot = get_object_or_404(
+            PublishedKnowledgePathSnapshot.objects.select_related(
+                'published_by',
+                'knowledge_path',
+            ),
+            knowledge_path_id=pk,
+            version=version,
+        )
+        return Response(serialize_published_snapshot(snapshot))
+
+
+class AdminKnowledgePathSnapshotDashboardView(APIView):
+    """Staff dashboard: paths with latest snapshot status."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        paths = (
+            KnowledgePath.objects.select_related('author')
+            .prefetch_related('published_snapshots')
+            .annotate(node_count=models.Count('nodes', distinct=True))
+            .order_by('-updated_at')
+        )
+        items = []
+        for path in paths:
+            snapshots = list(path.published_snapshots.all())
+            latest = max(snapshots, key=lambda row: row.version, default=None)
+            latest_payload = None
+            if latest is not None:
+                serialized = serialize_published_snapshot(latest)
+                latest_payload = {
+                    "version": serialized["version"],
+                    "digest": serialized["digest"],
+                    "publishedAt": serialized["publishedAt"],
+                    "publishedBy": serialized["publishedBy"],
+                }
+            items.append({
+                "id": path.id,
+                "title": path.title,
+                "author": path.author.username if path.author_id else None,
+                "isVisible": path.is_visible,
+                "certificatesEnabled": path.certificates_enabled,
+                "nodeCount": path.node_count,
+                "latestSnapshot": latest_payload,
+            })
+        return Response({"paths": items})
+
 
 def knowledge_path_detail(request, path_id):
     try:

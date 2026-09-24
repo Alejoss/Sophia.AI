@@ -185,7 +185,7 @@ See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 ### Bitcoin OP_RETURN (transcript anchoring)
 
-Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**. Full product/API/ops guide: [transcript-anchor.md](../api/transcript-anchor.md). Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md).
+Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**. Full product/API/ops guide: [transcript-anchor.md](../hackathon/transcript-anchor.md). Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md).
 
 #### `BTC_NETWORK`
 - **Description**: `signet` (default), `testnet`, `testnet4`, or `mainnet`

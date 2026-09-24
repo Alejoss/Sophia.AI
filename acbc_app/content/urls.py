@@ -93,6 +93,7 @@ from .views_transcript_ingest import (
     ContentTranscriptPublicView,
 )
 from .views_transcript_anchor import (
+    ContentTranscriptAnchorCertifiedTextView,
     ContentTranscriptAnchorCurrentView,
     ContentTranscriptAnchorListView,
 )
@@ -103,6 +104,7 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestTopicQueueView,
     ContentEmbeddingIngestDetailView,
 )
+from .views_knowledge_path_ingest import KnowledgePathIngestDetailView
 from .views_topic_purchase import TopicPurchaseView
 from .views_topic_chat import (
     TopicChatView,
@@ -146,6 +148,11 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/anchors/',
         ContentTranscriptAnchorListView.as_view(),
         name='content-transcript-anchors',
+    ),
+    path(
+        'content_details/<int:content_id>/transcript/anchors/<int:anchor_id>/certified-text/',
+        ContentTranscriptAnchorCertifiedTextView.as_view(),
+        name='content-transcript-anchor-certified-text',
     ),
     path(
         'content_details/<int:content_id>/transcript/anchor-requests/',
@@ -284,5 +291,10 @@ urlpatterns = [
         'embedding-ingest/<int:content_id>/',
         ContentEmbeddingIngestDetailView.as_view(),
         name='embedding-ingest-detail',
+    ),
+    path(
+        'knowledge-path-ingest/<int:knowledge_path_id>/',
+        KnowledgePathIngestDetailView.as_view(),
+        name='knowledge-path-ingest-detail',
     ),
 ]

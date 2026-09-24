@@ -123,7 +123,7 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 Anchor `ContentTranscript.text_hash` in a Bitcoin `OP_RETURN`. API prepares/lists
 rows; broadcast is ops-only (`manage.py broadcast_transcript_anchor`).
 
-Full contract: [transcript-anchor.md](transcript-anchor.md). Architecture:
+Full contract: [transcript-anchor.md](../hackathon/transcript-anchor.md). Architecture:
 [blockchain-integration.md](../architecture/blockchain-integration.md).
 
 ### Current anchor for transcript hash
@@ -135,6 +135,11 @@ Full contract: [transcript-anchor.md](transcript-anchor.md). Architecture:
 - **GET** `/api/content/content_details/{content_id}/transcript/anchors/`
 - **Auth**: Optional (`AllowAny`)
 - **Response**: array of `TranscriptAnchorSerializer`
+
+### Download certified text
+- **GET** `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/`
+- **Auth**: Optional (`AllowAny`)
+- **Response**: `text/plain; charset=utf-8` attachment of the exact normalized snapshot; headers `X-Text-Hash`, `X-Expected-Text-Hash`, `X-Hash-Match`. **404** `certified_text_missing` when no snapshot was saved.
 
 ### Prepare pending anchor
 - **POST** `/api/content/content_details/{content_id}/transcript/anchors/`

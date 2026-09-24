@@ -9,6 +9,11 @@ vi.mock('../../api/contentApi', () => ({
     getTranscriptAnchorRequest: vi.fn(),
     createTranscriptAnchorRequest: vi.fn(),
     broadcastTranscriptAnchor: vi.fn(),
+    getTranscriptAnchorCertifiedTextUrl: vi.fn(
+      (contentId, anchorId) => (
+        `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
+      ),
+    ),
   },
 }));
 
@@ -73,20 +78,27 @@ describe('ContentBitcoinAnchor', () => {
     expect(screen.queryByRole('button', { name: /solicitar anclaje/i })).not.toBeInTheDocument();
   });
 
-  it('shows hash, txid and mempool link when anchored', async () => {
+  it('shows hash, txid, mempool link and certified-text download when anchored', async () => {
     contentApi.getTranscriptAnchor.mockResolvedValue({
       content_id: 3,
       has_transcript: true,
       current_text_hash: '835afa37dfc4e8b615d8403426779cd03bb030304d77497f50dd4cf1b9c2f824',
       can_certify: false,
       anchor: {
+        id: 9,
         status: 'anchored',
         is_btc_confirmed: true,
         btc_network: 'signet',
         text_hash: '835afa37dfc4e8b615d8403426779cd03bb030304d77497f50dd4cf1b9c2f824',
         btc_txid: '47bf019be4de25908bf1302a5bf8360ba9cfd54d6a0a38a48909b90d61cdc2e3',
+        certified_plain_text: 'Texto certificado de prueba.',
       },
     });
+    contentApi.getTranscriptAnchorCertifiedTextUrl = vi.fn(
+      (contentId, anchorId) => (
+        `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
+      ),
+    );
 
     render(<ContentBitcoinAnchor contentId={3} />);
 
@@ -99,5 +111,9 @@ describe('ContentBitcoinAnchor', () => {
       'href',
       'https://mempool.space/signet/tx/47bf019be4de25908bf1302a5bf8360ba9cfd54d6a0a38a48909b90d61cdc2e3',
     );
+    expect(
+      screen.getByRole('button', { name: /descargar texto certificado/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Texto certificado de prueba.')).toBeInTheDocument();
   });
 });

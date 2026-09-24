@@ -1,7 +1,9 @@
 """API for transcript Bitcoin certification anchors (OP_RETURN)."""
+import hashlib
 import logging
 
 from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -19,6 +21,8 @@ from content.bitcoin.service import (
     broadcast_anchor,
     ensure_pending_anchor,
     maybe_refresh_broadcast_anchor,
+    set_anchor_network,
+    validate_btc_network,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,6 +98,16 @@ class ContentTranscriptAnchorListView(APIView):
 
         from content.transcript_utils import resolve_certified_plain_text
 
+        try:
+            network = validate_btc_network(
+                data.get(
+                    'btc_network',
+                    TranscriptAnchor.BTC_NETWORK_SIGNET,
+                )
+            )
+        except AnchorBroadcastError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         anchor = TranscriptAnchor(
             content=content,
             text_hash=transcript.text_hash,
@@ -103,10 +117,7 @@ class ContentTranscriptAnchorListView(APIView):
                 'op_return_prefix',
                 TranscriptAnchor.DEFAULT_OP_RETURN_PREFIX,
             ),
-            btc_network=data.get(
-                'btc_network',
-                TranscriptAnchor.BTC_NETWORK_SIGNET,
-            ),
+            btc_network=network,
             ipfs_cid=data.get('ipfs_cid', ''),
             anchored_by=request.user,
             status=TranscriptAnchor.STATUS_PENDING,
@@ -126,8 +137,8 @@ class ContentTranscriptAnchorCurrentView(APIView):
     POST /api/content/content_details/<content_id>/transcript/anchor/
 
     GET returns the Bitcoin anchor matching the current transcript hash, or null.
-    If the matching row is still ``btc_broadcast``, polls Esplora once to update
-    confirmations / mark ``anchored`` when ready.
+    If the matching row is still ``btc_broadcast`` (or ``anchored``), polls Esplora
+    once to update confirmations / mark ``anchored`` or demote after a reorg.
 
     POST (staff/ops) ensures a pending row and broadcasts via the platform
     wallet. Rejects with 503 when estimated fee USD exceeds ``BTC_MAX_FEE_USD``.
@@ -173,14 +184,14 @@ class ContentTranscriptAnchorCurrentView(APIView):
             or getattr(settings, 'BTC_NETWORK', TranscriptAnchor.BTC_NETWORK_SIGNET)
         )
         try:
+            network = validate_btc_network(network)
             anchor = ensure_pending_anchor(
                 content,
                 network=network,
                 anchored_by=request.user,
             )
             if request.data.get('btc_network'):
-                anchor.btc_network = str(network).lower()
-                anchor.save(update_fields=['btc_network', 'updated_at'])
+                set_anchor_network(anchor, network)
             anchor = broadcast_anchor(anchor, dry_run=False)
         except FeeBudgetError as exc:
             return Response(
@@ -218,3 +229,46 @@ class ContentTranscriptAnchorCurrentView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class ContentTranscriptAnchorCertifiedTextView(APIView):
+    """
+    GET /api/content/content_details/<content_id>/transcript/anchors/<anchor_id>/certified-text/
+
+    Public download of the exact normalized UTF-8 bytes whose SHA-256 is
+    ``text_hash``. Used for independent verification after the live transcript
+    has been edited. Returns 404 when the historical snapshot was never saved.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, content_id, anchor_id):
+        content = get_object_or_404(Content, pk=content_id)
+        anchor = get_object_or_404(
+            TranscriptAnchor,
+            pk=anchor_id,
+            content=content,
+        )
+        text = anchor.certified_plain_text or ''
+        if not text.strip():
+            return Response(
+                {
+                    'error': (
+                        'Este anclaje no tiene texto certificado guardado; '
+                        'no se puede verificar de forma independiente.'
+                    ),
+                    'code': 'certified_text_missing',
+                    'text_hash': anchor.text_hash,
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        body = text.encode('utf-8')
+        digest = hashlib.sha256(body).hexdigest()
+        response = HttpResponse(body, content_type='text/plain; charset=utf-8')
+        filename = f'transcript-anchor-{anchor.pk}-{anchor.text_hash[:12]}.txt'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['X-Text-Hash'] = digest
+        response['X-Expected-Text-Hash'] = anchor.text_hash
+        response['X-Hash-Match'] = 'true' if digest == anchor.text_hash else 'false'
+        return response

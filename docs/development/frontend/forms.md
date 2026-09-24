@@ -133,9 +133,9 @@ When a page loads data then edits it:
 
 Broken pattern (avoid): `if (error) return <Alert />` after a failed save.
 
-## PR checklist
+## Change review checklist
 
-- [ ] RHF + Yup (or intentional hybrid documented in the PR)
+- [ ] RHF + Yup (or intentional hybrid documented in the change description)
 - [ ] Spanish messages for client and mapped API errors
 - [ ] Field errors via `helperText`; general via `Alert`
 - [ ] `noValidate` on `<form>`
@@ -153,7 +153,7 @@ Broken pattern (avoid): `if (error) return <Alert />` after a failed save.
   ```bash
   cd frontend && npm run test
   ```
-- Always smoke-test Login, Register, and FormData/file uploads manually before merge when touching auth or uploads
+- Always smoke-test Login, Register, and FormData/file uploads manually before committing when touching auth or uploads
 
 - Most form components now have Vitest + React Testing Library suites colocated in the module's
   `__tests__` folder (e.g. `profiles/__tests__/EditProfile.test.jsx`, `topics/__tests__/ContentSuggestionModal.test.jsx`,

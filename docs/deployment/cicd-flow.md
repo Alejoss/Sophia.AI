@@ -1,5 +1,7 @@
 # CI/CD flow
 
+Development work is restricted to `develop`; see [workflow](../../CONTRIBUTING.md#development-workflow). The `main` references below describe existing production release infrastructure, not authorization to modify that branch. Manual dispatch also publishes images and is not a test-only operation.
+
 ## Overview
 
 | Stage | When it runs | What it does |
@@ -14,9 +16,9 @@
 
 ### Triggers
 
-- **`push` to `main`**: full validation + GHCR publish (use this after batching local merges).
+- **`push` to `main`**: full validation + GHCR publish (release automation; not the development workflow).
 - **`workflow_dispatch`**: manual run from GitHub Actions (validates and publishes all components).
-- **Pull requests do not run CI** — agent/feature branches are reviewed via diff only; merge locally and push once to `main` to run CI a single time.
+- **Pull requests do not run CI** — review changes locally and commit only to `develop`. Do not push or merge to `main` to obtain a test run.
 
 ### Concurrency
 

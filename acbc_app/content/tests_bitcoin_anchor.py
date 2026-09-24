@@ -9,7 +9,9 @@ from content.bitcoin.service import (
     broadcast_anchor,
     ensure_pending_anchor,
     refresh_anchor_confirmations,
+    set_anchor_network,
 )
+from content.bitcoin.esplora import BitcoinApiError, api_base_for_network
 from content.bitcoin.tx_builder import (
     build_and_sign_op_return_tx,
     build_op_return_script,
@@ -116,6 +118,7 @@ class AnchorBroadcastServiceTests(TestCase):
             ]
             client.get_recommended_fee_sat_vb.return_value = 2
             client.broadcast.return_value = 'abcd' * 16
+            client.get_tx_or_none.return_value = None
 
             dry = broadcast_anchor(anchor, dry_run=True, client=client)
             self.assertEqual(dry.status, TranscriptAnchor.STATUS_PENDING)
@@ -127,6 +130,7 @@ class AnchorBroadcastServiceTests(TestCase):
             self.assertEqual(live.btc_txid, 'abcd' * 16)
             client.broadcast.assert_called_once()
             self.assertEqual(live.metadata.get('from_address'), address)
+            self.assertNotIn('signed_raw_tx_hex', live.metadata or {})
 
     @override_settings(BTC_PRIVATE_KEY_WIF='ignored')
     def test_refresh_marks_anchored(self):
@@ -158,6 +162,7 @@ class AnchorBroadcastServiceTests(TestCase):
             ]
             # 25 sat/vB * ~160 vB ≈ 4000 sats → ~$2.40 at $60k BTC
             client.get_recommended_fee_sat_vb.return_value = 25
+            client.get_tx_or_none.return_value = None
 
             with self.assertRaises(AnchorBroadcastError) as ctx:
                 broadcast_anchor(anchor, client=client)
@@ -173,3 +178,132 @@ class AnchorBroadcastServiceTests(TestCase):
         # 1600 sats at $60k ≈ $0.96
         usd = assert_fee_within_usd_budget(1600, btc_usd=60000)
         self.assertLessEqual(usd, 1.0)
+
+    @override_settings(BTC_PRIVATE_KEY_WIF='ignored')
+    def test_wallet_error_persists_failed_status(self):
+        with override_settings(BTC_PRIVATE_KEY_WIF=self.wif):
+            anchor = ensure_pending_anchor(self.content, network='signet')
+            client = MagicMock()
+            client.get_address_utxos.side_effect = BitcoinApiError('UTXO fetch failed')
+
+            with self.assertRaises(AnchorBroadcastError):
+                broadcast_anchor(anchor, client=client)
+            anchor.refresh_from_db()
+            self.assertEqual(anchor.status, TranscriptAnchor.STATUS_FAILED)
+            self.assertIn('UTXO fetch failed', anchor.error_message)
+
+    @override_settings()
+    def test_retry_reuses_prepared_txid_without_second_broadcast(self):
+        with override_settings(BTC_PRIVATE_KEY_WIF=self.wif):
+            anchor = ensure_pending_anchor(self.content, network='signet')
+            predicted = 'ab' * 32
+            anchor.metadata = {
+                'signed_raw_tx_hex': '01' * 40,
+                'predicted_txid': predicted,
+                'from_address': 'tb1qtest',
+            }
+            anchor.save(update_fields=['metadata', 'updated_at'])
+
+            client = MagicMock()
+            client.get_tx_or_none.return_value = {
+                'txid': predicted,
+                'status': {'confirmed': False},
+            }
+
+            result = broadcast_anchor(anchor, client=client)
+            self.assertEqual(result.status, TranscriptAnchor.STATUS_BTC_BROADCAST)
+            self.assertEqual(result.btc_txid, predicted)
+            client.broadcast.assert_not_called()
+            client.get_address_utxos.assert_not_called()
+
+    def test_network_immutable_after_prepared_broadcast(self):
+        anchor = ensure_pending_anchor(self.content, network='signet')
+        anchor.metadata = {
+            'signed_raw_tx_hex': '01' * 40,
+            'predicted_txid': 'cd' * 32,
+        }
+        anchor.save(update_fields=['metadata', 'updated_at'])
+        with self.assertRaises(AnchorBroadcastError):
+            set_anchor_network(anchor, 'mainnet')
+        anchor.refresh_from_db()
+        self.assertEqual(anchor.btc_network, 'signet')
+
+    def test_api_base_for_network_ignores_global_override_for_other_networks(self):
+        with override_settings(BTC_NETWORK='signet', BTC_API_BASE='https://custom.example/api'):
+            with patch.dict('os.environ', {'BTC_API_BASE': 'https://custom.example/api'}):
+                self.assertEqual(
+                    api_base_for_network('signet'),
+                    'https://custom.example/api',
+                )
+                self.assertEqual(
+                    api_base_for_network('mainnet'),
+                    'https://mempool.space/api',
+                )
+
+    @override_settings(BTC_PRIVATE_KEY_WIF='ignored', BTC_MIN_CONFIRMATIONS=2)
+    def test_refresh_demotes_anchored_after_reorg(self):
+        anchor = ensure_pending_anchor(self.content, network='signet')
+        anchor.status = TranscriptAnchor.STATUS_ANCHORED
+        anchor.btc_txid = 'ff' * 32
+        anchor.btc_confirmations = 3
+        anchor.save()
+        client = MagicMock()
+        client.get_tx_status.return_value = {
+            'status': {
+                'confirmed': True,
+                'block_height': 100,
+                'block_hash': 'aa' * 32,
+            }
+        }
+        # tip - height + 1 = 1 confirmation → below min_conf=2
+        client.get_tip_height.return_value = 100
+        refreshed = refresh_anchor_confirmations(anchor, client=client)
+        self.assertEqual(refreshed.status, TranscriptAnchor.STATUS_BTC_BROADCAST)
+        self.assertEqual(refreshed.btc_confirmations, 1)
+        self.assertIn('reorg_demoted_at', refreshed.metadata)
+
+
+class CertifiedTextDownloadAPITests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        self.client = APIClient()
+        self.user = User.objects.create_user('dluser', 'dl@example.com', 'pass')
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Downloadable anchor',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto certificado exacto.',
+            language='es',
+        )
+        self.anchor = ensure_pending_anchor(self.content, network='signet')
+
+    def test_download_certified_text_matches_hash_header(self):
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'transcript/anchors/{self.anchor.id}/certified-text/'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/plain; charset=utf-8')
+        self.assertEqual(response['X-Expected-Text-Hash'], self.anchor.text_hash)
+        self.assertEqual(response['X-Text-Hash'], self.anchor.text_hash)
+        self.assertEqual(response['X-Hash-Match'], 'true')
+        self.assertEqual(
+            response.content.decode('utf-8'),
+            self.anchor.certified_plain_text,
+        )
+
+    def test_download_missing_certified_text_returns_404(self):
+        self.anchor.certified_plain_text = ''
+        self.anchor.save(update_fields=['certified_plain_text', 'updated_at'])
+        url = (
+            f'/api/content/content_details/{self.content.id}/'
+            f'transcript/anchors/{self.anchor.id}/certified-text/'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['code'], 'certified_text_missing')

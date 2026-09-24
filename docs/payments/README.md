@@ -29,6 +29,6 @@ After payment succeeds, the platform **automatically broadcasts** the Bitcoin OP
 
 Related:
 
-- [Transcript certification (Bitcoin)](../api/transcript-anchor.md)
+- [Transcript certification (Bitcoin)](../hackathon/transcript-anchor.md)
 - [Environment variables](../deployment/environment-variables.md#bitcoin-cash-direct-anchor-request-payments)
 - API index: [endpoints.md — Payments](../api/endpoints.md#payments)

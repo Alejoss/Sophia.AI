@@ -321,7 +321,7 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
 
 ## Transcript certification (Bitcoin)
 
-Full contract: [transcript-anchor.md](transcript-anchor.md).
+Full contract: [transcript-anchor.md](../hackathon/transcript-anchor.md).
 
 ### Read current anchor
 
@@ -348,7 +348,7 @@ docker compose exec backend python manage.py broadcast_transcript_anchor 101 --c
 
 - [API Endpoints](endpoints.md)
 - [Transcript ingest](transcript-ingest.md)
-- [Transcript certification](transcript-anchor.md)
+- [Transcript certification](../hackathon/transcript-anchor.md)
 - [Authentication](authentication.md)
 - [Error Handling](errors.md)
 

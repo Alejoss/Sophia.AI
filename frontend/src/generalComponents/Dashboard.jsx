@@ -18,11 +18,13 @@ const showDashboardTabs = (pathname) =>
   pathname === '/dashboard'
   || pathname === '/dashboard/'
   || pathname.startsWith('/dashboard/libros-destacados')
-  || pathname.startsWith('/dashboard/pagos-bch');
+  || pathname.startsWith('/dashboard/pagos-bch')
+  || pathname.startsWith('/dashboard/snapshots');
 
 const dashboardTabValue = (pathname) => {
   if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
   if (pathname.startsWith('/dashboard/pagos-bch')) return 'bch-payments';
+  if (pathname.startsWith('/dashboard/snapshots')) return 'snapshots';
   return 'home';
 };
 
@@ -79,6 +81,12 @@ const Dashboard = () => {
               value="bch-payments"
               component={RouterLink}
               to="/dashboard/pagos-bch"
+            />
+            <Tab
+              label="Snapshots"
+              value="snapshots"
+              component={RouterLink}
+              to="/dashboard/snapshots"
             />
           </Tabs>
         </>

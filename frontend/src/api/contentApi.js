@@ -336,6 +336,10 @@ const contentApi = {
     return response.data;
   },
 
+  getTranscriptAnchorCertifiedTextUrl: (contentId, anchorId) => (
+    `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
+  ),
+
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {
       let url = `/content/content_preview/${contentId}/`;
