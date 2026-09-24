@@ -36,7 +36,8 @@ The API uses JWT (JSON Web Tokens) for authentication. See [Authentication Guide
 - **[Certificates](endpoints.md#certificates)** - Certificate management
 - **[Search](endpoints.md#search)** - Search functionality
 - **[Notifications](endpoints.md#notifications)** - In-app notifications (`/api/profiles/notifications/`). See also [backend notifications](../backend/notifications.md).
-- **[Transcript ingest (workers)](transcript-ingest.md)** - Machine-to-machine queue + upsert for external Whisper/captions workers
+- [Transcript ingest (workers)](transcript-ingest.md) - Machine-to-machine queue + upsert for external Whisper/captions workers
+- **[Knowledge-path ingest detail (Vincent)](knowledge-path-ingest.md)** - Per-path nodes with transcript/embedding state for workers
 - **[Transcript certification (Bitcoin)](../hackathon/transcript-anchor.md)** - Prepare/list OP_RETURN anchors; ops broadcast via management command
 - **[Payments](endpoints.md#payments)** - NOWPayments + self-custody BCH. See [payments/](../payments/README.md)
 - **[Topic RAG & embeddings](../architecture/topic-rag-embeddings.md)** - Pipeline overview (Qdrant + OpenAI)

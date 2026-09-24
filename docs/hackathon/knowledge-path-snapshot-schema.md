@@ -162,6 +162,17 @@ For hackathon publication of a certified version: **strict**.
 Author testing / draft preview: `GET /api/knowledge_paths/<id>/snapshot-preview/`
 (author/staff) and the **Snapshot** tab on the knowledge-path edit page.
 
+### Worker readiness (Vincent)
+
+External workers can read live path structure and per-node transcript/embedding
+state (without a user JWT) via:
+
+- `GET /api/content/knowledge-path-ingest/<id>/`
+  (`X-Transcript-Ingest-Key` / same key as transcript ingest)
+
+See [knowledge-path-ingest.md](../api/knowledge-path-ingest.md). The learner-facing
+`GET /api/knowledge_paths/<id>/` does **not** expose embedding bookkeeping.
+
 ### Admin publish (persistence)
 
 Snapshots are **not** created when an author creates, edits, or toggles visibility

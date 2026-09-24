@@ -1770,6 +1770,37 @@ class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
         }
 
 
+class KnowledgePathIngestNodeSerializer(serializers.Serializer):
+    """One ordered node for Vincent knowledge-path detail (transcript/embedding state)."""
+
+    id = serializers.IntegerField()
+    node_id = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField(allow_blank=True)
+    order = serializers.IntegerField()
+    position = serializers.IntegerField()
+    media_type = serializers.CharField()
+    content_profile_id = serializers.IntegerField(allow_null=True)
+    content = ContentEmbeddingQueueItemSerializer(allow_null=True)
+    has_certified_text = serializers.BooleanField()
+
+
+class KnowledgePathIngestDetailSerializer(serializers.Serializer):
+    """Knowledge-path detail for Vincent (machine-to-machine)."""
+
+    id = serializers.IntegerField()
+    knowledge_path_id = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    author_id = serializers.IntegerField(allow_null=True)
+    author_username = serializers.CharField(allow_blank=True)
+    is_visible = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    nodes = KnowledgePathIngestNodeSerializer(many=True)
+    summary = serializers.DictField()
+
+
 class TopicChatRequestSerializer(serializers.Serializer):
     """Body for POST /api/content/topics/{id}/chat/ (one independent consultation)."""
 
