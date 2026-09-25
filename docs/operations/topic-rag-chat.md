@@ -48,7 +48,7 @@ GET /api/content/topics/{topic_id}/chat/sources/
 Authorization: Bearer <JWT>
 ```
 
-Returns VIDEO/AUDIO in the topic with `embedding_status=indexed` (what the
+Returns VIDEO/AUDIO/TEXT in the topic with `embedding_status=indexed` (what the
 Consultas checklist shows).
 
 ```json
@@ -233,7 +233,7 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
   Hook for future premium/unlimited:
   `content.topic_chat_quota.user_daily_consultation_limit`.
 - The Consultas tab is only shown when `Topic.chat_enabled` is true **and**
-  the topic has at least one VIDEO/AUDIO with `embedding_status=indexed`.
+  the topic has at least one VIDEO/AUDIO/TEXT with `embedding_status=indexed`.
   Enabling the flag via topic edit / PATCH fails with **400** if nothing is
   indexed yet. Chat API still returns **403** when the flag is off.
 - If Qdrant drops the TLS connection (`Connection reset by peer`), the client

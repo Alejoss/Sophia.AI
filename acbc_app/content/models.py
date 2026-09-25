@@ -265,19 +265,21 @@ class FileDetails(models.Model):
 
 class ContentTranscript(models.Model):
     """
-    Canonical transcript for video or audio content.
+    Canonical plain-text artifact for a Content item (VIDEO, AUDIO, or TEXT/PDF).
 
-    Stores the three artifacts produced by the external worker pipeline:
+    Stores the artifacts produced by the external worker pipeline:
     parsed_plain → processed_plain → obsidian_markdown.
-    Optional source_subtitles (SRT/VTT) enables timed segments for the player.
+    Optional source_subtitles (SRT/VTT) enables timed segments for A/V players.
 
-    Embedding bookkeeping lives on ContentEmbedding (not here): A/V transcripts
-    remain the hash source for staleness, but vectors and index status are
-    content-level so TEXT files can be indexed without a transcript body.
+    Content is atomic: the same row is used for Whisper/captions (A/V) and for
+    PDF/text extracts (TEXT). Knowledge-path snapshots and Bitcoin text hashes
+    both read this normalized plain text. Embedding bookkeeping lives on
+    ContentEmbedding; ``text_hash`` here is the usual source_hash for staleness.
     """
     FORMAT_CHOICES = [
         ('SRT', 'SubRip (.srt)'),
         ('VTT', 'WebVTT (.vtt)'),
+        ('PLAIN', 'Plain text extract (PDF/TEXT)'),
     ]
 
     content = models.OneToOneField(
@@ -291,7 +293,10 @@ class ContentTranscript(models.Model):
     )
     processed_plain = models.TextField(
         blank=True,
-        help_text='spaCy-cleaned plain text; primary source for hash and future RAG.',
+        help_text=(
+            'spaCy-cleaned or PDF-extracted plain text; primary source for '
+            'hash, snapshots, and RAG.'
+        ),
     )
     obsidian_markdown = models.TextField(
         blank=True,
@@ -304,10 +309,10 @@ class ContentTranscript(models.Model):
     )
     source_subtitles = models.TextField(
         blank=True,
-        help_text='Optional raw SRT/VTT in memory for timed segments (not required by worker).',
+        help_text='Optional raw SRT/VTT in memory for timed segments (A/V; not required for TEXT).',
     )
     format = models.CharField(
-        max_length=3,
+        max_length=5,
         choices=FORMAT_CHOICES,
         default='SRT',
     )
@@ -367,9 +372,8 @@ class ContentEmbedding(models.Model):
     Vector-index bookkeeping for any Content (VIDEO, AUDIO, TEXT, …).
 
     Vectors live in Qdrant; this row only tracks whether the current source
-    hash is indexed. TEXT files do not need a ContentTranscript — the worker
-    hashes/chunks the file and acks here. For A/V, transcript.text_hash is the
-    usual source_hash input for staleness.
+    hash is indexed. VIDEO, AUDIO, and TEXT all use ``ContentTranscript.text_hash``
+    as the usual ``source_hash`` for staleness (PDF/text extract for TEXT).
     """
 
     STATUS_PENDING = 'pending'
@@ -425,8 +429,8 @@ class ContentEmbedding(models.Model):
         blank=True,
         null=True,
         help_text=(
-            'Hash of the source that was indexed (transcript text_hash for A/V, '
-            'or worker-supplied file/content hash for TEXT).'
+            'Hash of the source that was indexed '
+            '(ContentTranscript.text_hash for VIDEO/AUDIO/TEXT).'
         ),
     )
     embedded_at = models.DateTimeField(

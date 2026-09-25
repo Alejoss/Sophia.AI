@@ -1897,15 +1897,15 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=64,
-        help_text='For A/V indexed ack: must match current transcript.text_hash '
-                  '(omit to use the current hash). For TEXT indexed ack: same as source_hash.',
+        help_text='Must match current ContentTranscript.text_hash when status=indexed '
+                  '(omit to use the current hash). Alias of source_hash.',
     )
     source_hash = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=64,
         help_text='Hash of the indexed source (alias: embedded_text_hash). '
-                  'Required for TEXT when status=indexed.',
+                  'Defaults to ContentTranscript.text_hash for VIDEO/AUDIO/TEXT.',
     )
     embedding_model = serializers.CharField(required=False, allow_blank=True, max_length=64)
     embedding_dims = serializers.IntegerField(required=False, allow_null=True, min_value=1)
