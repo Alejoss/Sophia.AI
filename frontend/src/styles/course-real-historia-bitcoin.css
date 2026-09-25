@@ -31,8 +31,16 @@
   box-sizing: border-box;
 }
 
+html:has(.rhb-page) {
+  scroll-behavior: smooth;
+}
+
 .rhb-page a {
   color: inherit;
+}
+
+.rhb-page :target {
+  scroll-margin-top: 1.25rem;
 }
 
 .rhb-shell {

@@ -161,13 +161,6 @@ const FAQS = [
   },
 ];
 
-const scrollToId = (id) => {
-  const el = document.getElementById(id);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-};
-
 const RealHistoriaBitcoinLanding = () => {
   useEffect(() => {
     const previousTitle = document.title;
@@ -201,12 +194,12 @@ const RealHistoriaBitcoinLanding = () => {
             Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
           </p>
           <div className="rhb-hero-actions">
-            <button type="button" className="rhb-btn rhb-btn-primary" onClick={() => scrollToId('recorrido')}>
+            <a className="rhb-btn rhb-btn-primary" href="#recorrido">
               Explorar el curso
-            </button>
-            <button type="button" className="rhb-btn rhb-btn-ghost" onClick={() => scrollToId('recorrido')}>
+            </a>
+            <a className="rhb-btn rhb-btn-ghost" href="#recorrido">
               Ver el recorrido
-            </button>
+            </a>
           </div>
           <div className="rhb-hero-signals" aria-label="Qué incluye la experiencia">
             <span>Contenido estructurado</span>
@@ -295,9 +288,9 @@ const RealHistoriaBitcoinLanding = () => {
               ))}
             </div>
             <div className="rhb-inline-cta">
-              <button type="button" className="rhb-btn rhb-btn-ghost" onClick={() => scrollToId('recorrido')}>
+              <a className="rhb-btn rhb-btn-ghost" href="#recorrido">
                 Ver el recorrido
-              </button>
+              </a>
             </div>
           </div>
         </section>
@@ -559,12 +552,12 @@ const RealHistoriaBitcoinLanding = () => {
               Pero comprenderla requiere conectar piezas que normalmente se cuentan por separado.
             </p>
             <div className="rhb-final-actions">
-              <button type="button" className="rhb-btn rhb-btn-primary" onClick={() => scrollToId('recorrido')}>
+              <a className="rhb-btn rhb-btn-primary" href="#recorrido">
                 Explorar La guerra por las criptomonedas
-              </button>
-              <button type="button" className="rhb-btn rhb-btn-ghost" onClick={() => scrollToId('inscripcion')}>
+              </a>
+              <a className="rhb-btn rhb-btn-ghost" href="#inscripcion">
                 Comenzar la investigación
-              </button>
+              </a>
             </div>
             <p className="rhb-tagline">Comprender es libertad.</p>
           </div>
