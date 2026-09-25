@@ -1093,14 +1093,28 @@ const KnowledgePathEdit = () => {
                   <Alert severity="warning" sx={{ borderRadius: 2 }}>
                     <AlertTitle>Pendientes para certificación</AlertTitle>
                     <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                      {snapshotPreview.issues.map((issue, index) => (
-                        <li key={`${issue.code}-${issue.nodeId}-${index}`}>
-                          <Typography variant="body2">
-                            <strong>{issue.code}</strong>
-                            {issue.nodeId ? ` (${issue.nodeId})` : ""}: {issue.message}
-                          </Typography>
-                        </li>
-                      ))}
+                      {snapshotPreview.issues.map((issue, index) => {
+                        const nodeLabel = issue.nodeTitle
+                          ? issue.nodeTitle
+                          : issue.nodeId || null;
+                        return (
+                          <li key={`${issue.code}-${issue.nodeId}-${index}`}>
+                            <Typography variant="body2">
+                              <strong>{issue.code}</strong>
+                              {nodeLabel ? (
+                                <>
+                                  {" — "}
+                                  <strong>{nodeLabel}</strong>
+                                  {issue.nodeTitle && issue.nodeId
+                                    ? ` (${issue.nodeId})`
+                                    : ""}
+                                </>
+                              ) : null}
+                              : {issue.message}
+                            </Typography>
+                          </li>
+                        );
+                      })}
                     </Box>
                   </Alert>
                 )}

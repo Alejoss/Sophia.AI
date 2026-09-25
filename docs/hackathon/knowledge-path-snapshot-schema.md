@@ -162,6 +162,11 @@ For hackathon publication of a certified version: **strict**.
 Author testing / draft preview: `GET /api/knowledge_paths/<id>/snapshot-preview/`
 (author/staff) and the **Snapshot** tab on the knowledge-path edit page.
 
+Compact readiness (no full JSON body): `GET /api/knowledge_paths/<id>/snapshot-readiness/`
+(author/staff). Returns `readyForStrictPublish`, per-node titles + certified-text
+flags, open `issues`, published snapshot summary, and a `blockchain` stub until
+OP_RETURN broadcast for knowledge-path digests is implemented.
+
 ### Worker readiness (Vincent)
 
 External workers can read live path structure and per-node transcript/embedding

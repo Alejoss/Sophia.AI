@@ -8,6 +8,7 @@ from .views import (
     KnowledgePathPurchaseView,
     KnowledgePathCreateView,
     KnowledgePathSnapshotPreviewView,
+    KnowledgePathSnapshotReadinessView,
     KnowledgePathSnapshotListCreateView,
     KnowledgePathSnapshotDetailView,
     AdminKnowledgePathSnapshotDashboardView,
@@ -40,6 +41,11 @@ urlpatterns = [
         '<int:pk>/snapshot-preview/',
         KnowledgePathSnapshotPreviewView.as_view(),
         name='knowledge-path-snapshot-preview',
+    ),
+    path(
+        '<int:pk>/snapshot-readiness/',
+        KnowledgePathSnapshotReadinessView.as_view(),
+        name='knowledge-path-snapshot-readiness',
     ),
     path(
         '<int:pk>/snapshots/',

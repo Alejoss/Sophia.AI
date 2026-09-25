@@ -23,7 +23,10 @@ from django.db import models
 from django.utils import timezone
 from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
-from knowledge_paths.services.snapshot_preview import preview_knowledge_path_snapshot
+from knowledge_paths.services.snapshot_preview import (
+    preview_knowledge_path_snapshot,
+    knowledge_path_snapshot_readiness,
+)
 from knowledge_paths.services.snapshot_publish import (
     SnapshotPublishError,
     publish_knowledge_path_snapshot,
@@ -1154,6 +1157,28 @@ class KnowledgePathSnapshotPreviewView(APIView):
             version=version_int,
         )
         return Response(payload)
+
+
+class KnowledgePathSnapshotReadinessView(APIView):
+    """Author/staff: compact snapshot readiness (no full document dump).
+
+    Answers: is this path ready to publish a certified snapshot, which nodes
+    are missing transcript text, and what has already been published.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(
+            KnowledgePath.objects.select_related("author"),
+            pk=pk,
+        )
+        if knowledge_path.author_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to view snapshot readiness"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(knowledge_path_snapshot_readiness(knowledge_path))
 
 
 class KnowledgePathSnapshotListCreateView(APIView):
