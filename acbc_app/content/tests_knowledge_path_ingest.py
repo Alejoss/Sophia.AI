@@ -84,6 +84,7 @@ class KnowledgePathIngestDetailAPITests(APITestCase):
         self.assertEqual(summary['node_count'], 1)
         self.assertEqual(summary['nodes_with_content'], 1)
         self.assertEqual(summary['nodes_with_transcript'], 0)
+        self.assertNotIn('nodes_embedding_needing_work', summary)
         self.assertFalse(summary['ready_for_strict_publish'])
 
     def test_detail_with_transcript_and_embedding(self):
@@ -115,6 +116,7 @@ class KnowledgePathIngestDetailAPITests(APITestCase):
         self.assertEqual(summary['nodes_with_transcript'], 1)
         self.assertEqual(summary['nodes_with_certified_text'], 1)
         self.assertEqual(summary['nodes_embedding_indexed'], 1)
+        self.assertNotIn('nodes_embedding_needing_work', summary)
         self.assertTrue(summary['ready_for_strict_publish'])
 
     def test_accepts_bearer_auth(self):

@@ -3,10 +3,10 @@
 Machine-to-machine ingest (header ``X-Transcript-Ingest-Key`` or ``Authorization: Bearer``):
 
 * ``GET  /api/content/transcript-ingest/``
-  Work queue / topic manifest. Default: VIDEO/AUDIO without a transcript.
+  Work queue / topic manifest. Default: VIDEO/AUDIO/TEXT without a transcript.
   Query params:
   - ``topic_id`` — only contents linked to this topic
-  - ``media_type`` — ``VIDEO`` or ``AUDIO``
+  - ``media_type`` — ``VIDEO``, ``AUDIO``, or ``TEXT``
   - ``content_id`` — single content
   - ``include_completed`` — ``true``/``1`` to also return items that already have a transcript
   - ``limit`` / ``offset`` — pagination (default limit 100, max 500)
@@ -17,7 +17,11 @@ Machine-to-machine ingest (header ``X-Transcript-Ingest-Key`` or ``Authorization
 * ``PUT  /api/content/transcript-ingest/<content_id>/``
   Idempotent upsert of transcript artifacts. Body may include any of
   ``parsed_plain``, ``processed_plain``, ``obsidian_markdown`` (at least one required),
-  plus optional ``source_subtitles`` (SRT/VTT), ``format``, ``language``.
+  plus optional ``source_subtitles`` (SRT/VTT; A/V), ``format``, ``language``.
+
+  TEXT/PDF extracts use the same ``ContentTranscript`` row as A/V (canonical plain
+  text for embeddings and knowledge-path snapshots). Prefer ``format=PLAIN`` for
+  PDF/text extracts.
 
 Queue items expose ``file_key`` (S3 object key) for workers with bucket credentials;
 they do not return pre-signed download URLs.
@@ -48,7 +52,9 @@ from utils.db_encoding import is_sql_ascii_error
 
 logger = logging.getLogger(__name__)
 
-TRANSCRIPT_MEDIA_TYPES = ('VIDEO', 'AUDIO')
+# Content is atomic: VIDEO/AUDIO/TEXT all store canonical plain text on
+# ContentTranscript (Whisper/captions for A/V; PDF/text extract for TEXT).
+TRANSCRIPT_MEDIA_TYPES = ('VIDEO', 'AUDIO', 'TEXT')
 DEFAULT_QUEUE_LIMIT = 100
 MAX_QUEUE_LIMIT = 500
 
@@ -101,7 +107,7 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
     """
     GET /api/content/transcript-ingest/
 
-    List video/audio content for an external transcript worker.
+    List VIDEO/AUDIO/TEXT content for an external transcript worker.
     Optional query params: topic_id, media_type, content_id, include_completed, limit, offset.
     """
 
@@ -109,7 +115,7 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
         media_type = request.query_params.get('media_type')
         if media_type and media_type not in TRANSCRIPT_MEDIA_TYPES:
             return Response(
-                {'error': 'media_type debe ser VIDEO o AUDIO.'},
+                {'error': 'media_type debe ser VIDEO, AUDIO o TEXT.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -205,7 +211,7 @@ class ContentTranscriptIngestDetailView(TranscriptIngestAPIView):
                 {
                     'error': (
                         f'El contenido {content_id} tiene media_type={content.media_type}. '
-                        'Solo se admiten VIDEO y AUDIO.'
+                        'Solo se admiten VIDEO, AUDIO y TEXT.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

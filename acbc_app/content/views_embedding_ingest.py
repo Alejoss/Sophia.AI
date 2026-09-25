@@ -5,8 +5,8 @@ or ``Authorization: Bearer`` with ``TRANSCRIPT_INGEST_API_KEY``):
 
 * ``GET  /api/content/embedding-ingest/``
   Work queue of VIDEO/AUDIO/TEXT contents whose ``ContentEmbedding.status``
-  needs work (default: ``pending``, ``stale``, ``failed``). VIDEO/AUDIO require
-  a transcript; TEXT is queued by embedding status alone (worker reads the file).
+  needs work (default: ``pending``, ``stale``, ``failed``). All of these media
+  types require a ``ContentTranscript`` first (PDF/text extract for TEXT).
 
 * ``GET  /api/content/embedding-ingest/topics/``
   Topics that have at least one content matching the embedding status filter
@@ -18,6 +18,7 @@ or ``Authorization: Bearer`` with ``TRANSCRIPT_INGEST_API_KEY``):
 * ``PUT  /api/content/embedding-ingest/<content_id>/``
   Ack from the embed worker after indexing (or failure/skip). Does **not**
   store vectors in Django -- only updates ``ContentEmbedding`` bookkeeping.
+  Indexed acks bind ``source_hash`` to ``ContentTranscript.text_hash``.
 """
 
 from __future__ import annotations
@@ -48,7 +49,8 @@ from content.views_transcript_ingest import (
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MEDIA_TYPES = TRANSCRIPT_MEDIA_TYPES + ('TEXT',)
+# Same set as transcript-ingest: all of these require ContentTranscript first.
+EMBEDDING_MEDIA_TYPES = TRANSCRIPT_MEDIA_TYPES
 
 DEFAULT_NEEDING_STATUSES = (
     ContentEmbedding.EMBEDDING_STATUS_PENDING,
@@ -175,13 +177,11 @@ def _topic_media_types(media_type):
 
 
 def _embedding_queue_filter(*, statuses):
-    """VIDEO/AUDIO need a transcript; TEXT is queued by embedding status only."""
+    """VIDEO/AUDIO/TEXT all need a ContentTranscript before embed work."""
     return Q(
         media_type__in=EMBEDDING_MEDIA_TYPES,
         embedding__status__in=statuses,
-    ) & (
-        Q(media_type='TEXT')
-        | Q(transcript__isnull=False)
+        transcript__isnull=False,
     )
 
 
@@ -271,9 +271,7 @@ class ContentEmbeddingIngestTopicQueueView(EmbeddingIngestAPIView):
         statuses = params['statuses']
         media_types = _topic_media_types(media_type)
 
-        av_transcript_ok = Q(contents__media_type='TEXT') | Q(
-            contents__transcript__isnull=False,
-        )
+        has_transcript = Q(contents__transcript__isnull=False)
 
         def _count_for(*status_values):
             return Count(
@@ -281,7 +279,7 @@ class ContentEmbeddingIngestTopicQueueView(EmbeddingIngestAPIView):
                 filter=Q(
                     contents__media_type__in=media_types,
                     contents__embedding__status__in=status_values,
-                ) & av_transcript_ok,
+                ) & has_transcript,
                 distinct=True,
             )
 
@@ -341,21 +339,21 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if content.media_type in TRANSCRIPT_MEDIA_TYPES:
-            try:
-                transcript = content.transcript
-            except ContentTranscript.DoesNotExist:
-                transcript = None
-            if transcript is None:
-                return None, Response(
-                    {
-                        'error': (
-                            f'El contenido {content_id} no tiene transcript. '
-                            'Transcribe primero vía /api/content/transcript-ingest/.'
-                        ),
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
+        try:
+            transcript = content.transcript
+        except ContentTranscript.DoesNotExist:
+            transcript = None
+        if transcript is None:
+            return None, Response(
+                {
+                    'error': (
+                        f'El contenido {content_id} no tiene transcript. '
+                        'Extrae el texto primero vía /api/content/transcript-ingest/ '
+                        '(incluye PDF/TEXT).'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         return content, None
 
     def get(self, request, content_id):
@@ -396,53 +394,36 @@ class ContentEmbeddingIngestDetailView(EmbeddingIngestAPIView):
         now = datetime.now(timezone.utc)
 
         if ack_status == ContentEmbedding.EMBEDDING_STATUS_INDEXED:
-            if content.media_type in TRANSCRIPT_MEDIA_TYPES:
-                transcript = content.transcript
-                current_hash = (transcript.text_hash or '').strip()
-                if not current_hash:
-                    return Response(
-                        {
-                            'error': (
-                                'El transcript no tiene text_hash; no se puede marcar indexed.'
-                            ),
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                ack_hash = (
-                    payload.get('source_hash')
-                    or payload.get('embedded_text_hash')
-                    or ''
-                ).strip() or current_hash
-                if ack_hash != current_hash:
-                    return Response(
-                        {
-                            'error': (
-                                'embedded_text_hash no coincide con text_hash actual del '
-                                'transcript. Re-embebe el texto vigente o omite el campo '
-                                'para usar el hash actual.'
-                            ),
-                            'text_hash': current_hash,
-                            'embedded_text_hash': ack_hash,
-                        },
-                        status=status.HTTP_409_CONFLICT,
-                    )
-                source_hash = current_hash
-            else:
-                source_hash = (
-                    payload.get('source_hash')
-                    or payload.get('embedded_text_hash')
-                    or ''
-                ).strip()
-                if not source_hash:
-                    return Response(
-                        {
-                            'error': (
-                                'source_hash (o embedded_text_hash) es requerido cuando '
-                                'status=indexed para contenido TEXT.'
-                            ),
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+            transcript = content.transcript
+            current_hash = (transcript.text_hash or '').strip()
+            if not current_hash:
+                return Response(
+                    {
+                        'error': (
+                            'El transcript no tiene text_hash; no se puede marcar indexed.'
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            ack_hash = (
+                payload.get('source_hash')
+                or payload.get('embedded_text_hash')
+                or ''
+            ).strip() or current_hash
+            if ack_hash != current_hash:
+                return Response(
+                    {
+                        'error': (
+                            'embedded_text_hash no coincide con text_hash actual del '
+                            'transcript. Re-embebe el texto vigente o omite el campo '
+                            'para usar el hash actual.'
+                        ),
+                        'text_hash': current_hash,
+                        'embedded_text_hash': ack_hash,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            source_hash = current_hash
 
             embedded_at = payload.get('embedded_at')
             if embedded_at:

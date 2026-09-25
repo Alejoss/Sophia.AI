@@ -145,10 +145,12 @@ Transcript materials:
 - Optional Bitcoin tx linkage stays out of band (append-only registry evidence),
   not inside this snapshot.
 
-Source materials (plain TEXT bodies for the hackathon):
+Source materials / TEXT / PDF:
 
-- Embed the exact archived text in `text` the same way.
-- Binary media without a transcript is incomplete until a text representation exists.
+- Store extracted plain text on `ContentTranscript` (same as A/V), then embed it
+  as `type: "transcript"` with `textFormat: "sophia-acbc-normalized-transcript-v1"`.
+- Do **not** hash PDF file bytes into the knowledge-path digest.
+- Binary media or PDFs without a transcript are incomplete until plain text exists.
 
 ### Completeness policy
 

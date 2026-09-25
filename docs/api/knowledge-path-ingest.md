@@ -1,8 +1,15 @@
 # Knowledge-path ingest detail (Vincent)
 
-Machine-to-machine **read** endpoint so an external worker (Vincent) can inspect a
-knowledge path’s ordered nodes and each linked content’s transcript / embedding
-bookkeeping — the same fields used by embedding-ingest queues.
+Machine-to-machine **read** endpoint so Vincent can inspect one knowledge path:
+ordered nodes, linked content, transcript presence, and embedding bookkeeping.
+
+**Content is atomic:** VIDEO, AUDIO, and TEXT (PDF) all use the same
+`ContentTranscript` fields. Snapshot hashing embeds that plain text — not PDF
+bytes. IMAGE has no transcript pipeline.
+
+Use this to decide **which contents need transcript extraction** and to see each
+content’s current `embedding_status`. It does **not** invent a derived “needs
+embedding work” queue count — count from per-node fields yourself.
 
 User JWT auth is **not** used. Auth matches transcript and embedding ingest.
 
@@ -11,9 +18,9 @@ User JWT auth is **not** used. Auth matches transcript and embedding ingest.
 
 Related:
 
-- [Transcript ingest](transcript-ingest.md)
-- [Qdrant embeddings + embed worker](../operations/qdrant-embeddings.md)
-- [Knowledge-path snapshot schema](../hackathon/knowledge-path-snapshot-schema.md)
+- [Transcript ingest](transcript-ingest.md) — queue + `PUT` (VIDEO/AUDIO/**TEXT**)
+- [Qdrant embeddings + embed worker](../operations/qdrant-embeddings.md) — embed after transcript
+- [Knowledge-path snapshot readiness](knowledge-path-snapshot-readiness.md) — author/staff JWT (not Vincent)
 
 ---
 
@@ -32,6 +39,9 @@ X-Transcript-Ingest-Key: <TRANSCRIPT_INGEST_API_KEY>
 Authorization: Bearer <TRANSCRIPT_INGEST_API_KEY>
 ```
 
+Do **not** use a user JWT. Opening the URL in a browser without the ingest key
+returns 403.
+
 ---
 
 ## `GET /api/content/knowledge-path-ingest/{knowledge_path_id}/`
@@ -41,23 +51,27 @@ Returns one knowledge path with ordered nodes. Unknown id → **404**.
 ### Example
 
 ```bash
-curl -s "http://localhost:8000/api/content/knowledge-path-ingest/42/" \
+curl -s "https://academiablockchain.com/api/content/knowledge-path-ingest/10/" \
   -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY"
 ```
 
-### Response `200`
+### Response `200` (shape)
+
+`content` uses the embedding-queue item fields (including transcript and
+embedding bookkeeping). `content` is `null` when the node has no linked
+content profile.
 
 ```json
 {
-  "id": 42,
-  "knowledge_path_id": "sophia-acbc:knowledge-path:42",
-  "title": "Introduction to Bitcoin",
+  "id": 10,
+  "knowledge_path_id": "sophia-acbc:knowledge-path:10",
+  "title": "…",
   "description": "…",
-  "author_id": 7,
-  "author_username": "demo-teacher",
+  "author_id": 1,
+  "author_username": "admin",
   "is_visible": true,
-  "created_at": "2026-09-01T12:00:00Z",
-  "updated_at": "2026-09-20T15:00:00Z",
+  "created_at": "…",
+  "updated_at": "…",
   "nodes": [
     {
       "id": 101,
@@ -68,61 +82,123 @@ curl -s "http://localhost:8000/api/content/knowledge-path-ingest/42/" \
       "position": 1,
       "media_type": "VIDEO",
       "content_profile_id": 55,
-      "has_certified_text": true,
+      "has_certified_text": false,
       "content": {
         "id": 55,
         "media_type": "VIDEO",
-        "original_title": "Intro a Bitcoin",
-        "original_author": "Satoshi",
-        "url": "https://www.youtube.com/watch?v=…",
+        "original_title": "…",
+        "url": "…",
         "is_youtube": true,
         "youtube_video_id": "…",
         "has_file": true,
         "file_key": "content/video/…",
         "file_size": 1048576,
-        "has_spanish_subtitles": false,
-        "has_spanish_dubbing": false,
-        "has_transcript": true,
-        "created_at": "2026-01-15T10:00:00Z",
-        "topics": [],
-        "text_hash": "a1b2c3…",
-        "text_length": 4200,
-        "language": "en",
-        "embedding_status": "indexed",
-        "embedding_model": "text-embedding-3-large",
-        "embedding_dims": 3072,
-        "chunk_count": 2,
-        "embedded_text_hash": "a1b2c3…",
-        "embedded_at": "2026-01-16T10:00:00Z",
-        "topic_ids": []
+        "has_transcript": false,
+        "text_hash": null,
+        "text_length": null,
+        "language": "",
+        "embedding_status": null,
+        "embedding_model": "",
+        "chunk_count": null,
+        "embedded_text_hash": null,
+        "topic_ids": [],
+        "topics": []
       }
     }
   ],
   "summary": {
     "node_count": 1,
     "nodes_with_content": 1,
-    "nodes_with_transcript": 1,
-    "nodes_with_certified_text": 1,
-    "nodes_embedding_indexed": 1,
-    "nodes_embedding_needing_work": 0,
-    "ready_for_strict_publish": true
+    "nodes_with_transcript": 0,
+    "nodes_with_certified_text": 0,
+    "nodes_embedding_indexed": 0,
+    "ready_for_strict_publish": false
   }
 }
 ```
 
-### Fields
+This endpoint does **not** return full transcript bodies. For embed `index_text`
+use `GET /api/content/embedding-ingest/{content_id}/`. To **write** a transcript
+use `PUT /api/content/transcript-ingest/{content_id}/` (`format=PLAIN` for
+PDF/text extracts). To **ack** embeddings use
+`PUT /api/content/embedding-ingest/{content_id}/` and bind to `text_hash`.
+
+---
+
+## How Vincent should read the response
+
+### Path / node identity
 
 | Field | Meaning |
 |-------|---------|
-| `knowledge_path_id` / `node_id` | Stable hackathon identifiers (`sophia-acbc:…`) |
-| `position` | 1-based order rank (same as snapshot `position`) |
-| `content` | Same manifest shape as [embedding-ingest queue items](../operations/qdrant-embeddings.md) (`ContentEmbeddingQueueItemSerializer`), or `null` if the node has no linked content |
-| `has_certified_text` | `true` when normalized transcript plain text is non-empty (what snapshot materials embed) |
-| `summary.ready_for_strict_publish` | Every node has content **and** certified transcript text |
+| `id` / `knowledge_path_id` | DB id and stable `sophia-acbc:knowledge-path:{id}` |
+| `nodes[].id` / `node_id` | DB node id and stable `sophia-acbc:node:{id}` |
+| `nodes[].title` | Human lesson title |
+| `nodes[].position` | 1-based order (same as snapshot) |
+| `nodes[].media_type` | Node media type (`VIDEO`, `AUDIO`, `TEXT`, `IMAGE`) |
+| `nodes[].content.id` | Content id to pass to transcript-ingest / embedding-ingest |
 
-This endpoint does **not** return full transcript bodies. Use
-`GET /api/content/embedding-ingest/{content_id}/` for `index_text`, or the
-public/certified transcript routes when appropriate.
+### Transcript state (extraction)
 
-Workers that need to **write** transcripts or embedding acks continue to use the
-existing transcript-ingest and embedding-ingest PUT endpoints.
+| Field | Meaning |
+|-------|---------|
+| `content.has_transcript` | `true` if a `ContentTranscript` row exists |
+| `nodes[].has_certified_text` | `true` if normalized plain text is non-empty (what KP snapshots embed) |
+| `content.text_hash` / `text_length` / `language` | Present when a transcript exists |
+| `content.file_key` / `url` / `is_youtube` / `youtube_video_id` | How to obtain media for extraction |
+
+**Contents that still need transcript extraction** (VIDEO, AUDIO, **and TEXT/PDF**):
+
+```text
+content != null
+AND content.media_type in {VIDEO, AUDIO, TEXT}
+AND content.has_transcript == false
+```
+
+Then `PUT /api/content/transcript-ingest/{content_id}/`. IMAGE has no transcript
+pipeline.
+
+### Embedding state
+
+| Field | Meaning |
+|-------|---------|
+| `content.embedding_status` | `null` = no `ContentEmbedding` row yet; else `pending` \| `stale` \| `failed` \| `indexed` \| `skipped` |
+| `content.embedded_text_hash` / `chunk_count` / `embedding_model` / … | Bookkeeping after ack |
+
+**Contents without an indexed embedding** (inventory):
+
+```text
+content != null AND content.embedding_status !== "indexed"
+```
+
+That includes `null`, `pending`, `stale`, `failed`, and `skipped`. Count from
+**nodes**, not from a summary “needs work” field (there isn’t one).
+
+Embed only after a transcript exists, including TEXT. VIDEO, AUDIO, and TEXT
+are not usefully embedded from the file alone.
+
+### `summary` (aggregates only)
+
+| Field | Meaning |
+|-------|---------|
+| `node_count` | Number of nodes on the path |
+| `nodes_with_content` | Nodes with a linked content profile |
+| `nodes_with_transcript` | Nodes whose content has a transcript row |
+| `nodes_with_certified_text` | Nodes with non-empty certified plain text |
+| `nodes_embedding_indexed` | Nodes whose `embedding_status == "indexed"` |
+| `ready_for_strict_publish` | `true` only if every node has content **and** certified text (snapshot materials complete). Independent of embedding index status. |
+
+There is **no** `nodes_embedding_needing_work` field. Derive embed/transcript work
+lists from the per-node rules above.
+
+---
+
+## Suggested Vincent loop for one knowledge path
+
+1. `GET /api/content/knowledge-path-ingest/{path_id}/` with ingest key  
+2. For each VIDEO/AUDIO/**TEXT** with `has_transcript == false` → extract →  
+   `PUT /api/content/transcript-ingest/{content_id}/`  
+3. For each content with `embedding_status !== "indexed"` and a transcript → embed →  
+   `PUT /api/content/embedding-ingest/{content_id}/`  
+4. Re-GET the path until `summary.ready_for_strict_publish` is true (for
+   certified snapshot materials) and every desired content is `indexed`

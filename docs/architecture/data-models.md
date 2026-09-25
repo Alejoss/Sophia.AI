@@ -85,9 +85,9 @@ Core content model representing educational materials.
 
 ### ContentTranscript / TranscriptAnchor
 
-Transcript text for VIDEO/AUDIO content, plus optional Bitcoin certification.
+Canonical plain text for VIDEO/AUDIO/TEXT (PDF extract) content, plus optional Bitcoin certification.
 
-**ContentTranscript** (One-to-One with `Content`): plain/processed text, `text_hash` (SHA-256), and embedding **bookkeeping** (vectors live in Qdrant, not Postgres).
+**ContentTranscript** (One-to-One with `Content`): plain/processed text, `text_hash` (SHA-256). Use `format=PLAIN` for PDF/TEXT extracts. Embedding **bookkeeping** lives on `ContentEmbedding` (vectors in Qdrant, not Postgres).
 
 | Field | Purpose |
 |-------|---------|

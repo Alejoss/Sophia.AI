@@ -1,13 +1,15 @@
 # Transcript ingest API (external workers)
 
-Machine-to-machine API for an **external** transcript worker (typically run on a laptop with local Whisper and optional YouTube captions). The worker is **not** part of this monorepo.
+Machine-to-machine API for an **external** transcript worker (typically Vincent: Whisper/captions for A/V, PDF/text extract for documents). The worker is **not** part of this monorepo.
+
+**Content is atomic:** VIDEO, AUDIO, and TEXT (PDF) all store canonical plain text on the same `ContentTranscript` model. Knowledge-path snapshots and embeddings hash that text — not the PDF file bytes.
 
 Workers:
 
-1. Pull a work queue / topic manifest of VIDEO/AUDIO content
-2. Obtain media via **S3 object key** (`file_key`) and/or **YouTube URL**
-3. Produce text artifacts (and optional SRT/VTT)
-4. Upsert them with `PUT`
+1. Pull a work queue / topic (or knowledge-path) manifest of VIDEO/AUDIO/TEXT content
+2. Obtain media via **S3 object key** (`file_key`) and/or **YouTube URL** (A/V)
+3. Produce text artifacts (and optional SRT/VTT for A/V; plain extract for TEXT/PDF)
+4. Upsert them with `PUT` (`format=PLAIN` recommended for PDF extracts)
 
 User-facing JWT auth is **not** used. Media download URLs are **not** pre-signed; give the worker read-only AWS credentials to your bucket.
 
@@ -44,13 +46,13 @@ Base path: `/api/content/transcript-ingest/`
 | `GET` | `/api/content/transcript-ingest/{content_id}/` | One item + transcript status |
 | `PUT` | `/api/content/transcript-ingest/{content_id}/` | Create or replace transcript (idempotent) |
 
-Only `media_type` **VIDEO** and **AUDIO** are accepted. TEXT/IMAGE return **400** on detail/PUT.
+Only `media_type` **VIDEO**, **AUDIO**, and **TEXT** are accepted. IMAGE returns **400** on detail/PUT.
 
 ---
 
 ## `GET /api/content/transcript-ingest/`
 
-Lists VIDEO/AUDIO contents for the worker.
+Lists VIDEO/AUDIO/TEXT contents for the worker.
 
 ### Query parameters
 
@@ -58,7 +60,7 @@ Lists VIDEO/AUDIO contents for the worker.
 |-------|------|---------|-------------|
 | `topic_id` | int | — | Only contents linked to this topic. Unknown id → **404**. |
 | `include_completed` | bool | `false` | If `true`/`1`/`yes`/`on`, also return items that already have a transcript (for local reconciliation). Default queue = pending only. |
-| `media_type` | string | — | `VIDEO` or `AUDIO` |
+| `media_type` | string | — | `VIDEO`, `AUDIO`, or `TEXT` |
 | `content_id` | int | — | Single content filter |
 | `limit` | int | `100` | Page size (max `500`) |
 | `offset` | int | `0` | Pagination offset |
@@ -146,12 +148,12 @@ Idempotent upsert: creates (**201**, `created: true`) or replaces (**200**, `cre
 | `processed_plain` | one of three* | Cleaned plain text (primary for hash / future RAG) |
 | `obsidian_markdown` | one of three* | Note with optional YAML frontmatter + body |
 | `source_subtitles` | no | Raw SRT or VTT; server parses timed `segments` |
-| `format` | no | `SRT` (default) or `VTT` |
+| `format` | no | `SRT` (default), `VTT`, or **`PLAIN`** (PDF/TEXT extract) |
 | `language` | no | ISO 639-1, e.g. `es` |
 
 \*At least one of `parsed_plain`, `processed_plain`, `obsidian_markdown` must be non-empty.
 
-### Example
+### Example (A/V)
 
 ```bash
 curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
@@ -163,6 +165,19 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
     "obsidian_markdown": "---\ntitle: Demo\nlanguage_code: es\n---\nHola mundo. Segunda línea.",
     "source_subtitles": "1\n00:00:01,000 --> 00:00:04,000\nHola mundo.\n",
     "format": "SRT",
+    "language": "es"
+  }'
+```
+
+### Example (TEXT/PDF extract)
+
+```bash
+curl -X PUT "http://localhost:8000/api/content/transcript-ingest/202/" \
+  -H "Content-Type: application/json" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY" \
+  -d '{
+    "processed_plain": "Texto extraído del PDF sobre Bitcoin y Lightning.",
+    "format": "PLAIN",
     "language": "es"
   }'
 ```
@@ -228,11 +243,12 @@ consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 3. For each item (suggested order):
    - Skip if already done locally **and** `has_transcript` is true (optional check via detail GET).
+   - If `media_type` is **TEXT**: download via `file_key` → extract plain text → `PUT` with `format=PLAIN`.
    - If `is_youtube`: try captions first (`youtube-transcript-api` / TimedText / similar).
    - Else if `has_file` / `file_key`: `s3.get_object` (or download audio-only) → Whisper.
    - Else if YouTube URL without captions: `yt-dlp` audio → Whisper.
    - Else mark failed / needs manual.
-4. `PUT` artifacts (include `source_subtitles` when you have SRT/VTT so the server stores timed segments).
+4. `PUT` artifacts (include `source_subtitles` when you have SRT/VTT so the server stores timed segments; use `format=PLAIN` for PDF/TEXT).
 5. Optionally reconcile:
 
    ```bash
@@ -255,7 +271,7 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 |--------|------|
 | **403** | Missing/wrong API key, or `TRANSCRIPT_INGEST_API_KEY` unset |
 | **404** | Unknown `topic_id` on queue, or unknown `content_id` on detail/PUT |
-| **400** | Bad query params; non VIDEO/AUDIO content; empty PUT body; invalid SRT/VTT |
+| **400** | Bad query params; non VIDEO/AUDIO/TEXT content; empty PUT body; invalid SRT/VTT |
 
 ---
 

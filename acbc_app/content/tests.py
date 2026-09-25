@@ -5171,19 +5171,55 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_put_rejects_non_media_content(self):
+    def test_put_accepts_text_pdf_extract(self):
         text_content = Content.objects.create(
             uploaded_by=self.user,
             media_type='TEXT',
-            original_title='Articulo',
+            original_title='Articulo PDF',
         )
         response = self.client.put(
             f'/api/content/transcript-ingest/{text_content.id}/',
+            {
+                'processed_plain': 'Texto extraído del PDF sobre Bitcoin.',
+                'format': 'PLAIN',
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        transcript = text_content.transcript
+        self.assertEqual(transcript.format, 'PLAIN')
+        self.assertTrue(transcript.text_hash)
+
+    def test_put_rejects_image_content(self):
+        image_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='IMAGE',
+            original_title='Foto',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{image_content.id}/',
             {'processed_plain': self.PROCESSED_PLAIN},
             format='json',
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_queue_lists_pending_text(self):
+        text_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Libro pendiente',
+        )
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'media_type': 'TEXT'},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in response.data['items']]
+        self.assertIn(text_content.id, ids)
 
     def test_put_rejects_invalid_optional_subtitles(self):
         response = self.client.put(
@@ -5361,6 +5397,44 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             response.data['embedding']['embedded_text_hash'],
             self.transcript.text_hash,
         )
+
+    def test_text_requires_transcript_before_embed(self):
+        pdf = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='PDF sin extracto',
+        )
+        ContentEmbedding.objects.get_or_create(
+            content=pdf,
+            defaults={'status': ContentEmbedding.STATUS_PENDING},
+        )
+        response = self.client.get(
+            f'/api/content/embedding-ingest/{pdf.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+        ContentTranscript.objects.create(
+            content=pdf,
+            processed_plain='Texto del PDF sobre Bitcoin.',
+            format='PLAIN',
+            language='es',
+        )
+        response = self.client.get(
+            f'/api/content/embedding-ingest/{pdf.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_transcript'])
+
+        queue = self.client.get(
+            '/api/content/embedding-ingest/',
+            {'media_type': 'TEXT'},
+            **self.auth_header,
+        )
+        self.assertEqual(queue.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in queue.data['items']]
+        self.assertIn(pdf.id, ids)
 
     def test_ack_indexed_rejects_hash_mismatch(self):
         response = self.client.put(
