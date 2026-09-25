@@ -214,6 +214,7 @@ def preview_knowledge_path_snapshot(
             text = material.get("text") or ""
             material_digests.append({
                 "nodeId": node.get("nodeId"),
+                "nodeTitle": node.get("title") or "",
                 "contentId": material.get("contentId"),
                 "complete": material_is_complete(material),
                 "textSha256": transcript_text_sha256(text) if text else "",
@@ -240,6 +241,95 @@ def preview_knowledge_path_snapshot(
                 "Given material.text and textFormat sophia-acbc-normalized-transcript-v1, "
                 "SHA-256(UTF-8 text) matches Bitcoin TranscriptAnchor.text_hash. "
                 "IPFS is not part of this snapshot."
+            ),
+        },
+    }
+
+
+def knowledge_path_snapshot_readiness(knowledge_path: KnowledgePath) -> dict[str, Any]:
+    """Compact readiness payload for authors/staff (no full document body).
+
+    Use this for dashboards and API clients that need publish state without the
+    heavy JCS document returned by ``preview_knowledge_path_snapshot``.
+    """
+    from knowledge_paths.models import PublishedKnowledgePathSnapshot
+    from knowledge_paths.services.snapshot_publish import serialize_published_snapshot
+
+    preview = preview_knowledge_path_snapshot(knowledge_path, version=1)
+    document = preview.get("document") or {}
+    material_by_node = {
+        item.get("nodeId"): item for item in (preview.get("materialDigests") or [])
+    }
+
+    nodes_out: list[dict[str, Any]] = []
+    for node in document.get("nodes") or []:
+        node_id = node.get("nodeId") or ""
+        material = (node.get("materials") or [{}])[0]
+        material_meta = material_by_node.get(node_id) or {}
+        nodes_out.append({
+            "nodeId": node_id,
+            "nodeTitle": node.get("title") or "",
+            "position": node.get("position"),
+            "mediaType": node.get("mediaType") or "",
+            "contentId": material.get("contentId") or "",
+            "materialType": material.get("type") or "",
+            "hasCertifiedText": bool(material_meta.get("complete")),
+            "textSha256": material_meta.get("textSha256") or "",
+        })
+
+    published_qs = (
+        PublishedKnowledgePathSnapshot.objects.filter(knowledge_path=knowledge_path)
+        .select_related("published_by")
+        .order_by("-version")
+    )
+    published_count = published_qs.count()
+    latest = published_qs.first()
+    latest_payload = None
+    if latest is not None:
+        serialized = serialize_published_snapshot(latest)
+        latest_payload = {
+            "version": serialized["version"],
+            "digest": serialized["digest"],
+            "schemaVersion": serialized["schemaVersion"],
+            "publishedAt": serialized["publishedAt"],
+            "publishedBy": serialized["publishedBy"],
+        }
+
+    return {
+        "knowledgePathDbId": knowledge_path.id,
+        "knowledgePathId": f"sophia-acbc:knowledge-path:{knowledge_path.id}",
+        "title": knowledge_path.title or "",
+        "description": knowledge_path.description or "",
+        "authorId": knowledge_path.author_id,
+        "authorUsername": (
+            knowledge_path.author.username if knowledge_path.author_id else ""
+        ),
+        "isVisible": knowledge_path.is_visible,
+        "validForHash": preview["validForHash"],
+        "readyForStrictPublish": preview["readyForStrictPublish"],
+        "liveDigest": preview.get("digest"),
+        "validationError": preview.get("validationError"),
+        "issues": preview.get("issues") or [],
+        "nodes": nodes_out,
+        "summary": {
+            "nodeCount": len(nodes_out),
+            "nodesWithCertifiedText": sum(
+                1 for node in nodes_out if node["hasCertifiedText"]
+            ),
+            "issueCount": len(preview.get("issues") or []),
+            "publishedSnapshotCount": published_count,
+        },
+        "published": {
+            "count": published_count,
+            "latest": latest_payload,
+        },
+        "blockchain": {
+            "status": "not_implemented",
+            "network": None,
+            "txid": None,
+            "message": (
+                "Knowledge-path snapshot Bitcoin broadcast is not wired yet. "
+                "Admin can persist snapshots in Postgres; on-chain anchoring is next."
             ),
         },
     }
