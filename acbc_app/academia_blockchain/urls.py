@@ -27,6 +27,8 @@ schema_view = get_schema_view(
     permission_classes=[permissions.AllowAny],
 )
 
+handler404 = 'academia_blockchain.error_views.page_not_found'
+
 urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),

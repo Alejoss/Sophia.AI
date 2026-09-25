@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Home from './generalComponents/BrandHome.jsx';
 import HowItWorksGuide from './generalComponents/HowItWorksGuide.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
+import NotFound from './generalComponents/NotFound.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
 import CompletarCuenta from './profiles/CompletarCuenta.jsx';
@@ -300,6 +301,7 @@ const AppContent = () => {
             <Route path="profiles/my_events" element={<ProtectedRoute><UserEvents /></ProtectedRoute>} />
             <Route path="profiles/profile_bookmarks" element={<ProtectedRoute><Bookmarks /></ProtectedRoute>} />
           </Route>
+          <Route path="*" element={<NotFound />} />
           </Routes>
           </NotificationsProvider>
         </AuthProvider>
