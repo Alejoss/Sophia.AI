@@ -7,6 +7,7 @@ Machine-to-machine auth matches transcript/embedding ingest
 * ``GET /api/content/knowledge-path-ingest/<knowledge_path_id>/``
   Ordered nodes with linked content transcript + embedding bookkeeping.
   VIDEO/AUDIO/TEXT all use ``ContentTranscript`` for canonical plain text.
+  A worker derives transcript and embedding work from per-node fields.
 """
 
 from __future__ import annotations
