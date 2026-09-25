@@ -6,7 +6,7 @@ Machine-to-machine auth matches transcript/embedding ingest
 
 * ``GET /api/content/knowledge-path-ingest/<knowledge_path_id>/``
   Ordered nodes with linked content transcript + embedding bookkeeping so a
-  worker can see what is ready for snapshot materials / further ingest work.
+  worker can see what needs transcript extraction or embedding ack.
 """
 
 from __future__ import annotations
@@ -57,7 +57,6 @@ def build_knowledge_path_ingest_detail(knowledge_path: KnowledgePath) -> dict:
     nodes_with_transcript = 0
     nodes_with_certified_text = 0
     nodes_embedding_indexed = 0
-    nodes_embedding_pending = 0
 
     for index, node in enumerate(nodes):
         profile = node.content_profile
@@ -76,17 +75,11 @@ def build_knowledge_path_ingest_detail(knowledge_path: KnowledgePath) -> dict:
             if has_certified:
                 nodes_with_certified_text += 1
             try:
-                embedding = content.embedding
-                embedding_status = embedding.status
+                embedding_status = content.embedding.status
             except ContentEmbedding.DoesNotExist:
                 embedding_status = None
             if embedding_status == 'indexed':
                 nodes_embedding_indexed += 1
-            elif embedding_status in ('pending', 'stale', 'failed', None):
-                # None = no ContentEmbedding row yet; treat as needing work when
-                # there is transcript text Vincent might process.
-                if has_transcript or content.media_type == 'TEXT':
-                    nodes_embedding_pending += 1
 
         node_payloads.append({
             'id': node.id,
@@ -120,7 +113,6 @@ def build_knowledge_path_ingest_detail(knowledge_path: KnowledgePath) -> dict:
             'nodes_with_transcript': nodes_with_transcript,
             'nodes_with_certified_text': nodes_with_certified_text,
             'nodes_embedding_indexed': nodes_embedding_indexed,
-            'nodes_embedding_needing_work': nodes_embedding_pending,
             'ready_for_strict_publish': (
                 node_count > 0
                 and nodes_with_content == node_count
