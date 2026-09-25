@@ -16,6 +16,7 @@ import Maintenance from './generalComponents/Maintenance.jsx';
 import NotFound from './generalComponents/NotFound.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
+import RealHistoriaBitcoinLanding from './courses/RealHistoriaBitcoinLanding.jsx';
 import CompletarCuenta from './profiles/CompletarCuenta.jsx';
 import BookClubLayout from './bookClubs/BookClubLayout.jsx';
 import BookClubOverview from './bookClubs/BookClubOverview.jsx';
@@ -172,6 +173,7 @@ const AppContent = () => {
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
           <Route path="club-de-lectura" element={<ClubDeLectura />} />
+          <Route path="courses/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
           <Route path="club-de-lectura/:slug" element={<BookClubLayout />}>
             <Route index element={<BookClubOverview />} />
             <Route path="misiones" element={<BookClubMissions />} />
