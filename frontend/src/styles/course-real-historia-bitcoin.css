@@ -24,7 +24,8 @@
   color: var(--rhb-ink);
   background: var(--rhb-navy);
   font-family: var(--rhb-font-body);
-  overflow-x: hidden;
+  /* clip avoids creating a scroll container (unlike hidden), so #hash CTAs work */
+  overflow-x: clip;
 }
 
 .rhb-page * {
@@ -147,6 +148,12 @@ html:has(.rhb-page) {
   max-width: 720px;
 }
 
+.rhb-hero-actions,
+.rhb-hero-actions a {
+  position: relative;
+  z-index: 3;
+}
+
 .rhb-kicker {
   margin: 0 0 1.35rem;
   color: var(--rhb-orange-hot);
@@ -161,12 +168,15 @@ html:has(.rhb-page) {
 
 .rhb-hero-title {
   margin: 0;
+  max-width: 100%;
   font-family: var(--rhb-font-display);
-  font-size: clamp(2.55rem, 7.2vw, 4.6rem);
+  font-size: clamp(2.15rem, 7.2vw, 4.6rem);
   font-weight: 800;
   letter-spacing: -0.045em;
-  line-height: 0.98;
+  line-height: 1.02;
   color: #fff;
+  overflow-wrap: break-word;
+  hyphens: manual;
   opacity: 0;
   animation: rhb-rise 0.95s ease 0.22s forwards;
 }
@@ -977,6 +987,11 @@ html:has(.rhb-page) {
 
   .rhb-brand-link span {
     font-size: 0.82rem;
+  }
+
+  .rhb-hero-title {
+    font-size: clamp(1.85rem, 9.5vw, 2.55rem);
+    letter-spacing: -0.035em;
   }
 
   .rhb-hero-actions {

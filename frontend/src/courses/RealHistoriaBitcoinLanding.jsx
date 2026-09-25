@@ -161,6 +161,14 @@ const FAQS = [
   },
 ];
 
+const scrollToHash = (event, id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  event.preventDefault();
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.history.replaceState(null, '', `#${id}`);
+};
+
 const RealHistoriaBitcoinLanding = () => {
   useEffect(() => {
     const previousTitle = document.title;
@@ -168,6 +176,16 @@ const RealHistoriaBitcoinLanding = () => {
     return () => {
       document.title = previousTitle;
     };
+  }, []);
+
+  useEffect(() => {
+    const { hash } = window.location;
+    if (!hash) return undefined;
+    const id = hash.slice(1);
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   return (
@@ -179,7 +197,11 @@ const RealHistoriaBitcoinLanding = () => {
             <img src="/images/logo.png" alt="" />
             <span>Academia Blockchain</span>
           </RouterLink>
-          <a className="rhb-topbar-cta" href="#inscripcion">
+          <a
+            className="rhb-topbar-cta"
+            href="#inscripcion"
+            onClick={(event) => scrollToHash(event, 'inscripcion')}
+          >
             Inscripción
           </a>
         </div>
@@ -194,10 +216,18 @@ const RealHistoriaBitcoinLanding = () => {
             Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
           </p>
           <div className="rhb-hero-actions">
-            <a className="rhb-btn rhb-btn-primary" href="#recorrido">
+            <a
+              className="rhb-btn rhb-btn-primary"
+              href="#recorrido"
+              onClick={(event) => scrollToHash(event, 'recorrido')}
+            >
               Explorar el curso
             </a>
-            <a className="rhb-btn rhb-btn-ghost" href="#recorrido">
+            <a
+              className="rhb-btn rhb-btn-ghost"
+              href="#recorrido"
+              onClick={(event) => scrollToHash(event, 'recorrido')}
+            >
               Ver el recorrido
             </a>
           </div>
@@ -288,7 +318,11 @@ const RealHistoriaBitcoinLanding = () => {
               ))}
             </div>
             <div className="rhb-inline-cta">
-              <a className="rhb-btn rhb-btn-ghost" href="#recorrido">
+              <a
+                className="rhb-btn rhb-btn-ghost"
+                href="#recorrido"
+                onClick={(event) => scrollToHash(event, 'recorrido')}
+              >
                 Ver el recorrido
               </a>
             </div>
@@ -512,9 +546,9 @@ const RealHistoriaBitcoinLanding = () => {
                 </div>
               </dl>
               <div className="rhb-inline-cta">
-                <RouterLink to="/unirme" className="rhb-btn rhb-btn-primary">
+                <a href="/unirme" className="rhb-btn rhb-btn-primary">
                   Avisarme cuando abran las inscripciones
-                </RouterLink>
+                </a>
               </div>
             </div>
           </div>
@@ -552,10 +586,18 @@ const RealHistoriaBitcoinLanding = () => {
               Pero comprenderla requiere conectar piezas que normalmente se cuentan por separado.
             </p>
             <div className="rhb-final-actions">
-              <a className="rhb-btn rhb-btn-primary" href="#recorrido">
+              <a
+                className="rhb-btn rhb-btn-primary"
+                href="#recorrido"
+                onClick={(event) => scrollToHash(event, 'recorrido')}
+              >
                 Explorar La guerra por las criptomonedas
               </a>
-              <a className="rhb-btn rhb-btn-ghost" href="#inscripcion">
+              <a
+                className="rhb-btn rhb-btn-ghost"
+                href="#inscripcion"
+                onClick={(event) => scrollToHash(event, 'inscripcion')}
+              >
                 Comenzar la investigación
               </a>
             </div>
