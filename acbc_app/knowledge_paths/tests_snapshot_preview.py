@@ -76,8 +76,36 @@ class SnapshotPreviewBuilderTests(TestCase):
         self.assertEqual(material["text"], "")
         self.assertTrue(payload["validForHash"])
         self.assertFalse(payload["readyForStrictPublish"])
-        codes = {issue["code"] for issue in payload["issues"]}
-        self.assertIn("NO_TRANSCRIPT_TEXT", codes)
+        missing = [
+            issue for issue in payload["issues"]
+            if issue["code"] == "NO_TRANSCRIPT_TEXT"
+        ]
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(missing[0]["nodeTitle"], "What is Bitcoin?")
+        self.assertEqual(
+            missing[0]["nodeId"],
+            f"sophia-acbc:node:{self.node.id}",
+        )
+
+    def test_readiness_endpoint_reports_missing_transcript_by_title(self):
+        from knowledge_paths.services.snapshot_preview import (
+            knowledge_path_snapshot_readiness,
+        )
+
+        ContentTranscript.objects.filter(content=self.content).delete()
+        payload = knowledge_path_snapshot_readiness(self.path)
+        self.assertFalse(payload["readyForStrictPublish"])
+        self.assertEqual(payload["knowledgePathDbId"], self.path.id)
+        self.assertEqual(payload["nodes"][0]["nodeTitle"], "What is Bitcoin?")
+        self.assertFalse(payload["nodes"][0]["hasCertifiedText"])
+        self.assertEqual(payload["summary"]["nodesWithCertifiedText"], 0)
+        self.assertEqual(payload["blockchain"]["status"], "not_implemented")
+        self.assertEqual(payload["published"]["count"], 0)
+        missing = [
+            issue for issue in payload["issues"]
+            if issue["code"] == "NO_TRANSCRIPT_TEXT"
+        ]
+        self.assertEqual(missing[0]["nodeTitle"], "What is Bitcoin?")
 
 
 class SnapshotPreviewAPITests(TestCase):
@@ -114,5 +142,24 @@ class SnapshotPreviewAPITests(TestCase):
         self.client.force_authenticate(user=self.other)
         response = self.client.get(
             f"/api/knowledge_paths/{self.path.id}/snapshot-preview/"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_author_can_get_readiness(self):
+        self.client.force_authenticate(user=self.author)
+        response = self.client.get(
+            f"/api/knowledge_paths/{self.path.id}/snapshot-readiness/"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("readyForStrictPublish", response.data)
+        self.assertIn("nodes", response.data)
+        self.assertEqual(response.data["nodes"][0]["nodeTitle"], "Lesson")
+        self.assertNotIn("document", response.data)
+        self.assertNotIn("canonical", response.data)
+
+    def test_readiness_forbidden_for_non_author(self):
+        self.client.force_authenticate(user=self.other)
+        response = self.client.get(
+            f"/api/knowledge_paths/{self.path.id}/snapshot-readiness/"
         )
         self.assertEqual(response.status_code, 403)

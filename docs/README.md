@@ -21,6 +21,7 @@ Complete API reference and usage guides:
 - [Endpoints](api/endpoints.md) - Complete endpoint reference
 - [Transcript ingest](api/transcript-ingest.md) - External worker queue + transcript upsert (S3 / YouTube)
 - [Knowledge-path ingest](api/knowledge-path-ingest.md) - Worker detail for path nodes + transcript/embedding state
+- [Knowledge-path snapshot readiness](api/knowledge-path-snapshot-readiness.md) - Author/staff publish readiness (JWT)
 - [Transcript certification](hackathon/transcript-anchor.md) - Bitcoin OP_RETURN anchors for transcript `text_hash`
 - [Examples](api/examples.md) - API usage examples
 - [Errors](api/errors.md) - Error codes and handling
