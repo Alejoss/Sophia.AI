@@ -90,7 +90,7 @@ See [Authentication Documentation](authentication.md) for detailed authenticatio
 
 ## Content — Transcript ingest (external workers)
 
-Machine-to-machine API for an external transcript worker (local Whisper, YouTube captions, S3 `file_key`). Not JWT-authenticated.
+Machine-to-machine API for an external transcript worker (Whisper/captions for A/V, PDF/text extract for TEXT, S3 `file_key`). Not JWT-authenticated. VIDEO, AUDIO, and TEXT share `ContentTranscript`.
 
 Full contract: [transcript-ingest.md](transcript-ingest.md).
 
@@ -115,7 +115,7 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 ### Upsert transcript
 - **PUT** `/api/content/transcript-ingest/{content_id}/`
 - **Auth**: Ingest API key
-- **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format`, `language`
+- **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format` (`SRT`/`VTT`/`PLAIN`), `language`
 - **Response**: `{ content_id, created, transcript }` (201 create / 200 update)
 
 ## Content — Transcript certification (Bitcoin OP_RETURN)
@@ -170,7 +170,7 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Default statuses**: `pending`, `stale`, `failed`
 - **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }`
 - **Item**: `{ id, title, is_public, chat_enabled, matching_count, status_counts }`
-- Topics with no matching VIDEO/AUDIO transcripts are omitted. Ordered by `matching_count` desc, then `id`.
+- Topics with no matching VIDEO/AUDIO/TEXT transcripts are omitted. Ordered by `matching_count` desc, then `id`.
 - Then fetch content with `GET /api/content/embedding-ingest/?topic_id={id}`
 
 ### Get embedding job detail

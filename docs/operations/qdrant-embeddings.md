@@ -20,7 +20,7 @@ Base: `/api/content/embedding-ingest/`
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/embedding-ingest/` | Queue of VIDEO/AUDIO with transcript needing embed work |
+| `GET` | `/embedding-ingest/` | Queue of VIDEO/AUDIO/TEXT with a transcript needing embed work |
 | `GET` | `/embedding-ingest/topics/` | Topics that have at least one transcript matching the status filter |
 | `GET` | `/embedding-ingest/{content_id}/` | One item + transcript embedding summary |
 | `PUT` | `/embedding-ingest/{content_id}/` | Worker ack (`indexed` / `failed` / `skipped`) |
@@ -64,7 +64,7 @@ Discover which topics need embed work. Each item:
 }
 ```
 
-- `matching_count` — VIDEO/AUDIO transcripts whose `embedding_status` is in the
+- `matching_count` — VIDEO/AUDIO/TEXT transcripts whose `embedding_status` is in the
   request's status filter (default: pending/stale/failed).
 - `status_counts` — full breakdown for that topic (not limited to the filter).
 - Topics with `matching_count = 0` are omitted. Ordered by `matching_count`
@@ -276,7 +276,7 @@ this repository.
      -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY"
    ```
 
-   Omit `topic_id` to list all VIDEO/AUDIO with transcripts needing work.
+   Omit `topic_id` to list all VIDEO/AUDIO/TEXT with transcripts needing work.
 
 5. **For each item**, load transcript text to chunk:
    - `GET /api/content/embedding-ingest/{content_id}/` → read `transcript.index_text`
@@ -313,7 +313,7 @@ this repository.
 |--------|------|
 | **403** | Missing/wrong API key, or `TRANSCRIPT_INGEST_API_KEY` unset |
 | **404** | Unknown `topic_id` on queue, or unknown `content_id` |
-| **400** | Bad query params; non VIDEO/AUDIO content; invalid ack body |
+| **400** | Bad query params; non VIDEO/AUDIO/TEXT content; invalid ack body |
 | **409** | No transcript yet; `embedded_text_hash` mismatch on indexed ack |
 
 ---
@@ -354,8 +354,8 @@ Each point payload should include at least:
 | Field | Type | Notes |
 |-------|------|-------|
 | `topic_id` | int | Required for RAG filter |
-| `content_id` | int | Source video/audio |
-| `media_type` | string | `VIDEO` or `AUDIO` |
+| `content_id` | int | Source content |
+| `media_type` | string | `VIDEO`, `AUDIO`, or `TEXT` |
 | `chunk_index` | int | 0-based index within content |
 | `text_hash` | string | Transcript `text_hash` at index time |
 | `doc_key` | string | Stable id, e.g. `{content_id}:{chunk_index}` |
