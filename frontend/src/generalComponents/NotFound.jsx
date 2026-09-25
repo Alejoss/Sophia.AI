@@ -1,12 +1,10 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Box, Button, Container, Typography } from '@mui/material';
 import '../styles/not-found.css';
 
 const NotFound = () => {
-  const navigate = useNavigate();
-
   return (
     <Box className="not-found-page" component="main">
       <div className="not-found-orbit" aria-hidden="true" />
@@ -28,16 +26,18 @@ const NotFound = () => {
           </Typography>
           <Box className="not-found-actions">
             <Button
+              component={RouterLink}
+              to="/"
               variant="contained"
               endIcon={<ArrowForwardIcon />}
-              onClick={() => navigate('/')}
               className="not-found-button not-found-button-primary"
             >
               Volver al inicio
             </Button>
             <Button
+              component={RouterLink}
+              to="/knowledge_path"
               variant="text"
-              onClick={() => navigate('/knowledge_path')}
               className="not-found-button not-found-button-secondary"
             >
               Explorar caminos

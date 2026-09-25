@@ -154,6 +154,7 @@
     content: '';
     position: absolute;
     inset: 0;
+    z-index: 1;
     background: linear-gradient(180deg, rgba(7, 13, 18, 0.22) 0%, rgba(7, 13, 18, 0.76) 42%, rgba(7, 13, 18, 0.94) 100%);
     pointer-events: none;
   }

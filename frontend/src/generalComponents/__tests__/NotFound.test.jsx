@@ -20,7 +20,7 @@ describe('NotFound', () => {
     expect(screen.getByText('Academia Blockchain')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /no encontramos esta página/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /volver al inicio/i }));
+    await user.click(screen.getByRole('link', { name: /volver al inicio/i }));
     expect(await screen.findByText('Inicio')).toBeInTheDocument();
   });
 });
