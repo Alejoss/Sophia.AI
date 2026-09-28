@@ -30,7 +30,7 @@ curl -s "https://academiablockchain.com/api/knowledge_paths/10/snapshot-readines
 | `validForHash` | Live document validates for hashing (preview mode may still have empty texts) |
 | `liveDigest` | SHA-256 of current live preview document (when `validForHash`) |
 | `issues` | Gap list (`NO_TRANSCRIPT_TEXT`, …) with `nodeTitle` + `nodeId` |
-| `nodes[]` | Per-node title, content id, `hasCertifiedText`, `textSha256` |
+| `nodes[]` | Per-node title, content id, `hasCertifiedText`, `textSha256`, `issueCode` |
 | `published.latest` | Latest admin-persisted snapshot (`version`, `digest`, …) or `null` |
 | `blockchain` | Stub until KP digest OP_RETURN is wired (`status: not_implemented`) |
 

@@ -43,9 +43,67 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
 import ImageUploadModal from "../components/ImageUploadModal";
+
+const TRANSCRIPT_ISSUE_LABELS = {
+  NO_CONTENT: "Sin contenido vinculado",
+  NO_TRANSCRIPT_TEXT: "Sin transcript",
+  EMPTY_TRANSCRIPT: "Transcript vacío",
+};
+
+const buildSnapshotNodeRows = (preview) => {
+  if (!preview) return [];
+
+  const issuesByNode = {};
+  for (const issue of preview.issues || []) {
+    if (issue?.nodeId && !issuesByNode[issue.nodeId]) {
+      issuesByNode[issue.nodeId] = issue;
+    }
+  }
+
+  const digests = Array.isArray(preview.materialDigests) ? preview.materialDigests : [];
+  if (digests.length > 0) {
+    return digests.map((item, index) => {
+      const ready = Boolean(item.hasCertifiedText ?? item.complete);
+      const issueCode = item.issueCode || issuesByNode[item.nodeId]?.code || "";
+      return {
+        key: item.nodeId || `digest-${index}`,
+        position: item.position ?? index + 1,
+        title: item.nodeTitle || "Sin título",
+        mediaType: item.mediaType || "",
+        contentId: item.contentId || "",
+        ready,
+        issueCode,
+        statusLabel: ready
+          ? "Transcript listo"
+          : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
+      };
+    });
+  }
+
+  return (preview.document?.nodes || []).map((node, index) => {
+    const material = (node.materials || [])[0] || {};
+    const ready = Boolean((material.text || "").trim());
+    const issue = issuesByNode[node.nodeId];
+    const issueCode = issue?.code || "";
+    return {
+      key: node.nodeId || `node-${index}`,
+      position: node.position ?? index + 1,
+      title: node.title || "Sin título",
+      mediaType: node.mediaType || "",
+      contentId: material.contentId || "",
+      ready,
+      issueCode,
+      statusLabel: ready
+        ? "Transcript listo"
+        : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
+    };
+  });
+};
 
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
@@ -95,6 +153,14 @@ const KnowledgePathEdit = () => {
   const [snapshotPreview, setSnapshotPreview] = useState(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState(null);
+  const snapshotNodeRows = useMemo(
+    () => buildSnapshotNodeRows(snapshotPreview),
+    [snapshotPreview],
+  );
+  const snapshotNodesReadyCount = useMemo(
+    () => snapshotNodeRows.filter((row) => row.ready).length,
+    [snapshotNodeRows],
+  );
 
   const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
   const initialTab =
@@ -1064,7 +1130,90 @@ const KnowledgePathEdit = () => {
                         : "No listo: falta texto en algún material"
                     }
                   />
+                  {snapshotNodeRows.length > 0 && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color={
+                        snapshotNodesReadyCount === snapshotNodeRows.length
+                          ? "success"
+                          : "default"
+                      }
+                      label={`Transcripts: ${snapshotNodesReadyCount}/${snapshotNodeRows.length}`}
+                    />
+                  )}
                 </Stack>
+
+                {snapshotNodeRows.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Transcript por nodo
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      Cada nodo necesita texto certificado del contenido vinculado
+                      (transcript o extracto PDF) para el publish estricto.
+                    </Typography>
+                    <Stack spacing={1}>
+                      {snapshotNodeRows.map((row) => (
+                        <Paper
+                          key={row.key}
+                          variant="outlined"
+                          sx={{
+                            px: 1.5,
+                            py: 1.25,
+                            borderRadius: 2,
+                            bgcolor: "action.hover",
+                            borderColor: row.ready ? "success.main" : "divider",
+                          }}
+                        >
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            justifyContent="space-between"
+                          >
+                            <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                {row.position}. {row.title}
+                              </Typography>
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {row.mediaType ? (
+                                  <Chip size="small" label={row.mediaType} variant="outlined" />
+                                ) : null}
+                                {row.contentId ? (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{
+                                      fontFamily:
+                                        "ui-monospace, SFMono-Regular, Menlo, monospace",
+                                      wordBreak: "break-all",
+                                    }}
+                                  >
+                                    {row.contentId}
+                                  </Typography>
+                                ) : null}
+                              </Stack>
+                            </Stack>
+                            <Chip
+                              size="small"
+                              icon={
+                                row.ready ? (
+                                  <CheckCircleOutlineIcon />
+                                ) : (
+                                  <HighlightOffIcon />
+                                )
+                              }
+                              color={row.ready ? "success" : "warning"}
+                              label={row.statusLabel}
+                              sx={{ flexShrink: 0 }}
+                            />
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
 
                 {snapshotPreview.digest && (
                   <Box>
