@@ -1,10 +1,29 @@
 import { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem, ListItemButton, ListItemText, useMediaQuery, useTheme, Badge, Tooltip } from '@mui/material';
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  useMediaQuery,
+  useTheme,
+  Badge,
+  Tooltip,
+  Menu,
+  MenuItem,
+  Button,
+} from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useThemeMode } from '../context/ThemeContext.jsx';
 import { useNotifications } from '../context/NotificationsContext.jsx';
@@ -12,15 +31,40 @@ import { getProfileMenuConfig } from '../profiles/ProfileVerticalNavigation.jsx'
 import { mergeMenuConfigs } from '../utils/menuUtils';
 import '../styles/header.css';
 
+const navLinkSx = {
+  color: 'text.primary',
+  textDecoration: 'none',
+  fontSize: '16px',
+  fontWeight: 400,
+  px: 2.5,
+  py: 0.625,
+  borderRadius: '4px',
+  '&:hover': {
+    color: '#6d28d2',
+    bgcolor: '#6d28d21f',
+  },
+};
+
 const HeaderComp = () => {
   const { authState } = useContext(AuthContext);
   const { isAuthenticated, user } = authState;
   const { mode, toggleMode } = useThemeMode();
   const { unreadCount } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
+  const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+
+  const profileMenuOpen = Boolean(profileMenuAnchor);
+
+  const handleProfileMenuOpen = (event) => {
+    setProfileMenuAnchor(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileMenuAnchor(null);
+  };
 
   // Check if we're on a profile page
   const isOnProfilePage = location.pathname.includes('/profiles/') && 
@@ -161,20 +205,22 @@ const HeaderComp = () => {
   );
   const navLinks = [
     { to: '/search', label: 'Biblioteca' },
-    { to: '/knowledge_path', label: 'Caminos de conocimiento' },
+    { to: '/knowledge_path', label: 'Caminos' },
     { to: '/content/topics', label: 'Temas' },
     { to: '/events', label: 'Eventos' },
   ];
 
-  const authLinks = isAuthenticated
+  const guestLinks = [
+    { to: '/profiles/login', label: 'Iniciar sesión' },
+    { to: '/profiles/register', label: 'Registrarse' },
+  ];
+
+  const mobileAuthLinks = isAuthenticated
     ? [
         { to: '/profiles/my_profile', label: user.username },
         { to: '/profiles/logout', label: 'Cerrar sesión' },
       ]
-    : [
-        { to: '/profiles/login', label: 'Iniciar sesión' },
-        { to: '/profiles/register', label: 'Registrarse' },
-      ];
+    : guestLinks;
 
   return (
     <AppBar 
@@ -246,46 +292,69 @@ const HeaderComp = () => {
               key={link.to}
               component={Link}
               to={link.to}
-              sx={{
-                color: 'text.primary',
-                textDecoration: 'none',
-                fontSize: '16px',
-                fontWeight: 400,
-                px: 2.5,
-                py: 0.625,
-                borderRadius: '4px',
-                '&:hover': {
-                  color: '#6d28d2',
-                  bgcolor: '#6d28d21f',
-                },
-              }}
+              sx={navLinkSx}
             >
               {link.label}
             </Typography>
           ))}
-          {authLinks.map((link) => (
-            <Typography
-              key={link.to}
-              component={Link}
-              to={link.to}
-              sx={{
-                color: 'text.primary',
-                textDecoration: 'none',
-                fontSize: '16px',
-                fontWeight: 400,
-                px: 2.5,
-                py: 0.625,
-                borderRadius: '4px',
-                '&:hover': {
-                  color: '#6d28d2',
-                  bgcolor: '#6d28d21f',
-                },
-              }}
-            >
-              {link.label}
-            </Typography>
-          ))}
-          
+          {isAuthenticated ? (
+            <>
+              <Button
+                id="profile-menu-button"
+                aria-controls={profileMenuOpen ? 'profile-menu' : undefined}
+                aria-haspopup="true"
+                aria-expanded={profileMenuOpen ? 'true' : undefined}
+                onClick={handleProfileMenuOpen}
+                endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  ...navLinkSx,
+                  textTransform: 'none',
+                  minWidth: 0,
+                  color: 'text.primary',
+                }}
+              >
+                {user.username}
+              </Button>
+              <Menu
+                id="profile-menu"
+                anchorEl={profileMenuAnchor}
+                open={profileMenuOpen}
+                onClose={handleProfileMenuClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{
+                  list: { 'aria-labelledby': 'profile-menu-button' },
+                }}
+              >
+                <MenuItem
+                  component={Link}
+                  to="/profiles/my_profile"
+                  onClick={handleProfileMenuClose}
+                >
+                  Mi perfil
+                </MenuItem>
+                <MenuItem
+                  component={Link}
+                  to="/profiles/logout"
+                  onClick={handleProfileMenuClose}
+                >
+                  Cerrar sesión
+                </MenuItem>
+              </Menu>
+            </>
+          ) : (
+            guestLinks.map((link) => (
+              <Typography
+                key={link.to}
+                component={Link}
+                to={link.to}
+                sx={navLinkSx}
+              >
+                {link.label}
+              </Typography>
+            ))
+          )}
+
           {renderNotificationBell({ ml: 0.5 })}
           {renderDarkModeToggle({ ml: 0.5 })}
         </Box>
@@ -343,7 +412,7 @@ const HeaderComp = () => {
               </ListItem>
             ))}
             {mobileMenuItems.map(renderMobileMenuItem)}
-            {authLinks.map((link) => (
+            {mobileAuthLinks.map((link) => (
               <ListItem
                 key={link.to}
                 component={Link}
