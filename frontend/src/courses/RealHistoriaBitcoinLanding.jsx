@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
+import { Box, Button, Container, Typography } from '@mui/material';
+import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
 const FORCES = [
@@ -170,6 +173,8 @@ const scrollToHash = (event, id) => {
 };
 
 const RealHistoriaBitcoinLanding = () => {
+  const navigate = useNavigate();
+
   useEffect(() => {
     const previousTitle = document.title;
     document.title = 'La guerra por las criptomonedas — Academia Blockchain';
@@ -189,73 +194,69 @@ const RealHistoriaBitcoinLanding = () => {
   }, []);
 
   return (
-    <div className="rhb-page">
-      <header className="rhb-hero" aria-labelledby="rhb-hero-title">
-        <div className="rhb-hero-grid" aria-hidden="true" />
-        <div className="rhb-shell rhb-topbar">
-          <RouterLink to="/" className="rhb-brand-link">
-            <img src="/images/logo.png" alt="" />
-            <span>Academia Blockchain</span>
-          </RouterLink>
-          <a
-            className="rhb-topbar-cta"
-            href="#inscripcion"
-            onClick={(event) => scrollToHash(event, 'inscripcion')}
-          >
-            Inscripción
-          </a>
-        </div>
-
-        <div className="rhb-shell rhb-hero-content">
-          <p className="rhb-kicker">Academia Blockchain</p>
-          <h1 className="rhb-hero-title" id="rhb-hero-title">
-            La guerra por las criptomonedas
-          </h1>
-          <p className="rhb-hero-subtitle">La real historia de Bitcoin</p>
-          <p className="rhb-hero-lead">
-            Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
-          </p>
-          <div className="rhb-hero-actions">
-            <a
-              className="rhb-btn rhb-btn-primary"
-              href="#recorrido"
-              onClick={(event) => scrollToHash(event, 'recorrido')}
-            >
-              Explorar el curso
-            </a>
-            <a
-              className="rhb-btn rhb-btn-ghost"
-              href="#recorrido"
-              onClick={(event) => scrollToHash(event, 'recorrido')}
-            >
-              Ver el recorrido
-            </a>
-          </div>
-          <div className="rhb-hero-signals" aria-label="Qué incluye la experiencia">
-            <span>Contenido estructurado</span>
-            <span>Investigación histórica</span>
-            <span>Encuentros en vivo</span>
-          </div>
-        </div>
-      </header>
-
-      <main>
-        <section className="rhb-section rhb-section-mid" aria-labelledby="rhb-rupture-title">
-          <div className="rhb-shell rhb-rupture-grid">
-            <div>
-              <p className="rhb-index">01 / La ruptura</p>
-              <h2 className="rhb-h2" id="rhb-rupture-title">
-                Creías conocer la historia de Bitcoin
-              </h2>
-              <p className="rhb-quote">
-                La historia de Bitcoin no comienza —ni termina— con Satoshi.
-              </p>
+    <Box className="rhb-page brand-home">
+      <section className="rhb-hero" aria-labelledby="rhb-hero-title">
+        <Container maxWidth="lg" className="brand-hero-container">
+          <Box className="rhb-hero-copy brand-hero-copy">
+            <Typography component="p" className="brand-kicker">
+              Academia Blockchain
+            </Typography>
+            <Typography component="h1" id="rhb-hero-title" className="brand-display">
+              La guerra por las criptomonedas
+            </Typography>
+            <Typography component="p" className="rhb-hero-subtitle">
+              La real historia de Bitcoin
+            </Typography>
+            <Typography component="p" className="brand-hero-lead">
+              Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
+            </Typography>
+            <Box className="brand-hero-actions rhb-hero-actions">
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                href="#recorrido"
+                onClick={(event) => scrollToHash(event, 'recorrido')}
+                className="brand-button brand-button-primary"
+              >
+                Explorar el curso
+              </Button>
+              <Button
+                variant="text"
+                href="#recorrido"
+                onClick={(event) => scrollToHash(event, 'recorrido')}
+                className="brand-button brand-button-secondary"
+              >
+                Ver el recorrido
+              </Button>
+            </Box>
+            <div className="rhb-hero-signals" aria-label="Qué incluye la experiencia">
+              <span>Contenido estructurado</span>
+              <span>Investigación histórica</span>
+              <span>Encuentros en vivo</span>
             </div>
+          </Box>
+        </Container>
+      </section>
+
+      <section className="rhb-section brand-statement" aria-labelledby="rhb-rupture-title">
+        <Container maxWidth="lg">
+          <div className="brand-section-grid">
             <div>
-              <p className="rhb-lead">
+              <Typography component="p" className="brand-section-index">
+                01 / La ruptura
+              </Typography>
+              <Typography component="h2" id="rhb-rupture-title" className="brand-section-title">
+                Creías conocer la historia de Bitcoin
+              </Typography>
+              <Typography component="p" className="rhb-quote">
+                La historia de Bitcoin no comienza —ni termina— con Satoshi.
+              </Typography>
+            </div>
+            <div className="brand-statement-copy">
+              <Typography component="p">
                 Bitcoin no apareció de la nada. Antes existieron décadas de ideas. Después comenzó otra
                 historia: una disputa sobre qué debía ser Bitcoin.
-              </p>
+              </Typography>
               <ul className="rhb-era-list">
                 <li>
                   <strong>Antes</strong>
@@ -272,345 +273,375 @@ const RealHistoriaBitcoinLanding = () => {
               </ul>
             </div>
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section className="rhb-section rhb-section-dark" aria-labelledby="rhb-question-title">
-          <div className="rhb-shell">
-            <div className="rhb-question-block">
-              <p className="rhb-index">02 / La pregunta central</p>
-              <h2 className="rhb-h2" id="rhb-question-title">
-                ¿Cómo llegó Bitcoin a convertirse en lo que es hoy?
-              </h2>
-              <p className="rhb-lead" style={{ marginInline: 'auto' }}>
-                Bitcoin no evolucionó únicamente como tecnología. Su historia también está formada por
-                seres humanos, intereses, desacuerdos, interpretaciones y decisiones.
-              </p>
-            </div>
-            <div className="rhb-forces" aria-label="Fuerzas que rodean a Bitcoin">
-              {FORCES.map((force) => (
-                <div
-                  key={force}
-                  className={force === 'Bitcoin' ? 'rhb-force rhb-force-core' : 'rhb-force'}
-                >
-                  {force}
-                </div>
-              ))}
-            </div>
+      <section className="rhb-section brand-ecosystem" aria-labelledby="rhb-question-title">
+        <Container maxWidth="lg">
+          <div className="rhb-question-wrap">
+            <Typography component="p" className="brand-section-index">
+              02 / La pregunta central
+            </Typography>
+            <Typography component="h2" id="rhb-question-title" className="brand-section-title">
+              ¿Cómo llegó Bitcoin a convertirse en lo que es hoy?
+            </Typography>
+            <Typography component="p" className="brand-section-lead">
+              Bitcoin no evolucionó únicamente como tecnología. Su historia también está formada por
+              seres humanos, intereses, desacuerdos, interpretaciones y decisiones.
+            </Typography>
           </div>
-        </section>
-
-        <section className="rhb-section rhb-section-charcoal" aria-labelledby="rhb-war-title">
-          <div className="rhb-shell">
-            <p className="rhb-index">03 / Visiones en conflicto</p>
-            <h2 className="rhb-h2" id="rhb-war-title">
-              Una guerra sobre qué debía ser Bitcoin
-            </h2>
-            <p className="rhb-lead">
-              Existieron —y existen— interpretaciones distintas. El curso no impone cuál es la
-              correcta: reconstruye cómo aparecieron y qué ocurrió cuando entraron en conflicto.
-            </p>
-            <div className="rhb-visions">
-              {VISIONS.map((vision, i) => (
-                <article className="rhb-vision" key={vision}>
-                  <span>Visión {String(i + 1).padStart(2, '0')}</span>
-                  <p>Bitcoin como {vision.toLowerCase()}</p>
-                </article>
-              ))}
-            </div>
-            <div className="rhb-inline-cta">
-              <a
-                className="rhb-btn rhb-btn-ghost"
-                href="#recorrido"
-                onClick={(event) => scrollToHash(event, 'recorrido')}
+          <div className="rhb-forces" aria-label="Fuerzas que rodean a Bitcoin">
+            {FORCES.map((force) => (
+              <div
+                key={force}
+                className={force === 'Bitcoin' ? 'rhb-force rhb-force-core' : 'rhb-force'}
               >
-                Ver el recorrido
-              </a>
-            </div>
+                {force}
+              </div>
+            ))}
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section
-          className="rhb-section rhb-section-mid"
-          id="recorrido"
-          aria-labelledby="rhb-path-title"
-        >
-          <div className="rhb-shell">
-            <p className="rhb-index">04 / El recorrido</p>
-            <h2 className="rhb-h2" id="rhb-path-title">
-              Lo que vas a investigar
-            </h2>
-            <p className="rhb-lead">
-              Una ruta de investigación histórica. Cada etapa conecta periodo, pregunta y conflicto —
-              no una lista genérica de módulos.
-            </p>
-            <span className="rhb-placeholder-pill">Currículo definitivo por insertar</span>
-            <div className="rhb-path">
-              {RESEARCH_PATH.map((step, index) => (
-                <article className="rhb-path-step" key={step.period}>
-                  <div className="rhb-path-num">{String(index + 1).padStart(2, '0')}</div>
-                  <div>
-                    <p className="rhb-path-period">{step.period}</p>
-                    <h3 className="rhb-path-question">{step.question}</h3>
-                    <p className="rhb-path-meta">{step.meta}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
+      <section className="rhb-section brand-principle" aria-labelledby="rhb-war-title">
+        <Container maxWidth="lg">
+          <Typography component="p" className="brand-section-index">
+            03 / Visiones en conflicto
+          </Typography>
+          <Typography component="h2" id="rhb-war-title" className="brand-section-title">
+            Una guerra sobre qué debía ser Bitcoin
+          </Typography>
+          <Typography component="p" className="brand-section-lead" style={{ maxWidth: '40rem' }}>
+            Existieron —y existen— interpretaciones distintas. El curso no impone cuál es la correcta:
+            reconstruye cómo aparecieron y qué ocurrió cuando entraron en conflicto.
+          </Typography>
+          <div className="rhb-visions">
+            {VISIONS.map((vision, i) => (
+              <article className="rhb-vision" key={vision}>
+                <span>Visión {String(i + 1).padStart(2, '0')}</span>
+                <p>Bitcoin como {vision.toLowerCase()}</p>
+              </article>
+            ))}
           </div>
-        </section>
+          <div className="rhb-inline-cta">
+            <Button
+              variant="text"
+              href="#recorrido"
+              onClick={(event) => scrollToHash(event, 'recorrido')}
+              endIcon={<ArrowForwardIcon />}
+              className="brand-button"
+              sx={{ color: 'var(--brand-orange)', fontWeight: 700 }}
+            >
+              Ver el recorrido
+            </Button>
+          </div>
+        </Container>
+      </section>
 
-        <section className="rhb-section rhb-section-dark" aria-labelledby="rhb-sources-title">
-          <div className="rhb-shell">
-            <p className="rhb-index">05 / Método</p>
-            <h2 className="rhb-h2" id="rhb-sources-title">
-              Trabajar con fuentes
-            </h2>
-            <p className="rhb-quote">
-              No queremos decirte qué pensar sobre la historia de Bitcoin. Queremos darte suficiente
-              contexto para que puedas examinarla.
-            </p>
-            <p className="rhb-lead">
-              El recorrido no es únicamente la interpretación de un profesor. Incluye documentos,
-              discusiones, código y archivos para que construyas tu propio criterio.
-            </p>
-            <div className="rhb-sources-grid">
-              {SOURCES.map((item) => (
-                <div className="rhb-source-item" key={item.title}>
-                  <strong>{item.title}</strong>
-                  {item.copy}
+      <section className="rhb-section brand-statement" id="recorrido" aria-labelledby="rhb-path-title">
+        <Container maxWidth="lg">
+          <Typography component="p" className="brand-section-index">
+            04 / El recorrido
+          </Typography>
+          <Typography component="h2" id="rhb-path-title" className="brand-section-title">
+            Lo que vas a investigar
+          </Typography>
+          <Typography component="p" className="brand-section-lead">
+            Una ruta de investigación histórica. Cada etapa conecta periodo, pregunta y conflicto —
+            no una lista genérica de módulos.
+          </Typography>
+          <span className="rhb-placeholder">Currículo definitivo por insertar</span>
+          <div className="rhb-path">
+            {RESEARCH_PATH.map((step, index) => (
+              <article className="rhb-path-step" key={step.period}>
+                <div className="rhb-path-num">{String(index + 1).padStart(2, '0')}</div>
+                <div>
+                  <p className="rhb-path-period">{step.period}</p>
+                  <h3 className="rhb-path-question">{step.question}</h3>
+                  <p className="rhb-path-meta">{step.meta}</p>
                 </div>
-              ))}
-            </div>
+              </article>
+            ))}
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section
-          className="rhb-section rhb-section-mid"
-          id="vivo"
-          aria-labelledby="rhb-live-title"
-        >
-          <div className="rhb-shell">
-            <div className="rhb-live-intro">
-              <div>
-                <p className="rhb-index">06 / Experiencia en vivo</p>
-                <h2 className="rhb-h2" id="rhb-live-title">
-                  La historia se estudia a tu ritmo. La conversación ocurre en vivo.
-                </h2>
-                <p className="rhb-lead">
-                  Contenido bajo demanda más encuentros en vivo durante una ventana temporal. Puedes
-                  comenzar cuando te inscribes y avanzar a tu ritmo. La conversación, en cambio,
-                  ocurre en tiempo real.
-                </p>
+      <section className="rhb-sources" aria-labelledby="rhb-sources-title">
+        <Container maxWidth="lg">
+          <Typography component="p" className="brand-section-index brand-section-index-light">
+            05 / Método
+          </Typography>
+          <Typography component="h2" id="rhb-sources-title" className="brand-section-title brand-section-title-light">
+            Trabajar con fuentes
+          </Typography>
+          <Typography component="p" className="rhb-quote rhb-quote-light">
+            No queremos decirte qué pensar sobre la historia de Bitcoin. Queremos darte suficiente
+            contexto para que puedas examinarla.
+          </Typography>
+          <Typography component="p" className="brand-section-lead" style={{ color: '#c7c3bb', marginTop: 28 }}>
+            El recorrido no es únicamente la interpretación de un profesor. Incluye documentos,
+            discusiones, código y archivos para que construyas tu propio criterio.
+          </Typography>
+          <div className="rhb-sources-grid">
+            {SOURCES.map((item) => (
+              <div className="rhb-source-item" key={item.title}>
+                <strong>{item.title}</strong>
+                <span>{item.copy}</span>
               </div>
-              <ul className="rhb-live-points">
-                <li>Profundizar acontecimientos y fuentes</li>
-                <li>Examinar interpretaciones en diálogo</li>
-                <li>Conectar ideas entre etapas del recorrido</li>
-                <li>Preguntar y conversar con otros participantes</li>
-                <li>Repeticiones previstas para distintos ritmos de avance</li>
-              </ul>
-            </div>
-
-            <div className="rhb-calendar" aria-label="Calendario de encuentros">
-              {MEETINGS.map((meeting) => (
-                <article className="rhb-meeting" key={meeting.id}>
-                  <p className="rhb-meeting-label">Encuentro {meeting.id}</p>
-                  <h3>{meeting.topic}</h3>
-                  <div className="rhb-meeting-dates">
-                    <span>Fecha 1 — por definir</span>
-                    <span>Fecha 2 — por definir</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="rhb-window-note">
-              <strong>Ventana aproximada:</strong> apertura hacia finales de octubre de 2026; encuentros
-              en vivo hasta alrededor de finales de noviembre de 2026. Fechas exactas por definir. La
-              urgencia es real solo mientras dura la ventana de conversación en vivo — no hay falsa
-              escasez.
-            </div>
+            ))}
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section className="rhb-section rhb-section-dark" aria-labelledby="rhb-audience-title">
-          <div className="rhb-shell">
-            <p className="rhb-index">07 / Encaje</p>
-            <h2 className="rhb-h2" id="rhb-audience-title">
-              Para quién es — y para quién no
-            </h2>
-            <div className="rhb-audience-grid">
-              <div className="rhb-audience-col yes">
-                <h3>Puede ser para ti si…</h3>
-                <ul>
-                  {FOR_WHOM.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rhb-audience-col no">
-                <h3>Probablemente no es para ti si buscas…</h3>
-                <ul>
-                  {NOT_FOR.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+      <section className="rhb-section brand-ecosystem" id="vivo" aria-labelledby="rhb-live-title">
+        <Container maxWidth="lg">
+          <div className="rhb-live-grid">
+            <div>
+              <Typography component="p" className="brand-section-index">
+                06 / Experiencia en vivo
+              </Typography>
+              <Typography component="h2" id="rhb-live-title" className="brand-section-title">
+                La historia se estudia a tu ritmo. La conversación ocurre en vivo.
+              </Typography>
+              <Typography component="p" className="brand-section-lead">
+                Contenido bajo demanda más encuentros en vivo durante una ventana temporal. Puedes
+                comenzar cuando te inscribes y avanzar a tu ritmo.
+              </Typography>
             </div>
-            <p className="rhb-body">
-              El curso trata Bitcoin como un fenómeno histórico, tecnológico, monetario y humano.
-            </p>
+            <ul className="rhb-live-points">
+              <li>Profundizar acontecimientos y fuentes</li>
+              <li>Examinar interpretaciones en diálogo</li>
+              <li>Conectar ideas entre etapas del recorrido</li>
+              <li>Preguntar y conversar con otros participantes</li>
+              <li>Repeticiones previstas para distintos ritmos de avance</li>
+            </ul>
           </div>
-        </section>
 
-        <section className="rhb-section rhb-section-charcoal" aria-labelledby="rhb-guide-title">
-          <div className="rhb-shell-narrow">
-            <p className="rhb-index">08 / Guía de investigación</p>
-            <h2 className="rhb-h2" id="rhb-guide-title">
-              Quién guía el recorrido
-            </h2>
-            <div className="rhb-guide-panel">
-              <p className="rhb-lead" style={{ marginTop: 0 }}>
-                Relación esperada: guía de investigación → estudiante. No gurú → seguidor.
-              </p>
-              <p className="rhb-body">
-                Biografía definitiva por insertar: quién guía la investigación, relación con Academia
-                Blockchain, experiencia relevante, por qué reconstruir esta historia y con qué
-                metodología.
-              </p>
-              <span className="rhb-placeholder-pill">Biografía del profesor — por definir</span>
-            </div>
+          <div className="rhb-calendar" aria-label="Calendario de encuentros">
+            {MEETINGS.map((meeting) => (
+              <article className="rhb-meeting" key={meeting.id}>
+                <p className="rhb-meeting-label">Encuentro {meeting.id}</p>
+                <h3>{meeting.topic}</h3>
+                <div className="rhb-meeting-dates">
+                  <span>Fecha 1 — por definir</span>
+                  <span>Fecha 2 — por definir</span>
+                </div>
+              </article>
+            ))}
           </div>
-        </section>
 
-        <section className="rhb-section rhb-section-mid" aria-labelledby="rhb-includes-title">
-          <div className="rhb-shell">
-            <p className="rhb-index">09 / Qué incluye</p>
-            <h2 className="rhb-h2" id="rhb-includes-title">
-              Lo que forma parte de la experiencia
-            </h2>
-            <div className="rhb-includes-panel">
-              <ul className="rhb-includes-list">
-                {INCLUDES_CONFIRMED.map((item) => (
+          <div className="rhb-window-note">
+            <strong>Ventana aproximada:</strong> apertura hacia finales de octubre de 2026; encuentros
+            en vivo hasta alrededor de finales de noviembre de 2026. Fechas exactas por definir.
+          </div>
+        </Container>
+      </section>
+
+      <section className="rhb-section brand-statement" aria-labelledby="rhb-audience-title">
+        <Container maxWidth="lg">
+          <Typography component="p" className="brand-section-index">
+            07 / Encaje
+          </Typography>
+          <Typography component="h2" id="rhb-audience-title" className="brand-section-title">
+            Para quién es — y para quién no
+          </Typography>
+          <div className="rhb-audience">
+            <div className="rhb-audience-col yes">
+              <h3>Puede ser para ti si…</h3>
+              <ul>
+                {FOR_WHOM.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
-                {INCLUDES_TBD.map((item) => (
-                  <li className="is-tbd" key={item}>
-                    {item} — por confirmar
-                  </li>
+              </ul>
+            </div>
+            <div className="rhb-audience-col no">
+              <h3>Probablemente no es para ti si buscas…</h3>
+              <ul>
+                {NOT_FOR.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section
-          className="rhb-section rhb-section-dark"
-          id="inscripcion"
-          aria-labelledby="rhb-price-title"
-        >
-          <div className="rhb-shell-narrow">
-            <p className="rhb-index">10 / Inscripción</p>
-            <h2 className="rhb-h2" id="rhb-price-title">
-              Precio y condiciones
-            </h2>
-            <div className="rhb-price-panel">
-              <dl className="rhb-price-rows">
-                <div className="rhb-price-row">
-                  <dt>Precio</dt>
-                  <dd>
-                    <span className="rhb-price-amount">Por definir</span>
-                  </dd>
-                </div>
-                <div className="rhb-price-row">
-                  <dt>Qué incluye</dt>
-                  <dd>Recorrido bajo demanda, fuentes y encuentros en vivo (detalle completo arriba).</dd>
-                </div>
-                <div className="rhb-price-row">
-                  <dt>Duración / acceso</dt>
-                  <dd>
-                    Por definir
-                    <span className="rhb-placeholder-pill">Acceso y condiciones — por definir</span>
-                  </dd>
-                </div>
-                <div className="rhb-price-row">
-                  <dt>Encuentros</dt>
-                  <dd>Ventana aproximada: finales de octubre – finales de noviembre de 2026.</dd>
-                </div>
-                <div className="rhb-price-row">
-                  <dt>Condiciones</dt>
-                  <dd>
-                    Sin precios tachados artificiales ni descuentos falsos. Si hay precio de
-                    lanzamiento, se explicará la condición real.
-                  </dd>
-                </div>
-              </dl>
-              <div className="rhb-inline-cta">
-                <a href="/unirme" className="rhb-btn rhb-btn-primary">
-                  Avisarme cuando abran las inscripciones
-                </a>
-              </div>
-            </div>
+      <section className="rhb-section brand-principle" aria-labelledby="rhb-guide-title">
+        <Container maxWidth="md">
+          <Typography component="p" className="brand-section-index">
+            08 / Guía de investigación
+          </Typography>
+          <Typography component="h2" id="rhb-guide-title" className="brand-section-title">
+            Quién guía el recorrido
+          </Typography>
+          <div className="rhb-panel">
+            <Typography component="p">
+              Relación esperada: guía de investigación → estudiante. No gurú → seguidor.
+            </Typography>
+            <Typography component="p">
+              Biografía definitiva por insertar: quién guía la investigación, relación con Academia
+              Blockchain, experiencia relevante, por qué reconstruir esta historia y con qué
+              metodología.
+            </Typography>
+            <span className="rhb-placeholder">Biografía del profesor — por definir</span>
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section className="rhb-section rhb-section-mid" aria-labelledby="rhb-faq-title">
-          <div className="rhb-shell-narrow">
-            <p className="rhb-index">11 / Preguntas</p>
-            <h2 className="rhb-h2" id="rhb-faq-title">
-              Preguntas frecuentes
-            </h2>
-            <div className="rhb-faq">
-              {FAQS.map((item) => (
-                <details key={item.q}>
-                  <summary>{item.q}</summary>
-                  <p>
-                    {item.a}
-                    {item.tbd ? (
-                      <>
-                        {' '}
-                        <span className="rhb-placeholder-pill">Por definir</span>
-                      </>
-                    ) : null}
-                  </p>
-                </details>
+      <section className="rhb-section brand-ecosystem" aria-labelledby="rhb-includes-title">
+        <Container maxWidth="lg">
+          <Typography component="p" className="brand-section-index">
+            09 / Qué incluye
+          </Typography>
+          <Typography component="h2" id="rhb-includes-title" className="brand-section-title">
+            Lo que forma parte de la experiencia
+          </Typography>
+          <div className="rhb-panel">
+            <ul className="rhb-includes">
+              {INCLUDES_CONFIRMED.map((item) => (
+                <li key={item}>{item}</li>
               ))}
+              {INCLUDES_TBD.map((item) => (
+                <li className="is-tbd" key={item}>
+                  {item} — por confirmar
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Container>
+      </section>
+
+      <section className="rhb-section brand-statement" id="inscripcion" aria-labelledby="rhb-price-title">
+        <Container maxWidth="md">
+          <Typography component="p" className="brand-section-index">
+            10 / Inscripción
+          </Typography>
+          <Typography component="h2" id="rhb-price-title" className="brand-section-title">
+            Precio y condiciones
+          </Typography>
+          <div className="rhb-panel">
+            <dl className="rhb-price-rows">
+              <div className="rhb-price-row">
+                <dt>Precio</dt>
+                <dd>
+                  <span className="rhb-price-amount">Por definir</span>
+                </dd>
+              </div>
+              <div className="rhb-price-row">
+                <dt>Qué incluye</dt>
+                <dd>Recorrido bajo demanda, fuentes y encuentros en vivo.</dd>
+              </div>
+              <div className="rhb-price-row">
+                <dt>Duración / acceso</dt>
+                <dd>
+                  Por definir
+                  <div>
+                    <span className="rhb-placeholder">Acceso y condiciones — por definir</span>
+                  </div>
+                </dd>
+              </div>
+              <div className="rhb-price-row">
+                <dt>Encuentros</dt>
+                <dd>Ventana aproximada: finales de octubre – finales de noviembre de 2026.</dd>
+              </div>
+              <div className="rhb-price-row">
+                <dt>Condiciones</dt>
+                <dd>
+                  Sin precios tachados artificiales ni descuentos falsos. Si hay precio de
+                  lanzamiento, se explicará la condición real.
+                </dd>
+              </div>
+            </dl>
+            <div className="rhb-inline-cta">
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate('/unirme')}
+                className="brand-button brand-button-primary"
+              >
+                Avisarme cuando abran las inscripciones
+              </Button>
             </div>
           </div>
-        </section>
+        </Container>
+      </section>
 
-        <section className="rhb-final" aria-labelledby="rhb-final-title">
-          <div className="rhb-shell-narrow">
+      <section className="rhb-section brand-principle" aria-labelledby="rhb-faq-title">
+        <Container maxWidth="md">
+          <Typography component="p" className="brand-section-index">
+            11 / Preguntas
+          </Typography>
+          <Typography component="h2" id="rhb-faq-title" className="brand-section-title">
+            Preguntas frecuentes
+          </Typography>
+          <div className="rhb-faq">
+            {FAQS.map((item) => (
+              <details key={item.q}>
+                <summary>{item.q}</summary>
+                <p>
+                  {item.a}
+                  {item.tbd ? (
+                    <>
+                      {' '}
+                      <span className="rhb-placeholder">Por definir</span>
+                    </>
+                  ) : null}
+                </p>
+              </details>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      <section className="rhb-final" aria-labelledby="rhb-final-title">
+        <Container maxWidth="lg">
+          <div className="rhb-final-inner">
+            <Typography component="p" className="brand-section-index brand-section-index-light">
+              Comprender es libertad
+            </Typography>
             <h2 id="rhb-final-title">Bitcoin tiene una historia.</h2>
-            <p>
-              Pero comprenderla requiere conectar piezas que normalmente se cuentan por separado.
-            </p>
+            <p>Pero comprenderla requiere conectar piezas que normalmente se cuentan por separado.</p>
             <div className="rhb-final-actions">
-              <a
-                className="rhb-btn rhb-btn-primary"
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
                 href="#recorrido"
                 onClick={(event) => scrollToHash(event, 'recorrido')}
+                className="brand-button brand-button-light"
               >
-                Explorar La guerra por las criptomonedas
-              </a>
-              <a
-                className="rhb-btn rhb-btn-ghost"
+                Explorar el curso
+              </Button>
+              <Button
+                variant="text"
                 href="#inscripcion"
                 onClick={(event) => scrollToHash(event, 'inscripcion')}
+                className="brand-button brand-button-secondary"
               >
                 Comenzar la investigación
-              </a>
+              </Button>
             </div>
             <p className="rhb-tagline">Comprender es libertad.</p>
           </div>
-        </section>
-      </main>
+        </Container>
+      </section>
 
-      <footer className="rhb-shell rhb-footer">
-        <span>Academia Blockchain</span>
-        <RouterLink to="/">Volver al inicio</RouterLink>
+      <footer className="brand-footer">
+        <Container maxWidth="lg">
+          <div className="brand-footer-inner">
+            <Typography component="p">ACADEMIA BLOCKCHAIN</Typography>
+            <Typography component="p" className="brand-footer-mission">
+              Claridad. Curiosidad. Independencia.
+            </Typography>
+            <nav aria-label="Navegación del curso">
+              <Link to="/">Inicio</Link>
+              <a href="#inscripcion" onClick={(event) => scrollToHash(event, 'inscripcion')}>
+                Inscripción
+              </a>
+            </nav>
+          </div>
+        </Container>
       </footer>
-    </div>
+    </Box>
   );
 };
 

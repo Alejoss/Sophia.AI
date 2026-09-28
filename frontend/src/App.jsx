@@ -173,7 +173,6 @@ const AppContent = () => {
           <Routes>
           <Route path="mantenimiento" element={<Maintenance />} />
           <Route path="club-de-lectura" element={<ClubDeLectura />} />
-          <Route path="courses/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
           <Route path="club-de-lectura/:slug" element={<BookClubLayout />}>
             <Route index element={<BookClubOverview />} />
             <Route path="misiones" element={<BookClubMissions />} />
@@ -193,6 +192,7 @@ const AppContent = () => {
             />
             <Route path="como-funciona" element={<Navigate to="/como-funciona/archivo-y-preservacion" replace />} />
             <Route path="como-funciona/:slug" element={<HowItWorksGuide />} />
+            <Route path="courses/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
