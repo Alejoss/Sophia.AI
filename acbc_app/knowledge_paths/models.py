@@ -327,3 +327,120 @@ class PublishedKnowledgePathSnapshot(models.Model):
         import json
         return json.loads(self.document_text)
 
+
+class KnowledgePathSnapshotAnchor(models.Model):
+    """Bitcoin OP_RETURN proof for a published knowledge-path snapshot digest.
+
+    The hashed curriculum document stays on ``PublishedKnowledgePathSnapshot``;
+    this row tracks out-of-band chain state (never written into the JCS).
+    Payload: ASCII prefix ``ACBC2`` + 32-byte SHA-256 of the snapshot digest.
+    Reuses the same broadcast helpers as ``TranscriptAnchor`` (prefix ``ACBC1``).
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_BTC_BROADCAST = 'btc_broadcast'
+    STATUS_ANCHORED = 'anchored'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_BTC_BROADCAST, 'Bitcoin broadcast'),
+        (STATUS_ANCHORED, 'Anchored on Bitcoin'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    BTC_NETWORK_MAINNET = 'mainnet'
+    BTC_NETWORK_TESTNET = 'testnet'
+    BTC_NETWORK_SIGNET = 'signet'
+    BTC_NETWORK_REGTEST = 'regtest'
+    BTC_NETWORK_CHOICES = [
+        (BTC_NETWORK_MAINNET, 'Bitcoin mainnet'),
+        (BTC_NETWORK_TESTNET, 'Bitcoin testnet'),
+        (BTC_NETWORK_SIGNET, 'Bitcoin signet'),
+        (BTC_NETWORK_REGTEST, 'Bitcoin regtest'),
+    ]
+
+    DEFAULT_OP_RETURN_PREFIX = 'ACBC2'
+
+    snapshot = models.OneToOneField(
+        PublishedKnowledgePathSnapshot,
+        on_delete=models.CASCADE,
+        related_name='bitcoin_anchor',
+    )
+    digest = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest copied from the published snapshot at anchor time.',
+    )
+    op_return_prefix = models.CharField(
+        max_length=16,
+        default=DEFAULT_OP_RETURN_PREFIX,
+        help_text='ASCII prefix prepended to digest bytes in the Bitcoin OP_RETURN.',
+    )
+    btc_network = models.CharField(
+        max_length=16,
+        choices=BTC_NETWORK_CHOICES,
+        default=BTC_NETWORK_SIGNET,
+    )
+    btc_txid = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Bitcoin transaction id (64 hex chars) once broadcast.',
+    )
+    btc_op_return_hex = models.CharField(
+        max_length=256,
+        blank=True,
+        help_text='Hex payload pushed in OP_RETURN (prefix ASCII bytes + 32-byte digest).',
+    )
+    btc_block_height = models.PositiveIntegerField(blank=True, null=True)
+    btc_block_hash = models.CharField(max_length=64, blank=True)
+    btc_confirmations = models.PositiveIntegerField(default=0)
+    btc_confirmed_at = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    error_message = models.TextField(blank=True)
+    anchored_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='knowledge_path_snapshot_anchors',
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Flexible extras (explorer URLs, raw receipts, etc.).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['digest'], name='kp_snap_anchor_digest_idx'),
+            models.Index(fields=['btc_txid'], name='kp_snap_anchor_btc_idx'),
+            models.Index(fields=['status', 'created_at'], name='kp_snap_anchor_status_idx'),
+        ]
+
+    def __str__(self):
+        short = (self.digest or '')[:12]
+        return (
+            f'KPSnapshotAnchor path={self.snapshot.knowledge_path_id} '
+            f'v{self.snapshot.version} {short}… [{self.status}]'
+        )
+
+    @property
+    def is_btc_confirmed(self):
+        return self.status == self.STATUS_ANCHORED and bool(self.btc_txid)
+
+    def build_op_return_payload_hex(self):
+        """prefix (ASCII) + raw 32-byte digest → hex string for OP_RETURN data."""
+        if not self.digest or len(self.digest) != 64:
+            raise ValueError('digest must be a 64-char SHA-256 hex digest')
+        prefix = (self.op_return_prefix or self.DEFAULT_OP_RETURN_PREFIX).encode('ascii')
+        digest = bytes.fromhex(self.digest)
+        return (prefix + digest).hex()
+

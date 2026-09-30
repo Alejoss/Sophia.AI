@@ -91,6 +91,7 @@ from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
     ContentTranscriptPublicView,
+    ContentTranscriptTextHashView,
 )
 from .views_transcript_anchor import (
     ContentTranscriptAnchorCertifiedTextView,
@@ -276,6 +277,11 @@ urlpatterns = [
         'transcript-ingest/<int:content_id>/',
         ContentTranscriptIngestDetailView.as_view(),
         name='transcript-ingest-detail',
+    ),
+    path(
+        'transcript-ingest/<int:content_id>/text-hash/',
+        ContentTranscriptTextHashView.as_view(),
+        name='transcript-ingest-text-hash',
     ),
     path(
         'embedding-ingest/',

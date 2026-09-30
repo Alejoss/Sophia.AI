@@ -45,6 +45,7 @@ Base path: `/api/content/transcript-ingest/`
 | `GET` | `/api/content/transcript-ingest/` | Queue / topic manifest |
 | `GET` | `/api/content/transcript-ingest/{content_id}/` | One item + transcript status |
 | `PUT` | `/api/content/transcript-ingest/{content_id}/` | Create or replace transcript (idempotent) |
+| `PUT` | `/api/content/transcript-ingest/{content_id}/text-hash/` | Persist externally computed `text_hash` (Vincent) |
 
 Only `media_type` **VIDEO**, **AUDIO**, and **TEXT** are accepted. IMAGE returns **400** on detail/PUT.
 
@@ -206,6 +207,69 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/202/" \
 
 Invalid optional subtitles → **400**. Missing all three text artifacts → **400**.
 
+---
+
+## `PUT /api/content/transcript-ingest/{content_id}/text-hash/`
+
+Persist a SHA-256 that Vincent computed **locally** over the original UTF-8
+transcript. Use this when production Postgres is still `SQL_ASCII`: Sophia’s
+normal `ContentTranscript.save()` may strip accents before hashing, so the
+on-save digest would not match the real Spanish text.
+
+**Prerequisite:** the content already has a `ContentTranscript` (from the
+artifact `PUT` above).
+
+### Body
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `text_hash` | yes | 64-char hex SHA-256 (case-insensitive). Same algorithm as Sophia: NFC + collapse whitespace → UTF-8 → SHA-256. |
+| `plain_text` | recommended | Exact text that was hashed. **Required** when the stored copy no longer matches (SQL_ASCII degrade). When omitted, Sophia verifies against stored `processed_plain` / `parsed_plain` / Obsidian body. |
+
+### Example
+
+```bash
+curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/text-hash/" \
+  -H "Content-Type: application/json" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY" \
+  -d '{
+    "text_hash": "a1b2c3d4e5f6…64 hex chars…",
+    "plain_text": "Texto con acentos: qué, también, español."
+  }'
+```
+
+### Behaviour
+
+1. Transcript must exist → else **404**.
+2. If `plain_text` is sent: `compute_text_hash(plain_text)` must equal `text_hash` → else **400**.
+3. If `plain_text` is omitted: recompute from stored artifacts must equal `text_hash` → else **409** (`hash_mismatch_stored_text`; re-send with `plain_text`).
+4. On success: sets `text_hash`, `text_length`, `text_hash_locked=true`, and
+   `hash_plain_text` to the normalized UTF-8 string. Public transcript `text`
+   prefers `hash_plain_text` so users can reconstruct the digest.
+5. A later artifact `PUT` clears the lock and recomputes from stored fields.
+
+### Response
+
+```json
+{
+  "content_id": 101,
+  "text_hash": "a1b2…",
+  "text_length": 42,
+  "text_hash_locked": true,
+  "has_hash_plain_text": true,
+  "transcript": { "...": "ContentTranscriptIngestSummarySerializer" }
+}
+```
+
+### Does Sophia hash on its own? Accents?
+
+Yes — every `ContentTranscript.save()` runs `compute_text_hash` unless
+`text_hash_locked` is set. On a **UTF8** database, Spanish accents are kept and
+the digest matches Vincent. On **SQL_ASCII**, `prepare_text_for_db` strips
+non-ASCII before that hash, so accents are **not** respected in the stored
+artifacts or the on-save digest — use this endpoint with `plain_text` instead
+(and prefer migrating with `./scripts/migrate-db-to-utf8.sh`).
+
 ### Embedding status (Postgres only)
 
 Each transcript tracks whether its current `text_hash` still needs vector indexing.
@@ -249,7 +313,10 @@ consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md)
    - Else if YouTube URL without captions: `yt-dlp` audio → Whisper.
    - Else mark failed / needs manual.
 4. `PUT` artifacts (include `source_subtitles` when you have SRT/VTT so the server stores timed segments; use `format=PLAIN` for PDF/TEXT).
-5. Optionally reconcile:
+5. If hashing locally (SQL_ASCII workaround): `PUT .../text-hash/` with
+   `text_hash` + `plain_text` (original UTF-8) so Sophia locks the worker digest
+   and shows `hash_plain_text` for verification.
+6. Optionally reconcile:
 
    ```bash
    curl -s "http://localhost:8000/api/content/transcript-ingest/?topic_id=12&include_completed=true" \
@@ -258,7 +325,7 @@ consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-download from S3.
 
-6. **After transcripts exist**, run the embed worker against
+7. **After transcripts exist**, run the embed worker against
    [embedding-ingest](../operations/qdrant-embeddings.md) so Qdrant receives
    chunk vectors and Django marks `embedding_status=indexed`. Topic consultations
    require at least one indexed transcript per topic.
@@ -270,8 +337,10 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 | Status | When |
 |--------|------|
 | **403** | Missing/wrong API key, or `TRANSCRIPT_INGEST_API_KEY` unset |
-| **404** | Unknown `topic_id` on queue, or unknown `content_id` on detail/PUT |
-| **400** | Bad query params; non VIDEO/AUDIO/TEXT content; empty PUT body; invalid SRT/VTT |
+| **404** | Unknown `topic_id` on queue, or unknown `content_id` on detail/PUT/text-hash |
+| **400** | Bad query params; non VIDEO/AUDIO/TEXT content; empty PUT body; invalid SRT/VTT; `text_hash` ≠ hash(`plain_text`) |
+| **409** | `text-hash` PUT without `plain_text` and stored artifacts do not match (`hash_mismatch_stored_text`) |
+| **503** | PostgreSQL `SQL_ASCII` blocked persisting Unicode `hash_plain_text` |
 
 ---
 

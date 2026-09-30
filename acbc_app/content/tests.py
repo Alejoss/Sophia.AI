@@ -5233,6 +5233,175 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_text_hash_put_requires_existing_transcript(self):
+        from content.transcript_utils import compute_text_hash
+
+        plain = 'Texto con acentos: qué, también.'
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(plain),
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_text_hash_put_locks_external_hash_with_plain_text(self):
+        import hashlib
+
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Que tambien (ascii degradado en DB).',
+            language='es',
+        )
+        plain = 'Qué también: filosofía cypherpunk en español.'
+        expected = compute_text_hash(plain)
+
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': expected,
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['text_hash_locked'])
+        self.assertEqual(response.data['text_hash'], expected)
+        self.assertTrue(response.data['has_hash_plain_text'])
+
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertTrue(transcript.text_hash_locked)
+        self.assertEqual(transcript.text_hash, expected)
+        self.assertEqual(
+            transcript.hash_plain_text,
+            'Qué también: filosofía cypherpunk en español.',
+        )
+
+        # Public text must be the exact hashed string (accents preserved).
+        public = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(public.status_code, status.HTTP_200_OK)
+        self.assertEqual(public.data['text'], transcript.hash_plain_text)
+        self.assertEqual(
+            hashlib.sha256(public.data['text'].encode('utf-8')).hexdigest(),
+            expected,
+        )
+
+        # Later save must not overwrite the locked external hash.
+        transcript.language = 'es'
+        transcript.save()
+        transcript.refresh_from_db()
+        self.assertEqual(transcript.text_hash, expected)
+        self.assertTrue(transcript.text_hash_locked)
+
+    def test_text_hash_put_rejects_mismatched_plain_text(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash('otro texto'),
+                'plain_text': 'Texto que no corresponde al hash.',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_text_hash_put_verifies_against_stored_when_plain_omitted(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        expected = compute_text_hash(self.PROCESSED_PLAIN)
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {'text_hash': expected},
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['text_hash_locked'])
+        self.assertEqual(response.data['text_hash'], expected)
+
+    def test_text_hash_put_conflict_when_stored_mismatches_without_plain(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Texto ascii en DB.',
+            language='es',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(
+                    'Qué también: filosofía cypherpunk en español.'
+                ),
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data.get('code'), 'hash_mismatch_stored_text')
+
+    def test_artifact_put_clears_external_hash_lock(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        plain = 'Qué también: filosofía.'
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=plain,
+            language='es',
+        )
+        lock_response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(plain),
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(lock_response.status_code, status.HTTP_200_OK)
+
+        replace = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'processed_plain': self.PROCESSED_PLAIN,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(replace.status_code, status.HTTP_200_OK)
+        self.assertFalse(replace.data['transcript']['text_hash_locked'])
+        self.assertFalse(replace.data['transcript']['has_hash_plain_text'])
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertFalse(transcript.text_hash_locked)
+        self.assertEqual(transcript.hash_plain_text, '')
+        self.assertEqual(transcript.text_hash, compute_text_hash(self.PROCESSED_PLAIN))
+
 
 class ContentTranscriptPublicAPITests(APITestCase):
     def setUp(self):

@@ -186,10 +186,24 @@ Snapshots are **not** created when an author creates, edits, or toggles visibili
 on a knowledge path. A staff admin publishes from the dashboard when the path is
 ready:
 
-- UI: `/dashboard/snapshots` → **Tomar snapshot**
+- UI: `/dashboard/snapshots` → **Tomar snapshot** / **Preview** / **Ver** → **Descargar JCS + digest**
+  / **Anclar en Bitcoin**
+- UI: knowledge-path edit **Snapshot** tab → **Tomar snapshot** (staff) and **Descargar preview JCS**
+  (`?from=dashboard` returns to `/dashboard/snapshots` via Volver)
 - `POST /api/knowledge_paths/<id>/snapshots/` (staff only)
 - `GET /api/knowledge_paths/<id>/snapshots/` and `.../snapshots/<version>/`
+- `GET|POST /api/knowledge_paths/<id>/snapshots/<version>/anchor/` (staff; Bitcoin OP_RETURN)
 - `GET /api/knowledge_paths/admin/snapshots/` (dashboard listing)
+- Ops: `python manage.py broadcast_knowledge_path_snapshot <path_id> --create`
+
+Offline hash check: download the exact JCS bytes (`.jcs.json`) and run
+`sha256sum <file>` (or equivalent). The hex digest must match the stored
+`digest` / sidecar `.sha256`.
+
+Bitcoin: the digest is written out-of-band in OP_RETURN as ASCII `ACBC2` +
+32-byte digest (transcript anchors use `ACBC1`). Chain state lives on
+`KnowledgePathSnapshotAnchor`, never inside the hashed JCS document. Same
+`BTC_*` wallet/Esplora settings as transcript anchors.
 
 Postgres model `PublishedKnowledgePathSnapshot` stores:
 

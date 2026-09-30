@@ -208,7 +208,15 @@ def resolve_certified_plain_text(transcript):
     Applies the same NFC + whitespace normalization used by ``compute_text_hash``.
     Prefer this for public display / copy / verification so
     ``sha256(utf8(text)) == text_hash`` without client-side re-normalization.
+
+    When ``text_hash_locked`` and ``hash_plain_text`` are set (external Vincent
+    ingest), return that snapshot as-is — it is already normalized and may keep
+    Spanish accents that SQL_ASCII ``prepare_text_for_db`` stripped elsewhere.
     """
+    if getattr(transcript, 'text_hash_locked', False):
+        locked_plain = (getattr(transcript, 'hash_plain_text', None) or '').strip()
+        if locked_plain:
+            return locked_plain
     return normalize_plain_text_for_hash(resolve_hash_source_text(transcript))
 
 
@@ -328,8 +336,21 @@ def sync_transcript_derived_fields(transcript):
         language_code = transcript.obsidian_frontmatter.get('language_code', '')
         transcript.language = normalize_language_code(language_code)
 
-    hash_source = resolve_hash_source_text(transcript)
-    normalized = normalize_plain_text_for_hash(hash_source)
-    transcript.text_length = len(normalized) if normalized else None
-    transcript.text_hash = compute_text_hash(hash_source)
+    if (
+        getattr(transcript, 'text_hash_locked', False)
+        and (getattr(transcript, 'text_hash', None) or '').strip()
+    ):
+        locked_plain = (getattr(transcript, 'hash_plain_text', None) or '').strip()
+        if locked_plain:
+            transcript.text_length = len(locked_plain)
+        else:
+            normalized = normalize_plain_text_for_hash(resolve_hash_source_text(transcript))
+            transcript.text_length = len(normalized) if normalized else None
+        # Keep worker-supplied text_hash; do not recompute from (possibly
+        # SQL_ASCII-degraded) stored artifacts.
+    else:
+        hash_source = resolve_hash_source_text(transcript)
+        normalized = normalize_plain_text_for_hash(hash_source)
+        transcript.text_length = len(normalized) if normalized else None
+        transcript.text_hash = compute_text_hash(hash_source)
     sync_embedding_status_for_text_hash(transcript)

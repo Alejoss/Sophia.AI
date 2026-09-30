@@ -106,7 +106,7 @@ class SnapshotPreviewBuilderTests(TestCase):
         self.assertEqual(payload["nodes"][0]["nodeTitle"], "What is Bitcoin?")
         self.assertFalse(payload["nodes"][0]["hasCertifiedText"])
         self.assertEqual(payload["summary"]["nodesWithCertifiedText"], 0)
-        self.assertEqual(payload["blockchain"]["status"], "not_implemented")
+        self.assertEqual(payload["blockchain"]["status"], "none")
         self.assertEqual(payload["published"]["count"], 0)
         missing = [
             issue for issue in payload["issues"]
