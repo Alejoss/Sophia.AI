@@ -1,10 +1,12 @@
 import {
   createAnchorRequestPayment,
   createPathPurchasePayment,
+  createCoursePurchasePayment,
   createRegistrationPayment,
   createTokenPurchasePayment,
   listAnchorRequestPayments,
   listPathPurchasePayments,
+  listCoursePurchasePayments,
   listRegistrationPayments,
   listTokenPurchasePayments,
 } from '../api/paymentsApi';
@@ -31,6 +33,10 @@ const NOWPAYMENTS_API_BY_KIND = {
   [PRODUCT_KINDS.EVENT]: {
     list: listRegistrationPayments,
     create: createRegistrationPayment,
+  },
+  [PRODUCT_KINDS.COURSE]: {
+    list: listCoursePurchasePayments,
+    create: createCoursePurchasePayment,
   },
 };
 

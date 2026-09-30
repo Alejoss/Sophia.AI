@@ -16,6 +16,7 @@ export const PRODUCT_KINDS = Object.freeze({
   EVENT: 'event',
   ANCHOR: 'anchor',
   TOKEN_PACKAGE: 'token_package',
+  COURSE: 'course',
 });
 
 /** Kinds that can create NOWPayments invoices (no topic). */
@@ -24,6 +25,7 @@ export const NOWPAYMENTS_KINDS = Object.freeze([
   PRODUCT_KINDS.EVENT,
   PRODUCT_KINDS.ANCHOR,
   PRODUCT_KINDS.TOKEN_PACKAGE,
+  PRODUCT_KINDS.COURSE,
 ]);
 
 export const PRODUCT_CATALOG = Object.freeze({
@@ -88,6 +90,18 @@ export const PRODUCT_CATALOG = Object.freeze({
       bch: 'gateway',
       monero: true,
       platform_tokens: 'gateway_tokens',
+    }),
+  }),
+  [PRODUCT_KINDS.COURSE]: Object.freeze({
+    kind: PRODUCT_KINDS.COURSE,
+    productLabel: 'curso',
+    chooserTitle: 'Pagar el curso',
+    paidSuccessMessage: '¡Pago recibido! Tu lugar en el curso está confirmado.',
+    methods: Object.freeze({
+      nowpayments: 'gateway',
+      bch: false,
+      monero: true,
+      platform_tokens: false,
     }),
   }),
   [PRODUCT_KINDS.TOKEN_PACKAGE]: Object.freeze({
@@ -219,6 +233,7 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
     '¡Pago completado! Publicando el hash SHA-256 en Bitcoin. '
     + 'La confirmación en la red suele tardar unos 10 minutos o más.',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: '¡Pago completado! Los tokens ya están en tu perfil.',
+  [PRODUCT_KINDS.COURSE]: '¡Pago completado! Tu lugar en el curso está confirmado.',
 });
 
 export const NOWPAYMENTS_HEADER_TITLES = Object.freeze({

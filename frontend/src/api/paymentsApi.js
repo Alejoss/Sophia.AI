@@ -1,8 +1,12 @@
 import axiosInstance from './axiosConfig.js';
 
 const throwApiError = (error, fallbackMessage) => {
-  if (error.response?.data) {
-    throw error.response.data;
+  const data = error.response?.data;
+  if (data && typeof data === 'object') {
+    throw { ...data, status: error.response.status };
+  }
+  if (data) {
+    throw { error: String(data), status: error.response.status };
   }
   throw new Error(fallbackMessage);
 };
@@ -13,6 +17,44 @@ export const getPaymentGatewayStatus = async () => {
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo obtener el estado de la pasarela');
+  }
+};
+
+export const getCourse = async (courseCode) => {
+  try {
+    const response = await axiosInstance.get(`/payments/courses/${courseCode}/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el curso');
+  }
+};
+
+export const createOrGetCoursePurchase = async (courseCode) => {
+  try {
+    const response = await axiosInstance.post('/payments/course-purchases/', {
+      course_code: courseCode,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar la compra del curso');
+  }
+};
+
+export const createCoursePurchasePayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago del curso. Inténtalo de nuevo');
+  }
+};
+
+export const listCoursePurchasePayments = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/course-purchase/${purchaseId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo listar los pagos del curso');
   }
 };
 
