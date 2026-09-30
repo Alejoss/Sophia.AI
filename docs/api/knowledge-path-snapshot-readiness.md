@@ -32,7 +32,7 @@ curl -s "https://academiablockchain.com/api/knowledge_paths/10/snapshot-readines
 | `issues` | Gap list (`NO_TRANSCRIPT_TEXT`, …) with `nodeTitle` + `nodeId` |
 | `nodes[]` | Per-node title, content id, `hasCertifiedText`, `textSha256`, `issueCode` |
 | `published.latest` | Latest admin-persisted snapshot (`version`, `digest`, …) or `null` |
-| `blockchain` | Stub until KP digest OP_RETURN is wired (`status: not_implemented`) |
+| `blockchain` | Bitcoin status for the latest published snapshot (`none` / `pending` / `btc_broadcast` / `anchored` / `failed`) |
 
 Omits the full snapshot `document` / `canonical` bytes. For those, use
 `GET /api/knowledge_paths/{id}/snapshot-preview/`.

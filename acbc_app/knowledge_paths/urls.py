@@ -11,6 +11,7 @@ from .views import (
     KnowledgePathSnapshotReadinessView,
     KnowledgePathSnapshotListCreateView,
     KnowledgePathSnapshotDetailView,
+    KnowledgePathSnapshotAnchorView,
     AdminKnowledgePathSnapshotDashboardView,
     NodeCreateView,
     NodeDeleteView,
@@ -56,6 +57,11 @@ urlpatterns = [
         '<int:pk>/snapshots/<int:version>/',
         KnowledgePathSnapshotDetailView.as_view(),
         name='knowledge-path-snapshot-detail',
+    ),
+    path(
+        '<int:pk>/snapshots/<int:version>/anchor/',
+        KnowledgePathSnapshotAnchorView.as_view(),
+        name='knowledge-path-snapshot-anchor',
     ),
     path('<int:path_id>/nodes/reorder/', NodeReorderView.as_view(), name='node-reorder'),
 ] 

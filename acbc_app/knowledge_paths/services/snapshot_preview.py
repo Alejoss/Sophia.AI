@@ -337,13 +337,11 @@ def knowledge_path_snapshot_readiness(knowledge_path: KnowledgePath) -> dict[str
             "count": published_count,
             "latest": latest_payload,
         },
-        "blockchain": {
-            "status": "not_implemented",
-            "network": None,
-            "txid": None,
-            "message": (
-                "Knowledge-path snapshot Bitcoin broadcast is not wired yet. "
-                "Admin can persist snapshots in Postgres; on-chain anchoring is next."
-            ),
-        },
+        "blockchain": _blockchain_for_latest(latest),
     }
+
+
+def _blockchain_for_latest(latest) -> dict:
+    from knowledge_paths.services.snapshot_anchor import blockchain_payload_for_snapshot
+
+    return blockchain_payload_for_snapshot(latest)
