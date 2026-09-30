@@ -45,9 +45,13 @@ import DataObjectIcon from "@mui/icons-material/DataObject";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import DownloadIcon from "@mui/icons-material/Download";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
 import ImageUploadModal from "../components/ImageUploadModal";
+import { useAuth } from "../context/AuthContext";
+import { downloadSnapshotForHashVerification } from "./snapshotDownload";
 
 const TRANSCRIPT_ISSUE_LABELS = {
   NO_CONTENT: "Sin contenido vinculado",
@@ -109,6 +113,15 @@ const KnowledgePathEdit = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { authState } = useAuth();
+  const isStaff = Boolean(authState.user?.is_staff || authState.user?.is_superuser);
+  const fromDashboard = (searchParams.get("from") || "").toLowerCase() === "dashboard";
+  const backTarget = fromDashboard
+    ? "/dashboard/snapshots"
+    : `/knowledge_path/${pathId}`;
+  const backLabel = fromDashboard
+    ? "Volver al panel de snapshots"
+    : "Volver";
 
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [nodes, setNodes] = useState([]);
@@ -153,6 +166,9 @@ const KnowledgePathEdit = () => {
   const [snapshotPreview, setSnapshotPreview] = useState(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState(null);
+  const [snapshotPublishing, setSnapshotPublishing] = useState(false);
+  const [snapshotPublishSuccess, setSnapshotPublishSuccess] = useState(null);
+  const [publishedSnapshot, setPublishedSnapshot] = useState(null);
   const snapshotNodeRows = useMemo(
     () => buildSnapshotNodeRows(snapshotPreview),
     [snapshotPreview],
@@ -276,6 +292,63 @@ const KnowledgePathEdit = () => {
       setSnapshotPreview(null);
     } finally {
       setSnapshotLoading(false);
+    }
+  };
+
+  const handleDownloadPreviewCanonical = () => {
+    if (!snapshotPreview?.canonical) {
+      setSnapshotError("No hay bytes canónicos JCS en la vista previa.");
+      return;
+    }
+    try {
+      downloadSnapshotForHashVerification({
+        canonical: snapshotPreview.canonical,
+        digest: snapshotPreview.digest,
+        knowledgePathId: snapshotPreview.knowledgePathId,
+        knowledgePathDbId: pathId,
+        label: "preview",
+      });
+    } catch (err) {
+      setSnapshotError(err?.message || "No se pudo descargar la vista previa");
+    }
+  };
+
+  const handleDownloadPublishedSnapshot = () => {
+    if (!publishedSnapshot?.canonical) {
+      setSnapshotError("No hay snapshot publicado para descargar.");
+      return;
+    }
+    try {
+      downloadSnapshotForHashVerification({
+        canonical: publishedSnapshot.canonical,
+        digest: publishedSnapshot.digest,
+        knowledgePathId: publishedSnapshot.knowledgePathId,
+        knowledgePathDbId: publishedSnapshot.knowledgePathDbId || pathId,
+        version: publishedSnapshot.version,
+      });
+    } catch (err) {
+      setSnapshotError(err?.message || "No se pudo descargar el snapshot");
+    }
+  };
+
+  const handleTakeSnapshot = async () => {
+    if (!isStaff) return;
+    try {
+      setSnapshotPublishing(true);
+      setSnapshotError(null);
+      setSnapshotPublishSuccess(null);
+      const created = await knowledgePathsApi.publishPathSnapshot(pathId);
+      setPublishedSnapshot(created);
+      setSnapshotPublishSuccess(
+        `Snapshot v${created.version} guardado. Digest: ${String(created.digest || "").slice(0, 16)}…`,
+      );
+      await loadSnapshotPreview();
+    } catch (err) {
+      setSnapshotError(
+        err.response?.data?.error || err.message || "No se pudo tomar el snapshot",
+      );
+    } finally {
+      setSnapshotPublishing(false);
     }
   };
 
@@ -585,12 +658,12 @@ const KnowledgePathEdit = () => {
       <Box sx={{ mb: 2 }}>
         <Button
           component={Link}
-          to={`/knowledge_path/${pathId}`}
+          to={backTarget}
           variant="outlined"
           startIcon={<ArrowBackIcon />}
           sx={{ textTransform: "none", borderRadius: 2 }}
         >
-          Volver
+          {backLabel}
         </Button>
       </Box>
 
@@ -1086,16 +1159,60 @@ const KnowledgePathEdit = () => {
                   desde el camino editable (aún no es una versión publicada en IPFS).
                 </Typography>
               </Box>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={loadSnapshotPreview}
-                disabled={snapshotLoading}
-                sx={{ textTransform: "none", borderRadius: 2 }}
-              >
-                Actualizar
-              </Button>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={loadSnapshotPreview}
+                  disabled={snapshotLoading || snapshotPublishing}
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Actualizar
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadPreviewCanonical}
+                  disabled={
+                    snapshotLoading ||
+                    snapshotPublishing ||
+                    !snapshotPreview?.canonical
+                  }
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Descargar preview JCS
+                </Button>
+                {isStaff && (
+                  <Button
+                    variant="contained"
+                    startIcon={<CameraAltIcon />}
+                    onClick={handleTakeSnapshot}
+                    disabled={
+                      snapshotLoading ||
+                      snapshotPublishing ||
+                      !snapshotPreview?.readyForStrictPublish
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    {snapshotPublishing ? "Guardando…" : "Tomar snapshot"}
+                  </Button>
+                )}
+              </Stack>
             </Stack>
+
+            {!isStaff && (
+              <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+                Solo el staff puede persistir un snapshot. Puedes revisar la vista previa
+                y descargar el JCS canónico para verificar el digest.
+              </Alert>
+            )}
+
+            {fromDashboard && (
+              <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+                Viniste desde el panel de snapshots. Usa “Volver al panel de snapshots”
+                para no perder ese enlace.
+              </Alert>
+            )}
 
             {snapshotLoading && (
               <Stack alignItems="center" sx={{ py: 4 }}>
@@ -1104,8 +1221,35 @@ const KnowledgePathEdit = () => {
             )}
 
             {snapshotError && (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>
+              <Alert
+                severity="error"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setSnapshotError(null)}
+              >
                 {snapshotError}
+              </Alert>
+            )}
+
+            {snapshotPublishSuccess && (
+              <Alert
+                severity="success"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setSnapshotPublishSuccess(null)}
+                action={
+                  publishedSnapshot?.canonical ? (
+                    <Button
+                      color="inherit"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      onClick={handleDownloadPublishedSnapshot}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Descargar
+                    </Button>
+                  ) : null
+                }
+              >
+                {snapshotPublishSuccess}
               </Alert>
             )}
 
@@ -1217,15 +1361,32 @@ const KnowledgePathEdit = () => {
 
                 {snapshotPreview.digest && (
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Digest SHA-256
-                    </Typography>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                      justifyContent="space-between"
+                      sx={{ mb: 0.5 }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Digest SHA-256 (preview)
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadPreviewCanonical}
+                        disabled={!snapshotPreview.canonical}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Descargar JCS para verificar
+                      </Button>
+                    </Stack>
                     <Typography
                       component="code"
                       variant="body2"
                       sx={{
                         display: "block",
-                        mt: 0.5,
                         p: 1.5,
                         borderRadius: 1,
                         bgcolor: "action.hover",
@@ -1234,6 +1395,10 @@ const KnowledgePathEdit = () => {
                       }}
                     >
                       {snapshotPreview.digest}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                      El digest del snapshot publicado puede diferir si cambia <code>publishedAt</code>.
+                      Para verificar un snapshot guardado, descárgalo desde el panel o tras “Tomar snapshot”.
                     </Typography>
                   </Box>
                 )}
