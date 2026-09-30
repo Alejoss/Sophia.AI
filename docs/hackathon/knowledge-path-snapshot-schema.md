@@ -186,10 +186,16 @@ Snapshots are **not** created when an author creates, edits, or toggles visibili
 on a knowledge path. A staff admin publishes from the dashboard when the path is
 ready:
 
-- UI: `/dashboard/snapshots` → **Tomar snapshot**
+- UI: `/dashboard/snapshots` → **Tomar snapshot** / **Preview** / **Ver** → **Descargar JCS + digest**
+- UI: knowledge-path edit **Snapshot** tab → **Tomar snapshot** (staff) and **Descargar preview JCS**
+  (`?from=dashboard` returns to `/dashboard/snapshots` via Volver)
 - `POST /api/knowledge_paths/<id>/snapshots/` (staff only)
 - `GET /api/knowledge_paths/<id>/snapshots/` and `.../snapshots/<version>/`
 - `GET /api/knowledge_paths/admin/snapshots/` (dashboard listing)
+
+Offline hash check: download the exact JCS bytes (`.jcs.json`) and run
+`sha256sum <file>` (or equivalent). The hex digest must match the stored
+`digest` / sidecar `.sha256`.
 
 Postgres model `PublishedKnowledgePathSnapshot` stores:
 

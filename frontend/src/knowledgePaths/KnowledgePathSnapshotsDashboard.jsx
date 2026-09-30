@@ -19,7 +19,9 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import { downloadSnapshotForHashVerification } from './snapshotDownload';
 
 const formatError = (err, fallback) => {
   const data = err?.response?.data;
@@ -81,6 +83,21 @@ const KnowledgePathSnapshotsDashboard = () => {
       setError(formatError(err, 'No se pudo cargar el snapshot'));
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleDownloadDetail = () => {
+    if (!detail) return;
+    try {
+      downloadSnapshotForHashVerification({
+        canonical: detail.canonical,
+        digest: detail.digest,
+        knowledgePathId: detail.knowledgePathId,
+        knowledgePathDbId: detail.knowledgePathDbId,
+        version: detail.version,
+      });
+    } catch (err) {
+      setError(err?.message || 'No se pudo descargar el snapshot');
     }
   };
 
@@ -206,7 +223,7 @@ const KnowledgePathSnapshotsDashboard = () => {
                       <Button
                         size="small"
                         component={RouterLink}
-                        to={`/knowledge_path/${path.id}/edit?tab=snapshot`}
+                        to={`/knowledge_path/${path.id}/edit?tab=snapshot&from=dashboard`}
                         sx={{ textTransform: 'none' }}
                       >
                         Preview
@@ -249,6 +266,11 @@ const KnowledgePathSnapshotsDashboard = () => {
                 Publicado {detail.publishedAt}
                 {detail.publishedBy?.username ? ` por ${detail.publishedBy.username}` : ''}
               </Typography>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Descarga el JCS canónico (y el sidecar <code>.sha256</code>) para reconstruir
+                el digest: <code>sha256sum archivo.jcs.json</code> debe coincidir con el
+                digest mostrado arriba.
+              </Alert>
               <Box
                 component="pre"
                 sx={{
@@ -268,7 +290,16 @@ const KnowledgePathSnapshotsDashboard = () => {
             </Stack>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadDetail}
+            disabled={!detail?.canonical}
+            sx={{ textTransform: 'none' }}
+          >
+            Descargar JCS + digest
+          </Button>
           <Button onClick={() => setDetail(null)} sx={{ textTransform: 'none' }}>
             Cerrar
           </Button>
