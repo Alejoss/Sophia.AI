@@ -208,16 +208,29 @@ def preview_knowledge_path_snapshot(
         except KnowledgePathSnapshotError:
             ready_for_strict_publish = False
 
+    issues_by_node: dict[str, str] = {}
+    for issue in issues:
+        node_id = issue.get("nodeId") or ""
+        if node_id and node_id not in issues_by_node:
+            issues_by_node[node_id] = issue.get("code") or ""
+
     material_digests = []
     for node in document.get("nodes", []):
         for material in node.get("materials", []):
             text = material.get("text") or ""
+            node_id = node.get("nodeId") or ""
+            complete = material_is_complete(material)
             material_digests.append({
-                "nodeId": node.get("nodeId"),
+                "nodeId": node_id,
                 "nodeTitle": node.get("title") or "",
-                "contentId": material.get("contentId"),
-                "complete": material_is_complete(material),
+                "position": node.get("position"),
+                "mediaType": node.get("mediaType") or "",
+                "contentId": material.get("contentId") or "",
+                "materialType": material.get("type") or "",
+                "hasCertifiedText": complete,
+                "complete": complete,
                 "textSha256": transcript_text_sha256(text) if text else "",
+                "issueCode": "" if complete else (issues_by_node.get(node_id) or ""),
             })
 
     return {
@@ -275,6 +288,7 @@ def knowledge_path_snapshot_readiness(knowledge_path: KnowledgePath) -> dict[str
             "materialType": material.get("type") or "",
             "hasCertifiedText": bool(material_meta.get("complete")),
             "textSha256": material_meta.get("textSha256") or "",
+            "issueCode": material_meta.get("issueCode") or "",
         })
 
     published_qs = (
