@@ -1,41 +1,37 @@
 import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Box, Button, Container, Typography } from '@mui/material';
 import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
-const FORCES = [
-  'Ideas',
-  'Personas',
-  'Código',
-  'Dinero',
-  'Bitcoin',
-  'Poder',
-  'Comunidad',
-  'Incentivos',
-  'Infraestructura',
+const PULLS = [
+  { name: 'Ideas', line: 'Criptografía, privacidad y dinero digital.' },
+  { name: 'Personas', line: 'Quienes discreparon sobre su rumbo.' },
+  { name: 'Código', line: 'Reglas escritas y rechazadas.' },
+  { name: 'Dinero', line: 'Si seguimos el dinero llegamos a ...!' },
+  { name: 'Poder', line: 'Quién decidió qué es Bitcoin.' },
+  { name: 'Comunidad', line: 'Quienes lo usaron o lo dejaron.' },
+  { name: 'Incentivos', line: 'Qué empuja una ruptura.' },
+  { name: 'Infraestructura', line: 'Lo que se construyó encima.' },
 ];
 
 const VISIONS = [
   'Dinero electrónico P2P',
-  'Red global de pagos',
   'Reserva de valor',
-  'Activo financiero',
-  'Capa base de liquidación',
-  'Infraestructura para sistemas posteriores',
+  'Capa base de liquidación'
 ];
 
 const RESEARCH_PATH = [
   {
     period: 'Antes de Bitcoin',
     question: '¿Qué ideas hicieron posible Bitcoin?',
-    meta: 'Criptografía, privacidad, dinero digital, Cypherpunks y redes P2P.',
+    meta: 'Criptografía, dinero digital, Cypherpunks y redes P2P.',
   },
   {
     period: 'Satoshi',
     question: '¿Qué problema intentaba resolver?',
-    meta: 'El white paper, el contexto y la propuesta original.',
+    meta: 'El white paper, el contexto y la propuesta original. Entender cómo funciona la tecnología de Bitcoin.',
   },
   {
     period: 'Los primeros años',
@@ -43,37 +39,38 @@ const RESEARCH_PATH = [
     meta: 'Primeras comunidades, usos emergentes y tensiones iniciales.',
   },
   {
-    period: 'La guerra del escalado',
+    period: 'La guerra por el proyecto',
     question: '¿Qué debía ser Bitcoin?',
     meta: 'Conflictos técnicos, económicos e ideológicos sobre su dirección.',
   },
   {
     period: 'La división',
-    question: '¿Qué ocurrió cuando las visiones dejaron de ser compatibles?',
-    meta: 'Rupturas, forks y la redefinición de narrativas.',
+    question: '¿Cómo se vio, a detalle, el conflicto?',
+    meta: 'Eventos importantes, forks y la redefinición de narrativas.',
   },
   {
-    period: 'Después de la guerra',
-    question: '¿Cómo llegamos al Bitcoin actual?',
-    meta: 'El ecosistema más amplio y las consecuencias de esas decisiones.',
+    period: 'El mercado',
+    question: '¿Realmente entiendes las consecuencias de que el mercado esté manipulado?',
+    meta: 'La guerra nunca estuvo separada del mercado.',
+  },
+  {
+    period: 'Más allá de Bitcoin',
+    question: '¿La guerra por las criptomonedas continúa?',
+    meta: 'El ecosistema es mucho más amplio y el tablero es complejo. Pero la perspectiva que habrás cultivado te ayudará a entenderlo mejor.',
   },
 ];
 
 const SOURCES = [
   { title: 'Documentos originales', copy: 'Textos fundacionales y archivos históricos.' },
-  { title: 'White Paper', copy: 'La propuesta de Satoshi en su contexto.' },
   { title: 'Discusiones', copy: 'Foros, listas y debates de época.' },
-  { title: 'Código', copy: 'Decisiones técnicas hechas visibles.' },
   { title: 'Entrevistas', copy: 'Voces de quienes participaron.' },
   { title: 'Cronologías', copy: 'Secuencias para conectar episodios.' },
-  { title: 'Fuentes primarias', copy: 'Materiales de primera mano.' },
-  { title: 'Fuentes secundarias', copy: 'Interpretaciones para contrastar.' },
 ];
 
 const FOR_WHOM = [
   'Personas que usan Bitcoin y quieren comprender su historia',
   'Quienes siguen criptomonedas y quieren ir más allá del precio',
-  'Desarrolladores y tecnólogos interesados en el contexto histórico',
+  'Entusiastas de la tecnología interesados en comprender a profundidad',
   'Estudiantes de economía, dinero o sistemas monetarios',
   'Curiosos por Cypherpunks, privacidad y cultura de Internet',
   'Quienes vivieron partes de la historia y nunca reconstruyeron el panorama completo',
@@ -83,84 +80,24 @@ const NOT_FOR = [
   'Señales de trading',
   'Recomendaciones de inversión',
   'Predicciones de precio',
-  'Fórmulas para hacerse rico con criptomonedas',
-  'Una explicación de cinco minutos que elimine toda complejidad',
-];
-
-const INCLUDES_CONFIRMED = [
-  'Recorrido estructurado bajo demanda',
-  'Materiales y documentos históricos',
-  'Cronología',
-  'Bibliografía y fuentes',
-  'Encuentros en vivo durante la ventana activa',
-];
-
-const INCLUDES_TBD = [
-  'Grabaciones de encuentros',
-  'Espacio de comunidad',
-  'Duración del acceso al contenido',
-  'Credencial o certificado',
+  'Fórmulas para hacerse rico con criptomonedas'
 ];
 
 const MEETINGS = [
-  { id: '01', topic: 'Tema por definir' },
-  { id: '02', topic: 'Tema por definir' },
-  { id: '03', topic: 'Tema por definir' },
-];
-
-const FAQS = [
   {
-    q: '¿Necesito conocimientos previos sobre Bitcoin?',
-    a: 'Respuesta por definir. La intención es que no se requiera conocimiento técnico avanzado; bastará curiosidad y disposición a leer fuentes.',
-    tbd: true,
+    id: '01',
+    topic: '¿Qué debía ser Bitcoin?',
+    dates: ['Lunes 9 Noviembre 2026', 'Lunes 23 Noviembre 2026'],
   },
   {
-    q: '¿Es un curso técnico?',
-    a: 'Respuesta por definir. Habrá código y decisiones técnicas en contexto, pero el eje es histórico, intelectual y humano.',
-    tbd: true,
+    id: '02',
+    topic: 'La guerra por Bitcoin',
+    dates: ['Lunes 23 Noviembre 2026', 'Lunes 8 Diciembre 2026'],
   },
   {
-    q: '¿Es un curso de inversión o trading?',
-    a: 'No. El curso tiene un enfoque histórico, intelectual y educativo. No ofrece señales, predicciones ni asesoría financiera.',
-  },
-  {
-    q: '¿Puedo comenzar después de la fecha de lanzamiento?',
-    a: 'Sí, mientras las inscripciones permanezcan abiertas. El contenido puede recorrerse a tu ritmo.',
-  },
-  {
-    q: '¿Qué ocurre si no puedo asistir a un encuentro en vivo?',
-    a: 'La intención es ofrecer más de una oportunidad para determinados encuentros. Política definitiva por confirmar.',
-    tbd: true,
-  },
-  {
-    q: '¿Se graban los encuentros?',
-    a: 'Por definir.',
-    tbd: true,
-  },
-  {
-    q: '¿Hasta cuándo puedo participar en encuentros en vivo?',
-    a: 'Ventana aproximada hasta finales de noviembre de 2026. Fecha definitiva por definir.',
-    tbd: true,
-  },
-  {
-    q: '¿Cuánto tiempo tengo acceso al contenido?',
-    a: 'Por definir.',
-    tbd: true,
-  },
-  {
-    q: '¿Dónde ocurre el curso?',
-    a: 'En Academia Blockchain. Detalle técnico de la plataforma por confirmar.',
-    tbd: true,
-  },
-  {
-    q: '¿Hay certificado o credencial?',
-    a: 'Por definir.',
-    tbd: true,
-  },
-  {
-    q: '¿En qué idioma se imparte?',
-    a: 'Presumiblemente en español. Idioma(s) definitivos por confirmar.',
-    tbd: true,
+    id: '03',
+    topic: 'La guerra más allá de Bitcoin',
+    dates: ['Lunes 8 Diciembre 2026', 'Lunes 15 Diciembre 2026'],
   },
 ];
 
@@ -173,11 +110,10 @@ const scrollToHash = (event, id) => {
 };
 
 const RealHistoriaBitcoinLanding = () => {
-  const navigate = useNavigate();
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'La guerra por las criptomonedas — Academia Blockchain';
+    document.title = 'La real historia de Bitcoin — Academia Blockchain';
     return () => {
       document.title = previousTitle;
     };
@@ -202,10 +138,10 @@ const RealHistoriaBitcoinLanding = () => {
               Academia Blockchain
             </Typography>
             <Typography component="h1" id="rhb-hero-title" className="brand-display">
-              La guerra por las criptomonedas
+              La real historia de Bitcoin
             </Typography>
             <Typography component="p" className="rhb-hero-subtitle">
-              La real historia de Bitcoin
+              Y la guerra por las criptomonedas
             </Typography>
             <Typography component="p" className="brand-hero-lead">
               Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
@@ -214,19 +150,19 @@ const RealHistoriaBitcoinLanding = () => {
               <Button
                 variant="contained"
                 endIcon={<ArrowForwardIcon />}
-                href="#recorrido"
-                onClick={(event) => scrollToHash(event, 'recorrido')}
+                href="#curso"
+                onClick={(event) => scrollToHash(event, 'curso')}
                 className="brand-button brand-button-primary"
               >
                 Explorar el curso
               </Button>
               <Button
+                component={Link}
+                to="/courses/real-historia-bitcoin/checkout"
                 variant="text"
-                href="#recorrido"
-                onClick={(event) => scrollToHash(event, 'recorrido')}
                 className="brand-button brand-button-secondary"
               >
-                Ver el recorrido
+                Inscribirse
               </Button>
             </Box>
             <div className="rhb-hero-signals" aria-label="Qué incluye la experiencia">
@@ -238,7 +174,7 @@ const RealHistoriaBitcoinLanding = () => {
         </Container>
       </section>
 
-      <section className="rhb-section brand-statement" aria-labelledby="rhb-rupture-title">
+      <section className="rhb-section brand-statement" id="curso" aria-labelledby="rhb-rupture-title">
         <Container maxWidth="lg">
           <div className="brand-section-grid">
             <div>
@@ -246,16 +182,15 @@ const RealHistoriaBitcoinLanding = () => {
                 01 / La ruptura
               </Typography>
               <Typography component="h2" id="rhb-rupture-title" className="brand-section-title">
-                Creías conocer la historia de Bitcoin
+                La Historia de Bitcoin no es lo que te cuentan
               </Typography>
               <Typography component="p" className="rhb-quote">
-                La historia de Bitcoin no comienza —ni termina— con Satoshi.
+                Si le preguntas al ChatGPT, te va a repetir una mentira.
               </Typography>
             </div>
             <div className="brand-statement-copy">
               <Typography component="p">
-                Bitcoin no apareció de la nada. Antes existieron décadas de ideas. Después comenzó otra
-                historia: una disputa sobre qué debía ser Bitcoin.
+                Debes conocer la historia oficial para luego profundizar y entender la historia real. Y, esto no comienza ni termina con Bitcoin.
               </Typography>
               <ul className="rhb-era-list">
                 <li>
@@ -275,7 +210,6 @@ const RealHistoriaBitcoinLanding = () => {
           </div>
         </Container>
       </section>
-
       <section className="rhb-section brand-ecosystem" aria-labelledby="rhb-question-title">
         <Container maxWidth="lg">
           <div className="rhb-question-wrap">
@@ -286,20 +220,38 @@ const RealHistoriaBitcoinLanding = () => {
               ¿Cómo llegó Bitcoin a convertirse en lo que es hoy?
             </Typography>
             <Typography component="p" className="brand-section-lead">
-              Bitcoin no evolucionó únicamente como tecnología. Su historia también está formada por
-              seres humanos, intereses, desacuerdos, interpretaciones y decisiones.
+              Bitcoin no cambió únicamente como tecnología. Su historia también está formada por conflictos de ideas y de
+              seres humanos, intereses, desacuerdos y grupos de poder.
             </Typography>
           </div>
-          <div className="rhb-forces" aria-label="Fuerzas que rodean a Bitcoin">
-            {FORCES.map((force) => (
-              <div
-                key={force}
-                className={force === 'Bitcoin' ? 'rhb-force rhb-force-core' : 'rhb-force'}
-              >
-                {force}
-              </div>
-            ))}
-          </div>
+          <figure className="rhb-pull-figure">
+            <div className="rhb-pull">
+              <svg className="rhb-pull-field" viewBox="0 0 100 100" aria-hidden="true">
+                <circle className="rhb-pull-ring" cx="50" cy="50" r="7.4" />
+                {PULLS.map((pull, index) => {
+                  const degrees = index * 45 - 90;
+                  return (
+                    <g key={pull.name} transform={`rotate(${degrees} 50 50)`}>
+                      <line className="rhb-pull-spoke" x1="60" y1="50" x2="73" y2="50" />
+                      <path className="rhb-pull-arrow" d="M 72.2 48.45 L 77.4 50 L 72.2 51.55 Z" />
+                    </g>
+                  );
+                })}
+              </svg>
+              <p className="rhb-pull-core">Bitcoin</p>
+              <ul className="rhb-pull-labels">
+                {PULLS.map((pull, index) => (
+                  <li key={pull.name} style={{ '--angle': `${index * 45 - 90}deg` }}>
+                    <strong>{pull.name}</strong>
+                    <span>{pull.line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <figcaption className="rhb-pull-caption">
+              Ocho fuerzas tiran de Bitcoin en direcciones distintas. Ninguna, por sí sola, explica en lo que se convirtió.
+            </figcaption>
+          </figure>
         </Container>
       </section>
 
@@ -309,11 +261,12 @@ const RealHistoriaBitcoinLanding = () => {
             03 / Visiones en conflicto
           </Typography>
           <Typography component="h2" id="rhb-war-title" className="brand-section-title">
-            Una guerra sobre qué debía ser Bitcoin
+            Entender la Tecnología
           </Typography>
-          <Typography component="p" className="brand-section-lead" style={{ maxWidth: '40rem' }}>
-            Existieron —y existen— interpretaciones distintas. El curso no impone cuál es la correcta:
-            reconstruye cómo aparecieron y qué ocurrió cuando entraron en conflicto.
+          <Typography component="p" className="brand-section-lead rhb-centered-lead">
+            Si no comprendes bien cómo funciona, y te parece importante, estás en el lugar correcto. He acompañado en el proceso de aprendizaje de la tecnología de Bitcoin a cientos de personas.
+            Te lo voy a explicar de la manera más sencilla posible para que luego avanzemos a un nivel más alto de comprensión, siempre con acompañamiento 1 a 1 cuando lo necesites.
+            Una vez que entiendas la tecnología, será más sencillo ponderar las distinats visiones que existen sobre ella.
           </Typography>
           <div className="rhb-visions">
             {VISIONS.map((vision, i) => (
@@ -347,10 +300,8 @@ const RealHistoriaBitcoinLanding = () => {
             Lo que vas a investigar
           </Typography>
           <Typography component="p" className="brand-section-lead">
-            Una ruta de investigación histórica. Cada etapa conecta periodo, pregunta y conflicto —
-            no una lista genérica de módulos.
+            La ruta de estudio en siete preguntas.
           </Typography>
-          <span className="rhb-placeholder">Currículo definitivo por insertar</span>
           <div className="rhb-path">
             {RESEARCH_PATH.map((step, index) => (
               <article className="rhb-path-step" key={step.period}>
@@ -372,15 +323,15 @@ const RealHistoriaBitcoinLanding = () => {
             05 / Método
           </Typography>
           <Typography component="h2" id="rhb-sources-title" className="brand-section-title brand-section-title-light">
-            Trabajar con fuentes
+            Trabajarás con fuentes
           </Typography>
           <Typography component="p" className="rhb-quote rhb-quote-light">
             No queremos decirte qué pensar sobre la historia de Bitcoin. Queremos darte suficiente
-            contexto para que puedas examinarla.
+            contexto para que puedas examinarla inteligentemente.
           </Typography>
           <Typography component="p" className="brand-section-lead" style={{ color: '#c7c3bb', marginTop: 28 }}>
-            El recorrido no es únicamente la interpretación de un profesor. Incluye documentos,
-            discusiones, código y archivos para que construyas tu propio criterio.
+            El recorrido no es únicamente la interpretación de un profesor. Incluye reportajes,
+            discusiones y artículos para que construyas tu propio criterio.
           </Typography>
           <div className="rhb-sources-grid">
             {SOURCES.map((item) => (
@@ -405,13 +356,13 @@ const RealHistoriaBitcoinLanding = () => {
               </Typography>
               <Typography component="p" className="brand-section-lead">
                 Contenido bajo demanda más encuentros en vivo durante una ventana temporal. Puedes
-                comenzar cuando te inscribes y avanzar a tu ritmo.
+                comenzar cuando te inscribes y avanzar a tu ritmo. Al final, opcionalmente, puedes tomar una prueba de conocimientos 
+                para obtener un certificado de finalización que se guardará en la blockchain y un NFT de recuerdo.
               </Typography>
             </div>
             <ul className="rhb-live-points">
-              <li>Profundizar acontecimientos y fuentes</li>
-              <li>Examinar interpretaciones en diálogo</li>
-              <li>Conectar ideas entre etapas del recorrido</li>
+              <li>Profundizar acontecimientos y fuentes originales</li>
+              <li>Examinar interpretaciones en diálogo con el profesor</li>
               <li>Preguntar y conversar con otros participantes</li>
               <li>Repeticiones previstas para distintos ritmos de avance</li>
             </ul>
@@ -423,16 +374,19 @@ const RealHistoriaBitcoinLanding = () => {
                 <p className="rhb-meeting-label">Encuentro {meeting.id}</p>
                 <h3>{meeting.topic}</h3>
                 <div className="rhb-meeting-dates">
-                  <span>Fecha 1 — por definir</span>
-                  <span>Fecha 2 — por definir</span>
+                  {meeting.dates.map((date, index) => (
+                    <span key={date}>
+                      Fecha {index + 1} — {date}
+                    </span>
+                  ))}
                 </div>
               </article>
             ))}
           </div>
 
           <div className="rhb-window-note">
-            <strong>Ventana aproximada:</strong> apertura hacia finales de octubre de 2026; encuentros
-            en vivo hasta alrededor de finales de noviembre de 2026. Fechas exactas por definir.
+            <strong>Ventana:</strong> cada encuentro se ofrece dos veces, en lunes sucesivos, del 9 de
+            Noviembre al 15 de Diciembre de 2026.
           </div>
         </Container>
       </section>
@@ -467,160 +421,64 @@ const RealHistoriaBitcoinLanding = () => {
       </section>
 
       <section className="rhb-section brand-principle" aria-labelledby="rhb-guide-title">
-        <Container maxWidth="md">
+        <Container maxWidth="lg">
           <Typography component="p" className="brand-section-index">
             08 / Guía de investigación
           </Typography>
           <Typography component="h2" id="rhb-guide-title" className="brand-section-title">
             Quién guía el recorrido
           </Typography>
-          <div className="rhb-panel">
-            <Typography component="p">
-              Relación esperada: guía de investigación → estudiante. No gurú → seguidor.
-            </Typography>
-            <Typography component="p">
-              Biografía definitiva por insertar: quién guía la investigación, relación con Academia
-              Blockchain, experiencia relevante, por qué reconstruir esta historia y con qué
-              metodología.
-            </Typography>
-            <span className="rhb-placeholder">Biografía del profesor — por definir</span>
+          <div className="rhb-guide">
+            <figure className="rhb-guide-photo">
+              <img
+                src="/images/course_rhb_guide.png"
+                alt="Alejandro Veintimilla hablando en una conferencia."
+              />
+            </figure>
+            <div className="rhb-guide-copy">
+              <Typography component="p" className="rhb-guide-name">
+                Alejandro Veintimilla
+              </Typography>
+              <Typography component="p" className="rhb-guide-role">
+                Guía de investigación → estudiante. No gurú → seguidor.
+              </Typography>
+              <Typography component="p">
+                Fundador de Academia Blockchain, economista y desarrollador de software especializado
+                en blockchain. Participa en el ecosistema Bitcoin y blockchain desde 2014–2015,
+                combinando una perspectiva económica con la comprensión técnica que le dan más de 14
+                años desarrollando software.
+              </Typography>
+              <Typography component="p">
+                Desde 2015 ha enseñado y dado conferencias sobre Bitcoin, blockchain, dinero y poder
+                en universidades, comunidades y eventos internacionales.
+              </Typography>
+            </div>
           </div>
         </Container>
       </section>
 
-      <section className="rhb-section brand-ecosystem" aria-labelledby="rhb-includes-title">
-        <Container maxWidth="lg">
+      <section className="rhb-section brand-principle" id="inscripcion" aria-labelledby="rhb-price-title">
+        <Container maxWidth="sm">
           <Typography component="p" className="brand-section-index">
-            09 / Qué incluye
-          </Typography>
-          <Typography component="h2" id="rhb-includes-title" className="brand-section-title">
-            Lo que forma parte de la experiencia
-          </Typography>
-          <div className="rhb-panel">
-            <ul className="rhb-includes">
-              {INCLUDES_CONFIRMED.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-              {INCLUDES_TBD.map((item) => (
-                <li className="is-tbd" key={item}>
-                  {item} — por confirmar
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Container>
-      </section>
-
-      <section className="rhb-section brand-statement" id="inscripcion" aria-labelledby="rhb-price-title">
-        <Container maxWidth="md">
-          <Typography component="p" className="brand-section-index">
-            10 / Inscripción
+            09 / Inscripción
           </Typography>
           <Typography component="h2" id="rhb-price-title" className="brand-section-title">
-            Precio y condiciones
+            35 USD
           </Typography>
-          <div className="rhb-panel">
-            <dl className="rhb-price-rows">
-              <div className="rhb-price-row">
-                <dt>Precio</dt>
-                <dd>
-                  <span className="rhb-price-amount">Por definir</span>
-                </dd>
-              </div>
-              <div className="rhb-price-row">
-                <dt>Qué incluye</dt>
-                <dd>Recorrido bajo demanda, fuentes y encuentros en vivo.</dd>
-              </div>
-              <div className="rhb-price-row">
-                <dt>Duración / acceso</dt>
-                <dd>
-                  Por definir
-                  <div>
-                    <span className="rhb-placeholder">Acceso y condiciones — por definir</span>
-                  </div>
-                </dd>
-              </div>
-              <div className="rhb-price-row">
-                <dt>Encuentros</dt>
-                <dd>Ventana aproximada: finales de octubre – finales de noviembre de 2026.</dd>
-              </div>
-              <div className="rhb-price-row">
-                <dt>Condiciones</dt>
-                <dd>
-                  Sin precios tachados artificiales ni descuentos falsos. Si hay precio de
-                  lanzamiento, se explicará la condición real.
-                </dd>
-              </div>
-            </dl>
-            <div className="rhb-inline-cta">
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/unirme')}
-                className="brand-button brand-button-primary"
-              >
-                Avisarme cuando abran las inscripciones
-              </Button>
-            </div>
-          </div>
-        </Container>
-      </section>
-
-      <section className="rhb-section brand-principle" aria-labelledby="rhb-faq-title">
-        <Container maxWidth="md">
-          <Typography component="p" className="brand-section-index">
-            11 / Preguntas
+          <Typography component="p" className="brand-section-lead rhb-centered-lead">
+            El camino, el acompañamiento con fuentes históricas y los tres encuentros en vivo. Quien
+            pase el examen recibe un certificado en la blockchain y un NFT de recuerdo.
           </Typography>
-          <Typography component="h2" id="rhb-faq-title" className="brand-section-title">
-            Preguntas frecuentes
-          </Typography>
-          <div className="rhb-faq">
-            {FAQS.map((item) => (
-              <details key={item.q}>
-                <summary>{item.q}</summary>
-                <p>
-                  {item.a}
-                  {item.tbd ? (
-                    <>
-                      {' '}
-                      <span className="rhb-placeholder">Por definir</span>
-                    </>
-                  ) : null}
-                </p>
-              </details>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      <section className="rhb-final" aria-labelledby="rhb-final-title">
-        <Container maxWidth="lg">
-          <div className="rhb-final-inner">
-            <Typography component="p" className="brand-section-index brand-section-index-light">
-              Comprender es libertad
-            </Typography>
-            <h2 id="rhb-final-title">Bitcoin tiene una historia.</h2>
-            <p>Pero comprenderla requiere conectar piezas que normalmente se cuentan por separado.</p>
-            <div className="rhb-final-actions">
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardIcon />}
-                href="#recorrido"
-                onClick={(event) => scrollToHash(event, 'recorrido')}
-                className="brand-button brand-button-light"
-              >
-                Explorar el curso
-              </Button>
-              <Button
-                variant="text"
-                href="#inscripcion"
-                onClick={(event) => scrollToHash(event, 'inscripcion')}
-                className="brand-button brand-button-secondary"
-              >
-                Comenzar la investigación
-              </Button>
-            </div>
-            <p className="rhb-tagline">Comprender es libertad.</p>
+          <div className="rhb-inline-cta">
+            <Button
+              component={Link}
+              to="/courses/real-historia-bitcoin/checkout"
+              variant="contained"
+              endIcon={<ArrowForwardIcon />}
+              className="brand-button brand-button-primary"
+            >
+              Subscribirse
+            </Button>
           </div>
         </Container>
       </section>
