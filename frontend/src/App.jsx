@@ -17,6 +17,7 @@ import NotFound from './generalComponents/NotFound.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
 import RealHistoriaBitcoinLanding from './courses/RealHistoriaBitcoinLanding.jsx';
+import RealHistoriaBitcoinCheckout from './courses/RealHistoriaBitcoinCheckout.jsx';
 import CompletarCuenta from './profiles/CompletarCuenta.jsx';
 import BookClubLayout from './bookClubs/BookClubLayout.jsx';
 import BookClubOverview from './bookClubs/BookClubOverview.jsx';
@@ -193,6 +194,7 @@ const AppContent = () => {
             <Route path="como-funciona" element={<Navigate to="/como-funciona/archivo-y-preservacion" replace />} />
             <Route path="como-funciona/:slug" element={<HowItWorksGuide />} />
             <Route path="courses/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
+            <Route path="courses/real-historia-bitcoin/checkout" element={<RealHistoriaBitcoinCheckout />} />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
