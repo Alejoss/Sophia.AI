@@ -21,9 +21,9 @@
 
 ## Sentry
 
-- **Status**: Sentry is wired. Backend: `sentry_config.configure_sentry()` is called at the end of `settings.py` when `SENTRY_DSN` is set; `SentryUserMiddleware` adds user context. Frontend: `@sentry/react` in `main.jsx` when `VITE_SENTRY_DSN` is set, with `ErrorBoundary` and optional Replay.
-- **Backend**: Set `SENTRY_DSN` in `acbc_app/.env`. Optional: `SENTRY_TRACES_SAMPLE_RATE` (default 0.1), `SENTRY_PROFILES_SAMPLE_RATE` (default 0.0).
-- **Frontend**: Set `VITE_SENTRY_DSN` in `frontend/.env` for beta/production. Rebuild after changing.
+- **Status**: Sentry is wired. Backend: `sentry_config.configure_sentry()` is called at the end of `settings.py` when `SENTRY_DSN` is set; `SentryUserMiddleware` adds user context. Frontend: `@sentry/react` in `main.jsx` when `VITE_SENTRY_DSN` is set **and** Vite MODE is not a local/test mode, with `ErrorBoundary` and optional Replay.
+- **Backend**: Set `SENTRY_DSN` in `acbc_app/.env`. Optional: `SENTRY_TRACES_SAMPLE_RATE` (default 0.1), `SENTRY_PROFILES_SAMPLE_RATE` (default 0.0). Init is skipped when `ENVIRONMENT` is `development` / `dev` / `local` / `test` / `testing`.
+- **Frontend**: Set `VITE_SENTRY_DSN` in the production/beta build env (not for `npm run dev`). Init is skipped for the same local/test MODE values as the backend; `beforeSend` also drops events from `localhost` / loopback. Rebuild after changing.
 - **PII**: `send_default_pii=True` in backend; Replay on frontend uses `maskAllText: true`, `blockAllMedia: true`.
 - **Policy**: See [sentry-and-logging-policy.md](./sentry-and-logging-policy.md) for log levels vs 4xx/5xx and the manual verification checklist.
 
