@@ -86,6 +86,13 @@ class SnapshotPreviewBuilderTests(TestCase):
             missing[0]["nodeId"],
             f"sophia-acbc:node:{self.node.id}",
         )
+        digest = payload["materialDigests"][0]
+        self.assertFalse(digest["hasCertifiedText"])
+        self.assertFalse(digest["complete"])
+        self.assertEqual(digest["issueCode"], "NO_TRANSCRIPT_TEXT")
+        self.assertEqual(digest["mediaType"], "VIDEO")
+        self.assertEqual(digest["position"], 1)
+        self.assertEqual(digest["nodeTitle"], "What is Bitcoin?")
 
     def test_readiness_endpoint_reports_missing_transcript_by_title(self):
         from knowledge_paths.services.snapshot_preview import (
