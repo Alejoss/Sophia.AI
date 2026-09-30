@@ -1497,6 +1497,27 @@ class ContentTranscriptIngestSerializer(serializers.Serializer):
         return attrs
 
 
+class ContentTranscriptTextHashSerializer(serializers.Serializer):
+    """External worker (Vincent) supplies a SHA-256 of locally hashed transcript text."""
+
+    text_hash = serializers.RegexField(
+        regex=r'^[0-9a-fA-F]{64}$',
+        help_text='SHA-256 hex digest (same algorithm as ContentTranscript.text_hash).',
+    )
+    plain_text = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        help_text=(
+            'Exact text that was hashed (before or after NFC/whitespace normalize). '
+            'Required when the DB copy was SQL_ASCII-degraded and no longer matches '
+            'the worker hash. When omitted, Sophia verifies against stored artifacts.'
+        ),
+    )
+
+    def validate_text_hash(self, value):
+        return value.lower()
+
+
 class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
     """User-facing transcript payload for content detail pages."""
 
@@ -1531,6 +1552,7 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
     has_parsed_plain = serializers.SerializerMethodField()
     has_processed_plain = serializers.SerializerMethodField()
     has_obsidian_markdown = serializers.SerializerMethodField()
+    has_hash_plain_text = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentTranscript
@@ -1539,6 +1561,8 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
             'language',
             'text_length',
             'text_hash',
+            'text_hash_locked',
+            'has_hash_plain_text',
             'segment_count',
             'has_parsed_plain',
             'has_processed_plain',
@@ -1559,6 +1583,9 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
 
     def get_has_obsidian_markdown(self, obj):
         return bool((obj.obsidian_markdown or '').strip())
+
+    def get_has_hash_plain_text(self, obj):
+        return bool((obj.hash_plain_text or '').strip())
 
 
 class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
