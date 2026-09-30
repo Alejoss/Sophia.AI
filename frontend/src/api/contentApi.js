@@ -1074,7 +1074,7 @@ const contentApi = {
       if (filters.status) params.append('status', filters.status);
       if (filters.is_duplicate !== undefined) params.append('is_duplicate', filters.is_duplicate);
 
-      const url = `/content/topics/${topicId}/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `/content/topics/${topicId}/content-suggestions/${params.toString() ? '?' + params.toString() : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1114,7 +1114,7 @@ const contentApi = {
       if (filters.status) params.append('status', filters.status);
       if (filters.topic_id) params.append('topic_id', filters.topic_id);
 
-      const url = `/content/user/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `/content/user/content-suggestions/${params.toString() ? '?' + params.toString() : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1151,7 +1151,7 @@ const contentApi = {
     try {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
-      const url = `/content/topics/${topicId}/timeline-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/topics/${topicId}/timeline-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1229,7 +1229,7 @@ const contentApi = {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.entry_id) params.append('entry_id', filters.entry_id);
-      const url = `/content/topics/${topicId}/timeline-entry-content-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/topics/${topicId}/timeline-entry-content-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1280,7 +1280,7 @@ const contentApi = {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.topic_id) params.append('topic_id', filters.topic_id);
-      const url = `/content/user/timeline-entry-content-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/user/timeline-entry-content-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
