@@ -53,6 +53,13 @@ class CryptoPayment(models.Model):
         null=True,
         blank=True,
     )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='crypto_payments',
+        null=True,
+        blank=True,
+    )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     pay_currency = models.CharField(max_length=16, blank=True, default='')
@@ -77,24 +84,35 @@ class CryptoPayment(models.Model):
                         path_purchase__isnull=True,
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=False,
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=True,
                         anchor_request__isnull=False,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=True,
                         anchor_request__isnull=True,
                         token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
                     )
                 ),
                 name='cryptopayment_exactly_one_target',
@@ -120,7 +138,110 @@ class CryptoPayment(models.Model):
             return self.anchor_request.requester
         if self.token_purchase_id:
             return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
         return None
+
+
+class Course(models.Model):
+    """A course offered for sale. The price lives on this row, edited in admin.
+
+    Like a reading club, a course can point at one knowledge path and at
+    several live events. Those links do not replace the course price.
+    """
+
+    code = models.SlugField(max_length=64, unique=True)
+    title = models.CharField(max_length=200)
+    price_usd = models.FloatField(
+        default=0,
+        help_text='Precio en USD. 0 significa que el curso no está a la venta.',
+    )
+    sales_enabled = models.BooleanField(
+        default=True,
+        help_text='Permite cobrar este curso cuando tiene precio.',
+    )
+    knowledge_path = models.ForeignKey(
+        'knowledge_paths.KnowledgePath',
+        on_delete=models.PROTECT,
+        related_name='courses',
+        null=True,
+        blank=True,
+        help_text='Optional path whose missions belong to this course.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_for_sale(self):
+        return bool(self.sales_enabled and self.price_usd and self.price_usd > 0)
+
+
+class CourseEvent(models.Model):
+    """Links live sessions to a course without altering the Event model."""
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='course_events')
+    event = models.ForeignKey('events.Event', on_delete=models.CASCADE, related_name='course_links')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['course', 'event'], name='course_event_once'),
+        ]
+        ordering = ['event__date_start', 'created_at']
+
+    def __str__(self):
+        return f'{self.course.code} ↔ {self.event_id}'
+
+
+class CoursePurchase(models.Model):
+    """A user's purchase of a course. price_amount is the price copied at checkout."""
+
+    PAYMENT_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('REFUNDED', 'Refunded'),
+    )
+
+    user = models.ForeignKey(
+        'auth.User',
+        on_delete=models.CASCADE,
+        related_name='course_purchases',
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.PROTECT,
+        related_name='purchases',
+    )
+    price_amount = models.FloatField(help_text='USD price copied from the course when checkout opened.')
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='PENDING',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'course'],
+                name='course_purchase_one_per_user',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → {self.course_id} ({self.payment_status})'
+
+    @property
+    def is_paid(self):
+        return self.payment_status == 'PAID'
 
 
 class BchDirectPayment(models.Model):

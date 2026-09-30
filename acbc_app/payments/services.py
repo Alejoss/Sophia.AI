@@ -8,7 +8,7 @@ from django.utils import timezone
 from content.models import TranscriptAnchorRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
-from payments.models import CryptoPayment, TokenLedgerEntry, TokenPackage, TokenPurchase
+from payments.models import Course, CoursePurchase, CryptoPayment, TokenLedgerEntry, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.handlers import on_crypto_payment_completed
 from payments.token_ledger import credit_platform_tokens
@@ -491,6 +491,8 @@ def _fulfill_if_needed(crypto_payment: CryptoPayment) -> None:
         _mark_anchor_request_paid_if_needed(crypto_payment)
     elif crypto_payment.token_purchase_id:
         _mark_token_purchase_paid_if_needed(crypto_payment)
+    elif crypto_payment.course_purchase_id:
+        _mark_course_purchase_paid_if_needed(crypto_payment)
 
 
 def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> CryptoPayment:
@@ -632,6 +634,119 @@ def create_event_registration_payment(*, event_registration: EventRegistration, 
             provider_payload=stored_payload,
         )
     return crypto_payment
+
+
+def get_or_create_course_purchase(*, course_code, user) -> CoursePurchase:
+    try:
+        course = Course.objects.get(code=course_code)
+    except Course.DoesNotExist:
+        raise ValueError('Este curso no está a la venta.')
+    if not course.is_for_sale:
+        raise ValueError('Este curso no está a la venta.')
+
+    purchase, created = CoursePurchase.objects.get_or_create(
+        user=user,
+        course=course,
+        defaults={
+            'price_amount': float(course.price_usd),
+            'payment_status': 'PENDING',
+        },
+    )
+    if created or purchase.payment_status != 'PENDING':
+        return purchase
+    if purchase.price_amount == float(course.price_usd):
+        return purchase
+    has_open_invoice = CryptoPayment.objects.filter(
+        course_purchase=purchase,
+        payment_status__in=OPEN_PAYMENT_STATUSES,
+    ).exists()
+    if has_open_invoice:
+        return purchase
+    purchase.price_amount = float(course.price_usd)
+    purchase.save(update_fields=['price_amount', 'updated_at'])
+    return purchase
+
+
+def mark_course_purchase_paid(course_purchase: CoursePurchase) -> CoursePurchase:
+    with transaction.atomic():
+        purchase = CoursePurchase.objects.select_for_update().get(pk=course_purchase.pk)
+        if purchase.payment_status == 'PAID':
+            return purchase
+        purchase.payment_status = 'PAID'
+        purchase.save(update_fields=['payment_status', 'updated_at'])
+    return purchase
+
+
+def _mark_course_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    purchase = mark_course_purchase_paid(
+        CoursePurchase.objects.get(pk=crypto_payment.course_purchase_id),
+    )
+    try:
+        on_crypto_payment_completed(crypto_payment)
+    except Exception as exc:
+        logger.error(
+            'on_crypto_payment_completed failed for course_purchase %s: %s',
+            purchase.id,
+            exc,
+            exc_info=True,
+        )
+
+
+def create_course_purchase_payment(*, course_purchase: CoursePurchase, user, pay_currency=None) -> CryptoPayment:
+    if course_purchase.user_id != user.id:
+        raise PermissionError('Solo el comprador puede iniciar el pago.')
+    if course_purchase.payment_status == 'PAID':
+        raise ValueError('Este curso ya está pagado.')
+    if not course_purchase.price_amount or course_purchase.price_amount <= 0:
+        raise ValueError('Este curso no tiene un precio de pago.')
+
+    client = NOWPaymentsClient()
+    if not client.configured:
+        raise NOWPaymentsError('La pasarela de pagos no está configurada en el servidor.')
+
+    reused = _reuse_or_refresh_open_payment(
+        CryptoPayment.objects.filter(course_purchase=course_purchase)
+    )
+    if reused:
+        return reused
+
+    from django.conf import settings
+
+    order_id = f'course-{course_purchase.id}-{uuid.uuid4().hex[:12]}'
+    ipn_url = f'{_public_base_url()}/api/payments/ipn/'
+    frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
+    return_url = f'{frontend_base}/courses/{course_purchase.course.code}/checkout'
+
+    payload = client.create_invoice(
+        price_amount=float(course_purchase.price_amount),
+        price_currency='usd',
+        order_id=order_id,
+        order_description=prepare_text_for_db(course_purchase.course.title),
+        ipn_callback_url=ipn_url,
+        success_url=return_url,
+        cancel_url=return_url,
+    )
+
+    invoice_url = payload.get('invoice_url') or ''
+    if not invoice_url:
+        raise NOWPaymentsError('NOWPayments no devolvió invoice_url.')
+
+    stored_payload = prepare_json_for_db(payload)
+    if payload.get('id') is not None and not stored_payload.get('invoice_id'):
+        stored_payload['invoice_id'] = payload.get('id')
+
+    with transaction.atomic():
+        return CryptoPayment.objects.create(
+            course_purchase=course_purchase,
+            order_id=order_id,
+            nowpayments_payment_id=payload.get('id'),
+            pay_currency=(pay_currency or '').lower().strip(),
+            price_amount=float(course_purchase.price_amount),
+            price_currency='usd',
+            payment_status='waiting',
+            invoice_url=invoice_url,
+            provider_payload=stored_payload,
+        )
 
 
 def get_or_create_path_purchase(*, knowledge_path, user) -> KnowledgePathPurchase:
