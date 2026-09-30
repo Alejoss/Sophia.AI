@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Box, Button, Container, Typography } from '@mui/material';
+import { getCourse } from '../api/paymentsApi.js';
 import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
@@ -109,7 +110,39 @@ const scrollToHash = (event, id) => {
   window.history.replaceState(null, '', `#${id}`);
 };
 
+const COURSE_CODE = 'real-historia-bitcoin';
+
+const formatCoursePrice = (amount) => {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  const rounded = Math.round(value * 100) / 100;
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+  return `${text} USD`;
+};
+
 const RealHistoriaBitcoinLanding = () => {
+  const [priceLabel, setPriceLabel] = useState('');
+  const [offerState, setOfferState] = useState('loading');
+
+  useEffect(() => {
+    let cancelled = false;
+    getCourse(COURSE_CODE)
+      .then((course) => {
+        if (cancelled) return;
+        if (!course?.is_for_sale) {
+          setOfferState('closed');
+          return;
+        }
+        setPriceLabel(formatCoursePrice(course.price_usd));
+        setOfferState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setOfferState('missing');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -156,14 +189,16 @@ const RealHistoriaBitcoinLanding = () => {
               >
                 Explorar el curso
               </Button>
-              <Button
-                component={Link}
-                to="/courses/real-historia-bitcoin/checkout"
-                variant="text"
-                className="brand-button brand-button-secondary"
-              >
-                Inscribirse
-              </Button>
+              {offerState !== 'closed' ? (
+                <Button
+                  component={Link}
+                  to="/courses/real-historia-bitcoin/checkout"
+                  variant="text"
+                  className="brand-button brand-button-secondary"
+                >
+                  Inscribirse
+                </Button>
+              ) : null}
             </Box>
             <div className="rhb-hero-signals" aria-label="Qué incluye la experiencia">
               <span>Contenido estructurado</span>
@@ -457,29 +492,38 @@ const RealHistoriaBitcoinLanding = () => {
         </Container>
       </section>
 
-      <section className="rhb-section brand-principle" id="inscripcion" aria-labelledby="rhb-price-title">
+      <section
+        className="rhb-section brand-principle"
+        id="inscripcion"
+        aria-labelledby={priceLabel ? 'rhb-price-title' : 'rhb-enroll-index'}
+      >
         <Container maxWidth="sm">
-          <Typography component="p" className="brand-section-index">
+          <Typography component="p" id="rhb-enroll-index" className="brand-section-index">
             09 / Inscripción
           </Typography>
-          <Typography component="h2" id="rhb-price-title" className="brand-section-title">
-            35 USD
-          </Typography>
+          {priceLabel ? (
+            <Typography component="h2" id="rhb-price-title" className="brand-section-title">
+              {priceLabel}
+            </Typography>
+          ) : null}
           <Typography component="p" className="brand-section-lead rhb-centered-lead">
-            El camino, el acompañamiento con fuentes históricas y los tres encuentros en vivo. Quien
-            pase el examen recibe un certificado en la blockchain y un NFT de recuerdo.
+            {offerState === 'closed'
+              ? 'La inscripción no está disponible en este momento.'
+              : 'El camino, el acompañamiento con fuentes históricas y los tres encuentros en vivo. Quien pase el examen recibe un certificado en la blockchain y un NFT de recuerdo.'}
           </Typography>
-          <div className="rhb-inline-cta">
-            <Button
-              component={Link}
-              to="/courses/real-historia-bitcoin/checkout"
-              variant="contained"
-              endIcon={<ArrowForwardIcon />}
-              className="brand-button brand-button-primary"
-            >
-              Subscribirse
-            </Button>
-          </div>
+          {offerState !== 'closed' ? (
+            <div className="rhb-inline-cta">
+              <Button
+                component={Link}
+                to="/courses/real-historia-bitcoin/checkout"
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                className="brand-button brand-button-primary"
+              >
+                Subscribirse
+              </Button>
+            </div>
+          ) : null}
         </Container>
       </section>
 

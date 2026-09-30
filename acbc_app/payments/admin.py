@@ -2,6 +2,9 @@ from django.contrib import admin
 
 from payments.models import (
     BchDirectPayment,
+    Course,
+    CourseEvent,
+    CoursePurchase,
     CryptoPayment,
     TokenLedgerEntry,
     TokenPackage,
@@ -17,6 +20,7 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'path_purchase',
         'anchor_request',
         'token_purchase',
+        'course_purchase',
         'pay_currency',
         'payment_status',
         'price_amount',
@@ -31,8 +35,47 @@ class CryptoPaymentAdmin(admin.ModelAdmin):
         'path_purchase__user__username',
         'anchor_request__requester__username',
         'token_purchase__user__username',
+        'course_purchase__user__username',
+        'course_purchase__course__code',
     )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload')
+
+
+class CourseEventInline(admin.TabularInline):
+    model = CourseEvent
+    extra = 0
+    raw_id_fields = ('event',)
+
+
+@admin.register(Course)
+class CourseAdmin(admin.ModelAdmin):
+    list_display = ('code', 'title', 'price_usd', 'sales_enabled', 'knowledge_path', 'updated_at')
+    list_editable = ('price_usd', 'sales_enabled')
+    search_fields = ('code', 'title')
+    raw_id_fields = ('knowledge_path',)
+    readonly_fields = ('created_at', 'updated_at')
+    inlines = [CourseEventInline]
+
+
+@admin.register(CourseEvent)
+class CourseEventAdmin(admin.ModelAdmin):
+    list_display = ('course', 'event', 'created_at')
+    raw_id_fields = ('course', 'event')
+
+
+@admin.register(CoursePurchase)
+class CoursePurchaseAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'user',
+        'course',
+        'price_amount',
+        'payment_status',
+        'created_at',
+    )
+    list_filter = ('payment_status', 'course')
+    search_fields = ('user__username', 'course__code', 'course__title')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(BchDirectPayment)

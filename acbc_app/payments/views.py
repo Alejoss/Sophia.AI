@@ -21,7 +21,7 @@ from payments.bch_services import (
     report_bch_payment_txid,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
+from payments.models import BchDirectPayment, Course, CoursePurchase, CryptoPayment, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.serializers import (
     AdminBchOrderSerializer,
@@ -35,8 +35,10 @@ from payments.services import (
     OPEN_PAYMENT_STATUSES,
     cancel_token_purchase,
     create_anchor_request_payment,
+    create_course_purchase_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
+    get_or_create_course_purchase,
     create_token_purchase,
     create_token_purchase_payment,
     pay_anchor_request_with_tokens,
@@ -149,6 +151,8 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
         return user.id == payment.anchor_request.requester_id or user.is_staff
     if payment.token_purchase_id:
         return user.id == payment.token_purchase.user_id or user.is_staff
+    if payment.course_purchase_id:
+        return user.id == payment.course_purchase.user_id or user.is_staff
     return False
 
 
@@ -230,6 +234,143 @@ class EventRegistrationPaymentView(APIView):
             registration_id,
         )
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+def _course_payload(course: Course) -> dict:
+    path = course.knowledge_path
+    events = [
+        {
+            'id': link.event_id,
+            'title': link.event.title,
+            'date_start': link.event.date_start,
+            'date_end': link.event.date_end,
+        }
+        for link in course.course_events.all()
+    ]
+    return {
+        'code': course.code,
+        'title': course.title,
+        'price_usd': course.price_usd,
+        'sales_enabled': course.sales_enabled,
+        'is_for_sale': course.is_for_sale,
+        'knowledge_path_id': path.id if path else None,
+        'knowledge_path_title': path.title if path else None,
+        'events': events,
+    }
+
+
+def _course_purchase_payload(purchase: CoursePurchase) -> dict:
+    return {
+        'id': purchase.id,
+        'course_code': purchase.course.code,
+        'title': purchase.course.title,
+        'price_amount': purchase.price_amount,
+        'payment_status': purchase.payment_status,
+        'is_paid': purchase.is_paid,
+    }
+
+
+class CourseDetailView(APIView):
+    """Public course price. The landing and checkout read this row."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, course_code):
+        try:
+            course = (
+                Course.objects
+                .select_related('knowledge_path')
+                .prefetch_related('course_events__event')
+                .get(code=course_code)
+            )
+        except Course.DoesNotExist:
+            return Response({'error': 'Curso no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_course_payload(course))
+
+
+class CoursePurchaseView(APIView):
+    """Create or fetch the current user's purchase for a fixed-price course."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        course_code = (request.data.get('course_code') or '').strip()
+        try:
+            purchase = get_or_create_course_purchase(course_code=course_code, user=request.user)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_course_purchase_payload(purchase), status=status.HTTP_200_OK)
+
+
+class CoursePurchasePaymentView(APIView):
+    """Create or refresh a NOWPayments invoice for a course purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        try:
+            purchase = CoursePurchase.objects.select_related('user', 'course').get(pk=purchase_id)
+        except CoursePurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_course_purchase_payment(
+                course_purchase=purchase,
+                pay_currency=pay_currency,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_course_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class CoursePurchasePaymentsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        try:
+            purchase = CoursePurchase.objects.get(pk=purchase_id)
+        except CoursePurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payments = CryptoPayment.objects.filter(course_purchase=purchase).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for course_purchase %s: %s',
+                            payment.id,
+                            purchase_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
+        return Response(CryptoPaymentSerializer(payments, many=True).data)
 
 
 class PathPurchasePaymentView(APIView):

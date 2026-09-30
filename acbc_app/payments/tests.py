@@ -20,14 +20,25 @@ from payments.bch_services import (
     get_bch_payment_product_meta,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment, TokenLedgerEntry, TokenPackage, TokenPurchase
+from payments.models import (
+    BchDirectPayment,
+    Course,
+    CourseEvent,
+    CoursePurchase,
+    CryptoPayment,
+    TokenLedgerEntry,
+    TokenPackage,
+    TokenPurchase,
+)
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
     create_anchor_request_payment,
+    create_course_purchase_payment,
     create_path_purchase_payment,
     create_token_purchase,
     create_token_purchase_payment,
     fetch_remote_payment_payload,
+    get_or_create_course_purchase,
     get_or_create_path_purchase,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
@@ -2266,3 +2277,156 @@ class BchWithdrawTests(SimpleTestCase):
             [('bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy', 100_000, 'satoshi')],
         )
         self.assertEqual(kwargs['leftover'], key.address)
+
+
+@override_settings(NOWPAYMENTS_API_KEY='test-key')
+class CoursePurchasePaymentTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+
+    def test_unknown_course_is_rejected(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': 'no-existe'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_public_course_returns_the_stored_price(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_usd'], 40)
+        self.assertEqual(response.data['title'], 'La real historia de Bitcoin')
+        self.assertTrue(response.data['is_for_sale'])
+
+    def test_course_purchase_uses_the_course_price(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': 'real-historia-bitcoin'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_amount'], 40.0)
+        self.assertEqual(response.data['title'], course.title)
+        self.assertEqual(response.data['payment_status'], 'PENDING')
+        self.assertFalse(response.data['is_paid'])
+
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_invoice_charges_the_course_price(self, mock_create_invoice):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        mock_create_invoice.return_value = {
+            'id': 3501,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=3501',
+        }
+        purchase = get_or_create_course_purchase(
+            course_code='real-historia-bitcoin',
+            user=self.buyer,
+        )
+        payment = create_course_purchase_payment(course_purchase=purchase, user=self.buyer)
+        self.assertEqual(payment.course_purchase_id, purchase.id)
+        self.assertIsNone(payment.path_purchase_id)
+        self.assertIsNone(payment.event_registration_id)
+        self.assertEqual(payment.price_amount, 40.0)
+        self.assertTrue(payment.order_id.startswith(f'course-{purchase.id}-'))
+        mock_create_invoice.assert_called_once()
+        self.assertEqual(mock_create_invoice.call_args.kwargs['price_amount'], 40.0)
+
+    @patch('payments.views.refresh_crypto_payment_from_nowpayments', side_effect=lambda payment: payment)
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_checkout_http_flow_uses_the_course_price(self, mock_create_invoice, _mock_refresh):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        mock_create_invoice.return_value = {
+            'id': 3502,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=3502',
+        }
+        guest = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': course.code},
+            format='json',
+        )
+        self.assertEqual(guest.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(user=self.buyer)
+        created = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': course.code},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_200_OK)
+        payment = self.client.post(
+            reverse('course-purchase-payment-create', kwargs={'purchase_id': created.data['id']}),
+            {},
+            format='json',
+        )
+        self.assertEqual(payment.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(payment.data['price_amount'], 40.0)
+        self.assertEqual(payment.data['invoice_url'], 'https://nowpayments.io/payment/?iid=3502')
+        listed = self.client.get(
+            reverse('course-purchase-payments-list', kwargs={'purchase_id': created.data['id']}),
+        )
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data[0]['invoice_url'], payment.data['invoice_url'])
+
+    def test_finished_payment_marks_course_paid(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=course,
+            price_amount=course.price_usd,
+        )
+        crypto_payment = CryptoPayment.objects.create(
+            course_purchase=purchase,
+            order_id='course-finished-test',
+            price_amount=35.0,
+            payment_status='waiting',
+        )
+        sync_payment_from_provider(crypto_payment, {
+            'payment_status': 'finished',
+            'actually_paid': '35',
+            'pay_amount': '35',
+        })
+        purchase.refresh_from_db()
+        self.assertEqual(purchase.payment_status, 'PAID')
+
+    def test_course_links_one_path_and_many_events(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        course = Course.objects.get(code='real-historia-bitcoin')
+        path = KnowledgePath.objects.create(title='La real historia', author=self.buyer)
+        course.knowledge_path = path
+        course.save(update_fields=['knowledge_path'])
+        first = EventFactory(
+            owner=self.buyer,
+            title='Encuentro 01',
+            date_start=timezone.now() + timedelta(days=1),
+        )
+        second = EventFactory(
+            owner=self.buyer,
+            title='Encuentro 02',
+            date_start=timezone.now() + timedelta(days=2),
+        )
+        CourseEvent.objects.create(course=course, event=first)
+        CourseEvent.objects.create(course=course, event=second)
+
+        response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['knowledge_path_id'], path.id)
+        self.assertEqual(response.data['knowledge_path_title'], path.title)
+        self.assertEqual(
+            [event['title'] for event in response.data['events']],
+            ['Encuentro 01', 'Encuentro 02'],
+        )
