@@ -328,6 +328,21 @@ class ContentTranscript(models.Model):
         null=True,
         help_text='SHA-256 of normalized processed_plain (fallback: parsed_plain / Obsidian body).',
     )
+    text_hash_locked = models.BooleanField(
+        default=False,
+        help_text=(
+            'When True, text_hash was set by an external worker (Vincent) and must '
+            'not be recomputed on save. Cleared when transcript artifacts are replaced.'
+        ),
+    )
+    hash_plain_text = models.TextField(
+        blank=True,
+        help_text=(
+            'Exact normalized UTF-8 plain text whose SHA-256 is text_hash, when set '
+            'via external hash ingest. Preferred for public display/verification so '
+            'users can reconstruct the digest even if SQL_ASCII degraded other fields.'
+        ),
+    )
     language = models.CharField(
         max_length=10,
         blank=True,
@@ -349,7 +364,9 @@ class ContentTranscript(models.Model):
     def save(self, *args, **kwargs):
         # Legacy SQL_ASCII clusters reject UTF-8 (accents in Spanish transcripts /
         # SRT). prepare_* is a no-op on UTF8; on SQL_ASCII it degrades before
-        # sync so text_hash matches what is actually persisted.
+        # sync so text_hash matches what is actually persisted — unless the hash
+        # was locked by external ingest (Vincent), in which case hash_plain_text
+        # keeps the original normalized UTF-8 for verification/display.
         from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
 
         self.parsed_plain = prepare_text_for_db(self.parsed_plain)
@@ -359,6 +376,8 @@ class ContentTranscript(models.Model):
         self.language = prepare_text_for_db(self.language)
         self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
         self.segments = prepare_json_for_db(self.segments or [])
+        # Do not run prepare_text_for_db on hash_plain_text — it must stay the
+        # exact normalized UTF-8 bytes that produce text_hash.
 
         sync_transcript_derived_fields(self)
 
