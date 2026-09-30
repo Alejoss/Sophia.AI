@@ -20,8 +20,10 @@ import {
   Typography,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
+import CurrencyBitcoinIcon from '@mui/icons-material/CurrencyBitcoin';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import { downloadSnapshotForHashVerification } from './snapshotDownload';
+import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
 
 const formatError = (err, fallback) => {
   const data = err?.response?.data;
@@ -30,11 +32,29 @@ const formatError = (err, fallback) => {
   return fallback;
 };
 
+const bitcoinStatusChip = (blockchain) => {
+  const status = blockchain?.status || 'none';
+  if (status === 'anchored') {
+    return <Chip size="small" color="success" label="BTC anclado" />;
+  }
+  if (status === 'btc_broadcast') {
+    return <Chip size="small" color="info" label="BTC broadcast" />;
+  }
+  if (status === 'pending') {
+    return <Chip size="small" color="warning" label="BTC pending" />;
+  }
+  if (status === 'failed') {
+    return <Chip size="small" color="error" label="BTC falló" />;
+  }
+  return <Chip size="small" variant="outlined" label="Sin BTC" />;
+};
+
 const KnowledgePathSnapshotsDashboard = () => {
   const [paths, setPaths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [publishingId, setPublishingId] = useState(null);
+  const [anchoringKey, setAnchoringKey] = useState(null);
   const [success, setSuccess] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -101,15 +121,45 @@ const KnowledgePathSnapshotsDashboard = () => {
     }
   };
 
+  const handleAnchorBitcoin = async (pathId, version, { refresh = false } = {}) => {
+    const key = `${pathId}:${version}`;
+    try {
+      setAnchoringKey(key);
+      setError(null);
+      setSuccess(null);
+      const result = await knowledgePathsApi.broadcastPathSnapshotAnchor(
+        pathId,
+        version,
+        { refresh },
+      );
+      const chain = result.blockchain || {};
+      setSuccess(
+        refresh
+          ? `Confirmaciones actualizadas (v${version}): ${chain.status}`
+          : `Digest enviado a Bitcoin (v${version}): ${chain.status}${
+              chain.txid ? ` · ${chain.txid.slice(0, 16)}…` : ''
+            }`,
+      );
+      if (detail && detail.knowledgePathDbId === pathId && detail.version === version) {
+        setDetail((prev) => ({ ...prev, blockchain: chain }));
+      }
+      await load();
+    } catch (err) {
+      setError(formatError(err, 'No se pudo anclar el digest en Bitcoin'));
+    } finally {
+      setAnchoringKey(null);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
         Snapshots de knowledge paths
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Solo administradores. El snapshot se toma cuando haces clic en “Tomar snapshot”,
-        no al crear o publicar el camino. Se guarda el JSON canónico exacto (texto de
-        transcripciones incluido) y su digest SHA-256.
+        Solo administradores. Primero “Tomar snapshot” (Postgres), luego
+        “Anclar en Bitcoin” para escribir el digest en OP_RETURN (prefijo ACBC2),
+        reutilizando la misma wallet/Esplora que los transcripts.
       </Typography>
 
       {error && (
@@ -135,21 +185,36 @@ const KnowledgePathSnapshotsDashboard = () => {
                 <TableCell>Camino</TableCell>
                 <TableCell>Nodos</TableCell>
                 <TableCell>Estado</TableCell>
-                <TableCell>Último snapshot</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                  <TableCell>Último snapshot</TableCell>
+                  <TableCell>Bitcoin</TableCell>
+                  <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paths.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <Typography variant="body2" color="text.secondary">
                       No hay knowledge paths.
                     </Typography>
                   </TableCell>
                 </TableRow>
               )}
-              {paths.map((path) => (
+              {paths.map((path) => {
+                const latest = path.latestSnapshot;
+                const chain = latest?.blockchain;
+                const anchorKey = latest
+                  ? `${path.id}:${latest.version}`
+                  : null;
+                const canBroadcast =
+                  latest &&
+                  (!chain?.status ||
+                    ['none', 'pending', 'failed'].includes(chain.status));
+                const canRefresh =
+                  latest &&
+                  chain?.txid &&
+                  ['btc_broadcast', 'anchored'].includes(chain.status);
+                return (
                 <TableRow key={path.id} hover>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -174,22 +239,22 @@ const KnowledgePathSnapshotsDashboard = () => {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    {path.latestSnapshot ? (
+                    {latest ? (
                       <Box>
                         <Typography variant="body2">
-                          v{path.latestSnapshot.version}
+                          v{latest.version}
                         </Typography>
                         <Typography
                           variant="caption"
                           component="code"
                           sx={{ display: 'block', wordBreak: 'break-all' }}
                         >
-                          {path.latestSnapshot.digest.slice(0, 20)}…
+                          {latest.digest.slice(0, 20)}…
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {path.latestSnapshot.publishedAt}
-                          {path.latestSnapshot.publishedBy?.username
-                            ? ` · ${path.latestSnapshot.publishedBy.username}`
+                          {latest.publishedAt}
+                          {latest.publishedBy?.username
+                            ? ` · ${latest.publishedBy.username}`
                             : ''}
                         </Typography>
                       </Box>
@@ -199,16 +264,74 @@ const KnowledgePathSnapshotsDashboard = () => {
                       </Typography>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {latest ? (
+                      <Stack spacing={0.5}>
+                        {bitcoinStatusChip(chain)}
+                        {chain?.txid ? (
+                          <Typography
+                            variant="caption"
+                            component="a"
+                            href={
+                              chain.explorerUrl ||
+                              getBtcExplorerTxUrl(chain.txid, chain.network)
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ wordBreak: 'break-all' }}
+                          >
+                            {chain.txid.slice(0, 18)}…
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      {path.latestSnapshot && (
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
+                      {latest && (
                         <Button
                           size="small"
                           variant="outlined"
-                          onClick={() => openDetail(path.id, path.latestSnapshot.version)}
+                          onClick={() => openDetail(path.id, latest.version)}
                           sx={{ textTransform: 'none' }}
                         >
                           Ver
+                        </Button>
+                      )}
+                      {canBroadcast && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          startIcon={<CurrencyBitcoinIcon />}
+                          disabled={anchoringKey === anchorKey}
+                          onClick={() =>
+                            handleAnchorBitcoin(path.id, latest.version)
+                          }
+                          sx={{ textTransform: 'none' }}
+                        >
+                          {anchoringKey === anchorKey
+                            ? 'Anclando…'
+                            : 'Anclar en Bitcoin'}
+                        </Button>
+                      )}
+                      {canRefresh && (
+                        <Button
+                          size="small"
+                          variant="text"
+                          disabled={anchoringKey === anchorKey}
+                          onClick={() =>
+                            handleAnchorBitcoin(path.id, latest.version, {
+                              refresh: true,
+                            })
+                          }
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Refresh BTC
                         </Button>
                       )}
                       <Button
@@ -231,7 +354,8 @@ const KnowledgePathSnapshotsDashboard = () => {
                     </Stack>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -271,6 +395,38 @@ const KnowledgePathSnapshotsDashboard = () => {
                 el digest: <code>sha256sum archivo.jcs.json</code> debe coincidir con el
                 digest mostrado arriba.
               </Alert>
+              {detail.blockchain && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                    Bitcoin OP_RETURN
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    {bitcoinStatusChip(detail.blockchain)}
+                    {detail.blockchain.txid ? (
+                      <Typography
+                        variant="body2"
+                        component="a"
+                        href={
+                          detail.blockchain.explorerUrl ||
+                          getBtcExplorerTxUrl(
+                            detail.blockchain.txid,
+                            detail.blockchain.network,
+                          )
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ wordBreak: 'break-all' }}
+                      >
+                        {detail.blockchain.txid}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        {detail.blockchain.message || 'Aún no anclado'}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              )}
               <Box
                 component="pre"
                 sx={{
@@ -300,6 +456,25 @@ const KnowledgePathSnapshotsDashboard = () => {
           >
             Descargar JCS + digest
           </Button>
+          {detail &&
+            (!detail.blockchain?.status ||
+              ['none', 'pending', 'failed'].includes(detail.blockchain.status)) && (
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<CurrencyBitcoinIcon />}
+                disabled={
+                  anchoringKey ===
+                  `${detail.knowledgePathDbId}:${detail.version}`
+                }
+                onClick={() =>
+                  handleAnchorBitcoin(detail.knowledgePathDbId, detail.version)
+                }
+                sx={{ textTransform: 'none' }}
+              >
+                Anclar en Bitcoin
+              </Button>
+            )}
           <Button onClick={() => setDetail(null)} sx={{ textTransform: 'none' }}>
             Cerrar
           </Button>

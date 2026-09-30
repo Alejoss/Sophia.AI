@@ -5,7 +5,12 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import KnowledgePath, Node, PublishedKnowledgePathSnapshot
+from .models import (
+    KnowledgePath,
+    KnowledgePathSnapshotAnchor,
+    Node,
+    PublishedKnowledgePathSnapshot,
+)
 from .serializers import (
     KnowledgePathSerializer,
     KnowledgePathCreateSerializer,
@@ -31,6 +36,13 @@ from knowledge_paths.services.snapshot_publish import (
     SnapshotPublishError,
     publish_knowledge_path_snapshot,
     serialize_published_snapshot,
+)
+from knowledge_paths.services.snapshot_anchor import (
+    SnapshotAnchorError,
+    broadcast_snapshot_anchor,
+    ensure_pending_snapshot_anchor,
+    refresh_snapshot_anchor_confirmations,
+    serialize_snapshot_anchor,
 )
 from payments.services import get_or_create_path_purchase
 from django.contrib.contenttypes.models import ContentType
@@ -1239,11 +1251,84 @@ class KnowledgePathSnapshotDetailView(APIView):
             PublishedKnowledgePathSnapshot.objects.select_related(
                 'published_by',
                 'knowledge_path',
+                'bitcoin_anchor',
             ),
             knowledge_path_id=pk,
             version=version,
         )
         return Response(serialize_published_snapshot(snapshot))
+
+
+class KnowledgePathSnapshotAnchorView(APIView):
+    """Staff: get or broadcast Bitcoin OP_RETURN for a published snapshot digest."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def _get_snapshot(self, pk, version):
+        return get_object_or_404(
+            PublishedKnowledgePathSnapshot.objects.select_related(
+                'published_by',
+                'knowledge_path',
+                'bitcoin_anchor',
+            ),
+            knowledge_path_id=pk,
+            version=version,
+        )
+
+    def get(self, request, pk, version):
+        snapshot = self._get_snapshot(pk, version)
+        try:
+            anchor = snapshot.bitcoin_anchor
+        except KnowledgePathSnapshotAnchor.DoesNotExist:
+            anchor = None
+        return Response({
+            'knowledgePathDbId': snapshot.knowledge_path_id,
+            'version': snapshot.version,
+            'digest': snapshot.digest,
+            'blockchain': serialize_snapshot_anchor(anchor),
+        })
+
+    def post(self, request, pk, version):
+        snapshot = self._get_snapshot(pk, version)
+        dry_run = str(request.data.get('dry_run', '')).lower() in (
+            '1', 'true', 'yes', 'on',
+        )
+        refresh_only = str(request.data.get('refresh', '')).lower() in (
+            '1', 'true', 'yes', 'on',
+        )
+        network = request.data.get('network') or None
+
+        try:
+            if refresh_only:
+                try:
+                    anchor = snapshot.bitcoin_anchor
+                except KnowledgePathSnapshotAnchor.DoesNotExist as exc:
+                    raise SnapshotAnchorError(
+                        'No Bitcoin anchor exists for this snapshot yet'
+                    ) from exc
+                if not anchor.btc_txid:
+                    raise SnapshotAnchorError('Anchor has no btc_txid to refresh')
+                anchor = refresh_snapshot_anchor_confirmations(anchor)
+            else:
+                anchor = ensure_pending_snapshot_anchor(
+                    snapshot,
+                    network=network,
+                    anchored_by=request.user,
+                )
+                anchor = broadcast_snapshot_anchor(anchor, dry_run=dry_run)
+        except SnapshotAnchorError as exc:
+            return Response(
+                {'error': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            'knowledgePathDbId': snapshot.knowledge_path_id,
+            'version': snapshot.version,
+            'digest': snapshot.digest,
+            'dryRun': dry_run,
+            'blockchain': serialize_snapshot_anchor(anchor),
+        })
 
 
 class AdminKnowledgePathSnapshotDashboardView(APIView):
@@ -1252,9 +1337,19 @@ class AdminKnowledgePathSnapshotDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
+        from knowledge_paths.services.snapshot_anchor import blockchain_payload_for_snapshot
+
         paths = (
             KnowledgePath.objects.select_related('author')
-            .prefetch_related('published_snapshots')
+            .prefetch_related(
+                models.Prefetch(
+                    'published_snapshots',
+                    queryset=PublishedKnowledgePathSnapshot.objects.select_related(
+                        'bitcoin_anchor',
+                        'published_by',
+                    ),
+                )
+            )
             .annotate(node_count=models.Count('nodes', distinct=True))
             .order_by('-updated_at')
         )
@@ -1270,6 +1365,7 @@ class AdminKnowledgePathSnapshotDashboardView(APIView):
                     "digest": serialized["digest"],
                     "publishedAt": serialized["publishedAt"],
                     "publishedBy": serialized["publishedBy"],
+                    "blockchain": blockchain_payload_for_snapshot(latest),
                 }
             items.append({
                 "id": path.id,

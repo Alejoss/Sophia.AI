@@ -80,6 +80,8 @@ def serialize_published_snapshot(snapshot: PublishedKnowledgePathSnapshot) -> di
     else:
         published_at_str = None
 
+    from knowledge_paths.services.snapshot_anchor import blockchain_payload_for_snapshot
+
     return {
         "id": snapshot.id,
         "knowledgePathId": f"sophia-acbc:knowledge-path:{snapshot.knowledge_path_id}",
@@ -95,4 +97,5 @@ def serialize_published_snapshot(snapshot: PublishedKnowledgePathSnapshot) -> di
         },
         "document": snapshot.document,
         "canonical": snapshot.document_text,
+        "blockchain": blockchain_payload_for_snapshot(snapshot),
     }

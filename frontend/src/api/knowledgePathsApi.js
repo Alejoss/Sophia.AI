@@ -326,6 +326,25 @@ const knowledgePathsApi = {
     );
     return response.data;
   },
+
+  getPathSnapshotAnchor: async (pathId, version) => {
+    const response = await axiosInstance.get(
+      `/knowledge_paths/${pathId}/snapshots/${version}/anchor/`,
+    );
+    return response.data;
+  },
+
+  broadcastPathSnapshotAnchor: async (pathId, version, { dryRun = false, refresh = false, network } = {}) => {
+    const response = await axiosInstance.post(
+      `/knowledge_paths/${pathId}/snapshots/${version}/anchor/`,
+      {
+        dry_run: dryRun,
+        refresh,
+        ...(network ? { network } : {}),
+      },
+    );
+    return response.data;
+  },
 };
 
 export default knowledgePathsApi;
