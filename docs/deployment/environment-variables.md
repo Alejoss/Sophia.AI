@@ -395,9 +395,16 @@ Location: `frontend/.env`
 - **Note**: Injected at Vite build time. Set as a GitHub Repository variable for production image builds.
 
 #### `VITE_SENTRY_DSN`
-- **Description**: Sentry DSN for frontend error tracking
+- **Description**: Sentry DSN for frontend error tracking (production/beta builds only)
 - **Required**: No
 - **Example**: `VITE_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx`
+- **Note**: Ignored when Vite `MODE` is `development` / `dev` / `local` / `test` / `testing` (mirrors backend `ENVIRONMENT` gating). Do not rely on leaving this unset alone — `npm run dev` with a DSN in `.env` previously reported local errors to Sentry.
+
+#### `VITE_SENTRY_ENVIRONMENT`
+- **Description**: Optional Sentry `environment` label for the frontend SDK
+- **Required**: No (defaults to Vite `MODE`)
+- **Example**: `VITE_SENTRY_ENVIRONMENT=beta`
+- **Note**: Does not enable or disable reporting; enablement follows Vite `MODE` only.
 
 ## Environment File Examples
 
