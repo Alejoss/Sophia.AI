@@ -219,6 +219,11 @@ class CoursePurchase(models.Model):
         related_name='purchases',
     )
     price_amount = models.FloatField(help_text='USD price copied from the course when checkout opened.')
+    receipt_email = models.EmailField(
+        blank=True,
+        default='',
+        help_text='Email confirmed at checkout for receipt and course access notices.',
+    )
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,

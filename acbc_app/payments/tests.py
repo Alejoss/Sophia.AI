@@ -2319,6 +2319,47 @@ class CoursePurchasePaymentTests(TestCase):
         self.assertEqual(response.data['title'], course.title)
         self.assertEqual(response.data['payment_status'], 'PENDING')
         self.assertFalse(response.data['is_paid'])
+        self.assertEqual(response.data['receipt_email'], '')
+
+    def test_course_purchase_stores_receipt_email(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': ' Alumno@Example.COM ',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['receipt_email'], 'alumno@example.com')
+        purchase = CoursePurchase.objects.get(pk=response.data['id'])
+        self.assertEqual(purchase.receipt_email, 'alumno@example.com')
+
+        updated = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'otro@example.com',
+            },
+            format='json',
+        )
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertEqual(updated.data['id'], response.data['id'])
+        self.assertEqual(updated.data['receipt_email'], 'otro@example.com')
+
+    def test_course_purchase_rejects_invalid_receipt_email(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'no-es-un-correo',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('correo', response.data['error'].lower())
 
     @patch('payments.services.NOWPaymentsClient.create_invoice')
     def test_invoice_charges_the_course_price(self, mock_create_invoice):

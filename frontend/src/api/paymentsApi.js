@@ -29,11 +29,13 @@ export const getCourse = async (courseCode) => {
   }
 };
 
-export const createOrGetCoursePurchase = async (courseCode) => {
+export const createOrGetCoursePurchase = async (courseCode, { receiptEmail } = {}) => {
   try {
-    const response = await axiosInstance.post('/payments/course-purchases/', {
-      course_code: courseCode,
-    });
+    const body = { course_code: courseCode };
+    if (receiptEmail != null) {
+      body.receipt_email = receiptEmail;
+    }
+    const response = await axiosInstance.post('/payments/course-purchases/', body);
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo iniciar la compra del curso');

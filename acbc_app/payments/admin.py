@@ -70,11 +70,18 @@ class CoursePurchaseAdmin(admin.ModelAdmin):
         'user',
         'course',
         'price_amount',
+        'receipt_email',
         'payment_status',
         'created_at',
     )
     list_filter = ('payment_status', 'course')
-    search_fields = ('user__username', 'course__code', 'course__title')
+    search_fields = (
+        'user__username',
+        'user__email',
+        'receipt_email',
+        'course__code',
+        'course__title',
+    )
     readonly_fields = ('created_at', 'updated_at')
 
 

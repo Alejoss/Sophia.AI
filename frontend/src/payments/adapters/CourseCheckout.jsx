@@ -3,7 +3,9 @@ import ProductPaymentCheckout from '../ProductPaymentCheckout';
 import { PRODUCT_KINDS } from '../productCatalog';
 
 /**
- * Fixed-price course checkout. Same chooser as events: NOWPayments and Monero.
+ * Fixed-price course checkout. Same rails as events: NOWPayments + Monero.
+ * Direct BCH is intentionally off (no course BCH target); BCH is available
+ * inside the NOWPayments hosted invoice among other cryptos.
  */
 const CourseCheckout = ({
   open,

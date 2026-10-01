@@ -265,6 +265,7 @@ def _course_purchase_payload(purchase: CoursePurchase) -> dict:
         'course_code': purchase.course.code,
         'title': purchase.course.title,
         'price_amount': purchase.price_amount,
+        'receipt_email': purchase.receipt_email or '',
         'payment_status': purchase.payment_status,
         'is_paid': purchase.is_paid,
     }
@@ -295,8 +296,13 @@ class CoursePurchaseView(APIView):
 
     def post(self, request):
         course_code = (request.data.get('course_code') or '').strip()
+        receipt_email = request.data.get('receipt_email')
         try:
-            purchase = get_or_create_course_purchase(course_code=course_code, user=request.user)
+            purchase = get_or_create_course_purchase(
+                course_code=course_code,
+                user=request.user,
+                receipt_email=receipt_email,
+            )
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(_course_purchase_payload(purchase), status=status.HTTP_200_OK)

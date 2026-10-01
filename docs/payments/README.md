@@ -13,13 +13,16 @@ Crypto checkout for Academia Blockchain. Complementary paths:
 
 All buyer checkouts share one chooser (`ProductPaymentCheckout`) entered through thin product adapters:
 
-| Product | Adapter | NOW | BCH | Monero | Platform tokens |
-|---------|---------|-----|-----|--------|-----------------|
+| Product | Adapter | NOW | BCH directo | Monero | Platform tokens |
+|---------|---------|-----|-------------|--------|-----------------|
 | Knowledge path | `PathCheckout` | if for sale | if staff flag | if for sale | no |
 | Topic consultas | `TopicCheckout` | **no** (no backend) | if staff flag | if for sale | no |
 | Event registration | `EventCheckout` | yes | no | yes | no |
+| Course (`CoursePurchase`) | `CourseCheckout` | yes | **no** (no `course_purchase` BCH target yet; BCH still selectable inside NOWPayments) | yes | no |
 | Transcript anchor | `AnchorCheckout` | gateway | gateway | yes | yes |
 | Token package | `TokenCheckout` | yes | yes | **no** | n/a |
+
+Course checkout UX (`/courses/<code>/checkout`): confirm receipt email first, then open the method chooser. `CoursePurchase.receipt_email` stores the address from that step.
 
 Method availability is centralized in `frontend/src/payments/productCatalog.js` (`resolveAvailableMethods`) and combined with `GET /payments/status/`. NOWPayments invoices use a single `paymentTarget: { kind, purchaseId }` shape (`nowpaymentsTarget.js`); legacy ID props on `CryptoPaymentModal` remain as shims.
 
