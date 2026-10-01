@@ -190,7 +190,7 @@ const RealHistoriaBitcoinLanding = () => {
               {offerState !== 'closed' ? (
                 <Button
                   component={Link}
-                  to="/courses/real-historia-bitcoin/checkout"
+                  to="/cursos/real-historia-bitcoin/checkout"
                   variant="text"
                   className="brand-button brand-button-secondary"
                 >
@@ -513,7 +513,7 @@ const RealHistoriaBitcoinLanding = () => {
             <div className="rhb-inline-cta">
               <Button
                 component={Link}
-                to="/courses/real-historia-bitcoin/checkout"
+                to="/cursos/real-historia-bitcoin/checkout"
                 variant="contained"
                 endIcon={<ArrowForwardIcon />}
                 className="brand-button brand-button-primary"

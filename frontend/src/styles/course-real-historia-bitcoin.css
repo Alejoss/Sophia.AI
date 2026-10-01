@@ -805,6 +805,7 @@ html:has(.rhb-page) {
   position: relative;
   min-height: 70vh;
   padding: 120px 0 88px;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   background:
     radial-gradient(ellipse 80% 50% at 10% 0%, rgba(240, 100, 0, 0.12), transparent 55%),
     radial-gradient(ellipse 60% 40% at 90% 20%, rgba(23, 35, 44, 0.08), transparent 50%),
@@ -820,6 +821,7 @@ html:has(.rhb-page) {
   align-items: center;
   gap: 10px;
   margin-bottom: 28px;
+  font-family: inherit;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -841,22 +843,40 @@ html:has(.rhb-page) {
   background: var(--rhb-line);
 }
 
-.rhb-checkout-heading {
+.rhb-checkout-heading,
+.rhb-checkout-summary-price {
   margin: 0 0 8px !important;
-  font-family: Georgia, 'Times New Roman', serif !important;
-  font-size: clamp(2rem, 4vw, 2.75rem) !important;
+  font-family: inherit !important;
+  font-size: 1.5rem !important;
   font-weight: 700 !important;
-  letter-spacing: -0.03em !important;
-  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.25 !important;
   color: var(--rhb-ink) !important;
+}
+
+.rhb-checkout-lead,
+.rhb-checkout-summary-title,
+.rhb-checkout-note,
+.rhb-checkout-form .MuiFormLabel-root,
+.rhb-checkout-form .MuiInputBase-input,
+.rhb-checkout-form .MuiFormHelperText-root {
+  font-family: inherit !important;
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.5 !important;
+}
+
+.rhb-checkout-shell .brand-button {
+  font-family: inherit !important;
+  font-size: 1rem !important;
+  letter-spacing: 0 !important;
 }
 
 .rhb-checkout-lead {
   margin: 0 0 28px !important;
   max-width: 34rem;
   color: var(--rhb-muted) !important;
-  font-size: 1.05rem !important;
-  line-height: 1.55 !important;
 }
 
 .rhb-checkout-summary {
@@ -868,18 +888,12 @@ html:has(.rhb-page) {
 
 .rhb-checkout-summary-title {
   margin: 0 0 8px !important;
-  font-size: 1.15rem !important;
   font-weight: 700 !important;
-  line-height: 1.35 !important;
   color: var(--rhb-ink) !important;
 }
 
 .rhb-checkout-summary-price {
   margin: 0 !important;
-  font-size: 1.85rem !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.02em !important;
-  color: var(--rhb-ink) !important;
 }
 
 .rhb-checkout-form {
@@ -897,8 +911,6 @@ html:has(.rhb-page) {
   margin: 28px 0 0 !important;
   max-width: 34rem;
   color: var(--rhb-muted) !important;
-  font-size: 0.92rem !important;
-  line-height: 1.5 !important;
 }
 
 @media (max-width: 600px) {

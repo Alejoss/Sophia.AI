@@ -764,7 +764,7 @@ def create_course_purchase_payment(*, course_purchase: CoursePurchase, user, pay
     order_id = f'course-{course_purchase.id}-{uuid.uuid4().hex[:12]}'
     ipn_url = f'{_public_base_url()}/api/payments/ipn/'
     frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
-    return_url = f'{frontend_base}/courses/{course_purchase.course.code}/checkout'
+    return_url = f'{frontend_base}/cursos/{course_purchase.course.code}/checkout'
 
     payload = client.create_invoice(
         price_amount=float(course_purchase.price_amount),

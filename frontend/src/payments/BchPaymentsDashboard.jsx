@@ -72,7 +72,7 @@ const productLink = (order) => {
     return `/content/topics/${order.product_id}`;
   }
   if (order.product_type === 'course' && order.product_id) {
-    return `/courses/${order.product_id}`;
+    return `/cursos/${order.product_id}`;
   }
   return null;
 };
