@@ -6,10 +6,45 @@ from payments.models import (
     CourseEvent,
     CoursePurchase,
     CryptoPayment,
+    PayphonePayment,
     TokenLedgerEntry,
     TokenPackage,
     TokenPurchase,
 )
+
+
+@admin.register(PayphonePayment)
+class PayphonePaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        'client_transaction_id',
+        'status',
+        'amount_cents',
+        'payphone_payment_id',
+        'transaction_id',
+        'event_registration',
+        'path_purchase',
+        'topic_purchase',
+        'anchor_request',
+        'token_purchase',
+        'course_purchase',
+        'created_at',
+    )
+    list_filter = ('status',)
+    search_fields = (
+        'client_transaction_id',
+        'payphone_payment_id',
+        'transaction_id',
+        'event_registration__user__username',
+        'path_purchase__user__username',
+        'topic_purchase__user__username',
+        'anchor_request__requester__username',
+        'token_purchase__user__username',
+        'course_purchase__user__username',
+        'course_purchase__course__code',
+    )
+    readonly_fields = (
+        'created_at', 'updated_at', 'provider_payload', 'confirm_payload', 'paid_at',
+    )
 
 
 @admin.register(CryptoPayment)

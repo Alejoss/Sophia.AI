@@ -221,6 +221,30 @@ docker compose exec backend python manage.py broadcast_transcript_anchor 123 --r
 # docker compose -f docker-compose.prod.yml --env-file .env.compose exec backend python manage.py broadcast_transcript_anchor --show-address
 ```
 
+### Payphone Botón de pago (card)
+
+Card / Payphone-balance checkout via hosted redirect. See [payphone-setup.md](../payments/payphone-setup.md).
+
+#### `PAYPHONE_TOKEN`
+- **Description**: Bearer token from Payphone Developers (Credenciales)
+- **Required**: Yes, to enable `methods.payphone`
+- **Default**: empty (disabled)
+
+#### `PAYPHONE_STORE_ID`
+- **Description**: StoreId from Payphone Developers
+- **Required**: Yes, to enable `methods.payphone`
+- **Default**: empty (disabled)
+
+#### `PAYPHONE_API_URL`
+- **Default**: `https://pay.payphonetodoesposible.com/api`
+
+#### `PAYPHONE_TIMEZONE_OFFSET`
+- **Default**: `-5` (America/Guayaquil)
+
+#### `PAYPHONE_IVA_PERCENT`
+- **Description**: When `> 0`, split the buyer-facing USD total into `amountWithTax` + `tax` (e.g. `15` for Ecuador IVA). When `0`, send the full amount as `amountWithoutTax`.
+- **Default**: `0`
+
 ### Bitcoin Cash direct (anchor request payments)
 
 Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and knowledge paths stay on NOWPayments). See [bch-direct.md](../payments/bch-direct.md).

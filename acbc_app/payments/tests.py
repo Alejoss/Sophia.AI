@@ -2568,3 +2568,115 @@ class CourseBchPaymentTests(TestCase):
                 user=self.buyer,
                 client=client,
             )
+
+
+@override_settings(
+    PAYPHONE_TOKEN='test-payphone-token',
+    PAYPHONE_STORE_ID='store-123',
+    PAYPHONE_IVA_PERCENT=0,
+    ACADEMIA_PUBLIC_URL='http://localhost:8000',
+    FRONTEND_PUBLIC_URL='http://localhost:5173',
+)
+class PayphoneButtonTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+        self.course = Course.objects.create(
+            code='payphone-course',
+            title='Payphone Course',
+            price_usd=10.0,
+            sales_enabled=True,
+        )
+        self.purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=self.course,
+            price_amount=10.0,
+            payment_status='PENDING',
+        )
+
+    def test_status_exposes_payphone_when_configured(self):
+        response = self.client.get(reverse('payment-gateway-status'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['methods']['payphone'])
+        self.assertTrue(response.data['payphone_enabled'])
+
+    @override_settings(PAYPHONE_TOKEN='', PAYPHONE_STORE_ID='')
+    def test_status_hides_payphone_when_unconfigured(self):
+        response = self.client.get(reverse('payment-gateway-status'))
+        self.assertFalse(response.data['methods']['payphone'])
+
+    @patch('payments.payphone_services.PayphoneClient.prepare')
+    def test_create_payphone_order_for_course(self, mock_prepare):
+        mock_prepare.return_value = {
+            'paymentId': 'PayIdABC',
+            'payWithCard': 'https://pay.example/card?paymentId=PayIdABC',
+            'payWithPayPhone': 'https://pay.example/pp?paymentId=PayIdABC',
+        }
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('payphone-payment-create'),
+            {'kind': 'course', 'purchaseId': self.purchase.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+        self.assertEqual(response.data['amount_cents'], 1000)
+        self.assertIn('pay.example/card', response.data['pay_with_card_url'])
+        mock_prepare.assert_called_once()
+        prepare_kwargs = mock_prepare.call_args.kwargs
+        self.assertEqual(prepare_kwargs['amount'], 1000)
+        self.assertEqual(prepare_kwargs['amount_without_tax'], 1000)
+        self.assertTrue(
+            prepare_kwargs['response_url'].endswith('/api/payments/payphone/return/')
+        )
+
+    @patch('payments.payphone_services.PayphoneClient.confirm')
+    @patch('payments.payphone_services.PayphoneClient.prepare')
+    def test_return_confirms_and_marks_course_paid(self, mock_prepare, mock_confirm):
+        from payments.models import PayphonePayment
+        from payments.payphone_services import create_or_reuse_payphone_payment
+
+        mock_prepare.return_value = {
+            'paymentId': 'PayIdXYZ',
+            'payWithCard': 'https://pay.example/card?paymentId=PayIdXYZ',
+            'payWithPayPhone': 'https://pay.example/pp?paymentId=PayIdXYZ',
+        }
+        mock_confirm.return_value = {
+            'statusCode': 3,
+            'transactionStatus': 'Approved',
+            'transactionId': 998877,
+            'amount': 1000,
+            'clientTransactionId': 'will-be-overwritten',
+        }
+        payment = create_or_reuse_payphone_payment(
+            user=self.buyer,
+            course_purchase=self.purchase,
+        )
+        mock_confirm.return_value['clientTransactionId'] = payment.client_transaction_id
+
+        response = self.client.get(
+            reverse('payphone-return'),
+            {
+                'id': '998877',
+                'clientTransactionId': payment.client_transaction_id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertIn('/payments/payphone/result', response['Location'])
+        self.assertIn('status=approved', response['Location'])
+
+        payment.refresh_from_db()
+        self.purchase.refresh_from_db()
+        self.assertEqual(payment.status, PayphonePayment.STATUS_APPROVED)
+        self.assertEqual(payment.transaction_id, 998877)
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_split_amount_with_iva(self):
+        from payments.payphone_services import split_amount_for_payphone
+
+        with override_settings(PAYPHONE_IVA_PERCENT=15):
+            fields = split_amount_for_payphone(115)
+        self.assertEqual(fields['amount'], 115)
+        self.assertEqual(fields['amount_with_tax'], 100)
+        self.assertEqual(fields['tax'], 15)
+        self.assertIsNone(fields['amount_without_tax'])

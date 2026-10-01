@@ -355,6 +355,10 @@ def pay_anchor_request_with_tokens(
                 )
             abandon_waiting_nowpayments(anchor_request=req)
 
+            from payments.payphone_services import abandon_pending_payphone, has_pending_payphone
+            if has_pending_payphone(anchor_request=req):
+                abandon_pending_payphone(anchor_request=req)
+
             pending_bch = BchDirectPayment.objects.filter(
                 anchor_request=req,
                 status=BchDirectPayment.STATUS_PENDING,
@@ -457,6 +461,8 @@ def cancel_token_purchase(*, token_purchase: TokenPurchase, user) -> TokenPurcha
             updated_at=timezone.now(),
         )
         abandon_waiting_nowpayments(token_purchase=purchase)
+        from payments.payphone_services import abandon_pending_payphone
+        abandon_pending_payphone(token_purchase=purchase)
         logger.info(
             'Token purchase %s cancelled by user_id=%s',
             purchase.pk,
@@ -588,6 +594,26 @@ def abandon_waiting_nowpayments(
     )
 
 
+def _abandon_pending_payphone_for_now(
+    *,
+    event_registration=None,
+    path_purchase=None,
+    anchor_request=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> None:
+    """Drop unused Payphone button orders when starting a NOWPayments invoice."""
+    from payments.payphone_services import abandon_pending_payphone
+
+    abandon_pending_payphone(
+        event_registration=event_registration,
+        path_purchase=path_purchase,
+        anchor_request=anchor_request,
+        token_purchase=token_purchase,
+        course_purchase=course_purchase,
+    )
+
+
 def create_event_registration_payment(*, event_registration: EventRegistration, user, pay_currency=None) -> CryptoPayment:
     if event_registration.user_id != user.id:
         raise PermissionError('Solo el participante puede iniciar el pago.')
@@ -609,6 +635,8 @@ def create_event_registration_payment(*, event_registration: EventRegistration, 
     )
     if reused:
         return reused
+
+    _abandon_pending_payphone_for_now(event_registration=event_registration)
 
     from django.conf import settings
 
@@ -759,6 +787,8 @@ def create_course_purchase_payment(*, course_purchase: CoursePurchase, user, pay
     if reused:
         return reused
 
+    _abandon_pending_payphone_for_now(course_purchase=course_purchase)
+
     from django.conf import settings
 
     order_id = f'course-{course_purchase.id}-{uuid.uuid4().hex[:12]}'
@@ -842,6 +872,8 @@ def create_path_purchase_payment(*, path_purchase: KnowledgePathPurchase, user, 
     if reused:
         return reused
 
+    _abandon_pending_payphone_for_now(path_purchase=path_purchase)
+
     from django.conf import settings
 
     order_id = f'kp-purchase-{path_purchase.id}-{uuid.uuid4().hex[:12]}'
@@ -916,6 +948,8 @@ def create_anchor_request_payment(
     )
     if reused:
         return reused
+
+    _abandon_pending_payphone_for_now(anchor_request=anchor_request)
 
     from django.conf import settings
 
@@ -1008,6 +1042,8 @@ def create_token_purchase_payment(*, token_purchase: TokenPurchase, user, pay_cu
     )
     if reused:
         return reused
+
+    _abandon_pending_payphone_for_now(token_purchase=token_purchase)
 
     from django.conf import settings
 

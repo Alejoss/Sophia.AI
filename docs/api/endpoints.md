@@ -536,7 +536,7 @@ Custom in-app notification API under profiles. See [Notifications (backend)](../
 
 ## Payments
 
-Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custody: [bch-direct.md](../payments/bch-direct.md). NOWPayments: [nowpayments-setup.md](../payments/nowpayments-setup.md).
+Checkout rails. Full setup: [payments/](../payments/README.md). Payphone card: [payphone-setup.md](../payments/payphone-setup.md). BCH self-custody: [bch-direct.md](../payments/bch-direct.md). NOWPayments: [nowpayments-setup.md](../payments/nowpayments-setup.md).
 
 ### Gateway status
 - **GET** `/api/payments/status/`
@@ -580,6 +580,12 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/token-purchase/{id}/bch/verify/`
 - **Auth**: Required
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
+### Payphone (Botón de pago)
+- **POST** `/api/payments/payphone/` — `{ "kind", "purchaseId" }` create order (buyer only)
+- **GET** `/api/payments/payphone/{id}/` — Payphone row for buyer/staff
+- **GET** `/api/payments/payphone/return/` — browser return URL; confirms with Payphone then redirects to frontend (no JWT)
+- Docs: [payphone-setup.md](../payments/payphone-setup.md)
 
 ### Payment detail / IPN
 - **GET** `/api/payments/{id}/` — NOWPayments row; syncs with the provider
