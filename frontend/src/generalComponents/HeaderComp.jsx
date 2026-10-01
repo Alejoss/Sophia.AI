@@ -218,6 +218,7 @@ const HeaderComp = () => {
   const mobileAuthLinks = isAuthenticated
     ? [
         { to: '/profiles/my_profile', label: user.username },
+        { to: '/content/library_user', label: 'Mi Biblioteca' },
         { to: '/profiles/logout', label: 'Cerrar sesión' },
       ]
     : guestLinks;
@@ -332,6 +333,13 @@ const HeaderComp = () => {
                   onClick={handleProfileMenuClose}
                 >
                   Mi perfil
+                </MenuItem>
+                <MenuItem
+                  component={Link}
+                  to="/content/library_user"
+                  onClick={handleProfileMenuClose}
+                >
+                  Mi Biblioteca
                 </MenuItem>
                 <MenuItem
                   component={Link}
