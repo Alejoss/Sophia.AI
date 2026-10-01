@@ -11,6 +11,12 @@ urlpatterns = [
     path('course-purchases/', views.CoursePurchaseView.as_view(), name='course-purchase-create'),
     path('course-purchase/<int:purchase_id>/', views.CoursePurchasePaymentView.as_view(), name='course-purchase-payment-create'),
     path('course-purchase/<int:purchase_id>/list/', views.CoursePurchasePaymentsListView.as_view(), name='course-purchase-payments-list'),
+    path('course-purchase/<int:purchase_id>/bch/', views.CoursePurchaseBchPaymentView.as_view(), name='course-purchase-bch'),
+    path(
+        'course-purchase/<int:purchase_id>/bch/verify/',
+        views.CoursePurchaseBchVerifyView.as_view(),
+        name='course-purchase-bch-verify',
+    ),
     path('path-purchase/<int:purchase_id>/', views.PathPurchasePaymentView.as_view(), name='path-purchase-payment-create'),
     path('path-purchase/<int:purchase_id>/list/', views.PathPurchasePaymentsListView.as_view(), name='path-purchase-payments-list'),
     path('anchor-request/<int:request_id>/', views.AnchorRequestPaymentView.as_view(), name='anchor-request-payment-create'),

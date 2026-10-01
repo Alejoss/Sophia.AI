@@ -400,7 +400,9 @@ const ProductPaymentCheckout = ({
                   disabled={!methods.nowpayments}
                   onClick={() => setMethod('nowpayments')}
                 >
-                  NOWPayments (varias criptos)
+                  {catalogAllowsBch
+                    ? 'NOWPayments (varias criptos)'
+                    : 'NOWPayments (BCH, BTC y más)'}
                 </Button>
               )}
               {catalogAllowsBch && (

@@ -4,13 +4,14 @@ Además de [NOWPayments](nowpayments-setup.md), Academia Blockchain puede cobrar
 precio fijo de una `TranscriptAnchorRequest` (`price_amount`, default
 `ANCHOR_REQUEST_PRICE_USD`) en **Bitcoin Cash** hacia una wallet propia.
 
-Cubre tres productos cuando tienen precio y la venta está activa
-(`/dashboard/pagos-bch` → **En venta**):
+Cubre estos productos cuando tienen precio y la venta está activa
+(`/dashboard/pagos-bch` → **En venta** para caminos/temas):
 
 - Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
 - Caminos de conocimiento con `reference_price > 0` y `sales_enabled`
 - Consultas de un tema con `reference_price > 0` y `sales_enabled`
 - Paquetes de tokens de plataforma (siempre, si hay dirección BCH)
+- Cursos fijos (`CoursePurchase`, si hay dirección BCH y el curso está a la venta)
 
 Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
 configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por
@@ -290,6 +291,8 @@ verificar**, no crear la orden.
 | POST | `/api/payments/path-purchase/<id>/bch/verify/` | Comprador o autor | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
 | GET/POST | `/api/payments/topic-purchase/<id>/bch/` | Comprador (POST) | Orden BCH de Consultas |
 | POST | `/api/payments/topic-purchase/<id>/bch/verify/` | Comprador o moderador | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
+| GET/POST | `/api/payments/course-purchase/<id>/bch/` | Comprador (POST) | Orden BCH del curso |
+| POST | `/api/payments/course-purchase/<id>/bch/verify/` | Comprador o staff | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
 
 ### Serializer (`BchDirectPayment`)
 

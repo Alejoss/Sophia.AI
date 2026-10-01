@@ -20,9 +20,10 @@ const gatewayAllOff = {
 };
 
 describe('productCatalog matrix', () => {
-  it('defines the five buyer product kinds', () => {
+  it('defines the buyer product kinds', () => {
     expect(Object.keys(PRODUCT_CATALOG).sort()).toEqual([
       'anchor',
+      'course',
       'event',
       'path',
       'token_package',
@@ -98,6 +99,31 @@ describe('productCatalog matrix', () => {
       monero: true,
       platform_tokens: false,
     });
+  });
+
+  it('course: NOW + BCH + Monero when gateway on; never tokens', () => {
+    const methods = resolveAvailableMethods({
+      kind: PRODUCT_KINDS.COURSE,
+      gatewayStatus: gatewayAllOn,
+      productFlags: {},
+    });
+    expect(methods).toMatchObject({
+      nowpayments: true,
+      bch_direct: true,
+      monero: true,
+      platform_tokens: false,
+    });
+  });
+
+  it('course: disables NOW/BCH when gateway reports them off', () => {
+    const methods = resolveAvailableMethods({
+      kind: PRODUCT_KINDS.COURSE,
+      gatewayStatus: gatewayAllOff,
+      productFlags: {},
+    });
+    expect(methods.nowpayments).toBe(false);
+    expect(methods.bch_direct).toBe(false);
+    expect(methods.monero).toBe(true);
   });
 
   it('anchor: tokens + NOW + BCH + Monero when gateway on', () => {

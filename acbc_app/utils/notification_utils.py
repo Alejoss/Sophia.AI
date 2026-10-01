@@ -2590,6 +2590,7 @@ def notify_bch_txid_reported(payment, *, note: str = ''):
             type_label = {
                 'path': 'camino',
                 'topic': 'tema',
+                'course': 'curso',
             }.get(product_type, 'producto')
             owner_description = (
                 f'{buyer.username} reportó el pago BCH de su compra del {type_label} '
@@ -2641,6 +2642,8 @@ def _send_bch_txid_reported_email_to_admins(
         'path': 'Camino de conocimiento',
         'topic': 'Consultas de tema',
         'anchor': 'Anclaje de transcript',
+        'course': 'Curso',
+        'token_package': 'Paquete de tokens',
     }.get(product_type, 'Producto')
 
     try:

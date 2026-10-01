@@ -1,9 +1,13 @@
 import React, { useRef } from 'react';
 import ProductPaymentCheckout from '../ProductPaymentCheckout';
+import {
+  createCoursePurchaseBchPayment,
+  verifyCoursePurchaseBchPayment,
+} from '../../api/paymentsApi';
 import { PRODUCT_KINDS } from '../productCatalog';
 
 /**
- * Fixed-price course checkout. Same chooser as events: NOWPayments and Monero.
+ * Fixed-price course checkout: NOWPayments, direct BCH, and Monero.
  */
 const CourseCheckout = ({
   open,
@@ -25,6 +29,16 @@ const CourseCheckout = ({
       priceUsd={priceUsd}
       productKind={PRODUCT_KINDS.COURSE}
       productFlags={{}}
+      createBchPayment={
+        activePurchaseId != null
+          ? () => createCoursePurchaseBchPayment(activePurchaseId)
+          : undefined
+      }
+      verifyBchPayment={
+        activePurchaseId != null
+          ? (txid) => verifyCoursePurchaseBchPayment(activePurchaseId, txid)
+          : undefined
+      }
       paymentTarget={
         activePurchaseId != null
           ? { kind: PRODUCT_KINDS.COURSE, purchaseId: activePurchaseId }
