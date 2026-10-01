@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import RealHistoriaBitcoinCheckout from '../RealHistoriaBitcoinCheckout.jsx';
@@ -94,8 +94,8 @@ describe('RealHistoriaBitcoinCheckout', () => {
     );
 
     const input = await screen.findByLabelText(/correo para el recibo/i);
-    await user.clear(input);
-    await user.type(input, 'no-es-correo');
+    fireEvent.change(input, { target: { value: 'no-es-correo' } });
+    expect(input).toHaveValue('no-es-correo');
     await user.click(screen.getByRole('button', { name: /continuar al pago/i }));
 
     expect(await screen.findByText(/correo electrónico válido/i)).toBeInTheDocument();

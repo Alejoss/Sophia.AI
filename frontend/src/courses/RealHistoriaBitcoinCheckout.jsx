@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -37,6 +37,7 @@ const RealHistoriaBitcoinCheckout = () => {
   const navigate = useNavigate();
   const { authState, authInitialized } = useAuth();
   const accountEmail = authState.user?.email || '';
+  const emailPrefillDone = useRef(false);
 
   const [course, setCourse] = useState(null);
   const [purchase, setPurchase] = useState(null);
@@ -65,10 +66,10 @@ const RealHistoriaBitcoinCheckout = () => {
   }, [authInitialized, authState.isAuthenticated, navigate]);
 
   useEffect(() => {
-    if (accountEmail && !email) {
-      setEmail(accountEmail);
-    }
-  }, [accountEmail, email]);
+    if (emailPrefillDone.current || !accountEmail) return;
+    emailPrefillDone.current = true;
+    setEmail(accountEmail);
+  }, [accountEmail]);
 
   useEffect(() => {
     if (!authInitialized || !authState.isAuthenticated) return undefined;
