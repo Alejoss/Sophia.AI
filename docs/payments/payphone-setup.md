@@ -4,7 +4,7 @@ Card checkout (Visa / Mastercard / Diners / Discover) and Payphone balance via [
 
 ## Flow
 
-1. Buyer chooses **Tarjeta (Payphone)** in `ProductPaymentCheckout`.
+1. Buyer chooses **Tarjeta de Crédito (Payphone)** in `ProductPaymentCheckout`.
 2. Frontend `POST /api/payments/payphone/` with `{ kind, purchaseId }`.
 3. Backend calls Payphone `POST /api/button/Prepare` and stores a `PayphonePayment`.
 4. Browser redirects to `payWithCard` (full page — no iframe).

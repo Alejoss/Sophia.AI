@@ -447,7 +447,7 @@ const ProductPaymentCheckout = ({
                   disabled={!methods.payphone || payphoneBusy}
                   onClick={startPayphone}
                 >
-                  {payphoneBusy ? 'Abriendo Payphone…' : 'Tarjeta (Payphone)'}
+                  {payphoneBusy ? 'Abriendo Payphone…' : 'Tarjeta de Crédito (Payphone)'}
                 </Button>
               )}
               {catalogAllowsPayphone && payphoneError && method === null && (
