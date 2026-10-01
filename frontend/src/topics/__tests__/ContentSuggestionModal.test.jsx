@@ -27,7 +27,17 @@ vi.mock('../../content/LibrarySelectMultiple', () => ({
 }));
 
 vi.mock('../../content/UploadContentForm', () => ({
-  default: () => <div data-testid="upload-content-form" />,
+  default: ({ onContentUploaded }) => (
+    <form
+      data-testid="upload-content-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onContentUploaded?.({ id: 55, content: { id: 88 }, title: 'Uploaded via URL' });
+      }}
+    >
+      <button type="submit">Guardar Contenido</button>
+    </form>
+  ),
 }));
 
 const goToMessageStep = async (user) => {
@@ -87,5 +97,33 @@ describe('ContentSuggestionModal', () => {
       await screen.findByText(/no se pudo crear la sugerencia/i),
     ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not nest UploadContentForm inside another form (upload can save to library)', async () => {
+    const user = userEvent.setup();
+    mockCreateContentSuggestion.mockResolvedValue({});
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+
+    renderWithProviders(
+      <ContentSuggestionModal open topicId={7} onClose={onClose} onSuccess={onSuccess} />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /desde url/i }));
+    const uploadForm = await screen.findByTestId('upload-content-form');
+    expect(uploadForm.tagName).toBe('FORM');
+    // Nested forms are invalid HTML; upload form must be the only ancestor form.
+    expect(uploadForm.parentElement?.closest('form')).toBeNull();
+    expect(document.querySelectorAll('[data-testid="upload-content-form"]').length).toBe(1);
+
+    await user.click(screen.getByRole('button', { name: /guardar contenido/i }));
+    await screen.findByLabelText(/mensaje para moderadores/i);
+    await user.click(screen.getByRole('button', { name: /sugerir contenido/i }));
+
+    await waitFor(() => {
+      expect(mockCreateContentSuggestion).toHaveBeenCalledWith(7, 88, '');
+      expect(onSuccess).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
   });
 });

@@ -158,8 +158,7 @@ const KnowledgePathSnapshotsDashboard = () => {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Solo administradores. Primero “Tomar snapshot” (Postgres), luego
-        “Anclar en Bitcoin” para escribir el digest en OP_RETURN (prefijo ACBC2),
-        reutilizando la misma wallet/Esplora que los transcripts.
+        “Anclar en Bitcoin” para escribir el digest en OP_RETURN (prefijo ACBC2).
       </Typography>
 
       {error && (
