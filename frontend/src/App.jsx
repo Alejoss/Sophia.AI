@@ -90,6 +90,7 @@ import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import CommunityBubble from './generalComponents/CommunityBubble.jsx';
 import Dashboard, { DashboardHome } from './generalComponents/Dashboard.jsx';
+import ConsultationsDashboard from './topics/ConsultationsDashboard.jsx';
 import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import BchPaymentsDashboard from './payments/BchPaymentsDashboard.jsx';
 import KnowledgePathSnapshotsDashboard from './knowledgePaths/KnowledgePathSnapshotsDashboard.jsx';
@@ -267,6 +268,7 @@ const AppContent = () => {
             <Route path="search" element={<MainSearch />} />
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
               <Route index element={<DashboardHome />} />
+              <Route path="consultas" element={<ConsultationsDashboard />} />
               <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="pagos-bch" element={<BchPaymentsDashboard />} />
               <Route path="snapshots" element={<KnowledgePathSnapshotsDashboard />} />

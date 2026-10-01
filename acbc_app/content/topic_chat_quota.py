@@ -1,27 +1,38 @@
 """Daily consultation (TopicChatQuery) quotas per user.
 
-Free users are capped; premium / token entitlements can return unlimited later
-via ``user_daily_consultation_limit``.
+Free users are capped; admin allowlist and future premium / token entitlements
+return unlimited via ``user_daily_consultation_limit``.
 """
 
 from __future__ import annotations
 
 from django.utils import timezone
 
-from content.models import TopicChatQuery
+from content.models import TopicChatQuery, UnlimitedConsultationUser
 
 # Own-profile tokens section where users buy ACBC platform tokens.
 TOKENS_PROFILE_PATH = '/profiles/my_profile?section=tokens'
+
+
+def user_has_unlimited_consultations(user) -> bool:
+    """True when the user is on the admin unlimited-consultations allowlist."""
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    user_id = getattr(user, 'pk', None) or getattr(user, 'id', None)
+    if not user_id:
+        return False
+    return UnlimitedConsultationUser.objects.filter(user_id=user_id).exists()
 
 
 def user_daily_consultation_limit(user) -> int | None:
     """
     Max consultations per calendar day (server local midnight).
 
-    Returns None for unlimited (reserved for future premium / paid tokens).
+    Returns None for unlimited (admin allowlist, and later premium / paid tokens).
     """
+    if user_has_unlimited_consultations(user):
+        return None
     # Future: if the user has an active premium/token entitlement, return None.
-    _ = user
     return TopicChatQuery.MAX_PER_USER_PER_DAY
 
 

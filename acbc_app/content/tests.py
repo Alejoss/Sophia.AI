@@ -13,6 +13,7 @@ from content.models import (
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
     TopicCreationRequest, TopicChatQuery, TranscriptAnchor, ContentEmbedding,
+    UnlimitedConsultationUser,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -1992,6 +1993,94 @@ class AdminTopicsConsultationsAPITests(APITestCase):
         self.assertEqual(response.data['consultation'], 'visible')
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Visible'])
+
+
+class AdminUnlimitedConsultationUsersAPITests(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='unlimitedadmin',
+            email='unlimitedadmin@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.regular = User.objects.create_user(
+            username='cappeduser',
+            email='capped@example.com',
+            password='testpass123',
+        )
+        self.target = User.objects.create_user(
+            username='whitelistme',
+            email='whitelist@example.com',
+            password='testpass123',
+        )
+
+    def test_requires_staff(self):
+        self.client.force_authenticate(user=self.regular)
+        response = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_add_and_remove(self):
+        self.client.force_authenticate(user=self.staff)
+        empty = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data['count'], 0)
+        self.assertEqual(
+            empty.data['daily_default_limit'],
+            TopicChatQuery.MAX_PER_USER_PER_DAY,
+        )
+
+        created = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': self.target.id, 'note': 'testing'},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(created.data['user_id'], self.target.id)
+        self.assertEqual(created.data['username'], 'whitelistme')
+        self.assertEqual(created.data['note'], 'testing')
+        self.assertEqual(created.data['added_by_id'], self.staff.id)
+        self.assertTrue(
+            UnlimitedConsultationUser.objects.filter(user=self.target).exists()
+        )
+
+        listed = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data['count'], 1)
+        self.assertEqual(listed.data['results'][0]['user_id'], self.target.id)
+
+        duplicate = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': self.target.id},
+            format='json',
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_409_CONFLICT)
+
+        missing = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': 999999},
+            format='json',
+        )
+        self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
+
+        invalid = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': 'abc'},
+            format='json',
+        )
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
+        deleted = self.client.delete(
+            f'/api/content/admin/unlimited-consultation-users/{self.target.id}/',
+        )
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            UnlimitedConsultationUser.objects.filter(user=self.target).exists()
+        )
+
+        deleted_again = self.client.delete(
+            f'/api/content/admin/unlimited-consultation-users/{self.target.id}/',
+        )
+        self.assertEqual(deleted_again.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class TopicActivityScoreTests(TestCase):
@@ -6076,6 +6165,34 @@ class TopicChatAPITests(APITestCase):
         )
         self.assertEqual(other_ok.status_code, status.HTTP_201_CREATED)
         self.assertEqual(other_ok.data['daily_used'], 1)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_unlimited_allowlist_bypasses_daily_limit(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Respuesta ilimitada.',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        UnlimitedConsultationUser.objects.create(user=self.user)
+        limit = TopicChatQuery.MAX_PER_USER_PER_DAY
+        for i in range(limit + 2):
+            response = self.client.post(
+                f'/api/content/topics/{self.topic.id}/chat/',
+                {'message': f'Ilimitada {i}'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            self.assertIsNone(response.data['daily_limit'])
+            self.assertIsNone(response.data['daily_remaining'])
+            self.assertEqual(response.data['daily_used'], i + 1)
+
+        self.assertEqual(mock_run.call_count, limit + 2)
+        self.assertEqual(
+            TopicChatQuery.objects.filter(user=self.user).count(),
+            limit + 2,
+        )
 
     @patch('content.views_topic_chat.run_topic_chat')
     def test_daily_consultation_limit_counts_across_topics(self, mock_run):

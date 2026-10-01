@@ -26,14 +26,15 @@ Current product rules for Consultas:
 | **Anonymous / not logged in** | Cannot create consultations. API `POST …/chat/` returns **401**. UI shows “Inicia sesión para consultar…”. |
 | **Logged-in free user** | Can create up to **3 consultations per calendar day** (server timezone), counted across **all** topics. |
 | **After the 3rd consultation today** | Further `POST …/chat/` returns **429** (`code=daily_consultation_limit`). UI shows a warning and a link **Ir a Mis tokens** → `/profiles/my_profile?section=tokens` so they can buy ACBC tokens. |
+| **Admin allowlist** | Staff can add user IDs under **Dashboard → Consultas → Usuarios sin límite diario**. Those users get unlimited consultations (`daily_limit` / `daily_remaining` are `null`). |
 
 Notes:
 
 - Buying tokens is the intended next step to raise the daily cap later. **Token balance does not increase the consultation limit yet** (see [platform-tokens.md](../payments/platform-tokens.md)).
 - Paid topics still require Consultas access (`topic_payment_required`) separately from this free-tier daily cap.
-- Staff/creator exemptions for the daily cap are not implemented; the cap applies to every authenticated user for now.
+- Staff/creator status alone does **not** bypass the daily cap; use the unlimited allowlist (`UnlimitedConsultationUser`) from the Consultas dashboard.
 
-Implementation: `TopicChatQuery.MAX_PER_USER_PER_DAY`, `content.topic_chat_quota`, enforced in `TopicChatView` **before** OpenAI/Qdrant spend. Frontend: `TopicChat.jsx`.
+Implementation: `TopicChatQuery.MAX_PER_USER_PER_DAY`, `content.topic_chat_quota` (checks `UnlimitedConsultationUser`), enforced in `TopicChatView` **before** OpenAI/Qdrant spend. Frontend: `TopicChat.jsx`; admin UI: `/dashboard/consultas`.
 
 ---
 
