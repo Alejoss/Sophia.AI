@@ -36,6 +36,7 @@ export const PRODUCT_CATALOG = Object.freeze({
     paidSuccessMessage: null,
     methods: Object.freeze({
       nowpayments: 'for_sale_and_gateway',
+      payphone: 'for_sale_and_gateway',
       bch: 'bch_flag_and_gateway',
       monero: 'for_sale',
       platform_tokens: false,
@@ -48,6 +49,7 @@ export const PRODUCT_CATALOG = Object.freeze({
     paidSuccessMessage: null,
     methods: Object.freeze({
       nowpayments: false,
+      payphone: 'for_sale_and_gateway',
       bch: 'bch_flag_and_gateway',
       monero: 'for_sale',
       platform_tokens: false,
@@ -60,6 +62,7 @@ export const PRODUCT_CATALOG = Object.freeze({
     paidSuccessMessage: null,
     methods: Object.freeze({
       nowpayments: 'gateway',
+      payphone: 'gateway',
       bch: false,
       monero: true,
       platform_tokens: false,
@@ -87,6 +90,7 @@ export const PRODUCT_CATALOG = Object.freeze({
       + '(Cuando el anclaje sí se emite, la confirmación en Bitcoin suele tardar ~10 minutos.)',
     methods: Object.freeze({
       nowpayments: 'gateway',
+      payphone: 'gateway',
       bch: 'gateway',
       monero: true,
       platform_tokens: 'gateway_tokens',
@@ -99,6 +103,7 @@ export const PRODUCT_CATALOG = Object.freeze({
     paidSuccessMessage: '¡Pago recibido! Tu lugar en el curso está confirmado.',
     methods: Object.freeze({
       nowpayments: 'gateway',
+      payphone: 'gateway',
       bch: 'gateway',
       monero: true,
       platform_tokens: false,
@@ -111,6 +116,7 @@ export const PRODUCT_CATALOG = Object.freeze({
     paidSuccessMessage: null,
     methods: Object.freeze({
       nowpayments: 'gateway',
+      payphone: 'gateway',
       bch: 'gateway',
       monero: false,
       platform_tokens: false,
@@ -128,6 +134,10 @@ export const getProductCatalogEntry = (kind) => {
 
 const gatewayNowpayments = (gatewayStatus) => Boolean(
   gatewayStatus?.methods?.nowpayments ?? gatewayStatus?.enabled ?? gatewayStatus?.nowpayments,
+);
+
+const gatewayPayphone = (gatewayStatus) => Boolean(
+  gatewayStatus?.methods?.payphone ?? gatewayStatus?.payphone_enabled ?? gatewayStatus?.payphone,
 );
 
 const gatewayBch = (gatewayStatus) => Boolean(
@@ -173,20 +183,24 @@ export const resolveAvailableMethods = ({
   const ctx = { gatewayStatus, productFlags };
 
   const nowRule = catalog.methods.nowpayments;
+  const payphoneRule = catalog.methods.payphone;
   const bchRule = catalog.methods.bch;
   const moneroRule = catalog.methods.monero;
   const tokensRule = catalog.methods.platform_tokens;
 
   const nowBase = evalRule(nowRule, ctx);
+  const payphoneBase = evalRule(payphoneRule, ctx);
   const bchBase = evalRule(bchRule, ctx);
   const monero = evalRule(moneroRule, ctx);
   const tokensBase = evalRule(tokensRule, ctx);
 
   const needsGwNow = nowRule === 'gateway' || nowRule === 'for_sale_and_gateway';
+  const needsGwPayphone = payphoneRule === 'gateway' || payphoneRule === 'for_sale_and_gateway';
   const needsGwBch = bchRule === 'gateway' || bchRule === 'bch_flag_and_gateway';
 
   return {
     nowpayments: nowBase && (!needsGwNow || gatewayNowpayments(gatewayStatus)),
+    payphone: payphoneBase && (!needsGwPayphone || gatewayPayphone(gatewayStatus)),
     bch_direct: bchBase && (!needsGwBch || gatewayBch(gatewayStatus)),
     monero,
     platform_tokens: tokensBase,

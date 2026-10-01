@@ -7,7 +7,7 @@ import {
 import { PRODUCT_KINDS } from '../productCatalog';
 
 /**
- * Topic consultas checkout adapter (BCH + Monero; no NOWPayments).
+ * Topic consultas checkout adapter (Payphone + BCH + Monero; no NOWPayments).
  */
 const TopicCheckout = ({
   open,
@@ -42,6 +42,11 @@ const TopicCheckout = ({
       verifyBchPayment={
         activePurchaseId != null
           ? (txid) => verifyTopicPurchaseBchPayment(activePurchaseId, txid)
+          : undefined
+      }
+      paymentTarget={
+        activePurchaseId != null
+          ? { kind: PRODUCT_KINDS.TOPIC, purchaseId: activePurchaseId }
           : undefined
       }
       onPaid={onPaid}

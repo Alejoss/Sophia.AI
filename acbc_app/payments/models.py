@@ -412,6 +412,186 @@ class BchDirectPayment(models.Model):
         return self
 
 
+class PayphonePayment(models.Model):
+    """Payphone Botón de pago order linked to exactly one entitlement."""
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_CANCELED = 'canceled'
+    STATUS_FAILED = 'failed'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_CANCELED, 'Canceled'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_EXPIRED, 'Expired'),
+    )
+
+    event_registration = models.ForeignKey(
+        'events.EventRegistration',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    path_purchase = models.ForeignKey(
+        'knowledge_paths.KnowledgePathPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    topic_purchase = models.ForeignKey(
+        'content.TopicPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    token_purchase = models.ForeignKey(
+        'payments.TokenPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    client_transaction_id = models.CharField(max_length=64, unique=True)
+    payphone_payment_id = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    transaction_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    amount_cents = models.PositiveIntegerField(help_text='Total charged in USD cents.')
+    currency = models.CharField(max_length=8, default='USD')
+    reference = models.CharField(max_length=256, blank=True, default='')
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    pay_with_card_url = models.URLField(max_length=512, blank=True, default='')
+    pay_with_payphone_url = models.URLField(max_length=512, blank=True, default='')
+    expires_at = models.DateTimeField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+    provider_payload = models.JSONField(default=dict, blank=True)
+    confirm_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'expires_at'], name='payphone_status_exp_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        event_registration__isnull=False,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=False,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=False,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=False,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
+                    )
+                ),
+                name='payphonepayment_exactly_one_target',
+            ),
+        ]
+
+    def __str__(self):
+        return f'Payphone {self.client_transaction_id} [{self.status}]'
+
+    @property
+    def is_paid(self):
+        return self.status == self.STATUS_APPROVED
+
+    @property
+    def is_expired(self):
+        if self.status != self.STATUS_PENDING:
+            return self.status == self.STATUS_EXPIRED
+        return timezone.now() >= self.expires_at
+
+    @property
+    def amount_usd(self):
+        return (Decimal(self.amount_cents or 0) / Decimal(100)).quantize(Decimal('0.01'))
+
+    @property
+    def buyer(self):
+        if self.event_registration_id:
+            return self.event_registration.user
+        if self.path_purchase_id:
+            return self.path_purchase.user
+        if self.topic_purchase_id:
+            return self.topic_purchase.user
+        if self.anchor_request_id:
+            return self.anchor_request.requester
+        if self.token_purchase_id:
+            return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
+        return None
+
+    def mark_expired_if_needed(self):
+        if self.status == self.STATUS_PENDING and timezone.now() >= self.expires_at:
+            self.status = self.STATUS_EXPIRED
+            self.save(update_fields=['status', 'updated_at'])
+        return self
+
+
 class TokenPackage(models.Model):
     """Staff-editable SKU of platform tokens sold for USD (paid in BCH / NOWPayments)."""
 

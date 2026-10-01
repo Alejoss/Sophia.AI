@@ -15,7 +15,7 @@ import CourseCheckout from '../payments/adapters/CourseCheckout.jsx';
 import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
-const COURSE_PATH = '/courses/real-historia-bitcoin';
+const COURSE_PATH = '/cursos/real-historia-bitcoin';
 const CHECKOUT_PATH = `${COURSE_PATH}/checkout`;
 const COURSE_CODE = 'real-historia-bitcoin';
 const COURSE_TITLE = 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas';

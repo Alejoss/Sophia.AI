@@ -25,6 +25,7 @@ from payments.bch_client import (
     is_bch_direct_configured,
 )
 from payments.models import BchDirectPayment, CoursePurchase, TokenPurchase
+from payments.payphone_services import abandon_pending_payphone
 from payments.services import (
     abandon_waiting_nowpayments,
     has_in_flight_nowpayments,
@@ -155,10 +156,11 @@ def _release_waiting_nowpayments(
     *,
     anchor_request=None,
     path_purchase=None,
+    topic_purchase=None,
     token_purchase=None,
     course_purchase=None,
 ) -> None:
-    """Allow switching from an unused NOWPayments invoice to BCH."""
+    """Allow switching from an unused NOWPayments / Payphone order to BCH."""
     if has_in_flight_nowpayments(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
@@ -171,6 +173,13 @@ def _release_waiting_nowpayments(
     abandon_waiting_nowpayments(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
+        token_purchase=token_purchase,
+        course_purchase=course_purchase,
+    )
+    abandon_pending_payphone(
+        path_purchase=path_purchase,
+        topic_purchase=topic_purchase,
+        anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
     )
@@ -287,6 +296,7 @@ def _authorize_create(
             raise BchPaymentError('Las consultas de este tema son gratuitas.')
         if not topic.sales_enabled:
             raise BchPaymentError('La venta de consultas de este tema está desactivada.')
+        _release_waiting_nowpayments(topic_purchase=topic_purchase)
         return
 
     if token_purchase is not None:

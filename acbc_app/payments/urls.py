@@ -5,6 +5,9 @@ from payments import views
 urlpatterns = [
     path('status/', views.PaymentGatewayStatusView.as_view(), name='payment-gateway-status'),
     path('ipn/', views.NOWPaymentsIPNView.as_view(), name='nowpayments-ipn'),
+    path('payphone/', views.PayphonePaymentCreateView.as_view(), name='payphone-payment-create'),
+    path('payphone/return/', views.PayphoneReturnView.as_view(), name='payphone-return'),
+    path('payphone/<int:payment_id>/', views.PayphonePaymentDetailView.as_view(), name='payphone-payment-detail'),
     path('registration/<int:registration_id>/', views.EventRegistrationPaymentView.as_view(), name='registration-payment-create'),
     path('registration/<int:registration_id>/list/', views.RegistrationPaymentsListView.as_view(), name='registration-payments-list'),
     path('courses/<slug:course_code>/', views.CourseDetailView.as_view(), name='course-detail'),

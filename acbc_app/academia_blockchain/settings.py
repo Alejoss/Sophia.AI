@@ -726,6 +726,18 @@ NOWPAYMENTS_API_URL = os.getenv(
 ACADEMIA_PUBLIC_URL = os.getenv('ACADEMIA_PUBLIC_URL', 'http://localhost:8000')
 FRONTEND_PUBLIC_URL = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5173')
 
+# Payphone Botón de pago (card / Payphone balance) — https://docs.payphone.app/boton-de-pago
+PAYPHONE_TOKEN = os.getenv('PAYPHONE_TOKEN', '').strip()
+PAYPHONE_STORE_ID = os.getenv('PAYPHONE_STORE_ID', '').strip()
+PAYPHONE_API_URL = os.getenv(
+    'PAYPHONE_API_URL',
+    'https://pay.payphonetodoesposible.com/api',
+).rstrip('/')
+# America/Guayaquil UTC offset used in Prepare payloads.
+PAYPHONE_TIMEZONE_OFFSET = int(os.getenv('PAYPHONE_TIMEZONE_OFFSET', '-5'))
+# When > 0, split the buyer-facing USD total into amountWithTax + tax (e.g. 15 for Ecuador IVA).
+PAYPHONE_IVA_PERCENT = float(os.getenv('PAYPHONE_IVA_PERCENT', '0') or 0)
+
 # External async workers that upload parsed subtitles/transcripts (machine-to-machine).
 TRANSCRIPT_INGEST_API_KEY = os.getenv('TRANSCRIPT_INGEST_API_KEY', '')
 

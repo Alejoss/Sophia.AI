@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
+from payments.models import (
+    BchDirectPayment,
+    CryptoPayment,
+    PayphonePayment,
+    TokenPackage,
+    TokenPurchase,
+)
 
 
 class CryptoPaymentSerializer(serializers.ModelSerializer):
@@ -227,3 +233,44 @@ class TokenPurchaseSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = fields
+
+
+class PayphonePaymentSerializer(serializers.ModelSerializer):
+    is_paid = serializers.BooleanField(read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    amount_usd = serializers.SerializerMethodField()
+    seconds_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayphonePayment
+        fields = [
+            'id',
+            'client_transaction_id',
+            'payphone_payment_id',
+            'transaction_id',
+            'amount_cents',
+            'amount_usd',
+            'currency',
+            'reference',
+            'status',
+            'pay_with_card_url',
+            'pay_with_payphone_url',
+            'expires_at',
+            'paid_at',
+            'is_paid',
+            'is_expired',
+            'seconds_remaining',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_amount_usd(self, obj):
+        return f'{obj.amount_usd:.2f}'
+
+    def get_seconds_remaining(self, obj):
+        from django.utils import timezone
+        if obj.status != PayphonePayment.STATUS_PENDING:
+            return 0
+        delta = obj.expires_at - timezone.now()
+        return max(0, int(delta.total_seconds()))
