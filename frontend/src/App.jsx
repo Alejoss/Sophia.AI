@@ -194,8 +194,10 @@ const AppContent = () => {
             />
             <Route path="como-funciona" element={<Navigate to="/como-funciona/archivo-y-preservacion" replace />} />
             <Route path="como-funciona/:slug" element={<HowItWorksGuide />} />
-            <Route path="courses/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
-            <Route path="courses/real-historia-bitcoin/checkout" element={<RealHistoriaBitcoinCheckout />} />
+            <Route path="cursos/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
+            <Route path="cursos/real-historia-bitcoin/checkout" element={<RealHistoriaBitcoinCheckout />} />
+            <Route path="courses/real-historia-bitcoin" element={<Navigate to="/cursos/real-historia-bitcoin" replace />} />
+            <Route path="courses/real-historia-bitcoin/checkout" element={<Navigate to="/cursos/real-historia-bitcoin/checkout" replace />} />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
