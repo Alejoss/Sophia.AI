@@ -930,6 +930,40 @@ class TopicChatQuery(models.Model):
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
 
 
+class UnlimitedConsultationUser(models.Model):
+    """
+    Admin allowlist: users exempt from the free-tier daily consultation cap.
+
+    Managed from the staff Consultas dashboard. Staff/superuser alone is not
+    enough for unlimited consultations; they must be listed here (or hold a
+    future premium entitlement).
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='unlimited_consultations',
+        help_text='User ID that may create unlimited topic consultations per day.',
+    )
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='added_unlimited_consultation_users',
+    )
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'unlimited consultation user'
+        verbose_name_plural = 'unlimited consultation users'
+
+    def __str__(self):
+        return f'UnlimitedConsultationUser(user_id={self.user_id})'
+
+
 class TopicCreationRequest(models.Model):
     """User request to create a new topic; admin must approve title and description first."""
     MAX_PENDING_REQUESTS_PER_USER = 3

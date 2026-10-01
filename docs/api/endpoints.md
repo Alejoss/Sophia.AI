@@ -190,10 +190,10 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Auth**: Required (JWT). Guests cannot create consultations (**401**).
 - **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
 - **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining, tokens_url }`
-- **429**: free-tier daily cap (`code=daily_consultation_limit`; default **3/day/user** across topics). Body includes `tokens_url` → `/profiles/my_profile?section=tokens` (buy ACBC tokens CTA; tokens do not raise the cap yet)
+- **429**: free-tier daily cap (`code=daily_consultation_limit`; default **3/day/user** across topics). Body includes `tokens_url` → `/profiles/my_profile?section=tokens` (buy ACBC tokens CTA; tokens do not raise the cap yet). Users on the staff unlimited allowlist get `daily_limit` / `daily_remaining` = `null` and are never blocked by this cap.
 - **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` + `tokens_url`)
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
-- **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
+- **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff Consultas tab (`/dashboard/consultas`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 ### Staff — topic consultations
@@ -201,7 +201,14 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Auth**: Staff (`IsAdminUser`)
 - **Query**: `consultation` = `visible` | `ready` | `on` | `no_embeddings` (legacy alias: `conversation`)
 - **Response**: `{ count, consultation, results[] }` with `chat_enabled`, `chat_can_enable`, `indexed_transcript_count`
-- UI: `/dashboard` section **Consultas con los archivos**
+- UI: `/dashboard/consultas` — **Consultas con los archivos**
+
+### Staff — unlimited consultation users
+- **GET** `/api/content/admin/unlimited-consultation-users/`
+- **POST** `/api/content/admin/unlimited-consultation-users/` — body `{ "user_id": <int>, "note"?: "…" }` → **201** (or **409** if already listed)
+- **DELETE** `/api/content/admin/unlimited-consultation-users/{user_id}/` → **204**
+- **Auth**: Staff (`IsAdminUser`)
+- UI: `/dashboard/consultas` — **Usuarios sin límite diario**
 
 ## Topics — Timeline
 
