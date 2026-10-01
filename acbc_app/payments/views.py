@@ -23,10 +23,18 @@ from payments.bch_services import (
 )
 from payments.models import BchDirectPayment, Course, CoursePurchase, CryptoPayment, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
+from payments.payphone_client import PayphoneError
+from payments.payphone_services import (
+    confirm_payphone_return,
+    create_or_reuse_payphone_payment,
+    is_payphone_configured,
+    resolve_payphone_target,
+)
 from payments.serializers import (
     AdminBchOrderSerializer,
     BchDirectPaymentSerializer,
     CryptoPaymentSerializer,
+    PayphonePaymentSerializer,
     TokenPackageSerializer,
     TokenPurchaseSerializer,
 )
@@ -89,6 +97,15 @@ def _validation_error_response(exc, *, action, **ctx):
 def _nowpayments_error_response(exc, *, action, **ctx):
     logger.warning('NOWPayments %s failed %s: %s', action, _ctx_bits(**ctx), exc)
     return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+def _payphone_error_response(exc, *, action, **ctx):
+    logger.warning('Payphone %s failed %s: %s', action, _ctx_bits(**ctx), exc)
+    status_code = getattr(exc, 'status_code', None)
+    http_status = status.HTTP_502_BAD_GATEWAY
+    if status_code and 400 <= int(status_code) < 500:
+        http_status = status.HTTP_400_BAD_REQUEST
+    return Response({'error': str(exc)}, status=http_status)
 
 
 def _unexpected_payment_error_response(exc, *, action, public_message, **ctx):
@@ -173,8 +190,10 @@ class PaymentGatewayStatusView(APIView):
             'methods': {
                 'nowpayments': client.configured,
                 'bch_direct': is_bch_direct_configured(),
+                'payphone': is_payphone_configured(),
                 'platform_tokens': True,
             },
+            'payphone_enabled': is_payphone_configured(),
             'anchor_price_usd': price_usd,
             'anchor_price_tokens': tokens_required_for_usd(price_usd),
         })
@@ -1615,3 +1634,107 @@ class TokenPurchaseBchVerifyView(APIView):
                 'total_tokens': purchase.total_tokens,
             },
         })
+
+
+class PayphonePaymentCreateView(APIView):
+    """Create a Payphone Botón de pago order for a product entitlement."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        kind = request.data.get('kind') or request.data.get('paymentTarget', {}).get('kind')
+        purchase_id = (
+            request.data.get('purchaseId')
+            or request.data.get('purchase_id')
+            or request.data.get('paymentTarget', {}).get('purchaseId')
+        )
+        try:
+            target = resolve_payphone_target(
+                kind=kind, purchase_id=purchase_id, user=request.user,
+            )
+            payment = create_or_reuse_payphone_payment(user=request.user, **target)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except PayphoneError as exc:
+            return _payphone_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_payphone',
+                public_message='No se pudo iniciar el pago con tarjeta. Inténtalo de nuevo.',
+                kind=kind,
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(PayphonePaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class PayphonePaymentDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, payment_id):
+        from payments.models import PayphonePayment
+
+        try:
+            payment = PayphonePayment.objects.get(pk=payment_id)
+        except PayphonePayment.DoesNotExist:
+            return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        buyer = payment.buyer
+        if not buyer or (buyer.id != request.user.id and not request.user.is_staff):
+            return Response({'error': 'No autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment.mark_expired_if_needed()
+        return Response(PayphonePaymentSerializer(payment).data)
+
+
+class PayphoneReturnView(APIView):
+    """
+    Browser return URL after Payphone checkout.
+
+    Confirms the transaction (required within 5 minutes) and redirects to the frontend.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        from django.shortcuts import redirect
+
+        transaction_id = request.query_params.get('id') or request.GET.get('id')
+        client_transaction_id = (
+            request.query_params.get('clientTransactionId')
+            or request.GET.get('clientTransactionId')
+            or request.query_params.get('clientTxId')
+            or request.GET.get('clientTxId')
+        )
+        try:
+            _payment, redirect_url = confirm_payphone_return(
+                transaction_id=transaction_id,
+                client_transaction_id=client_transaction_id,
+            )
+        except ValueError as exc:
+            logger.info('Payphone return rejected: %s', exc)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(status='failed', message=str(exc)))
+        except PayphoneError as exc:
+            logger.warning('Payphone return confirm failed: %s', exc)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(status='failed', message=str(exc)))
+        except Exception as exc:
+            logger.error('Unexpected Payphone return error: %s', exc, exc_info=True)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(
+                status='failed',
+                message='No se pudo confirmar el pago. Contacta soporte si te cobraron.',
+            ))
+        return redirect(redirect_url)

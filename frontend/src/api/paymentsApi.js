@@ -367,3 +367,24 @@ export const verifyTokenPurchaseBchPayment = async (purchaseId, txid) => {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
   }
 };
+
+export const createPayphonePayment = async ({ kind, purchaseId }) => {
+  try {
+    const response = await axiosInstance.post('/payments/payphone/', {
+      kind,
+      purchaseId,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago con tarjeta. Inténtalo de nuevo');
+  }
+};
+
+export const getPayphonePayment = async (paymentId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/payphone/${paymentId}/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo obtener el estado del pago Payphone');
+  }
+};
