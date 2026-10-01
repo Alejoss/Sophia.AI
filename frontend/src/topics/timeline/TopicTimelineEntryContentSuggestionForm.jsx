@@ -95,12 +95,11 @@ const TopicTimelineEntryContentSuggestionForm = ({
     }
   };
 
+  // Not a <form>: ContentSuggestionPicker embeds UploadContentForm (its own form).
+  // Nested forms are invalid HTML and break URL/file uploads into the library.
   return (
     <Paper
       variant="outlined"
-      component="form"
-      onSubmit={handleSubmit(handleFormSubmit)}
-      noValidate
       sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}
     >
       <Stack spacing={2.5}>
@@ -178,8 +177,9 @@ const TopicTimelineEntryContentSuggestionForm = ({
           Cancelar
         </Button>
         <Button
-          type="submit"
+          type="button"
           variant="contained"
+          onClick={handleSubmit(handleFormSubmit)}
           disabled={pending}
         >
           {pending ? 'Enviando...' : 'Enviar sugerencia'}
