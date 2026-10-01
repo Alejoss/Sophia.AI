@@ -97,11 +97,9 @@ export const PRODUCT_CATALOG = Object.freeze({
     productLabel: 'curso',
     chooserTitle: 'Elige cómo pagar',
     paidSuccessMessage: '¡Pago recibido! Tu lugar en el curso está confirmado.',
-    // Same rails as events: hosted NOWPayments (BCH/BTC/etc. there) + Monero DM.
-    // No self-custody BCH target on CoursePurchase yet (see docs/payments/README.md).
     methods: Object.freeze({
       nowpayments: 'gateway',
-      bch: false,
+      bch: 'gateway',
       monero: true,
       platform_tokens: false,
     }),

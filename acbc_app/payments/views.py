@@ -379,6 +379,96 @@ class CoursePurchasePaymentsListView(APIView):
         return Response(CryptoPaymentSerializer(payments, many=True).data)
 
 
+def _get_course_purchase(purchase_id):
+    try:
+        return CoursePurchase.objects.select_related('user', 'course').get(pk=purchase_id)
+    except CoursePurchase.DoesNotExist:
+        return None
+
+
+class CoursePurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(course_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, course_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_course_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class CoursePurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(
+                user=request.user,
+                course_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_course_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+                'course_code': purchase.course.code,
+                'title': purchase.course.title,
+            },
+        })
+
+
 class PathPurchasePaymentView(APIView):
     """Create or refresh a NOWPayments invoice for a knowledge path purchase."""
 

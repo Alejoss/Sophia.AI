@@ -537,30 +537,52 @@ def _reuse_or_refresh_open_payment(queryset):
     return None
 
 
-def nowpayments_queryset(*, anchor_request=None, path_purchase=None, token_purchase=None):
+def nowpayments_queryset(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+):
     if anchor_request is not None:
         return CryptoPayment.objects.filter(anchor_request=anchor_request)
     if path_purchase is not None:
         return CryptoPayment.objects.filter(path_purchase=path_purchase)
     if token_purchase is not None:
         return CryptoPayment.objects.filter(token_purchase=token_purchase)
+    if course_purchase is not None:
+        return CryptoPayment.objects.filter(course_purchase=course_purchase)
     return CryptoPayment.objects.none()
 
 
-def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> bool:
+def has_in_flight_nowpayments(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> bool:
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
 
 
-def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> int:
+def abandon_waiting_nowpayments(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> int:
     """Mark unused hosted invoices expired so the user can switch to BCH."""
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
         payment_status='expired',
     )

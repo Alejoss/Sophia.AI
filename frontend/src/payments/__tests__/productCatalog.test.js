@@ -101,7 +101,7 @@ describe('productCatalog matrix', () => {
     });
   });
 
-  it('course: NOW + Monero only; never direct BCH or tokens', () => {
+  it('course: NOW + BCH + Monero when gateway on; never tokens', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.COURSE,
       gatewayStatus: gatewayAllOn,
@@ -109,11 +109,21 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      bch_direct: false,
+      bch_direct: true,
       monero: true,
       platform_tokens: false,
     });
-    expect(PRODUCT_CATALOG[PRODUCT_KINDS.COURSE].methods.bch).toBe(false);
+  });
+
+  it('course: disables NOW/BCH when gateway reports them off', () => {
+    const methods = resolveAvailableMethods({
+      kind: PRODUCT_KINDS.COURSE,
+      gatewayStatus: gatewayAllOff,
+      productFlags: {},
+    });
+    expect(methods.nowpayments).toBe(false);
+    expect(methods.bch_direct).toBe(false);
+    expect(methods.monero).toBe(true);
   });
 
   it('anchor: tokens + NOW + BCH + Monero when gateway on', () => {

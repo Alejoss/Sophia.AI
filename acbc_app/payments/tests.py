@@ -2471,3 +2471,97 @@ class CoursePurchasePaymentTests(TestCase):
             [event['title'] for event in response.data['events']],
             ['Encuentro 01', 'Encuentro 02'],
         )
+
+
+@override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class CourseBchPaymentTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+        self.course = Course.objects.get(code='real-historia-bitcoin')
+        self.course.price_usd = 35
+        self.course.sales_enabled = True
+        self.course.save(update_fields=['price_usd', 'sales_enabled'])
+        self.purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=self.course,
+            price_amount=35,
+            receipt_email='buyer@example.com',
+        )
+
+    def _paid_tx(self, order, txid='cd' * 32):
+        return BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
+
+    def test_course_bch_create_and_verify_marks_paid(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            course_purchase=self.purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.course_purchase_id, self.purchase.id)
+        self.assertEqual(order.expected_amount_sats, 17_500_000)  # 35/200 BCH
+        self.assertEqual(get_bch_payment_product_meta(order)['product_type'], 'course')
+
+        txid = 'cd' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+        paid = verify_bch_payment(
+            course_purchase=self.purchase,
+            user=self.buyer,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_course_bch_http_create_and_verify(self):
+        self.client.force_authenticate(user=self.buyer)
+        with patch('payments.bch_services.build_bch_client') as mock_build:
+            mock_client = MagicMock()
+            mock_client.get_bch_usd_rate.return_value = Decimal('200')
+            mock_build.return_value = mock_client
+            created = self.client.post(
+                reverse('course-purchase-bch', kwargs={'purchase_id': self.purchase.id}),
+                {},
+                format='json',
+            )
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(created.data['usd_amount'], '35.00')
+            order = BchDirectPayment.objects.get(pk=created.data['id'])
+            txid = 'ab' * 32
+            mock_client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+            verified = self.client.post(
+                reverse('course-purchase-bch-verify', kwargs={'purchase_id': self.purchase.id}),
+                {'txid': txid},
+                format='json',
+            )
+        self.assertEqual(verified.status_code, status.HTTP_200_OK)
+        self.assertEqual(verified.data['payment']['status'], 'paid')
+        self.assertTrue(verified.data['purchase']['is_paid'])
+
+    def test_course_bch_rejects_when_not_for_sale(self):
+        self.course.sales_enabled = False
+        self.course.save(update_fields=['sales_enabled'])
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError):
+            create_or_reuse_bch_payment(
+                course_purchase=self.purchase,
+                user=self.buyer,
+                client=client,
+            )

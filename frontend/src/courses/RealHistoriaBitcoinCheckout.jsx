@@ -249,7 +249,7 @@ const RealHistoriaBitcoinCheckout = () => {
           </Box>
 
           <Typography component="p" className="rhb-checkout-note">
-            Puedes pagar con varias criptomonedas (incluye Bitcoin Cash) vía NOWPayments,
+            Puedes pagar con Bitcoin Cash directo, otras criptos vía NOWPayments,
             o acordar Monero por mensaje.
           </Typography>
         </Container>

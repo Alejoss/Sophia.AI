@@ -93,6 +93,7 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'path_purchase',
         'topic_purchase',
         'token_purchase',
+        'course_purchase',
         'expected_amount_sats',
         'usd_amount',
         'status',
@@ -108,8 +109,16 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'anchor_request__requester__username',
         'anchor_request__text_hash',
         'token_purchase__user__username',
+        'course_purchase__user__username',
+        'course_purchase__course__code',
     )
-    raw_id_fields = ('anchor_request', 'path_purchase', 'topic_purchase', 'token_purchase')
+    raw_id_fields = (
+        'anchor_request',
+        'path_purchase',
+        'topic_purchase',
+        'token_purchase',
+        'course_purchase',
+    )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload', 'paid_at')
 
 

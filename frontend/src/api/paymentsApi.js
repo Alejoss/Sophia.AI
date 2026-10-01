@@ -51,6 +51,28 @@ export const createCoursePurchasePayment = async (purchaseId) => {
   }
 };
 
+export const createCoursePurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
+  }
+};
+
+export const verifyCoursePurchaseBchPayment = async (purchaseId, txid) => {
+  try {
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/course-purchase/${purchaseId}/bch/verify/`,
+      body,
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
 export const listCoursePurchasePayments = async (purchaseId) => {
   try {
     const response = await axiosInstance.get(`/payments/course-purchase/${purchaseId}/list/`);

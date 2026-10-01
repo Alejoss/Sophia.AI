@@ -18,7 +18,7 @@ All buyer checkouts share one chooser (`ProductPaymentCheckout`) entered through
 | Knowledge path | `PathCheckout` | if for sale | if staff flag | if for sale | no |
 | Topic consultas | `TopicCheckout` | **no** (no backend) | if staff flag | if for sale | no |
 | Event registration | `EventCheckout` | yes | no | yes | no |
-| Course (`CoursePurchase`) | `CourseCheckout` | yes | **no** (no `course_purchase` BCH target yet; BCH still selectable inside NOWPayments) | yes | no |
+| Course (`CoursePurchase`) | `CourseCheckout` | yes | when gateway BCH is configured | yes | no |
 | Transcript anchor | `AnchorCheckout` | gateway | gateway | yes | yes |
 | Token package | `TokenCheckout` | yes | yes | **no** | n/a |
 

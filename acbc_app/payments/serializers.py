@@ -105,6 +105,7 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
     topic_purchase_id = serializers.IntegerField(read_only=True)
     anchor_request_id = serializers.IntegerField(read_only=True)
     token_purchase_id = serializers.IntegerField(read_only=True)
+    course_purchase_id = serializers.IntegerField(read_only=True)
 
     class Meta(BchDirectPaymentSerializer.Meta):
         fields = BchDirectPaymentSerializer.Meta.fields + [
@@ -120,6 +121,7 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             'topic_purchase_id',
             'anchor_request_id',
             'token_purchase_id',
+            'course_purchase_id',
         ]
 
     def get_product_type(self, obj):
@@ -131,6 +133,8 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             return 'anchor'
         if obj.token_purchase_id:
             return 'token_package'
+        if obj.course_purchase_id:
+            return 'course'
         return None
 
     def get_product_id(self, obj):
@@ -142,6 +146,8 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             return obj.anchor_request_id
         if obj.token_purchase_id:
             return obj.token_purchase.package_id if obj.token_purchase else obj.token_purchase_id
+        if obj.course_purchase_id and obj.course_purchase:
+            return obj.course_purchase.course.code
         return None
 
     def get_product_title(self, obj):
@@ -157,6 +163,8 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
                 or (obj.token_purchase.package.name if obj.token_purchase.package_id else None)
                 or f'{obj.token_purchase.token_amount} tokens'
             )
+        if obj.course_purchase_id and obj.course_purchase:
+            return obj.course_purchase.course.title
         return None
 
     def get_buyer_id(self, obj):
