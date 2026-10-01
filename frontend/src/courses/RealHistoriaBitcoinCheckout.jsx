@@ -18,6 +18,7 @@ import '../styles/course-real-historia-bitcoin.css';
 const COURSE_PATH = '/courses/real-historia-bitcoin';
 const CHECKOUT_PATH = `${COURSE_PATH}/checkout`;
 const COURSE_CODE = 'real-historia-bitcoin';
+const COURSE_TITLE = 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,7 +52,7 @@ const RealHistoriaBitcoinCheckout = () => {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Pago — La real historia de Bitcoin';
+    document.title = `Pago — ${COURSE_TITLE}`;
     return () => {
       document.title = previousTitle;
     };
@@ -103,7 +104,7 @@ const RealHistoriaBitcoinCheckout = () => {
   }, [email]);
 
   const priceLabel = formatPrice(purchase?.price_amount ?? course?.price_usd);
-  const title = purchase?.title || course?.title || 'La real historia de Bitcoin';
+  const title = purchase?.title || course?.title || COURSE_TITLE;
 
   const continueToPayment = (event) => {
     event.preventDefault();
@@ -182,7 +183,7 @@ const RealHistoriaBitcoinCheckout = () => {
           </nav>
 
           <Typography component="h1" className="rhb-checkout-heading">
-            Checkout
+            Finalizar compra
           </Typography>
           <Typography component="p" className="rhb-checkout-lead">
             Confirma tu correo para el recibo y el acceso al curso. Luego elige cómo pagar.

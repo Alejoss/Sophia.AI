@@ -49,6 +49,8 @@ from content.models import (
     TopicCreationRequest,
     ContentTranscript,
     ContentEmbedding,
+    TopicChatQuery,
+    UnlimitedConsultationUser,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from votes.models import VoteCount
@@ -1491,6 +1493,108 @@ class AdminTopicsConsultationsView(APIView):
             'consultation': consultation or None,
             'results': results,
         })
+
+
+class AdminUnlimitedConsultationUsersView(APIView):
+    """Staff dashboard: manage users exempt from the daily consultation cap."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    @staticmethod
+    def _serialize(entry: UnlimitedConsultationUser) -> dict:
+        user = entry.user
+        return {
+            'id': entry.id,
+            'user_id': entry.user_id,
+            'username': user.username if user else None,
+            'email': user.email if user else None,
+            'note': entry.note or '',
+            'added_by_id': entry.added_by_id,
+            'added_by_username': (
+                entry.added_by.username if entry.added_by_id else None
+            ),
+            'created_at': entry.created_at,
+        }
+
+    def get(self, request):
+        entries = (
+            UnlimitedConsultationUser.objects
+            .select_related('user', 'added_by')
+            .all()
+        )
+        results = [self._serialize(entry) for entry in entries]
+        return Response({
+            'count': len(results),
+            'daily_default_limit': TopicChatQuery.MAX_PER_USER_PER_DAY,
+            'results': results,
+        })
+
+    def post(self, request):
+        raw_user_id = request.data.get('user_id')
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'user_id inválido'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if user_id <= 0:
+            return Response(
+                {'error': 'user_id inválido'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            target = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': f'No existe un usuario con id {user_id}.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        note = request.data.get('note') or ''
+        if not isinstance(note, str):
+            note = str(note)
+        note = note.strip()[:255]
+
+        entry, created = UnlimitedConsultationUser.objects.get_or_create(
+            user=target,
+            defaults={
+                'added_by': request.user,
+                'note': note,
+            },
+        )
+        if not created:
+            return Response(
+                {
+                    'error': f'El usuario {user_id} ya tiene consultas ilimitadas.',
+                    'user_id': user_id,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if note and entry.note != note:
+            entry.note = note
+            entry.save(update_fields=['note'])
+
+        return Response(
+            self._serialize(entry),
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminUnlimitedConsultationUserDetailView(APIView):
+    """Remove a user from the unlimited consultations allowlist."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, user_id):
+        deleted, _ = UnlimitedConsultationUser.objects.filter(user_id=user_id).delete()
+        if not deleted:
+            return Response(
+                {'error': f'El usuario {user_id} no está en la lista de ilimitados.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AdminFeaturedBooksView(APIView):

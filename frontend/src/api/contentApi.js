@@ -539,6 +539,38 @@ const contentApi = {
     }
   },
 
+  getUnlimitedConsultationUsers: async () => {
+    try {
+      const response = await axiosInstance.get('/content/admin/unlimited-consultation-users/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching unlimited consultation users:', error);
+      throw error;
+    }
+  },
+
+  addUnlimitedConsultationUser: async (data) => {
+    try {
+      const response = await axiosInstance.post(
+        '/content/admin/unlimited-consultation-users/',
+        data,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error adding unlimited consultation user:', error);
+      throw error;
+    }
+  },
+
+  removeUnlimitedConsultationUser: async (userId) => {
+    try {
+      await axiosInstance.delete(`/content/admin/unlimited-consultation-users/${userId}/`);
+    } catch (error) {
+      console.error('Error removing unlimited consultation user:', error);
+      throw error;
+    }
+  },
+
   approveTopicCreationRequest: async (requestId, data) => {
     try {
       const response = await axiosInstance.post(

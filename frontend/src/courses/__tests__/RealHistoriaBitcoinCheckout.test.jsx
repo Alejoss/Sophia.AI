@@ -45,7 +45,7 @@ describe('RealHistoriaBitcoinCheckout', () => {
     createOrGetCoursePurchase.mockReset();
     getCourse.mockResolvedValue({
       code: 'real-historia-bitcoin',
-      title: 'La real historia de Bitcoin',
+      title: 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
       price_usd: 35,
       is_for_sale: true,
     });
@@ -59,13 +59,17 @@ describe('RealHistoriaBitcoinCheckout', () => {
       </MemoryRouter>,
     );
 
+    expect(await screen.findByRole('heading', { name: /finalizar compra/i })).toBeInTheDocument();
     expect(await screen.findByLabelText(/correo para el recibo/i)).toHaveValue('buyer@example.com');
     expect(screen.queryByTestId('course-checkout-modal')).not.toBeInTheDocument();
     expect(screen.getByText(/1\.\s*Correo/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/La Real Historia de Bitcoin y la Guerra por las Criptomonedas/i),
+    ).toBeInTheDocument();
 
     createOrGetCoursePurchase.mockResolvedValue({
       id: 9,
-      title: 'La real historia de Bitcoin',
+      title: 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
       price_amount: 35,
       payment_status: 'PENDING',
       is_paid: false,
@@ -81,7 +85,7 @@ describe('RealHistoriaBitcoinCheckout', () => {
       );
     });
     expect(await screen.findByTestId('course-checkout-modal')).toHaveTextContent(
-      /La real historia de Bitcoin/i,
+      /Guerra por las Criptomonedas/i,
     );
   });
 

@@ -20,6 +20,7 @@ from content.models import (
     TopicCreationRequest,
     TopicChatQuery,
     TopicPurchase,
+    UnlimitedConsultationUser,
 )
 
 
@@ -247,6 +248,14 @@ class TopicChatQueryAdmin(admin.ModelAdmin):
     raw_id_fields = ['topic', 'user']
     readonly_fields = ['created_at']
     date_hierarchy = 'created_at'
+
+
+@admin.register(UnlimitedConsultationUser)
+class UnlimitedConsultationUserAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'added_by', 'note', 'created_at']
+    search_fields = ['user__username', 'user__email', 'note']
+    raw_id_fields = ['user', 'added_by']
+    readonly_fields = ['created_at']
 
 
 @admin.register(TopicCreationRequest)

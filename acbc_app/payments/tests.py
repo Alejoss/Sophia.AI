@@ -2301,7 +2301,10 @@ class CoursePurchasePaymentTests(TestCase):
         response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['price_usd'], 40)
-        self.assertEqual(response.data['title'], 'La real historia de Bitcoin')
+        self.assertEqual(
+            response.data['title'],
+            'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
+        )
         self.assertTrue(response.data['is_for_sale'])
 
     def test_course_purchase_uses_the_course_price(self):

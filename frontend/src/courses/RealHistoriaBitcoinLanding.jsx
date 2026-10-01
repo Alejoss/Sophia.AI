@@ -111,6 +111,7 @@ const scrollToHash = (event, id) => {
 };
 
 const COURSE_CODE = 'real-historia-bitcoin';
+const COURSE_TITLE = 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas';
 
 const formatCoursePrice = (amount) => {
   const value = Number(amount);
@@ -146,7 +147,7 @@ const RealHistoriaBitcoinLanding = () => {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'La real historia de Bitcoin — Academia Blockchain';
+    document.title = `${COURSE_TITLE} — Academia Blockchain`;
     return () => {
       document.title = previousTitle;
     };
@@ -171,10 +172,7 @@ const RealHistoriaBitcoinLanding = () => {
               Academia Blockchain
             </Typography>
             <Typography component="h1" id="rhb-hero-title" className="brand-display">
-              La real historia de Bitcoin
-            </Typography>
-            <Typography component="p" className="rhb-hero-subtitle">
-              Y la guerra por las criptomonedas
+              {COURSE_TITLE}
             </Typography>
             <Typography component="p" className="brand-hero-lead">
               Una investigación guiada sobre las ideas, personas y conflictos que transformaron Bitcoin.
