@@ -219,6 +219,11 @@ class CoursePurchase(models.Model):
         related_name='purchases',
     )
     price_amount = models.FloatField(help_text='USD price copied from the course when checkout opened.')
+    receipt_email = models.EmailField(
+        blank=True,
+        default='',
+        help_text='Email confirmed at checkout for receipt and course access notices.',
+    )
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
@@ -246,7 +251,7 @@ class CoursePurchase(models.Model):
 
 class BchDirectPayment(models.Model):
     """
-    Self-custody BCH payment for anchors, paths, topics, or token packages.
+    Self-custody BCH payment for anchors, paths, topics, token packages, or courses.
 
     Unique amount (sats) on a single receive address; verify accepts payments
     within ``BCH_AMOUNT_TOLERANCE_USD`` of ``expected_amount_sats`` at the
@@ -292,6 +297,13 @@ class BchDirectPayment(models.Model):
         null=True,
         blank=True,
     )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
         help_text='Target amount in satoshis; verify allows BCH_AMOUNT_TOLERANCE_USD variance.',
@@ -329,24 +341,35 @@ class BchDirectPayment(models.Model):
                         path_purchase__isnull=True,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=False,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=False,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
                     )
                 ),
                 name='bchdirectpayment_exactly_one_target',
@@ -378,6 +401,8 @@ class BchDirectPayment(models.Model):
             return self.anchor_request.requester
         if self.token_purchase_id:
             return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
         return None
 
     def mark_expired_if_needed(self):

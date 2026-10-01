@@ -537,30 +537,52 @@ def _reuse_or_refresh_open_payment(queryset):
     return None
 
 
-def nowpayments_queryset(*, anchor_request=None, path_purchase=None, token_purchase=None):
+def nowpayments_queryset(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+):
     if anchor_request is not None:
         return CryptoPayment.objects.filter(anchor_request=anchor_request)
     if path_purchase is not None:
         return CryptoPayment.objects.filter(path_purchase=path_purchase)
     if token_purchase is not None:
         return CryptoPayment.objects.filter(token_purchase=token_purchase)
+    if course_purchase is not None:
+        return CryptoPayment.objects.filter(course_purchase=course_purchase)
     return CryptoPayment.objects.none()
 
 
-def has_in_flight_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> bool:
+def has_in_flight_nowpayments(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> bool:
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
 
 
-def abandon_waiting_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> int:
+def abandon_waiting_nowpayments(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> int:
     """Mark unused hosted invoices expired so the user can switch to BCH."""
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
         payment_status='expired',
     )
@@ -636,7 +658,21 @@ def create_event_registration_payment(*, event_registration: EventRegistration, 
     return crypto_payment
 
 
-def get_or_create_course_purchase(*, course_code, user) -> CoursePurchase:
+def _normalize_receipt_email(receipt_email) -> str:
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    email = (receipt_email or '').strip().lower()
+    if not email:
+        return ''
+    try:
+        validate_email(email)
+    except ValidationError as exc:
+        raise ValueError('Introduce un correo electrónico válido.') from exc
+    return email
+
+
+def get_or_create_course_purchase(*, course_code, user, receipt_email=None) -> CoursePurchase:
     try:
         course = Course.objects.get(code=course_code)
     except Course.DoesNotExist:
@@ -644,26 +680,39 @@ def get_or_create_course_purchase(*, course_code, user) -> CoursePurchase:
     if not course.is_for_sale:
         raise ValueError('Este curso no está a la venta.')
 
+    normalized_email = _normalize_receipt_email(receipt_email)
+    defaults = {
+        'price_amount': float(course.price_usd),
+        'payment_status': 'PENDING',
+    }
+    if normalized_email:
+        defaults['receipt_email'] = normalized_email
+
     purchase, created = CoursePurchase.objects.get_or_create(
         user=user,
         course=course,
-        defaults={
-            'price_amount': float(course.price_usd),
-            'payment_status': 'PENDING',
-        },
+        defaults=defaults,
     )
+    update_fields = []
+    if normalized_email and purchase.receipt_email != normalized_email:
+        purchase.receipt_email = normalized_email
+        update_fields.append('receipt_email')
     if created or purchase.payment_status != 'PENDING':
+        if update_fields:
+            update_fields.append('updated_at')
+            purchase.save(update_fields=update_fields)
         return purchase
-    if purchase.price_amount == float(course.price_usd):
-        return purchase
-    has_open_invoice = CryptoPayment.objects.filter(
-        course_purchase=purchase,
-        payment_status__in=OPEN_PAYMENT_STATUSES,
-    ).exists()
-    if has_open_invoice:
-        return purchase
-    purchase.price_amount = float(course.price_usd)
-    purchase.save(update_fields=['price_amount', 'updated_at'])
+    if purchase.price_amount != float(course.price_usd):
+        has_open_invoice = CryptoPayment.objects.filter(
+            course_purchase=purchase,
+            payment_status__in=OPEN_PAYMENT_STATUSES,
+        ).exists()
+        if not has_open_invoice:
+            purchase.price_amount = float(course.price_usd)
+            update_fields.append('price_amount')
+    if update_fields:
+        update_fields.append('updated_at')
+        purchase.save(update_fields=update_fields)
     return purchase
 
 

@@ -115,6 +115,37 @@ describe('UploadContentForm', () => {
     expect(screen.queryByText(/tipo de archivo no soportado/i)).not.toBeInTheDocument();
   });
 
+  it('accepts Markdown files as TEXT content', async () => {
+    const user = userEvent.setup();
+    const onContentUploaded = vi.fn();
+    contentApi.uploadContentViaS3.mockResolvedValue({
+      content_id: 88,
+      content_profile: { id: 89, content: { id: 88 } },
+    });
+
+    renderWithProviders(
+      <UploadContentForm
+        initialUrlMode={false}
+        showModeToggle={false}
+        onContentUploaded={onContentUploaded}
+      />,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]');
+    const markdown = new File(['# Titulo'], 'notas.md', { type: 'text/markdown' });
+    await user.upload(fileInput, markdown);
+    await user.click(screen.getByRole('button', { name: /guardar contenido/i }));
+
+    await waitFor(() => {
+      expect(contentApi.uploadContentViaS3).toHaveBeenCalled();
+    });
+
+    const [uploadedFile, payload] = contentApi.uploadContentViaS3.mock.calls[0];
+    expect(uploadedFile.name).toBe('notas.md');
+    expect(payload.media_type).toBe('TEXT');
+    expect(screen.queryByText(/tipo de archivo no soportado/i)).not.toBeInTheDocument();
+  });
+
   it('rejects unsupported archives instead of treating them as TEXT', async () => {
     const user = userEvent.setup();
     renderWithProviders(
