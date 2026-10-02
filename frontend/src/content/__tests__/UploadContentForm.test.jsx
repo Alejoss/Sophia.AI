@@ -182,4 +182,36 @@ describe('UploadContentForm', () => {
 
     expect(screen.getByLabelText(/tipo de contenido/i)).toHaveTextContent(/texto/i);
   });
+
+  it('maps API field errors into the form and shows a Spanish Alert', async () => {
+    const user = userEvent.setup();
+    contentApi.fetchUrlMetadata.mockResolvedValue({
+      title: 'Artículo',
+      siteName: 'Example',
+      type: 'article',
+    });
+    contentApi.uploadContent.mockRejectedValue({
+      response: {
+        data: {
+          title: ['This field may not be blank.'],
+          detail: 'No se pudo guardar el contenido.',
+        },
+      },
+    });
+
+    renderWithProviders(
+      <UploadContentForm
+        initialUrlMode
+        showModeToggle={false}
+      />,
+    );
+
+    await user.type(screen.getByRole('textbox', { name: /^url$/i }), 'https://example.com/article');
+    await user.click(screen.getByLabelText(/tipo de contenido/i));
+    await user.click(await screen.findByRole('option', { name: /texto/i }));
+    await user.click(screen.getByRole('button', { name: /guardar contenido/i }));
+
+    expect(await screen.findByText(/este campo es requerido/i)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/no se pudo guardar el contenido/i);
+  });
 });
