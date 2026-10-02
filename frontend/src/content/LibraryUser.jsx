@@ -65,7 +65,9 @@ const LibraryUser = () => {
       setTotalCount(typeof data?.count === "number" ? data.count : 0);
     } catch (err) {
       setError(
-        err.response?.data?.error || err.message || "Error al obtener el contenido"
+        err?.response?.data?.error
+        || err?.error
+        || "Error al obtener el contenido",
       );
     } finally {
       setLoading(false);

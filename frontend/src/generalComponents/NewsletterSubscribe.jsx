@@ -6,6 +6,7 @@ import { Container, Box, Typography, TextField, Button, Alert, useTheme } from '
 import { submitNewsletterSubscription } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { emailField } from '../utils/formSchemas';
+import { bindMuiRhfField } from '../utils/muiRhfField';
 
 const schema = yup.object({
   email: emailField(),
@@ -23,11 +24,13 @@ const NewsletterSubscribe = () => {
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { email: '' },
   });
+  const emailValue = watch('email');
 
   const onSubmit = async ({ email }) => {
     setSuccessMessage('');
@@ -126,13 +129,14 @@ const NewsletterSubscribe = () => {
             <TextField
               type="email"
               label="Email"
-              {...register('email')}
+              {...bindMuiRhfField(register('email'), emailValue)}
               error={!!errors.email}
               helperText={errors.email?.message}
               placeholder="tu@email"
               fullWidth
               variant="outlined"
               size="medium"
+              autoComplete="email"
             />
 
             {generalError && (

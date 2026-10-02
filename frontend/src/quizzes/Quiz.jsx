@@ -16,6 +16,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import quizApi from '../api/quizzesApi';
+import { parseApiValidationErrors } from '../utils/apiFormErrors';
 
 const Quiz = () => {
     // TODO complete the quiz
@@ -136,8 +137,11 @@ const Quiz = () => {
       }
       
     } catch (error) {
-      const errorMessage = error.message || 'Ocurrió un error inesperado';
-      setError(errorMessage);
+      const { generalError } = parseApiValidationErrors(
+        error,
+        'No se pudo enviar el cuestionario. Inténtalo de nuevo.',
+      );
+      setError(generalError || 'No se pudo enviar el cuestionario. Inténtalo de nuevo.');
       setSubmitted(false);
     }
   };
@@ -473,6 +477,7 @@ const Quiz = () => {
       <Box
         component="form"
         onSubmit={handleSubmit}
+        noValidate
         sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}
       >
         {quiz.questions.map((question, index) => (
