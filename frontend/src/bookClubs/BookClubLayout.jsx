@@ -1,5 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, NavLink, Outlet, useParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as yup from 'yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 import {
   Alert,
   Box,
@@ -29,6 +32,9 @@ import {
   setGuestSession,
 } from './guestStorage';
 import { resolveMediaUrl } from '../utils/fileUtils';
+import { emailField } from '../utils/formSchemas';
+import { bindMuiRhfField } from '../utils/muiRhfField';
+import { parseApiValidationErrors } from '../utils/apiFormErrors';
 
 export const BookClubContext = createContext(null);
 
@@ -72,10 +78,24 @@ const WeekDots = ({ total, completed }) => {
   );
 };
 
+const emailGateSchema = yup.object({
+  email: emailField(),
+});
+
 const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
-  const [email, setEmail] = useState('');
   const clubPath = clubSlug ? `/club-de-lectura/${clubSlug}` : window.location.pathname;
   const loginNext = encodeURIComponent(clubPath);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: yupResolver(emailGateSchema),
+    defaultValues: { email: '' },
+  });
+  const emailValue = watch('email');
+  const busy = loading || isSubmitting;
 
   return (
     <Box sx={{ bgcolor: CLUB_BG, minHeight: '100vh', color: '#fff', py: 8 }}>
@@ -101,19 +121,18 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
         <Stack
           component="form"
           spacing={2}
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit(email.trim());
-          }}
+          onSubmit={handleSubmit(({ email }) => onSubmit(email.trim()))}
+          noValidate
         >
           <TextField
             type="email"
-            required
             fullWidth
             label="Tu correo"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            {...bindMuiRhfField(register('email'), emailValue)}
+            error={Boolean(errors.email)}
+            helperText={errors.email?.message}
             autoComplete="email"
+            disabled={busy}
             sx={CLUB_TEXT_FIELD_SX}
           />
           <Stack
@@ -124,7 +143,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
             <Button
               type="submit"
               variant="contained"
-              disabled={loading || !email.trim()}
+              disabled={busy}
               sx={{
                 flex: 1,
                 bgcolor: CLUB_ACCENT,
@@ -132,7 +151,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
                 py: 1.1,
               }}
             >
-              {loading ? 'Entrando…' : 'Entrar con mi correo'}
+              {busy ? 'Entrando…' : 'Entrar con mi correo'}
             </Button>
             <Typography
               variant="body2"
@@ -264,7 +283,11 @@ const BookClubLayoutInner = () => {
       const hubData = await bookClubsApi.getHub(slug, { guestToken: data.guest_token });
       setHub(hubData);
     } catch (err) {
-      setGateError(err?.response?.data?.detail || 'No se pudo registrar el correo.');
+      const { generalError } = parseApiValidationErrors(
+        err,
+        'No se pudo registrar el correo. Inténtalo de nuevo.',
+      );
+      setGateError(generalError || 'No se pudo registrar el correo. Inténtalo de nuevo.');
     } finally {
       setGateLoading(false);
     }

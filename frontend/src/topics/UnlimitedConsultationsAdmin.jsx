@@ -114,6 +114,7 @@ const UnlimitedConsultationsAdmin = () => {
         component="form"
         variant="outlined"
         onSubmit={handleAdd}
+        noValidate
         sx={{ p: 2, mb: 2 }}
       >
         <Stack

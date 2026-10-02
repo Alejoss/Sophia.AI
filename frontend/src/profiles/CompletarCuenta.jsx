@@ -171,6 +171,7 @@ const CompletarCuenta = () => {
           component="form"
           spacing={2}
           onSubmit={handleSubmit(onSubmit)}
+          noValidate
         >
           <TextField
             label="Correo"
