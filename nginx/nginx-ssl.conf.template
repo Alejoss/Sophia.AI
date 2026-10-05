@@ -13,6 +13,12 @@ upstream frontend {
     server frontend:80;
 }
 
+# Social unfurlers do not execute SPA JS; route them to Django OG HTML.
+map $http_user_agent $is_social_crawler {
+    default 0;
+    ~*(?i)(TelegramBot|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Pinterest|redditbot|Embedly|Quora\sLink\sPreview|Showyoubot|outbrain|vkShare|W3C_Validator|Googlebot|bingbot|Applebot|DuckDuckBot|Baiduspider|YandexBot|Slurp|ia_archiver) 1;
+}
+
 # HTTP → canonical HTTPS (single hop)
 server {
     listen 80;
@@ -99,6 +105,50 @@ server {
         proxy_set_header Host $host;
         expires 1y;
         add_header Cache-Control "public";
+    }
+
+    location ~ ^/content/topics/(?<topic_id>[0-9]+)(?:/|$) {
+        if ($is_social_crawler) {
+            rewrite ^ /api/content/topics/social-preview/$topic_id/ last;
+        }
+        proxy_pass http://frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+
+    # Content inside a topic: preserve topic context for OG title/profile
+    location ~ ^/content/(?<content_id>[0-9]+)/topic/(?<topic_id>[0-9]+)(?:/|$) {
+        if ($is_social_crawler) {
+            rewrite ^ /api/content/social-preview/$content_id/?context=topic&id=$topic_id last;
+        }
+        proxy_pass http://frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location ~ ^/content/(?<content_id>[0-9]+)(?:/|$) {
+        if ($is_social_crawler) {
+            rewrite ^ /api/content/social-preview/$content_id/ last;
+        }
+        proxy_pass http://frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
     }
 
     location / {

@@ -38,6 +38,7 @@ Copy the appropriate file to `/etc/nginx/sites-available` (or `conf.d`) and enab
 - **`/health/`**: Proxied to Django `GET /health/`. Returns `{"status":"healthy","service":"academia_blockchain"}`. Use for backend readiness.
 - **`/health`**: Nginx returns `200 "healthy"` (no backend). Use for simple load-balancer checks.
 - **`/api/`**, **`/admin/`**, **`/static/`**, **`/media/`**: Proxied to backend.
+- **`/content/<id>/…`** and **`/content/topics/<id>/…`**: For normal browsers, proxied to the frontend SPA. For social crawlers (TelegramBot, facebookexternalhit, Twitterbot, Slackbot, Discordbot, WhatsApp, etc.), nginx rewrites to Django Open Graph HTML at `/api/content/social-preview/<id>/` or `/api/content/topics/social-preview/<id>/` so link previews get `og:title` / `og:image` without executing React.
 - **`/`**: Proxied to frontend (React).
 
 ## SSL (Let’s Encrypt)
