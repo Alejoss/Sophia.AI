@@ -1,4 +1,7 @@
 from django.urls import path
+
+from content.views_social_preview import KnowledgePathSocialPreviewView
+
 from .views import (
     KnowledgePathListView,
     UserKnowledgePathsView,
@@ -23,6 +26,11 @@ from .views import (
 app_name = 'knowledge_paths'
 
 urlpatterns = [
+    path(
+        'social-preview/<int:pk>/',
+        KnowledgePathSocialPreviewView.as_view(),
+        name='knowledge-path-social-preview',
+    ),
     path('', KnowledgePathListView.as_view(), name='knowledge-path-list'),
     path('my/', UserKnowledgePathsView.as_view(), name='user-knowledge-paths'),
     path('engaged/', UserEngagedKnowledgePathsView.as_view(), name='user-engaged-knowledge-paths'),

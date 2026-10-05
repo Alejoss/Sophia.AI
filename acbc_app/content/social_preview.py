@@ -15,6 +15,7 @@ from django.db.models import Prefetch
 
 from content.models import Content, ContentProfile, FileDetails, Publication, Topic
 from content.utils import build_media_url
+from events.models import Event
 from knowledge_paths.models import KnowledgePath
 
 SITE_NAME = 'Academia Blockchain'
@@ -58,6 +59,17 @@ def absolute_frontend_url(request, path: str) -> str:
     return f'{_frontend_base_url(request)}{path}'
 
 
+def _media_field_url(request, file_field) -> str | None:
+    if not file_field:
+        return None
+    return build_media_url(file_field, request)
+
+
+def _pick_preview_or_full_image_url(request, preview_field, full_field) -> str | None:
+    """Match UI: listing/card thumbnails prefer downsized preview WebP."""
+    return _media_field_url(request, preview_field) or _media_field_url(request, full_field)
+
+
 def _truncate(text: str | None, limit: int = 300) -> str:
     if not text:
         return ''
@@ -65,6 +77,37 @@ def _truncate(text: str | None, limit: int = 300) -> str:
     if len(cleaned) <= limit:
         return cleaned
     return cleaned[: limit - 1].rstrip() + '…'
+
+
+def _topic_content_profile_for_social(content: Content, topic: Topic, request):
+    """Same profile pick as topic content grids (creator, then any profile)."""
+    profiles = list(content.profiles.all())
+    if not profiles:
+        return None
+    creator_id = topic.creator_id
+    for profile in profiles:
+        if creator_id and profile.user_id == creator_id:
+            return profile
+    uid = request.user.id if request.user.is_authenticated else None
+    if uid is not None:
+        for profile in profiles:
+            if profile.user_id == uid:
+                return profile
+    return min(profiles, key=lambda profile: profile.id)
+
+
+def _fallback_public_content_profile(content: Content) -> ContentProfile | None:
+    """Public library item when share URL has no context query params."""
+    return (
+        ContentProfile.objects.filter(
+            content=content,
+            is_visible=True,
+            collection__is_public=True,
+        )
+        .select_related('collection', 'user')
+        .order_by('id')
+        .first()
+    )
 
 
 def resolve_content_profile_for_social(content: Content, request):
@@ -87,7 +130,10 @@ def resolve_content_profile_for_social(content: Content, request):
             topic = Topic.objects.get(id=context_id_int)
             if not topic.can_be_viewed_by(request.user):
                 return None
-            return ContentProfile.objects.get(content=content, user=topic.creator)
+            profile = _topic_content_profile_for_social(content, topic, request)
+            if profile is not None:
+                return profile
+            return ContentProfile.objects.filter(content=content, user=topic.creator).first()
 
         if context == 'library':
             library_owner = User.objects.get(id=context_id_int)
@@ -156,16 +202,32 @@ def _content_canonical_path(content_id: int, request) -> str:
     return path
 
 
-def _content_image_url(content: Content, profile: ContentProfile | None, request) -> str:
-    if profile is not None:
-        if profile.thumbnail:
-            url = build_media_url(profile.thumbnail, request)
-            if url:
-                return url
-        if profile.thumbnail_preview:
-            url = build_media_url(profile.thumbnail_preview, request)
-            if url:
-                return url
+def _content_profile_thumbnail_url(profile: ContentProfile | None, request) -> str | None:
+    if profile is None:
+        return None
+    return _pick_preview_or_full_image_url(
+        request,
+        profile.thumbnail_preview,
+        profile.thumbnail,
+    )
+
+
+def _content_image_url(
+    content: Content,
+    profile: ContentProfile | None,
+    request,
+    *,
+    allow_public_profile_fallback: bool = True,
+) -> str:
+    url = _content_profile_thumbnail_url(profile, request)
+    if url:
+        return url
+
+    if profile is None and allow_public_profile_fallback:
+        fallback_profile = _fallback_public_content_profile(content)
+        url = _content_profile_thumbnail_url(fallback_profile, request)
+        if url:
+            return url
 
     file_details = getattr(content, 'file_details', None)
     if file_details is None:
@@ -206,17 +268,26 @@ def _content_description(content: Content, profile: ContentProfile | None) -> st
 
 
 def build_content_social_preview(content: Content, request) -> SocialPreviewMeta:
+    has_context = bool(request.GET.get('context') and request.GET.get('id'))
     profile = resolve_content_profile_for_social(content, request)
+    title_profile = profile
+    if title_profile is None and not has_context:
+        title_profile = _fallback_public_content_profile(content)
     title = (
-        profile.display_title
-        if profile is not None and profile.display_title
+        title_profile.display_title
+        if title_profile is not None and title_profile.display_title
         else (content.original_title or f'Contenido #{content.id}')
     )
     canonical_path = _content_canonical_path(content.id, request)
     return SocialPreviewMeta(
         title=_truncate(title, 110),
-        description=_content_description(content, profile),
-        image_url=_content_image_url(content, profile, request),
+        description=_content_description(content, title_profile),
+        image_url=_content_image_url(
+            content,
+            profile,
+            request,
+            allow_public_profile_fallback=not has_context,
+        ),
         page_url=absolute_frontend_url(request, canonical_path),
         canonical_path=canonical_path,
         og_type='article',
@@ -227,11 +298,11 @@ def build_topic_social_preview(topic: Topic, request) -> SocialPreviewMeta | Non
     if not topic.can_be_viewed_by(request.user):
         return None
 
-    image_url = None
-    if topic.topic_image:
-        image_url = build_media_url(topic.topic_image, request)
-    if not image_url and topic.topic_image_thumbnail:
-        image_url = build_media_url(topic.topic_image_thumbnail, request)
+    image_url = _pick_preview_or_full_image_url(
+        request,
+        topic.topic_image_thumbnail,
+        topic.topic_image,
+    )
     if not image_url:
         image_url = absolute_frontend_url(request, DEFAULT_IMAGE_PATH)
 
@@ -239,6 +310,73 @@ def build_topic_social_preview(topic: Topic, request) -> SocialPreviewMeta | Non
     canonical_path = f'/content/topics/{topic.id}'
     return SocialPreviewMeta(
         title=_truncate(topic.title, 110),
+        description=description,
+        image_url=image_url,
+        page_url=absolute_frontend_url(request, canonical_path),
+        canonical_path=canonical_path,
+        og_type='website',
+    )
+
+
+def _knowledge_path_can_be_previewed(path: KnowledgePath, request) -> bool:
+    if path.is_visible:
+        return True
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            return True
+        if path.author_id and path.author_id == request.user.id:
+            return True
+    return False
+
+
+def build_knowledge_path_social_preview(
+    path: KnowledgePath,
+    request,
+) -> SocialPreviewMeta | None:
+    if not _knowledge_path_can_be_previewed(path, request):
+        return None
+
+    image_url = _pick_preview_or_full_image_url(request, path.image_preview, path.image)
+    if not image_url:
+        image_url = absolute_frontend_url(request, DEFAULT_IMAGE_PATH)
+
+    description = _truncate(path.description) or DEFAULT_DESCRIPTION
+    canonical_path = f'/knowledge_path/{path.id}'
+    return SocialPreviewMeta(
+        title=_truncate(path.title, 110),
+        description=description,
+        image_url=image_url,
+        page_url=absolute_frontend_url(request, canonical_path),
+        canonical_path=canonical_path,
+        og_type='website',
+    )
+
+
+def _event_can_be_previewed(event: Event, request) -> bool:
+    if event.deleted:
+        return False
+    if event.is_visible:
+        return True
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            return True
+        if event.owner_id and event.owner_id == request.user.id:
+            return True
+    return False
+
+
+def build_event_social_preview(event: Event, request) -> SocialPreviewMeta | None:
+    if not _event_can_be_previewed(event, request):
+        return None
+
+    image_url = _media_field_url(request, event.image)
+    if not image_url:
+        image_url = absolute_frontend_url(request, DEFAULT_IMAGE_PATH)
+
+    description = _truncate(event.description) or DEFAULT_DESCRIPTION
+    canonical_path = f'/events/{event.id}'
+    return SocialPreviewMeta(
+        title=_truncate(event.title, 110) or f'Evento #{event.id}',
         description=description,
         image_url=image_url,
         page_url=absolute_frontend_url(request, canonical_path),

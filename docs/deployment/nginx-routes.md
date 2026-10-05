@@ -38,7 +38,9 @@ Copy the appropriate file to `/etc/nginx/sites-available` (or `conf.d`) and enab
 - **`/health/`**: Proxied to Django `GET /health/`. Returns `{"status":"healthy","service":"academia_blockchain"}`. Use for backend readiness.
 - **`/health`**: Nginx returns `200 "healthy"` (no backend). Use for simple load-balancer checks.
 - **`/api/`**, **`/admin/`**, **`/static/`**, **`/media/`**: Proxied to backend.
-- **`/content/<id>/…`** and **`/content/topics/<id>/…`**: For normal browsers, proxied to the frontend SPA. For social crawlers (TelegramBot, facebookexternalhit, Twitterbot, Slackbot, Discordbot, WhatsApp, etc.), nginx rewrites to Django Open Graph HTML at `/api/content/social-preview/<id>/` or `/api/content/topics/social-preview/<id>/` so link previews get `og:title` / `og:image` without executing React.
+- **`/content/<id>/…`** and **`/content/topics/<id>/…`**: For normal browsers, proxied to the frontend SPA. For social crawlers (TelegramBot, facebookexternalhit, Twitterbot, Slackbot, Discordbot, WhatsApp, etc.), nginx rewrites to Django Open Graph HTML at `/api/content/social-preview/<id>/` (query string preserved for `context` / `id`) or `/api/content/topics/social-preview/<id>/` so link previews get `og:title` / `og:image` without executing React.
+- **`/knowledge_path/<id>/…`**: Crawlers → `/api/knowledge_paths/social-preview/<id>/` (cover uses `image_preview`, then full `image`).
+- **`/events/<id>/…`** (numeric ids only): Crawlers → `/api/events/social-preview/<id>/` (event cover image).
 - **`/`**: Proxied to frontend (React).
 
 ## SSL (Let’s Encrypt)
