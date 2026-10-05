@@ -7,9 +7,10 @@ Revisar antes de abrir el beta a testers.
 - [ ] **Backend:** Crear proyecto en [sentry.io](https://sentry.io), copiar el DSN y añadir en `acbc_app/.env`:
   - `SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx`
   - Opcional: `SENTRY_TRACES_SAMPLE_RATE=0.2` para más transacciones en beta.
-- [ ] **Frontend:** En el mismo proyecto (o uno para “frontend”) copiar DSN y añadir en `frontend/.env`:
+- [ ] **Frontend:** En el mismo proyecto (o uno para “frontend”) copiar DSN y añadirlo al **build** de beta/producción (variables de CI / imagen), no al `.env` de `npm run dev`:
   - `VITE_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx`
-- [ ] Reconstruir y desplegar. Verificar en Sentry que lleguen eventos (por ejemplo provocando un error de prueba).
+  - Sentry del frontend se ignora en modos Vite `development` / `local` / `test` (misma política que el backend).
+- [ ] Reconstruir y desplegar. Verificar en Sentry que lleguen eventos (por ejemplo provocando un error de prueba **en el entorno desplegado**, no en localhost).
 
 ## 2. Entorno y despliegue
 

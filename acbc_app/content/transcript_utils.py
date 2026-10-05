@@ -130,6 +130,13 @@ def segments_to_plain_text(segments):
 
 
 def normalize_plain_text_for_hash(plain_text):
+    """Apply the existing Bitcoin transcript convention: NFC, then whitespace collapse.
+
+    Planned IPFS archives must store the resulting exact UTF-8 text so the same
+    SHA-256 verifies on both chains. This normalization is transcript-specific;
+    do not apply it to knowledge-path JSON, which needs a separate
+    canonicalization rule.
+    """
     normalized = unicodedata.normalize('NFC', plain_text or '')
     return ' '.join(normalized.split())
 
@@ -192,6 +199,54 @@ def resolve_hash_source_text(transcript):
         return parsed
 
     return extract_obsidian_body(transcript.obsidian_markdown)
+
+
+def resolve_certified_plain_text(transcript):
+    """
+    Exact UTF-8 string whose SHA-256 is ``transcript.text_hash``.
+
+    Applies the same NFC + whitespace normalization used by ``compute_text_hash``.
+    Prefer this for public display / copy / verification so
+    ``sha256(utf8(text)) == text_hash`` without client-side re-normalization.
+
+    When ``text_hash_locked`` and ``hash_plain_text`` are set (external Vincent
+    ingest), return that snapshot as-is — it is already normalized and may keep
+    Spanish accents that SQL_ASCII ``prepare_text_for_db`` stripped elsewhere.
+    """
+    if getattr(transcript, 'text_hash_locked', False):
+        locked_plain = (getattr(transcript, 'hash_plain_text', None) or '').strip()
+        if locked_plain:
+            return locked_plain
+    return normalize_plain_text_for_hash(resolve_hash_source_text(transcript))
+
+
+def resolve_public_transcript_text(transcript):
+    """
+    Text shown on public transcript pages.
+
+    Prefer a snapshotted ``TranscriptAnchor.certified_plain_text`` when an
+    anchor exists for the current ``text_hash`` (stable after re-ingest of
+    non-matching drafts). Otherwise return the live certified plain text.
+    """
+    current_hash = (getattr(transcript, 'text_hash', None) or '').strip()
+    if current_hash:
+        # Local import avoids circular import with models → transcript_utils.
+        from content.models import TranscriptAnchor
+
+        content_id = getattr(transcript, 'content_id', None)
+        if content_id:
+            certified = (
+                TranscriptAnchor.objects.filter(
+                    content_id=content_id,
+                    text_hash=current_hash,
+                )
+                .exclude(certified_plain_text='')
+                .values_list('certified_plain_text', flat=True)
+                .first()
+            )
+            if certified:
+                return certified
+    return resolve_certified_plain_text(transcript)
 
 
 def _bind_embedding_on_content(content, embedding):
@@ -281,8 +336,21 @@ def sync_transcript_derived_fields(transcript):
         language_code = transcript.obsidian_frontmatter.get('language_code', '')
         transcript.language = normalize_language_code(language_code)
 
-    hash_source = resolve_hash_source_text(transcript)
-    normalized = normalize_plain_text_for_hash(hash_source)
-    transcript.text_length = len(normalized) if normalized else None
-    transcript.text_hash = compute_text_hash(hash_source)
+    if (
+        getattr(transcript, 'text_hash_locked', False)
+        and (getattr(transcript, 'text_hash', None) or '').strip()
+    ):
+        locked_plain = (getattr(transcript, 'hash_plain_text', None) or '').strip()
+        if locked_plain:
+            transcript.text_length = len(locked_plain)
+        else:
+            normalized = normalize_plain_text_for_hash(resolve_hash_source_text(transcript))
+            transcript.text_length = len(normalized) if normalized else None
+        # Keep worker-supplied text_hash; do not recompute from (possibly
+        # SQL_ASCII-degraded) stored artifacts.
+    else:
+        hash_source = resolve_hash_source_text(transcript)
+        normalized = normalize_plain_text_for_hash(hash_source)
+        transcript.text_length = len(normalized) if normalized else None
+        transcript.text_hash = compute_text_hash(hash_source)
     sync_embedding_status_for_text_hash(transcript)

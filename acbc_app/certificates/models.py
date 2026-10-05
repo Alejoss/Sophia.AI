@@ -24,6 +24,15 @@ class CertificateTemplate(models.Model):
 
 
 class Certificate(models.Model):
+    """Educational achievement for a path or event, distinct from a transcript anchor.
+
+    Planned NFT issuance uses certificate_id as a stable duplicate-prevention
+    reference, plus a verified recipient wallet and immutable achievement version.
+    blockchain_hash currently denotes a transaction hash, NOT a credential file
+    digest or token ID; those require separate fields in the future integration.
+    Existing uniqueness rules need review for linked replacement credentials.
+    See docs/hackathon/hackathon-ethereum-credentials.md.
+    """
     # Represents an issued certificate for completing a KnowledgePath or attending an Event, linked to specific templates.
 
     certificate_id = models.UUIDField(

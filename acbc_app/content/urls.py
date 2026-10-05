@@ -82,17 +82,26 @@ from .views import (
     AdminTopicCreationRequestRejectView,
     AdminFeaturedBooksView,
     AdminTopicsConsultationsView,
+    AdminUnlimitedConsultationUsersView,
+    AdminUnlimitedConsultationUserDetailView,
     AdminFeaturedBookDetailView,
     AdminFeaturedBookCandidatesView,
     AdminFeaturedBooksReorderView,
 )
 from .views_youtube_migration import YouTubeMigrationManifestView
+from .views_social_preview import (
+    ContentSocialPreviewView,
+    SiteSocialPreviewView,
+    TopicSocialPreviewView,
+)
 from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
     ContentTranscriptPublicView,
+    ContentTranscriptTextHashView,
 )
 from .views_transcript_anchor import (
+    ContentTranscriptAnchorCertifiedTextView,
     ContentTranscriptAnchorCurrentView,
     ContentTranscriptAnchorListView,
 )
@@ -103,6 +112,7 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestTopicQueueView,
     ContentEmbeddingIngestDetailView,
 )
+from .views_knowledge_path_ingest import KnowledgePathIngestDetailView
 from .views_topic_purchase import TopicPurchaseView
 from .views_topic_chat import (
     TopicChatView,
@@ -114,6 +124,23 @@ from .views_topic_chat import (
 app_name = "content"
 
 urlpatterns = [
+    # Social crawler Open Graph HTML (Telegram/Facebook/etc. via nginx User-Agent routing)
+    path(
+        'social-preview/site/',
+        SiteSocialPreviewView.as_view(),
+        name='social-preview-site',
+    ),
+    path(
+        'social-preview/<int:pk>/',
+        ContentSocialPreviewView.as_view(),
+        name='social-preview-content',
+    ),
+    path(
+        'topics/social-preview/<int:pk>/',
+        TopicSocialPreviewView.as_view(),
+        name='social-preview-topic',
+    ),
+
     # Publication URLs
     path('publications/', PublicationListView.as_view(), name='publication-list'),
     path('publications/<int:pk>/', PublicationDetailView.as_view(), name='publication-detail'),
@@ -148,6 +175,11 @@ urlpatterns = [
         name='content-transcript-anchors',
     ),
     path(
+        'content_details/<int:content_id>/transcript/anchors/<int:anchor_id>/certified-text/',
+        ContentTranscriptAnchorCertifiedTextView.as_view(),
+        name='content-transcript-anchor-certified-text',
+    ),
+    path(
         'content_details/<int:content_id>/transcript/anchor-requests/',
         ContentTranscriptAnchorRequestView.as_view(),
         name='content-transcript-anchor-requests',
@@ -164,6 +196,16 @@ urlpatterns = [
     path('topic-creation-requests/<int:request_id>/cancel/', TopicCreationRequestCancelView.as_view(), name='topic-creation-request-cancel'),
     path('admin/topic-creation-requests/', AdminTopicCreationRequestsView.as_view(), name='admin-topic-creation-requests'),
     path('admin/topics/', AdminTopicsConsultationsView.as_view(), name='admin-topics-consultations'),
+    path(
+        'admin/unlimited-consultation-users/',
+        AdminUnlimitedConsultationUsersView.as_view(),
+        name='admin-unlimited-consultation-users',
+    ),
+    path(
+        'admin/unlimited-consultation-users/<int:user_id>/',
+        AdminUnlimitedConsultationUserDetailView.as_view(),
+        name='admin-unlimited-consultation-user-detail',
+    ),
     path('admin/topic-creation-requests/<int:request_id>/approve/', AdminTopicCreationRequestApproveView.as_view(), name='admin-topic-creation-request-approve'),
     path('admin/topic-creation-requests/<int:request_id>/finalize/', AdminTopicCreationRequestFinalizeView.as_view(), name='admin-topic-creation-request-finalize'),
     path('admin/topic-creation-requests/<int:request_id>/reject/', AdminTopicCreationRequestRejectView.as_view(), name='admin-topic-creation-request-reject'),
@@ -271,6 +313,11 @@ urlpatterns = [
         name='transcript-ingest-detail',
     ),
     path(
+        'transcript-ingest/<int:content_id>/text-hash/',
+        ContentTranscriptTextHashView.as_view(),
+        name='transcript-ingest-text-hash',
+    ),
+    path(
         'embedding-ingest/',
         ContentEmbeddingIngestQueueView.as_view(),
         name='embedding-ingest-queue',
@@ -284,5 +331,10 @@ urlpatterns = [
         'embedding-ingest/<int:content_id>/',
         ContentEmbeddingIngestDetailView.as_view(),
         name='embedding-ingest-detail',
+    ),
+    path(
+        'knowledge-path-ingest/<int:knowledge_path_id>/',
+        KnowledgePathIngestDetailView.as_view(),
+        name='knowledge-path-ingest-detail',
     ),
 ]

@@ -11,7 +11,7 @@ document-hash contracts.
 
 **Transcript certification is not here.** The product path anchors transcript
 SHA-256 digests on **Bitcoin** via `OP_RETURN` (Django backend). See
-[transcript-anchor.md](../docs/api/transcript-anchor.md) and
+[transcript-anchor.md](../docs/hackathon/transcript-anchor.md) and
 [blockchain-integration.md](../docs/architecture/blockchain-integration.md).
 
 ## Install everything

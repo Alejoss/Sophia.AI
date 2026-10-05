@@ -4,7 +4,7 @@ Academia Blockchain usa [NOWPayments](https://nowpayments.io/) para aceptar pago
 
 1. **Registro a eventos de pago** (`EventRegistration`)
 2. **Compra de Caminos del Conocimiento** (`KnowledgePathPurchase`)
-3. **Solicitud de anclaje Bitcoin de transcripción** (`TranscriptAnchorRequest`, USD fijo `ANCHOR_REQUEST_PRICE_USD`, default `$1`) — el pago deja la solicitud en `paid_pending_review`; un admin aprueba (broadcast) o rechaza en Django admin (sin reembolso automático). Alternativa autocustodia: [pago BCH directo](bch-direct.md).
+3. **Solicitud de anclaje Bitcoin de transcripción** (`TranscriptAnchorRequest`, USD fijo `ANCHOR_REQUEST_PRICE_USD`, default `$1`) — tras el pago se emite automáticamente el OP_RETURN; `paid_pending_review` solo si la emisión queda diferida (comisiones/fondos) para reintento. Alternativa autocustodia: [pago BCH directo](bch-direct.md).
 
 ## Configuración en NOWPayments
 

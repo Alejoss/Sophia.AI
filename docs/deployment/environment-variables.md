@@ -185,7 +185,7 @@ See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 ### Bitcoin OP_RETURN (transcript anchoring)
 
-Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**. Full product/API/ops guide: [transcript-anchor.md](../api/transcript-anchor.md). Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md).
+Platform wallet embeds `ACBC1` + SHA-256 digest in a Bitcoin `OP_RETURN`. Default public API: [mempool.space](https://mempool.space) Esplora. Recommended test network: **signet**. Full product/API/ops guide: [transcript-anchor.md](../hackathon/transcript-anchor.md). Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md).
 
 #### `BTC_NETWORK`
 - **Description**: `signet` (default), `testnet`, `testnet4`, or `mainnet`
@@ -221,6 +221,30 @@ docker compose exec backend python manage.py broadcast_transcript_anchor 123 --r
 # docker compose -f docker-compose.prod.yml --env-file .env.compose exec backend python manage.py broadcast_transcript_anchor --show-address
 ```
 
+### Payphone Botón de pago (card)
+
+Card / Payphone-balance checkout via hosted redirect. See [payphone-setup.md](../payments/payphone-setup.md).
+
+#### `PAYPHONE_TOKEN`
+- **Description**: Bearer token from Payphone Developers (Credenciales)
+- **Required**: Yes, to enable `methods.payphone`
+- **Default**: empty (disabled)
+
+#### `PAYPHONE_STORE_ID`
+- **Description**: StoreId from Payphone Developers
+- **Required**: Yes, to enable `methods.payphone`
+- **Default**: empty (disabled)
+
+#### `PAYPHONE_API_URL`
+- **Default**: `https://pay.payphonetodoesposible.com/api`
+
+#### `PAYPHONE_TIMEZONE_OFFSET`
+- **Default**: `-5` (America/Guayaquil)
+
+#### `PAYPHONE_IVA_PERCENT`
+- **Description**: When `> 0`, split the buyer-facing USD total into `amountWithTax` + `tax` (e.g. `15` for Ecuador IVA). When `0`, send the full amount as `amountWithoutTax`.
+- **Default**: `0`
+
 ### Bitcoin Cash direct (anchor request payments)
 
 Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and knowledge paths stay on NOWPayments). See [bch-direct.md](../payments/bch-direct.md).
@@ -230,8 +254,14 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Required**: No
 - **Default**: `1`
 
+#### `PLATFORM_TOKEN_USD_PRICE`
+- **Description**: Face value of one platform token in USD. Packages in admin must price at `token_amount ×` this rate (default **$0.01**).
+- **Required**: No
+- **Default**: `0.01`
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
 #### `TOKEN_CONTENT_DISCOUNT_PERCENT`
-- **Description**: Reserved discount when spending platform tokens on paid content. Unused until token checkout ships.
+- **Description**: Percent discount when spending platform tokens on paid content (transcript anchors today). Example: `10` → 90 tokens for a $1 anchor at `$0.01`/token.
 - **Required**: No
 - **Default**: `0`
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)
@@ -246,6 +276,12 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Required** (one of them for the active network) to enable the BCH method in the checkout chooser
 - Chipnet: CashAddr `bchtest:q...`
 - Mainnet: CashAddr `bitcoincash:q...`
+
+#### `BCH_PRIVATE_KEY_WIF`
+- **Description**: WIF private key for the configured receive address. Used **only** by `manage.py withdraw_bch` to sweep funds; never by HTTP handlers.
+- **Required**: No (only when withdrawing)
+- **Example**: `BCH_PRIVATE_KEY_WIF=K...` or `L...` (mainnet); testnet/chipnet WIFs start with `c`
+- Keep this out of git. After sweeping to a wallet you control, you can remove it from the server.
 
 #### `BCH_API_BASE` / `BCH_BLOCKCHAIR_API_KEY` / `BCH_PAYMENT_TTL_MINUTES` / `BCH_MIN_CONFIRMATIONS` / `BCH_USD_PRICE`
 - **Defaults**: Fulcrum Electrum SSL for mainnet + chipnet / empty / `30` / `0` / `0`
@@ -383,9 +419,16 @@ Location: `frontend/.env`
 - **Note**: Injected at Vite build time. Set as a GitHub Repository variable for production image builds.
 
 #### `VITE_SENTRY_DSN`
-- **Description**: Sentry DSN for frontend error tracking
+- **Description**: Sentry DSN for frontend error tracking (production/beta builds only)
 - **Required**: No
 - **Example**: `VITE_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx`
+- **Note**: Ignored when Vite `MODE` is `development` / `dev` / `local` / `test` / `testing` (mirrors backend `ENVIRONMENT` gating). Do not rely on leaving this unset alone — `npm run dev` with a DSN in `.env` previously reported local errors to Sentry.
+
+#### `VITE_SENTRY_ENVIRONMENT`
+- **Description**: Optional Sentry `environment` label for the frontend SDK
+- **Required**: No (defaults to Vite `MODE`)
+- **Example**: `VITE_SENTRY_ENVIRONMENT=beta`
+- **Note**: Does not enable or disable reporting; enablement follows Vite `MODE` only.
 
 ## Environment File Examples
 

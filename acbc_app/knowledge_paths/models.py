@@ -33,6 +33,14 @@ def knowledge_path_image_preview_path(instance, filename):
 
 
 class KnowledgePath(models.Model):
+    """Editable knowledge path, not an immutable certified published version.
+
+    The planned Ethereum integration must snapshot this knowledge path and its
+    ordered nodes before binding learner progress to a published version. Later
+    edits must not change the curriculum referenced by an issued certificate.
+    See docs/hackathon/hackathon-ethereum-credentials.md and
+    docs/hackathon/knowledge-path-snapshot-schema.md.
+    """
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_paths')
@@ -158,6 +166,12 @@ class KnowledgePath(models.Model):
 
 
 class Node(models.Model):
+    """Editable lesson whose full title, description and order belong in a snapshot.
+
+    ContentProfile links resolve live content; certification must instead retain
+    version-specific archived material references. Quiz content is outside the
+    hackathon knowledge-path digest; see docs/hackathon/knowledge-path-snapshot-schema.md.
+    """
     MEDIA_TYPES = [
         ('VIDEO', 'Video'),
         ('AUDIO', 'Audio'),
@@ -252,3 +266,181 @@ class KnowledgePathPurchase(models.Model):
     @property
     def is_paid(self):
         return self.payment_status == 'PAID'
+
+
+class PublishedKnowledgePathSnapshot(models.Model):
+    """Immutable admin-published knowledge-path snapshot (hackathon Phase 2).
+
+    ``document_text`` stores the exact RFC 8785 JCS canonical JSON (as text)
+    whose SHA-256 is ``digest``. Use TextField rather than JSONField so the
+    exact hashed bytes are preserved without JSON round-trip differences.
+    Snapshots are created only by staff from the dashboard — not on path
+    create/publish/visibility changes.
+    """
+
+    knowledge_path = models.ForeignKey(
+        KnowledgePath,
+        on_delete=models.CASCADE,
+        related_name='published_snapshots',
+    )
+    version = models.PositiveIntegerField()
+    schema_version = models.CharField(max_length=64)
+    document_text = models.TextField(
+        help_text='Exact JCS canonical JSON UTF-8 text that was hashed.',
+    )
+    digest = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest of document_text UTF-8 bytes.',
+    )
+    published_at = models.DateTimeField(auto_now_add=True)
+    published_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='published_knowledge_path_snapshots',
+    )
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['-version']
+        unique_together = [['knowledge_path', 'version']]
+        indexes = [
+            models.Index(fields=['digest'], name='kp_snapshot_digest_idx'),
+        ]
+
+    def __str__(self):
+        return (
+            f'path {self.knowledge_path_id} v{self.version} '
+            f'({(self.digest or "")[:12]})'
+        )
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError(
+                'PublishedKnowledgePathSnapshot rows are immutable; '
+                'create a new version instead of updating.'
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def document(self):
+        """Parse canonical JSON for API display (logical object)."""
+        import json
+        return json.loads(self.document_text)
+
+
+class KnowledgePathSnapshotAnchor(models.Model):
+    """Bitcoin OP_RETURN proof for a published knowledge-path snapshot digest.
+
+    The hashed curriculum document stays on ``PublishedKnowledgePathSnapshot``;
+    this row tracks out-of-band chain state (never written into the JCS).
+    Payload: ASCII prefix ``ACBC2`` + 32-byte SHA-256 of the snapshot digest.
+    Reuses the same broadcast helpers as ``TranscriptAnchor`` (prefix ``ACBC1``).
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_BTC_BROADCAST = 'btc_broadcast'
+    STATUS_ANCHORED = 'anchored'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_BTC_BROADCAST, 'Bitcoin broadcast'),
+        (STATUS_ANCHORED, 'Anchored on Bitcoin'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    BTC_NETWORK_MAINNET = 'mainnet'
+    BTC_NETWORK_TESTNET = 'testnet'
+    BTC_NETWORK_SIGNET = 'signet'
+    BTC_NETWORK_REGTEST = 'regtest'
+    BTC_NETWORK_CHOICES = [
+        (BTC_NETWORK_MAINNET, 'Bitcoin mainnet'),
+        (BTC_NETWORK_TESTNET, 'Bitcoin testnet'),
+        (BTC_NETWORK_SIGNET, 'Bitcoin signet'),
+        (BTC_NETWORK_REGTEST, 'Bitcoin regtest'),
+    ]
+
+    DEFAULT_OP_RETURN_PREFIX = 'ACBC2'
+
+    snapshot = models.OneToOneField(
+        PublishedKnowledgePathSnapshot,
+        on_delete=models.CASCADE,
+        related_name='bitcoin_anchor',
+    )
+    digest = models.CharField(
+        max_length=64,
+        help_text='SHA-256 hex digest copied from the published snapshot at anchor time.',
+    )
+    op_return_prefix = models.CharField(
+        max_length=16,
+        default=DEFAULT_OP_RETURN_PREFIX,
+        help_text='ASCII prefix prepended to digest bytes in the Bitcoin OP_RETURN.',
+    )
+    btc_network = models.CharField(
+        max_length=16,
+        choices=BTC_NETWORK_CHOICES,
+        default=BTC_NETWORK_SIGNET,
+    )
+    btc_txid = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='Bitcoin transaction id (64 hex chars) once broadcast.',
+    )
+    btc_op_return_hex = models.CharField(
+        max_length=256,
+        blank=True,
+        help_text='Hex payload pushed in OP_RETURN (prefix ASCII bytes + 32-byte digest).',
+    )
+    btc_block_height = models.PositiveIntegerField(blank=True, null=True)
+    btc_block_hash = models.CharField(max_length=64, blank=True)
+    btc_confirmations = models.PositiveIntegerField(default=0)
+    btc_confirmed_at = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    error_message = models.TextField(blank=True)
+    anchored_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='knowledge_path_snapshot_anchors',
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Flexible extras (explorer URLs, raw receipts, etc.).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['digest'], name='kp_snap_anchor_digest_idx'),
+            models.Index(fields=['btc_txid'], name='kp_snap_anchor_btc_idx'),
+            models.Index(fields=['status', 'created_at'], name='kp_snap_anchor_status_idx'),
+        ]
+
+    def __str__(self):
+        short = (self.digest or '')[:12]
+        return (
+            f'KPSnapshotAnchor path={self.snapshot.knowledge_path_id} '
+            f'v{self.snapshot.version} {short}… [{self.status}]'
+        )
+
+    @property
+    def is_btc_confirmed(self):
+        return self.status == self.STATUS_ANCHORED and bool(self.btc_txid)
+
+    def build_op_return_payload_hex(self):
+        """prefix (ASCII) + raw 32-byte digest → hex string for OP_RETURN data."""
+        if not self.digest or len(self.digest) != 64:
+            raise ValueError('digest must be a 64-char SHA-256 hex digest')
+        prefix = (self.op_return_prefix or self.DEFAULT_OP_RETURN_PREFIX).encode('ascii')
+        digest = bytes.fromhex(self.digest)
+        return (prefix + digest).hex()
+

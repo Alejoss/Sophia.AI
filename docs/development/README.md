@@ -15,7 +15,7 @@ Django REST Framework backend development:
 
 React frontend development:
 
-- [Forms standard](frontend/forms.md) - React Hook Form + Yup, errors, auth contracts, PR checklist
+- [Forms standard](frontend/forms.md) - React Hook Form + Yup, errors, auth contracts, change review checklist
 - Components, routing, state, and API client guides — planned (not written yet); follow existing `frontend/src` patterns and [Architecture](../architecture/overview.md)
 
 ## Smart Contract Development

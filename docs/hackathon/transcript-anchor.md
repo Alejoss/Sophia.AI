@@ -6,6 +6,13 @@ it against the on-chain payload (and explorer).
 
 **No EVM / smart-contract path.** Certification is Bitcoin-only.
 
+This describes the current independent transcript-anchoring feature, not
+educational certificate NFTs. The proposed Ethereum work is documented in
+[the hackathon specification](hackathon-ethereum-credentials.md).
+See the [2026-09-22 readiness review](bitcoin-anchor-readiness.md)
+(updated 2026-09-23) for reliability hardening that was applied and what still
+needs a live signet demonstration.
+
 **Implementation**
 
 | Layer | Location |
@@ -17,7 +24,7 @@ it against the on-chain payload (and explorer).
 | Env | [`BTC_*`](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring) |
 
 Prerequisite: a `ContentTranscript` with a non-empty `text_hash` (usually from
-[transcript ingest](transcript-ingest.md)).
+[transcript ingest](../api/transcript-ingest.md)).
 
 ---
 
@@ -77,20 +84,22 @@ Base path under content details:
 | Method | Path | Auth |
 |--------|------|------|
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchor/` | Public (`AllowAny`). If status is `btc_broadcast`, polls Esplora once and may promote to `anchored`. |
-| `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated; uploader or staff. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
-| `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → admin review. |
+| `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated **staff** only. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
+| `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → auto-broadcast. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
-| `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated; uploader or staff |
+| `GET` | `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/` | Public. Exact UTF-8 snapshot download (`text/plain`) with `X-Text-Hash` / `X-Expected-Text-Hash` / `X-Hash-Match` headers. **404** when `certified_plain_text` was never saved. |
+| `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated **staff** only (prepare pending row) |
 
 Public paid requests use `TranscriptAnchorRequest` and a payment method chooser:
 
+- **Platform tokens** — `POST /api/payments/anchor-request/<id>/tokens/` ($1 → 100 tokens at `$0.01`/token, after `TOKEN_CONTENT_DISCOUNT_PERCENT`)
 - **NOWPayments** — `POST /api/payments/anchor-request/<id>/`
 - **BCH directo** — `POST /api/payments/anchor-request/<id>/bch/` + `.../bch/verify/` ([docs](../payments/bch-direct.md))
 
-After payment, status is `paid_pending_review`. Staff approve/reject in Django admin (**Content → Transcript anchor requests**). No automatic refunds.
+After payment succeeds, the platform hashes the current transcript (already snapshotted as `text_hash` on the request) and **automatically broadcasts** the OP_RETURN. Status becomes `approved` when a `btc_txid` is linked. If fees/funds block broadcast, status stays `paid_pending_review` for retry (admin action **Reintentar emisión** or ops CLI). Staff may still **reject** (no automatic refund).
 
-`POST .../anchors/` **only creates a pending row**.  
-`POST .../anchor/` **broadcasts** (platform wallet). The same USD fee cap applies to the ops CLI.
+`POST .../anchors/` **only creates a pending row** (staff/ops).  
+`POST .../anchor/` **broadcasts** via the platform wallet (staff/ops). Uploaders and other users must use the **paid** `TranscriptAnchorRequest` flow ($1). The same USD fee cap applies to the ops CLI.
 
 ### `GET .../transcript/anchor/` (current)
 
@@ -138,7 +147,8 @@ Body (all optional):
 | `ipfs_cid` | `""` | Off-chain pointer only |
 
 **201** — created. **409** — already exists for current `text_hash` (includes
-existing `anchor`). **403** — not uploader/staff. **404** — no transcript.
+existing `anchor`). **403** — authenticated user is not staff/superuser (uploading
+the content does not grant this permission). **404** — no transcript.
 
 ```bash
 curl -X POST "http://localhost:8000/api/content/content_details/101/transcript/anchors/" \
@@ -176,6 +186,12 @@ before running these commands.
 
 ---
 
+The public transcript `GET .../transcript/` field `text` is the **exact**
+normalized UTF-8 string whose SHA-256 is `text_hash` (NFC + collapsed
+whitespace). Anchors also snapshot that string as `certified_plain_text`
+so verification stays stable if the live transcript is later re-ingested
+with equivalent whitespace.
+
 ## Verification (manual)
 
 1. Obtain transcript plain text and recompute SHA-256 (same normalization as
@@ -184,13 +200,27 @@ before running these commands.
 3. Open `btc_txid` on mempool.space for the configured network and confirm the
    `OP_RETURN` data matches.
 
+For an older anchor, download
+`GET .../transcript/anchors/{id}/certified-text/` (or use
+`certified_plain_text` from the anchor-history API), not the current transcript
+endpoint. Hash its exact UTF-8 bytes without adding a newline or BOM. A legacy
+anchor with no saved text returns **404** `certified_text_missing` and cannot be
+independently reconstructed from its digest alone. An `ipfs_cid` field does not
+demonstrate that upload, pinning or long-term availability has been implemented.
+
+Broadcast durability: before Esplora submission the service persists
+`metadata.signed_raw_tx_hex` and `metadata.predicted_txid`, then reconciles by
+txid on retry. `btc_network` is immutable after that preparation.
+`refresh_anchor_confirmations` may demote `anchored` → `btc_broadcast` if
+confirmations fall below `BTC_MIN_CONFIRMATIONS` (reorg).
+
 ---
 
 ## Related
 
 - Env: [environment-variables.md — Bitcoin OP_RETURN](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring)
 - Payments: [BCH directo](../payments/bch-direct.md) · [NOWPayments](../payments/nowpayments-setup.md) · [payments index](../payments/README.md)
-- Transcript ingest: [transcript-ingest.md](transcript-ingest.md)
+- Transcript ingest: [transcript-ingest.md](../api/transcript-ingest.md)
 - Architecture: [blockchain-integration.md](../architecture/blockchain-integration.md)
 - Permissions: [endpoint-permissions-map.md](../security/endpoint-permissions-map.md)
-- Endpoints index: [endpoints.md](endpoints.md#payments)
+- Endpoints index: [endpoints.md](../api/endpoints.md#payments)

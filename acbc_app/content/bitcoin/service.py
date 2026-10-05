@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import logging
+import threading
+from contextlib import contextmanager
 from typing import Optional
 
 from django.conf import settings
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
-from content.bitcoin.esplora import BitcoinApiError, EsploraClient
+from content.bitcoin.esplora import BitcoinApiError, EsploraClient, client_for_network
 from content.bitcoin.fees import FeeBudgetError, assert_fee_within_usd_budget
 from content.bitcoin.tx_builder import (
     BitcoinWalletError,
@@ -17,8 +19,21 @@ from content.bitcoin.tx_builder import (
     private_key_from_wif,
 )
 from content.models import Content, ContentTranscript, TranscriptAnchor
+from content.transcript_utils import resolve_certified_plain_text
 
 logger = logging.getLogger(__name__)
+
+# Session advisory lock key for serializing platform-wallet UTXO use (PostgreSQL).
+_BTC_WALLET_ADVISORY_LOCK_KEY = 0x0ACBCB01
+_THREAD_WALLET_LOCK = threading.Lock()
+
+SUPPORTED_BTC_NETWORKS = frozenset({
+    TranscriptAnchor.BTC_NETWORK_MAINNET,
+    TranscriptAnchor.BTC_NETWORK_TESTNET,
+    TranscriptAnchor.BTC_NETWORK_SIGNET,
+    TranscriptAnchor.BTC_NETWORK_REGTEST,
+    'testnet4',
+})
 
 
 class AnchorBroadcastError(Exception):
@@ -33,6 +48,36 @@ def platform_address(network: Optional[str] = None) -> str:
     network = network or settings.BTC_NETWORK
     key = private_key_from_wif(settings.BTC_PRIVATE_KEY_WIF, network)
     return p2wpkh_address(key, network)
+
+
+def validate_btc_network(network: str) -> str:
+    network = (network or '').strip().lower()
+    if network not in SUPPORTED_BTC_NETWORKS:
+        raise AnchorBroadcastError(f'Unsupported btc_network: {network}')
+    return network
+
+
+def set_anchor_network(anchor: TranscriptAnchor, network: str) -> TranscriptAnchor:
+    """
+    Set ``btc_network`` only before broadcast preparation.
+
+    After a signed tx is persisted or a txid exists, the network is immutable so
+    explorer lookups and historical proofs stay consistent.
+    """
+    network = validate_btc_network(network)
+    meta = dict(anchor.metadata or {})
+    frozen = bool(anchor.btc_txid) or bool(meta.get('signed_raw_tx_hex')) or bool(
+        meta.get('predicted_txid')
+    )
+    if frozen and anchor.btc_network != network:
+        raise AnchorBroadcastError(
+            f'btc_network is immutable after broadcast preparation '
+            f'(have {anchor.btc_network}, requested {network})'
+        )
+    if anchor.btc_network != network:
+        anchor.btc_network = network
+        anchor.save(update_fields=['btc_network', 'updated_at'])
+    return anchor
 
 
 def ensure_pending_anchor(
@@ -51,18 +96,24 @@ def ensure_pending_anchor(
     if not transcript.text_hash:
         raise AnchorBroadcastError('Transcript has no text_hash')
 
-    network = (network or settings.BTC_NETWORK).lower()
+    network = validate_btc_network(network or settings.BTC_NETWORK)
+    certified_plain_text = resolve_certified_plain_text(transcript)
+
     existing = TranscriptAnchor.objects.filter(
         content=content,
         text_hash=transcript.text_hash,
     ).first()
     if existing is not None:
+        if not (existing.certified_plain_text or '').strip() and certified_plain_text:
+            existing.certified_plain_text = certified_plain_text
+            existing.save(update_fields=['certified_plain_text', 'updated_at'])
         return existing
 
     anchor = TranscriptAnchor(
         content=content,
         text_hash=transcript.text_hash,
         text_length=transcript.text_length,
+        certified_plain_text=certified_plain_text,
         btc_network=network,
         anchored_by=anchored_by,
         status=TranscriptAnchor.STATUS_PENDING,
@@ -77,96 +128,73 @@ def _payload_bytes(anchor: TranscriptAnchor) -> bytes:
     return bytes.fromhex(hex_payload)
 
 
-@transaction.atomic
-def broadcast_anchor(
-    anchor: TranscriptAnchor,
-    *,
-    dry_run: bool = False,
-    client: Optional[EsploraClient] = None,
-) -> TranscriptAnchor:
-    """
-    Build OP_RETURN tx for ``anchor.text_hash``, broadcast (unless dry_run),
-    and update status to ``btc_broadcast`` with ``btc_txid``.
-    """
-    if anchor.status == TranscriptAnchor.STATUS_ANCHORED and anchor.btc_txid:
-        raise AnchorBroadcastError(f'Anchor {anchor.pk} already anchored ({anchor.btc_txid})')
-    if anchor.status == TranscriptAnchor.STATUS_BTC_BROADCAST and anchor.btc_txid and not dry_run:
-        raise AnchorBroadcastError(
-            f'Anchor {anchor.pk} already broadcast ({anchor.btc_txid}); '
-            'use refresh to wait for confirmations'
-        )
-    if not settings.BTC_PRIVATE_KEY_WIF:
-        raise AnchorBroadcastError('BTC_PRIVATE_KEY_WIF is not configured')
-
-    network = anchor.btc_network or settings.BTC_NETWORK
-    client = client or EsploraClient()
-    address = platform_address(network)
-
-    try:
-        utxos = client.get_address_utxos(address)
-        fee_rate = client.get_recommended_fee_sat_vb()
-        built = build_and_sign_op_return_tx(
-            wif=settings.BTC_PRIVATE_KEY_WIF,
-            network_name=network,
-            op_return_payload=_payload_bytes(anchor),
-            utxos=utxos,
-            fee_sat_vb=fee_rate,
-        )
-    except (BitcoinApiError, BitcoinWalletError) as exc:
-        anchor.status = TranscriptAnchor.STATUS_FAILED
-        anchor.error_message = str(exc)
-        anchor.save(update_fields=['status', 'error_message', 'updated_at'])
-        raise AnchorBroadcastError(str(exc)) from exc
-
-    if built.from_address != address:
-        raise AnchorBroadcastError('Derived address mismatch')
-
-    try:
-        fee_usd = assert_fee_within_usd_budget(built.fee_sats)
-    except FeeBudgetError as exc:
-        # Temporary market condition — keep row pending so the user can retry later.
-        raise AnchorBroadcastError(str(exc)) from exc
-
-    metadata = dict(anchor.metadata or {})
-    metadata.update({
-        'from_address': built.from_address,
-        'fee_sats': built.fee_sats,
-        'change_sats': built.change_sats,
-        'input_sats': built.input_sats,
-        'fee_sat_vb': fee_rate,
-        'fee_usd': round(fee_usd, 6) if fee_usd else None,
-        'dry_run': dry_run,
-        'raw_tx_hex': built.raw_tx_hex if dry_run else metadata.get('raw_tx_hex'),
-    })
-
-    if dry_run:
-        anchor.btc_op_return_hex = anchor.btc_op_return_hex or anchor.build_op_return_payload_hex()
-        anchor.metadata = metadata
-        anchor.error_message = ''
-        anchor.save(update_fields=['btc_op_return_hex', 'metadata', 'error_message', 'updated_at'])
-        return anchor
-
-    try:
-        txid = client.broadcast(built.raw_tx_hex)
-    except BitcoinApiError as exc:
-        anchor.status = TranscriptAnchor.STATUS_FAILED
-        anchor.error_message = str(exc)
-        anchor.metadata = metadata
-        anchor.save(update_fields=['status', 'error_message', 'metadata', 'updated_at'])
-        raise AnchorBroadcastError(str(exc)) from exc
-
-    explorer = {
+def _explorer_url(network: str, txid: str) -> str:
+    return {
         'signet': f'https://mempool.space/signet/tx/{txid}',
         'testnet': f'https://mempool.space/testnet/tx/{txid}',
         'testnet4': f'https://mempool.space/testnet4/tx/{txid}',
         'mainnet': f'https://mempool.space/tx/{txid}',
     }.get(network, '')
-    metadata['explorer_url'] = explorer
-    metadata.pop('raw_tx_hex', None)
 
+
+@contextmanager
+def _wallet_lock():
+    """
+    Serialize platform-wallet UTXO selection across concurrent broadcasts.
+
+    PostgreSQL uses a session advisory lock; SQLite/tests use a process lock.
+    """
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT pg_advisory_lock(%s)', [_BTC_WALLET_ADVISORY_LOCK_KEY])
+        try:
+            yield
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    'SELECT pg_advisory_unlock(%s)',
+                    [_BTC_WALLET_ADVISORY_LOCK_KEY],
+                )
+    else:
+        with _THREAD_WALLET_LOCK:
+            yield
+
+
+def _persist_failure(anchor, message: str):
+    """
+    Commit a durable ``failed`` status in its own transaction.
+
+    Must not be called inside an outer atomic that may roll back — callers that
+    wrap broadcast must release their transaction first (see paid fulfillment).
+    """
+    model = type(anchor)
+    with transaction.atomic():
+        locked = model.objects.select_for_update().get(pk=anchor.pk)
+        if locked.btc_txid:
+            return locked
+        if locked.status == model.STATUS_ANCHORED:
+            return locked
+        locked.status = model.STATUS_FAILED
+        locked.error_message = (message or '')[:4000]
+        locked.save(update_fields=['status', 'error_message', 'updated_at'])
+        return locked
+
+
+def _mark_broadcast(
+    anchor,
+    *,
+    txid: str,
+    metadata: dict,
+    network: str,
+):
+    model = type(anchor)
+    metadata = dict(metadata or {})
+    metadata['explorer_url'] = _explorer_url(network, txid)
+    metadata.pop('signed_raw_tx_hex', None)
+    metadata['predicted_txid'] = txid
     anchor.btc_txid = txid
     anchor.btc_op_return_hex = anchor.btc_op_return_hex or anchor.build_op_return_payload_hex()
-    anchor.status = TranscriptAnchor.STATUS_BTC_BROADCAST
+    anchor.status = model.STATUS_BTC_BROADCAST
     anchor.error_message = ''
     anchor.metadata = metadata
     anchor.save(
@@ -180,24 +208,275 @@ def broadcast_anchor(
         ]
     )
     logger.info(
-        'Broadcast transcript anchor %s content=%s txid=%s fee=%s',
+        'Broadcast OP_RETURN anchor model=%s pk=%s txid=%s',
+        model.__name__,
         anchor.pk,
-        anchor.content_id,
         txid,
-        built.fee_sats,
     )
     return anchor
 
 
+def _resolve_client(anchor, client: Optional[EsploraClient]) -> EsploraClient:
+    if client is not None:
+        return client
+    return client_for_network(anchor.btc_network or settings.BTC_NETWORK)
+
+
+def _prepare_signed_transaction(
+    anchor,
+    *,
+    dry_run: bool,
+    client: EsploraClient,
+):
+    """
+    Lock the row, build/sign if needed, and commit the signed tx identity before
+    any network broadcast. Returns the refreshed anchor.
+
+    Works for any saved model with TranscriptAnchor-compatible BTC fields
+    (status constants, ``btc_*``, ``metadata``, ``build_op_return_payload_hex``).
+    """
+    model = type(anchor)
+    with transaction.atomic():
+        locked = model.objects.select_for_update().get(pk=anchor.pk)
+
+        if locked.status == model.STATUS_ANCHORED and locked.btc_txid:
+            raise AnchorBroadcastError(
+                f'Anchor {locked.pk} already anchored ({locked.btc_txid})'
+            )
+        if (
+            locked.status == model.STATUS_BTC_BROADCAST
+            and locked.btc_txid
+            and not dry_run
+        ):
+            raise AnchorBroadcastError(
+                f'Anchor {locked.pk} already broadcast ({locked.btc_txid}); '
+                'use refresh to wait for confirmations'
+            )
+        if not settings.BTC_PRIVATE_KEY_WIF:
+            raise AnchorBroadcastError('BTC_PRIVATE_KEY_WIF is not configured')
+
+        network = validate_btc_network(locked.btc_network or settings.BTC_NETWORK)
+        if locked.btc_network != network:
+            locked.btc_network = network
+            locked.save(update_fields=['btc_network', 'updated_at'])
+
+        metadata = dict(locked.metadata or {})
+        prepared_raw = (metadata.get('signed_raw_tx_hex') or '').strip()
+        predicted_txid = (metadata.get('predicted_txid') or '').strip()
+
+        # Reuse a previously persisted signed tx (durable retry).
+        if prepared_raw and predicted_txid and not dry_run:
+            return locked
+
+        address = platform_address(network)
+        try:
+            utxos = client.get_address_utxos(address)
+            fee_rate = client.get_recommended_fee_sat_vb()
+            built = build_and_sign_op_return_tx(
+                wif=settings.BTC_PRIVATE_KEY_WIF,
+                network_name=network,
+                op_return_payload=_payload_bytes(locked),
+                utxos=utxos,
+                fee_sat_vb=fee_rate,
+            )
+        except (BitcoinApiError, BitcoinWalletError) as exc:
+            # Persist failure in a nested atomic that still rolls back with the
+            # outer savepoint — caller must invoke durable failure after this
+            # raises if needed. We raise a typed error and let broadcast_anchor
+            # persist failure outside this atomic.
+            raise AnchorBroadcastError(str(exc)) from exc
+
+        if built.from_address != address:
+            raise AnchorBroadcastError('Derived address mismatch')
+
+        try:
+            fee_usd = assert_fee_within_usd_budget(built.fee_sats)
+        except FeeBudgetError as exc:
+            # Temporary market condition — keep row pending for retry.
+            raise AnchorBroadcastError(str(exc)) from exc
+
+        metadata.update({
+            'from_address': built.from_address,
+            'fee_sats': built.fee_sats,
+            'change_sats': built.change_sats,
+            'input_sats': built.input_sats,
+            'fee_sat_vb': fee_rate,
+            'fee_usd': round(fee_usd, 6) if fee_usd else None,
+            'dry_run': dry_run,
+        })
+        if dry_run:
+            # Inspection only — do not persist a durable signed payload that
+            # would freeze network identity or skip a fresh UTXO selection.
+            metadata['raw_tx_hex'] = built.raw_tx_hex
+            metadata['predicted_txid_dry_run'] = built.txid
+            metadata.pop('signed_raw_tx_hex', None)
+            metadata.pop('predicted_txid', None)
+            locked.btc_op_return_hex = (
+                locked.btc_op_return_hex or locked.build_op_return_payload_hex()
+            )
+            locked.metadata = metadata
+            locked.error_message = ''
+            locked.save(
+                update_fields=['btc_op_return_hex', 'metadata', 'error_message', 'updated_at']
+            )
+            return locked
+
+        metadata['predicted_txid'] = built.txid
+        metadata['signed_raw_tx_hex'] = built.raw_tx_hex
+        locked.btc_op_return_hex = (
+            locked.btc_op_return_hex or locked.build_op_return_payload_hex()
+        )
+        locked.metadata = metadata
+        locked.error_message = ''
+        # Stay pending until broadcast is accepted / reconciled.
+        if locked.status == model.STATUS_FAILED:
+            locked.status = model.STATUS_PENDING
+        locked.save(
+            update_fields=[
+                'btc_op_return_hex',
+                'metadata',
+                'error_message',
+                'status',
+                'updated_at',
+            ]
+        )
+        return locked
+
+
+def _submit_prepared_transaction(
+    anchor,
+    *,
+    client: EsploraClient,
+):
+    """
+    Broadcast a previously persisted signed transaction, reconciling by txid
+    when the explorer already knows it (retry after uncertain acceptance).
+    """
+    model = type(anchor)
+    network = validate_btc_network(anchor.btc_network or settings.BTC_NETWORK)
+    metadata = dict(anchor.metadata or {})
+    prepared_raw = (metadata.get('signed_raw_tx_hex') or '').strip()
+    predicted_txid = (metadata.get('predicted_txid') or '').strip()
+    if not prepared_raw or not predicted_txid:
+        raise AnchorBroadcastError(
+            f'Anchor {anchor.pk} has no prepared signed transaction to broadcast'
+        )
+
+    # Reconcile first: network may have accepted a prior attempt.
+    try:
+        existing = client.get_tx_or_none(predicted_txid)
+    except BitcoinApiError as exc:
+        raise AnchorBroadcastError(str(exc)) from exc
+
+    if existing is not None:
+        with transaction.atomic():
+            locked = model.objects.select_for_update().get(pk=anchor.pk)
+            return _mark_broadcast(
+                locked,
+                txid=predicted_txid,
+                metadata=dict(locked.metadata or {}),
+                network=network,
+            )
+
+    try:
+        txid = client.broadcast(prepared_raw)
+    except BitcoinApiError as exc:
+        # Ambiguous: tx may still have been accepted. Re-check by predicted txid.
+        try:
+            existing = client.get_tx_or_none(predicted_txid)
+        except BitcoinApiError:
+            existing = None
+        if existing is not None:
+            txid = predicted_txid
+        else:
+            raise AnchorBroadcastError(str(exc)) from exc
+
+    if txid and predicted_txid and txid != predicted_txid:
+        logger.warning(
+            'Broadcast returned txid %s but predicted %s for anchor %s; using returned',
+            txid,
+            predicted_txid,
+            anchor.pk,
+        )
+
+    with transaction.atomic():
+        locked = model.objects.select_for_update().get(pk=anchor.pk)
+        return _mark_broadcast(
+            locked,
+            txid=txid or predicted_txid,
+            metadata=dict(locked.metadata or {}),
+            network=network,
+        )
+
+
+def broadcast_anchor(
+    anchor,
+    *,
+    dry_run: bool = False,
+    client: Optional[EsploraClient] = None,
+):
+    """
+    Build OP_RETURN tx for the anchor digest, broadcast (unless dry_run),
+    and update status to ``btc_broadcast`` with ``btc_txid``.
+
+    Works for ``TranscriptAnchor`` and compatible models (e.g. knowledge-path
+    snapshot anchors). Durability: signed raw tx + predicted txid are committed
+    before submission; retries reconcile by txid.
+    """
+    if anchor.pk is None:
+        raise AnchorBroadcastError('Anchor must be saved before broadcast')
+
+    model = type(anchor)
+    resolved_client: Optional[EsploraClient] = client
+    try:
+        with _wallet_lock():
+            # Bind Esplora to the row's network unless the caller injected a mock.
+            if resolved_client is None:
+                refreshed = model.objects.get(pk=anchor.pk)
+                resolved_client = _resolve_client(refreshed, None)
+
+            prepared = _prepare_signed_transaction(
+                anchor,
+                dry_run=dry_run,
+                client=resolved_client,
+            )
+            if dry_run:
+                return prepared
+            return _submit_prepared_transaction(prepared, client=resolved_client)
+    except AnchorBroadcastError as exc:
+        from content.bitcoin.fees import FEE_TOO_HIGH_MESSAGE
+
+        # Fee-too-high must remain pending for retry.
+        if isinstance(exc.__cause__, FeeBudgetError) or str(exc) == FEE_TOO_HIGH_MESSAGE:
+            raise
+        # Durable failed state for wallet/API errors during prepare.
+        # If a signed tx was already persisted, leave pending so retry reuses it.
+        current = model.objects.filter(pk=anchor.pk).first()
+        if current is not None and not current.btc_txid:
+            meta = dict(current.metadata or {})
+            has_prepared = bool(meta.get('signed_raw_tx_hex')) and bool(
+                meta.get('predicted_txid')
+            )
+            if not has_prepared:
+                _persist_failure(current, str(exc))
+        raise
+
+
 def refresh_anchor_confirmations(
-    anchor: TranscriptAnchor,
+    anchor,
     *,
     client: Optional[EsploraClient] = None,
-) -> TranscriptAnchor:
-    """Poll Esplora and mark anchored when enough confirmations exist."""
+):
+    """
+    Poll Esplora and mark anchored when enough confirmations exist.
+
+    If an already-anchored transaction later falls below the confirmation
+    threshold (reorg), demote status back to ``btc_broadcast``.
+    """
     if not anchor.btc_txid:
         raise AnchorBroadcastError('Anchor has no btc_txid')
-    client = client or EsploraClient()
+    model = type(anchor)
+    client = client or _resolve_client(anchor, None)
     try:
         tx = client.get_tx_status(anchor.btc_txid)
     except BitcoinApiError as exc:
@@ -208,58 +487,85 @@ def refresh_anchor_confirmations(
     block_height = status.get('block_height')
     block_hash = status.get('block_hash') or ''
 
-    # Esplora does not always return confirmations count; treat confirmed as enough.
     min_conf = max(1, int(getattr(settings, 'BTC_MIN_CONFIRMATIONS', 1)))
     confirmations = 1 if confirmed else 0
-    tip = None
     if confirmed and block_height is not None:
         try:
             tip = client.get_tip_height()
             confirmations = max(1, tip - int(block_height) + 1)
         except Exception:  # noqa: BLE001
             confirmations = 1
+    elif not confirmed:
+        confirmations = 0
 
-    anchor.btc_block_height = int(block_height) if block_height is not None else anchor.btc_block_height
-    anchor.btc_block_hash = block_hash or anchor.btc_block_hash
-    anchor.btc_confirmations = confirmations
-    update_fields = ['btc_block_height', 'btc_block_hash', 'btc_confirmations', 'updated_at']
+    with transaction.atomic():
+        locked = model.objects.select_for_update().get(pk=anchor.pk)
+        was_anchored = locked.status == model.STATUS_ANCHORED
+        locked.btc_block_height = (
+            int(block_height) if block_height is not None else locked.btc_block_height
+        )
+        locked.btc_block_hash = block_hash or locked.btc_block_hash
+        locked.btc_confirmations = confirmations
+        update_fields = [
+            'btc_block_height',
+            'btc_block_hash',
+            'btc_confirmations',
+            'updated_at',
+        ]
 
-    if confirmed and confirmations >= min_conf:
-        anchor.status = TranscriptAnchor.STATUS_ANCHORED
-        if not anchor.btc_confirmed_at:
-            anchor.btc_confirmed_at = timezone.now()
-            update_fields.append('btc_confirmed_at')
-        update_fields.append('status')
-        anchor.error_message = ''
-        update_fields.append('error_message')
+        if confirmed and confirmations >= min_conf:
+            locked.status = model.STATUS_ANCHORED
+            if not locked.btc_confirmed_at:
+                locked.btc_confirmed_at = timezone.now()
+                update_fields.append('btc_confirmed_at')
+            update_fields.append('status')
+            locked.error_message = ''
+            update_fields.append('error_message')
+            meta = dict(locked.metadata or {})
+            if meta.pop('reorg_demoted_at', None) is not None:
+                locked.metadata = meta
+                update_fields.append('metadata')
+        elif was_anchored and confirmations < min_conf:
+            locked.status = model.STATUS_BTC_BROADCAST
+            update_fields.append('status')
+            meta = dict(locked.metadata or {})
+            meta['reorg_demoted_at'] = timezone.now().isoformat()
+            meta['reorg_confirmations'] = confirmations
+            locked.metadata = meta
+            update_fields.append('metadata')
+            logger.warning(
+                'Demoted OP_RETURN anchor %s (%s) to btc_broadcast after reorg '
+                '(confirmations=%s)',
+                locked.pk,
+                model.__name__,
+                confirmations,
+            )
 
-    anchor.save(update_fields=update_fields)
-    return anchor
+        locked.save(update_fields=update_fields)
+        return locked
 
 
 def maybe_refresh_broadcast_anchor(
-    anchor: TranscriptAnchor,
+    anchor,
     *,
     client: Optional[EsploraClient] = None,
-) -> TranscriptAnchor:
+):
     """
-    Best-effort confirmation poll for anchors still in ``btc_broadcast``.
+    Best-effort confirmation poll for anchors with a ``btc_txid``.
 
-    Used by the public GET endpoint so the UI catches up without a manual
-    ``manage.py broadcast_transcript_anchor --refresh``. Failures leave the
-    row unchanged.
+    Refreshes both ``btc_broadcast`` (promotion) and ``anchored`` (reorg
+    demotion). Failures leave the row unchanged.
     """
-    if (
-        anchor is None
-        or not anchor.btc_txid
-        or anchor.status != TranscriptAnchor.STATUS_BTC_BROADCAST
-    ):
+    if anchor is None or not getattr(anchor, 'btc_txid', None):
+        return anchor
+    model = type(anchor)
+    if anchor.status not in (model.STATUS_BTC_BROADCAST, model.STATUS_ANCHORED):
         return anchor
     try:
         return refresh_anchor_confirmations(anchor, client=client)
     except Exception as exc:  # noqa: BLE001 — never break public reads
         logger.warning(
-            'Could not refresh transcript anchor %s confirmations: %s',
+            'Could not refresh OP_RETURN anchor %s confirmations: %s',
             anchor.pk,
             exc,
         )

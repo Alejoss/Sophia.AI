@@ -1,13 +1,15 @@
 # Transcript ingest API (external workers)
 
-Machine-to-machine API for an **external** transcript worker (typically run on a laptop with local Whisper and optional YouTube captions). The worker is **not** part of this monorepo.
+Machine-to-machine API for an **external** transcript worker (typically Vincent: Whisper/captions for A/V, PDF/text extract for documents). The worker is **not** part of this monorepo.
+
+**Content is atomic:** VIDEO, AUDIO, and TEXT (PDF) all store canonical plain text on the same `ContentTranscript` model. Knowledge-path snapshots and embeddings hash that text — not the PDF file bytes.
 
 Workers:
 
-1. Pull a work queue / topic manifest of VIDEO/AUDIO content
-2. Obtain media via **S3 object key** (`file_key`) and/or **YouTube URL**
-3. Produce text artifacts (and optional SRT/VTT)
-4. Upsert them with `PUT`
+1. Pull a work queue / topic (or knowledge-path) manifest of VIDEO/AUDIO/TEXT content
+2. Obtain media via **S3 object key** (`file_key`) and/or **YouTube URL** (A/V)
+3. Produce text artifacts (and optional SRT/VTT for A/V; plain extract for TEXT/PDF)
+4. Upsert them with `PUT` (`format=PLAIN` recommended for PDF extracts)
 
 User-facing JWT auth is **not** used. Media download URLs are **not** pre-signed; give the worker read-only AWS credentials to your bucket.
 
@@ -43,14 +45,15 @@ Base path: `/api/content/transcript-ingest/`
 | `GET` | `/api/content/transcript-ingest/` | Queue / topic manifest |
 | `GET` | `/api/content/transcript-ingest/{content_id}/` | One item + transcript status |
 | `PUT` | `/api/content/transcript-ingest/{content_id}/` | Create or replace transcript (idempotent) |
+| `PUT` | `/api/content/transcript-ingest/{content_id}/text-hash/` | Persist externally computed `text_hash` (Vincent) |
 
-Only `media_type` **VIDEO** and **AUDIO** are accepted. TEXT/IMAGE return **400** on detail/PUT.
+Only `media_type` **VIDEO**, **AUDIO**, and **TEXT** are accepted. IMAGE returns **400** on detail/PUT.
 
 ---
 
 ## `GET /api/content/transcript-ingest/`
 
-Lists VIDEO/AUDIO contents for the worker.
+Lists VIDEO/AUDIO/TEXT contents for the worker.
 
 ### Query parameters
 
@@ -58,7 +61,7 @@ Lists VIDEO/AUDIO contents for the worker.
 |-------|------|---------|-------------|
 | `topic_id` | int | — | Only contents linked to this topic. Unknown id → **404**. |
 | `include_completed` | bool | `false` | If `true`/`1`/`yes`/`on`, also return items that already have a transcript (for local reconciliation). Default queue = pending only. |
-| `media_type` | string | — | `VIDEO` or `AUDIO` |
+| `media_type` | string | — | `VIDEO`, `AUDIO`, or `TEXT` |
 | `content_id` | int | — | Single content filter |
 | `limit` | int | `100` | Page size (max `500`) |
 | `offset` | int | `0` | Pagination offset |
@@ -146,12 +149,12 @@ Idempotent upsert: creates (**201**, `created: true`) or replaces (**200**, `cre
 | `processed_plain` | one of three* | Cleaned plain text (primary for hash / future RAG) |
 | `obsidian_markdown` | one of three* | Note with optional YAML frontmatter + body |
 | `source_subtitles` | no | Raw SRT or VTT; server parses timed `segments` |
-| `format` | no | `SRT` (default) or `VTT` |
+| `format` | no | `SRT` (default), `VTT`, or **`PLAIN`** (PDF/TEXT extract) |
 | `language` | no | ISO 639-1, e.g. `es` |
 
 \*At least one of `parsed_plain`, `processed_plain`, `obsidian_markdown` must be non-empty.
 
-### Example
+### Example (A/V)
 
 ```bash
 curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
@@ -163,6 +166,19 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
     "obsidian_markdown": "---\ntitle: Demo\nlanguage_code: es\n---\nHola mundo. Segunda línea.",
     "source_subtitles": "1\n00:00:01,000 --> 00:00:04,000\nHola mundo.\n",
     "format": "SRT",
+    "language": "es"
+  }'
+```
+
+### Example (TEXT/PDF extract)
+
+```bash
+curl -X PUT "http://localhost:8000/api/content/transcript-ingest/202/" \
+  -H "Content-Type: application/json" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY" \
+  -d '{
+    "processed_plain": "Texto extraído del PDF sobre Bitcoin y Lightning.",
+    "format": "PLAIN",
     "language": "es"
   }'
 ```
@@ -190,6 +206,69 @@ curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/" \
 ```
 
 Invalid optional subtitles → **400**. Missing all three text artifacts → **400**.
+
+---
+
+## `PUT /api/content/transcript-ingest/{content_id}/text-hash/`
+
+Persist a SHA-256 that Vincent computed **locally** over the original UTF-8
+transcript. Use this when production Postgres is still `SQL_ASCII`: Sophia’s
+normal `ContentTranscript.save()` may strip accents before hashing, so the
+on-save digest would not match the real Spanish text.
+
+**Prerequisite:** the content already has a `ContentTranscript` (from the
+artifact `PUT` above).
+
+### Body
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `text_hash` | yes | 64-char hex SHA-256 (case-insensitive). Same algorithm as Sophia: NFC + collapse whitespace → UTF-8 → SHA-256. |
+| `plain_text` | recommended | Exact text that was hashed. **Required** when the stored copy no longer matches (SQL_ASCII degrade). When omitted, Sophia verifies against stored `processed_plain` / `parsed_plain` / Obsidian body. |
+
+### Example
+
+```bash
+curl -X PUT "http://localhost:8000/api/content/transcript-ingest/101/text-hash/" \
+  -H "Content-Type: application/json" \
+  -H "X-Transcript-Ingest-Key: $TRANSCRIPT_INGEST_API_KEY" \
+  -d '{
+    "text_hash": "a1b2c3d4e5f6…64 hex chars…",
+    "plain_text": "Texto con acentos: qué, también, español."
+  }'
+```
+
+### Behaviour
+
+1. Transcript must exist → else **404**.
+2. If `plain_text` is sent: `compute_text_hash(plain_text)` must equal `text_hash` → else **400**.
+3. If `plain_text` is omitted: recompute from stored artifacts must equal `text_hash` → else **409** (`hash_mismatch_stored_text`; re-send with `plain_text`).
+4. On success: sets `text_hash`, `text_length`, `text_hash_locked=true`, and
+   `hash_plain_text` to the normalized UTF-8 string. Public transcript `text`
+   prefers `hash_plain_text` so users can reconstruct the digest.
+5. A later artifact `PUT` clears the lock and recomputes from stored fields.
+
+### Response
+
+```json
+{
+  "content_id": 101,
+  "text_hash": "a1b2…",
+  "text_length": 42,
+  "text_hash_locked": true,
+  "has_hash_plain_text": true,
+  "transcript": { "...": "ContentTranscriptIngestSummarySerializer" }
+}
+```
+
+### Does Sophia hash on its own? Accents?
+
+Yes — every `ContentTranscript.save()` runs `compute_text_hash` unless
+`text_hash_locked` is set. On a **UTF8** database, Spanish accents are kept and
+the digest matches Vincent. On **SQL_ASCII**, `prepare_text_for_db` strips
+non-ASCII before that hash, so accents are **not** respected in the stored
+artifacts or the on-save digest — use this endpoint with `plain_text` instead
+(and prefer migrating with `./scripts/migrate-db-to-utf8.sh`).
 
 ### Embedding status (Postgres only)
 
@@ -228,12 +307,16 @@ consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 3. For each item (suggested order):
    - Skip if already done locally **and** `has_transcript` is true (optional check via detail GET).
+   - If `media_type` is **TEXT**: download via `file_key` → extract plain text → `PUT` with `format=PLAIN`.
    - If `is_youtube`: try captions first (`youtube-transcript-api` / TimedText / similar).
    - Else if `has_file` / `file_key`: `s3.get_object` (or download audio-only) → Whisper.
    - Else if YouTube URL without captions: `yt-dlp` audio → Whisper.
    - Else mark failed / needs manual.
-4. `PUT` artifacts (include `source_subtitles` when you have SRT/VTT so the server stores timed segments).
-5. Optionally reconcile:
+4. `PUT` artifacts (include `source_subtitles` when you have SRT/VTT so the server stores timed segments; use `format=PLAIN` for PDF/TEXT).
+5. If hashing locally (SQL_ASCII workaround): `PUT .../text-hash/` with
+   `text_hash` + `plain_text` (original UTF-8) so Sophia locks the worker digest
+   and shows `hash_plain_text` for verification.
+6. Optionally reconcile:
 
    ```bash
    curl -s "http://localhost:8000/api/content/transcript-ingest/?topic_id=12&include_completed=true" \
@@ -242,7 +325,7 @@ consumes indexed chunks see [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-download from S3.
 
-6. **After transcripts exist**, run the embed worker against
+7. **After transcripts exist**, run the embed worker against
    [embedding-ingest](../operations/qdrant-embeddings.md) so Qdrant receives
    chunk vectors and Django marks `embedding_status=indexed`. Topic consultations
    require at least one indexed transcript per topic.
@@ -254,8 +337,10 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 | Status | When |
 |--------|------|
 | **403** | Missing/wrong API key, or `TRANSCRIPT_INGEST_API_KEY` unset |
-| **404** | Unknown `topic_id` on queue, or unknown `content_id` on detail/PUT |
-| **400** | Bad query params; non VIDEO/AUDIO content; empty PUT body; invalid SRT/VTT |
+| **404** | Unknown `topic_id` on queue, or unknown `content_id` on detail/PUT/text-hash |
+| **400** | Bad query params; non VIDEO/AUDIO/TEXT content; empty PUT body; invalid SRT/VTT; `text_hash` ≠ hash(`plain_text`) |
+| **409** | `text-hash` PUT without `plain_text` and stored artifacts do not match (`hash_mismatch_stored_text`) |
+| **503** | PostgreSQL `SQL_ASCII` blocked persisting Unicode `hash_plain_text` |
 
 ---
 
@@ -265,4 +350,4 @@ Keep a local cache keyed by `content_id` (media + outputs) so re-runs do not re-
 - Model: `ContentTranscript` in `acbc_app/content/models.py`
 - Tests: `ContentTranscriptIngestAPITests` in `acbc_app/content/tests.py`
 - After ingest, index for RAG: [qdrant-embeddings.md](../operations/qdrant-embeddings.md)
-- After ingest, certify the hash on Bitcoin: [transcript-anchor.md](transcript-anchor.md)
+- After ingest, certify the hash on Bitcoin: [transcript-anchor.md](../hackathon/transcript-anchor.md)

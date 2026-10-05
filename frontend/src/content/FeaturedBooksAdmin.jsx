@@ -320,6 +320,7 @@ const FeaturedBooksAdmin = () => {
       <Box
         component="form"
         onSubmit={handleSearch}
+        noValidate
         sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}
       >
         <TextField

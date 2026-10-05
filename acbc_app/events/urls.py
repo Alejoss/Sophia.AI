@@ -1,10 +1,17 @@
 from django.urls import path
 
+from content.views_social_preview import EventSocialPreviewView
+
 from events import views
 
 app_name = "events"
 
 urlpatterns = [
+    path(
+        'social-preview/<int:pk>/',
+        EventSocialPreviewView.as_view(),
+        name='event-social-preview',
+    ),
     path('', views.EventList.as_view(), name='event-list'),
     path('<int:pk>/', views.EventDetail.as_view(), name='event-detail'),
     

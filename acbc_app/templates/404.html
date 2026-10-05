@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Página no encontrada · Academia Blockchain</title>
+  <style>
+    :root {
+      --brand-orange: #f06400;
+      --brand-orange-dark: #c94f00;
+      --brand-ink: #191919;
+      --brand-paper: #f7f5f0;
+      --brand-muted: #696761;
+      --brand-line: rgba(25, 25, 25, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+      color: #f8f5ef;
+      background: #0c1115;
+    }
+
+    .not-found {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      padding: 72px 24px;
+      background:
+        linear-gradient(90deg, rgba(10, 18, 25, 0.94) 0%, rgba(10, 18, 25, 0.82) 44%, rgba(10, 18, 25, 0.55) 72%, rgba(10, 18, 25, 0.42) 100%),
+        radial-gradient(ellipse at 78% 28%, rgba(240, 100, 0, 0.22), transparent 42%),
+        radial-gradient(ellipse at 12% 88%, rgba(240, 100, 0, 0.1), transparent 36%),
+        #17232c;
+    }
+
+    .not-found::before,
+    .not-found::after {
+      content: '';
+      position: absolute;
+      border: 1px solid rgba(240, 100, 0, 0.28);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .not-found::before {
+      width: min(42vw, 420px);
+      height: min(42vw, 420px);
+      right: 8%;
+      top: 18%;
+      animation: drift 12s ease-in-out infinite;
+    }
+
+    .not-found::after {
+      width: min(58vw, 560px);
+      height: min(24vw, 220px);
+      right: -2%;
+      top: 42%;
+      transform: rotate(-22deg);
+      animation: drift 16s ease-in-out infinite reverse;
+    }
+
+    .not-found-inner {
+      position: relative;
+      z-index: 1;
+      width: min(720px, 100%);
+      margin: 0 auto 0 8vw;
+      animation: rise 0.7s ease-out both;
+    }
+
+    .brand {
+      margin: 0 0 28px;
+      color: var(--brand-orange);
+      font-size: 0.78rem;
+      font-weight: 750;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .code {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.18);
+      font-size: clamp(5rem, 18vw, 9rem);
+      font-weight: 720;
+      letter-spacing: -0.08em;
+      line-height: 0.85;
+      animation: soft-pulse 4.5s ease-in-out infinite;
+    }
+
+    h1 {
+      margin: 18px 0 0;
+      color: #fff;
+      font-size: clamp(2.4rem, 6vw, 4.4rem);
+      font-weight: 690;
+      letter-spacing: -0.05em;
+      line-height: 1.02;
+      text-shadow: 0 2px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .lead {
+      max-width: 34rem;
+      margin: 28px 0 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+      line-height: 1.65;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 36px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 52px;
+      padding: 0 25px;
+      border: 0;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--brand-orange);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--brand-orange-dark);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .path {
+      margin: 28px 0 0;
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes soft-pulse {
+      0%, 100% { opacity: 0.18; }
+      50% { opacity: 0.28; }
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translateY(0) rotate(-22deg); }
+      50% { transform: translateY(-10px) rotate(-18deg); }
+    }
+
+    .not-found::before {
+      animation-name: float-ring;
+    }
+
+    @keyframes float-ring {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    @media (max-width: 700px) {
+      .not-found {
+        padding: 56px 20px;
+        align-items: flex-end;
+      }
+
+      .not-found-inner {
+        margin: 0;
+        padding-bottom: 12px;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .not-found-inner,
+      .code,
+      .not-found::before,
+      .not-found::after,
+      .btn {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="not-found">
+    <div class="not-found-inner">
+      <p class="brand">Academia Blockchain</p>
+      <p class="code" aria-hidden="true">404</p>
+      <h1>No encontramos esta página</h1>
+      <p class="lead">
+        El camino que buscas no existe, se movió, o nunca estuvo aquí.
+        Vuelve al inicio y sigue explorando con intención.
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href="{{ frontend_url }}/">Volver al inicio</a>
+        <a class="btn btn-secondary" href="{{ frontend_url }}/knowledge_path">Explorar caminos</a>
+      </div>
+      {% if request_path %}
+      <p class="path">{{ request_path }}</p>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

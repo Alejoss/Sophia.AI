@@ -336,6 +336,10 @@ const contentApi = {
     return response.data;
   },
 
+  getTranscriptAnchorCertifiedTextUrl: (contentId, anchorId) => (
+    `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
+  ),
+
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {
       let url = `/content/content_preview/${contentId}/`;
@@ -531,6 +535,38 @@ const contentApi = {
       return response.data;
     } catch (error) {
       console.error('Error fetching admin topics:', error);
+      throw error;
+    }
+  },
+
+  getUnlimitedConsultationUsers: async () => {
+    try {
+      const response = await axiosInstance.get('/content/admin/unlimited-consultation-users/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching unlimited consultation users:', error);
+      throw error;
+    }
+  },
+
+  addUnlimitedConsultationUser: async (data) => {
+    try {
+      const response = await axiosInstance.post(
+        '/content/admin/unlimited-consultation-users/',
+        data,
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error adding unlimited consultation user:', error);
+      throw error;
+    }
+  },
+
+  removeUnlimitedConsultationUser: async (userId) => {
+    try {
+      await axiosInstance.delete(`/content/admin/unlimited-consultation-users/${userId}/`);
+    } catch (error) {
+      console.error('Error removing unlimited consultation user:', error);
       throw error;
     }
   },
@@ -1070,7 +1106,7 @@ const contentApi = {
       if (filters.status) params.append('status', filters.status);
       if (filters.is_duplicate !== undefined) params.append('is_duplicate', filters.is_duplicate);
 
-      const url = `/content/topics/${topicId}/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `/content/topics/${topicId}/content-suggestions/${params.toString() ? '?' + params.toString() : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1110,7 +1146,7 @@ const contentApi = {
       if (filters.status) params.append('status', filters.status);
       if (filters.topic_id) params.append('topic_id', filters.topic_id);
 
-      const url = `/content/user/content-suggestions${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `/content/user/content-suggestions/${params.toString() ? '?' + params.toString() : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1147,7 +1183,7 @@ const contentApi = {
     try {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
-      const url = `/content/topics/${topicId}/timeline-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/topics/${topicId}/timeline-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1225,7 +1261,7 @@ const contentApi = {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.entry_id) params.append('entry_id', filters.entry_id);
-      const url = `/content/topics/${topicId}/timeline-entry-content-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/topics/${topicId}/timeline-entry-content-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -1276,7 +1312,7 @@ const contentApi = {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.topic_id) params.append('topic_id', filters.topic_id);
-      const url = `/content/user/timeline-entry-content-suggestions${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/content/user/timeline-entry-content-suggestions/${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {

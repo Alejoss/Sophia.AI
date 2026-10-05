@@ -51,7 +51,7 @@ def on_crypto_payment_completed(
             'Crypto payment completed: order=%s token_purchase=%s tokens=%s',
             crypto_payment.order_id,
             token_purchase.id,
-            token_purchase.token_amount,
+            token_purchase.total_tokens,
         )
     else:
         logger.info('Crypto payment completed: order=%s', crypto_payment.order_id)

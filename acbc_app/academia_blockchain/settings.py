@@ -8,6 +8,7 @@ import os
 import dj_database_url
 import logging
 from datetime import timedelta
+from decimal import Decimal
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -725,6 +726,18 @@ NOWPAYMENTS_API_URL = os.getenv(
 ACADEMIA_PUBLIC_URL = os.getenv('ACADEMIA_PUBLIC_URL', 'http://localhost:8000')
 FRONTEND_PUBLIC_URL = os.getenv('FRONTEND_PUBLIC_URL', 'http://localhost:5173')
 
+# Payphone Botón de pago (card / Payphone balance) — https://docs.payphone.app/boton-de-pago
+PAYPHONE_TOKEN = os.getenv('PAYPHONE_TOKEN', '').strip()
+PAYPHONE_STORE_ID = os.getenv('PAYPHONE_STORE_ID', '').strip()
+PAYPHONE_API_URL = os.getenv(
+    'PAYPHONE_API_URL',
+    'https://pay.payphonetodoesposible.com/api',
+).rstrip('/')
+# America/Guayaquil UTC offset used in Prepare payloads.
+PAYPHONE_TIMEZONE_OFFSET = int(os.getenv('PAYPHONE_TIMEZONE_OFFSET', '-5'))
+# When > 0, split the buyer-facing USD total into amountWithTax + tax (e.g. 15 for Ecuador IVA).
+PAYPHONE_IVA_PERCENT = float(os.getenv('PAYPHONE_IVA_PERCENT', '0') or 0)
+
 # External async workers that upload parsed subtitles/transcripts (machine-to-machine).
 TRANSCRIPT_INGEST_API_KEY = os.getenv('TRANSCRIPT_INGEST_API_KEY', '')
 
@@ -767,7 +780,9 @@ BTC_MAX_FEE_USD = float(os.getenv('BTC_MAX_FEE_USD', '1'))
 BTC_USD_PRICE = float(os.getenv('BTC_USD_PRICE', '0'))
 # Fixed USD price charged via NOWPayments for a public transcript-anchor request.
 ANCHOR_REQUEST_PRICE_USD = float(os.getenv('ANCHOR_REQUEST_PRICE_USD', '1'))
-# Reserved for later token checkout (paths, Consultas, events, anchors). Unused in v1.
+# Platform token face value: 1 token = $0.01 USD (packages should price at this rate).
+PLATFORM_TOKEN_USD_PRICE = Decimal(os.getenv('PLATFORM_TOKEN_USD_PRICE', '0.01') or '0.01')
+# Discount when spending platform tokens on paid content (anchors today).
 TOKEN_CONTENT_DISCOUNT_PERCENT = int(os.getenv('TOKEN_CONTENT_DISCOUNT_PERCENT', '0') or 0)
 
 # Self-custody Bitcoin Cash payments (USD-tolerance amount match on a single address).
@@ -778,6 +793,9 @@ BCH_NETWORK = os.getenv('BCH_NETWORK', _BCH_NETWORK_DEFAULT).strip().lower()
 BCH_RECEIVE_ADDRESS = os.getenv('BCH_RECEIVE_ADDRESS', '').strip()
 BCH_RECEIVE_ADDRESS_CHIPNET = os.getenv('BCH_RECEIVE_ADDRESS_CHIPNET', '').strip()
 BCH_RECEIVE_ADDRESS_MAINNET = os.getenv('BCH_RECEIVE_ADDRESS_MAINNET', '').strip()
+# WIF for the receive address — used only by `manage.py withdraw_bch` (never by HTTP).
+# Prefer keeping this off the app server long-term; sweep to a wallet you control.
+BCH_PRIVATE_KEY_WIF = os.getenv('BCH_PRIVATE_KEY_WIF', '').strip()
 _BCH_API_DEFAULTS = {
     # Fulcrum Electrum SSL — avoids Blockchair free-tier IP bans on verify.
     'mainnet': 'ssl://bch.imaginary.cash:50002',
@@ -790,6 +808,9 @@ BCH_API_BASE = os.getenv(
     'BCH_API_BASE',
     _BCH_API_DEFAULTS.get(BCH_NETWORK, _BCH_API_DEFAULTS['chipnet']),
 ).rstrip('/')
+# Optional comma-separated Fulcrum SSL endpoints (tried in order before Blockchair HTTP).
+# Empty → built-in mainnet/chipnet defaults in payments.bch_client.
+BCH_ELECTRUM_SERVERS = os.getenv('BCH_ELECTRUM_SERVERS', '').strip()
 # Optional Blockchair key when BCH_API_BASE points at api.blockchair.com
 BCH_BLOCKCHAIR_API_KEY = os.getenv('BCH_BLOCKCHAIR_API_KEY', '').strip()
 BCH_PAYMENT_TTL_MINUTES = int(os.getenv('BCH_PAYMENT_TTL_MINUTES', '30'))

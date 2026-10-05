@@ -80,13 +80,13 @@ TRANSCRIPT_TOPIC_SPECS = [
                 ),
             ),
             (
-                'Lección 2 — Flujo de pago y revisión',
+                'Lección 2 — Flujo de pago y emisión automática',
                 (
-                    'Después de solicitar el anclaje, el usuario puede pagar con '
-                    'NOWPayments o con Bitcoin Cash directo. El estado pasa a '
-                    'paid_pending_review hasta que un administrador aprueba o rechaza '
-                    'la solicitud. Este párrafo es distinto a propósito para generar '
-                    'otro text_hash único.'
+                    'Después de iniciar el anclaje, el usuario puede pagar con '
+                    'NOWPayments, Bitcoin Cash directo o tokens. Tras el pago se '
+                    'emite automáticamente el OP_RETURN; paid_pending_review solo '
+                    'indica emisión diferida (comisiones o fondos). Este párrafo es '
+                    'distinto a propósito para generar otro text_hash único.'
                 ),
             ),
         ],

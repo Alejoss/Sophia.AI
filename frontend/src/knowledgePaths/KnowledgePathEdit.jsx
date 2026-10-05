@@ -41,14 +41,87 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import DataObjectIcon from "@mui/icons-material/DataObject";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import DownloadIcon from "@mui/icons-material/Download";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import knowledgePathsApi from "../api/knowledgePathsApi";
 import quizzesApi from "../api/quizzesApi";
 import ImageUploadModal from "../components/ImageUploadModal";
+import { useAuth } from "../context/AuthContext";
+import { downloadSnapshotForHashVerification } from "./snapshotDownload";
+
+const TRANSCRIPT_ISSUE_LABELS = {
+  NO_CONTENT: "Sin contenido vinculado",
+  NO_TRANSCRIPT_TEXT: "Sin transcript",
+  EMPTY_TRANSCRIPT: "Transcript vacío",
+};
+
+const buildSnapshotNodeRows = (preview) => {
+  if (!preview) return [];
+
+  const issuesByNode = {};
+  for (const issue of preview.issues || []) {
+    if (issue?.nodeId && !issuesByNode[issue.nodeId]) {
+      issuesByNode[issue.nodeId] = issue;
+    }
+  }
+
+  const digests = Array.isArray(preview.materialDigests) ? preview.materialDigests : [];
+  if (digests.length > 0) {
+    return digests.map((item, index) => {
+      const ready = Boolean(item.hasCertifiedText ?? item.complete);
+      const issueCode = item.issueCode || issuesByNode[item.nodeId]?.code || "";
+      return {
+        key: item.nodeId || `digest-${index}`,
+        position: item.position ?? index + 1,
+        title: item.nodeTitle || "Sin título",
+        mediaType: item.mediaType || "",
+        contentId: item.contentId || "",
+        ready,
+        issueCode,
+        statusLabel: ready
+          ? "Transcript listo"
+          : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
+      };
+    });
+  }
+
+  return (preview.document?.nodes || []).map((node, index) => {
+    const material = (node.materials || [])[0] || {};
+    const ready = Boolean((material.text || "").trim());
+    const issue = issuesByNode[node.nodeId];
+    const issueCode = issue?.code || "";
+    return {
+      key: node.nodeId || `node-${index}`,
+      position: node.position ?? index + 1,
+      title: node.title || "Sin título",
+      mediaType: node.mediaType || "",
+      contentId: material.contentId || "",
+      ready,
+      issueCode,
+      statusLabel: ready
+        ? "Transcript listo"
+        : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
+    };
+  });
+};
 
 const KnowledgePathEdit = () => {
   const { pathId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { authState } = useAuth();
+  const isStaff = Boolean(authState.user?.is_staff || authState.user?.is_superuser);
+  const fromDashboard = (searchParams.get("from") || "").toLowerCase() === "dashboard";
+  const backTarget = fromDashboard
+    ? "/dashboard/snapshots"
+    : `/knowledge_path/${pathId}`;
+  const backLabel = fromDashboard
+    ? "Volver al panel de snapshots"
+    : "Volver";
 
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [nodes, setNodes] = useState([]);
@@ -90,8 +163,24 @@ const KnowledgePathEdit = () => {
   const [deletePathDialogOpen, setDeletePathDialogOpen] = useState(false);
   const [isDeletingPath, setIsDeletingPath] = useState(false);
 
+  const [snapshotPreview, setSnapshotPreview] = useState(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState(null);
+  const [snapshotPublishing, setSnapshotPublishing] = useState(false);
+  const [snapshotPublishSuccess, setSnapshotPublishSuccess] = useState(null);
+  const [publishedSnapshot, setPublishedSnapshot] = useState(null);
+  const snapshotNodeRows = useMemo(
+    () => buildSnapshotNodeRows(snapshotPreview),
+    [snapshotPreview],
+  );
+  const snapshotNodesReadyCount = useMemo(
+    () => snapshotNodeRows.filter((row) => row.ready).length,
+    [snapshotNodeRows],
+  );
+
   const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
-  const initialTab = tabFromQuery === "details" ? 0 : 1; // Default to Curriculum (tab 1)
+  const initialTab =
+    tabFromQuery === "details" ? 0 : tabFromQuery === "snapshot" ? 2 : 1;
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const canBePublic = useMemo(() => {
@@ -177,7 +266,8 @@ const KnowledgePathEdit = () => {
 
   // Keep tab selection in URL
   useEffect(() => {
-    const tab = activeTab === 1 ? "curriculum" : "details";
+    const tab =
+      activeTab === 0 ? "details" : activeTab === 2 ? "snapshot" : "curriculum";
     const current = (searchParams.get("tab") || "").toLowerCase();
     if (current !== tab) {
       setSearchParams((prev) => {
@@ -188,6 +278,86 @@ const KnowledgePathEdit = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  const loadSnapshotPreview = async () => {
+    try {
+      setSnapshotLoading(true);
+      setSnapshotError(null);
+      const data = await knowledgePathsApi.getSnapshotPreview(pathId);
+      setSnapshotPreview(data);
+    } catch (err) {
+      setSnapshotError(
+        err.response?.data?.error || err.message || "No se pudo cargar el snapshot"
+      );
+      setSnapshotPreview(null);
+    } finally {
+      setSnapshotLoading(false);
+    }
+  };
+
+  const handleDownloadPreviewCanonical = () => {
+    if (!snapshotPreview?.canonical) {
+      setSnapshotError("No hay bytes canónicos JCS en la vista previa.");
+      return;
+    }
+    try {
+      downloadSnapshotForHashVerification({
+        canonical: snapshotPreview.canonical,
+        digest: snapshotPreview.digest,
+        knowledgePathId: snapshotPreview.knowledgePathId,
+        knowledgePathDbId: pathId,
+        label: "preview",
+      });
+    } catch (err) {
+      setSnapshotError(err?.message || "No se pudo descargar la vista previa");
+    }
+  };
+
+  const handleDownloadPublishedSnapshot = () => {
+    if (!publishedSnapshot?.canonical) {
+      setSnapshotError("No hay snapshot publicado para descargar.");
+      return;
+    }
+    try {
+      downloadSnapshotForHashVerification({
+        canonical: publishedSnapshot.canonical,
+        digest: publishedSnapshot.digest,
+        knowledgePathId: publishedSnapshot.knowledgePathId,
+        knowledgePathDbId: publishedSnapshot.knowledgePathDbId || pathId,
+        version: publishedSnapshot.version,
+      });
+    } catch (err) {
+      setSnapshotError(err?.message || "No se pudo descargar el snapshot");
+    }
+  };
+
+  const handleTakeSnapshot = async () => {
+    if (!isStaff) return;
+    try {
+      setSnapshotPublishing(true);
+      setSnapshotError(null);
+      setSnapshotPublishSuccess(null);
+      const created = await knowledgePathsApi.publishPathSnapshot(pathId);
+      setPublishedSnapshot(created);
+      setSnapshotPublishSuccess(
+        `Snapshot v${created.version} guardado. Digest: ${String(created.digest || "").slice(0, 16)}…`,
+      );
+      await loadSnapshotPreview();
+    } catch (err) {
+      setSnapshotError(
+        err.response?.data?.error || err.message || "No se pudo tomar el snapshot",
+      );
+    } finally {
+      setSnapshotPublishing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 2 && !loading && !loadError) {
+      loadSnapshotPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, pathId, loading, loadError]);
 
   // Cleanup object URL for image preview
   useEffect(() => {
@@ -488,12 +658,12 @@ const KnowledgePathEdit = () => {
       <Box sx={{ mb: 2 }}>
         <Button
           component={Link}
-          to={`/knowledge_path/${pathId}`}
+          to={backTarget}
           variant="outlined"
           startIcon={<ArrowBackIcon />}
           sx={{ textTransform: "none", borderRadius: 2 }}
         >
-          Volver
+          {backLabel}
         </Button>
       </Box>
 
@@ -592,6 +762,7 @@ const KnowledgePathEdit = () => {
               <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label="knowledge path edit tabs">
                 <Tab icon={<SettingsIcon />} iconPosition="start" label="Detalles" />
                 <Tab icon={<SchoolIcon />} iconPosition="start" label={`Currículum (${nodes.length})`} />
+                <Tab icon={<DataObjectIcon />} iconPosition="start" label="Snapshot" />
               </Tabs>
             </Box>
 
@@ -962,6 +1133,361 @@ const KnowledgePathEdit = () => {
                     </Paper>
                   );
                 })}
+              </Stack>
+            )}
+          </Paper>
+        </Stack>
+      )}
+
+      {/* Snapshot Tab */}
+      {activeTab === 2 && (
+        <Stack spacing={3}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: 3 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+              sx={{ mb: 2 }}
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Snapshot del knowledge path
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  JSON lógico que se hashea con RFC 8785 JCS → SHA-256. Esto es una vista previa
+                  desde el camino editable (aún no es una versión publicada en IPFS).
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={loadSnapshotPreview}
+                  disabled={snapshotLoading || snapshotPublishing}
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Actualizar
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadPreviewCanonical}
+                  disabled={
+                    snapshotLoading ||
+                    snapshotPublishing ||
+                    !snapshotPreview?.canonical
+                  }
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Descargar preview JCS
+                </Button>
+                {isStaff && (
+                  <Button
+                    variant="contained"
+                    startIcon={<CameraAltIcon />}
+                    onClick={handleTakeSnapshot}
+                    disabled={
+                      snapshotLoading ||
+                      snapshotPublishing ||
+                      !snapshotPreview?.readyForStrictPublish
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    {snapshotPublishing ? "Guardando…" : "Tomar snapshot"}
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+
+            {!isStaff && (
+              <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+                Solo el staff puede persistir un snapshot. Puedes revisar la vista previa
+                y descargar el JCS canónico para verificar el digest.
+              </Alert>
+            )}
+
+            {fromDashboard && (
+              <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+                Viniste desde el panel de snapshots. Usa “Volver al panel de snapshots”
+                para no perder ese enlace.
+              </Alert>
+            )}
+
+            {snapshotLoading && (
+              <Stack alignItems="center" sx={{ py: 4 }}>
+                <CircularProgress size={32} />
+              </Stack>
+            )}
+
+            {snapshotError && (
+              <Alert
+                severity="error"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setSnapshotError(null)}
+              >
+                {snapshotError}
+              </Alert>
+            )}
+
+            {snapshotPublishSuccess && (
+              <Alert
+                severity="success"
+                sx={{ borderRadius: 2 }}
+                onClose={() => setSnapshotPublishSuccess(null)}
+                action={
+                  publishedSnapshot?.canonical ? (
+                    <Button
+                      color="inherit"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      onClick={handleDownloadPublishedSnapshot}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Descargar
+                    </Button>
+                  ) : null
+                }
+              >
+                {snapshotPublishSuccess}
+              </Alert>
+            )}
+
+            {!snapshotLoading && snapshotPreview && (
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip
+                    size="small"
+                    color={snapshotPreview.validForHash ? "success" : "error"}
+                    label={
+                      snapshotPreview.validForHash
+                        ? "Válido para hash (modo preview)"
+                        : "No válido para hash"
+                    }
+                  />
+                  <Chip
+                    size="small"
+                    color={snapshotPreview.readyForStrictPublish ? "success" : "warning"}
+                    label={
+                      snapshotPreview.readyForStrictPublish
+                        ? "Listo para publish (texto embebido en todos los materiales)"
+                        : "No listo: falta texto en algún material"
+                    }
+                  />
+                  {snapshotNodeRows.length > 0 && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color={
+                        snapshotNodesReadyCount === snapshotNodeRows.length
+                          ? "success"
+                          : "default"
+                      }
+                      label={`Transcripts: ${snapshotNodesReadyCount}/${snapshotNodeRows.length}`}
+                    />
+                  )}
+                </Stack>
+
+                {snapshotNodeRows.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Transcript por nodo
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      Cada nodo necesita texto certificado del contenido vinculado
+                      (transcript o extracto PDF) para el publish estricto.
+                    </Typography>
+                    <Stack spacing={1}>
+                      {snapshotNodeRows.map((row) => (
+                        <Paper
+                          key={row.key}
+                          variant="outlined"
+                          sx={{
+                            px: 1.5,
+                            py: 1.25,
+                            borderRadius: 2,
+                            bgcolor: "action.hover",
+                            borderColor: row.ready ? "success.main" : "divider",
+                          }}
+                        >
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            justifyContent="space-between"
+                          >
+                            <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                {row.position}. {row.title}
+                              </Typography>
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {row.mediaType ? (
+                                  <Chip size="small" label={row.mediaType} variant="outlined" />
+                                ) : null}
+                                {row.contentId ? (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{
+                                      fontFamily:
+                                        "ui-monospace, SFMono-Regular, Menlo, monospace",
+                                      wordBreak: "break-all",
+                                    }}
+                                  >
+                                    {row.contentId}
+                                  </Typography>
+                                ) : null}
+                              </Stack>
+                            </Stack>
+                            <Chip
+                              size="small"
+                              icon={
+                                row.ready ? (
+                                  <CheckCircleOutlineIcon />
+                                ) : (
+                                  <HighlightOffIcon />
+                                )
+                              }
+                              color={row.ready ? "success" : "warning"}
+                              label={row.statusLabel}
+                              sx={{ flexShrink: 0 }}
+                            />
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {snapshotPreview.digest && (
+                  <Box>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                      justifyContent="space-between"
+                      sx={{ mb: 0.5 }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Digest SHA-256 (preview)
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleDownloadPreviewCanonical}
+                        disabled={!snapshotPreview.canonical}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Descargar JCS para verificar
+                      </Button>
+                    </Stack>
+                    <Typography
+                      component="code"
+                      variant="body2"
+                      sx={{
+                        display: "block",
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: "action.hover",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {snapshotPreview.digest}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                      El digest del snapshot publicado puede diferir si cambia <code>publishedAt</code>.
+                      Para verificar un snapshot guardado, descárgalo desde el panel o tras “Tomar snapshot”.
+                    </Typography>
+                  </Box>
+                )}
+
+                {Array.isArray(snapshotPreview.issues) && snapshotPreview.issues.length > 0 && (
+                  <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                    <AlertTitle>Pendientes para certificación</AlertTitle>
+                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                      {snapshotPreview.issues.map((issue, index) => {
+                        const nodeLabel = issue.nodeTitle
+                          ? issue.nodeTitle
+                          : issue.nodeId || null;
+                        return (
+                          <li key={`${issue.code}-${issue.nodeId}-${index}`}>
+                            <Typography variant="body2">
+                              <strong>{issue.code}</strong>
+                              {nodeLabel ? (
+                                <>
+                                  {" — "}
+                                  <strong>{nodeLabel}</strong>
+                                  {issue.nodeTitle && issue.nodeId
+                                    ? ` (${issue.nodeId})`
+                                    : ""}
+                                </>
+                              ) : null}
+                              : {issue.message}
+                            </Typography>
+                          </li>
+                        );
+                      })}
+                    </Box>
+                  </Alert>
+                )}
+
+                {snapshotPreview.validationError && (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    {snapshotPreview.validationError}
+                  </Alert>
+                )}
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                    Documento (pretty JSON)
+                  </Typography>
+                  <Box
+                    component="pre"
+                    sx={{
+                      m: 0,
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: "grey.900",
+                      color: "grey.100",
+                      overflow: "auto",
+                      maxHeight: 520,
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    }}
+                  >
+                    {JSON.stringify(snapshotPreview.document, null, 2)}
+                  </Box>
+                </Box>
+
+                {snapshotPreview.canonical && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Bytes canónicos JCS (lo que se hashea)
+                    </Typography>
+                    <Box
+                      component="pre"
+                      sx={{
+                        m: 0,
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: "grey.900",
+                        color: "grey.100",
+                        overflow: "auto",
+                        maxHeight: 240,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      }}
+                    >
+                      {snapshotPreview.canonical}
+                    </Box>
+                  </Box>
+                )}
               </Stack>
             )}
           </Paper>

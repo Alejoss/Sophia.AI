@@ -382,6 +382,7 @@ function TopicChat({ topicId }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [dailyLimit, setDailyLimit] = useState(null);
   const [dailyRemaining, setDailyRemaining] = useState(null);
+  const [tokensUrl, setTokensUrl] = useState('/profiles/my_profile?section=tokens');
 
   const sourceById = useMemo(() => {
     const map = {};
@@ -394,24 +395,37 @@ function TopicChat({ topicId }) {
   const atDailyLimit =
     dailyLimit != null && dailyRemaining != null && dailyRemaining <= 0;
 
+  const applyQuotaFields = (data) => {
+    if (!data || typeof data !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(data, 'daily_limit')) {
+      setDailyLimit(data.daily_limit);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
+      setDailyRemaining(data.daily_remaining);
+    }
+    if (typeof data.tokens_url === 'string' && data.tokens_url.trim()) {
+      setTokensUrl(data.tokens_url);
+    }
+  };
+
+  const dailyLimitMessage = (limit) =>
+    limit != null
+      ? `Has alcanzado el límite de ${limit} consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.`
+      : 'Has alcanzado el límite de consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.';
+
   const loadHistory = useCallback(async () => {
     if (!isAuthenticated || !topicId) return;
     setHistoryLoading(true);
     try {
       const data = await contentApi.listTopicChatQueries(topicId);
       setHistory(data.results || []);
-      if (Object.prototype.hasOwnProperty.call(data, 'daily_limit')) {
-        setDailyLimit(data.daily_limit);
-      }
-      if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
-        setDailyRemaining(data.daily_remaining);
-        if (
-          data.daily_limit != null &&
-          data.daily_remaining != null &&
-          data.daily_remaining <= 0
-        ) {
-          setComposing(false);
-        }
+      applyQuotaFields(data);
+      if (
+        data.daily_limit != null &&
+        data.daily_remaining != null &&
+        data.daily_remaining <= 0
+      ) {
+        setComposing(false);
       }
     } catch {
       // Non-fatal: form still works.
@@ -452,11 +466,7 @@ function TopicChat({ topicId }) {
 
   const startNewConsultation = () => {
     if (atDailyLimit) {
-      setError(
-        dailyLimit != null
-          ? `Has alcanzado el límite de ${dailyLimit} consultas por día. Podrás hacer más consultas mañana.`
-          : 'Has alcanzado el límite de consultas por día.'
-      );
+      setError(dailyLimitMessage(dailyLimit));
       return;
     }
     setActiveQuery(null);
@@ -497,11 +507,7 @@ function TopicChat({ topicId }) {
     const text = input.trim();
     if (!text || loading) return;
     if (atDailyLimit) {
-      setError(
-        dailyLimit != null
-          ? `Has alcanzado el límite de ${dailyLimit} consultas por día. Podrás hacer más consultas mañana.`
-          : 'Has alcanzado el límite de consultas por día.'
-      );
+      setError(dailyLimitMessage(dailyLimit));
       return;
     }
     if (selectedIds.length === 0) {
@@ -519,12 +525,7 @@ function TopicChat({ topicId }) {
       setActiveQuery(data);
       setComposing(false);
       setInput('');
-      if (Object.prototype.hasOwnProperty.call(data, 'daily_limit')) {
-        setDailyLimit(data.daily_limit);
-      }
-      if (Object.prototype.hasOwnProperty.call(data, 'daily_remaining')) {
-        setDailyRemaining(data.daily_remaining);
-      }
+      applyQuotaFields(data);
       setHistory((prev) => {
         const preview =
           text.length <= 120 ? text : `${text.slice(0, 117)}…`;
@@ -542,20 +543,22 @@ function TopicChat({ topicId }) {
       const status = err?.response?.status;
       const code = err?.response?.data?.code;
       if (code === 'daily_consultation_limit') {
-        if (Object.prototype.hasOwnProperty.call(err.response.data, 'daily_limit')) {
-          setDailyLimit(err.response.data.daily_limit);
-        }
-        if (Object.prototype.hasOwnProperty.call(err.response.data, 'daily_remaining')) {
-          setDailyRemaining(err.response.data.daily_remaining);
-        } else {
+        applyQuotaFields(err.response.data);
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            err.response.data || {},
+            'daily_remaining'
+          )
+        ) {
           setDailyRemaining(0);
         }
+        setComposing(false);
+        setError(null);
+        return;
       }
       let detail = apiError;
       if (typeof detail !== 'string' || !detail.trim()) {
-        if (status === 429) {
-          detail = 'Has alcanzado el límite de consultas por día.';
-        } else if (status >= 500) {
+        if (status >= 500) {
           detail = 'No se pudo completar la consulta. Inténtalo de nuevo en unos segundos.';
         } else {
           detail = err?.message || 'No se pudo obtener una respuesta.';
@@ -608,7 +611,21 @@ function TopicChat({ topicId }) {
         </Button>
       </Box>
 
-      {error && (
+      {atDailyLimit && (
+        <Alert severity="warning" sx={{ borderRadius: 0 }}>
+          {dailyLimitMessage(dailyLimit)}{' '}
+          <Link
+            component={RouterLink}
+            to={tokensUrl}
+            underline="hover"
+            sx={{ fontWeight: 600 }}
+          >
+            Ir a Mis tokens
+          </Link>
+        </Alert>
+      )}
+
+      {error && !atDailyLimit && (
         <Alert severity="error" sx={{ borderRadius: 0 }} onClose={() => setError(null)}>
           {error}
         </Alert>

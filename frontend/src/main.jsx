@@ -5,13 +5,18 @@ import * as Sentry from '@sentry/react';
 import App from './App.jsx';
 import { initMetaPixel } from './utils/metaPixel';
 import { initGoogleAnalytics } from './utils/googleAnalytics';
+import { sentryBeforeSend, shouldEnableSentry } from './utils/sentryEnv';
 import './index.css';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+const viteMode = import.meta.env.MODE || 'development';
+// Label only — enable/disable is decided from Vite MODE (mirrors backend ENVIRONMENT).
+const sentryEnvironment = import.meta.env.VITE_SENTRY_ENVIRONMENT || viteMode;
 const userAgent = navigator.userAgent || '';
 const isTelegramOrWebView = /Telegram|wv|WebView/i.test(userAgent);
 
-if (SENTRY_DSN) {
+// Match backend policy: DSN alone is not enough — skip Vite development/test modes.
+if (shouldEnableSentry({ dsn: SENTRY_DSN, mode: viteMode })) {
   const sentryIntegrations = [Sentry.browserTracingIntegration()];
   if (!isTelegramOrWebView) {
     sentryIntegrations.push(
@@ -21,10 +26,11 @@ if (SENTRY_DSN) {
 
   Sentry.init({
     dsn: SENTRY_DSN,
-    environment: import.meta.env.MODE || 'development',
+    environment: sentryEnvironment,
     integrations: sentryIntegrations,
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: isTelegramOrWebView ? 0 : 0.1,
+    beforeSend: sentryBeforeSend,
   });
 }
 

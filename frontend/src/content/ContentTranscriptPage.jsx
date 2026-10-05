@@ -52,7 +52,7 @@ const ContentTranscriptPage = () => {
   const [error, setError] = useState(null);
   const [copyLabel, setCopyLabel] = useState('Copiar texto');
   /** 'timed' | 'plain' — only meaningful when segments exist. */
-  const [viewMode, setViewMode] = useState('timed');
+  const [viewMode, setViewMode] = useState('plain');
 
   const backPath = useMemo(() => {
     if (context === 'topic' && topicId) {
@@ -77,7 +77,7 @@ const ContentTranscriptPage = () => {
       setError(null);
       setTranscript(undefined);
       setContent(null);
-      setViewMode('timed');
+      setViewMode('plain');
 
       try {
         let detailContext = null;
@@ -213,6 +213,12 @@ const ContentTranscriptPage = () => {
           )}
         </Box>
 
+        {!error && (
+          <Box sx={{ mb: 2 }}>
+            <ContentBitcoinAnchor contentId={contentId} />
+          </Box>
+        )}
+
         {error && (
           <Typography color="error" sx={{ py: 4 }}>
             {error}
@@ -287,6 +293,14 @@ const ContentTranscriptPage = () => {
           </Box>
         )}
 
+        {!error && plainText && transcript?.text_hash && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: showTimed ? 0 : 0 }}>
+            El texto continuo es exactamente el que se usó para calcular el{' '}
+            <Box component="span" sx={{ fontFamily: 'ui-monospace, monospace' }}>text_hash</Box>
+            {' '}(SHA-256). Cópialo para verificar el anclaje.
+          </Typography>
+        )}
+
         {!error && !showTimed && plainText && (
           <Typography
             variant="body1"
@@ -297,10 +311,6 @@ const ContentTranscriptPage = () => {
         )}
 
       </Paper>
-
-      {!error && (
-        <ContentBitcoinAnchor contentId={contentId} contentTitle={title} />
-      )}
     </Container>
   );
 };

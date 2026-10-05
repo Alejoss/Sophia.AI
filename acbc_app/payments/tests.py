@@ -4,7 +4,9 @@ import json
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase, override_settings
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -18,14 +20,25 @@ from payments.bch_services import (
     get_bch_payment_product_meta,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment, TokenLedgerEntry, TokenPackage
+from payments.models import (
+    BchDirectPayment,
+    Course,
+    CourseEvent,
+    CoursePurchase,
+    CryptoPayment,
+    TokenLedgerEntry,
+    TokenPackage,
+    TokenPurchase,
+)
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
 from payments.services import (
     create_anchor_request_payment,
+    create_course_purchase_payment,
     create_path_purchase_payment,
     create_token_purchase,
     create_token_purchase_payment,
     fetch_remote_payment_payload,
+    get_or_create_course_purchase,
     get_or_create_path_purchase,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
@@ -451,6 +464,360 @@ class AnchorRequestPaymentFulfillmentTests(TestCase):
         self.assertEqual(payment.anchor_request_id, req.id)
         self.assertIsNone(payment.path_purchase_id)
         self.assertTrue(payment.order_id.startswith('anchor-req-'))
+        mock_create_invoice.assert_called_once()
+        invoice_kwargs = mock_create_invoice.call_args.kwargs
+        self.assertIn('hash SHA-256', invoice_kwargs['order_description'])
+        self.assertIn('Bitcoin', invoice_kwargs['order_description'])
+        self.assertNotIn('Contenido', invoice_kwargs['order_description'])
+
+
+@override_settings(
+    ANCHOR_REQUEST_PRICE_USD=1,
+    PLATFORM_TOKEN_USD_PRICE=Decimal('0.01'),
+    TOKEN_CONTENT_DISCOUNT_PERCENT=0,
+)
+class AnchorRequestTokenPaymentTests(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.other = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video tokens',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para pago con tokens.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_tokens_required_for_one_dollar(self):
+        from payments.token_pricing import tokens_required_for_usd
+
+        self.assertEqual(tokens_required_for_usd(1), 100)
+
+    def test_pay_with_tokens_success(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['request']['status'], 'paid_pending_review')
+        self.assertEqual(response.data['tokens_spent'], 100)
+        self.assertEqual(response.data['token_balance'], 50)
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.token_balance, 50)
+        spend = TokenLedgerEntry.objects.get(
+            anchor_request=self.req,
+            reason=TokenLedgerEntry.REASON_SPEND,
+        )
+        self.assertEqual(spend.delta, -100)
+
+    def test_pay_with_tokens_insufficient_balance(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=10,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['code'], 'insufficient_tokens')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_pay_with_tokens_idempotent(self):
+        from payments.services import pay_anchor_request_with_tokens
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=200,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        first = pay_anchor_request_with_tokens(anchor_request=self.req, user=self.user)
+        second = pay_anchor_request_with_tokens(anchor_request=self.req, user=self.user)
+        self.assertEqual(first.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.assertEqual(second.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.token_balance, 100)
+        self.assertEqual(
+            TokenLedgerEntry.objects.filter(
+                anchor_request=self.req,
+                reason=TokenLedgerEntry.REASON_SPEND,
+            ).count(),
+            1,
+        )
+
+    def test_other_user_cannot_pay_with_tokens(self):
+        self.client.force_authenticate(user=self.other)
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_token_pay_blocks_in_flight_nowpayments(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-req-inflight',
+            pay_currency='bch',
+            price_amount=1.0,
+            payment_status='confirming',
+            invoice_url='https://nowpayments.io/payment/?iid=1',
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('NOWPayments', response.data['error'])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_token_pay_abandons_waiting_nowpayments(self):
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        waiting = CryptoPayment.objects.create(
+            anchor_request=self.req,
+            order_id='anchor-req-waiting',
+            pay_currency='bch',
+            price_amount=1.0,
+            payment_status='waiting',
+            invoice_url='https://nowpayments.io/payment/?iid=2',
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        waiting.refresh_from_db()
+        self.assertEqual(waiting.payment_status, 'expired')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+
+    def test_token_pay_blocks_pending_bch(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from payments.models import BchDirectPayment
+        from payments.token_ledger import credit_platform_tokens
+
+        credit_platform_tokens(
+            user=self.user,
+            amount=150,
+            reason=TokenLedgerEntry.REASON_ADJUSTMENT,
+        )
+        BchDirectPayment.objects.create(
+            anchor_request=self.req,
+            address='bitcoincash:qtest',
+            expected_amount_sats=5000,
+            usd_amount=Decimal('1.00'),
+            usd_bch_rate=Decimal('200'),
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at=timezone.now() + timedelta(minutes=20),
+        )
+        response = self.client.post(
+            reverse('anchor-request-tokens', kwargs={'request_id': self.req.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('BCH', response.data['error'])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
+
+    def test_request_info_uses_snapshotted_price(self):
+        self.req.price_amount = 2.0
+        self.req.save(update_fields=['price_amount', 'updated_at'])
+        response = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor-requests/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_usd'], 2.0)
+        self.assertEqual(response.data['price_tokens'], 200)
+
+
+@override_settings(
+    ANCHOR_REQUEST_PRICE_USD=1,
+    PLATFORM_TOKEN_USD_PRICE=Decimal('0.01'),
+    TOKEN_CONTENT_DISCOUNT_PERCENT=0,
+)
+class AnchorRequestAutoBroadcastTests(TestCase):
+    """Payment marks paid then auto-fulfills Bitcoin broadcast."""
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Video auto-broadcast',
+        )
+        self.transcript = ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto para auto broadcast del anclaje.',
+            language='es',
+        )
+        self.req = TranscriptAnchorRequest.objects.create(
+            requester=self.user,
+            content=self.content,
+            text_hash=self.transcript.text_hash,
+            text_length=self.transcript.text_length,
+            price_amount=1.0,
+            status=TranscriptAnchorRequest.STATUS_PENDING_PAYMENT,
+        )
+
+    @patch('content.anchor_request_service.fulfill_paid_anchor_request')
+    def test_mark_paid_calls_fulfill_with_raise_on_defer_false(self, mock_fulfill):
+        from payments.services import mark_anchor_request_paid
+
+        mock_fulfill.side_effect = lambda req, **kwargs: req
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        mock_fulfill.assert_called_once()
+        _, kwargs = mock_fulfill.call_args
+        self.assertEqual(kwargs.get('raise_on_defer'), False)
+        self.assertIsNone(kwargs.get('actor'))
+
+    @patch('content.anchor_request_service.broadcast_anchor')
+    @patch('content.anchor_request_service.ensure_pending_anchor')
+    def test_mark_paid_approves_when_broadcast_succeeds(self, mock_ensure, mock_broadcast):
+        from content.models import TranscriptAnchor
+        from payments.services import mark_anchor_request_paid
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+
+        def _broadcast(a, *, dry_run=False):
+            a.status = TranscriptAnchor.STATUS_BTC_BROADCAST
+            a.btc_txid = 'ab' * 32
+            a.save(update_fields=['status', 'btc_txid', 'updated_at'])
+            return a
+
+        mock_ensure.return_value = anchor
+        mock_broadcast.side_effect = _broadcast
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_APPROVED)
+        self.assertEqual(result.anchor_id, anchor.pk)
+        mock_broadcast.assert_called()
+
+    @patch('content.anchor_request_service.broadcast_anchor')
+    @patch('content.anchor_request_service.ensure_pending_anchor')
+    def test_mark_paid_stays_pending_when_broadcast_defers(self, mock_ensure, mock_broadcast):
+        from content.bitcoin.service import AnchorBroadcastError
+        from content.models import TranscriptAnchor
+        from payments.services import mark_anchor_request_paid
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+        mock_ensure.return_value = anchor
+        mock_broadcast.side_effect = AnchorBroadcastError('fee too high')
+
+        result = mark_anchor_request_paid(self.req, source='test')
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
+        self.assertIsNone(result.anchor_id)
+
+
+    def test_fulfill_lock_uses_of_self_with_transcript_select_related(self):
+        """Regression for Postgres: FOR UPDATE + LEFT OUTER JOIN on transcript."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from content.anchor_request_service import fulfill_paid_anchor_request
+        from content.models import TranscriptAnchor
+
+        self.req.status = TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW
+        self.req.save(update_fields=['status', 'updated_at'])
+
+        anchor = TranscriptAnchor.objects.create(
+            content=self.content,
+            text_hash=self.req.text_hash,
+            text_length=self.req.text_length,
+            btc_network='signet',
+            status=TranscriptAnchor.STATUS_PENDING,
+            anchored_by=self.user,
+        )
+
+        def _broadcast(a, *, dry_run=False):
+            a.status = TranscriptAnchor.STATUS_BTC_BROADCAST
+            a.btc_txid = 'cd' * 32
+            a.save(update_fields=['status', 'btc_txid', 'updated_at'])
+            return a
+
+        with patch(
+            'content.anchor_request_service.ensure_pending_anchor',
+            return_value=anchor,
+        ), patch(
+            'content.anchor_request_service.broadcast_anchor',
+            side_effect=_broadcast,
+        ):
+            with CaptureQueriesContext(connection) as ctx:
+                result = fulfill_paid_anchor_request(self.req, raise_on_defer=False)
+
+        lock_sql = next(
+            (q['sql'] for q in ctx.captured_queries if 'FOR UPDATE' in q['sql'].upper()),
+            '',
+        )
+        if lock_sql:
+            self.assertIn('FOR UPDATE OF', lock_sql.upper())
+        result.refresh_from_db()
+        self.assertEqual(result.status, TranscriptAnchorRequest.STATUS_APPROVED)
 
 
 @override_settings(
@@ -511,26 +878,26 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ab' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ab' * 32
+        tx = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
+        client.list_recent_transactions.return_value = [tx]
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'ab' * 32)
+        self.assertEqual(paid.payment_txid, txid)
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PAID_PENDING_REVIEW)
 
@@ -543,21 +910,25 @@ class BchDirectPaymentTests(TestCase):
             client=client,
         )
         # At $200/BCH, $0.20 tolerance ≈ 100_000 sats — stay outside that window.
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='cd' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats + 150_000,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'cd' * 32
+        tx = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats + 150_000,
+                ),
+            ],
+        )
+        client.list_recent_transactions.return_value = [tx]
         with self.assertRaises(BchPaymentError):
-            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
         self.req.refresh_from_db()
         self.assertEqual(self.req.status, TranscriptAnchorRequest.STATUS_PENDING_PAYMENT)
 
@@ -571,23 +942,23 @@ class BchDirectPaymentTests(TestCase):
             client=client,
         )
         paid_sats = order.expected_amount_sats - 1441
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='c4' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=paid_sats),
-                ],
-            ),
-        ]
+        txid = 'c4' * 32
+        tx = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=paid_sats),
+            ],
+        )
+        client.list_recent_transactions.return_value = [tx]
         paid = verify_bch_payment(
             anchor_request=self.req,
             user=self.user,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'c4' * 32)
+        self.assertEqual(paid.payment_txid, txid)
         self.assertEqual(paid.provider_payload.get('amount_sats'), paid_sats)
         self.assertEqual(paid.provider_payload.get('amount_delta_sats'), -1441)
 
@@ -621,23 +992,23 @@ class BchDirectPaymentTests(TestCase):
                 expires_at=timezone.now() + timedelta(minutes=30),
                 provider_payload={'network': 'mainnet'},
             )
-            client.list_recent_transactions.return_value = [
-                BchTransaction(
-                    txid='4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a',
-                    timestamp=int(order.created_at.timestamp()) + 60,
-                    confirmations=0,
-                    outputs=[
-                        BchTxOutput(
-                            address='bitcoincash:qzqna5s34njc3exw6l3u6jm8wzkd0l324sa6ytrkgl',
-                            amount_sats=12_757_089,
-                        ),
-                        BchTxOutput(address=receive, amount_sats=paid_sats),
-                    ],
-                ),
-            ]
+            txid = '4fd39e0a8c7836b7b10be30fcd213d21e2ed9a1fedd16dc8da77ca200e328d7a'
+            client.get_transaction.return_value = BchTransaction(
+                txid=txid,
+                timestamp=int(order.created_at.timestamp()) + 60,
+                confirmations=0,
+                outputs=[
+                    BchTxOutput(
+                        address='bitcoincash:qzqna5s34njc3exw6l3u6jm8wzkd0l324sa6ytrkgl',
+                        amount_sats=12_757_089,
+                    ),
+                    BchTxOutput(address=receive, amount_sats=paid_sats),
+                ],
+            )
             paid = verify_bch_payment(
                 anchor_request=self.req,
                 user=self.user,
+                payment_txid=txid,
                 client=client,
             )
             self.assertEqual(paid.pk, order.pk)
@@ -656,21 +1027,25 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ee' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats + 250_000,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ee' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats + 250_000,
+                ),
+            ],
+        )
         with self.assertRaises(BchPaymentError) as ctx:
-            verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                payment_txid=txid,
+                client=client,
+            )
         details = ctx.exception.details
         self.assertEqual(details.get('expected_sats'), order.expected_amount_sats)
         self.assertIn(order.expected_amount_sats + 250_000, details.get('amounts_seen') or [])
@@ -701,26 +1076,87 @@ class BchDirectPaymentTests(TestCase):
         )
         # Payment block time 5 minutes before the order — still within default grace.
         early_ts = int(order.created_at.timestamp()) - 300
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ef' * 32,
-                timestamp=early_ts,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(
-                        address=order.address,
-                        amount_sats=order.expected_amount_sats,
-                    ),
-                ],
-            ),
-        ]
+        txid = 'ef' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=early_ts,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
         paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.assertEqual(paid.payment_txid, txid)
+
+    def test_verify_without_txid_scans_address_and_txid_unlocks_expired(self):
+        """Auto-verify needs no TXID; TXID fallback can still unlock an expired order."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
             anchor_request=self.req,
             user=self.user,
             client=client,
         )
+        txid = '11' * 32
+        matching_tx = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(
+                    address=order.address,
+                    amount_sats=order.expected_amount_sats,
+                ),
+            ],
+        )
+
+        # Auto path (no TXID) finds the payment via address history.
+        client.list_recent_transactions.return_value = []
+        with self.assertRaises(BchPaymentError) as empty_scan:
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
+        self.assertIn('soporte', str(empty_scan.exception).lower())
+
+        order.status = BchDirectPayment.STATUS_EXPIRED
+        order.expires_at = timezone.now() - timedelta(minutes=1)
+        order.save(update_fields=['status', 'expires_at', 'updated_at'])
+
+        # Without TXID, expired orders are not auto-scanned.
+        with self.assertRaises(BchPaymentError) as expired_auto:
+            verify_bch_payment(
+                anchor_request=self.req,
+                user=self.user,
+                client=client,
+            )
+        self.assertIn('expir', str(expired_auto.exception).lower())
+
+        # With TXID, the same expired order can still be fulfilled.
+        client.get_transaction.return_value = matching_tx
+        paid = verify_bch_payment(
+            anchor_request=self.req,
+            user=self.user,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.pk, order.pk)
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
-        self.assertEqual(paid.payment_txid, 'ef' * 32)
+        self.assertEqual(paid.payment_txid, txid)
 
     def test_waiting_nowpayments_is_abandoned_when_starting_bch(self):
         CryptoPayment.objects.create(
@@ -785,14 +1221,20 @@ class BchDirectPaymentTests(TestCase):
             user=self.user,
             client=client,
         )
-        client.list_recent_transactions.side_effect = BchApiError(
-            'Blockchair error 430: blacklisted'
+        txid = 'aa' * 32
+        client.get_transaction.side_effect = BchApiError(
+            'Electrum timed out'
         )
         with self.assertLogs('payments.bch_services', level='ERROR') as logs:
             with self.assertRaises(BchPaymentError) as ctx:
-                verify_bch_payment(anchor_request=self.req, user=self.user, client=client)
-        self.assertIn('blockchain', str(ctx.exception).lower())
-        self.assertTrue(any('chain lookup failed' in line.lower() for line in logs.output))
+                verify_bch_payment(
+                    anchor_request=self.req,
+                    user=self.user,
+                    payment_txid=txid,
+                    client=client,
+                )
+        self.assertIn('transacción', str(ctx.exception).lower())
+        self.assertTrue(any('txid lookup failed' in line.lower() for line in logs.output))
         order.refresh_from_db()
         self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
 
@@ -860,9 +1302,9 @@ class BchNetworkClientTests(TestCase):
 
     @override_settings(BCH_NETWORK='chipnet', BCH_API_BASE='ssl://chipnet.bch.ninja:50002')
     def test_build_client_chipnet_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'chipnet.bch.ninja')
         self.assertEqual(client.port, 50002)
 
@@ -878,13 +1320,55 @@ class BchNetworkClientTests(TestCase):
     @override_settings(
         BCH_NETWORK='mainnet',
         BCH_API_BASE='ssl://bch.imaginary.cash:50002',
+        BCH_ELECTRUM_SERVERS='',
     )
-    def test_build_client_mainnet_default_is_electrum(self):
-        from payments.bch_client import BchElectrumClient, build_bch_client
+    def test_build_client_mainnet_default_is_failover(self):
+        from payments.bch_client import BchFailoverClient, build_bch_client
         client = build_bch_client()
-        self.assertIsInstance(client, BchElectrumClient)
+        self.assertIsInstance(client, BchFailoverClient)
         self.assertEqual(client.host, 'bch.imaginary.cash')
         self.assertEqual(client.port, 50002)
+        self.assertGreaterEqual(len(client.servers), 2)
+        self.assertIsNotNone(client.http_fallback)
+
+    def test_failover_fills_missing_tx_via_http(self):
+        from payments.bch_client import BchFailoverClient
+
+        primary = MagicMock()
+        primary.host = 'primary.example'
+        primary.port = 50002
+        primary.fetch_address_history.return_value = (
+            [{'tx_hash': 'aa' * 32, 'height': 100}],
+            110,
+        )
+        primary.__enter__ = MagicMock(return_value=primary)
+        primary.__exit__ = MagicMock(return_value=False)
+        primary.get_transaction.side_effect = BchApiError('timed out')
+
+        secondary = MagicMock()
+        secondary.host = 'secondary.example'
+        secondary.port = 50002
+        secondary.get_transaction.side_effect = BchApiError('also down')
+
+        http = MagicMock()
+        expected = BchTransaction(
+            txid='aa' * 32,
+            timestamp=1_700_000_000,
+            confirmations=11,
+            outputs=[BchTxOutput(address='bitcoincash:qtest', amount_sats=123)],
+        )
+        http.get_transaction.return_value = expected
+
+        client = BchFailoverClient.__new__(BchFailoverClient)
+        client.servers = [primary, secondary]
+        client.http_fallback = http
+        client.host = primary.host
+        client.port = primary.port
+
+        txs = client.list_recent_transactions('bitcoincash:qtest', limit=5)
+        self.assertEqual(len(txs), 1)
+        self.assertEqual(txs[0].txid, 'aa' * 32)
+        http.get_transaction.assert_called_once()
 
     @override_settings(
         BCH_NETWORK='chipnet',
@@ -1256,17 +1740,15 @@ class PathAndTopicBchPaymentTests(TestCase):
             price_amount=4,
         )
 
-    def _paid_tx(self, order):
-        return [
-            BchTransaction(
-                txid='ef' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
-                ],
-            ),
-        ]
+    def _paid_tx(self, order, txid='ef' * 32):
+        return BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
 
     def test_path_bch_requires_flag(self):
         self.path.sales_enabled = False
@@ -1288,10 +1770,12 @@ class PathAndTopicBchPaymentTests(TestCase):
             user=self.buyer,
             client=client,
         )
-        client.list_recent_transactions.return_value = self._paid_tx(order)
+        txid = 'ef' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
         paid = verify_bch_payment(
             path_purchase=self.purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -1322,10 +1806,12 @@ class PathAndTopicBchPaymentTests(TestCase):
             user=self.buyer,
             client=client,
         )
-        client.list_recent_transactions.return_value = self._paid_tx(order)
+        txid = 'ef' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
         paid = verify_bch_payment(
             topic_purchase=self.topic_purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -1398,7 +1884,11 @@ class PathAndTopicBchPaymentTests(TestCase):
         api = APIClient()
         api.force_authenticate(user=self.buyer)
         with self.assertLogs('payments.views', level='WARNING') as logs:
-            response = api.post(f'/api/payments/path-purchase/{self.purchase.id}/bch/verify/')
+            response = api.post(
+                f'/api/payments/path-purchase/{self.purchase.id}/bch/verify/',
+                {'txid': 'ab' * 32},
+                format='json',
+            )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(
             any('verify_path_bch failed' in line for line in logs.output),
@@ -1424,7 +1914,7 @@ class TokenPackagePurchaseTests(TestCase):
         self.package = TokenPackage.objects.create(
             name='Test 50 tokens',
             token_amount=50,
-            usd_price=Decimal('4.00'),
+            usd_price=Decimal('0.50'),
             is_active=True,
             sort_order=99,
         )
@@ -1434,7 +1924,7 @@ class TokenPackagePurchaseTests(TestCase):
         TokenPackage.objects.create(
             name='Hidden pack',
             token_amount=10,
-            usd_price=Decimal('1.00'),
+            usd_price=Decimal('0.10'),
             is_active=False,
         )
         self.api.force_authenticate(user=self.buyer)
@@ -1505,19 +1995,19 @@ class TokenPackagePurchaseTests(TestCase):
         )
         self.assertEqual(order.token_purchase_id, purchase.id)
         self.assertIsNone(order.path_purchase_id)
-        client.list_recent_transactions.return_value = [
-            BchTransaction(
-                txid='ab' * 32,
-                timestamp=int(order.created_at.timestamp()) + 10,
-                confirmations=1,
-                outputs=[
-                    BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
-                ],
-            ),
-        ]
+        txid = 'ab' * 32
+        client.get_transaction.return_value = BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
         paid = verify_bch_payment(
             token_purchase=purchase,
             user=self.buyer,
+            payment_txid=txid,
             client=client,
         )
         self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
@@ -1598,3 +2088,595 @@ class TokenPackagePurchaseTests(TestCase):
         other = self.api.get(f'/api/profiles/{self.buyer.id}/')
         self.assertEqual(other.status_code, status.HTTP_200_OK)
         self.assertIsNone(other.data.get('token_balance'))
+
+
+    def test_package_usd_price_must_match_unit_rate(self):
+        self.assertEqual(TokenPackage.usd_price_for_amount(100), Decimal('1.00'))
+        self.assertEqual(TokenPackage.unit_usd_price(), Decimal('0.01'))
+        bad = TokenPackage(
+            name='Wrong price',
+            token_amount=100,
+            usd_price=Decimal('5.00'),
+        )
+        with self.assertRaises(ValidationError):
+            bad.full_clean()
+        good = TokenPackage(
+            name='Correct price',
+            token_amount=100,
+            bonus_tokens=50,
+            usd_price=Decimal('1.00'),
+        )
+        good.full_clean()
+        self.assertEqual(good.total_tokens, 150)
+
+    def test_bonus_tokens_credited_on_pay(self):
+        bonus_package = TokenPackage.objects.create(
+            name='800 + 50',
+            token_amount=800,
+            bonus_tokens=50,
+            usd_price=Decimal('8.00'),
+            is_active=True,
+            sort_order=50,
+        )
+        purchase = create_token_purchase(package=bonus_package, user=self.buyer)
+        self.assertEqual(purchase.token_amount, 800)
+        self.assertEqual(purchase.bonus_tokens, 50)
+        self.assertEqual(purchase.total_tokens, 850)
+
+        from payments.services import mark_token_purchase_paid
+
+        mark_token_purchase_paid(purchase, source='test')
+        self.buyer.profile.refresh_from_db()
+        self.assertEqual(self.buyer.profile.token_balance, 850)
+
+    def test_buyer_can_cancel_pending_purchase(self):
+        from payments.models import BchDirectPayment
+        from payments.services import cancel_token_purchase
+
+        purchase = create_token_purchase(package=self.package, user=self.buyer)
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            token_purchase=purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+
+        self.api.force_authenticate(user=self.buyer)
+        response = self.api.post(f'/api/payments/token-purchase/{purchase.id}/cancel/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['payment_status'], 'CANCELLED')
+
+        purchase.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(purchase.payment_status, TokenPurchase.STATUS_CANCELLED)
+        self.assertEqual(order.status, BchDirectPayment.STATUS_CANCELLED)
+
+        again = cancel_token_purchase(token_purchase=purchase, user=self.buyer)
+        self.assertEqual(again.payment_status, TokenPurchase.STATUS_CANCELLED)
+
+        self.api.force_authenticate(user=self.other)
+        denied = self.api.post(f'/api/payments/token-purchase/{purchase.id}/cancel/')
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BchWithdrawTests(SimpleTestCase):
+    def test_addresses_match_ignores_prefix(self):
+        from payments.bch_withdraw import _addresses_match
+
+        self.assertTrue(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'BITCOINCASH:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            )
+        )
+        self.assertTrue(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+            )
+        )
+        self.assertFalse(
+            _addresses_match(
+                'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+                'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            )
+        )
+
+    @override_settings(BCH_PRIVATE_KEY_WIF='')
+    def test_missing_wif_raises(self):
+        from payments.bch_withdraw import BchWithdrawError, load_spend_key
+
+        with self.assertRaises(BchWithdrawError):
+            load_spend_key()
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_RECEIVE_ADDRESS_MAINNET='',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_key_address_mismatch_raises(self, mock_load):
+        from payments.bch_withdraw import BchWithdrawError, assert_key_matches_receive_address
+
+        key = MagicMock()
+        key.address = 'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy'
+        mock_load.return_value = key
+        with self.assertRaises(BchWithdrawError):
+            assert_key_matches_receive_address(key)
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_RECEIVE_ADDRESS='',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_build_plan_sweep_dry_run(self, mock_load):
+        from payments.bch_withdraw import build_plan, execute_withdraw
+
+        utxo = MagicMock()
+        utxo.amount = 250_000
+        key = MagicMock()
+        key.address = 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a'
+        key.get_unspents.return_value = [utxo]
+        key.create_transaction.return_value = 'deadbeef'
+        mock_load.return_value = key
+
+        loaded, plan = build_plan(
+            to_address='bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            amount_sats=None,
+            dry_run=True,
+        )
+        self.assertIs(loaded, key)
+        self.assertEqual(plan.balance_sats, 250_000)
+        self.assertIsNone(plan.amount_sats)
+        self.assertTrue(plan.dry_run)
+
+        raw = execute_withdraw(key, plan)
+        self.assertEqual(raw, 'deadbeef')
+        key.create_transaction.assert_called_once()
+        key.send.assert_not_called()
+        args, kwargs = key.create_transaction.call_args
+        self.assertEqual(args[0], [])
+        self.assertEqual(
+            kwargs['leftover'],
+            'bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+        )
+
+    @override_settings(
+        BCH_NETWORK='mainnet',
+        BCH_RECEIVE_ADDRESS_MAINNET='bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a',
+        BCH_PRIVATE_KEY_WIF='L1fake',
+    )
+    @patch('payments.bch_withdraw.load_spend_key')
+    def test_build_plan_partial_broadcast(self, mock_load):
+        from payments.bch_withdraw import build_plan, execute_withdraw
+
+        utxo = MagicMock()
+        utxo.amount = 500_000
+        key = MagicMock()
+        key.address = 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a'
+        key.get_unspents.return_value = [utxo]
+        key.send.return_value = 'txid123'
+        mock_load.return_value = key
+
+        _key, plan = build_plan(
+            to_address='bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy',
+            amount_sats=100_000,
+            dry_run=False,
+        )
+        txid = execute_withdraw(key, plan)
+        self.assertEqual(txid, 'txid123')
+        key.send.assert_called_once()
+        args, kwargs = key.send.call_args
+        self.assertEqual(
+            args[0],
+            [('bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy', 100_000, 'satoshi')],
+        )
+        self.assertEqual(kwargs['leftover'], key.address)
+
+
+@override_settings(NOWPAYMENTS_API_KEY='test-key')
+class CoursePurchasePaymentTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+
+    def test_unknown_course_is_rejected(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': 'no-existe'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_public_course_returns_the_stored_price(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_usd'], 40)
+        self.assertEqual(
+            response.data['title'],
+            'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
+        )
+        self.assertTrue(response.data['is_for_sale'])
+
+    def test_course_purchase_uses_the_course_price(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': 'real-historia-bitcoin'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['price_amount'], 40.0)
+        self.assertEqual(response.data['title'], course.title)
+        self.assertEqual(response.data['payment_status'], 'PENDING')
+        self.assertFalse(response.data['is_paid'])
+        self.assertEqual(response.data['receipt_email'], '')
+
+    def test_course_purchase_stores_receipt_email(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': ' Alumno@Example.COM ',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['receipt_email'], 'alumno@example.com')
+        purchase = CoursePurchase.objects.get(pk=response.data['id'])
+        self.assertEqual(purchase.receipt_email, 'alumno@example.com')
+
+        updated = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'otro@example.com',
+            },
+            format='json',
+        )
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertEqual(updated.data['id'], response.data['id'])
+        self.assertEqual(updated.data['receipt_email'], 'otro@example.com')
+
+    def test_course_purchase_rejects_invalid_receipt_email(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'no-es-un-correo',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('correo', response.data['error'].lower())
+
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_invoice_charges_the_course_price(self, mock_create_invoice):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        mock_create_invoice.return_value = {
+            'id': 3501,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=3501',
+        }
+        purchase = get_or_create_course_purchase(
+            course_code='real-historia-bitcoin',
+            user=self.buyer,
+        )
+        payment = create_course_purchase_payment(course_purchase=purchase, user=self.buyer)
+        self.assertEqual(payment.course_purchase_id, purchase.id)
+        self.assertIsNone(payment.path_purchase_id)
+        self.assertIsNone(payment.event_registration_id)
+        self.assertEqual(payment.price_amount, 40.0)
+        self.assertTrue(payment.order_id.startswith(f'course-{purchase.id}-'))
+        mock_create_invoice.assert_called_once()
+        self.assertEqual(mock_create_invoice.call_args.kwargs['price_amount'], 40.0)
+
+    @patch('payments.views.refresh_crypto_payment_from_nowpayments', side_effect=lambda payment: payment)
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_checkout_http_flow_uses_the_course_price(self, mock_create_invoice, _mock_refresh):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        course.price_usd = 40
+        course.save(update_fields=['price_usd'])
+        mock_create_invoice.return_value = {
+            'id': 3502,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=3502',
+        }
+        guest = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': course.code},
+            format='json',
+        )
+        self.assertEqual(guest.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(user=self.buyer)
+        created = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': course.code},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_200_OK)
+        payment = self.client.post(
+            reverse('course-purchase-payment-create', kwargs={'purchase_id': created.data['id']}),
+            {},
+            format='json',
+        )
+        self.assertEqual(payment.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(payment.data['price_amount'], 40.0)
+        self.assertEqual(payment.data['invoice_url'], 'https://nowpayments.io/payment/?iid=3502')
+        listed = self.client.get(
+            reverse('course-purchase-payments-list', kwargs={'purchase_id': created.data['id']}),
+        )
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data[0]['invoice_url'], payment.data['invoice_url'])
+
+    def test_finished_payment_marks_course_paid(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=course,
+            price_amount=course.price_usd,
+        )
+        crypto_payment = CryptoPayment.objects.create(
+            course_purchase=purchase,
+            order_id='course-finished-test',
+            price_amount=35.0,
+            payment_status='waiting',
+        )
+        sync_payment_from_provider(crypto_payment, {
+            'payment_status': 'finished',
+            'actually_paid': '35',
+            'pay_amount': '35',
+        })
+        purchase.refresh_from_db()
+        self.assertEqual(purchase.payment_status, 'PAID')
+
+    def test_course_links_one_path_and_many_events(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        course = Course.objects.get(code='real-historia-bitcoin')
+        path = KnowledgePath.objects.create(title='La real historia', author=self.buyer)
+        course.knowledge_path = path
+        course.save(update_fields=['knowledge_path'])
+        first = EventFactory(
+            owner=self.buyer,
+            title='Encuentro 01',
+            date_start=timezone.now() + timedelta(days=1),
+        )
+        second = EventFactory(
+            owner=self.buyer,
+            title='Encuentro 02',
+            date_start=timezone.now() + timedelta(days=2),
+        )
+        CourseEvent.objects.create(course=course, event=first)
+        CourseEvent.objects.create(course=course, event=second)
+
+        response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['knowledge_path_id'], path.id)
+        self.assertEqual(response.data['knowledge_path_title'], path.title)
+        self.assertEqual(
+            [event['title'] for event in response.data['events']],
+            ['Encuentro 01', 'Encuentro 02'],
+        )
+
+
+@override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class CourseBchPaymentTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+        self.course = Course.objects.get(code='real-historia-bitcoin')
+        self.course.price_usd = 35
+        self.course.sales_enabled = True
+        self.course.save(update_fields=['price_usd', 'sales_enabled'])
+        self.purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=self.course,
+            price_amount=35,
+            receipt_email='buyer@example.com',
+        )
+
+    def _paid_tx(self, order, txid='cd' * 32):
+        return BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
+
+    def test_course_bch_create_and_verify_marks_paid(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            course_purchase=self.purchase,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.course_purchase_id, self.purchase.id)
+        self.assertEqual(order.expected_amount_sats, 17_500_000)  # 35/200 BCH
+        self.assertEqual(get_bch_payment_product_meta(order)['product_type'], 'course')
+
+        txid = 'cd' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+        paid = verify_bch_payment(
+            course_purchase=self.purchase,
+            user=self.buyer,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.purchase.refresh_from_db()
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_course_bch_http_create_and_verify(self):
+        self.client.force_authenticate(user=self.buyer)
+        with patch('payments.bch_services.build_bch_client') as mock_build:
+            mock_client = MagicMock()
+            mock_client.get_bch_usd_rate.return_value = Decimal('200')
+            mock_build.return_value = mock_client
+            created = self.client.post(
+                reverse('course-purchase-bch', kwargs={'purchase_id': self.purchase.id}),
+                {},
+                format='json',
+            )
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(created.data['usd_amount'], '35.00')
+            order = BchDirectPayment.objects.get(pk=created.data['id'])
+            txid = 'ab' * 32
+            mock_client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+            verified = self.client.post(
+                reverse('course-purchase-bch-verify', kwargs={'purchase_id': self.purchase.id}),
+                {'txid': txid},
+                format='json',
+            )
+        self.assertEqual(verified.status_code, status.HTTP_200_OK)
+        self.assertEqual(verified.data['payment']['status'], 'paid')
+        self.assertTrue(verified.data['purchase']['is_paid'])
+
+    def test_course_bch_rejects_when_not_for_sale(self):
+        self.course.sales_enabled = False
+        self.course.save(update_fields=['sales_enabled'])
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError):
+            create_or_reuse_bch_payment(
+                course_purchase=self.purchase,
+                user=self.buyer,
+                client=client,
+            )
+
+
+@override_settings(
+    PAYPHONE_TOKEN='test-payphone-token',
+    PAYPHONE_STORE_ID='store-123',
+    PAYPHONE_IVA_PERCENT=0,
+    ACADEMIA_PUBLIC_URL='http://localhost:8000',
+    FRONTEND_PUBLIC_URL='http://localhost:5173',
+)
+class PayphoneButtonTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = UserFactory()
+        self.course = Course.objects.create(
+            code='payphone-course',
+            title='Payphone Course',
+            price_usd=10.0,
+            sales_enabled=True,
+        )
+        self.purchase = CoursePurchase.objects.create(
+            user=self.buyer,
+            course=self.course,
+            price_amount=10.0,
+            payment_status='PENDING',
+        )
+
+    def test_status_exposes_payphone_when_configured(self):
+        response = self.client.get(reverse('payment-gateway-status'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['methods']['payphone'])
+        self.assertTrue(response.data['payphone_enabled'])
+
+    @override_settings(PAYPHONE_TOKEN='', PAYPHONE_STORE_ID='')
+    def test_status_hides_payphone_when_unconfigured(self):
+        response = self.client.get(reverse('payment-gateway-status'))
+        self.assertFalse(response.data['methods']['payphone'])
+
+    @patch('payments.payphone_services.PayphoneClient.prepare')
+    def test_create_payphone_order_for_course(self, mock_prepare):
+        mock_prepare.return_value = {
+            'paymentId': 'PayIdABC',
+            'payWithCard': 'https://pay.example/card?paymentId=PayIdABC',
+            'payWithPayPhone': 'https://pay.example/pp?paymentId=PayIdABC',
+        }
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(
+            reverse('payphone-payment-create'),
+            {'kind': 'course', 'purchaseId': self.purchase.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+        self.assertEqual(response.data['amount_cents'], 1000)
+        self.assertIn('pay.example/card', response.data['pay_with_card_url'])
+        mock_prepare.assert_called_once()
+        prepare_kwargs = mock_prepare.call_args.kwargs
+        self.assertEqual(prepare_kwargs['amount'], 1000)
+        self.assertEqual(prepare_kwargs['amount_without_tax'], 1000)
+        self.assertTrue(
+            prepare_kwargs['response_url'].endswith('/api/payments/payphone/return/')
+        )
+
+    @patch('payments.payphone_services.PayphoneClient.confirm')
+    @patch('payments.payphone_services.PayphoneClient.prepare')
+    def test_return_confirms_and_marks_course_paid(self, mock_prepare, mock_confirm):
+        from payments.models import PayphonePayment
+        from payments.payphone_services import create_or_reuse_payphone_payment
+
+        mock_prepare.return_value = {
+            'paymentId': 'PayIdXYZ',
+            'payWithCard': 'https://pay.example/card?paymentId=PayIdXYZ',
+            'payWithPayPhone': 'https://pay.example/pp?paymentId=PayIdXYZ',
+        }
+        mock_confirm.return_value = {
+            'statusCode': 3,
+            'transactionStatus': 'Approved',
+            'transactionId': 998877,
+            'amount': 1000,
+            'clientTransactionId': 'will-be-overwritten',
+        }
+        payment = create_or_reuse_payphone_payment(
+            user=self.buyer,
+            course_purchase=self.purchase,
+        )
+        mock_confirm.return_value['clientTransactionId'] = payment.client_transaction_id
+
+        response = self.client.get(
+            reverse('payphone-return'),
+            {
+                'id': '998877',
+                'clientTransactionId': payment.client_transaction_id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertIn('/payments/payphone/result', response['Location'])
+        self.assertIn('status=approved', response['Location'])
+
+        payment.refresh_from_db()
+        self.purchase.refresh_from_db()
+        self.assertEqual(payment.status, PayphonePayment.STATUS_APPROVED)
+        self.assertEqual(payment.transaction_id, 998877)
+        self.assertEqual(self.purchase.payment_status, 'PAID')
+
+    def test_split_amount_with_iva(self):
+        from payments.payphone_services import split_amount_for_payphone
+
+        with override_settings(PAYPHONE_IVA_PERCENT=15):
+            fields = split_amount_for_payphone(115)
+        self.assertEqual(fields['amount'], 115)
+        self.assertEqual(fields['amount_with_tax'], 100)
+        self.assertEqual(fields['tax'], 15)
+        self.assertIsNone(fields['amount_without_tax'])

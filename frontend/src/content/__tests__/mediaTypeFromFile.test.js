@@ -22,6 +22,26 @@ describe('getMediaType', () => {
     expect(getMediaType(file)).toBe('TEXT');
   });
 
+  it('maps Markdown MIME type to TEXT', () => {
+    const file = new File(['# hola'], 'notas.md', { type: 'text/markdown' });
+    expect(getMediaType(file)).toBe('TEXT');
+  });
+
+  it('maps Markdown extension to TEXT when MIME type is empty', () => {
+    const file = new File(['# hola'], 'notas.md', { type: '' });
+    expect(getMediaType(file)).toBe('TEXT');
+  });
+
+  it('maps .markdown extension and text/x-markdown MIME to TEXT', () => {
+    expect(getMediaType(new File(['x'], 'guia.markdown', { type: '' }))).toBe('TEXT');
+    expect(getMediaType(new File(['x'], 'guia.md', { type: 'text/x-markdown' }))).toBe('TEXT');
+  });
+
+  it('maps Markdown when browser reports octet-stream', () => {
+    const file = new File(['# hola'], 'notas.md', { type: 'application/octet-stream' });
+    expect(getMediaType(file)).toBe('TEXT');
+  });
+
   it('rejects unsupported extensions', () => {
     const file = new File(['zip'], 'archive.zip', { type: 'application/zip' });
     expect(getMediaType(file)).toBeNull();

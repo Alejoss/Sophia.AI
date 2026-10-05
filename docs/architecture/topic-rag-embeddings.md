@@ -43,11 +43,12 @@ Django stores **embedding bookkeeping** on `ContentEmbedding` (1:1 with
 `Content`): `status`, `source_hash`, `model`, `dims`, `chunk_count`,
 `embedded_at`, `error`. Vectors stay in Qdrant only.
 
-`ContentTranscript` holds A/V transcript text only. TEXT/PDF files are indexed
-**without** a transcript row — the embed worker hashes/chunks the file and acks
-`ContentEmbedding` directly.
+`ContentTranscript` holds canonical plain text for VIDEO, AUDIO, and TEXT/PDF.
+TEXT/PDF extracts use the same row (`format=PLAIN` recommended). Knowledge-path
+snapshots embed that text; the embed worker chunks it and acks
+`ContentEmbedding` with `source_hash = text_hash`.
 
-For A/V, staleness compares `ContentTranscript.text_hash` →
+For A/V and TEXT alike, staleness compares `ContentTranscript.text_hash` →
 `ContentEmbedding.source_hash` on transcript save.
 
 ### Status lifecycle
@@ -71,7 +72,7 @@ Embed-worker acks (`PUT /api/content/embedding-ingest/{content_id}/`) set
 Topic RAG consultations are available when **all** of the following hold:
 
 1. `Topic.chat_enabled` is `true` (moderator toggle; PATCH returns **400** if nothing is indexed yet).
-2. At least one VIDEO/AUDIO in the topic has `embedding_status=indexed`
+2. At least one VIDEO/AUDIO/TEXT in the topic has `embedding_status=indexed`
    (`Topic.indexed_transcript_count()`, exposed as `chat_can_enable` in API).
 3. Runtime env: `OPENAI_API_KEY`, `QDRANT_URL`, and `QDRANT_API_KEY`.
 

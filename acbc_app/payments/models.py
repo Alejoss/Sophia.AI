@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -51,6 +53,13 @@ class CryptoPayment(models.Model):
         null=True,
         blank=True,
     )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='crypto_payments',
+        null=True,
+        blank=True,
+    )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     pay_currency = models.CharField(max_length=16, blank=True, default='')
@@ -75,24 +84,35 @@ class CryptoPayment(models.Model):
                         path_purchase__isnull=True,
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=False,
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=True,
                         anchor_request__isnull=False,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
                         path_purchase__isnull=True,
                         anchor_request__isnull=True,
                         token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
                     )
                 ),
                 name='cryptopayment_exactly_one_target',
@@ -118,12 +138,120 @@ class CryptoPayment(models.Model):
             return self.anchor_request.requester
         if self.token_purchase_id:
             return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
         return None
+
+
+class Course(models.Model):
+    """A course offered for sale. The price lives on this row, edited in admin.
+
+    Like a reading club, a course can point at one knowledge path and at
+    several live events. Those links do not replace the course price.
+    """
+
+    code = models.SlugField(max_length=64, unique=True)
+    title = models.CharField(max_length=200)
+    price_usd = models.FloatField(
+        default=0,
+        help_text='Precio en USD. 0 significa que el curso no está a la venta.',
+    )
+    sales_enabled = models.BooleanField(
+        default=True,
+        help_text='Permite cobrar este curso cuando tiene precio.',
+    )
+    knowledge_path = models.ForeignKey(
+        'knowledge_paths.KnowledgePath',
+        on_delete=models.PROTECT,
+        related_name='courses',
+        null=True,
+        blank=True,
+        help_text='Optional path whose missions belong to this course.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_for_sale(self):
+        return bool(self.sales_enabled and self.price_usd and self.price_usd > 0)
+
+
+class CourseEvent(models.Model):
+    """Links live sessions to a course without altering the Event model."""
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='course_events')
+    event = models.ForeignKey('events.Event', on_delete=models.CASCADE, related_name='course_links')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['course', 'event'], name='course_event_once'),
+        ]
+        ordering = ['event__date_start', 'created_at']
+
+    def __str__(self):
+        return f'{self.course.code} ↔ {self.event_id}'
+
+
+class CoursePurchase(models.Model):
+    """A user's purchase of a course. price_amount is the price copied at checkout."""
+
+    PAYMENT_STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('REFUNDED', 'Refunded'),
+    )
+
+    user = models.ForeignKey(
+        'auth.User',
+        on_delete=models.CASCADE,
+        related_name='course_purchases',
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.PROTECT,
+        related_name='purchases',
+    )
+    price_amount = models.FloatField(help_text='USD price copied from the course when checkout opened.')
+    receipt_email = models.EmailField(
+        blank=True,
+        default='',
+        help_text='Email confirmed at checkout for receipt and course access notices.',
+    )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='PENDING',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'course'],
+                name='course_purchase_one_per_user',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user_id} → {self.course_id} ({self.payment_status})'
+
+    @property
+    def is_paid(self):
+        return self.payment_status == 'PAID'
 
 
 class BchDirectPayment(models.Model):
     """
-    Self-custody BCH payment for anchors, paths, topics, or token packages.
+    Self-custody BCH payment for anchors, paths, topics, token packages, or courses.
 
     Unique amount (sats) on a single receive address; verify accepts payments
     within ``BCH_AMOUNT_TOLERANCE_USD`` of ``expected_amount_sats`` at the
@@ -169,6 +297,13 @@ class BchDirectPayment(models.Model):
         null=True,
         blank=True,
     )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
         help_text='Target amount in satoshis; verify allows BCH_AMOUNT_TOLERANCE_USD variance.',
@@ -206,24 +341,35 @@ class BchDirectPayment(models.Model):
                         path_purchase__isnull=True,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=False,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=False,
                         token_purchase__isnull=True,
+                        course_purchase__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
                         path_purchase__isnull=True,
                         topic_purchase__isnull=True,
                         token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
                     )
                 ),
                 name='bchdirectpayment_exactly_one_target',
@@ -255,6 +401,188 @@ class BchDirectPayment(models.Model):
             return self.anchor_request.requester
         if self.token_purchase_id:
             return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
+        return None
+
+    def mark_expired_if_needed(self):
+        if self.status == self.STATUS_PENDING and timezone.now() >= self.expires_at:
+            self.status = self.STATUS_EXPIRED
+            self.save(update_fields=['status', 'updated_at'])
+        return self
+
+
+class PayphonePayment(models.Model):
+    """Payphone Botón de pago order linked to exactly one entitlement."""
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_CANCELED = 'canceled'
+    STATUS_FAILED = 'failed'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_CANCELED, 'Canceled'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_EXPIRED, 'Expired'),
+    )
+
+    event_registration = models.ForeignKey(
+        'events.EventRegistration',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    path_purchase = models.ForeignKey(
+        'knowledge_paths.KnowledgePathPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    topic_purchase = models.ForeignKey(
+        'content.TopicPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    token_purchase = models.ForeignKey(
+        'payments.TokenPurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    course_purchase = models.ForeignKey(
+        'payments.CoursePurchase',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
+    client_transaction_id = models.CharField(max_length=64, unique=True)
+    payphone_payment_id = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    transaction_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    amount_cents = models.PositiveIntegerField(help_text='Total charged in USD cents.')
+    currency = models.CharField(max_length=8, default='USD')
+    reference = models.CharField(max_length=256, blank=True, default='')
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    pay_with_card_url = models.URLField(max_length=512, blank=True, default='')
+    pay_with_payphone_url = models.URLField(max_length=512, blank=True, default='')
+    expires_at = models.DateTimeField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+    provider_payload = models.JSONField(default=dict, blank=True)
+    confirm_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'expires_at'], name='payphone_status_exp_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        event_registration__isnull=False,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=False,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=False,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=False,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=False,
+                        course_purchase__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=False,
+                    )
+                ),
+                name='payphonepayment_exactly_one_target',
+            ),
+        ]
+
+    def __str__(self):
+        return f'Payphone {self.client_transaction_id} [{self.status}]'
+
+    @property
+    def is_paid(self):
+        return self.status == self.STATUS_APPROVED
+
+    @property
+    def is_expired(self):
+        if self.status != self.STATUS_PENDING:
+            return self.status == self.STATUS_EXPIRED
+        return timezone.now() >= self.expires_at
+
+    @property
+    def amount_usd(self):
+        return (Decimal(self.amount_cents or 0) / Decimal(100)).quantize(Decimal('0.01'))
+
+    @property
+    def buyer(self):
+        if self.event_registration_id:
+            return self.event_registration.user
+        if self.path_purchase_id:
+            return self.path_purchase.user
+        if self.topic_purchase_id:
+            return self.topic_purchase.user
+        if self.anchor_request_id:
+            return self.anchor_request.requester
+        if self.token_purchase_id:
+            return self.token_purchase.user
+        if self.course_purchase_id:
+            return self.course_purchase.user
         return None
 
     def mark_expired_if_needed(self):
@@ -268,7 +596,11 @@ class TokenPackage(models.Model):
     """Staff-editable SKU of platform tokens sold for USD (paid in BCH / NOWPayments)."""
 
     name = models.CharField(max_length=80)
-    token_amount = models.PositiveIntegerField()
+    token_amount = models.PositiveIntegerField(help_text='Paid tokens (face value).')
+    bonus_tokens = models.PositiveIntegerField(
+        default=0,
+        help_text='Extra tokens credited on purchase (reward). Not charged.',
+    )
     usd_price = models.DecimalField(max_digits=12, decimal_places=2)
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
@@ -279,16 +611,51 @@ class TokenPackage(models.Model):
         ordering = ['sort_order', 'token_amount', 'id']
 
     def __str__(self):
-        return f'{self.name} ({self.token_amount} tokens / ${self.usd_price})'
+        bonus = f' +{self.bonus_tokens} bonus' if self.bonus_tokens else ''
+        return f'{self.name} ({self.token_amount}{bonus} tokens / ${self.usd_price})'
+
+    @property
+    def total_tokens(self) -> int:
+        return int(self.token_amount or 0) + int(self.bonus_tokens or 0)
+
+    @staticmethod
+    def unit_usd_price() -> Decimal:
+        from django.conf import settings
+        return Decimal(str(settings.PLATFORM_TOKEN_USD_PRICE)).quantize(Decimal('0.01'))
+
+    @classmethod
+    def usd_price_for_amount(cls, token_amount: int) -> Decimal:
+        return (Decimal(int(token_amount)) * cls.unit_usd_price()).quantize(Decimal('0.01'))
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.token_amount and self.usd_price is not None:
+            expected = self.usd_price_for_amount(self.token_amount)
+            actual = Decimal(self.usd_price).quantize(Decimal('0.01'))
+            if actual != expected:
+                unit = self.unit_usd_price()
+                raise ValidationError({
+                    'usd_price': (
+                        f'Debe ser ${expected} ({self.token_amount} tokens × ${unit}/token). '
+                        'Los tokens de recompensa no se cobran.'
+                    ),
+                })
 
 
 class TokenPurchase(models.Model):
     """A user's attempt to buy a token package. Repeatable (same package many times)."""
 
+    STATUS_PENDING = 'PENDING'
+    STATUS_PAID = 'PAID'
+    STATUS_CANCELLED = 'CANCELLED'
+    STATUS_REFUNDED = 'REFUNDED'
     PAYMENT_STATUS_CHOICES = (
-        ('PENDING', 'Pending'),
-        ('PAID', 'Paid'),
-        ('REFUNDED', 'Refunded'),
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_REFUNDED, 'Refunded'),
     )
 
     user = models.ForeignKey(
@@ -304,12 +671,16 @@ class TokenPurchase(models.Model):
         related_name='purchases',
     )
     package_name = models.CharField(max_length=80, blank=True, default='')
-    token_amount = models.PositiveIntegerField()
+    token_amount = models.PositiveIntegerField(help_text='Paid tokens snapshot.')
+    bonus_tokens = models.PositiveIntegerField(
+        default=0,
+        help_text='Bonus tokens snapshot credited with the purchase.',
+    )
     usd_price = models.DecimalField(max_digits=12, decimal_places=2)
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
-        default='PENDING',
+        default=STATUS_PENDING,
         db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -319,15 +690,19 @@ class TokenPurchase(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.user_id} → {self.token_amount} tokens ({self.payment_status})'
+        return f'{self.user_id} → {self.total_tokens} tokens ({self.payment_status})'
+
+    @property
+    def total_tokens(self) -> int:
+        return int(self.token_amount or 0) + int(self.bonus_tokens or 0)
 
     @property
     def is_paid(self):
-        return self.payment_status == 'PAID'
+        return self.payment_status == self.STATUS_PAID
 
 
 class TokenLedgerEntry(models.Model):
-    """Append-only platform token movements. Purchase credits are unique per TokenPurchase."""
+    """Append-only platform token movements. Purchase credits / anchor spends are unique."""
 
     REASON_PURCHASE = 'purchase'
     REASON_ADJUSTMENT = 'adjustment'
@@ -352,6 +727,14 @@ class TokenLedgerEntry(models.Model):
         blank=True,
         related_name='ledger_entries',
     )
+    anchor_request = models.ForeignKey(
+        'content.TranscriptAnchorRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='token_ledger_entries',
+        help_text='Set when reason=spend for a paid Bitcoin anchor request.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -361,6 +744,11 @@ class TokenLedgerEntry(models.Model):
                 fields=['token_purchase'],
                 condition=Q(reason='purchase') & Q(token_purchase__isnull=False),
                 name='unique_token_purchase_ledger_credit',
+            ),
+            models.UniqueConstraint(
+                fields=['anchor_request'],
+                condition=Q(reason='spend') & Q(anchor_request__isnull=False),
+                name='unique_token_anchor_request_spend',
             ),
         ]
 

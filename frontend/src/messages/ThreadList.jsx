@@ -76,6 +76,8 @@ const ThreadList = ({ onThreadSelect }) => {
                 <Typography variant="h6" sx={{ mb: 2 }}>Mensajes</Typography>
                 <Paper
                     component="form"
+                    noValidate
+                    onSubmit={(e) => e.preventDefault()}
                     sx={{ p: '2px 4px', display: 'flex', alignItems: 'center' }}
                 >
                     <InputBase
@@ -83,8 +85,9 @@ const ThreadList = ({ onThreadSelect }) => {
                         placeholder="Buscar conversaciones"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        inputProps={{ 'aria-label': 'Buscar conversaciones' }}
                     />
-                    <IconButton type="button" sx={{ p: '10px' }}>
+                    <IconButton type="submit" sx={{ p: '10px' }} aria-label="Buscar">
                         <SearchIcon />
                     </IconButton>
                 </Paper>

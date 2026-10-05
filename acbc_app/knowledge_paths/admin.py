@@ -1,5 +1,11 @@
 from django.contrib import admin
-from .models import KnowledgePath, KnowledgePathPurchase, Node
+from .models import (
+    KnowledgePath,
+    KnowledgePathPurchase,
+    KnowledgePathSnapshotAnchor,
+    Node,
+    PublishedKnowledgePathSnapshot,
+)
 
 
 @admin.register(KnowledgePath)
@@ -37,3 +43,61 @@ class NodeAdmin(admin.ModelAdmin):
     list_display = ('title', 'knowledge_path', 'media_type', 'created_at')
     list_filter = ('media_type', 'created_at')
     search_fields = ('title', 'description', 'knowledge_path__title')
+
+
+@admin.register(PublishedKnowledgePathSnapshot)
+class PublishedKnowledgePathSnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'knowledge_path',
+        'version',
+        'digest',
+        'published_by',
+        'published_at',
+    )
+    list_filter = ('schema_version', 'published_at')
+    search_fields = ('knowledge_path__title', 'digest', 'published_by__username')
+    readonly_fields = (
+        'knowledge_path',
+        'version',
+        'schema_version',
+        'document_text',
+        'digest',
+        'published_at',
+        'published_by',
+    )
+
+
+@admin.register(KnowledgePathSnapshotAnchor)
+class KnowledgePathSnapshotAnchorAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'snapshot',
+        'digest',
+        'status',
+        'btc_network',
+        'btc_txid',
+        'btc_confirmations',
+        'anchored_by',
+        'updated_at',
+    )
+    list_filter = ('status', 'btc_network', 'created_at')
+    search_fields = (
+        'digest',
+        'btc_txid',
+        'snapshot__knowledge_path__title',
+        'anchored_by__username',
+    )
+    readonly_fields = (
+        'snapshot',
+        'digest',
+        'op_return_prefix',
+        'btc_op_return_hex',
+        'btc_txid',
+        'btc_block_height',
+        'btc_block_hash',
+        'btc_confirmations',
+        'btc_confirmed_at',
+        'created_at',
+        'updated_at',
+    )

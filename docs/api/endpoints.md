@@ -90,7 +90,7 @@ See [Authentication Documentation](authentication.md) for detailed authenticatio
 
 ## Content — Transcript ingest (external workers)
 
-Machine-to-machine API for an external transcript worker (local Whisper, YouTube captions, S3 `file_key`). Not JWT-authenticated.
+Machine-to-machine API for an external transcript worker (Whisper/captions for A/V, PDF/text extract for TEXT, S3 `file_key`). Not JWT-authenticated. VIDEO, AUDIO, and TEXT share `ContentTranscript`.
 
 Full contract: [transcript-ingest.md](transcript-ingest.md).
 
@@ -115,7 +115,7 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 ### Upsert transcript
 - **PUT** `/api/content/transcript-ingest/{content_id}/`
 - **Auth**: Ingest API key
-- **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format`, `language`
+- **Body**: at least one of `parsed_plain`, `processed_plain`, `obsidian_markdown`; optional `source_subtitles`, `format` (`SRT`/`VTT`/`PLAIN`), `language`
 - **Response**: `{ content_id, created, transcript }` (201 create / 200 update)
 
 ## Content — Transcript certification (Bitcoin OP_RETURN)
@@ -123,7 +123,7 @@ Full contract: [transcript-ingest.md](transcript-ingest.md).
 Anchor `ContentTranscript.text_hash` in a Bitcoin `OP_RETURN`. API prepares/lists
 rows; broadcast is ops-only (`manage.py broadcast_transcript_anchor`).
 
-Full contract: [transcript-anchor.md](transcript-anchor.md). Architecture:
+Full contract: [transcript-anchor.md](../hackathon/transcript-anchor.md). Architecture:
 [blockchain-integration.md](../architecture/blockchain-integration.md).
 
 ### Current anchor for transcript hash
@@ -135,6 +135,11 @@ Full contract: [transcript-anchor.md](transcript-anchor.md). Architecture:
 - **GET** `/api/content/content_details/{content_id}/transcript/anchors/`
 - **Auth**: Optional (`AllowAny`)
 - **Response**: array of `TranscriptAnchorSerializer`
+
+### Download certified text
+- **GET** `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/`
+- **Auth**: Optional (`AllowAny`)
+- **Response**: `text/plain; charset=utf-8` attachment of the exact normalized snapshot; headers `X-Text-Hash`, `X-Expected-Text-Hash`, `X-Hash-Match`. **404** `certified_text_missing` when no snapshot was saved.
 
 ### Prepare pending anchor
 - **POST** `/api/content/content_details/{content_id}/transcript/anchors/`
@@ -165,7 +170,7 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Default statuses**: `pending`, `stale`, `failed`
 - **Response**: `{ count, limit, offset, include_completed, status_filter, topic_id, items[] }`
 - **Item**: `{ id, title, is_public, chat_enabled, matching_count, status_counts }`
-- Topics with no matching VIDEO/AUDIO transcripts are omitted. Ordered by `matching_count` desc, then `id`.
+- Topics with no matching VIDEO/AUDIO/TEXT transcripts are omitted. Ordered by `matching_count` desc, then `id`.
 - Then fetch content with `GET /api/content/embedding-ingest/?topic_id={id}`
 
 ### Get embedding job detail
@@ -182,13 +187,13 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 
 ### Topic RAG chat (consultations)
 - **POST** `/api/content/topics/{topic_id}/chat/`
-- **Auth**: Required (JWT)
+- **Auth**: Required (JWT). Guests cannot create consultations (**401**).
 - **Body**: `{ "message": "…" }` (one independent consultation; no chat history)
-- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining }`
-- **429**: free-tier daily cap (`code=daily_consultation_limit`; default 3/day/user across topics)
-- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` quota fields)
+- **Response** `201`: `{ id, topic_id, question, answer, sources[], created_at, daily_limit, daily_used, daily_remaining, tokens_url }`
+- **429**: free-tier daily cap (`code=daily_consultation_limit`; default **3/day/user** across topics). Body includes `tokens_url` → `/profiles/my_profile?section=tokens` (buy ACBC tokens CTA; tokens do not raise the cap yet). Users on the staff unlimited allowlist get `daily_limit` / `daily_remaining` = `null` and are never blocked by this cap.
+- **GET** `/api/content/topics/{topic_id}/chat/queries/` — current user's history (+ `daily_*` + `tokens_url`)
 - **GET** `/api/content/topics/{topic_id}/chat/queries/{query_id}/` — one saved consultation
-- **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff dashboard (`/dashboard`), or PATCH as creator/moderator/staff.
+- **Note**: requires `Topic.chat_enabled=true` (else **403**). Toggle in topic edit, staff Consultas tab (`/dashboard/consultas`), or PATCH as creator/moderator/staff.
 - Full contract: [topic-rag-chat.md](../operations/topic-rag-chat.md)
 
 ### Staff — topic consultations
@@ -196,7 +201,14 @@ Same auth as transcript ingest (`TRANSCRIPT_INGEST_API_KEY`).
 - **Auth**: Staff (`IsAdminUser`)
 - **Query**: `consultation` = `visible` | `ready` | `on` | `no_embeddings` (legacy alias: `conversation`)
 - **Response**: `{ count, consultation, results[] }` with `chat_enabled`, `chat_can_enable`, `indexed_transcript_count`
-- UI: `/dashboard` section **Consultas con los archivos**
+- UI: `/dashboard/consultas` — **Consultas con los archivos**
+
+### Staff — unlimited consultation users
+- **GET** `/api/content/admin/unlimited-consultation-users/`
+- **POST** `/api/content/admin/unlimited-consultation-users/` — body `{ "user_id": <int>, "note"?: "…" }` → **201** (or **409** if already listed)
+- **DELETE** `/api/content/admin/unlimited-consultation-users/{user_id}/` → **204**
+- **Auth**: Staff (`IsAdminUser`)
+- UI: `/dashboard/consultas` — **Usuarios sin límite diario**
 
 ## Topics — Timeline
 
@@ -524,7 +536,7 @@ Custom in-app notification API under profiles. See [Notifications (backend)](../
 
 ## Payments
 
-Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custody: [bch-direct.md](../payments/bch-direct.md). NOWPayments: [nowpayments-setup.md](../payments/nowpayments-setup.md).
+Checkout rails. Full setup: [payments/](../payments/README.md). Payphone card: [payphone-setup.md](../payments/payphone-setup.md). BCH self-custody: [bch-direct.md](../payments/bch-direct.md). NOWPayments: [nowpayments-setup.md](../payments/nowpayments-setup.md).
 
 ### Gateway status
 - **GET** `/api/payments/status/`
@@ -550,8 +562,13 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 ### Transcript-anchor request (BCH directo)
 - **GET** `/api/payments/anchor-request/{id}/bch/` — current order (`payment` may be `null`)
 - **POST** `/api/payments/anchor-request/{id}/bch/` — create or reuse exact-amount order (requester only)
-- **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match
+- **POST** `/api/payments/anchor-request/{id}/bch/verify/` — user-triggered on-chain match (`{}` auto address-scan; optional `{ "txid": "…" }` fallback)
 - **Auth**: Required (requester; staff may GET/verify)
+
+### Transcript-anchor request (platform tokens)
+- **POST** `/api/payments/anchor-request/{id}/tokens/` — debit face-value tokens ($1 → 100 at `$0.01`/token), mark paid, and auto-broadcast OP_RETURN
+- **Auth**: Required (requester only)
+- Docs: [platform-tokens.md](../payments/platform-tokens.md)
 
 ### Platform token packages
 - **GET** `/api/payments/token-packages/` — active SKUs
@@ -563,6 +580,12 @@ Crypto checkout. Full setup: [payments/](../payments/README.md). BCH self-custod
 - **POST** `/api/payments/token-purchase/{id}/bch/verify/`
 - **Auth**: Required
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)
+
+### Payphone (Botón de pago)
+- **POST** `/api/payments/payphone/` — `{ "kind", "purchaseId" }` create order (buyer only)
+- **GET** `/api/payments/payphone/{id}/` — Payphone row for buyer/staff
+- **GET** `/api/payments/payphone/return/` — browser return URL; confirms with Payphone then redirects to frontend (no JWT)
+- Docs: [payphone-setup.md](../payments/payphone-setup.md)
 
 ### Payment detail / IPN
 - **GET** `/api/payments/{id}/` — NOWPayments row; syncs with the provider

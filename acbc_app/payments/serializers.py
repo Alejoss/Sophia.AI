@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
+from payments.models import (
+    BchDirectPayment,
+    CryptoPayment,
+    PayphonePayment,
+    TokenPackage,
+    TokenPurchase,
+)
 
 
 class CryptoPaymentSerializer(serializers.ModelSerializer):
@@ -105,6 +111,7 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
     topic_purchase_id = serializers.IntegerField(read_only=True)
     anchor_request_id = serializers.IntegerField(read_only=True)
     token_purchase_id = serializers.IntegerField(read_only=True)
+    course_purchase_id = serializers.IntegerField(read_only=True)
 
     class Meta(BchDirectPaymentSerializer.Meta):
         fields = BchDirectPaymentSerializer.Meta.fields + [
@@ -120,6 +127,7 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             'topic_purchase_id',
             'anchor_request_id',
             'token_purchase_id',
+            'course_purchase_id',
         ]
 
     def get_product_type(self, obj):
@@ -131,6 +139,8 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             return 'anchor'
         if obj.token_purchase_id:
             return 'token_package'
+        if obj.course_purchase_id:
+            return 'course'
         return None
 
     def get_product_id(self, obj):
@@ -142,6 +152,8 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
             return obj.anchor_request_id
         if obj.token_purchase_id:
             return obj.token_purchase.package_id if obj.token_purchase else obj.token_purchase_id
+        if obj.course_purchase_id and obj.course_purchase:
+            return obj.course_purchase.course.code
         return None
 
     def get_product_title(self, obj):
@@ -150,13 +162,15 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
         if obj.topic_purchase_id and obj.topic_purchase and obj.topic_purchase.topic_id:
             return obj.topic_purchase.topic.title
         if obj.anchor_request_id:
-            return f'Anclaje #{obj.anchor_request_id}'
+            return 'Enviar hash SHA-256 a Bitcoin'
         if obj.token_purchase_id and obj.token_purchase:
             return (
                 obj.token_purchase.package_name
                 or (obj.token_purchase.package.name if obj.token_purchase.package_id else None)
                 or f'{obj.token_purchase.token_amount} tokens'
             )
+        if obj.course_purchase_id and obj.course_purchase:
+            return obj.course_purchase.course.title
         return None
 
     def get_buyer_id(self, obj):
@@ -181,12 +195,16 @@ class AdminBchOrderSerializer(BchDirectPaymentSerializer):
 
 
 class TokenPackageSerializer(serializers.ModelSerializer):
+    total_tokens = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = TokenPackage
         fields = [
             'id',
             'name',
             'token_amount',
+            'bonus_tokens',
+            'total_tokens',
             'usd_price',
             'is_active',
             'sort_order',
@@ -197,6 +215,7 @@ class TokenPackageSerializer(serializers.ModelSerializer):
 class TokenPurchaseSerializer(serializers.ModelSerializer):
     is_paid = serializers.BooleanField(read_only=True)
     package_id = serializers.IntegerField(read_only=True)
+    total_tokens = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = TokenPurchase
@@ -205,6 +224,8 @@ class TokenPurchaseSerializer(serializers.ModelSerializer):
             'package_id',
             'package_name',
             'token_amount',
+            'bonus_tokens',
+            'total_tokens',
             'usd_price',
             'payment_status',
             'is_paid',
@@ -212,3 +233,44 @@ class TokenPurchaseSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = fields
+
+
+class PayphonePaymentSerializer(serializers.ModelSerializer):
+    is_paid = serializers.BooleanField(read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    amount_usd = serializers.SerializerMethodField()
+    seconds_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayphonePayment
+        fields = [
+            'id',
+            'client_transaction_id',
+            'payphone_payment_id',
+            'transaction_id',
+            'amount_cents',
+            'amount_usd',
+            'currency',
+            'reference',
+            'status',
+            'pay_with_card_url',
+            'pay_with_payphone_url',
+            'expires_at',
+            'paid_at',
+            'is_paid',
+            'is_expired',
+            'seconds_remaining',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_amount_usd(self, obj):
+        return f'{obj.amount_usd:.2f}'
+
+    def get_seconds_remaining(self, obj):
+        from django.utils import timezone
+        if obj.status != PayphonePayment.STATUS_PENDING:
+            return 0
+        delta = obj.expires_at - timezone.now()
+        return max(0, int(delta.total_seconds()))

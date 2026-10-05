@@ -265,19 +265,21 @@ class FileDetails(models.Model):
 
 class ContentTranscript(models.Model):
     """
-    Canonical transcript for video or audio content.
+    Canonical plain-text artifact for a Content item (VIDEO, AUDIO, or TEXT/PDF).
 
-    Stores the three artifacts produced by the external worker pipeline:
+    Stores the artifacts produced by the external worker pipeline:
     parsed_plain → processed_plain → obsidian_markdown.
-    Optional source_subtitles (SRT/VTT) enables timed segments for the player.
+    Optional source_subtitles (SRT/VTT) enables timed segments for A/V players.
 
-    Embedding bookkeeping lives on ContentEmbedding (not here): A/V transcripts
-    remain the hash source for staleness, but vectors and index status are
-    content-level so TEXT files can be indexed without a transcript body.
+    Content is atomic: the same row is used for Whisper/captions (A/V) and for
+    PDF/text extracts (TEXT). Knowledge-path snapshots and Bitcoin text hashes
+    both read this normalized plain text. Embedding bookkeeping lives on
+    ContentEmbedding; ``text_hash`` here is the usual source_hash for staleness.
     """
     FORMAT_CHOICES = [
         ('SRT', 'SubRip (.srt)'),
         ('VTT', 'WebVTT (.vtt)'),
+        ('PLAIN', 'Plain text extract (PDF/TEXT)'),
     ]
 
     content = models.OneToOneField(
@@ -291,7 +293,10 @@ class ContentTranscript(models.Model):
     )
     processed_plain = models.TextField(
         blank=True,
-        help_text='spaCy-cleaned plain text; primary source for hash and future RAG.',
+        help_text=(
+            'spaCy-cleaned or PDF-extracted plain text; primary source for '
+            'hash, snapshots, and RAG.'
+        ),
     )
     obsidian_markdown = models.TextField(
         blank=True,
@@ -304,10 +309,10 @@ class ContentTranscript(models.Model):
     )
     source_subtitles = models.TextField(
         blank=True,
-        help_text='Optional raw SRT/VTT in memory for timed segments (not required by worker).',
+        help_text='Optional raw SRT/VTT in memory for timed segments (A/V; not required for TEXT).',
     )
     format = models.CharField(
-        max_length=3,
+        max_length=5,
         choices=FORMAT_CHOICES,
         default='SRT',
     )
@@ -322,6 +327,21 @@ class ContentTranscript(models.Model):
         blank=True,
         null=True,
         help_text='SHA-256 of normalized processed_plain (fallback: parsed_plain / Obsidian body).',
+    )
+    text_hash_locked = models.BooleanField(
+        default=False,
+        help_text=(
+            'When True, text_hash was set by an external worker (Vincent) and must '
+            'not be recomputed on save. Cleared when transcript artifacts are replaced.'
+        ),
+    )
+    hash_plain_text = models.TextField(
+        blank=True,
+        help_text=(
+            'Exact normalized UTF-8 plain text whose SHA-256 is text_hash, when set '
+            'via external hash ingest. Preferred for public display/verification so '
+            'users can reconstruct the digest even if SQL_ASCII degraded other fields.'
+        ),
     )
     language = models.CharField(
         max_length=10,
@@ -344,7 +364,9 @@ class ContentTranscript(models.Model):
     def save(self, *args, **kwargs):
         # Legacy SQL_ASCII clusters reject UTF-8 (accents in Spanish transcripts /
         # SRT). prepare_* is a no-op on UTF8; on SQL_ASCII it degrades before
-        # sync so text_hash matches what is actually persisted.
+        # sync so text_hash matches what is actually persisted — unless the hash
+        # was locked by external ingest (Vincent), in which case hash_plain_text
+        # keeps the original normalized UTF-8 for verification/display.
         from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
 
         self.parsed_plain = prepare_text_for_db(self.parsed_plain)
@@ -354,6 +376,8 @@ class ContentTranscript(models.Model):
         self.language = prepare_text_for_db(self.language)
         self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
         self.segments = prepare_json_for_db(self.segments or [])
+        # Do not run prepare_text_for_db on hash_plain_text — it must stay the
+        # exact normalized UTF-8 bytes that produce text_hash.
 
         sync_transcript_derived_fields(self)
 
@@ -367,9 +391,8 @@ class ContentEmbedding(models.Model):
     Vector-index bookkeeping for any Content (VIDEO, AUDIO, TEXT, …).
 
     Vectors live in Qdrant; this row only tracks whether the current source
-    hash is indexed. TEXT files do not need a ContentTranscript — the worker
-    hashes/chunks the file and acks here. For A/V, transcript.text_hash is the
-    usual source_hash input for staleness.
+    hash is indexed. VIDEO, AUDIO, and TEXT all use ``ContentTranscript.text_hash``
+    as the usual ``source_hash`` for staleness (PDF/text extract for TEXT).
     """
 
     STATUS_PENDING = 'pending'
@@ -425,8 +448,8 @@ class ContentEmbedding(models.Model):
         blank=True,
         null=True,
         help_text=(
-            'Hash of the source that was indexed (transcript text_hash for A/V, '
-            'or worker-supplied file/content hash for TEXT).'
+            'Hash of the source that was indexed '
+            '(ContentTranscript.text_hash for VIDEO/AUDIO/TEXT).'
         ),
     )
     embedded_at = models.DateTimeField(
@@ -478,6 +501,11 @@ class TranscriptAnchor(models.Model):
     Rows snapshot text_hash at certify time so re-ingested transcripts can be
     re-anchored without rewriting history. Optional ipfs_cid is only a pointer
     to the text off-chain — not part of the Bitcoin proof.
+
+    Planned Ethereum registry integration must reuse the matching archived text
+    and digest, never resolve an old certificate through the latest transcript.
+    A copied btc_txid is a reference, not Ethereum verification of Bitcoin.
+    See docs/hackathon/hackathon-ethereum-credentials.md.
     """
 
     STATUS_PENDING = 'pending'
@@ -518,6 +546,13 @@ class TranscriptAnchor(models.Model):
         blank=True,
         null=True,
         help_text='Length of normalized hash-source text at certify time.',
+    )
+    certified_plain_text = models.TextField(
+        blank=True,
+        help_text=(
+            'Exact normalized plain text whose SHA-256 is text_hash '
+            '(snapshot at certify time for public verification).'
+        ),
     )
     op_return_prefix = models.CharField(
         max_length=16,
@@ -618,9 +653,10 @@ class TranscriptAnchorRequest(models.Model):
     """
     Paid request to anchor a transcript hash on Bitcoin.
 
-    Any authenticated user may request; after NOWPayments or BCH-direct payment
-    succeeds, status becomes paid_pending_review until staff approves (broadcast)
-    or rejects (no automatic refund).
+    Any authenticated user may start; after NOWPayments, BCH-direct, or token
+    payment succeeds, the platform wallet broadcasts the OP_RETURN automatically.
+    ``paid_pending_review`` means paid and broadcast is in progress or deferred
+    (fees/funds); staff can retry emit or reject (no automatic refund).
     """
 
     STATUS_PENDING_PAYMENT = 'pending_payment'
@@ -629,7 +665,7 @@ class TranscriptAnchorRequest(models.Model):
     STATUS_REJECTED = 'rejected'
     STATUS_CHOICES = [
         (STATUS_PENDING_PAYMENT, 'Pending payment'),
-        (STATUS_PAID_PENDING_REVIEW, 'Paid — pending review'),
+        (STATUS_PAID_PENDING_REVIEW, 'Paid — broadcasting / retry'),
         (STATUS_APPROVED, 'Approved (broadcast)'),
         (STATUS_REJECTED, 'Rejected'),
     ]
@@ -892,6 +928,40 @@ class TopicChatQuery(models.Model):
     def __str__(self):
         preview = (self.question or '')[:60]
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
+
+
+class UnlimitedConsultationUser(models.Model):
+    """
+    Admin allowlist: users exempt from the free-tier daily consultation cap.
+
+    Managed from the staff Consultas dashboard. Staff/superuser alone is not
+    enough for unlimited consultations; they must be listed here (or hold a
+    future premium entitlement).
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='unlimited_consultations',
+        help_text='User ID that may create unlimited topic consultations per day.',
+    )
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='added_unlimited_consultation_users',
+    )
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'unlimited consultation user'
+        verbose_name_plural = 'unlimited consultation users'
+
+    def __str__(self):
+        return f'UnlimitedConsultationUser(user_id={self.user_id})'
 
 
 class TopicCreationRequest(models.Model):

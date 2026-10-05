@@ -21,26 +21,40 @@ from payments.bch_services import (
     report_bch_payment_txid,
     verify_bch_payment,
 )
-from payments.models import BchDirectPayment, CryptoPayment, TokenPackage, TokenPurchase
+from payments.models import BchDirectPayment, Course, CoursePurchase, CryptoPayment, TokenPackage, TokenPurchase
 from payments.nowpayments_client import NOWPaymentsClient, NOWPaymentsError
+from payments.payphone_client import PayphoneError
+from payments.payphone_services import (
+    confirm_payphone_return,
+    create_or_reuse_payphone_payment,
+    is_payphone_configured,
+    resolve_payphone_target,
+)
 from payments.serializers import (
     AdminBchOrderSerializer,
     BchDirectPaymentSerializer,
     CryptoPaymentSerializer,
+    PayphonePaymentSerializer,
     TokenPackageSerializer,
     TokenPurchaseSerializer,
 )
 from payments.services import (
     ALLOWED_PAY_CURRENCIES,
     OPEN_PAYMENT_STATUSES,
+    cancel_token_purchase,
     create_anchor_request_payment,
+    create_course_purchase_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
+    get_or_create_course_purchase,
     create_token_purchase,
     create_token_purchase_payment,
+    pay_anchor_request_with_tokens,
     refresh_crypto_payment_from_nowpayments,
     sync_payment_from_provider,
 )
+from payments.token_ledger import InsufficientTokenBalance
+from payments.token_pricing import tokens_required_for_usd
 from content.serializers import TranscriptAnchorRequestSerializer
 
 logger = logging.getLogger(__name__)
@@ -65,6 +79,11 @@ def _bch_error_response(exc, *, action, **ctx):
     return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _request_bch_txid(request) -> str:
+    """TXID from verify body (required for buyer-triggered chain lookup)."""
+    return (request.data.get('txid') or request.data.get('payment_txid') or '').strip()
+
+
 def _permission_error_response(exc, *, action, **ctx):
     logger.info('Payment %s forbidden %s: %s', action, _ctx_bits(**ctx), exc)
     return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
@@ -78,6 +97,15 @@ def _validation_error_response(exc, *, action, **ctx):
 def _nowpayments_error_response(exc, *, action, **ctx):
     logger.warning('NOWPayments %s failed %s: %s', action, _ctx_bits(**ctx), exc)
     return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+def _payphone_error_response(exc, *, action, **ctx):
+    logger.warning('Payphone %s failed %s: %s', action, _ctx_bits(**ctx), exc)
+    status_code = getattr(exc, 'status_code', None)
+    http_status = status.HTTP_502_BAD_GATEWAY
+    if status_code and 400 <= int(status_code) < 500:
+        http_status = status.HTTP_400_BAD_REQUEST
+    return Response({'error': str(exc)}, status=http_status)
 
 
 def _unexpected_payment_error_response(exc, *, action, public_message, **ctx):
@@ -140,6 +168,8 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
         return user.id == payment.anchor_request.requester_id or user.is_staff
     if payment.token_purchase_id:
         return user.id == payment.token_purchase.user_id or user.is_staff
+    if payment.course_purchase_id:
+        return user.id == payment.course_purchase.user_id or user.is_staff
     return False
 
 
@@ -150,6 +180,7 @@ class PaymentGatewayStatusView(APIView):
 
     def get(self, request):
         client = NOWPaymentsClient()
+        price_usd = float(getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
         return Response({
             'enabled': client.configured,
             'currencies': sorted(ALLOWED_PAY_CURRENCIES),
@@ -159,7 +190,12 @@ class PaymentGatewayStatusView(APIView):
             'methods': {
                 'nowpayments': client.configured,
                 'bch_direct': is_bch_direct_configured(),
+                'payphone': is_payphone_configured(),
+                'platform_tokens': True,
             },
+            'payphone_enabled': is_payphone_configured(),
+            'anchor_price_usd': price_usd,
+            'anchor_price_tokens': tokens_required_for_usd(price_usd),
         })
 
 
@@ -217,6 +253,239 @@ class EventRegistrationPaymentView(APIView):
             registration_id,
         )
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+def _course_payload(course: Course) -> dict:
+    path = course.knowledge_path
+    events = [
+        {
+            'id': link.event_id,
+            'title': link.event.title,
+            'date_start': link.event.date_start,
+            'date_end': link.event.date_end,
+        }
+        for link in course.course_events.all()
+    ]
+    return {
+        'code': course.code,
+        'title': course.title,
+        'price_usd': course.price_usd,
+        'sales_enabled': course.sales_enabled,
+        'is_for_sale': course.is_for_sale,
+        'knowledge_path_id': path.id if path else None,
+        'knowledge_path_title': path.title if path else None,
+        'events': events,
+    }
+
+
+def _course_purchase_payload(purchase: CoursePurchase) -> dict:
+    return {
+        'id': purchase.id,
+        'course_code': purchase.course.code,
+        'title': purchase.course.title,
+        'price_amount': purchase.price_amount,
+        'receipt_email': purchase.receipt_email or '',
+        'payment_status': purchase.payment_status,
+        'is_paid': purchase.is_paid,
+    }
+
+
+class CourseDetailView(APIView):
+    """Public course price. The landing and checkout read this row."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, course_code):
+        try:
+            course = (
+                Course.objects
+                .select_related('knowledge_path')
+                .prefetch_related('course_events__event')
+                .get(code=course_code)
+            )
+        except Course.DoesNotExist:
+            return Response({'error': 'Curso no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_course_payload(course))
+
+
+class CoursePurchaseView(APIView):
+    """Create or fetch the current user's purchase for a fixed-price course."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        course_code = (request.data.get('course_code') or '').strip()
+        receipt_email = request.data.get('receipt_email')
+        try:
+            purchase = get_or_create_course_purchase(
+                course_code=course_code,
+                user=request.user,
+                receipt_email=receipt_email,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_course_purchase_payload(purchase), status=status.HTTP_200_OK)
+
+
+class CoursePurchasePaymentView(APIView):
+    """Create or refresh a NOWPayments invoice for a course purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        try:
+            purchase = CoursePurchase.objects.select_related('user', 'course').get(pk=purchase_id)
+        except CoursePurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_course_purchase_payment(
+                course_purchase=purchase,
+                pay_currency=pay_currency,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except NOWPaymentsError as exc:
+            return _nowpayments_error_response(
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_course_payment',
+                public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class CoursePurchasePaymentsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        try:
+            purchase = CoursePurchase.objects.get(pk=purchase_id)
+        except CoursePurchase.DoesNotExist:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        payments = CryptoPayment.objects.filter(course_purchase=purchase).order_by('-created_at')[:10]
+        client = NOWPaymentsClient()
+        if client.configured:
+            refreshed = []
+            for payment in payments:
+                if payment.payment_status in OPEN_PAYMENT_STATUSES:
+                    try:
+                        payment = refresh_crypto_payment_from_nowpayments(payment)
+                    except NOWPaymentsError as exc:
+                        logger.warning(
+                            'Could not refresh payment %s for course_purchase %s: %s',
+                            payment.id,
+                            purchase_id,
+                            exc,
+                        )
+                refreshed.append(payment)
+            payments = refreshed
+        return Response(CryptoPaymentSerializer(payments, many=True).data)
+
+
+def _get_course_purchase(purchase_id):
+    try:
+        return CoursePurchase.objects.select_related('user', 'course').get(pk=purchase_id)
+    except CoursePurchase.DoesNotExist:
+        return None
+
+
+class CoursePurchaseBchPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if purchase.user_id != request.user.id and not request.user.is_staff:
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(course_purchase=purchase)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(user=request.user, course_purchase=purchase)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_course_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class CoursePurchaseBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_course_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(
+                user=request.user,
+                course_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_course_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        purchase.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'purchase': {
+                'id': purchase.id,
+                'payment_status': purchase.payment_status,
+                'is_paid': purchase.is_paid,
+                'course_code': purchase.course.code,
+                'title': purchase.course.title,
+            },
+        })
 
 
 class PathPurchasePaymentView(APIView):
@@ -516,6 +785,60 @@ class AnchorRequestBchPaymentView(APIView):
         )
 
 
+class AnchorRequestTokenPaymentView(APIView):
+    """Pay a transcript anchor request with platform tokens ($1 → face-value tokens)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        try:
+            anchor_request = TranscriptAnchorRequest.objects.select_related(
+                'content', 'requester'
+            ).get(pk=request_id)
+        except TranscriptAnchorRequest.DoesNotExist:
+            return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            paid = pay_anchor_request_with_tokens(
+                anchor_request=anchor_request,
+                user=request.user,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='pay_anchor_tokens', request_id=request_id, user_id=request.user.id,
+            )
+        except InsufficientTokenBalance as exc:
+            return Response(
+                {
+                    'error': str(exc),
+                    'code': 'insufficient_tokens',
+                    'required': exc.required,
+                    'available': exc.available,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='pay_anchor_tokens', request_id=request_id, user_id=request.user.id,
+            )
+
+        from profiles.models import Profile
+
+        balance = (
+            Profile.objects.filter(user_id=request.user.id)
+            .values_list('token_balance', flat=True)
+            .first()
+        )
+
+        return Response({
+            'request': TranscriptAnchorRequestSerializer(paid).data,
+            'token_balance': balance if balance is not None else 0,
+            'tokens_spent': tokens_required_for_usd(
+                float(paid.price_amount or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1))
+            ),
+        })
+
+
 class AnchorRequestBchVerifyView(APIView):
     """User-triggered on-chain verification for a BCH direct order."""
 
@@ -533,6 +856,7 @@ class AnchorRequestBchVerifyView(APIView):
             payment = verify_bch_payment(
                 anchor_request=anchor_request,
                 user=request.user,
+                payment_txid=_request_bch_txid(request),
             )
         except PermissionError as exc:
             return _permission_error_response(
@@ -959,7 +1283,11 @@ class PathPurchaseBchVerifyView(APIView):
         except KnowledgePathPurchase.DoesNotExist:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, path_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                path_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_path_bch', purchase_id=purchase_id, user_id=request.user.id,
@@ -1048,7 +1376,11 @@ class TopicPurchaseBchVerifyView(APIView):
         except TopicPurchase.DoesNotExist:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, topic_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                topic_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_topic_bch', purchase_id=purchase_id, user_id=request.user.id,
@@ -1117,6 +1449,36 @@ class TokenPurchaseListCreateView(APIView):
                 exc, action='create_token_purchase', package_id=package_id, user_id=request.user.id,
             )
         return Response(TokenPurchaseSerializer(purchase).data, status=status.HTTP_201_CREATED)
+
+
+class TokenPurchaseCancelView(APIView):
+    """Buyer cancels a pending token package purchase."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, purchase_id):
+        purchase = _get_token_purchase(purchase_id)
+        if purchase is None:
+            return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            purchase = cancel_token_purchase(token_purchase=purchase, user=request.user)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='cancel_token_purchase', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='cancel_token_purchase', purchase_id=purchase_id, user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='cancel_token_purchase',
+                public_message='No se pudo cancelar la orden. Inténtalo de nuevo.',
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(TokenPurchaseSerializer(purchase).data)
 
 
 class TokenPurchasePaymentView(APIView):
@@ -1239,7 +1601,11 @@ class TokenPurchaseBchVerifyView(APIView):
         if purchase is None:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            payment = verify_bch_payment(user=request.user, token_purchase=purchase)
+            payment = verify_bch_payment(
+                user=request.user,
+                token_purchase=purchase,
+                payment_txid=_request_bch_txid(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
                 exc, action='verify_token_bch', purchase_id=purchase_id, user_id=request.user.id,
@@ -1264,5 +1630,111 @@ class TokenPurchaseBchVerifyView(APIView):
                 'payment_status': purchase.payment_status,
                 'is_paid': purchase.is_paid,
                 'token_amount': purchase.token_amount,
+                'bonus_tokens': purchase.bonus_tokens,
+                'total_tokens': purchase.total_tokens,
             },
         })
+
+
+class PayphonePaymentCreateView(APIView):
+    """Create a Payphone Botón de pago order for a product entitlement."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        kind = request.data.get('kind') or request.data.get('paymentTarget', {}).get('kind')
+        purchase_id = (
+            request.data.get('purchaseId')
+            or request.data.get('purchase_id')
+            or request.data.get('paymentTarget', {}).get('purchaseId')
+        )
+        try:
+            target = resolve_payphone_target(
+                kind=kind, purchase_id=purchase_id, user=request.user,
+            )
+            payment = create_or_reuse_payphone_payment(user=request.user, **target)
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except PayphoneError as exc:
+            return _payphone_error_response(
+                exc, action='create_payphone', kind=kind, purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_payphone',
+                public_message='No se pudo iniciar el pago con tarjeta. Inténtalo de nuevo.',
+                kind=kind,
+                purchase_id=purchase_id,
+                user_id=request.user.id,
+            )
+        return Response(PayphonePaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class PayphonePaymentDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, payment_id):
+        from payments.models import PayphonePayment
+
+        try:
+            payment = PayphonePayment.objects.get(pk=payment_id)
+        except PayphonePayment.DoesNotExist:
+            return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        buyer = payment.buyer
+        if not buyer or (buyer.id != request.user.id and not request.user.is_staff):
+            return Response({'error': 'No autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment.mark_expired_if_needed()
+        return Response(PayphonePaymentSerializer(payment).data)
+
+
+class PayphoneReturnView(APIView):
+    """
+    Browser return URL after Payphone checkout.
+
+    Confirms the transaction (required within 5 minutes) and redirects to the frontend.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        from django.shortcuts import redirect
+
+        transaction_id = request.query_params.get('id') or request.GET.get('id')
+        client_transaction_id = (
+            request.query_params.get('clientTransactionId')
+            or request.GET.get('clientTransactionId')
+            or request.query_params.get('clientTxId')
+            or request.GET.get('clientTxId')
+        )
+        try:
+            _payment, redirect_url = confirm_payphone_return(
+                transaction_id=transaction_id,
+                client_transaction_id=client_transaction_id,
+            )
+        except ValueError as exc:
+            logger.info('Payphone return rejected: %s', exc)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(status='failed', message=str(exc)))
+        except PayphoneError as exc:
+            logger.warning('Payphone return confirm failed: %s', exc)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(status='failed', message=str(exc)))
+        except Exception as exc:
+            logger.error('Unexpected Payphone return error: %s', exc, exc_info=True)
+            from payments.payphone_services import _result_redirect_url
+            return redirect(_result_redirect_url(
+                status='failed',
+                message='No se pudo confirmar el pago. Contacta soporte si te cobraron.',
+            ))
+        return redirect(redirect_url)

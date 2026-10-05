@@ -60,6 +60,7 @@ const productLabel = (order) => {
   if (order.product_type === 'topic') return 'Consultas';
   if (order.product_type === 'anchor') return 'Anclaje';
   if (order.product_type === 'token_package') return 'Tokens';
+  if (order.product_type === 'course') return 'Curso';
   return 'Producto';
 };
 
@@ -69,6 +70,9 @@ const productLink = (order) => {
   }
   if (order.product_type === 'topic' && order.product_id) {
     return `/content/topics/${order.product_id}`;
+  }
+  if (order.product_type === 'course' && order.product_id) {
+    return `/cursos/${order.product_id}`;
   }
   return null;
 };

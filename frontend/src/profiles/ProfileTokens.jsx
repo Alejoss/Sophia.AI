@@ -1,56 +1,40 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
   CircularProgress,
-  Grid,
   Stack,
   Typography,
 } from '@mui/material';
 import TollIcon from '@mui/icons-material/Toll';
-import ProductPaymentCheckout from '../payments/ProductPaymentCheckout';
+import TokenCheckout from '../payments/TokenCheckout';
 import {
-  createTokenPurchase,
-  createTokenPurchaseBchPayment,
-  getTokenPackages,
-  listTokenPurchases,
-  verifyTokenPurchaseBchPayment,
-} from '../api/paymentsApi';
+  checkoutFromPurchase,
+  formatApiError,
+  purchaseStatusLabel,
+} from '../payments/tokenPackages';
+import { cancelTokenPurchase, listTokenPurchases } from '../api/paymentsApi';
 
-const formatApiError = (err, fallback) => {
-  const msg = err?.error || err?.detail || err?.message;
-  if (typeof msg === 'string') return msg;
-  if (msg) return JSON.stringify(msg);
-  return fallback;
-};
-
-const statusLabel = (status) => {
-  if (status === 'PAID') return 'Pagado';
-  if (status === 'PENDING') return 'Pendiente';
-  if (status === 'REFUNDED') return 'Reembolsado';
-  return status;
+const statusChipColor = (status) => {
+  if (status === 'PAID') return 'success';
+  if (status === 'CANCELLED') return 'default';
+  if (status === 'REFUNDED') return 'info';
+  return 'warning';
 };
 
 const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
-  const [packages, setPackages] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [busyPackageId, setBusyPackageId] = useState(null);
   const [checkout, setCheckout] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
 
   const load = useCallback(async () => {
-    const [packageRows, purchaseRows] = await Promise.all([
-      getTokenPackages(),
-      listTokenPurchases(),
-    ]);
-    setPackages(Array.isArray(packageRows) ? packageRows : []);
+    const purchaseRows = await listTokenPurchases();
     setPurchases(Array.isArray(purchaseRows) ? purchaseRows : []);
   }, []);
 
@@ -72,55 +56,34 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
     };
   }, [load]);
 
-  const bestValueId = useMemo(() => {
-    if (!packages.length) return null;
-    return packages.reduce((best, pkg) => (
-      pkg.token_amount > (best?.token_amount || 0) ? pkg : best
-    ), null)?.id ?? null;
-  }, [packages]);
-
-  const openCheckout = (purchase, pkg) => {
-    setCheckout({
-      purchaseId: purchase.id,
-      title: purchase.package_name || pkg?.name || `${purchase.token_amount} tokens`,
-      priceUsd: Number(purchase.usd_price || pkg?.usd_price || 0),
-      tokenAmount: purchase.token_amount,
-    });
-  };
-
-  const handleBuy = async (pkg) => {
-    const pending = purchases.find(
-      (row) => row.package_id === pkg.id && row.payment_status === 'PENDING',
-    );
-    if (pending) {
-      openCheckout(pending, pkg);
-      return;
-    }
-    setBusyPackageId(pkg.id);
-    setError(null);
-    try {
-      const purchase = await createTokenPurchase(pkg.id);
-      setPurchases((prev) => [purchase, ...prev]);
-      openCheckout(purchase, pkg);
-    } catch (err) {
-      setError(formatApiError(err, 'No se pudo iniciar la compra.'));
-    } finally {
-      setBusyPackageId(null);
-    }
-  };
-
   const handlePaid = async () => {
-    setSuccess('Pago recibido. Los tokens ya est├ín en tu saldo.');
+    setSuccess('Pago recibido. Los tokens ya están en tu saldo.');
     setCheckout(null);
     try {
       await load();
       await onBalanceChange?.();
     } catch (err) {
-      setError(formatApiError(err, 'El pago se acredit├│, pero no se pudo actualizar el saldo.'));
+      setError(formatApiError(err, 'El pago se acreditó, pero no se pudo actualizar el saldo.'));
+    }
+  };
+
+  const handleCancel = async (purchase) => {
+    setCancellingId(purchase.id);
+    setError(null);
+    try {
+      const updated = await cancelTokenPurchase(purchase.id);
+      setPurchases((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      if (checkout?.purchaseId === purchase.id) setCheckout(null);
+      setSuccess('Orden cancelada.');
+    } catch (err) {
+      setError(formatApiError(err, 'No se pudo cancelar la orden.'));
+    } finally {
+      setCancellingId(null);
     }
   };
 
   const balance = Number(tokenBalance || 0);
+  const pending = purchases.filter((row) => row.payment_status === 'PENDING');
 
   if (loading) {
     return (
@@ -146,9 +109,20 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-          Estos tokens existen solo en Academia Blockchain: no son una criptomoneda.
-          M├ís adelante podr├ís usarlos para pagar contenidos con descuento.
+          Créditos internos de Academia Blockchain. No son una criptomoneda.
+          1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento,
+          eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin con descuento.
         </Typography>
+        <Box>
+          <Button
+            component={RouterLink}
+            to="/acbc-tokens"
+            variant="contained"
+            startIcon={<TollIcon />}
+          >
+            Comprar tokens
+          </Button>
+        </Box>
       </Stack>
 
       {error && (
@@ -162,65 +136,33 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         </Alert>
       )}
 
-      {balance === 0 && (
+      {balance === 0 && pending.length === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          A├║n no tienes tokens. Elige un paquete y p├ígalo con Bitcoin Cash o NOWPayments.
+          Aún no tienes tokens.{' '}
+          <Button
+            component={RouterLink}
+            to="/acbc-tokens"
+            size="small"
+            sx={{ verticalAlign: 'baseline', textTransform: 'none', p: 0, minWidth: 0 }}
+          >
+            Elige un paquete
+          </Button>
+          {' '}para empezar.
+        </Alert>
+      )}
+
+      {pending.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Tienes un pago pendiente. Puedes continuarlo aquí, cancelarlo, o seguir desde la página de compra.
         </Alert>
       )}
 
       <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Comprar tokens
-      </Typography>
-      {packages.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          No hay paquetes disponibles por ahora.
-        </Typography>
-      ) : (
-        <Grid container spacing={2} sx={{ mb: 4 }}>
-          {packages.map((pkg) => (
-            <Grid item xs={12} sm={6} md={4} key={pkg.id}>
-              <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      {pkg.name}
-                    </Typography>
-                    {pkg.id === bestValueId && packages.length > 1 && (
-                      <Chip size="small" color="primary" label="Mejor valor" />
-                    )}
-                  </Stack>
-                  <Typography variant="h4" fontWeight={800} sx={{ mt: 1 }}>
-                    {pkg.token_amount}
-                    <Typography component="span" variant="body1" color="text.secondary">
-                      {' '}tokens
-                    </Typography>
-                  </Typography>
-                  <Typography variant="h6" color="primary" sx={{ mt: 0.5 }}>
-                    ${Number(pkg.usd_price).toFixed(2)} USD
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ px: 2, pb: 2 }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disabled={busyPackageId === pkg.id}
-                    onClick={() => handleBuy(pkg)}
-                  >
-                    {busyPackageId === pkg.id ? 'PreparandoÔÇª' : 'Comprar'}
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-
-      <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Compras recientes
+        Actividad
       </Typography>
       {purchases.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Todav├¡a no has comprado tokens.
+          Todavía no has comprado tokens. Aquí verás tus compras y el uso que le has dado a tus tokens.
         </Typography>
       ) : (
         <Stack spacing={1}>
@@ -243,44 +185,43 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                   {row.package_name || `${row.token_amount} tokens`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {row.token_amount} tokens ┬À ${Number(row.usd_price).toFixed(2)} USD
+                  {(row.total_tokens ?? row.token_amount)} tokens
+                  {Number(row.bonus_tokens || 0) > 0 ? ` (incl. +${row.bonus_tokens} bonus)` : ''}
+                  {' · '}${Number(row.usd_price).toFixed(2)} USD
                 </Typography>
               </Box>
               <Chip
                 size="small"
-                color={row.payment_status === 'PAID' ? 'success' : 'warning'}
-                label={statusLabel(row.payment_status)}
+                color={statusChipColor(row.payment_status)}
+                label={purchaseStatusLabel(row.payment_status)}
               />
               {row.payment_status === 'PENDING' && (
-                <Button size="small" variant="outlined" onClick={() => openCheckout(row)}>
-                  Continuar pago
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setCheckout(checkoutFromPurchase(row))}
+                  >
+                    Continuar pago
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    disabled={cancellingId === row.id}
+                    onClick={() => handleCancel(row)}
+                  >
+                    {cancellingId === row.id ? 'Cancelando…' : 'Cancelar orden'}
+                  </Button>
+                </Stack>
               )}
             </Box>
           ))}
         </Stack>
       )}
 
-      <ProductPaymentCheckout
-        open={Boolean(checkout)}
+      <TokenCheckout
+        checkout={checkout}
         onClose={() => setCheckout(null)}
-        title={checkout?.title || 'Paquete de tokens'}
-        priceUsd={checkout?.priceUsd || 0}
-        productLabel="paquete de tokens"
-        offerNowpayments
-        offerBch
-        offerMonero={false}
-        createBchPayment={
-          checkout
-            ? () => createTokenPurchaseBchPayment(checkout.purchaseId)
-            : undefined
-        }
-        verifyBchPayment={
-          checkout
-            ? () => verifyTokenPurchaseBchPayment(checkout.purchaseId)
-            : undefined
-        }
-        nowpaymentsProps={{ tokenPurchaseId: checkout?.purchaseId }}
         onPaid={handlePaid}
       />
     </Box>

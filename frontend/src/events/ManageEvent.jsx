@@ -272,17 +272,12 @@ const ManageEvent = () => {
       const { generalError } = applyApiErrorsToForm(
         err,
         setCertificateFormError,
-        err.error || err.details || 'Error al generar el certificado',
+        'Error al generar el certificado',
         { note: 'certificateNote' },
       );
-      const errorMessage = generalError || 'Error al generar el certificado';
-      setCertificateGeneralError(errorMessage);
-      setError(errorMessage);
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: 'error',
-      });
+      if (generalError) {
+        setCertificateGeneralError(generalError);
+      }
     } finally {
       setUpdatingStatus(null);
     }

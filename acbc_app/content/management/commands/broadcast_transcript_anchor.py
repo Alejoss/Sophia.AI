@@ -23,6 +23,7 @@ from content.bitcoin.service import (
     ensure_pending_anchor,
     platform_address,
     refresh_anchor_confirmations,
+    set_anchor_network,
 )
 from content.bitcoin.tx_builder import BitcoinWalletError
 from content.models import Content, TranscriptAnchor
@@ -122,8 +123,7 @@ class Command(BaseCommand):
                         'Re-run with --create or prepare via API first.'
                     )
             if options['network']:
-                anchor.btc_network = network
-                anchor.save(update_fields=['btc_network', 'updated_at'])
+                set_anchor_network(anchor, network)
 
             anchor = broadcast_anchor(anchor, dry_run=options['dry_run'])
         except (AnchorBroadcastError, BitcoinWalletError) as exc:

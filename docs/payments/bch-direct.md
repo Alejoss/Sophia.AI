@@ -4,13 +4,14 @@ Además de [NOWPayments](nowpayments-setup.md), Academia Blockchain puede cobrar
 precio fijo de una `TranscriptAnchorRequest` (`price_amount`, default
 `ANCHOR_REQUEST_PRICE_USD`) en **Bitcoin Cash** hacia una wallet propia.
 
-Cubre tres productos cuando tienen precio y la venta está activa
-(`/dashboard/pagos-bch` → **En venta**):
+Cubre estos productos cuando tienen precio y la venta está activa
+(`/dashboard/pagos-bch` → **En venta** para caminos/temas):
 
 - Solicitudes de anclaje (siempre, si hay dirección BCH en el servidor)
 - Caminos de conocimiento con `reference_price > 0` y `sales_enabled`
 - Consultas de un tema con `reference_price > 0` y `sales_enabled`
 - Paquetes de tokens de plataforma (siempre, si hay dirección BCH)
+- Cursos fijos (`CoursePurchase`, si hay dirección BCH y el curso está a la venta)
 
 Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
 configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por
@@ -28,7 +29,7 @@ NOWPayments sigue en `waiting` (aún no hay fondos en camino).
 | Entorno | Default `BCH_NETWORK` | Verificación | Prefijo CashAddr |
 |---------|----------------------|--------------|------------------|
 | `ENVIRONMENT` ≠ `PRODUCTION` (Docker local) | `chipnet` | Fulcrum/Electrum (`ssl://chipnet.bch.ninja:50002`) | `bchtest:` |
-| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum `ssl://bch.imaginary.cash:50002` | `bitcoincash:` |
+| `ENVIRONMENT=PRODUCTION` (servidor) | `mainnet` | Fulcrum Electrum pool (`bch.imaginary.cash` + fallbacks) → Blockchair HTTP | `bitcoincash:` |
 
 Override explícito: `BCH_NETWORK=chipnet` o `mainnet`. Chipnet es la red de pruebas
 permanente de BCH (análogo práctico a signet para este flujo).
@@ -40,7 +41,7 @@ Faucet / explorer chipnet: [chipnet.chaingraph.cash](https://chipnet.chaingraph.
 | Concepto | Implementación |
 |----------|----------------|
 | Entitlement | Solo `TranscriptAnchorRequest` (no eventos ni caminos) |
-| Tras pagar | `paid_pending_review` vía `mark_anchor_request_paid()` (compartido con NOWPayments) |
+| Tras pagar | `mark_anchor_request_paid()` auto-emite OP_RETURN; `approved` o `paid_pending_review` si diferido (compartido con NOWPayments) |
 | Admin | Aprueba/rechaza anclaje BTC como hoy (sin reembolso automático) |
 | HTTP / SSL | Fulcrum/Electrum SSL (mainnet + chipnet); Blockchair HTTP opcional con API key |
 | Workers / IPN BCH | No — el usuario pulsa **Ya realicé el pago** |
@@ -50,7 +51,7 @@ Faucet / explorer chipnet: [chipnet.chaingraph.cash](https://chipnet.chaingraph.
 ```mermaid
 sequenceDiagram
     participant User
-    participant UI as AnchorPaymentCheckout
+    participant UI as Checkout
     participant API as Django API
     participant Chain as Fulcrum / Blockchair
     participant Admin
@@ -60,25 +61,42 @@ sequenceDiagram
     User->>UI: Elige BCH directo
     UI->>API: POST /api/payments/anchor-request/{id}/bch/
     API-->>UI: address + expected_amount_sats + TTL
-    User->>Chain: Envía el monto exacto
-    User->>UI: Ya realicé el pago
-    UI->>API: POST .../bch/verify/
+    User->>Chain: Envía el monto (QR = solo dirección)
+    User->>UI: Ya realicé el pago (sin TXID)
+    UI->>API: POST .../bch/verify/ {}
     API->>Chain: list_recent_transactions(address)
     Chain-->>API: txs recientes
-    API-->>UI: paid + request paid_pending_review
-    Admin->>Admin: Aprueba anclaje OP_RETURN
+    alt Match on-chain
+        API-->>UI: paid + entitlement unlocked
+    else Auto-verify falla
+        UI-->>User: Campo TXID opcional + Enviar TXID a soporte
+        User->>UI: Pega TXID y reintenta (o reporta a soporte)
+        UI->>API: POST .../bch/verify/ {txid}
+        API->>Chain: get_transaction(txid)
+        Chain-->>API: tx
+        API-->>UI: paid (pending/expired/cancelled) o error
+    end
+    Admin->>Admin: Aprueba anclaje OP_RETURN (solo anchors)
 ```
 
-1. Usuario crea solicitud de anclaje (`pending_payment`).
+1. Usuario crea solicitud de anclaje (`pending_payment`) — o inicia compra de camino/tema/tokens.
 2. Elige método: NOWPayments o BCH directo. Puede volver atrás y cambiar
    mientras el invoice NOWPayments esté en `waiting`.
 3. BCH: backend asigna `expected_amount_sats` único (tasa USD→BCH, mínimo 1000 sats;
    desambiguación por ventana de tolerancia USD para no solapar órdenes concurrentes).
 4. Usuario paga el monto mostrado a la dirección de la red activa (se tolera hasta
    `BCH_AMOUNT_TOLERANCE_USD`, default $0.20, por redondeo/fee de wallet).
-5. `POST .../bch/verify/` consulta Fulcrum (o Blockchair si se fuerza); si hay match → orden `paid` + solicitud `paid_pending_review`.
-   Si el indexer falla, el error se registra en logs y el UI ofrece **Avisar por mensaje**.
-6. Admin emite el anclaje Bitcoin (OP_RETURN) desde Django admin (**Content → Transcript anchor requests**).
+5. Usuario pulsa **Ya realicé el pago** — **sin TXID**. El cliente hace
+   `POST .../bch/verify/` con `{}`. El servidor escanea la dirección de cobro
+   (`list_recent_transactions`) y busca un output cuyo monto esté dentro de la
+   tolerancia USD de la orden pendiente. Si hay match → orden `paid` y se
+   desbloquea el entitlement.
+6. Si el auto-verify falla (mempool lenta, indexer caído, orden expirada, etc.),
+   el checkout muestra un campo TXID opcional y **Enviar TXID a soporte**. El
+   comprador puede reintentar `POST .../bch/verify/` con `{ "txid": "…" }`
+   (`get_transaction`) — eso también puede confirmar órdenes `expired` o
+   `cancelled` del mismo producto — o reportar el TXID para confirmación manual.
+7. Tras confirmar el pago, la plataforma emite automáticamente el OP_RETURN. Si queda diferido, staff puede reintentar desde Django admin (**Content → Transcript anchor requests**).
 
 ## Cómo se calcula el monto
 
@@ -96,8 +114,25 @@ En checkout, un **QR** codifica solo la CashAddr (sin `amount=`), para evitar de
 
 ## Cómo se verifica (match on-chain)
 
-Sin webhooks. `verify_bch_payment()` pide las ~30 txs más recientes de la dirección y acepta
-el candidato **más cercano** a `expected_amount_sats` que cumpla:
+Sin webhooks. `verify_bch_payment()` tiene **dos modos**; el TXID **no** es obligatorio
+en el happy path.
+
+### 1. Auto-verify (default — body vacío `{}`)
+
+1. Carga la orden `pending` más reciente del producto.
+2. Si ya expiró (o solo quedan órdenes `expired`), pide regenerar la orden o pegar TXID.
+3. Llama `list_recent_transactions(address, limit=30)` (Fulcrum pool → Blockchair).
+4. Busca el mejor output a la dirección de cobro que cumpla las reglas de abajo.
+5. Si no hay match: `400` pidiendo reintentar o enviar TXID a soporte
+   (`auto_verify_failed` en diagnósticos de log).
+
+### 2. Fallback por TXID (opcional — `{ "txid": "…" }`)
+
+Usado cuando el auto-verify falló, la orden expiró, o el comprador/staff ya tiene el
+id. `get_transaction(txid)` carga **esa** tx y se prueba contra órdenes no pagadas
+del mismo producto (`pending`, `expired`, `cancelled`), más reciente primero.
+
+### Reglas de match (ambos modos)
 
 | Regla | Detalle |
 |-------|---------|
@@ -108,8 +143,12 @@ el candidato **más cercano** a `expected_amount_sats` que cumpla:
 | Txid único | `payment_txid` no puede repetirse en otra fila |
 | Otras órdenes | Si otro `pending` está más cerca del monto pagado (y dentro de su tolerancia), no se reclama |
 
-Si no hay match: `400` *No encontramos un pago BCH con un monto cercano al de la orden aún.*
-El WARNING de borde HTTP incluye `expected_sats`, `amounts_seen`, `tol_sats`, skips, etc.
+`_fulfill_bch_payment` marca la orden `paid` y desbloquea el entitlement. Acepta
+órdenes `pending` (auto) y también `expired` / `cancelled` cuando el match viene
+por TXID.
+
+Si no hay match: `400` con mensaje en español. El WARNING de borde HTTP incluye
+`expected_sats`, `amounts_seen`, `tol_sats`, skips, etc.
 
 ## Probe / debugging sin nuevo pago
 
@@ -146,20 +185,23 @@ Estados de `BchDirectPayment`: `pending` → `paid` \| `expired` \| `cancelled`.
 
 ## Manual confirmation (staff dashboard)
 
-If auto-verify fails or the order expires after the buyer already paid, they
-report the **TXID** from checkout (support modal). That:
+Primary verify is automatic (address scan). The **TXID** path is only for when
+auto-verify fails or the order expires after the buyer already paid:
 
-1. Stores the TXID on the order for the staff inbox
-2. Sends **admins** an email + in-app notification (link → Pagos BCH)
-3. Notifies the **product owner** (path author / topic creator) in-app
-4. Still opens a message thread with support (user id 2)
+1. Checkout shows an optional TXID field after a failed auto-verify, and
+   **Enviar TXID a soporte** (support modal).
+2. Reporting a TXID stores it on the order for the staff inbox, emails/notifies
+   **admins** (link → Pagos BCH), notifies the **product owner** (path author /
+   topic creator) in-app, and opens a message thread with support (user id 2).
+3. The buyer can also retry verify with `{ "txid": "…" }` themselves — that can
+   still unlock `expired` / `cancelled` orders for the same product.
 
 Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 
 1. Open **Confirmar pagos reportados** (pending / expired / cancelled; reported first).
 2. TXID is prefilled when the buyer already reported it — confirm after checking the explorer.
 3. The API marks the `BchDirectPayment` as `paid` and unlocks the entitlement
-   (`path` / `topic` / `anchor`) — no Django admin required.
+   (`path` / `topic` / `anchor` / tokens) — no Django admin required.
 4. For path/topic purchases, the **buyer** and **content owner** get in-app
    notifications when payment is confirmed (same on auto-verify).
 
@@ -178,11 +220,14 @@ Staff confirm from **Pagos Bitcoin Cash** (`/dashboard/pagos-bch`):
 # BCH_RECEIVE_ADDRESS_MAINNET=bitcoincash:q...
 # Or a single fallback for the active network:
 # BCH_RECEIVE_ADDRESS=bchtest:q...
+# WIF for the receive address (ops only — `manage.py withdraw_bch`, never HTTP):
+# BCH_PRIVATE_KEY_WIF=
 
-# Optional overrides (defaults: Fulcrum Electrum for mainnet + chipnet):
+# Optional overrides (defaults: Fulcrum Electrum pool for mainnet + chipnet):
 # BCH_API_BASE=ssl://bch.imaginary.cash:50002
 # BCH_API_BASE=ssl://chipnet.bch.ninja:50002
 # BCH_API_BASE=https://api.blockchair.com/bitcoin-cash
+# BCH_ELECTRUM_SERVERS=ssl://bch.imaginary.cash:50002,ssl://electrum.imaginary.cash:50002,ssl://blackie.c3-soft.com:50002
 # BCH_BLOCKCHAIR_API_KEY=
 
 BCH_PAYMENT_TTL_MINUTES=30
@@ -202,6 +247,31 @@ coincide con la red se registra como warning; la verificación fallará después
 
 Referencia completa: [environment-variables.md](../deployment/environment-variables.md#bitcoin-cash-direct-anchor-request-payments).
 
+## Retirar fondos (sweep)
+
+El backend solo *recibe* BCH. Para mover monedas fuera de la dirección de cobro:
+
+1. Pon el WIF de esa dirección en el servidor como `BCH_PRIVATE_KEY_WIF`
+   (mismo `.env` de producción; no lo subas a git).
+2. Dry-run (firma la tx pero no la publica):
+
+```bash
+cd acbc_app && . .venv/bin/activate
+python manage.py withdraw_bch --to bitcoincash:qTU_WALLET... --sweep
+```
+
+3. Si el resumen (red, from, balance) es correcto, broadcast:
+
+```bash
+python manage.py withdraw_bch --to bitcoincash:qTU_WALLET... --sweep --broadcast --yes
+```
+
+El comando comprueba que el WIF derive exactamente `BCH_RECEIVE_ADDRESS*`.
+Envío parcial: `--amount-sats N` (el cambio vuelve a la dirección de cobro).
+
+Recomendación: después del sweep, usa un wallet que controles para custodiar los
+fondos. No hace falta dejar el WIF en el servidor a largo plazo.
+
 ## API
 
 Todas las rutas BCH de anclaje requieren JWT (`IsAuthenticated`) salvo el status
@@ -216,11 +286,13 @@ verificar**, no crear la orden.
 | PATCH | `/api/payments/admin/topics/<id>/` | Staff | `{ sales_enabled, reference_price }` |
 | GET | `/api/payments/anchor-request/<id>/bch/` | Requester o staff | `{ payment, bch_direct_enabled, bch_network, request? }` (`payment` puede ser `null`) |
 | POST | `/api/payments/anchor-request/<id>/bch/` | Solo requester | Cuerpo del serializer (201). Reusa si hay orden viva. |
-| POST | `/api/payments/anchor-request/<id>/bch/verify/` | Requester o staff | `{ payment, request }` |
+| POST | `/api/payments/anchor-request/<id>/bch/verify/` | Requester o staff | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, request }` |
 | GET/POST | `/api/payments/path-purchase/<id>/bch/` | Comprador (POST) | Orden BCH del camino |
-| POST | `/api/payments/path-purchase/<id>/bch/verify/` | Comprador o autor | `{ payment, purchase }` |
+| POST | `/api/payments/path-purchase/<id>/bch/verify/` | Comprador o autor | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
 | GET/POST | `/api/payments/topic-purchase/<id>/bch/` | Comprador (POST) | Orden BCH de Consultas |
-| POST | `/api/payments/topic-purchase/<id>/bch/verify/` | Comprador o moderador | `{ payment, purchase }` |
+| POST | `/api/payments/topic-purchase/<id>/bch/verify/` | Comprador o moderador | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
+| GET/POST | `/api/payments/course-purchase/<id>/bch/` | Comprador (POST) | Orden BCH del curso |
+| POST | `/api/payments/course-purchase/<id>/bch/verify/` | Comprador o staff | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
 
 ### Serializer (`BchDirectPayment`)
 
@@ -260,20 +332,24 @@ verificar**, no crear la orden.
 
 - Modelo: `payments.BchDirectPayment`
 - Cliente: `payments/bch_client.py` (`build_bch_client()` → Electrum SSL por defecto; Blockchair HTTP si se fuerza)
-elección chipnet/mainnet (Electrum) vs Blockchair explícito.
 - CashAddr → scripthash: `payments/bch_cashaddr.py`
+- Sweep ops: `payments/bch_withdraw.py` + `manage.py withdraw_bch`
 - Servicios: `payments/bch_services.py`
+  - `verify_bch_payment` → auto `list_recent_transactions` o fallback `get_transaction(txid)`
+  - `_fulfill_bch_payment` → `pending` / `expired` / `cancelled` → `paid`
 - Admin: `payments/admin.py` → **Payments → Bch direct payments**
-- UI: `frontend/src/content/AnchorPaymentCheckout.jsx`
-- Cliente HTTP: `frontend/src/api/paymentsApi.js`
+- UI checkout: `frontend/src/payments/ProductPaymentCheckout.jsx`,
+  `frontend/src/content/AnchorPaymentCheckout.jsx`
+- Cliente HTTP: `frontend/src/api/paymentsApi.js` (verify helpers envían `{}` salvo que haya TXID)
 
 ## Tests
 
 ```bash
 cd acbc_app && . .venv/bin/activate && ENVIRONMENT=DEVELOPMENT \
-  python manage.py test payments.tests.BchDirectPaymentTests payments.tests.BchNetworkClientTests -v 1
+  python manage.py test payments -v 1
 ```
 
 Los tests mockean el cliente de cadena. No hace falta Blockchair, Fulcrum ni una
-wallet real. Cubren monto único, reuso, match exacto, rechazo por sat de más, y
-elección Electrum (default) vs Blockchair explícito.
+wallet real. Cubren monto único, reuso, auto-verify por address scan, fallback
+por TXID (incl. orden expirada), match dentro/fuera de tolerancia, y confirmación
+manual staff.

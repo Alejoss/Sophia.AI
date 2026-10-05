@@ -123,7 +123,7 @@ Todas las vistas de Topics requieren autenticación (`IsAuthenticated`), y algun
       - Perfiles de contenido (`ContentProfile`) seleccionados preferentemente del creador del tema y, si no existen, del usuario actual.
   - `PATCH /topics/<pk>/` → `TopicDetailView.patch`
     - Actualiza el título, descripción, imagen o **`chat_enabled`** del tema.
-    - **`chat_enabled`**: activa la pestaña **Consultas** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
+    - **`chat_enabled`**: activa la pestaña **Consultas** (RAG sobre transcripciones). Solo se puede poner en `true` si hay al menos un VIDEO/AUDIO/TEXT con `embedding_status=indexed` (`chat_can_enable` / `indexed_transcript_count` en el serializer).
     - **Permiso**: `creator`, moderadores, o staff (`is_staff`).
     - Si se actualiza `topic_image`, elimina el fichero anterior en disco/S3 antes de guardar el nuevo.
 

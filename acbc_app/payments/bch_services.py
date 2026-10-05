@@ -17,17 +17,20 @@ from payments.bch_client import (
     SATS_PER_BCH,
     BchApiError,
     BchElectrumClient,
+    BchFailoverClient,
     BchPublicClient,
     build_bch_client,
     get_bch_network,
     get_bch_receive_address,
     is_bch_direct_configured,
 )
-from payments.models import BchDirectPayment, TokenPurchase
+from payments.models import BchDirectPayment, CoursePurchase, TokenPurchase
+from payments.payphone_services import abandon_pending_payphone
 from payments.services import (
     abandon_waiting_nowpayments,
     has_in_flight_nowpayments,
     mark_anchor_request_paid,
+    mark_course_purchase_paid,
     mark_path_purchase_paid,
     mark_token_purchase_paid,
     mark_topic_purchase_paid,
@@ -134,6 +137,7 @@ def _target_filter(
     path_purchase=None,
     topic_purchase=None,
     token_purchase=None,
+    course_purchase=None,
 ) -> Q:
     if anchor_request is not None:
         return Q(anchor_request=anchor_request)
@@ -143,15 +147,25 @@ def _target_filter(
         return Q(topic_purchase=topic_purchase)
     if token_purchase is not None:
         return Q(token_purchase=token_purchase)
+    if course_purchase is not None:
+        return Q(course_purchase=course_purchase)
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _release_waiting_nowpayments(*, anchor_request=None, path_purchase=None, token_purchase=None) -> None:
-    """Allow switching from an unused NOWPayments invoice to BCH."""
+def _release_waiting_nowpayments(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    topic_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> None:
+    """Allow switching from an unused NOWPayments / Payphone order to BCH."""
     if has_in_flight_nowpayments(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     ):
         raise BchPaymentError(
             'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
@@ -160,6 +174,14 @@ def _release_waiting_nowpayments(*, anchor_request=None, path_purchase=None, tok
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
+    )
+    abandon_pending_payphone(
+        path_purchase=path_purchase,
+        topic_purchase=topic_purchase,
+        anchor_request=anchor_request,
+        token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
 
 
@@ -231,7 +253,15 @@ def _amount_closer_to_other_pending(
     return False
 
 
-def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> None:
+def _authorize_create(
+    *,
+    user,
+    anchor_request=None,
+    path_purchase=None,
+    topic_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> None:
     if not is_bch_direct_configured():
         raise BchPaymentError('Pagos BCH directos no están configurados en el servidor.')
 
@@ -266,6 +296,7 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise BchPaymentError('Las consultas de este tema son gratuitas.')
         if not topic.sales_enabled:
             raise BchPaymentError('La venta de consultas de este tema está desactivada.')
+        _release_waiting_nowpayments(topic_purchase=topic_purchase)
         return
 
     if token_purchase is not None:
@@ -273,15 +304,38 @@ def _authorize_create(*, user, anchor_request=None, path_purchase=None, topic_pu
             raise PermissionError('Solo el comprador puede iniciar el pago BCH.')
         if token_purchase.payment_status == 'PAID':
             raise BchPaymentError('Esta compra de tokens ya está pagada.')
+        if token_purchase.payment_status == 'CANCELLED':
+            raise BchPaymentError('Esta compra de tokens fue cancelada.')
         if token_purchase.usd_price <= 0 or token_purchase.token_amount <= 0:
             raise BchPaymentError('Este paquete de tokens no es válido.')
         _release_waiting_nowpayments(token_purchase=token_purchase)
         return
 
+    if course_purchase is not None:
+        course = course_purchase.course
+        if course_purchase.user_id != user.id:
+            raise PermissionError('Solo el comprador puede iniciar el pago BCH.')
+        if course_purchase.payment_status == 'PAID':
+            raise BchPaymentError('Este curso ya está pagado.')
+        if not course.is_for_sale:
+            raise BchPaymentError('Este curso no está a la venta.')
+        if not course_purchase.price_amount or course_purchase.price_amount <= 0:
+            raise BchPaymentError('Este curso no tiene un precio de pago.')
+        _release_waiting_nowpayments(course_purchase=course_purchase)
+        return
+
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> None:
+def _authorize_verify(
+    *,
+    user,
+    anchor_request=None,
+    path_purchase=None,
+    topic_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
             raise PermissionError('No tienes permiso para verificar este pago.')
@@ -308,10 +362,21 @@ def _authorize_verify(*, user, anchor_request=None, path_purchase=None, topic_pu
         if token_purchase.user_id != user.id and not getattr(user, 'is_staff', False):
             raise PermissionError('No tienes permiso para verificar este pago.')
         return
+    if course_purchase is not None:
+        if course_purchase.user_id != user.id and not getattr(user, 'is_staff', False):
+            raise PermissionError('No tienes permiso para verificar este pago.')
+        return
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
-def _usd_for_target(*, anchor_request=None, path_purchase=None, topic_purchase=None, token_purchase=None) -> Decimal:
+def _usd_for_target(
+    *,
+    anchor_request=None,
+    path_purchase=None,
+    topic_purchase=None,
+    token_purchase=None,
+    course_purchase=None,
+) -> Decimal:
     if anchor_request is not None:
         return Decimal(str(
             anchor_request.price_amount or getattr(settings, 'ANCHOR_REQUEST_PRICE_USD', 1)
@@ -326,6 +391,10 @@ def _usd_for_target(*, anchor_request=None, path_purchase=None, topic_purchase=N
         ))
     if token_purchase is not None:
         return Decimal(str(token_purchase.usd_price or 0))
+    if course_purchase is not None:
+        return Decimal(str(
+            course_purchase.price_amount or course_purchase.course.price_usd or 0
+        ))
     return Decimal('0')
 
 
@@ -336,10 +405,13 @@ def create_or_reuse_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    course_purchase: CoursePurchase | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
-        t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
+        t for t in (
+            anchor_request, path_purchase, topic_purchase, token_purchase, course_purchase,
+        ) if t is not None
     ]
     if len(targets) != 1:
         raise BchPaymentError('El pago BCH debe apuntar a un solo producto.')
@@ -350,6 +422,7 @@ def create_or_reuse_bch_payment(
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
 
     target_q = _target_filter(
@@ -357,6 +430,7 @@ def create_or_reuse_bch_payment(
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
     _expire_stale_pending()
     existing = (
@@ -390,6 +464,7 @@ def create_or_reuse_bch_payment(
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
     if usd <= 0 or rate <= 0:
         raise BchPaymentError('No se pudo calcular el monto BCH.')
@@ -406,6 +481,7 @@ def create_or_reuse_bch_payment(
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
         address=address,
         expected_amount_sats=sats,
         usd_amount=usd.quantize(Decimal('0.01')),
@@ -429,6 +505,127 @@ def create_or_reuse_bch_payment(
     return payment
 
 
+def _match_payment_on_transactions(
+    payment: BchDirectPayment,
+    txs: list,
+    *,
+    lookup_txid: str | None = None,
+):
+    """
+    Pick the best matching receive output within USD tolerance.
+
+    Returns the fulfilled payment, or raises ``BchPaymentError`` with diagnostics.
+    """
+    grace = _verify_timestamp_grace_seconds()
+    min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
+    min_conf = _min_confirmations()
+    receive = payment.address
+    expected = int(payment.expected_amount_sats)
+    tol_sats = _tolerance_sats_for_rate(payment.usd_bch_rate)
+    skipped_conf = 0
+    skipped_time = 0
+    skipped_txid = 0
+    skipped_other_order = 0
+    amounts_to_receive: list[int] = []
+    # (abs_delta, -confirmations, -timestamp, txid, amount_sats, confirmations, timestamp)
+    best: tuple | None = None
+
+    for tx in txs:
+        if tx.confirmations < min_conf:
+            skipped_conf += 1
+            continue
+        if tx.timestamp is not None and tx.timestamp < min_ts:
+            skipped_time += 1
+            continue
+        if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
+            skipped_txid += 1
+            continue
+        for out in tx.outputs:
+            if not _addresses_match(out.address, receive):
+                continue
+            amounts_to_receive.append(out.amount_sats)
+            delta = abs(int(out.amount_sats) - expected)
+            if delta > tol_sats:
+                continue
+            if _amount_closer_to_other_pending(amount_sats=out.amount_sats, payment=payment):
+                skipped_other_order += 1
+                continue
+            candidate = (
+                delta,
+                -int(tx.confirmations or 0),
+                -int(tx.timestamp or 0),
+                str(tx.txid),
+                int(out.amount_sats),
+                int(tx.confirmations or 0),
+                tx.timestamp,
+            )
+            if best is None or candidate[:3] < best[:3]:
+                best = candidate
+
+    if best is not None:
+        _delta, _nc, _nts, txid, amount_sats, confirmations, timestamp = best
+        return _fulfill_bch_payment(payment, txid, tx_payload={
+            'txid': txid,
+            'timestamp': timestamp,
+            'confirmations': confirmations,
+            'amount_sats': amount_sats,
+            'expected_amount_sats': expected,
+            'amount_delta_sats': amount_sats - expected,
+            'amount_tolerance_sats': tol_sats,
+            'amount_tolerance_usd': str(_amount_tolerance_usd()),
+            'verify_mode': 'txid' if lookup_txid else 'address_scan',
+        })
+
+    logger.warning(
+        'BCH verify no amount match within tolerance payment_id=%s address=%s '
+        'expected_sats=%s tol_sats=%s tol_usd=%s txs_scanned=%s amounts_seen=%s '
+        'skipped_conf=%s skipped_time=%s skipped_txid=%s skipped_other_order=%s '
+        'grace_s=%s created_at=%s lookup_txid=%s',
+        payment.pk,
+        payment.address,
+        expected,
+        tol_sats,
+        str(_amount_tolerance_usd()),
+        len(txs),
+        amounts_to_receive[:20],
+        skipped_conf,
+        skipped_time,
+        skipped_txid,
+        skipped_other_order,
+        grace,
+        payment.created_at.isoformat(),
+        lookup_txid or '',
+    )
+    details = {
+        'payment_id': payment.pk,
+        'address': payment.address,
+        'expected_sats': expected,
+        'tol_sats': tol_sats,
+        'tol_usd': str(_amount_tolerance_usd()),
+        'txs_scanned': len(txs),
+        'amounts_seen': amounts_to_receive[:20],
+        'skipped_conf': skipped_conf,
+        'skipped_time': skipped_time,
+        'skipped_txid': skipped_txid,
+        'skipped_other_order': skipped_other_order,
+        'grace_s': grace,
+        'created_at': payment.created_at.isoformat(),
+        'network': get_bch_network(),
+        'lookup_txid': lookup_txid or '',
+    }
+    if lookup_txid:
+        raise BchPaymentError(
+            'Esa transacción no envía a nuestra dirección un monto cercano al de la orden. '
+            'Revisa el TXID, el monto (sats) y vuelve a intentarlo.',
+            details=details,
+        )
+    raise BchPaymentError(
+        'No encontramos un pago BCH con un monto cercano al de la orden aún. '
+        'Espera unos segundos y vuelve a intentarlo.',
+        details=details,
+    )
+
+
 def verify_bch_payment(
     *,
     user,
@@ -436,10 +633,24 @@ def verify_bch_payment(
     path_purchase: KnowledgePathPurchase | None = None,
     topic_purchase: TopicPurchase | None = None,
     token_purchase: TokenPurchase | None = None,
-    client: BchPublicClient | BchElectrumClient | None = None,
+    course_purchase: CoursePurchase | None = None,
+    payment_txid: str | None = None,
+    client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
+    """
+    Confirm an on-chain BCH payment for one product entitlement.
+
+    Primary path (no TXID): scan the receive address for a recent output that
+    matches the pending order amount (within USD tolerance).
+
+    Optional TXID: used only as a fallback after auto-verify fails (or when the
+    buyer/staff already has the tx id). Looks up that single transaction and
+    may fulfill a pending, expired, or cancelled order for the same product.
+    """
     targets = [
-        t for t in (anchor_request, path_purchase, topic_purchase, token_purchase) if t is not None
+        t for t in (
+            anchor_request, path_purchase, topic_purchase, token_purchase, course_purchase,
+        ) if t is not None
     ]
     if len(targets) != 1:
         raise BchPaymentError('El pago BCH debe apuntar a un solo producto.')
@@ -450,6 +661,7 @@ def verify_bch_payment(
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
 
     if anchor_request is not None:
@@ -503,31 +715,89 @@ def verify_bch_payment(
         if paid:
             return paid
         raise BchPaymentError('Esta compra de tokens ya está pagada.')
+    elif course_purchase is not None and course_purchase.payment_status == 'PAID':
+        paid = (
+            BchDirectPayment.objects.filter(
+                course_purchase=course_purchase,
+                status=BchDirectPayment.STATUS_PAID,
+            )
+            .order_by('-paid_at')
+            .first()
+        )
+        if paid:
+            return paid
+        raise BchPaymentError('Este curso ya está pagado.')
 
     target_q = _target_filter(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         topic_purchase=topic_purchase,
         token_purchase=token_purchase,
+        course_purchase=course_purchase,
     )
+
+    raw_txid = (payment_txid or '').strip()
+    clean_txid = ''
+    if raw_txid:
+        clean_txid = normalize_bch_txid(raw_txid)
+
+    client = client or build_bch_client()
+
+    if clean_txid:
+        return _verify_bch_by_txid(target_q=target_q, clean_txid=clean_txid, client=client)
+
+    return _verify_bch_by_address_scan(target_q=target_q, client=client, user=user)
+
+
+def _verify_bch_by_address_scan(*, target_q, client, user) -> BchDirectPayment:
+    """Automatic verify: find a matching payment on the shared receive address."""
     payment = (
         BchDirectPayment.objects.filter(target_q, status=BchDirectPayment.STATUS_PENDING)
         .order_by('-created_at')
         .first()
     )
     if payment is None:
+        expired = (
+            BchDirectPayment.objects.filter(target_q, status=BchDirectPayment.STATUS_EXPIRED)
+            .order_by('-created_at')
+            .first()
+        )
+        if expired is not None:
+            raise BchPaymentError(
+                'La orden BCH expiró. Genera una nueva orden. Si ya enviaste el pago, '
+                'pega el TXID para verificarlo o envíalo a soporte.',
+                details={
+                    'payment_id': expired.pk,
+                    'expected_sats': expired.expected_amount_sats,
+                    'status': expired.status,
+                },
+            )
         raise BchPaymentError('No hay una orden BCH pendiente. Crea una primero.')
 
     payment.mark_expired_if_needed()
     if payment.status == BchDirectPayment.STATUS_EXPIRED:
-        raise BchPaymentError('La orden BCH expiró. Genera una nueva orden.')
+        raise BchPaymentError(
+            'La orden BCH expiró. Genera una nueva orden. Si ya enviaste el pago, '
+            'pega el TXID para verificarlo o envíalo a soporte.',
+            details={
+                'payment_id': payment.pk,
+                'expected_sats': payment.expected_amount_sats,
+                'status': payment.status,
+            },
+        )
 
-    client = client or build_bch_client()
+    logger.info(
+        'BCH auto-verify address scan payment_id=%s expected_sats=%s address=%s user_id=%s',
+        payment.pk,
+        payment.expected_amount_sats,
+        payment.address,
+        getattr(user, 'id', None),
+    )
     try:
         txs = client.list_recent_transactions(payment.address, limit=30)
     except BchApiError as exc:
         logger.exception(
-            'BCH chain lookup failed network=%s payment_id=%s address=%s sats=%s: %s',
+            'BCH address scan failed network=%s payment_id=%s address=%s sats=%s: %s',
             get_bch_network(),
             payment.pk,
             payment.address,
@@ -535,108 +805,96 @@ def verify_bch_payment(
             exc,
         )
         raise BchPaymentError(
-            'No se pudo consultar la blockchain de BCH. Inténtalo más tarde '
-            'o avísanos por mensaje con el monto y la dirección de la orden.'
+            'No se pudo consultar la blockchain de BCH automáticamente. '
+            'Espera un momento e inténtalo de nuevo, o envía el TXID a soporte.',
+            details={
+                'payment_id': payment.pk,
+                'expected_sats': payment.expected_amount_sats,
+                'status': payment.status,
+            },
         ) from exc
 
-    grace = _verify_timestamp_grace_seconds()
-    min_ts = int((payment.created_at - timedelta(seconds=grace)).timestamp())
-    min_conf = _min_confirmations()
-    receive = payment.address
-    expected = int(payment.expected_amount_sats)
-    tol_sats = _tolerance_sats_for_rate(payment.usd_bch_rate)
-    skipped_conf = 0
-    skipped_time = 0
-    skipped_txid = 0
-    skipped_other_order = 0
-    amounts_to_receive: list[int] = []
-    # (abs_delta, -confirmations, -timestamp, txid, amount_sats, tx_payload fields)
-    best: tuple | None = None
+    try:
+        return _match_payment_on_transactions(payment, txs, lookup_txid=None)
+    except BchPaymentError as exc:
+        # Nudge the buyer toward the support TXID path after auto-verify misses.
+        if not getattr(exc, 'details', None):
+            exc.details = {}
+        exc.details.setdefault('payment_id', payment.pk)
+        exc.details.setdefault('expected_sats', payment.expected_amount_sats)
+        exc.details['auto_verify_failed'] = True
+        raise BchPaymentError(
+            'No encontramos tu pago BCH todavía. Espera unos segundos y vuelve a '
+            'intentarlo. Si ya pagaste hace un rato, envía el TXID a soporte.',
+            details=exc.details,
+        ) from exc
 
-    for tx in txs:
-        if tx.confirmations < min_conf:
-            skipped_conf += 1
-            continue
-        if tx.timestamp is not None and tx.timestamp < min_ts:
-            skipped_time += 1
-            continue
-        if BchDirectPayment.objects.filter(payment_txid=tx.txid).exclude(pk=payment.pk).exists():
-            skipped_txid += 1
-            continue
-        for out in tx.outputs:
-            if not _addresses_match(out.address, receive):
-                continue
-            amounts_to_receive.append(out.amount_sats)
-            delta = abs(int(out.amount_sats) - expected)
-            if delta > tol_sats:
-                continue
-            if _amount_closer_to_other_pending(amount_sats=out.amount_sats, payment=payment):
-                skipped_other_order += 1
-                continue
-            candidate = (
-                delta,
-                -int(tx.confirmations or 0),
-                -int(tx.timestamp or 0),
-                str(tx.txid),
-                int(out.amount_sats),
-                int(tx.confirmations or 0),
-                tx.timestamp,
-            )
-            if best is None or candidate[:3] < best[:3]:
-                best = candidate
 
-    if best is not None:
-        _delta, _nc, _nts, txid, amount_sats, confirmations, timestamp = best
-        return _fulfill_bch_payment(payment, txid, tx_payload={
-            'txid': txid,
-            'timestamp': timestamp,
-            'confirmations': confirmations,
-            'amount_sats': amount_sats,
-            'expected_amount_sats': expected,
-            'amount_delta_sats': amount_sats - expected,
-            'amount_tolerance_sats': tol_sats,
-            'amount_tolerance_usd': str(_amount_tolerance_usd()),
-        })
-
-    logger.warning(
-        'BCH verify no amount match within tolerance payment_id=%s address=%s '
-        'expected_sats=%s tol_sats=%s tol_usd=%s txs_scanned=%s amounts_seen=%s '
-        'skipped_conf=%s skipped_time=%s skipped_txid=%s skipped_other_order=%s '
-        'grace_s=%s created_at=%s',
-        payment.pk,
-        payment.address,
-        expected,
-        tol_sats,
-        str(_amount_tolerance_usd()),
-        len(txs),
-        amounts_to_receive[:20],
-        skipped_conf,
-        skipped_time,
-        skipped_txid,
-        skipped_other_order,
-        grace,
-        payment.created_at.isoformat(),
+def _verify_bch_by_txid(*, target_q, clean_txid: str, client) -> BchDirectPayment:
+    """Fallback verify with an explicit TXID (support / retry after auto-fail)."""
+    candidates = list(
+        BchDirectPayment.objects.filter(target_q)
+        .exclude(status=BchDirectPayment.STATUS_PAID)
+        .order_by('-created_at')[:12]
     )
-    details = {
-        'payment_id': payment.pk,
-        'address': payment.address,
-        'expected_sats': expected,
-        'tol_sats': tol_sats,
-        'tol_usd': str(_amount_tolerance_usd()),
-        'txs_scanned': len(txs),
-        'amounts_seen': amounts_to_receive[:20],
-        'skipped_conf': skipped_conf,
-        'skipped_time': skipped_time,
-        'skipped_txid': skipped_txid,
-        'skipped_other_order': skipped_other_order,
-        'grace_s': grace,
-        'created_at': payment.created_at.isoformat(),
-        'network': get_bch_network(),
-    }
+    if not candidates:
+        raise BchPaymentError(
+            'No hay una orden BCH para este producto. Crea una primero.',
+            details={'lookup_txid': clean_txid},
+        )
+
+    for payment in candidates:
+        payment.mark_expired_if_needed()
+
+    try:
+        tx = client.get_transaction(clean_txid)
+    except BchApiError as exc:
+        logger.exception(
+            'BCH txid lookup failed network=%s payment_ids=%s txid=%s: %s',
+            get_bch_network(),
+            [p.pk for p in candidates],
+            clean_txid,
+            exc,
+        )
+        raise BchPaymentError(
+            'No se pudo consultar esa transacción en la blockchain de BCH. '
+            'Revisa el TXID o inténtalo más tarde.',
+            details={
+                'payment_ids': [p.pk for p in candidates],
+                'lookup_txid': clean_txid,
+            },
+        ) from exc
+
+    last_error: BchPaymentError | None = None
+    for payment in candidates:
+        if payment.status not in (
+            BchDirectPayment.STATUS_PENDING,
+            BchDirectPayment.STATUS_EXPIRED,
+            BchDirectPayment.STATUS_CANCELLED,
+        ):
+            continue
+        try:
+            return _match_payment_on_transactions(
+                payment, [tx], lookup_txid=clean_txid,
+            )
+        except BchPaymentError as exc:
+            last_error = exc
+            logger.info(
+                'BCH txid candidate miss payment_id=%s status=%s expected_sats=%s txid=%s: %s',
+                payment.pk,
+                payment.status,
+                payment.expected_amount_sats,
+                clean_txid,
+                exc,
+            )
+    if last_error is not None:
+        raise last_error
     raise BchPaymentError(
-        'No encontramos un pago BCH con un monto cercano al de la orden aún. '
-        'Espera unos segundos y vuelve a intentarlo.',
-        details=details,
+        'Esa transacción no coincide con ninguna orden BCH de este producto.',
+        details={
+            'payment_ids': [p.pk for p in candidates],
+            'lookup_txid': clean_txid,
+        },
     )
 
 
@@ -647,7 +905,10 @@ def _fulfill_bch_payment(
     *,
     tx_payload: dict,
 ) -> BchDirectPayment:
-    locked = BchDirectPayment.objects.select_for_update().select_related(
+    # Postgres rejects FOR UPDATE on the nullable side of OUTER JOINs from
+    # select_related() on optional FKs (anchor/path/topic/token). Lock only
+    # the payment row — same pattern as report_bch_payment_txid / manual_confirm.
+    locked = BchDirectPayment.objects.select_for_update(of=('self',)).select_related(
         'anchor_request',
         'path_purchase',
         'topic_purchase',
@@ -656,10 +917,19 @@ def _fulfill_bch_payment(
         'token_purchase',
         'token_purchase__user',
         'token_purchase__package',
+        'course_purchase',
+        'course_purchase__course',
+        'course_purchase__user',
     ).get(pk=payment.pk)
     if locked.status == BchDirectPayment.STATUS_PAID:
         return locked
-    if locked.status != BchDirectPayment.STATUS_PENDING:
+    # PENDING is the normal auto-verify path. EXPIRED/CANCELLED are allowed so a
+    # TXID fallback can still unlock after TTL or after a replacement order.
+    if locked.status not in (
+        BchDirectPayment.STATUS_PENDING,
+        BchDirectPayment.STATUS_EXPIRED,
+        BchDirectPayment.STATUS_CANCELLED,
+    ):
         raise BchPaymentError('La orden BCH ya no está pendiente.')
 
     locked.status = BchDirectPayment.STATUS_PAID
@@ -678,6 +948,8 @@ def _fulfill_bch_payment(
         mark_topic_purchase_paid(locked.topic_purchase, source='bch_direct')
     elif locked.token_purchase_id:
         mark_token_purchase_paid(locked.token_purchase, source='bch_direct')
+    elif locked.course_purchase_id:
+        mark_course_purchase_paid(locked.course_purchase)
 
     logger.info(
         'BCH direct payment fulfilled id=%s txid=%s',
@@ -734,10 +1006,19 @@ def get_bch_payment_product_meta(payment: BchDirectPayment) -> dict:
             'owner': None,
             'product': package,
         }
+    if payment.course_purchase_id:
+        course = getattr(payment.course_purchase, 'course', None)
+        return {
+            'product_type': 'course',
+            'product_id': getattr(course, 'code', None) or payment.course_purchase.course_id,
+            'product_title': getattr(course, 'title', None) or f'Curso #{payment.course_purchase.course_id}',
+            'owner': None,
+            'product': course,
+        }
     return {
         'product_type': 'anchor',
         'product_id': payment.anchor_request_id,
-        'product_title': f'Anclaje #{payment.anchor_request_id}',
+        'product_title': 'Enviar hash SHA-256 a Bitcoin',
         'owner': None,
         'product': None,
     }
@@ -774,6 +1055,8 @@ def list_staff_bch_orders(
             'anchor_request__requester',
             'token_purchase__user',
             'token_purchase__package',
+            'course_purchase__user',
+            'course_purchase__course',
         )
         .order_by('-created_at')[:cap]
     )
@@ -814,6 +1097,8 @@ def report_bch_payment_txid(
             'topic_purchase__topic__creator',
             'token_purchase__user',
             'token_purchase__package',
+            'course_purchase__user',
+            'course_purchase__course',
         )
         .filter(pk=payment_id)
         .first()
@@ -891,6 +1176,9 @@ def manual_confirm_bch_payment(
             'token_purchase',
             'token_purchase__user',
             'token_purchase__package',
+            'course_purchase',
+            'course_purchase__course',
+            'course_purchase__user',
         )
         .filter(pk=payment_id)
         .first()
@@ -942,6 +1230,8 @@ def manual_confirm_bch_payment(
         mark_topic_purchase_paid(locked.topic_purchase, source='bch_direct_manual')
     elif locked.token_purchase_id:
         mark_token_purchase_paid(locked.token_purchase, source='bch_direct_manual')
+    elif locked.course_purchase_id:
+        mark_course_purchase_paid(locked.course_purchase)
 
     logger.info(
         'BCH direct payment manually confirmed id=%s txid=%s by user_id=%s',

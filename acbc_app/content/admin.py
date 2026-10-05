@@ -20,6 +20,7 @@ from content.models import (
     TopicCreationRequest,
     TopicChatQuery,
     TopicPurchase,
+    UnlimitedConsultationUser,
 )
 
 
@@ -179,7 +180,7 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
             return ''
         return f'{obj.text_hash[:12]}…'
 
-    @admin.action(description='Aprobar y emitir anclaje Bitcoin')
+    @admin.action(description='Reintentar emisión del anclaje Bitcoin')
     def approve_selected(self, request, queryset):
         ok = 0
         for req in queryset:
@@ -189,7 +190,11 @@ class TranscriptAnchorRequestAdmin(admin.ModelAdmin):
             except AnchorRequestError as exc:
                 self.message_user(request, f'#{req.pk}: {exc}', level=messages.WARNING)
         if ok:
-            self.message_user(request, f'{ok} solicitud(es) aprobada(s).', level=messages.SUCCESS)
+            self.message_user(
+                request,
+                f'{ok} anclaje(s) emitido(s).',
+                level=messages.SUCCESS,
+            )
 
     @admin.action(description='Rechazar (sin reembolso automático)')
     def reject_selected(self, request, queryset):
@@ -243,6 +248,14 @@ class TopicChatQueryAdmin(admin.ModelAdmin):
     raw_id_fields = ['topic', 'user']
     readonly_fields = ['created_at']
     date_hierarchy = 'created_at'
+
+
+@admin.register(UnlimitedConsultationUser)
+class UnlimitedConsultationUserAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'added_by', 'note', 'created_at']
+    search_fields = ['user__username', 'user__email', 'note']
+    raw_id_fields = ['user', 'added_by']
+    readonly_fields = ['created_at']
 
 
 @admin.register(TopicCreationRequest)

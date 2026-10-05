@@ -1,8 +1,12 @@
 import axiosInstance from './axiosConfig.js';
 
 const throwApiError = (error, fallbackMessage) => {
-  if (error.response?.data) {
-    throw error.response.data;
+  const data = error.response?.data;
+  if (data && typeof data === 'object') {
+    throw { ...data, status: error.response.status };
+  }
+  if (data) {
+    throw { error: String(data), status: error.response.status };
   }
   throw new Error(fallbackMessage);
 };
@@ -13,6 +17,68 @@ export const getPaymentGatewayStatus = async () => {
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo obtener el estado de la pasarela');
+  }
+};
+
+export const getCourse = async (courseCode) => {
+  try {
+    const response = await axiosInstance.get(`/payments/courses/${courseCode}/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar el curso');
+  }
+};
+
+export const createOrGetCoursePurchase = async (courseCode, { receiptEmail } = {}) => {
+  try {
+    const body = { course_code: courseCode };
+    if (receiptEmail != null) {
+      body.receipt_email = receiptEmail;
+    }
+    const response = await axiosInstance.post('/payments/course-purchases/', body);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar la compra del curso');
+  }
+};
+
+export const createCoursePurchasePayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago del curso. Inténtalo de nuevo');
+  }
+};
+
+export const createCoursePurchaseBchPayment = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
+  }
+};
+
+export const verifyCoursePurchaseBchPayment = async (purchaseId, txid) => {
+  try {
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/course-purchase/${purchaseId}/bch/verify/`,
+      body,
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
+export const listCoursePurchasePayments = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/course-purchase/${purchaseId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo listar los pagos del curso');
   }
 };
 
@@ -88,6 +154,15 @@ export const createAnchorRequestBchPayment = async (requestId) => {
   }
 };
 
+export const payAnchorRequestWithTokens = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/tokens/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo pagar el anclaje con tokens. Inténtalo de nuevo');
+  }
+};
+
 export const getAnchorRequestBchPayment = async (requestId) => {
   try {
     const response = await axiosInstance.get(`/payments/anchor-request/${requestId}/bch/`);
@@ -97,9 +172,13 @@ export const getAnchorRequestBchPayment = async (requestId) => {
   }
 };
 
-export const verifyAnchorRequestBchPayment = async (requestId) => {
+export const verifyAnchorRequestBchPayment = async (requestId, txid) => {
   try {
-    const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/bch/verify/`, {});
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/anchor-request/${requestId}/bch/verify/`,
+      body,
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
@@ -178,9 +257,13 @@ export const createPathPurchaseBchPayment = async (purchaseId) => {
   }
 };
 
-export const verifyPathPurchaseBchPayment = async (purchaseId) => {
+export const verifyPathPurchaseBchPayment = async (purchaseId, txid) => {
   try {
-    const response = await axiosInstance.post(`/payments/path-purchase/${purchaseId}/bch/verify/`, {});
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/path-purchase/${purchaseId}/bch/verify/`,
+      body,
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
@@ -196,9 +279,13 @@ export const createTopicPurchaseBchPayment = async (purchaseId) => {
   }
 };
 
-export const verifyTopicPurchaseBchPayment = async (purchaseId) => {
+export const verifyTopicPurchaseBchPayment = async (purchaseId, txid) => {
   try {
-    const response = await axiosInstance.post(`/payments/topic-purchase/${purchaseId}/bch/verify/`, {});
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/topic-purchase/${purchaseId}/bch/verify/`,
+      body,
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
@@ -232,6 +319,15 @@ export const createTokenPurchase = async (packageId) => {
   }
 };
 
+export const cancelTokenPurchase = async (purchaseId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/cancel/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cancelar la orden de tokens');
+  }
+};
+
 export const createTokenPurchasePayment = async (purchaseId) => {
   try {
     const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/`, {});
@@ -259,11 +355,36 @@ export const createTokenPurchaseBchPayment = async (purchaseId) => {
   }
 };
 
-export const verifyTokenPurchaseBchPayment = async (purchaseId) => {
+export const verifyTokenPurchaseBchPayment = async (purchaseId, txid) => {
   try {
-    const response = await axiosInstance.post(`/payments/token-purchase/${purchaseId}/bch/verify/`, {});
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/token-purchase/${purchaseId}/bch/verify/`,
+      body,
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
+export const createPayphonePayment = async ({ kind, purchaseId }) => {
+  try {
+    const response = await axiosInstance.post('/payments/payphone/', {
+      kind,
+      purchaseId,
+    });
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo iniciar el pago con tarjeta. Inténtalo de nuevo');
+  }
+};
+
+export const getPayphonePayment = async (paymentId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/payphone/${paymentId}/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo obtener el estado del pago Payphone');
   }
 };

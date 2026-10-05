@@ -11,19 +11,19 @@ def seed_token_packages(apps, schema_editor):
         {
             'name': '100 tokens',
             'token_amount': 100,
-            'usd_price': Decimal('5.00'),
+            'usd_price': Decimal('1.00'),
             'sort_order': 1,
         },
         {
             'name': '300 tokens',
             'token_amount': 300,
-            'usd_price': Decimal('12.00'),
+            'usd_price': Decimal('3.00'),
             'sort_order': 2,
         },
         {
             'name': '800 tokens',
             'token_amount': 800,
-            'usd_price': Decimal('25.00'),
+            'usd_price': Decimal('8.00'),
             'sort_order': 3,
         },
     ]

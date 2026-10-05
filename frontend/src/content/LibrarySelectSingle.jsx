@@ -104,7 +104,11 @@ const LibrarySelectSingle = ({
       setTotalCount(typeof data?.count === 'number' ? data.count : 0);
     } catch (err) {
       console.error('LibrarySelectSingle: Error fetching content:', err);
-      setError(err.message || 'Error al obtener tu contenido');
+      setError(
+        err?.response?.data?.error
+        || err?.error
+        || 'Error al obtener tu contenido',
+      );
     } finally {
       setLoading(false);
     }

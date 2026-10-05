@@ -2,10 +2,15 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import KnowledgePath, Node
+from .models import (
+    KnowledgePath,
+    KnowledgePathSnapshotAnchor,
+    Node,
+    PublishedKnowledgePathSnapshot,
+)
 from .serializers import (
     KnowledgePathSerializer,
     KnowledgePathCreateSerializer,
@@ -23,6 +28,22 @@ from django.db import models
 from django.utils import timezone
 from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
+from knowledge_paths.services.snapshot_preview import (
+    preview_knowledge_path_snapshot,
+    knowledge_path_snapshot_readiness,
+)
+from knowledge_paths.services.snapshot_publish import (
+    SnapshotPublishError,
+    publish_knowledge_path_snapshot,
+    serialize_published_snapshot,
+)
+from knowledge_paths.services.snapshot_anchor import (
+    SnapshotAnchorError,
+    broadcast_snapshot_anchor,
+    ensure_pending_snapshot_anchor,
+    refresh_snapshot_anchor_confirmations,
+    serialize_snapshot_anchor,
+)
 from payments.services import get_or_create_path_purchase
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
@@ -1116,6 +1137,247 @@ class NodeReorderView(APIView):
                 {'error': 'An error occurred while reordering nodes'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class KnowledgePathSnapshotPreviewView(APIView):
+    """Author-only preview of the knowledge-path snapshot JSON and digest."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        if knowledge_path.author_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to preview this snapshot"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        version = request.query_params.get("version", "1")
+        try:
+            version_int = int(version)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "version must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if version_int < 1:
+            return Response(
+                {"error": "version must be >= 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = preview_knowledge_path_snapshot(
+            knowledge_path,
+            version=version_int,
+        )
+        return Response(payload)
+
+
+class KnowledgePathSnapshotReadinessView(APIView):
+    """Author/staff: compact snapshot readiness (no full document dump).
+
+    Answers: is this path ready to publish a certified snapshot, which nodes
+    are missing transcript text, and what has already been published.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(
+            KnowledgePath.objects.select_related("author"),
+            pk=pk,
+        )
+        if knowledge_path.author_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to view snapshot readiness"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(knowledge_path_snapshot_readiness(knowledge_path))
+
+
+class KnowledgePathSnapshotListCreateView(APIView):
+    """Staff: list published snapshots for a path, or publish a new version."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        rows = (
+            PublishedKnowledgePathSnapshot.objects.filter(
+                knowledge_path=knowledge_path,
+            )
+            .select_related('published_by', 'knowledge_path')
+            .order_by('-version')
+        )
+        return Response({
+            "knowledgePathDbId": knowledge_path.id,
+            "knowledgePathTitle": knowledge_path.title,
+            "snapshots": [
+                {
+                    "id": row.id,
+                    "version": row.version,
+                    "schemaVersion": row.schema_version,
+                    "digest": row.digest,
+                    "publishedAt": serialize_published_snapshot(row)["publishedAt"],
+                    "publishedBy": serialize_published_snapshot(row)["publishedBy"],
+                }
+                for row in rows
+            ],
+        })
+
+    def post(self, request, pk):
+        knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+        try:
+            snapshot = publish_knowledge_path_snapshot(
+                knowledge_path,
+                published_by=request.user,
+            )
+        except SnapshotPublishError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            serialize_published_snapshot(snapshot),
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class KnowledgePathSnapshotDetailView(APIView):
+    """Staff: fetch one published snapshot by version (includes full document)."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk, version):
+        snapshot = get_object_or_404(
+            PublishedKnowledgePathSnapshot.objects.select_related(
+                'published_by',
+                'knowledge_path',
+                'bitcoin_anchor',
+            ),
+            knowledge_path_id=pk,
+            version=version,
+        )
+        return Response(serialize_published_snapshot(snapshot))
+
+
+class KnowledgePathSnapshotAnchorView(APIView):
+    """Staff: get or broadcast Bitcoin OP_RETURN for a published snapshot digest."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def _get_snapshot(self, pk, version):
+        return get_object_or_404(
+            PublishedKnowledgePathSnapshot.objects.select_related(
+                'published_by',
+                'knowledge_path',
+                'bitcoin_anchor',
+            ),
+            knowledge_path_id=pk,
+            version=version,
+        )
+
+    def get(self, request, pk, version):
+        snapshot = self._get_snapshot(pk, version)
+        try:
+            anchor = snapshot.bitcoin_anchor
+        except KnowledgePathSnapshotAnchor.DoesNotExist:
+            anchor = None
+        return Response({
+            'knowledgePathDbId': snapshot.knowledge_path_id,
+            'version': snapshot.version,
+            'digest': snapshot.digest,
+            'blockchain': serialize_snapshot_anchor(anchor),
+        })
+
+    def post(self, request, pk, version):
+        snapshot = self._get_snapshot(pk, version)
+        dry_run = str(request.data.get('dry_run', '')).lower() in (
+            '1', 'true', 'yes', 'on',
+        )
+        refresh_only = str(request.data.get('refresh', '')).lower() in (
+            '1', 'true', 'yes', 'on',
+        )
+        network = request.data.get('network') or None
+
+        try:
+            if refresh_only:
+                try:
+                    anchor = snapshot.bitcoin_anchor
+                except KnowledgePathSnapshotAnchor.DoesNotExist as exc:
+                    raise SnapshotAnchorError(
+                        'No Bitcoin anchor exists for this snapshot yet'
+                    ) from exc
+                if not anchor.btc_txid:
+                    raise SnapshotAnchorError('Anchor has no btc_txid to refresh')
+                anchor = refresh_snapshot_anchor_confirmations(anchor)
+            else:
+                anchor = ensure_pending_snapshot_anchor(
+                    snapshot,
+                    network=network,
+                    anchored_by=request.user,
+                )
+                anchor = broadcast_snapshot_anchor(anchor, dry_run=dry_run)
+        except SnapshotAnchorError as exc:
+            return Response(
+                {'error': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            'knowledgePathDbId': snapshot.knowledge_path_id,
+            'version': snapshot.version,
+            'digest': snapshot.digest,
+            'dryRun': dry_run,
+            'blockchain': serialize_snapshot_anchor(anchor),
+        })
+
+
+class AdminKnowledgePathSnapshotDashboardView(APIView):
+    """Staff dashboard: paths with latest snapshot status."""
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        from knowledge_paths.services.snapshot_anchor import blockchain_payload_for_snapshot
+
+        paths = (
+            KnowledgePath.objects.select_related('author')
+            .prefetch_related(
+                models.Prefetch(
+                    'published_snapshots',
+                    queryset=PublishedKnowledgePathSnapshot.objects.select_related(
+                        'bitcoin_anchor',
+                        'published_by',
+                    ),
+                )
+            )
+            .annotate(node_count=models.Count('nodes', distinct=True))
+            .order_by('-updated_at')
+        )
+        items = []
+        for path in paths:
+            snapshots = list(path.published_snapshots.all())
+            latest = max(snapshots, key=lambda row: row.version, default=None)
+            latest_payload = None
+            if latest is not None:
+                serialized = serialize_published_snapshot(latest)
+                latest_payload = {
+                    "version": serialized["version"],
+                    "digest": serialized["digest"],
+                    "publishedAt": serialized["publishedAt"],
+                    "publishedBy": serialized["publishedBy"],
+                    "blockchain": blockchain_payload_for_snapshot(latest),
+                }
+            items.append({
+                "id": path.id,
+                "title": path.title,
+                "author": path.author.username if path.author_id else None,
+                "isVisible": path.is_visible,
+                "certificatesEnabled": path.certificates_enabled,
+                "nodeCount": path.node_count,
+                "latestSnapshot": latest_payload,
+            })
+        return Response({"paths": items})
+
 
 def knowledge_path_detail(request, path_id):
     try:

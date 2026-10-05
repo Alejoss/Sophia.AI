@@ -13,6 +13,7 @@ from content.models import (
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
     TopicCreationRequest, TopicChatQuery, TranscriptAnchor, ContentEmbedding,
+    UnlimitedConsultationUser,
 )
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
@@ -1992,6 +1993,94 @@ class AdminTopicsConsultationsAPITests(APITestCase):
         self.assertEqual(response.data['consultation'], 'visible')
         titles = [item['title'] for item in response.data['results']]
         self.assertEqual(titles, ['Visible'])
+
+
+class AdminUnlimitedConsultationUsersAPITests(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='unlimitedadmin',
+            email='unlimitedadmin@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.regular = User.objects.create_user(
+            username='cappeduser',
+            email='capped@example.com',
+            password='testpass123',
+        )
+        self.target = User.objects.create_user(
+            username='whitelistme',
+            email='whitelist@example.com',
+            password='testpass123',
+        )
+
+    def test_requires_staff(self):
+        self.client.force_authenticate(user=self.regular)
+        response = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_add_and_remove(self):
+        self.client.force_authenticate(user=self.staff)
+        empty = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data['count'], 0)
+        self.assertEqual(
+            empty.data['daily_default_limit'],
+            TopicChatQuery.MAX_PER_USER_PER_DAY,
+        )
+
+        created = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': self.target.id, 'note': 'testing'},
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(created.data['user_id'], self.target.id)
+        self.assertEqual(created.data['username'], 'whitelistme')
+        self.assertEqual(created.data['note'], 'testing')
+        self.assertEqual(created.data['added_by_id'], self.staff.id)
+        self.assertTrue(
+            UnlimitedConsultationUser.objects.filter(user=self.target).exists()
+        )
+
+        listed = self.client.get('/api/content/admin/unlimited-consultation-users/')
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data['count'], 1)
+        self.assertEqual(listed.data['results'][0]['user_id'], self.target.id)
+
+        duplicate = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': self.target.id},
+            format='json',
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_409_CONFLICT)
+
+        missing = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': 999999},
+            format='json',
+        )
+        self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
+
+        invalid = self.client.post(
+            '/api/content/admin/unlimited-consultation-users/',
+            {'user_id': 'abc'},
+            format='json',
+        )
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
+
+        deleted = self.client.delete(
+            f'/api/content/admin/unlimited-consultation-users/{self.target.id}/',
+        )
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            UnlimitedConsultationUser.objects.filter(user=self.target).exists()
+        )
+
+        deleted_again = self.client.delete(
+            f'/api/content/admin/unlimited-consultation-users/{self.target.id}/',
+        )
+        self.assertEqual(deleted_again.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class TopicActivityScoreTests(TestCase):
@@ -5171,19 +5260,55 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_put_rejects_non_media_content(self):
+    def test_put_accepts_text_pdf_extract(self):
         text_content = Content.objects.create(
             uploaded_by=self.user,
             media_type='TEXT',
-            original_title='Articulo',
+            original_title='Articulo PDF',
         )
         response = self.client.put(
             f'/api/content/transcript-ingest/{text_content.id}/',
+            {
+                'processed_plain': 'Texto extraído del PDF sobre Bitcoin.',
+                'format': 'PLAIN',
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        transcript = text_content.transcript
+        self.assertEqual(transcript.format, 'PLAIN')
+        self.assertTrue(transcript.text_hash)
+
+    def test_put_rejects_image_content(self):
+        image_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='IMAGE',
+            original_title='Foto',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{image_content.id}/',
             {'processed_plain': self.PROCESSED_PLAIN},
             format='json',
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_queue_lists_pending_text(self):
+        text_content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='Libro pendiente',
+        )
+        response = self.client.get(
+            '/api/content/transcript-ingest/',
+            {'media_type': 'TEXT'},
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in response.data['items']]
+        self.assertIn(text_content.id, ids)
 
     def test_put_rejects_invalid_optional_subtitles(self):
         response = self.client.put(
@@ -5196,6 +5321,175 @@ Hola, bienvenidos al podcast. Hoy hablamos de blockchain.
             **self.auth_header,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_text_hash_put_requires_existing_transcript(self):
+        from content.transcript_utils import compute_text_hash
+
+        plain = 'Texto con acentos: qué, también.'
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(plain),
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_text_hash_put_locks_external_hash_with_plain_text(self):
+        import hashlib
+
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Que tambien (ascii degradado en DB).',
+            language='es',
+        )
+        plain = 'Qué también: filosofía cypherpunk en español.'
+        expected = compute_text_hash(plain)
+
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': expected,
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['text_hash_locked'])
+        self.assertEqual(response.data['text_hash'], expected)
+        self.assertTrue(response.data['has_hash_plain_text'])
+
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertTrue(transcript.text_hash_locked)
+        self.assertEqual(transcript.text_hash, expected)
+        self.assertEqual(
+            transcript.hash_plain_text,
+            'Qué también: filosofía cypherpunk en español.',
+        )
+
+        # Public text must be the exact hashed string (accents preserved).
+        public = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(public.status_code, status.HTTP_200_OK)
+        self.assertEqual(public.data['text'], transcript.hash_plain_text)
+        self.assertEqual(
+            hashlib.sha256(public.data['text'].encode('utf-8')).hexdigest(),
+            expected,
+        )
+
+        # Later save must not overwrite the locked external hash.
+        transcript.language = 'es'
+        transcript.save()
+        transcript.refresh_from_db()
+        self.assertEqual(transcript.text_hash, expected)
+        self.assertTrue(transcript.text_hash_locked)
+
+    def test_text_hash_put_rejects_mismatched_plain_text(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash('otro texto'),
+                'plain_text': 'Texto que no corresponde al hash.',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_text_hash_put_verifies_against_stored_when_plain_omitted(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=self.PROCESSED_PLAIN,
+            language='es',
+        )
+        expected = compute_text_hash(self.PROCESSED_PLAIN)
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {'text_hash': expected},
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['text_hash_locked'])
+        self.assertEqual(response.data['text_hash'], expected)
+
+    def test_text_hash_put_conflict_when_stored_mismatches_without_plain(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='Texto ascii en DB.',
+            language='es',
+        )
+        response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(
+                    'Qué también: filosofía cypherpunk en español.'
+                ),
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data.get('code'), 'hash_mismatch_stored_text')
+
+    def test_artifact_put_clears_external_hash_lock(self):
+        from content.models import ContentTranscript
+        from content.transcript_utils import compute_text_hash
+
+        plain = 'Qué también: filosofía.'
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=plain,
+            language='es',
+        )
+        lock_response = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/text-hash/',
+            {
+                'text_hash': compute_text_hash(plain),
+                'plain_text': plain,
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(lock_response.status_code, status.HTTP_200_OK)
+
+        replace = self.client.put(
+            f'/api/content/transcript-ingest/{self.video.id}/',
+            {
+                'processed_plain': self.PROCESSED_PLAIN,
+                'language': 'es',
+            },
+            format='json',
+            **self.auth_header,
+        )
+        self.assertEqual(replace.status_code, status.HTTP_200_OK)
+        self.assertFalse(replace.data['transcript']['text_hash_locked'])
+        self.assertFalse(replace.data['transcript']['has_hash_plain_text'])
+        transcript = ContentTranscript.objects.get(content=self.video)
+        self.assertFalse(transcript.text_hash_locked)
+        self.assertEqual(transcript.hash_plain_text, '')
+        self.assertEqual(transcript.text_hash, compute_text_hash(self.PROCESSED_PLAIN))
 
 
 class ContentTranscriptPublicAPITests(APITestCase):
@@ -5229,6 +5523,58 @@ class ContentTranscriptPublicAPITests(APITestCase):
         self.assertEqual(response.data['text'], 'Texto procesado con acentos: qué.')
         self.assertEqual(response.data['segment_count'], 2)
         self.assertEqual(len(response.data['segments']), 2)
+
+
+    def test_get_transcript_text_matches_text_hash_exactly(self):
+        """Public ``text`` is the normalized string that produces ``text_hash``."""
+        import hashlib
+
+        ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain='  Hola,\n\nmundo   con   espacios  ',
+            language='es',
+        )
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        text = response.data['text']
+        self.assertEqual(text, 'Hola, mundo con espacios')
+        self.assertEqual(
+            hashlib.sha256(text.encode('utf-8')).hexdigest(),
+            response.data['text_hash'],
+        )
+        self.assertEqual(response.data['text_length'], len(text))
+
+    def test_get_transcript_prefers_anchor_certified_plain_text(self):
+        from content.models import TranscriptAnchor
+        from content.transcript_utils import compute_text_hash
+
+        certified = 'Texto certificado exacto para el ancla.'
+        transcript = ContentTranscript.objects.create(
+            content=self.video,
+            processed_plain=certified,
+            language='es',
+        )
+        TranscriptAnchor.objects.create(
+            content=self.video,
+            text_hash=transcript.text_hash,
+            text_length=transcript.text_length,
+            certified_plain_text=certified,
+            status=TranscriptAnchor.STATUS_ANCHORED,
+            btc_network=TranscriptAnchor.BTC_NETWORK_SIGNET,
+            btc_txid='ab' * 32,
+        )
+        # Re-ingest with different whitespace but same normalized hash.
+        transcript.processed_plain = 'Texto   certificado\nexacto para el ancla.'
+        transcript.save()
+        self.assertEqual(transcript.text_hash, compute_text_hash(certified))
+
+        response = self.client.get(
+            f'/api/content/content_details/{self.video.id}/transcript/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text'], certified)
 
     def test_get_transcript_404_when_missing(self):
         response = self.client.get(
@@ -5309,6 +5655,44 @@ class ContentEmbeddingIngestAPITests(APITestCase):
             response.data['embedding']['embedded_text_hash'],
             self.transcript.text_hash,
         )
+
+    def test_text_requires_transcript_before_embed(self):
+        pdf = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='TEXT',
+            original_title='PDF sin extracto',
+        )
+        ContentEmbedding.objects.get_or_create(
+            content=pdf,
+            defaults={'status': ContentEmbedding.STATUS_PENDING},
+        )
+        response = self.client.get(
+            f'/api/content/embedding-ingest/{pdf.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+        ContentTranscript.objects.create(
+            content=pdf,
+            processed_plain='Texto del PDF sobre Bitcoin.',
+            format='PLAIN',
+            language='es',
+        )
+        response = self.client.get(
+            f'/api/content/embedding-ingest/{pdf.id}/',
+            **self.auth_header,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['has_transcript'])
+
+        queue = self.client.get(
+            '/api/content/embedding-ingest/',
+            {'media_type': 'TEXT'},
+            **self.auth_header,
+        )
+        self.assertEqual(queue.status_code, status.HTTP_200_OK)
+        ids = [item['id'] for item in queue.data['items']]
+        self.assertIn(pdf.id, ids)
 
     def test_ack_indexed_rejects_hash_mismatch(self):
         response = self.client.put(
@@ -5704,6 +6088,10 @@ class TopicChatAPITests(APITestCase):
             list_response.data['daily_remaining'],
             TopicChatQuery.MAX_PER_USER_PER_DAY - 1,
         )
+        self.assertEqual(
+            list_response.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
 
         detail = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/{query_id}/',
@@ -5753,7 +6141,11 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(blocked.data['daily_limit'], limit)
         self.assertEqual(blocked.data['daily_used'], limit)
         self.assertEqual(blocked.data['daily_remaining'], 0)
-        self.assertIn('límite', blocked.data['error'].lower())
+        self.assertEqual(
+            blocked.data['tokens_url'],
+            '/profiles/my_profile?section=tokens',
+        )
+        self.assertIn('tokens acbc', blocked.data['error'].casefold())
         self.assertEqual(mock_run.call_count, limit)
         self.assertEqual(
             TopicChatQuery.objects.filter(user=self.user).count(),
@@ -5773,6 +6165,34 @@ class TopicChatAPITests(APITestCase):
         )
         self.assertEqual(other_ok.status_code, status.HTTP_201_CREATED)
         self.assertEqual(other_ok.data['daily_used'], 1)
+
+    @patch('content.views_topic_chat.run_topic_chat')
+    def test_unlimited_allowlist_bypasses_daily_limit(self, mock_run):
+        mock_run.return_value = {
+            'topic_id': self.topic.id,
+            'answer': 'Respuesta ilimitada.',
+            'sources': [],
+            'retrieved_chunk_count': 0,
+            'used_chunk_count': 0,
+        }
+        UnlimitedConsultationUser.objects.create(user=self.user)
+        limit = TopicChatQuery.MAX_PER_USER_PER_DAY
+        for i in range(limit + 2):
+            response = self.client.post(
+                f'/api/content/topics/{self.topic.id}/chat/',
+                {'message': f'Ilimitada {i}'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            self.assertIsNone(response.data['daily_limit'])
+            self.assertIsNone(response.data['daily_remaining'])
+            self.assertEqual(response.data['daily_used'], i + 1)
+
+        self.assertEqual(mock_run.call_count, limit + 2)
+        self.assertEqual(
+            TopicChatQuery.objects.filter(user=self.user).count(),
+            limit + 2,
+        )
 
     @patch('content.views_topic_chat.run_topic_chat')
     def test_daily_consultation_limit_counts_across_topics(self, mock_run):
@@ -6610,6 +7030,12 @@ class TranscriptAnchorAPITests(APITestCase):
             email='owneranchor@example.com',
             password='testpass123',
         )
+        self.staff = User.objects.create_user(
+            username='staffanchor',
+            email='staffanchor@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
         self.other = User.objects.create_user(
             username='otheranchor',
             email='otheranchor@example.com',
@@ -6636,8 +7062,21 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertIsNone(response.data['anchor'])
         self.assertFalse(response.data['can_certify'])
 
-    def test_owner_can_create_pending_anchor(self):
+    def test_owner_cannot_free_certify_must_pay(self):
         self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            f'/api/content/content_details/{self.content.id}/transcript/anchors/',
+            {'ipfs_cid': 'bafytestcid'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        current = self.client.get(
+            f'/api/content/content_details/{self.content.id}/transcript/anchor/',
+        )
+        self.assertFalse(current.data['can_certify'])
+
+    def test_staff_can_create_pending_anchor(self):
+        self.client.force_authenticate(user=self.staff)
         response = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchors/',
             {'ipfs_cid': 'bafytestcid'},
@@ -6667,7 +7106,7 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_duplicate_anchor_conflict(self):
-        self.client.force_authenticate(user=self.owner)
+        self.client.force_authenticate(user=self.staff)
         first = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchors/',
             {},
@@ -6737,7 +7176,7 @@ class TranscriptAnchorAPITests(APITestCase):
         err.__cause__ = cause
         mock_broadcast.side_effect = err
 
-        self.client.force_authenticate(user=self.owner)
+        self.client.force_authenticate(user=self.staff)
         response = self.client.post(
             f'/api/content/content_details/{self.content.id}/transcript/anchor/',
             {},

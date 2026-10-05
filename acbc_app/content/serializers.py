@@ -1497,6 +1497,27 @@ class ContentTranscriptIngestSerializer(serializers.Serializer):
         return attrs
 
 
+class ContentTranscriptTextHashSerializer(serializers.Serializer):
+    """External worker (Vincent) supplies a SHA-256 of locally hashed transcript text."""
+
+    text_hash = serializers.RegexField(
+        regex=r'^[0-9a-fA-F]{64}$',
+        help_text='SHA-256 hex digest (same algorithm as ContentTranscript.text_hash).',
+    )
+    plain_text = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        help_text=(
+            'Exact text that was hashed (before or after NFC/whitespace normalize). '
+            'Required when the DB copy was SQL_ASCII-degraded and no longer matches '
+            'the worker hash. When omitted, Sophia verifies against stored artifacts.'
+        ),
+    )
+
+    def validate_text_hash(self, value):
+        return value.lower()
+
+
 class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
     """User-facing transcript payload for content detail pages."""
 
@@ -1517,9 +1538,10 @@ class ContentTranscriptPublicSerializer(serializers.ModelSerializer):
         ]
 
     def get_text(self, obj):
-        from content.transcript_utils import resolve_hash_source_text
+        from content.transcript_utils import resolve_public_transcript_text
 
-        return resolve_hash_source_text(obj)
+        # Exact string hashed into text_hash (NFC + collapsed whitespace).
+        return resolve_public_transcript_text(obj)
 
     def get_segment_count(self, obj):
         return len(obj.segments or [])
@@ -1530,6 +1552,7 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
     has_parsed_plain = serializers.SerializerMethodField()
     has_processed_plain = serializers.SerializerMethodField()
     has_obsidian_markdown = serializers.SerializerMethodField()
+    has_hash_plain_text = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentTranscript
@@ -1538,6 +1561,8 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
             'language',
             'text_length',
             'text_hash',
+            'text_hash_locked',
+            'has_hash_plain_text',
             'segment_count',
             'has_parsed_plain',
             'has_processed_plain',
@@ -1558,6 +1583,9 @@ class ContentTranscriptIngestSummarySerializer(serializers.ModelSerializer):
 
     def get_has_obsidian_markdown(self, obj):
         return bool((obj.obsidian_markdown or '').strip())
+
+    def get_has_hash_plain_text(self, obj):
+        return bool((obj.hash_plain_text or '').strip())
 
 
 class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
@@ -1769,6 +1797,37 @@ class ContentEmbeddingTopicQueueItemSerializer(serializers.ModelSerializer):
         }
 
 
+class KnowledgePathIngestNodeSerializer(serializers.Serializer):
+    """One ordered node for Vincent knowledge-path detail (transcript/embedding state)."""
+
+    id = serializers.IntegerField()
+    node_id = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField(allow_blank=True)
+    order = serializers.IntegerField()
+    position = serializers.IntegerField()
+    media_type = serializers.CharField()
+    content_profile_id = serializers.IntegerField(allow_null=True)
+    content = ContentEmbeddingQueueItemSerializer(allow_null=True)
+    has_certified_text = serializers.BooleanField()
+
+
+class KnowledgePathIngestDetailSerializer(serializers.Serializer):
+    """Knowledge-path detail for Vincent (machine-to-machine)."""
+
+    id = serializers.IntegerField()
+    knowledge_path_id = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    author_id = serializers.IntegerField(allow_null=True)
+    author_username = serializers.CharField(allow_blank=True)
+    is_visible = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    nodes = KnowledgePathIngestNodeSerializer(many=True)
+    summary = serializers.DictField()
+
+
 class TopicChatRequestSerializer(serializers.Serializer):
     """Body for POST /api/content/topics/{id}/chat/ (one independent consultation)."""
 
@@ -1865,15 +1924,15 @@ class ContentEmbeddingAckSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=64,
-        help_text='For A/V indexed ack: must match current transcript.text_hash '
-                  '(omit to use the current hash). For TEXT indexed ack: same as source_hash.',
+        help_text='Must match current ContentTranscript.text_hash when status=indexed '
+                  '(omit to use the current hash). Alias of source_hash.',
     )
     source_hash = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=64,
         help_text='Hash of the indexed source (alias: embedded_text_hash). '
-                  'Required for TEXT when status=indexed.',
+                  'Defaults to ContentTranscript.text_hash for VIDEO/AUDIO/TEXT.',
     )
     embedding_model = serializers.CharField(required=False, allow_blank=True, max_length=64)
     embedding_dims = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -1967,6 +2026,7 @@ class TranscriptAnchorSerializer(serializers.ModelSerializer):
             'content',
             'text_hash',
             'text_length',
+            'certified_plain_text',
             'op_return_prefix',
             'btc_network',
             'btc_txid',

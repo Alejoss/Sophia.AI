@@ -22,6 +22,7 @@ import { AuthContext } from '../context/AuthContext';
 import { getAccessTokenFromLocalStorage } from '../context/localStorageUtils';
 import { getUserProfile, updateProfile } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { bindMuiRhfField } from '../utils/muiRhfField';
 import UserAvatar from '../components/UserAvatar';
 
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -95,6 +96,7 @@ const EditProfile = () => {
 
     const username = watch('username');
     const profileDescription = watch('profile_description') || '';
+    const externalUrl = watch('external_url');
     const canEditUsername = usernameChangeCount < MAX_USERNAME_CHANGES;
     const remainingUsernameChanges = MAX_USERNAME_CHANGES - usernameChangeCount;
     const remainingChars = MAX_DESCRIPTION_LENGTH - profileDescription.length;
@@ -281,7 +283,7 @@ const EditProfile = () => {
 
                     <TextField
                         label="Nombre de usuario"
-                        {...register('username')}
+                        {...bindMuiRhfField(register('username'), username)}
                         fullWidth
                         disabled={!canEditUsername}
                         error={!!errors.username}
@@ -299,7 +301,7 @@ const EditProfile = () => {
 
                     <TextField
                         label="Sitio web o enlace externo"
-                        {...register('external_url')}
+                        {...bindMuiRhfField(register('external_url'), externalUrl)}
                         fullWidth
                         placeholder="https://tu-sitio-web.com"
                         error={!!errors.external_url}
@@ -369,11 +371,22 @@ const EditProfile = () => {
 
                     <TextField
                         label="Sobre ti"
-                        {...register('profile_description')}
+                        {...(() => {
+                            const field = bindMuiRhfField(
+                                register('profile_description'),
+                                profileDescription,
+                            );
+                            return {
+                                ...field,
+                                inputProps: {
+                                    ...field.inputProps,
+                                    maxLength: MAX_DESCRIPTION_LENGTH,
+                                },
+                            };
+                        })()}
                         multiline
                         rows={5}
                         fullWidth
-                        inputProps={{ maxLength: MAX_DESCRIPTION_LENGTH }}
                         placeholder="Cuéntanos quién eres, qué te apasiona y qué aportas a la comunidad. Sé auténtico y comparte lo que te hace único en el mundo de la tecnología y blockchain."
                         error={!!errors.profile_description}
                         helperText={

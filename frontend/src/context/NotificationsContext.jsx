@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { getUnreadNotificationsCount } from '../api/profilesApi';
 import { useAuth } from './AuthContext.jsx';
 
-const POLL_INTERVAL_MS = 60_000;
 const MIN_REFRESH_INTERVAL_MS = 15_000;
 
 const NotificationsContext = createContext(null);
@@ -65,10 +64,6 @@ export const NotificationsProvider = ({ children }) => {
 
     refreshUnreadCount(true);
 
-    const intervalId = window.setInterval(() => {
-      refreshUnreadCount(true);
-    }, POLL_INTERVAL_MS);
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshUnreadCount(true);
@@ -78,7 +73,6 @@ export const NotificationsProvider = ({ children }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [authInitialized, isAuthenticated, refreshUnreadCount]);

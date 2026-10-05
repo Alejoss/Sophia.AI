@@ -70,6 +70,11 @@ class Command(BaseCommand):
         client = build_bch_client()
         self.stdout.write(f'Network: {get_bch_network()}')
         self.stdout.write(f'Client:  {type(client).__name__}')
+        if hasattr(client, 'servers'):
+            hosts = ', '.join(f'{c.host}:{c.port}' for c in client.servers)
+            self.stdout.write(f'Servers: {hosts}')
+            if getattr(client, 'http_fallback', None) is not None:
+                self.stdout.write('HTTP fallback: Blockchair enabled')
         self.stdout.write(f'Address: {address or "(none)"}')
 
         rate = None

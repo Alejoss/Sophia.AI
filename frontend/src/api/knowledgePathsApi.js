@@ -296,6 +296,55 @@ const knowledgePathsApi = {
       throw error;
     }
   },
+
+  getSnapshotPreview: async (pathId, { version } = {}) => {
+    const response = await axiosInstance.get(
+      `/knowledge_paths/${pathId}/snapshot-preview/`,
+      { params: version ? { version } : undefined },
+    );
+    return response.data;
+  },
+
+  getAdminSnapshotDashboard: async () => {
+    const response = await axiosInstance.get('/knowledge_paths/admin/snapshots/');
+    return response.data;
+  },
+
+  listPathSnapshots: async (pathId) => {
+    const response = await axiosInstance.get(`/knowledge_paths/${pathId}/snapshots/`);
+    return response.data;
+  },
+
+  publishPathSnapshot: async (pathId) => {
+    const response = await axiosInstance.post(`/knowledge_paths/${pathId}/snapshots/`);
+    return response.data;
+  },
+
+  getPathSnapshot: async (pathId, version) => {
+    const response = await axiosInstance.get(
+      `/knowledge_paths/${pathId}/snapshots/${version}/`,
+    );
+    return response.data;
+  },
+
+  getPathSnapshotAnchor: async (pathId, version) => {
+    const response = await axiosInstance.get(
+      `/knowledge_paths/${pathId}/snapshots/${version}/anchor/`,
+    );
+    return response.data;
+  },
+
+  broadcastPathSnapshotAnchor: async (pathId, version, { dryRun = false, refresh = false, network } = {}) => {
+    const response = await axiosInstance.post(
+      `/knowledge_paths/${pathId}/snapshots/${version}/anchor/`,
+      {
+        dry_run: dryRun,
+        refresh,
+        ...(network ? { network } : {}),
+      },
+    );
+    return response.data;
+  },
 };
 
 export default knowledgePathsApi;

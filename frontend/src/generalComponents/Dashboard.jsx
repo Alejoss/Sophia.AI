@@ -4,12 +4,10 @@ import { Box, Tab, Tabs, Typography, CircularProgress } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import TopicCreationRequestsAdmin from '../topics/TopicCreationRequestsAdmin';
 import BookClubsDashboardAdmin from '../bookClubs/BookClubsDashboardAdmin';
-import TopicsConsultationsDashboard from '../topics/TopicsConsultationsDashboard';
 
 export const DashboardHome = () => (
   <>
     <BookClubsDashboardAdmin />
-    <TopicsConsultationsDashboard />
     <TopicCreationRequestsAdmin embedded />
   </>
 );
@@ -17,12 +15,16 @@ export const DashboardHome = () => (
 const showDashboardTabs = (pathname) =>
   pathname === '/dashboard'
   || pathname === '/dashboard/'
+  || pathname.startsWith('/dashboard/consultas')
   || pathname.startsWith('/dashboard/libros-destacados')
-  || pathname.startsWith('/dashboard/pagos-bch');
+  || pathname.startsWith('/dashboard/pagos-bch')
+  || pathname.startsWith('/dashboard/snapshots');
 
 const dashboardTabValue = (pathname) => {
+  if (pathname.startsWith('/dashboard/consultas')) return 'consultations';
   if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
   if (pathname.startsWith('/dashboard/pagos-bch')) return 'bch-payments';
+  if (pathname.startsWith('/dashboard/snapshots')) return 'snapshots';
   return 'home';
 };
 
@@ -69,6 +71,12 @@ const Dashboard = () => {
               to="/dashboard"
             />
             <Tab
+              label="Consultas"
+              value="consultations"
+              component={RouterLink}
+              to="/dashboard/consultas"
+            />
+            <Tab
               label="Libros destacados"
               value="featured-books"
               component={RouterLink}
@@ -79,6 +87,12 @@ const Dashboard = () => {
               value="bch-payments"
               component={RouterLink}
               to="/dashboard/pagos-bch"
+            />
+            <Tab
+              label="Snapshots"
+              value="snapshots"
+              component={RouterLink}
+              to="/dashboard/snapshots"
             />
           </Tabs>
         </>

@@ -10,10 +10,15 @@ import MetaPixelTracker from './components/MetaPixelTracker';
 import GoogleAnalyticsTracker from './components/GoogleAnalyticsTracker';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import Home from './generalComponents/Home.jsx';
+import Home from './generalComponents/BrandHome.jsx';
+import HowItWorksGuide from './generalComponents/HowItWorksGuide.jsx';
 import Maintenance from './generalComponents/Maintenance.jsx';
+import NotFound from './generalComponents/NotFound.jsx';
 import NewsletterSubscribe from './generalComponents/NewsletterSubscribe.jsx';
 import ClubDeLectura from './generalComponents/ClubDeLectura.jsx';
+import RealHistoriaBitcoinLanding from './courses/RealHistoriaBitcoinLanding.jsx';
+import RealHistoriaBitcoinCheckout from './courses/RealHistoriaBitcoinCheckout.jsx';
+import PayphoneResultPage from './payments/PayphoneResultPage.jsx';
 import CompletarCuenta from './profiles/CompletarCuenta.jsx';
 import BookClubLayout from './bookClubs/BookClubLayout.jsx';
 import BookClubOverview from './bookClubs/BookClubOverview.jsx';
@@ -46,6 +51,7 @@ import Register from './profiles/Register.jsx';
 import ForgotPassword from './profiles/ForgotPassword.jsx';
 import PasswordResetConfirm from './profiles/PasswordResetConfirm.jsx';
 import Welcome from './profiles/Welcome.jsx';
+import TokenBuyPage from './profiles/TokenBuyPage.jsx';
 import LibraryUploadContent from './content/LibraryUploadContent.jsx';
 import LibraryFolderUpload from './content/LibraryFolderUpload.jsx';
 import LibraryUser from './content/LibraryUser.jsx';
@@ -85,8 +91,10 @@ import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import CommunityBubble from './generalComponents/CommunityBubble.jsx';
 import Dashboard, { DashboardHome } from './generalComponents/Dashboard.jsx';
+import ConsultationsDashboard from './topics/ConsultationsDashboard.jsx';
 import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import BchPaymentsDashboard from './payments/BchPaymentsDashboard.jsx';
+import KnowledgePathSnapshotsDashboard from './knowledgePaths/KnowledgePathSnapshotsDashboard.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -185,6 +193,13 @@ const AppContent = () => {
               path="/"
               element={isTelegramInAppBrowser() ? <TelegramNotSupportedMessage /> : <Home />}
             />
+            <Route path="como-funciona" element={<Navigate to="/como-funciona/archivo-y-preservacion" replace />} />
+            <Route path="como-funciona/:slug" element={<HowItWorksGuide />} />
+            <Route path="cursos/real-historia-bitcoin" element={<RealHistoriaBitcoinLanding />} />
+            <Route path="cursos/real-historia-bitcoin/checkout" element={<RealHistoriaBitcoinCheckout />} />
+            <Route path="courses/real-historia-bitcoin" element={<Navigate to="/cursos/real-historia-bitcoin" replace />} />
+            <Route path="courses/real-historia-bitcoin/checkout" element={<Navigate to="/cursos/real-historia-bitcoin/checkout" replace />} />
+            <Route path="payments/payphone/result" element={<PayphoneResultPage />} />
             <Route path="unirme" element={<NewsletterSubscribe />} />
             <Route path="profiles">
               <Route path="login" element={
@@ -257,8 +272,10 @@ const AppContent = () => {
             <Route path="search" element={<MainSearch />} />
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
               <Route index element={<DashboardHome />} />
+              <Route path="consultas" element={<ConsultationsDashboard />} />
               <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="pagos-bch" element={<BchPaymentsDashboard />} />
+              <Route path="snapshots" element={<KnowledgePathSnapshotsDashboard />} />
               <Route path="book-clubs/nuevo" element={<BookClubAdminGeneral mode="create" />} />
               <Route path="book-clubs/:slug" element={<BookClubAdminLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
@@ -271,6 +288,7 @@ const AppContent = () => {
               </Route>
             </Route>
             <Route path="welcome" element={<Welcome />} />
+            <Route path="acbc-tokens" element={<ProtectedRoute><TokenBuyPage /></ProtectedRoute>} />
             <Route path="messages" element={<MessagesLayout />}>
               <Route path="thread/:userId" element={<MessageThread />} />
             </Route>
@@ -293,6 +311,7 @@ const AppContent = () => {
             <Route path="profiles/my_events" element={<ProtectedRoute><UserEvents /></ProtectedRoute>} />
             <Route path="profiles/profile_bookmarks" element={<ProtectedRoute><Bookmarks /></ProtectedRoute>} />
           </Route>
+          <Route path="*" element={<NotFound />} />
           </Routes>
           </NotificationsProvider>
         </AuthProvider>
