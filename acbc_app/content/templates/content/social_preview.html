@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ meta.title }} | {{ meta.site_name }}</title>
+    <meta name="description" content="{{ meta.description }}" />
+    <link rel="canonical" href="{{ meta.page_url }}" />
+
+    <meta property="og:site_name" content="{{ meta.site_name }}" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:type" content="{{ meta.og_type }}" />
+    <meta property="og:title" content="{{ meta.title }}" />
+    <meta property="og:description" content="{{ meta.description }}" />
+    <meta property="og:url" content="{{ meta.page_url }}" />
+    <meta property="og:image" content="{{ meta.image_url }}" />
+    <meta property="og:image:alt" content="{{ meta.title }}" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{ meta.title }}" />
+    <meta name="twitter:description" content="{{ meta.description }}" />
+    <meta name="twitter:image" content="{{ meta.image_url }}" />
+
+    <meta http-equiv="refresh" content="0;url={{ meta.page_url }}" />
+  </head>
+  <body>
+    <p>
+      <a href="{{ meta.page_url }}">{{ meta.title }}</a>
+      — {{ meta.site_name }}
+    </p>
+    <p>{{ meta.description }}</p>
+  </body>
+</html>

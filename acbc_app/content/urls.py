@@ -89,6 +89,11 @@ from .views import (
     AdminFeaturedBooksReorderView,
 )
 from .views_youtube_migration import YouTubeMigrationManifestView
+from .views_social_preview import (
+    ContentSocialPreviewView,
+    SiteSocialPreviewView,
+    TopicSocialPreviewView,
+)
 from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
@@ -119,6 +124,23 @@ from .views_topic_chat import (
 app_name = "content"
 
 urlpatterns = [
+    # Social crawler Open Graph HTML (Telegram/Facebook/etc. via nginx User-Agent routing)
+    path(
+        'social-preview/site/',
+        SiteSocialPreviewView.as_view(),
+        name='social-preview-site',
+    ),
+    path(
+        'social-preview/<int:pk>/',
+        ContentSocialPreviewView.as_view(),
+        name='social-preview-content',
+    ),
+    path(
+        'topics/social-preview/<int:pk>/',
+        TopicSocialPreviewView.as_view(),
+        name='social-preview-topic',
+    ),
+
     # Publication URLs
     path('publications/', PublicationListView.as_view(), name='publication-list'),
     path('publications/<int:pk>/', PublicationDetailView.as_view(), name='publication-detail'),
