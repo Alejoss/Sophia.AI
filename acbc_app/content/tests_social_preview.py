@@ -83,8 +83,8 @@ class ContentSocialPreviewTests(TestCase):
         response = self.client.get(url, {'context': 'library', 'id': self.user.id})
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertIn('content_profile_thumbnails/', html)
-        self.assertIn('/preview_', html)
+        self.profile.refresh_from_db()
+        self.assertIn(self.profile.thumbnail_preview.url, html)
         self.assertNotIn('https://cdn.example.com/covers/durov.jpg', html)
 
     def test_content_social_preview_prefers_preview_over_full_thumbnail(self):
@@ -101,8 +101,9 @@ class ContentSocialPreviewTests(TestCase):
         url = reverse('content:social-preview-content', args=[self.content.id])
         response = self.client.get(url, {'context': 'library', 'id': self.user.id})
         html = response.content.decode()
-        self.assertIn('/preview_', html)
-        self.assertNotIn('/full.', html)
+        self.profile.refresh_from_db()
+        self.assertIn(self.profile.thumbnail_preview.url, html)
+        self.assertNotIn(self.profile.thumbnail.url, html)
 
     def test_content_social_preview_hides_private_library_profile_title(self):
         other = User.objects.create_user(
