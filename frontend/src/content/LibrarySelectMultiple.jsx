@@ -132,7 +132,11 @@ const LibrarySelectMultiple = ({
       }
     } catch (err) {
       console.error('LibrarySelectMultiple: Error fetching content:', err);
-      setError(err.message || 'Error al obtener tu contenido');
+      setError(
+        err?.response?.data?.error
+        || err?.error
+        || 'Error al obtener tu contenido',
+      );
     } finally {
       setLoading(false);
     }
@@ -210,7 +214,11 @@ const LibrarySelectMultiple = ({
       await onSave(ids, profiles);
     } catch (err) {
       console.error('LibrarySelectMultiple.handleSubmit - Error:', err);
-      setError('Error al guardar las selecciones');
+      setError(
+        err?.response?.data?.error
+        || err?.error
+        || 'Error al guardar las selecciones',
+      );
     } finally {
       setSaving(false);
     }

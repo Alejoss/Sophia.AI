@@ -21,6 +21,7 @@ import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { TextField, Button, Alert, Box } from '@mui/material';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { bindMuiRhfField } from '../utils/muiRhfField';
 // Optional shared rules:
 import { emailField, usernameField, passwordField } from '../utils/formSchemas';
 
@@ -34,11 +35,13 @@ const ExampleForm = () => {
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { title: '' },
   });
+  const titleValue = watch('title');
 
   const onSubmit = async (data) => {
     setGeneralError('');
@@ -60,7 +63,7 @@ const ExampleForm = () => {
       {generalError && <Alert severity="error">{generalError}</Alert>}
       <TextField
         label="Título"
-        {...register('title')}
+        {...bindMuiRhfField(register('title'), titleValue)}
         error={!!errors.title}
         helperText={errors.title?.message}
         fullWidth
@@ -88,6 +91,7 @@ const ExampleForm = () => {
 |--------|---------|
 | `frontend/src/utils/apiFormErrors.js` | `parseApiValidationErrors`, `applyApiErrorsToForm`, Spanish DRF translations |
 | `frontend/src/utils/formSchemas.js` | `emailField`, `usernameField`, `passwordField`, `getPasswordRuleErrors` |
+| `frontend/src/utils/muiRhfField.js` | `bindMuiRhfField` — MUI `TextField` + RHF (label shrink + autofill) |
 
 ### `applyApiErrorsToForm(error, setError, fallback?, fieldMap?)`
 
@@ -96,9 +100,27 @@ const ExampleForm = () => {
 - Use `fieldMap` when API snake_case ≠ form field names, e.g. `{ personal_note: 'personalNote' }`
 - Add new English→Spanish strings to `API_ERROR_TRANSLATIONS` when you see repeated DRF messages
 
+### `bindMuiRhfField(register(...), value)`
+
+Use for MUI `TextField`s wired with RHF `register`:
+
+- Forwards the RHF ref via `inputRef` (MUI puts `ref` on `FormControl`, not `<input>`)
+- Shrinks the floating label when the field has a value (autofill / `setValue` / typed content)
+- Syncs Chrome autofill into RHF
+
+Auth and email fields must use it. Prefer it for any other MUI `TextField` + `register` pair.
+
 ### Controllers
 
 Use `Controller` for MUI controls that don’t work cleanly with `register` alone: `Select`, `Switch`, `Checkbox`, `Autocomplete`, custom date pickers, multi-selects.
+
+### Never nest HTML forms
+
+Browsers ignore an inner `<form>` when it sits inside another `<form>` / `component="form"`. That silently breaks submit (notably `UploadContentForm` and `ContentSuggestionPicker`).
+
+- Do **not** wrap `UploadContentForm` or `ContentSuggestionPicker` in a parent form
+- Parent UIs that need a later “suggest / continue” step should use a non-form container and call RHF `handleSubmit` from a button `onClick`
+- Guardrail: `frontend/src/test/nestedForms.audit.test.jsx` (update its consumer inventories when adding new upload parents)
 
 ### Files outside RHF
 
@@ -109,7 +131,7 @@ Optional / awkward controls may stay in `useState` next to RHF:
 - Nested question builders (Quiz uses hybrid: RHF for meta + local state for questions)
 - Pure confirm dialogs with no text fields (payment accept, etc.)
 
-Still use Spanish messages and never leave API failures only in `console.error`.
+Still use Spanish messages and never leave API failures only in `console.error`. Prefer `parseApiValidationErrors` over raw `error.message` (Axios English strings).
 
 ## Auth forms (special care)
 
@@ -138,9 +160,11 @@ Broken pattern (avoid): `if (error) return <Alert />` after a failed save.
 - [ ] RHF + Yup (or intentional hybrid documented in the change description)
 - [ ] Spanish messages for client and mapped API errors
 - [ ] Field errors via `helperText`; general via `Alert`
-- [ ] `noValidate` on `<form>`
+- [ ] `noValidate` on `<form>` / `component="form"`
 - [ ] Submit disabled + loading label while pending
-- [ ] `applyApiErrorsToForm` (or `parseApiValidationErrors`) on API failure — not `alert()`, not console-only
+- [ ] `applyApiErrorsToForm` (or `parseApiValidationErrors`) on API failure — not `alert()`, not console-only, not raw English `error.message`
+- [ ] `bindMuiRhfField` for MUI `TextField` + `register` (especially auth / email / autofill)
+- [ ] No nested `<form>` around `UploadContentForm` / `ContentSuggestionPicker`
 - [ ] Auth contracts unchanged if the form touches tokens / register / login
 - [ ] Cancel / close blocked or safe while submitting
 
@@ -149,6 +173,7 @@ Broken pattern (avoid): `if (error) return <Alert />` after a failed save.
 - Helper unit tests: `frontend/src/utils/__tests__/apiFormErrors.test.js`, `formSchemas.test.js`
 - Form component suites (Vitest + React Testing Library) live next to components under `__tests__/`, using `src/test/formTestUtils.jsx`
 - Each form suite covers: invalid submit (Spanish error, no API), valid submit (API/callback), and API rejection (visible Spanish error)
+- Nested-form + compliance audits: `frontend/src/test/nestedForms.audit.test.jsx`, `frontend/src/test/formsCompliance.audit.test.jsx`
 - Run form-related tests:
   ```bash
   cd frontend && npm run test
@@ -174,6 +199,7 @@ Broken pattern (avoid): `if (error) return <Alert />` after a failed save.
 | ImageUploadModal / file-only dialogs | Primarily file + crop UI |
 | Confirm-only dialogs | No validated fields |
 | KnowledgePathEdit autosave chrome | Not a classic submit form; still should surface errors in Spanish when touched |
+| Admin filter/search bars | May stay `useState` if they only filter lists; still need `noValidate` + Spanish errors |
 
 ## Related docs
 

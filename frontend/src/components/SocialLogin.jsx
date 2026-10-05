@@ -71,7 +71,11 @@ const SocialLogin = ({ redirectTo, text = 'continue_with' } = {}) => {
         navigate(dest);
       } catch (err) {
         console.error('Google login failed:', err);
-        setError(err.message || 'Failed to login with Google');
+        setError(
+          err?.response?.data?.error
+          || err?.error
+          || 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
+        );
       }
     },
     [updateAuthState, navigate, redirectTo, searchParams, location.state]
@@ -84,7 +88,7 @@ const SocialLogin = ({ redirectTo, text = 'continue_with' } = {}) => {
         onSuccess={handleCredentialResponse}
         onError={(err) => {
           console.error('Google OAuth error:', err);
-          setError('Failed to initialize Google login');
+          setError('No se pudo iniciar el inicio de sesión con Google.');
         }}
         theme="filled_blue"
         shape="rectangular"

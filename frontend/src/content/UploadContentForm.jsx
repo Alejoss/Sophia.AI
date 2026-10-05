@@ -39,6 +39,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { getMediaType } from './mediaTypeFromFile';
+import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { bindMuiRhfField } from '../utils/muiRhfField';
 
 // URL Preview Component
 const URLPreview = ({ previewData, isLoading, error }) => {
@@ -205,6 +207,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [generalError, setGeneralError] = useState('');
   const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
@@ -240,6 +243,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
     reset,
     watch,
     setValue,
+    setError,
     trigger
   } = useForm({
     resolver: yupResolver(schema),
@@ -256,6 +260,15 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
     }
   });
 
+  const titleValue = watch('title');
+  const authorValue = watch('author');
+  // Watch the URL and file fields for changes
+  const url = watch('url');
+  const file = watch('file');
+  const urlField = bindMuiRhfField(register('url'), url);
+  const authorField = bindMuiRhfField(register('author'), authorValue);
+  const titleField = bindMuiRhfField(register('title'), titleValue);
+
   // Sync isUrlMode state with form value when initialUrlMode changes
   useEffect(() => {
     if (initialUrlMode !== null && initialUrlMode !== isUrlMode) {
@@ -268,10 +281,6 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
   useEffect(() => {
     setValue('isUrlMode', isUrlMode, { shouldValidate: false });
   }, [isUrlMode, setValue]);
-
-  // Watch the URL and file fields for changes
-  const url = watch('url');
-  const file = watch('file');
 
   const applyMetadataFromFileName = (filename) => {
     if (!filename) return;
@@ -421,7 +430,11 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         // Check current URL value to ensure it hasn't changed
         const currentUrl = watch('url');
         if (currentUrl === url) {
-          setPreviewError(error.message || 'No se pudo cargar la vista previa para esta URL');
+          setPreviewError(
+            error?.response?.data?.error
+            || error?.error
+            || 'No se pudo cargar la vista previa para esta URL',
+          );
         }
       } finally {
         setIsLoadingPreview(false);
@@ -434,7 +447,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
   }, [url, isUrlMode]); // Removed setValue, trigger, watch from dependencies to avoid unnecessary re-runs
 
   const onSubmit = async (data) => {
-
+    setGeneralError('');
 
     // Use form data's isUrlMode if available, otherwise fall back to state
     const currentIsUrlMode = data.isUrlMode !== undefined ? data.isUrlMode : isUrlMode;
@@ -582,16 +595,24 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      const backendError = error.response?.data?.error;
-      const backendDetails = error.response?.data?.details;
-      const message = backendError ?
-      backendDetails ? `${backendError}: ${backendDetails}` : backendError :
-      error.message || 'Error al subir contenido. Por favor, inténtalo de nuevo.';
-      setSnackbar({
-        open: true,
-        message,
-        severity: 'error'
-      });
+      const fallback = 'Error al subir contenido. Por favor, inténtalo de nuevo.';
+      const { fieldErrors, generalError: parsed } = applyApiErrorsToForm(
+        error,
+        setError,
+        null,
+        { personal_note: 'personalNote' },
+      );
+      let message = parsed;
+      // Local thrown Errors (unsupported file, missing file) are already Spanish.
+      if (!message && error instanceof Error && !error.response && error.message) {
+        message = error.message;
+      }
+      if (!message && Object.keys(fieldErrors).length === 0) {
+        message = fallback;
+      }
+      if (message) {
+        setGeneralError(message);
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -744,16 +765,17 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         </>
       }
 
-      <form onSubmit={handleSubmit(onSubmit, (errors) => {
-        console.error('Form validation errors:', errors);
-        console.error('Current isUrlMode state:', isUrlMode);
-        console.error('Current isUrlMode form value:', watch('isUrlMode'));
-        setSnackbar({
-          open: true,
-          message: 'Por favor completa todos los campos requeridos correctamente.',
-          severity: 'error'
-        });
-      })}>
+      <form
+        noValidate
+        onSubmit={handleSubmit(onSubmit, () => {
+          setGeneralError('Por favor completa todos los campos requeridos correctamente.');
+        })}
+      >
+        {generalError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setGeneralError('')}>
+            {generalError}
+          </Alert>
+        )}
         {/* File or URL Input */}
         {!isUrlMode ?
         <FormControl fullWidth error={!!errors.file} sx={{ mb: 3 }}>
@@ -832,12 +854,14 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               <TextField
               label="URL"
               variant="outlined"
-              {...register('url')}
-              value={watch('url') || ''}
+              {...urlField}
+              onChange={(e) => {
+                urlField.onChange(e);
+                setHasSavedSuccessfully(false);
+              }}
               error={!!errors.url}
               helperText={errors.url?.message}
-              disabled={isLoadingPreview}
-              inputProps={{ onInput: () => setHasSavedSuccessfully(false) }} />
+              disabled={isLoadingPreview} />
             
             </FormControl>
             
@@ -904,10 +928,9 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                   <TextField
                   label="Autor"
                   variant="outlined"
-                  {...register('author')}
-                  value={watch('author') || ''}
+                  {...authorField}
                   onChange={(e) => {
-                    setValue('author', e.target.value);
+                    authorField.onChange(e);
                     setHasSavedSuccessfully(false);
                   }}
                   error={!!errors.author}
@@ -918,10 +941,9 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                   <TextField
                   label="Título"
                   variant="outlined"
-                  {...register('title')}
-                  value={watch('title') || ''}
+                  {...titleField}
                   onChange={(e) => {
-                    setValue('title', e.target.value);
+                    titleField.onChange(e);
                     setHasSavedSuccessfully(false);
                   }}
                   error={!!errors.title}
@@ -937,10 +959,9 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               <TextField
               label="Autor"
               variant="outlined"
-              {...register('author')}
-              value={watch('author') || ''}
+              {...authorField}
               onChange={(e) => {
-                setValue('author', e.target.value);
+                authorField.onChange(e);
                 setHasSavedSuccessfully(false);
               }}
               error={!!errors.author}
@@ -951,10 +972,9 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               <TextField
               label="Título"
               variant="outlined"
-              {...register('title')}
-              value={watch('title') || ''}
+              {...titleField}
               onChange={(e) => {
-                setValue('title', e.target.value);
+                titleField.onChange(e);
                 setHasSavedSuccessfully(false);
               }}
               error={!!errors.title}

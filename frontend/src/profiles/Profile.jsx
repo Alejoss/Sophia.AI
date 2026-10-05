@@ -43,6 +43,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import SecurityIcon from '@mui/icons-material/Security';
 import { passwordField } from '../utils/formSchemas.js';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+import { bindMuiRhfField } from '../utils/muiRhfField.js';
 
 const changePasswordSchema = yup.object({
   old_password: yup
@@ -71,6 +72,7 @@ export const SecuritySection = () => {
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(changePasswordSchema),
@@ -80,6 +82,10 @@ export const SecuritySection = () => {
       confirm_password: '',
     },
   });
+
+  const oldPasswordValue = watch('old_password');
+  const newPasswordValue = watch('new_password');
+  const confirmPasswordValue = watch('confirm_password');
 
   const onSubmit = async ({ old_password, new_password, confirm_password }) => {
     setGeneralError('');
@@ -152,7 +158,7 @@ export const SecuritySection = () => {
             autoComplete="current-password"
             error={!!errors.old_password}
             helperText={errors.old_password?.message}
-            {...register('old_password')}
+            {...bindMuiRhfField(register('old_password'), oldPasswordValue)}
           />
 
           <TextField
@@ -164,7 +170,7 @@ export const SecuritySection = () => {
             autoComplete="new-password"
             error={!!errors.new_password}
             helperText={errors.new_password?.message || 'Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos'}
-            {...register('new_password')}
+            {...bindMuiRhfField(register('new_password'), newPasswordValue)}
           />
 
           <TextField
@@ -176,7 +182,7 @@ export const SecuritySection = () => {
             autoComplete="new-password"
             error={!!errors.confirm_password}
             helperText={errors.confirm_password?.message}
-            {...register('confirm_password')}
+            {...bindMuiRhfField(register('confirm_password'), confirmPasswordValue)}
           />
 
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
