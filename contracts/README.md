@@ -123,7 +123,7 @@ Now you'll see 100 full coins in your MetaMask account in that network.
 The console commands are:
 
 ```node
-const Params = await ethers.getContractFactory("SophiaAIParams");
+const Params = await ethers.getContractFactory("ACBCSophiaAIParams");
 const contract = Params.attach(ctAddr); // Considering that you took notes of the deployed address
 await contract.transferOwnership(mmAddr);
 ```

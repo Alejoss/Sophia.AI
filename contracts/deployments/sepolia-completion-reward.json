@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contract": "ACBCSophiaCompletionReward",
+  "address": "0xf3e5c1D577479F26B78cebA09C5fABbd06517C93",
+  "deployer": "0xA75dA0D7DdEa2B5b343bf1b83f9D4474C1c7595C",
+  "admin": "0xA75dA0D7DdEa2B5b343bf1b83f9D4474C1c7595C",
+  "transactionHash": "0xd3ee1f56b03abdfa31cd45496b3161e522a3ce007b2f5a56fa6f1d97c3ba6574",
+  "blockNumber": 11858957,
+  "deployedAt": "2026-10-06T23:00:02.147Z"
+}

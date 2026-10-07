@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.21;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "./SophiaAIParams.sol";
+import "./ACBCSophiaAIParams.sol";
 
 /**
  * This is a trait for all the contracts making use of the
@@ -10,12 +10,12 @@ import "./SophiaAIParams.sol";
  * than the advertised in first place -- the remainder will
  * always be returned back).
  */
-abstract contract SophiaAIParamsConsumer {
-    SophiaAIParams public params;
+abstract contract ACBCSophiaAIParamsConsumer {
+    ACBCSophiaAIParams public params;
 
     constructor(address _params) {
-        require(_params != address(0), "SophiaAIParamsConsumer: Invalid params contract address");
-        params = SophiaAIParams(payable(_params));
+        require(_params != address(0), "ACBCSophiaAIParamsConsumer: Invalid params contract address");
+        params = ACBCSophiaAIParams(payable(_params));
     }
 
     /**
@@ -27,7 +27,7 @@ abstract contract SophiaAIParamsConsumer {
     modifier chargesAmount(bytes32 _param, uint256 amount) {
         uint256 paid = msg.value;
         uint256 cost = params.getNativeCost(_param) * amount;
-        require(paid >= cost, "SophiaAIParamsConsumer: Insufficient payment");
+        require(paid >= cost, "ACBCSophiaAIParamsConsumer: Insufficient payment");
         payable(address(params)).call{value: paid}("");
         payable(msg.sender).call{value: paid - cost}("");
         _;

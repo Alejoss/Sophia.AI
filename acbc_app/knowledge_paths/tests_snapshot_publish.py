@@ -49,33 +49,62 @@ class SnapshotPublishServiceTests(TestCase):
         )
 
     def test_publish_persists_canonical_text_and_digest(self):
-        snapshot = publish_knowledge_path_snapshot(
+        snapshot, created = publish_knowledge_path_snapshot(
             self.path,
             published_by=self.admin,
         )
+        self.assertTrue(created)
         self.assertEqual(snapshot.version, 1)
         self.assertEqual(len(snapshot.digest), 64)
         self.assertTrue(snapshot.document_text.startswith("{"))
         self.assertIn("Bitcoin is digital money.", snapshot.document_text)
         self.assertEqual(snapshot.published_by_id, self.admin.id)
+        self.assertEqual(snapshot.document["version"], 1)
 
-        second = publish_knowledge_path_snapshot(
+        second, second_created = publish_knowledge_path_snapshot(
             self.path,
             published_by=self.admin,
         )
+        self.assertFalse(second_created)
+        self.assertEqual(second.id, snapshot.id)
+        self.assertEqual(second.version, 1)
+        self.assertEqual(
+            PublishedKnowledgePathSnapshot.objects.filter(knowledge_path=self.path).count(),
+            1,
+        )
+
+    def test_publish_new_version_only_when_digest_changes(self):
+        first, _created = publish_knowledge_path_snapshot(
+            self.path,
+            published_by=self.admin,
+        )
+        self.path.title = "Introduction to Bitcoin, revised"
+        self.path.save(update_fields=["title"])
+
+        second, created = publish_knowledge_path_snapshot(
+            self.path,
+            published_by=self.admin,
+        )
+        self.assertTrue(created)
         self.assertEqual(second.version, 2)
+        self.assertNotEqual(second.digest, first.digest)
+        self.assertEqual(second.document["version"], 2)
+        self.assertEqual(
+            PublishedKnowledgePathSnapshot.objects.filter(knowledge_path=self.path).count(),
+            2,
+        )
 
     def test_publish_rejects_incomplete_path(self):
         ContentTranscript.objects.filter(content=self.content).delete()
         with self.assertRaises(SnapshotPublishError):
-            publish_knowledge_path_snapshot(self.path, published_by=self.admin)
+            publish_knowledge_path_snapshot(self.path, published_by=self.admin)[0]
 
     def test_publish_rejects_non_staff(self):
         with self.assertRaises(SnapshotPublishError):
-            publish_knowledge_path_snapshot(self.path, published_by=self.author)
+            publish_knowledge_path_snapshot(self.path, published_by=self.author)[0]
 
     def test_snapshot_row_is_immutable(self):
-        snapshot = publish_knowledge_path_snapshot(
+        snapshot, _created = publish_knowledge_path_snapshot(
             self.path,
             published_by=self.admin,
         )
@@ -126,8 +155,15 @@ class SnapshotPublishAPITests(TestCase):
         create = self.client.post(f"/api/knowledge_paths/{self.path.id}/snapshots/")
         self.assertEqual(create.status_code, 201, create.data)
         self.assertEqual(create.data["version"], 1)
+        self.assertTrue(create.data["created"])
         self.assertEqual(len(create.data["digest"]), 64)
         self.assertIn("document", create.data)
+
+        again = self.client.post(f"/api/knowledge_paths/{self.path.id}/snapshots/")
+        self.assertEqual(again.status_code, 200, again.data)
+        self.assertFalse(again.data["created"])
+        self.assertEqual(again.data["version"], 1)
+        self.assertEqual(again.data["digest"], create.data["digest"])
 
         listing = self.client.get(f"/api/knowledge_paths/{self.path.id}/snapshots/")
         self.assertEqual(listing.status_code, 200)

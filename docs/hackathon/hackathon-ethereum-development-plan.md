@@ -1,8 +1,9 @@
 # Ethereum hackathon development plan
 
-Status: Phase 1 schema freeze recorded 2026-09-23; later phases still pending
-implementation.
-Date: 2026-09-21 (updated 2026-09-23).
+Status: Phase 1 schema freeze recorded 2026-09-23. Phase 3 credential contract
+deployed to Sepolia on 2026-10-01. Phase 2 archival remains partial. Phases 4–7
+still pending.
+Date: 2026-09-21 (updated 2026-10-01).
 Specification: [Ethereum credentials and evidence](hackathon-ethereum-credentials.md).
 Frozen schema: [Knowledge-path snapshot schema](knowledge-path-snapshot-schema.md).
 
@@ -72,16 +73,48 @@ version and its assigned learner progress unchanged.
 
 ## 3. Implement the contract
 
-- New non-upgradeable ERC-721 + ERC-5192 contract using reviewed OpenZeppelin
-  components; logically separate transcript, achievement and certificate records.
-- Scoped issuer/admin permissions, immutable version registration, append-only
-  Bitcoin references, mint deduplication and declared credential hashes.
-- Revocation/replacement links and emergency issuance pause, with readable history.
-- Emit registration, issuance, evidence and status events for indexing.
-- Document NatSpec invariants, trust boundaries and each permission as code is added.
+**Deployed to Sepolia on 2026-10-01.** Unit tests passed locally on 2026-09-30.
 
-Done when tests cover unauthorized actions, all transfer paths, duplicate
-issuance, version immutability, scoped issuance, replacement, revocation and pause.
+`contracts/contracts/ACBCSophiaCredentialRegistry.sol` is a non-upgradeable ERC-721
+and ERC-5192 registry (OpenZeppelin 5.0.2). One contract keeps separate
+transcript, knowledge-path achievement-version, and credential records.
+`contracts/test/ACBCSophiaCredentialRegistry.js` covers unauthorized actions, every
+transfer and approval path, duplicate issuance, version immutability, scoped
+issuance, replacement, revocation, and pause. Deployed bytecode is about 23.6 KiB,
+under the 24 KiB limit, with little spare room.
+
+Sepolia deployment, recorded in `contracts/deployments/sepolia-credential-registry.json`:
+
+| | |
+| --- | --- |
+| Contract | `0xf13a2ece9747Dd286fE3e1d5C6179A875c843944` |
+| Admin | `0xA75dA0D7DdEa2B5b343bf1b83f9D4474C1c7595C` |
+| Transaction | `0x4ff58112d3152b3814f6b996e21ff6f079b9f24858c5ad81fcdee0848e41646f` |
+| Block | 11822909 |
+
+The admin address holds `DEFAULT_ADMIN_ROLE` only. Registrar, evidence, pauser, and issuer roles are not granted yet. The platform mint service is still pending.
+
+Permissions, recorded in the contract NatSpec:
+
+- `DEFAULT_ADMIN_ROLE` grants roles and may revoke any credential. It does not
+  register versions, append Bitcoin evidence, mint, or replace unless it also holds that role.
+- `REGISTRAR_ROLE` registers immutable transcripts and knowledge-path versions.
+- `EVIDENCE_ROLE` appends Bitcoin network and transaction strings. Earlier
+  assertions stay in place.
+- `PAUSER_ROLE` pauses new registrations, evidence, mints, and replacements.
+  Revocation and views stay available while paused.
+- `issuerRole(knowledgePathId)` mints, replaces, and revokes only that path.
+  Removing the role does not change tokens already issued.
+
+The contract stores declared SHA-256 digests and URIs. It does not fetch IPFS,
+recompute hashes, grade quizzes, or prove a Bitcoin transaction. The platform
+mint service remains a later phase.
+
+Registering a knowledge-path version on the contract is not part of taking a
+snapshot. Staff may store many snapshots while testing. A later action chooses
+one stored snapshot and asks the platform signer to call
+`registerAchievementVersion`. That call spends gas, so it stays separate from
+snapshot storage and from Bitcoin anchoring.
 
 ## 4. Integrate approvals and reliable minting
 

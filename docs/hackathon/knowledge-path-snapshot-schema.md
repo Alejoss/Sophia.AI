@@ -183,8 +183,11 @@ See [knowledge-path-ingest.md](../api/knowledge-path-ingest.md). The learner-fac
 ### Admin publish (persistence)
 
 Snapshots are **not** created when an author creates, edits, or toggles visibility
-on a knowledge path. A staff admin publishes from the dashboard when the path is
-ready:
+on a knowledge path. A staff admin stores one from the dashboard when the path is
+ready. **Tomar snapshot** writes Postgres only. It does not call
+`registerAchievementVersion` and does not spend Ethereum gas. Sending a stored
+snapshot to the credential contract is a separate staff action, taken only for
+the version that should be committed. Bitcoin anchoring is a third, separate action:
 
 - UI: `/dashboard/snapshots` → **Tomar snapshot** / **Preview** / **Ver** → **Descargar JCS + digest**
   / **Anclar en Bitcoin**
@@ -214,7 +217,7 @@ Postgres model `PublishedKnowledgePathSnapshot` stores:
 | `version` | int | Monotone per knowledge path |
 | `published_by` / `published_at` | admin audit | Who/when |
 
-Rows are immutable: updates raise; publish again to create `version + 1`.
+Rows are immutable: updates raise. Publishing again creates `version + 1` only when the curriculum digest changes. The comparison reuses the latest snapshot's `version` and `publishedAt`, because those fields are inside the hash and would otherwise change on every publish. Identical curriculum keeps the current version.
 
 Author testing: `GET /api/knowledge_paths/<id>/snapshot-preview/` (author/staff)
 and the **Snapshot** tab on the knowledge-path edit page show the live logical

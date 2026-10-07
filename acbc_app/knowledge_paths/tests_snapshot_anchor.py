@@ -59,7 +59,7 @@ class SnapshotAnchorServiceTests(TestCase):
             order=1,
             media_type='VIDEO',
         )
-        self.snapshot = publish_knowledge_path_snapshot(
+        self.snapshot, _created = publish_knowledge_path_snapshot(
             self.path, published_by=self.admin,
         )
 
@@ -120,7 +120,7 @@ class SnapshotAnchorAPITests(TestCase):
             order=1,
             media_type='TEXT',
         )
-        self.snapshot = publish_knowledge_path_snapshot(
+        self.snapshot, _created = publish_knowledge_path_snapshot(
             self.path, published_by=self.admin,
         )
         self.client = APIClient()

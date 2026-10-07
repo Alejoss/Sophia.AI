@@ -141,7 +141,45 @@ const certificatesApi = {
       console.error('DEBUG: Error response:', error.response?.data);
       throw error;
     }
-  }
+  },
+
+  getEthereumCredentialDashboard: async () => {
+    const response = await axiosInstance.get('/certificates/ethereum/');
+    return response.data;
+  },
+
+  registerEthereumCredentialVersion: async (certificateId) => {
+    const response = await axiosInstance.post(
+      `/certificates/ethereum/${certificateId}/register/`,
+    );
+    return response.data;
+  },
+
+  mintEthereumCredential: async (certificateId, recipient) => {
+    const response = await axiosInstance.post(
+      `/certificates/ethereum/${certificateId}/mint/`,
+      { recipient },
+    );
+    return response.data;
+  },
+
+  uploadEthereumRewardImage: async (certificateId, file) => {
+    const body = new FormData();
+    body.append('image', file);
+    const response = await axiosInstance.post(
+      `/certificates/ethereum/${certificateId}/reward-image/`,
+      body,
+    );
+    return response.data;
+  },
+
+  mintEthereumReward: async (certificateId, recipient) => {
+    const response = await axiosInstance.post(
+      `/certificates/ethereum/${certificateId}/reward/`,
+      { recipient },
+    );
+    return response.data;
+  },
 };
 
 export default certificatesApi;

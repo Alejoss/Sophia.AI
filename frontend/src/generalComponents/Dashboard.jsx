@@ -18,13 +18,18 @@ const showDashboardTabs = (pathname) =>
   || pathname.startsWith('/dashboard/consultas')
   || pathname.startsWith('/dashboard/libros-destacados')
   || pathname.startsWith('/dashboard/pagos-bch')
-  || pathname.startsWith('/dashboard/snapshots');
+  || pathname.startsWith('/dashboard/snapshots')
+  || pathname.startsWith('/dashboard/certificados')
+  || pathname.startsWith('/dashboard/credenciales');
 
 const dashboardTabValue = (pathname) => {
   if (pathname.startsWith('/dashboard/consultas')) return 'consultations';
   if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
   if (pathname.startsWith('/dashboard/pagos-bch')) return 'bch-payments';
   if (pathname.startsWith('/dashboard/snapshots')) return 'snapshots';
+  if (pathname.startsWith('/dashboard/certificados') || pathname.startsWith('/dashboard/credenciales')) {
+    return 'certificates';
+  }
   return 'home';
 };
 
@@ -62,6 +67,8 @@ const Dashboard = () => {
           </Typography>
           <Tabs
             value={tabValue}
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab
@@ -93,6 +100,12 @@ const Dashboard = () => {
               value="snapshots"
               component={RouterLink}
               to="/dashboard/snapshots"
+            />
+            <Tab
+              label="Certificados"
+              value="certificates"
+              component={RouterLink}
+              to="/dashboard/certificados"
             />
           </Tabs>
         </>

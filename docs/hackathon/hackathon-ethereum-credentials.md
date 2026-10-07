@@ -1,8 +1,10 @@
 # Sophia hackathon: Ethereum educational credentials and knowledge-path evidence
 
 Status: agreed product direction; Phase 1 knowledge-path schema frozen 2026-09-23;
-archival/contract implementation still pending.
-Date: 2026-09-21 (updated 2026-09-23).
+knowledge-path snapshots persist in Postgres. The credential contract is deployed
+on Sepolia at `0xf13a2ece9747Dd286fE3e1d5C6179A875c843944` (2026-10-01). Learner-version
+binding, IPFS packaging, and issuance integration are still pending.
+Date: 2026-09-21 (updated 2026-10-01).
 Companion: [Development plan](hackathon-ethereum-development-plan.md),
 [frozen knowledge-path snapshot schema](knowledge-path-snapshot-schema.md).
 
@@ -27,7 +29,7 @@ not a new token economy. Contract feature count is not a success metric.
 | Approval | `acbc_app/certificates/views.py` and CertificateRequest.approve | Consistent approved issuance across all entry points; retry-safe mint jobs |
 | Transcripts | `acbc_app/content/transcript_utils.py` and ContentTranscript | Archive exact normalized bytes, not a mutable latest-content URL |
 | Bitcoin | TranscriptAnchor snapshots text/hash and tracks broadcast/confirmation | Reuse matching evidence and expose network-specific verification |
-| EVM | `contracts/` contains legacy/experimental contracts | New focused credential/registry implementation and deployment |
+| EVM | `ACBCSophiaCredentialRegistry` on Sepolia: `0xf13a2ece9747Dd286fE3e1d5C6179A875c843944`. Admin is the deployer. Registrar, issuer, and platform minting are not wired yet | Grant roles and send approved snapshots and credentials through the platform signer |
 
 General older documentation mentions Polygon and Chainlink. The current
 transcript product is Bitcoin-only; this document proposes an additional
