@@ -1,4 +1,13 @@
 from django.urls import path
+from .views_ethereum import (
+    CredentialArtifactView,
+    EthereumCredentialDashboardView,
+    EthereumCredentialMintView,
+    EthereumCredentialRegisterView,
+    EthereumRewardImageView,
+    EthereumRewardMintView,
+    RewardMetadataView,
+)
 from .views import (
     CertificateRequestView,
     CertificateRequestListView,
@@ -15,6 +24,37 @@ from .views import (
 app_name = 'certificates'
 
 urlpatterns = [
+    path('ethereum/', EthereumCredentialDashboardView.as_view(), name='ethereum-credential-dashboard'),
+    path(
+        'ethereum/<int:certificate_pk>/register/',
+        EthereumCredentialRegisterView.as_view(),
+        name='ethereum-credential-register',
+    ),
+    path(
+        'ethereum/<int:certificate_pk>/mint/',
+        EthereumCredentialMintView.as_view(),
+        name='ethereum-credential-mint',
+    ),
+    path(
+        'ethereum/<int:certificate_pk>/reward/',
+        EthereumRewardMintView.as_view(),
+        name='ethereum-reward-mint',
+    ),
+    path(
+        'ethereum/<int:certificate_pk>/reward-image/',
+        EthereumRewardImageView.as_view(),
+        name='ethereum-reward-image',
+    ),
+    path(
+        'ethereum/reward/<uuid:certificate_id>/',
+        RewardMetadataView.as_view(),
+        name='ethereum-reward-metadata',
+    ),
+    path(
+        'ethereum/artifact/<uuid:certificate_id>/',
+        CredentialArtifactView.as_view(),
+        name='ethereum-credential-artifact',
+    ),
     path('', CertificateListView.as_view(), name='certificate-list'),
     path('request/<int:path_id>/', CertificateRequestView.as_view(), name='certificate-request'),
     path('requests/', CertificateRequestListView.as_view(), name='certificate-request-list'),

@@ -95,6 +95,7 @@ import ConsultationsDashboard from './topics/ConsultationsDashboard.jsx';
 import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import BchPaymentsDashboard from './payments/BchPaymentsDashboard.jsx';
 import KnowledgePathSnapshotsDashboard from './knowledgePaths/KnowledgePathSnapshotsDashboard.jsx';
+import EthereumCredentialsDashboard from './certificates/EthereumCredentialsDashboard.jsx';
 import MessageThread from './messages/MessageThread.jsx';
 import ThreadList from './messages/ThreadList.jsx';
 import MessagesLayout from './messages/MessagesLayout';
@@ -276,6 +277,8 @@ const AppContent = () => {
               <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="pagos-bch" element={<BchPaymentsDashboard />} />
               <Route path="snapshots" element={<KnowledgePathSnapshotsDashboard />} />
+              <Route path="certificados" element={<EthereumCredentialsDashboard />} />
+              <Route path="credenciales" element={<Navigate to="/dashboard/certificados" replace />} />
               <Route path="book-clubs/nuevo" element={<BookClubAdminGeneral mode="create" />} />
               <Route path="book-clubs/:slug" element={<BookClubAdminLayout />}>
                 <Route index element={<Navigate to="general" replace />} />

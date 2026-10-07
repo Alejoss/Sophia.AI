@@ -83,7 +83,9 @@ const KnowledgePathSnapshotsDashboard = () => {
       setSuccess(null);
       const created = await knowledgePathsApi.publishPathSnapshot(pathId);
       setSuccess(
-        `Snapshot v${created.version} creado para “${created.knowledgePathTitle}”. Digest: ${created.digest.slice(0, 16)}…`,
+        created.created
+          ? `Snapshot v${created.version} creado para “${created.knowledgePathTitle}”. Digest: ${created.digest.slice(0, 16)}…`
+          : `Sin cambios en “${created.knowledgePathTitle}”. Se mantiene el snapshot v${created.version}.`,
       );
       await load();
     } catch (err) {
@@ -157,8 +159,10 @@ const KnowledgePathSnapshotsDashboard = () => {
         Snapshots de knowledge paths
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Solo administradores. Primero “Tomar snapshot” (Postgres), luego
-        “Anclar en Bitcoin” para escribir el digest en OP_RETURN (prefijo ACBC2).
+        Solo administradores. “Tomar snapshot” guarda la versión en la base de
+        datos y no envía nada a Ethereum. Registrar esa versión y enviar el
+        certificado se hace en Certificados, porque gasta gas. “Anclar en Bitcoin”
+        también es un paso distinto: escribe el digest en OP_RETURN (prefijo ACBC2).
       </Typography>
 
       {error && (

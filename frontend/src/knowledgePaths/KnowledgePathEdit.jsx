@@ -340,7 +340,9 @@ const KnowledgePathEdit = () => {
       const created = await knowledgePathsApi.publishPathSnapshot(pathId);
       setPublishedSnapshot(created);
       setSnapshotPublishSuccess(
-        `Snapshot v${created.version} guardado. Digest: ${String(created.digest || "").slice(0, 16)}…`,
+        created.created
+          ? `Snapshot v${created.version} guardado. Digest: ${String(created.digest || "").slice(0, 16)}…`
+          : `Sin cambios. Se mantiene el snapshot v${created.version}.`,
       );
       await loadSnapshotPreview();
     } catch (err) {
@@ -1155,8 +1157,8 @@ const KnowledgePathEdit = () => {
                   Snapshot del knowledge path
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  JSON lógico que se hashea con RFC 8785 JCS → SHA-256. Esto es una vista previa
-                  desde el camino editable (aún no es una versión publicada en IPFS).
+                  JSON lógico que se hashea con RFC 8785 JCS → SHA-256. “Tomar snapshot”
+                  guarda esa versión en la base de datos. No la envía al contrato de Ethereum.
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

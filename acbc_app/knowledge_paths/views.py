@@ -1226,7 +1226,7 @@ class KnowledgePathSnapshotListCreateView(APIView):
     def post(self, request, pk):
         knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
         try:
-            snapshot = publish_knowledge_path_snapshot(
+            snapshot, created = publish_knowledge_path_snapshot(
                 knowledge_path,
                 published_by=request.user,
             )
@@ -1235,9 +1235,11 @@ class KnowledgePathSnapshotListCreateView(APIView):
                 {"error": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        payload = serialize_published_snapshot(snapshot)
+        payload["created"] = created
         return Response(
-            serialize_published_snapshot(snapshot),
-            status=status.HTTP_201_CREATED,
+            payload,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 

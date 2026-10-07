@@ -77,6 +77,65 @@ class Certificate(models.Model):
         blank=True,
         help_text="Blockchain transaction hash"
     )
+    ethereum_recipient = models.CharField(
+        max_length=42,
+        blank=True,
+        default="",
+        help_text="Checksummed wallet that received or will receive the soulbound credential",
+    )
+    ethereum_token_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        help_text="ERC-721 token id on the credential registry, once minted",
+    )
+    credential_digest = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="SHA-256 hex of the frozen credential canonical JSON",
+    )
+    credential_uri = models.TextField(
+        blank=True,
+        default="",
+        help_text="URI stored on the credential registry for the frozen artifact",
+    )
+    credential_canonical = models.TextField(
+        blank=True,
+        default="",
+        help_text="Exact JCS JSON committed by credential_digest",
+    )
+    ethereum_status = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text="minted or failed. The chain read is the source of truth after a receipt.",
+    )
+    ethereum_error = models.TextField(blank=True, default="")
+    reward_recipient = models.CharField(
+        max_length=42,
+        blank=True,
+        default="",
+        help_text="Wallet that received the transferable completion reward",
+    )
+    reward_token_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        help_text="ERC-721 token id on the completion reward contract",
+    )
+    reward_tx_hash = models.CharField(max_length=80, blank=True, default="")
+    reward_status = models.CharField(max_length=16, blank=True, default="")
+    reward_error = models.TextField(blank=True, default="")
+    reward_image = models.FileField(
+        upload_to="nft_rewards/",
+        null=True,
+        blank=True,
+        help_text="Backup of the completion-reward image. The metadata image URI is reward_image_uri when set.",
+    )
+    reward_image_uri = models.TextField(
+        blank=True,
+        default="",
+        help_text="Permanent image URI, usually ipfs://. Preferred over the uploaded file in token metadata.",
+    )
     certificate_file = models.FileField(
         upload_to='certificates/',
         null=True,

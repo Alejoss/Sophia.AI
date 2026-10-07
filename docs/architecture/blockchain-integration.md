@@ -37,16 +37,18 @@ the platform wallet and ops runbook are ready.
 
 ## Secondary / legacy: EVM contracts (Polygon, Hardhat)
 
-Smart contracts under `contracts/contracts/` support platform parameters, token,
-and experimental/document-hash work — **not** the current transcript
-certification path.
+Smart contracts under `contracts/contracts/` cover the educational certificate,
+platform parameters, and experimental document-hash work. They are not the
+current transcript certification path.
 
 ### Contracts (examples)
 
-- **SophiaAIParams**: Platform parameters, costs, earnings
+- **ACBCSophiaCredentialRegistry**: soulbound educational certificate (ERC-721), symbol `ACBC`. Sepolia: `0xf13a2ece9747Dd286fE3e1d5C6179A875c843944`
+- **ACBCSophiaAIParams**: Platform parameters, costs, earnings
 - **HashStore**: Document hashes on-chain (legacy / experimental)
-- **ACBCToken**: Token contract
-- **SophiaAIParamsConsumer**: Chainlink Functions consumer
+- **ACBCSophiaAIParamsConsumer**: Chainlink Functions consumer
+
+The old fungible `ACBCToken` ERC-20 has been removed. Platform credits in the Django app are separate from this certificate.
 
 Draft / broken Chainlink samples live under `contracts/drafts/` and should not
 be compiled as part of the product path.

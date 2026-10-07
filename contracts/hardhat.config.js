@@ -1,11 +1,34 @@
+const fs = require("fs");
+const path = require("path");
+
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ignition-ethers");
 require("hardhat-contract-sizer");
 require("./tasks/FunctionTasks");
 
+const envPath = path.join(__dirname, ".env");
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+    const match = line.match(/^([^#=\s]+)=(.*)$/);
+    if (match && process.env[match[1]] === undefined) {
+      process.env[match[1]] = match[2];
+    }
+  }
+}
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.24",
+  solidity: {
+    compilers: [{ version: "0.8.24" }],
+    overrides: {
+      "contracts/ACBCSophiaCompletionReward.sol": {
+        version: "0.8.24",
+        settings: {
+          optimizer: { enabled: true, runs: 200 },
+        },
+      },
+    },
+  },
   networks: {
     hardhat: {
       chainId: 31337,
@@ -30,6 +53,11 @@ module.exports = {
         mnemonic: process.env.MNEMONIC || 'invalid-mnemonic-please-set-one',
         count: 100
       }
+    },
+    sepolia: {
+      chainId: 11155111,
+      url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: process.env.SEPOLIA_PRIVATE_KEY ? [process.env.SEPOLIA_PRIVATE_KEY] : [],
     }
   }
 };

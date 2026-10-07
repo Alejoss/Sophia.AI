@@ -12,8 +12,10 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     # No command - entrypoint.sh elige según ENVIRONMENT del .env
+    # contracts/.env holds the Sepolia signer. It is gitignored.
     env_file:
       - ./acbc_app/.env
+      - ./contracts/.env
     # DB credentials live in acbc_app/.env (env_file). Do not use ${DB_PASSWORD} here:
     # Docker Compose expands $ in substituted values and breaks passwords like "x$vL8y".
     environment:

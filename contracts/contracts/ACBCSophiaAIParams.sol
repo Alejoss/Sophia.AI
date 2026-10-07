@@ -5,10 +5,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 /**
- * Manages all the underlying parameters of our Sophia AI
+ * Manages all the underlying parameters of our ACBCSophia AI
  * ecosystem. This includes ownership, costs, and withdrawal.
  */
-contract SophiaAIParams is Ownable {
+contract ACBCSophiaAIParams is Ownable {
     /**
      * The scale factor between polygon price feeds and USD
      * cents. The scale of 24 is used because the conversion
@@ -88,7 +88,7 @@ contract SophiaAIParams is Ownable {
      * allowed to the owner of the contract.
      */
     function setEarningsReceiver(address _earningsReceiver) public onlyOwner {
-        require(_earningsReceiver != address(0), "SophiaAIParams: Invalid receiver");
+        require(_earningsReceiver != address(0), "ACBCSophiaAIParams: Invalid receiver");
         earningsReceiver = _earningsReceiver;
     }
 
