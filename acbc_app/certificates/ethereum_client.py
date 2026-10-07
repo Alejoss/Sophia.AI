@@ -10,10 +10,17 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# One signer is shared by every request in this process. The public Sepolia
+# RPC can report a transaction count from before the receipt we just waited
+# for, so the next transaction must not reuse that nonce.
+_nonce_lock = threading.Lock()
+_nonce_floors: dict[str, int] = {}
 
 DEFAULT_REGISTRY_ADDRESS = "0xf13a2ece9747Dd286fE3e1d5C6179A875c843944"
 DEFAULT_REWARD_ADDRESS = "0xf3e5c1D577479F26B78cebA09C5fABbd06517C93"
@@ -596,37 +603,90 @@ class EthereumRegistryClient:
 
     def _broadcast(self, fn) -> str:
         w3 = self._w3
-        try:
-            tx = fn.build_transaction({
-                "from": self._account.address,
-                "nonce": w3.eth.get_transaction_count(self._account.address),
-                "chainId": self.chain_id,
-            })
-            signed = self._account.sign_transaction(tx)
-            raw = getattr(signed, "raw_transaction", None)
-            if raw is None:
-                raw = signed.rawTransaction
-            tx_hash = w3.eth.send_raw_transaction(raw)
-            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
-        except EthereumRegistryError:
-            raise
-        except Exception as exc:
-            message = _revert_message(exc)
-            logger.warning(
-                "Sepolia rechazó %s: %s",
-                getattr(fn, "fn_name", "la operación"),
-                message,
-            )
-            raise EthereumRegistryError(message) from exc
-        if getattr(receipt, "status", 1) != 1:
-            message = f"La transacción falló: {_hex_bytes(tx_hash)}"
-            logger.warning(
-                "Sepolia rechazó %s: %s",
-                getattr(fn, "fn_name", "la operación"),
-                message,
-            )
-            raise EthereumRegistryError(message)
-        return _hex_bytes(tx_hash)
+        last_error = None
+        for attempt in range(4):
+            nonce = self._peek_nonce()
+            try:
+                tx = fn.build_transaction({
+                    "from": self._account.address,
+                    "nonce": nonce,
+                    "chainId": self.chain_id,
+                })
+                signed = self._account.sign_transaction(tx)
+                raw = getattr(signed, "raw_transaction", None)
+                if raw is None:
+                    raw = signed.rawTransaction
+                tx_hash = w3.eth.send_raw_transaction(raw)
+            except EthereumRegistryError:
+                raise
+            except Exception as exc:
+                raw = str(exc)
+                message = _revert_message(exc)
+                reported = _reported_next_nonce(raw)
+                if reported is not None and attempt < 3:
+                    self._note_nonce_used(reported - 1)
+                    logger.warning(
+                        "Sepolia ya usó el nonce %s; el siguiente es %s",
+                        nonce,
+                        reported,
+                    )
+                    time.sleep(2)
+                    last_error = EthereumRegistryError(message)
+                    continue
+                if _nonce_is_stale(raw) and attempt < 3:
+                    self._forget_nonce()
+                    logger.warning(
+                        "Sepolia ya usó el nonce %s; reintento %s",
+                        nonce,
+                        attempt + 2,
+                    )
+                    time.sleep(2)
+                    last_error = EthereumRegistryError(message)
+                    continue
+                logger.warning(
+                    "Sepolia rechazó %s: %s",
+                    getattr(fn, "fn_name", "la operación"),
+                    message,
+                )
+                raise EthereumRegistryError(message) from exc
+            self._note_nonce_used(nonce)
+            try:
+                receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+            except Exception as exc:
+                message = _revert_message(exc)
+                logger.warning(
+                    "Sepolia rechazó %s: %s",
+                    getattr(fn, "fn_name", "la operación"),
+                    message,
+                )
+                raise EthereumRegistryError(message) from exc
+            if getattr(receipt, "status", 1) != 1:
+                message = f"La transacción falló: {_hex_bytes(tx_hash)}"
+                logger.warning(
+                    "Sepolia rechazó %s: %s",
+                    getattr(fn, "fn_name", "la operación"),
+                    message,
+                )
+                raise EthereumRegistryError(message)
+            return _hex_bytes(tx_hash)
+        raise last_error
+
+    def _peek_nonce(self) -> int:
+        chain = self._w3.eth.get_transaction_count(self._account.address, "pending")
+        with _nonce_lock:
+            floor = _nonce_floors.get(self._account.address.lower())
+        if floor is None:
+            return chain
+        return max(chain, floor)
+
+    def _note_nonce_used(self, nonce: int) -> None:
+        with _nonce_lock:
+            key = self._account.address.lower()
+            _nonce_floors[key] = max(_nonce_floors.get(key, 0), nonce + 1)
+
+    def _forget_nonce(self) -> None:
+        with _nonce_lock:
+            _nonce_floors.pop(self._account.address.lower(), None)
 
 
 _HEX_BLOB = re.compile(r"0x[0-9a-fA-F]{8,}")
@@ -660,9 +720,26 @@ def _revert_message(exc: Exception) -> str:
         if decoded:
             return decoded
     text = str(exc).strip() or exc.__class__.__name__
+    if _nonce_is_stale(text):
+        return (
+            "La red ya usó ese número de transacción. "
+            "Vuelve a pulsar el botón para enviarla con el número actual."
+        )
     if len(text) > 500:
         text = text[:500]
     return f"El contrato rechazó la operación: {text}"
+
+
+def _nonce_is_stale(message: str) -> bool:
+    text = message.lower()
+    return "nonce too low" in text or "nonce has already been used" in text
+
+
+def _reported_next_nonce(message: str) -> int | None:
+    match = re.search(r"next nonce (\d+)", message, re.IGNORECASE)
+    if match is None:
+        return None
+    return int(match.group(1))
 
 
 def _decode_revert(payload: str) -> str:

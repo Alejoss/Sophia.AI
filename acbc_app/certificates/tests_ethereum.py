@@ -7,7 +7,12 @@ from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
-from certificates.ethereum_client import EthereumRegistryError, _revert_message
+from certificates.ethereum_client import (
+    EthereumRegistryClient,
+    EthereumRegistryError,
+    _nonce_floors,
+    _revert_message,
+)
 from certificates.models import Certificate
 from certificates.services.ethereum_credentials import credential_label
 from content.models import Content, ContentProfile, ContentTranscript
@@ -376,3 +381,28 @@ class EthereumRevertMessageTests(SimpleTestCase):
         message = _revert_message(Exception(raw))
         self.assertIn("espera la versión 1", message)
         self.assertIn("recibió la 3", message)
+
+    def test_translates_a_stale_nonce(self):
+        message = _revert_message(Exception(
+            "{'code': -32000, 'message': 'nonce too low: next nonce 10, tx nonce 9'}"
+        ))
+        self.assertIn("número de transacción", message)
+        self.assertNotIn("nonce too low", message)
+
+
+class NonceAllocationTests(SimpleTestCase):
+    def test_next_transaction_skips_a_nonce_the_rpc_has_not_counted(self):
+        signer = "0xA75dA0D7DdEa2B5b343bf1b83f9D4474C1c7595C"
+        _nonce_floors.pop(signer.lower(), None)
+        client = EthereumRegistryClient("http://rpc.example", "0x" + "11" * 20, 11155111)
+        client._account = type("Account", (), {"address": signer})()
+        client._w3 = type("Web3", (), {
+            "eth": type("Eth", (), {
+                "get_transaction_count": staticmethod(lambda address, block="latest": 9),
+            })(),
+        })()
+
+        self.assertEqual(client._peek_nonce(), 9)
+        client._note_nonce_used(9)
+        self.assertEqual(client._peek_nonce(), 10)
+        _nonce_floors.pop(signer.lower(), None)
