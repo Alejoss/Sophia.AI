@@ -33,6 +33,20 @@ describe('FavoriteCryptos add modal', () => {
     return screen.findByRole('dialog');
   };
 
+  it('shows the Bitcoin Cash and Monero payment guidance alert', async () => {
+    renderWithProviders(<FavoriteCryptos isOwnProfile userId={1} />);
+
+    expect(
+      await screen.findByText(/aceptamos bitcoin cash de forma preferente/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/también aceptamos monero/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/mensaje privado desde la plataforma/i),
+    ).toBeInTheDocument();
+  });
+
   it('shows a validation error when no crypto is selected and does not call the API', async () => {
     const user = userEvent.setup();
     renderWithProviders(<FavoriteCryptos isOwnProfile userId={1} />);
